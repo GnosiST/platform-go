@@ -44,6 +44,8 @@ Default admin address:
 http://127.0.0.1:9202
 ```
 
+The admin dev server proxies `/api` to `http://127.0.0.1:9200`. Set `VITE_PLATFORM_API_BASE` when a different API base is needed.
+
 ## Verification
 
 ```bash

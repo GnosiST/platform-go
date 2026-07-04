@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_PLATFORM_API_BASE ?? "http://127.0.0.1:9200/api";
+const API_BASE = import.meta.env.VITE_PLATFORM_API_BASE ?? "/api";
 
 export type PlatformResponse<T> = {
   data?: T;

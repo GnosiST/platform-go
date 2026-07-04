@@ -6,5 +6,8 @@ export default defineConfig({
   server: {
     host: "127.0.0.1",
     port: 9202,
+    proxy: {
+      "/api": "http://127.0.0.1:9200",
+    },
   },
 });
