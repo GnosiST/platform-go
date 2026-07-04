@@ -402,6 +402,221 @@ Errors include:
 
 Sensitive information must not leak through query strings, logs or error messages.
 
+## Development Standards
+
+The platform must define one code-writing and calling style before implementation starts. The goal is to make every new capability look and behave like it belongs to the same system.
+
+### Package Layout
+
+Backend packages use a capability-first layout:
+
+```text
+internal/platform/kernel
+internal/platform/capability
+internal/platform/core/tenant
+internal/platform/core/identity
+internal/platform/core/session
+internal/platform/core/rbac
+internal/platform/core/audit
+internal/platform/core/menu
+internal/platform/core/parameter
+internal/platform/capabilities/wechatlogin
+internal/platform/capabilities/filestorage
+internal/platform/capabilities/branding
+internal/platform/capabilities/demoseed
+internal/apps/zshenmez
+```
+
+Frontend packages use the same split:
+
+```text
+admin/src/platform/shell
+admin/src/platform/api
+admin/src/platform/resources
+admin/src/platform/capabilities
+admin/src/capabilities/fileStorage
+admin/src/capabilities/branding
+admin/src/apps/zshenmez
+```
+
+Rules:
+
+- core packages must not import application packages;
+- optional capability packages must not import application packages;
+- application packages may import platform core and optional capabilities through public interfaces only;
+- cross-capability imports must follow declared manifest dependencies;
+- package names are lowercase and stable; capability IDs are kebab-case in manifests and config.
+
+### Unified Internal Call Style
+
+Every permissioned service method uses a request/response style:
+
+```go
+type Service interface {
+    DoThing(exec platform.ExecutionContext, req DoThingRequest) (DoThingResult, error)
+}
+```
+
+`ExecutionContext` carries:
+
+```go
+type ExecutionContext struct {
+    Context          context.Context
+    Actor            Actor
+    TenantScope      TenantScope
+    PermissionIntent PermissionIntent
+    UoW              UnitOfWork
+}
+```
+
+Rules:
+
+- no service method accepts loose `userID`, `tenantID` and `db` parameters when the operation is permissioned;
+- request structs contain business input only;
+- result structs contain caller-facing output only;
+- services return typed platform errors, not raw HTTP responses;
+- services do not read HTTP headers, route params or frontend-specific field names;
+- handlers adapt HTTP to service calls, then adapt service results to HTTP responses.
+
+### Unified HTTP Handler Style
+
+HTTP handlers are adapters. They should follow this shape:
+
+```text
+bind request
+build ExecutionContext
+call capability service
+write platform response
+```
+
+Rules:
+
+- handlers must not contain business state transitions;
+- handlers must not call GORM directly;
+- handlers must not assemble audit rows manually when the capability service owns the action;
+- admin handlers must enforce permission intent through middleware or service-level checks;
+- collection queries must use request bodies for filters and must reject sensitive filter fields.
+
+### Unified Transaction Style
+
+Write paths use Unit of Work:
+
+```go
+result, err := platform.WithUnitOfWork(exec, func(txExec platform.ExecutionContext) (Result, error) {
+    return service.DoThing(txExec, request)
+})
+```
+
+Rules:
+
+- cross-capability writes must share the same Unit of Work;
+- services must not create hidden nested transactions unless explicitly documented;
+- audit, session and notification writes that belong to the same user action should be in the same Unit of Work when consistency matters;
+- reads may run without Unit of Work unless they must participate in a larger write flow.
+
+### Unified Error Style
+
+Capability services return platform errors:
+
+```text
+code
+message
+safe detail
+field errors
+cause
+```
+
+Rules:
+
+- user-facing messages are safe and localized at the adapter edge when needed;
+- causes are logged but not exposed to clients;
+- permission errors, validation errors, not-found errors and conflict errors use stable error codes;
+- HTTP adapters map platform errors to status codes consistently.
+
+### Unified Audit Style
+
+Write actions declare audit metadata in the capability manifest and record through the audit capability.
+
+Rules:
+
+- audit action names use `capability.resource.action`, for example `identity.user.create` or `zshenmez.task.status.update`;
+- services record audit with actor, tenant, target type, target ID and note;
+- handlers must not invent audit action names;
+- seed and system jobs use a system actor.
+
+### Unified Admin Resource Style
+
+Admin resources are registered through `AdminResourceDefinition`.
+
+Rules:
+
+- no resource-specific `resource === "name"` branching in the core resource engine;
+- columns, filters, toolbar actions, row actions, forms, drawers, modals and detail panels live in the capability or app package that owns the resource;
+- standard list resources use the shared engine;
+- complex screens register `customPage`;
+- resources declare permission, route, menu and API resource metadata through the capability manifest;
+- disabled capabilities must not register admin resources or menus.
+
+### Unified Frontend API Style
+
+Frontend calls use typed capability clients:
+
+```text
+platformApi.admin.request(...)
+platformApi.identity.users.query(...)
+platformApi.files.upload(...)
+platformApi.zshenmez.tasks.updateStatus(...)
+```
+
+Rules:
+
+- UI code must not construct absolute backend URLs;
+- admin requests must stay on relative admin or capability paths accepted by the request boundary;
+- UI code must not set `Authorization` manually;
+- query filters must pass through the shared query safety layer;
+- capability clients own endpoint paths and request/response types.
+
+### Unified Config Style
+
+Configuration is capability-scoped:
+
+```text
+PLATFORM_CAPABILITIES=wechat-login,file-storage,branding,zshenmez-business
+PLATFORM_BRANDING_PRODUCT_NAME=...
+PLATFORM_FILE_STORAGE_DRIVER=...
+PLATFORM_WECHAT_MINIAPP_APP_ID=...
+```
+
+Rules:
+
+- capability config keys are prefixed by the capability domain;
+- secrets are never stored in frontend code or seed files;
+- config validation runs during `Configure`;
+- invalid enabled capability config is a startup failure.
+
+### Unified Codegen Style
+
+The codegen capability is preview-first in v1.
+
+Rules:
+
+- manifests generate contracts, previews and scaffold drafts;
+- generated previews are stable and reviewable;
+- generation does not overwrite Go or React source by default;
+- any future source-writing generator must have an explicit dry-run, diff review and test gate;
+- hand-written complex actions remain first-class and must not be forced into generic CRUD generation.
+
+### Prohibited Patterns
+
+- importing an application package from platform core;
+- directly editing core route registration for a business capability;
+- directly editing core admin engine for a business resource;
+- direct GORM access from HTTP handlers;
+- bypassing `ExecutionContext` for permissioned operations;
+- writing audit logs with ad hoc action names;
+- adding query-string filters for sensitive fields;
+- making capability disable destructive by default.
+
 ## Testing Strategy
 
 The architecture requires tests at four levels:
@@ -505,4 +720,3 @@ The parity target is functional equivalence, not identical source structure.
 - Replace the giant admin resource page with an admin resource engine.
 - Treat `zshenmez-business` as the first parity proof.
 - Keep code generation as validation and scaffold preview in v1.
-
