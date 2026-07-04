@@ -1,0 +1,16 @@
+# dependencies
+node_modules/
+
+# frontend build output
+dist/
+admin/dist/
+
+# local environment
+.env
+.env.*
+
+# OS/editor
+.DS_Store
+
+# temporary binaries
+/tmp/
