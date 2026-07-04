@@ -29,6 +29,10 @@ Useful endpoints:
 ```text
 GET /api/health
 GET /api/capabilities
+GET /api/admin/resources/:resource
+POST /api/admin/resources/:resource
+PUT /api/admin/resources/:resource/:id
+DELETE /api/admin/resources/:resource/:id
 ```
 
 ## Admin
@@ -45,6 +49,8 @@ http://127.0.0.1:9202
 ```
 
 The admin dev server proxies `/api` to `http://127.0.0.1:9200`. Set `VITE_PLATFORM_API_BASE` when a different API base is needed.
+
+System resource pages use the generic admin resource contract above. The current slice uses an in-memory store so the CRUD flow is suitable for framework validation and UI development, not durable production persistence yet.
 
 ## Verification
 

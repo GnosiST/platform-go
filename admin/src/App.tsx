@@ -7,6 +7,7 @@ import { CapabilityConsole } from "./platform/capabilities/CapabilityConsole";
 import { enrichCapabilities, optionalCapabilities } from "./platform/capabilities/metadata";
 import { dictionaries, type Language } from "./platform/i18n";
 import { coreResources } from "./platform/resources/registry";
+import { GenericResourceConsole } from "./platform/resources/GenericResourceConsole";
 import { AdminShell } from "./platform/shell/AdminShell";
 import { themeTokens, type AdminLayoutMode, type ThemeName } from "./platform/theme";
 
@@ -22,6 +23,7 @@ export default function App() {
   const dictionary = dictionaries[language];
   const tokens = themeTokens[themeName];
   const capabilities = useMemo(() => enrichCapabilities(capabilityItems), [capabilityItems]);
+  const activeResource = coreResources.find((resource) => resource.route === activeRoute);
 
   useEffect(() => {
     listCapabilities()
@@ -76,6 +78,8 @@ export default function App() {
             loading={loading}
             error={error}
           />
+        ) : activeResource ? (
+          <GenericResourceConsole resource={activeResource} language={language} dictionary={dictionary} />
         ) : (
           <EmptyResource route={activeRoute} language={language} />
         )}
