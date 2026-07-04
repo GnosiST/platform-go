@@ -1,0 +1,194 @@
+import type { CapabilityItem } from "../api/client";
+import type { Language } from "../i18n";
+
+export type CapabilityKind = "core" | "plugin" | "optional" | "disabled";
+export type CapabilityHealth = "healthy" | "warning" | "error";
+
+type Localized = Record<Language, string>;
+
+export type CapabilityView = CapabilityItem & {
+  label: Localized;
+  description: Localized;
+  domain: Localized;
+  group: "identity" | "authorization" | "system" | "observability" | "business";
+  kind: CapabilityKind;
+  health: CapabilityHealth;
+  owner: string;
+  dependencies: string[];
+  apis: Array<{ method: string; path: string; summary: Localized }>;
+};
+
+const capabilityMetadata: Record<string, Omit<CapabilityView, keyof CapabilityItem>> = {
+  tenant: {
+    label: { zh: "租户", en: "Tenant" },
+    description: { zh: "多租户隔离、租户生命周期与平台空间管理。", en: "Tenant isolation, lifecycle, and platform space management." },
+    domain: { zh: "身份与访问", en: "Identity & Access" },
+    group: "identity",
+    kind: "core",
+    health: "healthy",
+    owner: "Platform Team",
+    dependencies: [],
+    apis: [
+      { method: "GET", path: "/api/tenants", summary: { zh: "租户列表", en: "List tenants" } },
+      { method: "POST", path: "/api/tenants", summary: { zh: "创建租户", en: "Create tenant" } },
+    ],
+  },
+  identity: {
+    label: { zh: "身份中心", en: "Identity Center" },
+    description: { zh: "用户、组织、账号身份与统一认证能力。", en: "Users, organizations, account identities, and unified authentication." },
+    domain: { zh: "身份与访问", en: "Identity & Access" },
+    group: "identity",
+    kind: "core",
+    health: "healthy",
+    owner: "Platform Team",
+    dependencies: ["tenant"],
+    apis: [
+      { method: "GET", path: "/api/users", summary: { zh: "用户列表", en: "List users" } },
+      { method: "POST", path: "/api/auth/login", summary: { zh: "登录", en: "Login" } },
+    ],
+  },
+  session: {
+    label: { zh: "会话", en: "Session" },
+    description: { zh: "登录会话、令牌生命周期和单点登录支撑。", en: "Login sessions, token lifecycle, and single sign-on support." },
+    domain: { zh: "身份与访问", en: "Identity & Access" },
+    group: "identity",
+    kind: "core",
+    health: "healthy",
+    owner: "Platform Team",
+    dependencies: ["identity"],
+    apis: [{ method: "DELETE", path: "/api/sessions/{id}", summary: { zh: "撤销会话", en: "Revoke session" } }],
+  },
+  rbac: {
+    label: { zh: "RBAC", en: "RBAC" },
+    description: { zh: "基于角色的访问控制、权限码与策略刷新。", en: "Role-based access control, permission codes, and policy refresh." },
+    domain: { zh: "授权管理", en: "Authorization" },
+    group: "authorization",
+    kind: "core",
+    health: "healthy",
+    owner: "Platform Team",
+    dependencies: ["tenant", "identity"],
+    apis: [
+      { method: "GET", path: "/api/rbac/roles", summary: { zh: "角色列表", en: "List roles" } },
+      { method: "PUT", path: "/api/rbac/policies", summary: { zh: "更新策略", en: "Update policies" } },
+    ],
+  },
+  menu: {
+    label: { zh: "菜单", en: "Menu" },
+    description: { zh: "后台菜单、路由入口与导航资源注册。", en: "Admin menus, route entries, and navigation resource registration." },
+    domain: { zh: "系统管理", en: "System Management" },
+    group: "system",
+    kind: "core",
+    health: "healthy",
+    owner: "Platform Team",
+    dependencies: ["rbac"],
+    apis: [{ method: "GET", path: "/api/menus", summary: { zh: "菜单树", en: "Menu tree" } }],
+  },
+  "api-resource": {
+    label: { zh: "API 资源", en: "API Resource" },
+    description: { zh: "接口资源注册、权限映射与调用边界。", en: "API registration, permission mapping, and invocation boundaries." },
+    domain: { zh: "系统管理", en: "System Management" },
+    group: "system",
+    kind: "core",
+    health: "healthy",
+    owner: "Platform Team",
+    dependencies: ["rbac"],
+    apis: [{ method: "GET", path: "/api/resources", summary: { zh: "接口资源", en: "API resources" } }],
+  },
+  audit: {
+    label: { zh: "审计", en: "Audit" },
+    description: { zh: "操作审计、日志留痕和安全追踪。", en: "Operation audit, activity trails, and security tracing." },
+    domain: { zh: "可观测性", en: "Observability" },
+    group: "observability",
+    kind: "core",
+    health: "warning",
+    owner: "Platform Team",
+    dependencies: ["tenant", "identity"],
+    apis: [{ method: "GET", path: "/api/audit/events", summary: { zh: "审计事件", en: "Audit events" } }],
+  },
+  dictionary: {
+    label: { zh: "字典", en: "Dictionary" },
+    description: { zh: "基础数据字典、枚举项和展示文案。", en: "Base dictionaries, enums, and display labels." },
+    domain: { zh: "系统管理", en: "System Management" },
+    group: "system",
+    kind: "core",
+    health: "healthy",
+    owner: "Platform Team",
+    dependencies: ["tenant"],
+    apis: [{ method: "GET", path: "/api/dictionaries", summary: { zh: "字典列表", en: "List dictionaries" } }],
+  },
+  parameter: {
+    label: { zh: "参数", en: "Parameter" },
+    description: { zh: "系统参数、敏感配置和运行开关。", en: "System parameters, sensitive config, and runtime switches." },
+    domain: { zh: "系统管理", en: "System Management" },
+    group: "system",
+    kind: "core",
+    health: "healthy",
+    owner: "Platform Team",
+    dependencies: ["tenant", "audit"],
+    apis: [{ method: "GET", path: "/api/parameters", summary: { zh: "参数列表", en: "List parameters" } }],
+  },
+  "admin-shell": {
+    label: { zh: "管理后台 Shell", en: "Admin Shell" },
+    description: { zh: "后台框架、主题、国际化、导航和资源承载。", en: "Admin frame, themes, i18n, navigation, and resource hosting." },
+    domain: { zh: "系统管理", en: "System Management" },
+    group: "system",
+    kind: "core",
+    health: "healthy",
+    owner: "Platform Team",
+    dependencies: ["identity", "session", "rbac", "menu"],
+    apis: [{ method: "GET", path: "/api/capabilities", summary: { zh: "能力清单", en: "Capability list" } }],
+  },
+  "system-admin": {
+    label: { zh: "系统管理", en: "System Admin" },
+    description: { zh: "租户、用户、角色、菜单、字典、参数与审计资源。", en: "Tenant, user, role, menu, dictionary, parameter, and audit resources." },
+    domain: { zh: "系统管理", en: "System Management" },
+    group: "system",
+    kind: "core",
+    health: "healthy",
+    owner: "Platform Team",
+    dependencies: ["admin-shell", "api-resource", "dictionary", "parameter", "audit"],
+    apis: [{ method: "GET", path: "/api/system/resources", summary: { zh: "系统资源", en: "System resources" } }],
+  },
+};
+
+export const optionalCapabilities: CapabilityView[] = [
+  makeOptional("wechat-login", { zh: "微信登录", en: "WeChat Login" }, { zh: "小程序登录、OpenID 绑定与访客会话。", en: "Mini-program login, OpenID binding, and guest sessions." }),
+  makeOptional("file-storage", { zh: "文件存储", en: "File Storage" }, { zh: "本地与 S3 兼容上传、预览、下载和删除。", en: "Local and S3-compatible upload, preview, download, and delete." }),
+  makeOptional("branding", { zh: "品牌配置", en: "Branding" }, { zh: "产品名称、Logo、主题和登录页文案。", en: "Product name, logo, theme, and login copy." }),
+  makeOptional("demo-seed", { zh: "演示数据", en: "Demo Seed" }, { zh: "演示数据包、重置行为和 fixture 槽位。", en: "Demo packs, reset behavior, and fixture slots." }),
+  makeOptional("workflow", { zh: "工作流", en: "Workflow" }, { zh: "流程定义、任务调度和审批动作。", en: "Workflow definitions, job scheduling, and approval actions." }),
+];
+
+export function enrichCapabilities(items: CapabilityItem[]): CapabilityView[] {
+  return items.map((item) => {
+    const metadata = capabilityMetadata[item.id] ?? {
+      label: { zh: item.name || item.id, en: item.name || item.id },
+      description: { zh: "通过能力规范注册的平台能力。", en: "Platform capability registered through capability conventions." },
+      domain: { zh: "业务扩展", en: "Business Extension" },
+      group: "business" as const,
+      kind: "plugin" as const,
+      health: "healthy" as const,
+      owner: "Platform Team",
+      dependencies: [],
+      apis: [],
+    };
+    return { ...item, ...metadata };
+  });
+}
+
+function makeOptional(id: string, label: Localized, description: Localized): CapabilityView {
+  return {
+    id,
+    name: label.en,
+    version: "0.1.0",
+    label,
+    description,
+    domain: { zh: "插件能力", en: "Plugin Capability" },
+    group: "business",
+    kind: "optional",
+    health: "healthy",
+    owner: "Platform Team",
+    dependencies: ["identity", "audit"],
+    apis: [],
+  };
+}

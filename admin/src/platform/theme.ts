@@ -1,0 +1,64 @@
+export type ThemeName = "tech" | "white" | "black" | "warm";
+export type AdminLayoutMode = "side" | "top" | "mixed" | "split";
+
+export const themeNames: ThemeName[] = ["tech", "white", "black", "warm"];
+export const adminLayoutModes: AdminLayoutMode[] = ["side", "top", "mixed", "split"];
+
+export const themeTokens = {
+  tech: {
+    primary: "#1d63ed",
+    success: "#258f67",
+    warning: "#bd7d12",
+    error: "#c43b3b",
+    sidebar: "#091426",
+    page: "#f5f7fb",
+    surface: "#ffffff",
+    elevated: "#ffffff",
+    border: "#dbe2ee",
+    text: "#172033",
+    muted: "#657083",
+    sidebarText: "#d8e4f7",
+  },
+  white: {
+    primary: "#2459d6",
+    success: "#179170",
+    warning: "#b77912",
+    error: "#c93c3c",
+    sidebar: "#ffffff",
+    page: "#f7f8fb",
+    surface: "#ffffff",
+    elevated: "#ffffff",
+    border: "#e4e7ec",
+    text: "#171b26",
+    muted: "#667085",
+    sidebarText: "#283344",
+  },
+  black: {
+    primary: "#5b8cff",
+    success: "#46c38d",
+    warning: "#f1b84b",
+    error: "#ff6b6b",
+    sidebar: "#070b12",
+    page: "#0c1018",
+    surface: "#121824",
+    elevated: "#171f2d",
+    border: "#2b3446",
+    text: "#edf3ff",
+    muted: "#9aa7bd",
+    sidebarText: "#dbe7ff",
+  },
+  warm: {
+    primary: "#9f6a18",
+    success: "#4f8f5d",
+    warning: "#bd7a15",
+    error: "#c44b3f",
+    sidebar: "#2c2419",
+    page: "#fbf6eb",
+    surface: "#fffaf1",
+    elevated: "#fffdf8",
+    border: "#eadcc5",
+    text: "#272116",
+    muted: "#756a5a",
+    sidebarText: "#f4e9d6",
+  },
+} as const;
