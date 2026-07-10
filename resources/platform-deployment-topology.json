@@ -1,0 +1,236 @@
+{
+  "purpose": "Machine-checkable deployment topology policy for the reusable platform foundation.",
+  "decision": {
+    "vercelRequired": false,
+    "vercelAdminUsage": "optional-static-admin",
+    "selectedTopology": "single-service-production",
+    "defaultApiRuntime": "long-lived-service",
+    "fullStackVercelGo": "requires-separate-adapter-spec"
+  },
+  "topologies": [
+    {
+      "id": "local-development",
+      "status": "supported",
+      "admin": {
+        "host": "vite-dev-server",
+        "command": "rtk npm --prefix admin run dev",
+        "apiBase": "/api",
+        "proxyEnv": "VITE_PLATFORM_API_PROXY_TARGET"
+      },
+      "api": {
+        "runtime": "long-lived-go-process",
+        "command": "rtk go run ./cmd/platform-api",
+        "defaultAddress": "127.0.0.1:9200"
+      },
+      "data": {
+        "persistentStores": "optional",
+        "cache": "memory-or-noop",
+        "fileStorage": "local"
+      }
+    },
+    {
+      "id": "single-service-production",
+      "status": "recommended",
+      "admin": {
+        "host": "same-origin-static-assets",
+        "buildCommand": "rtk npm --prefix admin run build",
+        "outputDirectory": "admin/dist",
+        "apiBase": "/api"
+      },
+      "api": {
+        "runtime": "long-lived-go-service",
+        "entrypoint": "cmd/platform-api",
+        "reverseProxy": "/api/*"
+      },
+      "data": {
+        "persistentStores": "GORM",
+        "cache": "Redis",
+        "fileStorage": "local-single-node-or-s3-multi-instance"
+      }
+    },
+    {
+      "id": "split-admin-vercel-api-service",
+      "status": "optional",
+      "admin": {
+        "host": "vercel-static",
+        "rootDirectory": "admin",
+        "buildCommand": "npm run build",
+        "outputDirectory": "dist",
+        "apiBaseEnv": "VITE_PLATFORM_API_BASE",
+        "sameOriginRewrite": "optional"
+      },
+      "api": {
+        "runtime": "long-lived-go-service",
+        "entrypoint": "cmd/platform-api",
+        "corsRequiredWhenAbsoluteApiBase": true
+      },
+      "data": {
+        "persistentStores": "GORM",
+        "cache": "Redis",
+        "fileStorage": "s3-recommended"
+      }
+    },
+    {
+      "id": "fullstack-vercel-go-runtime",
+      "status": "not-default",
+      "admin": {
+        "host": "vercel-static",
+        "rootDirectory": "admin",
+        "buildCommand": "npm run build",
+        "outputDirectory": "dist"
+      },
+      "api": {
+        "runtime": "vercel-go-runtime",
+        "requiresSeparateAdapterSpec": true,
+        "defaultDeployment": false
+      },
+      "data": {
+        "persistentStores": "external-GORM",
+        "cache": "external-Redis",
+        "fileStorage": "external-S3"
+      }
+    }
+  ],
+  "vercelPolicy": {
+    "admin": {
+      "allowed": true,
+      "required": false,
+      "usage": "static-admin-preview-or-cdn",
+      "rootDirectory": "admin",
+      "buildCommand": "npm run build",
+      "outputDirectory": "dist",
+      "apiBaseEnv": "VITE_PLATFORM_API_BASE",
+      "adapterTemplate": "deploy/vercel/admin.vercel.json",
+      "adapterScope": "admin-static-only",
+      "adapterRuntime": "static-assets",
+      "adapterPackage": {
+        "status": "implemented",
+        "template": "deploy/vercel/admin.vercel.json",
+        "copyTarget": "admin/vercel.json",
+        "installation": "copy-into-admin-project-only-when-vercel-is-selected",
+        "defaultIncludedInProduction": false,
+        "apiBindingModes": [
+          "absolute-api-base-env",
+          "reviewed-edge-proxy"
+        ],
+        "forbiddenRuntimeWiring": [
+          "functions",
+          "builds",
+          "routes",
+          "go-build",
+          "vercel-go-runtime",
+          "api-rewrite"
+        ]
+      }
+    },
+    "api": {
+      "defaultDeployment": false,
+      "requiresSeparateAdapterSpec": true,
+      "mustRemainLongLivedByDefault": true,
+      "requiredEvidenceBeforePromotion": [
+        "go-runtime-adapter-spec",
+        "production-gorm-stores",
+        "redis-cache-invalidation",
+        "external-file-storage",
+        "demo-auth-disabled",
+        "production-auth-approval-package",
+        "rollback-plan"
+      ]
+    }
+  },
+  "productionApiRequirements": {
+    "environment": "PLATFORM_RUNTIME_ENV=production",
+    "requiredEnv": [
+      "PLATFORM_JWT_SECRET",
+      "PLATFORM_ADMIN_RESOURCE_DRIVER",
+      "PLATFORM_ADMIN_RESOURCE_DSN",
+      "PLATFORM_SESSION_DRIVER",
+      "PLATFORM_SESSION_DSN",
+      "PLATFORM_LIFECYCLE_HISTORY_DRIVER",
+      "PLATFORM_LIFECYCLE_HISTORY_DSN",
+      "PLATFORM_CACHE_DRIVER",
+      "PLATFORM_REDIS_ADDR",
+      "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER"
+    ],
+    "forbiddenProductionCapabilities": ["demo-data"],
+    "recommendedFileStorage": "s3-for-multi-instance"
+  },
+  "deploymentPackage": {
+    "status": "implemented",
+    "defaultTopology": "single-service-production",
+    "selectedTopology": "single-service-production",
+    "dockerfile": "Dockerfile",
+    "composeFile": "deploy/compose/docker-compose.prod.yml",
+    "adminProxy": "deploy/nginx/platform.conf",
+    "envTemplate": "deploy/env/production.example.env",
+    "dockerTargets": {
+      "api": "api",
+      "admin": "admin-static"
+    },
+    "sameOrigin": {
+      "adminPort": "8080",
+      "apiProxy": "/api/",
+      "uploadAlias": "/uploads/"
+    },
+    "requiredSourceSnippets": [
+      {
+        "path": "Dockerfile",
+        "contains": "FROM golang:1.26-alpine AS api-builder"
+      },
+      {
+        "path": "Dockerfile",
+        "contains": "FROM nginx:1.29-alpine AS admin-static"
+      },
+      {
+        "path": "Dockerfile",
+        "contains": "COPY resources/generated/openapi.admin.json"
+      },
+      {
+        "path": "deploy/compose/docker-compose.prod.yml",
+        "contains": "target: api"
+      },
+      {
+        "path": "deploy/compose/docker-compose.prod.yml",
+        "contains": "target: admin-static"
+      },
+      {
+        "path": "deploy/compose/docker-compose.prod.yml",
+        "contains": "PLATFORM_RUNTIME_ENV: ${PLATFORM_RUNTIME_ENV:?required}"
+      },
+      {
+        "path": "deploy/compose/docker-compose.prod.yml",
+        "contains": "MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?required}"
+      },
+      {
+        "path": "deploy/nginx/platform.conf",
+        "contains": "proxy_pass http://platform_api"
+      },
+      {
+        "path": "deploy/nginx/platform.conf",
+        "contains": "try_files $uri $uri/ /index.html"
+      },
+      {
+        "path": "deploy/env/production.example.env",
+        "contains": "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true"
+      },
+      {
+        "path": "deploy/vercel/admin.vercel.json",
+        "contains": "\"framework\": \"vite\""
+      },
+      {
+        "path": "deploy/vercel/admin.vercel.json",
+        "contains": "\"outputDirectory\": \"dist\""
+      }
+    ]
+  },
+  "docs": [
+    "docs/platform-deployment.md",
+    "README.md"
+  ],
+  "validators": [
+    "scripts/validate-platform-deployment-topology.mjs"
+  ],
+  "tests": [
+    "scripts/platform-deployment-topology.test.mjs"
+  ]
+}

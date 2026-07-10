@@ -1,0 +1,64 @@
+{
+  "generatedBy": "cmd/platform-contracts app-routes",
+  "source": "capability.Manifest.App.Routes",
+  "sourceMode": "go-manifest",
+  "sourceVersion": "0.1.0",
+  "routeCount": 5,
+  "capabilities": [
+    "file-storage",
+    "session"
+  ],
+  "permissions": [],
+  "routes": [
+    {
+      "capabilityId": "session",
+      "method": "POST",
+      "path": "/api/app/auth/login",
+      "auth": "public",
+      "description": {
+        "zh": "App 登录。",
+        "en": "App login."
+      }
+    },
+    {
+      "capabilityId": "session",
+      "method": "POST",
+      "path": "/api/app/auth/logout",
+      "auth": "session",
+      "description": {
+        "zh": "退出 App 会话。",
+        "en": "Log out app session."
+      }
+    },
+    {
+      "capabilityId": "file-storage",
+      "method": "POST",
+      "path": "/api/app/files",
+      "auth": "session",
+      "description": {
+        "zh": "上传 App 文件。",
+        "en": "Upload app file."
+      }
+    },
+    {
+      "capabilityId": "file-storage",
+      "method": "GET",
+      "path": "/api/app/files/:id/content",
+      "auth": "session",
+      "description": {
+        "zh": "读取 App 文件内容。",
+        "en": "Read app file content."
+      }
+    },
+    {
+      "capabilityId": "session",
+      "method": "GET",
+      "path": "/api/app/session/current",
+      "auth": "session",
+      "description": {
+        "zh": "读取 App 当前会话。",
+        "en": "Read current app session."
+      }
+    }
+  ]
+}

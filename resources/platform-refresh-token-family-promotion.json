@@ -1,0 +1,284 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-refresh-token-family-promotion.json",
+  "capturedAt": "2026-07-07",
+  "purpose": "Machine-checkable promotion gate for an independent refresh-token-family runtime slice. The runtime artifacts exist as a disabled platform capability; the current default platform runtime remains JWT bearer tokens backed by server-side sessions with sliding renewal.",
+  "productionAuthHardening": "resources/platform-production-auth-hardening.json",
+  "taskGraph": {
+    "path": "resources/platform-foundation-task-graph.json",
+    "taskId": "production-auth-provider-hardening",
+    "allowedStatusesBeforePromotion": ["preview"],
+    "promotionStatus": "implemented"
+  },
+  "currentRuntime": {
+    "status": "sliding-renewal-only",
+    "endpoint": "POST /api/auth/refresh",
+    "model": "renew-same-server-side-session-and-issue-new-jwt",
+    "notARefreshTokenFamily": true,
+    "sourceEvidence": [
+      {
+        "path": "internal/platform/httpapi/server.go",
+        "contains": "func (s *Server) authRefresh"
+      },
+      {
+        "path": "docs/platform-auth.md",
+        "contains": "sliding session renewal, not a separate refresh-token rotation model"
+      },
+      {
+        "path": "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md",
+        "contains": "It is not a refresh-token-family model"
+      }
+    ]
+  },
+  "promotionState": {
+    "refreshTokenFamilyStatus": "implemented-disabled",
+    "implementationStatus": "implemented",
+    "runtimeDefault": "disabled",
+    "approvalRequired": true,
+    "defaultRuntimeMutation": "forbidden",
+    "productionEnablementStatus": "blocked-by-external-approval",
+    "allowedOnlyWhen": [
+      "offline-renewal-required",
+      "token-family-reuse-detection-required",
+      "separate-refresh-token-storage-approved",
+      "rotation-replay-audit-approved"
+    ]
+  },
+  "implementedRuntimeArtifacts": [
+    {
+      "id": "refresh-token-family-store",
+      "status": "implemented",
+      "evidence": [
+        {
+          "path": "internal/platform/refreshtoken/store.go",
+          "contains": "type Store struct"
+        },
+        {
+          "path": "internal/platform/refreshtoken/store.go",
+          "contains": "TokenHash"
+        },
+        {
+          "path": "internal/platform/refreshtoken/store_test.go",
+          "contains": "TestStoreIssuesHashedRefreshTokenFamily"
+        }
+      ]
+    },
+    {
+      "id": "gorm-refresh-token-family-repository",
+      "status": "implemented",
+      "evidence": [
+        {
+          "path": "internal/platform/refreshtoken/gorm_repository.go",
+          "contains": "const familiesTable = \"platform_refresh_token_families\""
+        },
+        {
+          "path": "internal/platform/refreshtoken/gorm_repository.go",
+          "contains": "AutoMigrate(&gormRefreshTokenRecord{})"
+        },
+        {
+          "path": "internal/platform/refreshtoken/gorm_repository_test.go",
+          "contains": "TestGORMRepositoryPersistsRefreshTokenFamilyLineage"
+        }
+      ]
+    },
+    {
+      "id": "rotation-and-reuse-detection-service",
+      "status": "implemented",
+      "evidence": [
+        {
+          "path": "internal/platform/refreshtoken/store.go",
+          "contains": "ErrRefreshTokenReuseDetected"
+        },
+        {
+          "path": "internal/platform/refreshtoken/store.go",
+          "contains": "auth.refresh.reuse_detected"
+        },
+        {
+          "path": "internal/platform/refreshtoken/store_test.go",
+          "contains": "TestStoreRotatesRefreshTokenAndDetectsReuse"
+        }
+      ]
+    },
+    {
+      "id": "audit-redaction-adapter",
+      "status": "implemented",
+      "evidence": [
+        {
+          "path": "internal/platform/refreshtoken/store.go",
+          "contains": "event.RefreshToken = \"\""
+        },
+        {
+          "path": "internal/platform/refreshtoken/store.go",
+          "contains": "event.TokenHash = \"\""
+        },
+        {
+          "path": "internal/platform/refreshtoken/store_test.go",
+          "contains": "audit contained raw token values"
+        }
+      ]
+    }
+  ],
+  "dataModelContract": {
+    "separateFromSessionTable": true,
+    "rawTokenPersistenceAllowed": false,
+    "tokenHashRequired": true,
+    "requiredFields": [
+      "familyId",
+      "tokenId",
+      "parentTokenId",
+      "sessionId",
+      "username",
+      "tenantId",
+      "tokenType",
+      "issuedAt",
+      "expiresAt",
+      "rotatedAt",
+      "revokedAt",
+      "reusedAt",
+      "replacedByTokenId",
+      "tokenHash"
+    ],
+    "exposedReadFields": [
+      "familyId",
+      "tokenId",
+      "status",
+      "issuedAt",
+      "expiresAt",
+      "rotatedAt",
+      "revokedAt",
+      "reusedAt"
+    ],
+    "forbiddenReadFields": [
+      "refreshToken",
+      "tokenHash",
+      "rawToken",
+      "secret"
+    ]
+  },
+  "rotationTransaction": {
+    "authoritativeStore": "database",
+    "singleTransactionRequired": true,
+    "requiredSteps": [
+      "validate-current-token-hash",
+      "mark-current-token-rotated",
+      "insert-next-token-generation",
+      "renew-server-side-session",
+      "publish-sessions-invalidation",
+      "write-redacted-rotation-audit"
+    ]
+  },
+  "reuseDetection": {
+    "mandatory": true,
+    "replayInputs": [
+      "unknown-token",
+      "rotated-token",
+      "revoked-token",
+      "expired-token"
+    ],
+    "requiredEffects": [
+      "mark-family-compromised",
+      "revoke-related-server-side-session",
+      "publish-sessions-invalidation",
+      "write-redacted-reuse-audit",
+      "reject-with-stable-auth-error"
+    ]
+  },
+  "revocationScopeMatrix": [
+    {
+      "scope": "logout",
+      "requiredEffects": ["revoke-current-session", "revoke-active-refresh-family"]
+    },
+    {
+      "scope": "reuse-detection",
+      "requiredEffects": ["revoke-full-family", "revoke-related-session", "publish-sessions-invalidation"]
+    },
+    {
+      "scope": "admin-forced-logout",
+      "requiredEffects": ["revoke-selected-user-sessions", "revoke-selected-refresh-families"]
+    },
+    {
+      "scope": "jwt-signing-secret-rotation",
+      "requiredEffects": ["document-session-invalidation-decision", "run-token-rotation-preflight"]
+    },
+    {
+      "scope": "provider-credential-rotation",
+      "requiredEffects": ["keep-family-revocation-separate-unless-incident-review-requires-it"]
+    },
+    {
+      "scope": "api-token-rotation",
+      "requiredEffects": ["do-not-touch-human-or-app-session-families"]
+    }
+  ],
+  "redisConvergencePolicy": {
+    "redisSourceOfTruth": false,
+    "authoritativeSourceOfTruth": "database",
+    "invalidationResource": "sessions",
+    "requiredEvents": [
+      "refresh-rotation-success",
+      "refresh-reuse-detected",
+      "logout",
+      "admin-forced-logout"
+    ]
+  },
+  "auditPolicy": {
+    "requiredActions": [
+      "auth.refresh",
+      "auth.refresh.rotate",
+      "auth.refresh.reuse_detected",
+      "auth.logout"
+    ],
+    "allowedFields": [
+      "actor",
+      "action",
+      "resource",
+      "provider",
+      "familyId",
+      "tokenId",
+      "sessionId",
+      "createdAt"
+    ],
+    "forbiddenRawFields": [
+      "jwt",
+      "bearerToken",
+      "refreshToken",
+      "tokenHash",
+      "apiToken",
+      "openid",
+      "unionid",
+      "phone",
+      "secret"
+    ]
+  },
+  "providerRotationSeparation": {
+    "providerCredentialRotationRevokesFamiliesByDefault": false,
+    "incidentReviewCanRequireFamilyRevocation": true,
+    "apiTokenRotationTouchesSessionFamilies": false
+  },
+  "requiredPromotionEvidence": {
+    "docs": [
+      "docs/platform-auth.md",
+      "docs/platform-capability-development.md",
+      "docs/platform-roadmap.md",
+      "docs/platform-foundation-task-map.md",
+      "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md"
+    ],
+    "validators": [
+      "scripts/validate-platform-refresh-token-family-promotion.mjs",
+      "scripts/validate-platform-production-auth-hardening.mjs",
+      "scripts/validate-platform-production-readiness.mjs"
+    ],
+    "testsBeforeProductionEnablement": [
+      "rotation lineage and reuse-detection tests",
+      "revocation scope tests",
+      "redis session invalidation convergence tests",
+      "audit redaction tests",
+      "provider rotation separation tests"
+    ],
+    "remainingBeforeProductionEnablement": [
+      "production approval package",
+      "redis session invalidation convergence evidence",
+      "rotation replay audit sample",
+      "provider rotation separation review",
+      "rollback plan"
+    ]
+  }
+}

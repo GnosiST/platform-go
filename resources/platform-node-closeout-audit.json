@@ -1,0 +1,730 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-node-closeout-audit.json",
+  "capturedAt": "2026-07-08",
+  "purpose": "Machine-checkable node closeout audit for the reusable platform foundation. It keeps implemented task nodes tied to neat-freak knowledge cleanup, evidence paths, objective-conflict review and visual design gates before a node can be treated as closed.",
+  "policy": {
+    "taskGraph": "resources/platform-foundation-task-graph.json",
+    "implementedTasksRequireCloseout": true,
+    "neatFreakRequired": true,
+    "cleanupEvidenceRequired": true,
+    "requiredDimensions": [
+      "docs",
+      "tests-or-validators",
+      "resource-lock-review",
+      "objective-conflict-review"
+    ],
+    "visualEvidenceRequiredForLocks": [
+      "admin-ui",
+      "browser-qa"
+    ],
+    "visualEvidenceRequired": [
+      "superpowers:brainstorming",
+      "product-design"
+    ],
+    "unfinishedTasksMustNotHaveCloseout": true
+  },
+  "nodeCloseouts": [
+    {
+      "taskId": "stack-alignment-and-architecture",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-stack-alignment-audit.md",
+        "docs/platform-foundation-task-map.md",
+        "scripts/validate-platform-engineering-capabilities.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "capability-manifest-contract",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/admin-capability-registration.md",
+        "docs/platform-capability-development.md",
+        "internal/platform/capability/registry.go",
+        "internal/platform/capability/registry_test.go",
+        "internal/platform/capability/admin_contract.go",
+        "internal/platform/capability/admin_contract_test.go",
+        "internal/platform/capability/app_contract_test.go",
+        "internal/platform/capability/auth_contract.go",
+        "internal/platform/capability/auth_contract_test.go",
+        "internal/platform/capability/demo_data_contract.go",
+        "internal/platform/capability/demo_data_contract_test.go",
+        "internal/platform/capability/lifecycle_contract.go",
+        "internal/platform/capability/lifecycle_contract_test.go"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "resource-schema-contract",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/admin-resource-schema.md",
+        "scripts/validate-admin-resources.mjs",
+        "internal/platform/capability/admin_contract.go",
+        "internal/platform/capability/admin_contract_test.go",
+        "internal/platform/adminresource/store_test.go"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "capability-profile-composition-gate",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-capability-development.md",
+        "docs/platform-foundation-task-map.md",
+        "scripts/validate-platform-capability-profiles.mjs",
+        "scripts/platform-capability-profiles.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "capability-contract-governance",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "resources/platform-capability-contracts.json",
+        "docs/platform-capability-development.md",
+        "docs/platform-foundation-task-map.md",
+        "scripts/validate-admin-resources.mjs",
+        "scripts/validate-admin-resources.test.mjs",
+        "scripts/validate-platform-capability-contracts.mjs",
+        "scripts/platform-capability-contracts.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "rbac-menu-data-scope",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/admin-rbac-menu.md",
+        "internal/platform/adminresource/store_test.go",
+        "internal/platform/httpapi/server_test.go"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "governance-org-area-role-groups",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/superpowers/specs/2026-07-06-platform-go-governance-boundary-design.md",
+        "docs/platform-foundation-task-map.md",
+        "scripts/validate-admin-resources.mjs",
+        "scripts/validate-platform-governance-topology.mjs",
+        "internal/platform/adminresource/store_test.go",
+        "internal/platform/httpapi/server_test.go"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "auth-session-provider-jwt-wechat",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-auth.md",
+        "docs/platform-capability-development.md",
+        "internal/platform/capability/auth_contract.go",
+        "internal/platform/capability/auth_contract_test.go",
+        "internal/platform/httpapi/server_test.go"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "gorm-storage-runtime",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "internal/platform/adminresource/gorm_store_test.go",
+        "internal/platform/session/store_test.go"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "cache-redis-invalidation",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-cache.md",
+        "internal/platform/httpapi/server_test.go"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "production-persistence-correctness",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/superpowers/specs/2026-07-10-platform-production-persistence-correctness-design.md",
+        "docs/platform-cache.md",
+        "docs/platform-roadmap.md",
+        "docs/platform-foundation-task-map.md",
+        "internal/platform/session/gorm_repository.go",
+        "internal/platform/session/gorm_repository_test.go",
+        "internal/platform/adminresource/gorm_store.go",
+        "internal/platform/adminresource/gorm_store_test.go",
+        "internal/platform/httpapi/server.go",
+        "internal/platform/httpapi/server_test.go",
+        "scripts/validate-platform-cache-invalidation.mjs",
+        "scripts/platform-cache-invalidation.test.mjs",
+        ".superpowers/sdd/task-4-report.md"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "production-runtime-gate",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "README.md",
+        "docs/platform-capability-development.md",
+        "internal/platform/config/config.go",
+        "internal/platform/config/config_test.go"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "production-readiness-preflight",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-foundation-task-map.md",
+        "docs/platform-capability-development.md",
+        "resources/platform-production-readiness.json",
+        "resources/generated/platform-operations-plan.json",
+        "scripts/validate-platform-production-readiness.mjs",
+        "scripts/platform-production-readiness.test.mjs",
+        "scripts/platform-operations-plan.test.mjs",
+        "scripts/platform-production-preflight-runner.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "openapi-app-contracts",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "internal/platform/capability/app_contract.go",
+        "internal/platform/capability/app_contract_test.go",
+        "docs/platform-capability-development.md",
+        "docs/platform-auth.md",
+        "docs/admin-resource-schema.md",
+        "scripts/generate-admin-openapi.mjs",
+        "scripts/generate-app-openapi.mjs",
+        "scripts/app-contract-generators.test.mjs",
+        "scripts/admin-resource-contract-generators.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "admin-api-boundary-query-security",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "resources/platform-admin-api-boundary.json",
+        "docs/admin-resource-schema.md",
+        "docs/platform-foundation-task-map.md",
+        "scripts/validate-platform-admin-api-boundary.mjs",
+        "scripts/platform-admin-api-boundary.test.mjs",
+        "internal/platform/adminresource/store_test.go"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "codegen-preview-scaffold",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-foundation-task-map.md",
+        "docs/admin-resource-schema.md",
+        "docs/superpowers/specs/2026-07-06-platform-go-codegen-source-writing-readiness-design.md",
+        "scripts/generate-admin-codegen-preview.mjs",
+        "scripts/generate-admin-scaffold-plan.mjs",
+        "scripts/generate-admin-scaffold-files.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "codegen-source-writing-readiness",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/superpowers/specs/2026-07-06-platform-go-codegen-source-writing-readiness-design.md",
+        "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+        "scripts/generate-admin-scaffold-promotion-review.mjs",
+        "scripts/platform-codegen-source-writing-readiness.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "admin-ui-shell-and-list-components",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/admin-ui-foundation.md",
+        "scripts/validate-admin-i18n.mjs",
+        "scripts/validate-admin-ui-contracts.mjs",
+        "scripts/admin-ui-contracts.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ],
+      "visualEvidence": [
+        "superpowers:brainstorming",
+        "product-design"
+      ]
+    },
+    {
+      "taskId": "branding-demo-data-dashboard",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-branding.md",
+        "docs/platform-demo-data.md",
+        "docs/platform-capability-development.md",
+        "internal/platform/capability/demo_data_contract.go",
+        "internal/platform/capability/demo_data_contract_test.go",
+        "internal/platform/httpapi/server_test.go"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ],
+      "visualEvidence": [
+        "superpowers:brainstorming",
+        "product-design"
+      ]
+    },
+    {
+      "taskId": "personnel-extension-boundary",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/superpowers/specs/2026-07-06-platform-go-governance-boundary-design.md",
+        "docs/platform-foundation-task-map.md",
+        "scripts/validate-platform-capability-profiles.mjs",
+        "scripts/validate-platform-reference-coverage.mjs",
+        "scripts/validate-admin-resources.mjs",
+        "scripts/validate-platform-personnel-runtime-readiness.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "notification-extension-boundary",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-capability-development.md",
+        "docs/platform-foundation-task-map.md",
+        "scripts/validate-platform-capability-profiles.mjs",
+        "scripts/validate-admin-resources.mjs",
+        "internal/platform/core/capabilities_test.go",
+        "scripts/platform-capability-profiles.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "job-extension-boundary",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-capability-development.md",
+        "docs/platform-roadmap.md",
+        "scripts/validate-platform-capability-profiles.mjs",
+        "scripts/validate-admin-resources.mjs",
+        "internal/platform/core/capabilities_test.go",
+        "scripts/platform-capability-profiles.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "visual-product-design-qa",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/admin-ui-foundation.md",
+        "design-qa.md",
+        "scripts/validate-admin-i18n.mjs",
+        "scripts/validate-admin-ui-contracts.mjs",
+        "admin/package.json"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ],
+      "visualEvidence": [
+        "superpowers:brainstorming",
+        "product-design"
+      ]
+    },
+    {
+      "taskId": "policy-review-and-audit-workflow",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-foundation-task-map.md",
+        "docs/platform-capability-development.md",
+        "scripts/validate-platform-capability-profiles.mjs",
+        "scripts/validate-admin-resources.mjs",
+        "internal/platform/core/capabilities_test.go",
+        "internal/platform/adminresource/policy_review_test.go"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "form-schema-layout-and-slots",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/admin-resource-schema.md",
+        "docs/admin-ui-foundation.md",
+        "docs/platform-foundation-task-map.md",
+        "docs/superpowers/specs/2026-07-08-form-runtime-slots-side-preview-design.md",
+        "internal/platform/capability/admin_contract.go",
+        "internal/platform/capability/admin_contract_test.go",
+        "internal/platform/adminresource/schema.go",
+        "internal/platform/adminresource/store_test.go",
+        "resources/platform-form-schema-layout-slots.json",
+        "scripts/validate-admin-resources.mjs",
+        "scripts/validate-admin-resources.test.mjs",
+        "scripts/validate-platform-form-schema-layout-slots.mjs",
+        "scripts/validate-admin-i18n.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ],
+      "visualEvidence": [
+        "superpowers:brainstorming",
+        "product-design"
+      ]
+    },
+    {
+      "taskId": "refine-custom-panels-and-actions",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/admin-ui-foundation.md",
+        "docs/platform-roadmap.md",
+        "docs/platform-foundation-task-map.md",
+        "docs/superpowers/specs/2026-07-07-refine-custom-panels-and-actions-design.md",
+        "scripts/validate-admin-resources.mjs",
+        "scripts/validate-admin-i18n.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ],
+      "visualEvidence": [
+        "superpowers:brainstorming",
+        "product-design"
+      ]
+    },
+    {
+      "taskId": "file-storage-preview-and-audit-workflow",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-capability-development.md",
+        "docs/admin-ui-foundation.md",
+        "docs/platform-roadmap.md",
+        "docs/platform-foundation-task-map.md",
+        "scripts/validate-platform-file-storage-experience.mjs",
+        "scripts/validate-admin-i18n.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ],
+      "visualEvidence": [
+        "superpowers:brainstorming",
+        "product-design"
+      ]
+    },
+    {
+      "taskId": "policy-review-custom-ui",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-capability-development.md",
+        "docs/platform-roadmap.md",
+        "docs/platform-foundation-task-map.md",
+        "docs/superpowers/specs/2026-07-07-policy-review-custom-ui-design.md",
+        "scripts/validate-admin-i18n.mjs",
+        "scripts/validate-admin-ui-contracts.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ],
+      "visualEvidence": [
+        "superpowers:brainstorming",
+        "product-design"
+      ]
+    },
+    {
+      "taskId": "task-dependency-governance",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-foundation-task-map.md",
+        "scripts/validate-platform-foundation-task-graph.mjs",
+        "scripts/platform-foundation-task-graph.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "reference-discovery-classification-gate",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-foundation-task-map.md",
+        "docs/platform-capability-development.md",
+        "docs/platform-roadmap.md",
+        "scripts/validate-admin-resources.mjs",
+        "scripts/validate-admin-resources.test.mjs",
+        "scripts/validate-platform-reference-discovery.mjs",
+        "scripts/platform-reference-discovery.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "reference-coverage-boundary-gate",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-foundation-task-map.md",
+        "scripts/validate-platform-reference-coverage.mjs",
+        "scripts/validate-platform-reference-discovery.mjs",
+        "scripts/platform-reference-coverage.test.mjs",
+        "scripts/platform-reference-discovery.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "node-closeout-audit",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-foundation-task-map.md",
+        "docs/platform-capability-development.md",
+        "scripts/validate-platform-node-closeout-audit.mjs",
+        "scripts/platform-node-closeout-audit.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "foundation-alignment-audit",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-foundation-task-map.md",
+        "README.md",
+        "resources/platform-foundation-alignment-audit.json",
+        "scripts/validate-platform-foundation-alignment.mjs",
+        "scripts/platform-foundation-alignment.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "production-auth-provider-hardening",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-auth.md",
+        "docs/platform-roadmap.md",
+        "docs/platform-foundation-task-map.md",
+        "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md",
+        "docs/superpowers/specs/2026-07-08-production-auth-hardening-codegen-skeleton-design.md",
+        "resources/platform-production-auth-hardening.json",
+        "resources/platform-refresh-token-family-promotion.json",
+        "resources/generated/production-auth-promotion-review.json",
+        "scripts/validate-platform-production-auth-hardening.mjs",
+        "scripts/validate-platform-refresh-token-family-promotion.mjs",
+        "scripts/platform-production-auth-hardening.test.mjs",
+        "scripts/platform-refresh-token-family-promotion.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "source-writing-codegen-promotion",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-capability-development.md",
+        "docs/platform-foundation-task-map.md",
+        "docs/platform-roadmap.md",
+        "docs/superpowers/specs/2026-07-08-production-auth-hardening-codegen-skeleton-design.md",
+        "docs/superpowers/plans/2026-07-08-production-auth-hardening-codegen-skeleton.md",
+        "resources/platform-codegen-source-writing-readiness.json",
+        "resources/generated/admin-scaffold-promotion-review.json",
+        "resources/generated/platform-promotion-evidence-templates.json",
+        "resources/generated/platform-promotion-evidence-package-draft.json",
+        "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+        "scripts/platform-codegen-source-writing-readiness.test.mjs",
+        "scripts/platform-promotion-evidence-templates.test.mjs",
+        "scripts/platform-promotion-evidence-package-draft.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    }
+  ]
+}

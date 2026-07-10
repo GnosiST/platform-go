@@ -1,0 +1,112 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-app-client-api-boundary.json",
+  "capturedAt": "2026-07-08",
+  "purpose": "Machine-checkable App client API boundary contract. Downstream App, H5 and mini-program clients must use generated App clients or platform request/upload ports, not page-level transport, upload or Authorization wiring.",
+  "reference": {
+    "project": "zshenmez",
+    "sourceSignals": [
+      "docs/mvp1-handoff-2026-06-19.md",
+      "docs/auth-rbac-multitenancy.md",
+      "docs/api-contract.md",
+      "miniprogram-native-v2/tests/apiPorts.test.ts",
+      "miniprogram-native-v2/scripts/check-boundary.mjs",
+      "miniprogram-native-v2/src/api/appRequest.ts",
+      "miniprogram-native-v2/src/api/appUpload.ts"
+    ],
+    "promotionDecision": "foundation-gate"
+  },
+  "clientBoundary": {
+    "targetClients": [
+      "wechat-miniprogram",
+      "h5",
+      "native-app"
+    ],
+    "contractSource": "resources/generated/app-route-contract.json",
+    "openapiSource": "resources/generated/openapi.app.json",
+    "codegenPreview": "resources/generated/app-codegen-preview.json",
+    "generatedClientBoundary": "future-app/src/platform/api/appClient.ts",
+    "allowedTransportPorts": [
+      "generated-app-client",
+      "appRequest",
+      "appUpload"
+    ],
+    "forbiddenPageLevelPatterns": [
+      "uni.request",
+      "wx.request",
+      "Taro.request",
+      "uni.uploadFile",
+      "wx.uploadFile",
+      "Taro.uploadFile",
+      "Authorization"
+    ],
+    "forbiddenApiTargets": [
+      "/api/admin",
+      "/admin",
+      "absolute admin URL",
+      "query-string hand-written paths",
+      "encoded admin API path"
+    ],
+    "tokenPolicy": {
+      "securityDomain": "app",
+      "tokenType": "app",
+      "tokenInjectionOwner": "generated-app-client-or-app-request-port",
+      "callerAuthorizationHeaderAllowed": false,
+      "adminTokenAccepted": false,
+      "apiTokenAccepted": false
+    },
+    "uploadPolicy": {
+      "uploadPort": "appUpload",
+      "pageLevelUploadAllowed": false,
+      "uploadTargetPrefix": "/api/app"
+    }
+  },
+  "requiredGeneratedEvidence": [
+    "resources/generated/app-route-contract.json",
+    "resources/generated/openapi.app.json",
+    "resources/generated/app-codegen-preview.json"
+  ],
+  "requiredSourceSnippets": [
+    {
+      "path": "resources/generated/app-codegen-preview.json",
+      "contains": "\"securityDomain\": \"app\""
+    },
+    {
+      "path": "resources/generated/app-codegen-preview.json",
+      "contains": "\"apiClientFile\": \"future-app/src/platform/api/appClient.ts\""
+    },
+    {
+      "path": "resources/generated/app-codegen-preview.json",
+      "contains": "App routes use tokenType=app"
+    },
+    {
+      "path": "resources/generated/openapi.app.json",
+      "contains": "\"appBearerAuth\""
+    },
+    {
+      "path": "resources/generated/app-route-contract.json",
+      "contains": "\"source\": \"capability.Manifest.App.Routes\""
+    },
+    {
+      "path": "resources/generated/app-route-contract.json",
+      "contains": "\"path\": \"/api/app/files\""
+    },
+    {
+      "path": "resources/generated/app-codegen-preview.json",
+      "contains": "\"path\": \"/api/app/files\""
+    },
+    {
+      "path": "scripts/generate-app-codegen-preview.mjs",
+      "contains": "apiClientFile: \"future-app/src/platform/api/appClient.ts\""
+    },
+    {
+      "path": "docs/platform-capability-development.md",
+      "contains": "App client API boundary"
+    }
+  ],
+  "requiredValidators": [
+    "scripts/validate-platform-app-client-api-boundary.mjs"
+  ],
+  "requiredTests": [
+    "scripts/platform-app-client-api-boundary.test.mjs"
+  ]
+}

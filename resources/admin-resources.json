@@ -1,0 +1,3812 @@
+{
+  "version": "0.1.0",
+  "updatedAt": "2026-07-06",
+  "purpose": "Base source for reusable platform admin resources. Menus, routes, permission codes, Refine resources, schemas and code generation previews are generated from this manifest plus enabled capability admin resources.",
+  "stack": {
+    "backend": [
+      "Gin",
+      "GORM",
+      "Casbin",
+      "JWT"
+    ],
+    "frontend": [
+      "Refine",
+      "React",
+      "Ant Design"
+    ]
+  },
+  "database": {
+    "runtimeDefault": "mysql",
+    "supportedDrivers": [
+      "mysql",
+      "postgres"
+    ],
+    "testDriver": "sqlite"
+  },
+  "resources": [
+    {
+      "name": "overview",
+      "code": "overview",
+      "label": {
+        "zh": "概览",
+        "en": "Overview"
+      },
+      "group": "foundation",
+      "menu": {
+        "path": "/overview",
+        "icon": "overview",
+        "sortOrder": 10,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "overview",
+        "list": "/overview",
+        "component": "DashboardPage"
+      },
+      "apiBase": "/api/admin/overview",
+      "permissions": {
+        "read": "admin:overview:read"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/admin/overview",
+          "permission": "admin:overview:read"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "metric",
+            "label": {
+              "zh": "指标",
+              "en": "Metric"
+            },
+            "type": "text",
+            "table": true,
+            "detail": true
+          },
+          {
+            "key": "value",
+            "label": {
+              "zh": "数值",
+              "en": "Value"
+            },
+            "type": "text",
+            "table": true,
+            "detail": true
+          }
+        ],
+        "search": [],
+        "table": [
+          "metric",
+          "value"
+        ],
+        "form": []
+      },
+      "codegen": {
+        "mode": "custom",
+        "reason": "Dashboard aggregates platform metrics instead of CRUD rows."
+      }
+    },
+    {
+      "name": "tenants",
+      "code": "tenants",
+      "label": {
+        "zh": "租户管理",
+        "en": "Tenants"
+      },
+      "group": "system",
+      "menu": {
+        "parentCode": "identity",
+        "path": "/tenants",
+        "icon": "bank",
+        "sortOrder": 110,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "tenants",
+        "list": "/tenants",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/tenants",
+      "permissions": {
+        "read": "admin:tenant:read",
+        "create": "admin:tenant:create",
+        "update": "admin:tenant:update",
+        "delete": "admin:tenant:delete"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/tenants/queries",
+          "permission": "admin:tenant:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/tenants",
+          "permission": "admin:tenant:create",
+          "auditAction": "tenant.create"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/admin/tenants/:id",
+          "permission": "admin:tenant:update",
+          "auditAction": "tenant.update"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/admin/tenants/:id",
+          "permission": "admin:tenant:delete",
+          "auditAction": "tenant.delete"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "code",
+            "label": {
+              "zh": "租户编码",
+              "en": "Code"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "name",
+            "label": {
+              "zh": "租户名称",
+              "en": "Name"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "areaCode",
+            "label": {
+              "zh": "地址码",
+              "en": "Area Code"
+            },
+            "type": "select",
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "relation": {
+              "resource": "area-codes",
+              "valueField": "code",
+              "labelField": "name",
+              "filters": [
+                {
+                  "field": "status",
+                  "operator": "=",
+                  "value": "enabled"
+                }
+              ],
+              "sortField": "name",
+              "sortOrder": "asc",
+              "display": "tree",
+              "parentField": "parentCode",
+              "pathField": "path"
+            }
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "table": true,
+            "form": true,
+            "options": [
+              "enabled",
+              "disabled"
+            ]
+          },
+          {
+            "key": "updatedAt",
+            "label": {
+              "zh": "更新时间",
+              "en": "Updated At"
+            },
+            "type": "datetime",
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          }
+        ],
+        "search": [
+          "code",
+          "name",
+          "areaCode",
+          "status"
+        ],
+        "table": [
+          "code",
+          "name",
+          "areaCode",
+          "status",
+          "updatedAt"
+        ],
+        "form": [
+          "code",
+          "name",
+          "areaCode",
+          "status"
+        ]
+      },
+      "codegen": {
+        "mode": "scaffold",
+        "model": "Tenant",
+        "table": "platform_tenants"
+      }
+    },
+    {
+      "name": "users",
+      "code": "users",
+      "label": {
+        "zh": "用户管理",
+        "en": "Users"
+      },
+      "group": "system",
+      "menu": {
+        "parentCode": "identity",
+        "path": "/users",
+        "icon": "team",
+        "sortOrder": 120,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "users",
+        "list": "/users",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/users",
+      "permissions": {
+        "read": "admin:user:read",
+        "create": "admin:user:create",
+        "update": "admin:user:update",
+        "delete": "admin:user:delete"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/users/queries",
+          "permission": "admin:user:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/users",
+          "permission": "admin:user:create",
+          "auditAction": "user.create"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/admin/users/:id",
+          "permission": "admin:user:update",
+          "auditAction": "user.update"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/admin/users/:id",
+          "permission": "admin:user:delete",
+          "auditAction": "user.delete"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "code",
+            "label": {
+              "zh": "用户名",
+              "en": "Username"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "name",
+            "label": {
+              "zh": "姓名",
+              "en": "Name"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "tenantCode",
+            "label": {
+              "zh": "租户",
+              "en": "Tenant"
+            },
+            "type": "select",
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "relation": {
+              "resource": "tenants",
+              "valueField": "code",
+              "labelField": "name",
+              "filters": [
+                {
+                  "field": "status",
+                  "operator": "=",
+                  "value": "enabled"
+                }
+              ],
+              "sortField": "name",
+              "sortOrder": "asc"
+            },
+            "required": true
+          },
+          {
+            "key": "orgUnitCode",
+            "label": {
+              "zh": "机构",
+              "en": "Org Unit"
+            },
+            "type": "select",
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "relation": {
+              "resource": "org-units",
+              "valueField": "code",
+              "labelField": "name",
+              "filters": [
+                {
+                  "field": "status",
+                  "operator": "=",
+                  "value": "enabled"
+                }
+              ],
+              "sortField": "name",
+              "sortOrder": "asc",
+              "display": "tree",
+              "parentField": "parentCode"
+            }
+          },
+          {
+            "key": "areaCode",
+            "label": {
+              "zh": "地址码",
+              "en": "Area Code"
+            },
+            "type": "select",
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "relation": {
+              "resource": "area-codes",
+              "valueField": "code",
+              "labelField": "name",
+              "filters": [
+                {
+                  "field": "status",
+                  "operator": "=",
+                  "value": "enabled"
+                }
+              ],
+              "sortField": "name",
+              "sortOrder": "asc",
+              "display": "tree",
+              "parentField": "parentCode",
+              "pathField": "path"
+            }
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "table": true,
+            "form": true,
+            "options": [
+              "enabled",
+              "disabled"
+            ]
+          },
+          {
+            "key": "roles",
+            "label": {
+              "zh": "角色",
+              "en": "Roles"
+            },
+            "type": "multiselect",
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "relation": {
+              "resource": "roles",
+              "valueField": "code",
+              "labelField": "name",
+              "multiple": true,
+              "filters": [
+                {
+                  "field": "status",
+                  "operator": "=",
+                  "value": "enabled"
+                }
+              ],
+              "sortField": "name",
+              "sortOrder": "asc"
+            }
+          },
+          {
+            "key": "updatedAt",
+            "label": {
+              "zh": "更新时间",
+              "en": "Updated At"
+            },
+            "type": "datetime",
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          }
+        ],
+        "search": [
+          "code",
+          "name",
+          "tenantCode",
+          "orgUnitCode",
+          "areaCode",
+          "status"
+        ],
+        "table": [
+          "code",
+          "name",
+          "tenantCode",
+          "orgUnitCode",
+          "areaCode",
+          "roles",
+          "status",
+          "updatedAt"
+        ],
+        "form": [
+          "code",
+          "name",
+          "tenantCode",
+          "orgUnitCode",
+          "areaCode",
+          "roles",
+          "status"
+        ]
+      },
+      "codegen": {
+        "mode": "scaffold",
+        "model": "User",
+        "table": "platform_users"
+      }
+    },
+    {
+      "name": "appIdentities",
+      "code": "app-identities",
+      "label": {
+        "zh": "App 身份绑定",
+        "en": "App Identities"
+      },
+      "group": "system",
+      "menu": {
+        "parentCode": "identity",
+        "path": "/app-identities",
+        "icon": "user",
+        "sortOrder": 122,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "appIdentities",
+        "list": "/app-identities",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/app-identities",
+      "permissions": {
+        "read": "admin:app-identity:read",
+        "create": "admin:app-identity:create",
+        "update": "admin:app-identity:update",
+        "delete": "admin:app-identity:delete"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/app-identities/queries",
+          "permission": "admin:app-identity:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/app-identities",
+          "permission": "admin:app-identity:create",
+          "auditAction": "app_identity.create"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/admin/app-identities/:id",
+          "permission": "admin:app-identity:update",
+          "auditAction": "app_identity.update"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/admin/app-identities/:id",
+          "permission": "admin:app-identity:delete",
+          "auditAction": "app_identity.delete"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "name",
+            "label": {
+              "zh": "名称",
+              "en": "Name"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "detail": true
+          },
+          {
+            "key": "code",
+            "label": {
+              "zh": "绑定编码",
+              "en": "Binding Code"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true,
+            "options": [
+              "enabled",
+              "disabled"
+            ]
+          },
+          {
+            "key": "provider",
+            "label": {
+              "zh": "登录方式",
+              "en": "Provider"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "providerKind",
+            "label": {
+              "zh": "方式类型",
+              "en": "Provider Kind"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "providerScope",
+            "label": {
+              "zh": "作用域",
+              "en": "Scope"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "maskedSubject",
+            "label": {
+              "zh": "脱敏标识",
+              "en": "Masked Subject"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "providerSubjectHash",
+            "label": {
+              "zh": "标识哈希",
+              "en": "Subject Hash"
+            },
+            "type": "text",
+            "required": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "appUsername",
+            "label": {
+              "zh": "App 用户",
+              "en": "App User"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "createdAt",
+            "label": {
+              "zh": "创建时间",
+              "en": "Created At"
+            },
+            "type": "datetime",
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "lastLoginAt",
+            "label": {
+              "zh": "最近登录",
+              "en": "Last Login"
+            },
+            "type": "datetime",
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "description",
+            "label": {
+              "zh": "描述",
+              "en": "Description"
+            },
+            "type": "textarea",
+            "detail": true
+          }
+        ],
+        "search": [
+          "name",
+          "code",
+          "status",
+          "provider",
+          "providerKind",
+          "providerScope",
+          "maskedSubject",
+          "appUsername"
+        ],
+        "table": [
+          "provider",
+          "providerKind",
+          "maskedSubject",
+          "appUsername",
+          "lastLoginAt",
+          "status"
+        ],
+        "form": [
+          "status"
+        ]
+      },
+      "codegen": {
+        "mode": "scaffold",
+        "model": "AppIdentity",
+        "table": "platform_app_identities"
+      }
+    },
+    {
+      "name": "orgUnits",
+      "code": "org-units",
+      "label": {
+        "zh": "组织机构",
+        "en": "Org Units"
+      },
+      "group": "system",
+      "menu": {
+        "parentCode": "identity",
+        "path": "/org-units",
+        "icon": "cluster",
+        "sortOrder": 125,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "orgUnits",
+        "list": "/org-units",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/org-units",
+      "permissions": {
+        "read": "admin:org-unit:read",
+        "create": "admin:org-unit:create",
+        "update": "admin:org-unit:update",
+        "delete": "admin:org-unit:delete"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/org-units/queries",
+          "permission": "admin:org-unit:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/org-units",
+          "permission": "admin:org-unit:create",
+          "auditAction": "org_unit.create"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/admin/org-units/:id",
+          "permission": "admin:org-unit:update",
+          "auditAction": "org_unit.update"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/admin/org-units/:id",
+          "permission": "admin:org-unit:delete",
+          "auditAction": "org_unit.delete"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "code",
+            "label": {
+              "zh": "机构编码",
+              "en": "Code"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "name",
+            "label": {
+              "zh": "机构名称",
+              "en": "Name"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "type",
+            "label": {
+              "zh": "类型",
+              "en": "Type"
+            },
+            "type": "select",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true,
+            "options": [
+              "group",
+              "company",
+              "branch",
+              "organization",
+              "department",
+              "team",
+              "store",
+              "custom"
+            ]
+          },
+          {
+            "key": "tenantCode",
+            "label": {
+              "zh": "租户",
+              "en": "Tenant"
+            },
+            "type": "select",
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "relation": {
+              "resource": "tenants",
+              "valueField": "code",
+              "labelField": "name",
+              "filters": [
+                {
+                  "field": "status",
+                  "operator": "=",
+                  "value": "enabled"
+                }
+              ],
+              "sortField": "name",
+              "sortOrder": "asc"
+            },
+            "required": true
+          },
+          {
+            "key": "parentCode",
+            "label": {
+              "zh": "上级机构",
+              "en": "Parent"
+            },
+            "type": "select",
+            "search": true,
+            "table": true,
+            "form": true,
+            "relation": {
+              "resource": "org-units",
+              "valueField": "code",
+              "labelField": "name",
+              "filters": [
+                {
+                  "field": "status",
+                  "operator": "=",
+                  "value": "enabled"
+                }
+              ],
+              "sortField": "name",
+              "sortOrder": "asc",
+              "display": "tree",
+              "parentField": "parentCode"
+            }
+          },
+          {
+            "key": "areaCode",
+            "label": {
+              "zh": "地址码",
+              "en": "Area Code"
+            },
+            "type": "select",
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "relation": {
+              "resource": "area-codes",
+              "valueField": "code",
+              "labelField": "name",
+              "filters": [
+                {
+                  "field": "status",
+                  "operator": "=",
+                  "value": "enabled"
+                }
+              ],
+              "sortField": "name",
+              "sortOrder": "asc",
+              "display": "tree",
+              "parentField": "parentCode",
+              "pathField": "path"
+            }
+          },
+          {
+            "key": "sortOrder",
+            "label": {
+              "zh": "排序",
+              "en": "Sort Order"
+            },
+            "type": "number",
+            "table": true,
+            "form": true,
+            "detail": true
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "table": true,
+            "form": true,
+            "options": [
+              "enabled",
+              "disabled"
+            ]
+          },
+          {
+            "key": "description",
+            "label": {
+              "zh": "描述",
+              "en": "Description"
+            },
+            "type": "textarea",
+            "form": true,
+            "detail": true
+          }
+        ],
+        "search": [
+          "code",
+          "name",
+          "type",
+          "tenantCode",
+          "parentCode",
+          "areaCode",
+          "status"
+        ],
+        "table": [
+          "code",
+          "name",
+          "type",
+          "tenantCode",
+          "parentCode",
+          "areaCode",
+          "sortOrder",
+          "status"
+        ],
+        "form": [
+          "code",
+          "name",
+          "type",
+          "tenantCode",
+          "parentCode",
+          "areaCode",
+          "sortOrder",
+          "status",
+          "description"
+        ]
+      },
+      "codegen": {
+        "mode": "scaffold",
+        "model": "OrgUnit",
+        "table": "platform_org_units"
+      }
+    },
+    {
+      "name": "roles",
+      "code": "roles",
+      "label": {
+        "zh": "角色管理",
+        "en": "Roles"
+      },
+      "group": "system",
+      "menu": {
+        "parentCode": "access",
+        "path": "/roles",
+        "icon": "safety",
+        "sortOrder": 130,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "roles",
+        "list": "/roles",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/roles",
+      "permissions": {
+        "read": "admin:role:read",
+        "create": "admin:role:create",
+        "update": "admin:role:update",
+        "delete": "admin:role:delete"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/roles/queries",
+          "permission": "admin:role:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/roles",
+          "permission": "admin:role:create",
+          "auditAction": "role.create"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/admin/roles/:id",
+          "permission": "admin:role:update",
+          "auditAction": "role.update"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/admin/roles/:id",
+          "permission": "admin:role:delete",
+          "auditAction": "role.delete"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "code",
+            "label": {
+              "zh": "角色编码",
+              "en": "Code"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "name",
+            "label": {
+              "zh": "角色名称",
+              "en": "Name"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "groupCode",
+            "label": {
+              "zh": "角色组",
+              "en": "Role Group"
+            },
+            "type": "select",
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "relation": {
+              "resource": "role-groups",
+              "valueField": "code",
+              "labelField": "name",
+              "filters": [
+                {
+                  "field": "status",
+                  "operator": "=",
+                  "value": "enabled"
+                }
+              ],
+              "sortField": "name",
+              "sortOrder": "asc",
+              "display": "tree",
+              "parentField": "parentCode"
+            }
+          },
+          {
+            "key": "dataScope",
+            "label": {
+              "zh": "数据范围",
+              "en": "Data Scope"
+            },
+            "type": "select",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "options": [
+              "all",
+              "current_org",
+              "current_and_children",
+              "custom_orgs",
+              "current_area",
+              "current_and_children_areas",
+              "custom_areas",
+              "self"
+            ]
+          },
+          {
+            "key": "dataScopeOrgCodes",
+            "label": {
+              "zh": "数据机构",
+              "en": "Data Orgs"
+            },
+            "type": "multiselect",
+            "search": true,
+            "form": true,
+            "detail": true,
+            "relation": {
+              "resource": "org-units",
+              "valueField": "code",
+              "labelField": "name",
+              "multiple": true,
+              "filters": [
+                {
+                  "field": "status",
+                  "operator": "=",
+                  "value": "enabled"
+                }
+              ],
+              "sortField": "name",
+              "sortOrder": "asc",
+              "display": "tree",
+              "parentField": "parentCode"
+            }
+          },
+          {
+            "key": "dataScopeAreaCodes",
+            "label": {
+              "zh": "数据区域",
+              "en": "Data Areas"
+            },
+            "type": "multiselect",
+            "search": true,
+            "form": true,
+            "detail": true,
+            "relation": {
+              "resource": "area-codes",
+              "valueField": "code",
+              "labelField": "name",
+              "multiple": true,
+              "filters": [
+                {
+                  "field": "status",
+                  "operator": "=",
+                  "value": "enabled"
+                }
+              ],
+              "sortField": "name",
+              "sortOrder": "asc",
+              "display": "tree",
+              "parentField": "parentCode",
+              "pathField": "path"
+            }
+          },
+          {
+            "key": "permissions",
+            "label": {
+              "zh": "权限码",
+              "en": "Permissions"
+            },
+            "type": "multiselect",
+            "form": true,
+            "detail": true,
+            "relation": {
+              "resource": "permissions",
+              "valueField": "code",
+              "labelField": "name",
+              "multiple": true,
+              "filters": [
+                {
+                  "field": "status",
+                  "operator": "=",
+                  "value": "enabled"
+                }
+              ],
+              "sortField": "name",
+              "sortOrder": "asc"
+            }
+          },
+          {
+            "key": "denyPermissions",
+            "label": {
+              "zh": "拒绝权限",
+              "en": "Deny Permissions"
+            },
+            "type": "multiselect",
+            "search": true,
+            "form": true,
+            "detail": true,
+            "relation": {
+              "resource": "permissions",
+              "valueField": "code",
+              "labelField": "name",
+              "multiple": true,
+              "filters": [
+                {
+                  "field": "status",
+                  "operator": "=",
+                  "value": "enabled"
+                }
+              ],
+              "sortField": "name",
+              "sortOrder": "asc"
+            }
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "table": true,
+            "form": true,
+            "options": [
+              "enabled",
+              "disabled"
+            ]
+          }
+        ],
+        "search": [
+          "code",
+          "name",
+          "groupCode",
+          "dataScope",
+          "dataScopeOrgCodes",
+          "dataScopeAreaCodes",
+          "denyPermissions",
+          "status"
+        ],
+        "table": [
+          "code",
+          "name",
+          "groupCode",
+          "dataScope",
+          "status"
+        ],
+        "form": [
+          "code",
+          "name",
+          "groupCode",
+          "dataScope",
+          "dataScopeOrgCodes",
+          "dataScopeAreaCodes",
+          "permissions",
+          "denyPermissions",
+          "status"
+        ]
+      },
+      "codegen": {
+        "mode": "scaffold",
+        "model": "Role",
+        "table": "platform_roles"
+      }
+    },
+    {
+      "name": "roleGroups",
+      "code": "role-groups",
+      "label": {
+        "zh": "角色组",
+        "en": "Role Groups"
+      },
+      "group": "system",
+      "menu": {
+        "parentCode": "access",
+        "path": "/role-groups",
+        "icon": "partition",
+        "sortOrder": 135,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "roleGroups",
+        "list": "/role-groups",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/role-groups",
+      "permissions": {
+        "read": "admin:role-group:read",
+        "create": "admin:role-group:create",
+        "update": "admin:role-group:update",
+        "delete": "admin:role-group:delete"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/role-groups/queries",
+          "permission": "admin:role-group:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/role-groups",
+          "permission": "admin:role-group:create",
+          "auditAction": "role_group.create"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/admin/role-groups/:id",
+          "permission": "admin:role-group:update",
+          "auditAction": "role_group.update"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/admin/role-groups/:id",
+          "permission": "admin:role-group:delete",
+          "auditAction": "role_group.delete"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "code",
+            "label": {
+              "zh": "分组编码",
+              "en": "Code"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "name",
+            "label": {
+              "zh": "分组名称",
+              "en": "Name"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "parentCode",
+            "label": {
+              "zh": "上级角色组",
+              "en": "Parent Group"
+            },
+            "type": "select",
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "relation": {
+              "resource": "role-groups",
+              "valueField": "code",
+              "labelField": "name",
+              "filters": [
+                {
+                  "field": "status",
+                  "operator": "=",
+                  "value": "enabled"
+                }
+              ],
+              "sortField": "name",
+              "sortOrder": "asc",
+              "display": "tree",
+              "parentField": "parentCode"
+            }
+          },
+          {
+            "key": "sortOrder",
+            "label": {
+              "zh": "排序",
+              "en": "Sort Order"
+            },
+            "type": "number",
+            "table": true,
+            "form": true,
+            "detail": true
+          },
+          {
+            "key": "description",
+            "label": {
+              "zh": "说明",
+              "en": "Description"
+            },
+            "type": "textarea",
+            "form": true,
+            "detail": true
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "table": true,
+            "form": true,
+            "options": [
+              "enabled",
+              "disabled"
+            ]
+          }
+        ],
+        "search": [
+          "code",
+          "name",
+          "parentCode",
+          "status"
+        ],
+        "table": [
+          "code",
+          "name",
+          "parentCode",
+          "sortOrder",
+          "status"
+        ],
+        "form": [
+          "code",
+          "name",
+          "parentCode",
+          "sortOrder",
+          "description",
+          "status"
+        ]
+      },
+      "codegen": {
+        "mode": "scaffold",
+        "model": "RoleGroup",
+        "table": "platform_role_groups"
+      }
+    },
+    {
+      "name": "permissions",
+      "code": "permissions",
+      "label": {
+        "zh": "权限码",
+        "en": "Permissions"
+      },
+      "group": "system",
+      "menu": {
+        "parentCode": "access",
+        "path": "/permissions",
+        "icon": "user-shield",
+        "sortOrder": 140,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "permissions",
+        "list": "/permissions",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/permissions",
+      "permissions": {
+        "read": "admin:permission:read",
+        "create": "admin:permission:create",
+        "update": "admin:permission:update",
+        "delete": "admin:permission:delete"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/permissions/queries",
+          "permission": "admin:permission:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/permissions",
+          "permission": "admin:permission:create",
+          "auditAction": "permission.create"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/admin/permissions/:id",
+          "permission": "admin:permission:update",
+          "auditAction": "permission.update"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/admin/permissions/:id",
+          "permission": "admin:permission:delete",
+          "auditAction": "permission.delete"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "code",
+            "label": {
+              "zh": "权限码",
+              "en": "Code"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "name",
+            "label": {
+              "zh": "名称",
+              "en": "Name"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "module",
+            "label": {
+              "zh": "模块",
+              "en": "Module"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "description",
+            "label": {
+              "zh": "说明",
+              "en": "Description"
+            },
+            "type": "textarea",
+            "form": true,
+            "detail": true
+          }
+        ],
+        "search": [
+          "code",
+          "name",
+          "module"
+        ],
+        "table": [
+          "code",
+          "name",
+          "module"
+        ],
+        "form": [
+          "code",
+          "name",
+          "module",
+          "description"
+        ]
+      },
+      "codegen": {
+        "mode": "readOnlySeeded",
+        "model": "Permission",
+        "table": "platform_permissions"
+      }
+    },
+    {
+      "name": "menus",
+      "code": "menus",
+      "label": {
+        "zh": "菜单管理",
+        "en": "Menus"
+      },
+      "group": "system",
+      "menu": {
+        "parentCode": "access",
+        "path": "/menus",
+        "icon": "menu",
+        "sortOrder": 150,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "menus",
+        "list": "/menus",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/menus",
+      "permissions": {
+        "read": "admin:menu:read",
+        "create": "admin:menu:create",
+        "update": "admin:menu:update",
+        "delete": "admin:menu:delete"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/admin/navigation/menus",
+          "permission": "admin:menu:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/menus/queries",
+          "permission": "admin:menu:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/menus",
+          "permission": "admin:menu:create",
+          "auditAction": "menu.create"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/admin/menus/:id",
+          "permission": "admin:menu:update",
+          "auditAction": "menu.update"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/admin/menus/:id",
+          "permission": "admin:menu:delete",
+          "auditAction": "menu.delete"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "code",
+            "label": {
+              "zh": "菜单编码",
+              "en": "Code"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "name",
+            "label": {
+              "zh": "菜单名称",
+              "en": "Name"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "path",
+            "label": {
+              "zh": "路由",
+              "en": "Path"
+            },
+            "type": "text",
+            "required": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "parentCode",
+            "label": {
+              "zh": "上级菜单",
+              "en": "Parent"
+            },
+            "type": "text",
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "external",
+            "label": {
+              "zh": "外链",
+              "en": "External"
+            },
+            "type": "switch",
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "keepAlive",
+            "label": {
+              "zh": "启用缓存",
+              "en": "Keep Alive"
+            },
+            "type": "switch",
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "visible",
+            "label": {
+              "zh": "显示",
+              "en": "Visible"
+            },
+            "type": "switch",
+            "table": true,
+            "form": true
+          }
+        ],
+        "search": [
+          "code",
+          "name",
+          "path"
+        ],
+        "table": [
+          "code",
+          "name",
+          "path",
+          "parentCode",
+          "external",
+          "keepAlive",
+          "visible"
+        ],
+        "form": [
+          "code",
+          "name",
+          "path",
+          "parentCode",
+          "external",
+          "keepAlive",
+          "visible"
+        ]
+      },
+      "codegen": {
+        "mode": "scaffold",
+        "model": "Menu",
+        "table": "platform_menus"
+      },
+      "actions": [
+        {
+          "key": "copy-config",
+          "label": {
+            "zh": "复制配置",
+            "en": "Copy Config"
+          },
+          "kind": "row",
+          "tone": "default",
+          "icon": "copy",
+          "permission": "admin:menu:read",
+          "refresh": false
+        }
+      ],
+      "panels": [
+        {
+          "key": "audit",
+          "label": {
+            "zh": "审计",
+            "en": "Audit"
+          },
+          "kind": "audit",
+          "permission": "admin:menu:read",
+          "component": "audit-timeline",
+          "order": 30,
+          "empty": {
+            "zh": "暂无审计记录",
+            "en": "No audit records"
+          }
+        }
+      ]
+    },
+    {
+      "name": "apiResources",
+      "code": "api-resources",
+      "label": {
+        "zh": "API 资源",
+        "en": "API Resources"
+      },
+      "group": "system",
+      "menu": {
+        "parentCode": "access",
+        "path": "/api-resources",
+        "icon": "api",
+        "sortOrder": 160,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "apiResources",
+        "list": "/api-resources",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/api-resources",
+      "permissions": {
+        "read": "admin:api-resource:read",
+        "create": "admin:api-resource:create",
+        "update": "admin:api-resource:update",
+        "delete": "admin:api-resource:delete"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/api-resources/queries",
+          "permission": "admin:api-resource:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/api-resources",
+          "permission": "admin:api-resource:create",
+          "auditAction": "api_resource.create"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/admin/api-resources/:id",
+          "permission": "admin:api-resource:update",
+          "auditAction": "api_resource.update"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/admin/api-resources/:id",
+          "permission": "admin:api-resource:delete",
+          "auditAction": "api_resource.delete"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "method",
+            "label": {
+              "zh": "方法",
+              "en": "Method"
+            },
+            "type": "select",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true,
+            "options": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ]
+          },
+          {
+            "key": "path",
+            "label": {
+              "zh": "路径",
+              "en": "Path"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "permission",
+            "label": {
+              "zh": "权限码",
+              "en": "Permission"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "table": true,
+            "form": true,
+            "options": [
+              "enabled",
+              "disabled"
+            ]
+          }
+        ],
+        "search": [
+          "method",
+          "path",
+          "permission"
+        ],
+        "table": [
+          "method",
+          "path",
+          "permission",
+          "status"
+        ],
+        "form": [
+          "method",
+          "path",
+          "permission",
+          "status"
+        ]
+      },
+      "codegen": {
+        "mode": "scaffold",
+        "model": "APIResource",
+        "table": "platform_api_resources"
+      }
+    },
+    {
+      "name": "apiDocs",
+      "code": "api-docs",
+      "label": {
+        "zh": "API 文档",
+        "en": "API Docs"
+      },
+      "group": "system",
+      "menu": {
+        "parentCode": "access",
+        "path": "/api-docs",
+        "icon": "book",
+        "sortOrder": 170,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "apiDocs",
+        "list": "/api-docs",
+        "component": "APIDocsPage"
+      },
+      "apiBase": "/api/openapi.json",
+      "permissions": {
+        "read": "admin:api-docs:read"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/openapi.json",
+          "permission": "admin:api-docs:read"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "title",
+            "label": {
+              "zh": "标题",
+              "en": "Title"
+            },
+            "type": "text",
+            "table": true,
+            "detail": true
+          },
+          {
+            "key": "version",
+            "label": {
+              "zh": "版本",
+              "en": "Version"
+            },
+            "type": "text",
+            "table": true,
+            "detail": true
+          },
+          {
+            "key": "routeCount",
+            "label": {
+              "zh": "路由数",
+              "en": "Routes"
+            },
+            "type": "number",
+            "table": true,
+            "detail": true
+          }
+        ],
+        "search": [
+          "title",
+          "version"
+        ],
+        "table": [
+          "title",
+          "version",
+          "routeCount"
+        ],
+        "form": []
+      },
+      "codegen": {
+        "mode": "custom",
+        "reason": "OpenAPI is generated from route metadata after the route contract is stable."
+      }
+    },
+    {
+      "name": "dictionaries",
+      "code": "dictionaries",
+      "label": {
+        "zh": "字典管理",
+        "en": "Dictionaries"
+      },
+      "group": "system",
+      "menu": {
+        "parentCode": "configuration",
+        "path": "/dictionaries",
+        "icon": "book",
+        "sortOrder": 210,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "dictionaries",
+        "list": "/dictionaries",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/dictionaries",
+      "permissions": {
+        "read": "admin:dictionary:read",
+        "create": "admin:dictionary:create",
+        "update": "admin:dictionary:update",
+        "delete": "admin:dictionary:delete"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/dictionaries/queries",
+          "permission": "admin:dictionary:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/dictionaries",
+          "permission": "admin:dictionary:create",
+          "auditAction": "dictionary.create"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/admin/dictionaries/:id",
+          "permission": "admin:dictionary:update",
+          "auditAction": "dictionary.update"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/admin/dictionaries/:id",
+          "permission": "admin:dictionary:delete",
+          "auditAction": "dictionary.delete"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "code",
+            "label": {
+              "zh": "字典编码",
+              "en": "Code"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "name",
+            "label": {
+              "zh": "字典名称",
+              "en": "Name"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "itemCount",
+            "label": {
+              "zh": "条目数",
+              "en": "Items"
+            },
+            "type": "number",
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "table": true,
+            "form": true,
+            "options": [
+              "enabled",
+              "disabled"
+            ]
+          }
+        ],
+        "search": [
+          "code",
+          "name",
+          "status"
+        ],
+        "table": [
+          "code",
+          "name",
+          "itemCount",
+          "status"
+        ],
+        "form": [
+          "code",
+          "name",
+          "status"
+        ]
+      },
+      "codegen": {
+        "mode": "scaffold",
+        "model": "Dictionary",
+        "table": "platform_dictionaries"
+      }
+    },
+    {
+      "name": "parameters",
+      "code": "parameters",
+      "label": {
+        "zh": "参数管理",
+        "en": "Parameters"
+      },
+      "group": "system",
+      "menu": {
+        "parentCode": "configuration",
+        "path": "/parameters",
+        "icon": "control",
+        "sortOrder": 220,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "parameters",
+        "list": "/parameters",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/parameters",
+      "permissions": {
+        "read": "admin:parameter:read",
+        "create": "admin:parameter:create",
+        "update": "admin:parameter:update",
+        "delete": "admin:parameter:delete"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/parameters/queries",
+          "permission": "admin:parameter:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/parameters",
+          "permission": "admin:parameter:create",
+          "auditAction": "parameter.create"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/admin/parameters/:id",
+          "permission": "admin:parameter:update",
+          "auditAction": "parameter.update"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/admin/parameters/:id",
+          "permission": "admin:parameter:delete",
+          "auditAction": "parameter.delete"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "key",
+            "label": {
+              "zh": "参数键",
+              "en": "Key"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "value",
+            "label": {
+              "zh": "参数值",
+              "en": "Value"
+            },
+            "type": "text",
+            "required": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "group",
+            "label": {
+              "zh": "分组",
+              "en": "Group"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "table": true,
+            "form": true,
+            "options": [
+              "enabled",
+              "disabled"
+            ]
+          }
+        ],
+        "search": [
+          "key",
+          "group",
+          "status"
+        ],
+        "table": [
+          "key",
+          "value",
+          "group",
+          "status"
+        ],
+        "form": [
+          "key",
+          "value",
+          "group",
+          "status"
+        ]
+      },
+      "codegen": {
+        "mode": "scaffold",
+        "model": "Parameter",
+        "table": "platform_parameters"
+      }
+    },
+    {
+      "name": "areaCodes",
+      "code": "area-codes",
+      "label": {
+        "zh": "地址码",
+        "en": "Area Codes"
+      },
+      "group": "system",
+      "menu": {
+        "parentCode": "configuration",
+        "path": "/area-codes",
+        "icon": "cluster",
+        "sortOrder": 230,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "areaCodes",
+        "list": "/area-codes",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/area-codes",
+      "permissions": {
+        "read": "admin:area-code:read",
+        "create": "admin:area-code:create",
+        "update": "admin:area-code:update",
+        "delete": "admin:area-code:delete"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/area-codes/queries",
+          "permission": "admin:area-code:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/area-codes",
+          "permission": "admin:area-code:create",
+          "auditAction": "area_code.create"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/admin/area-codes/:id",
+          "permission": "admin:area-code:update",
+          "auditAction": "area_code.update"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/admin/area-codes/:id",
+          "permission": "admin:area-code:delete",
+          "auditAction": "area_code.delete"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "code",
+            "label": {
+              "zh": "地址码",
+              "en": "Area Code"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "name",
+            "label": {
+              "zh": "区域名称",
+              "en": "Area Name"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "parentCode",
+            "label": {
+              "zh": "上级地址码",
+              "en": "Parent Code"
+            },
+            "type": "select",
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "relation": {
+              "resource": "area-codes",
+              "valueField": "code",
+              "labelField": "name",
+              "filters": [
+                {
+                  "field": "status",
+                  "operator": "=",
+                  "value": "enabled"
+                }
+              ],
+              "sortField": "name",
+              "sortOrder": "asc",
+              "display": "tree",
+              "parentField": "parentCode",
+              "pathField": "path"
+            }
+          },
+          {
+            "key": "level",
+            "label": {
+              "zh": "层级",
+              "en": "Level"
+            },
+            "type": "select",
+            "search": true,
+            "table": true,
+            "form": true,
+            "options": [
+              "country",
+              "province",
+              "city",
+              "district",
+              "street",
+              "custom"
+            ]
+          },
+          {
+            "key": "path",
+            "label": {
+              "zh": "层级路径",
+              "en": "Path"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true
+          },
+          {
+            "key": "sortOrder",
+            "label": {
+              "zh": "排序",
+              "en": "Sort Order"
+            },
+            "type": "number",
+            "table": true,
+            "form": true,
+            "detail": true
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "table": true,
+            "form": true,
+            "options": [
+              "enabled",
+              "disabled"
+            ]
+          },
+          {
+            "key": "description",
+            "label": {
+              "zh": "说明",
+              "en": "Description"
+            },
+            "type": "textarea",
+            "form": true,
+            "detail": true
+          }
+        ],
+        "search": [
+          "code",
+          "name",
+          "parentCode",
+          "level",
+          "path",
+          "status"
+        ],
+        "table": [
+          "code",
+          "name",
+          "parentCode",
+          "level",
+          "path",
+          "sortOrder",
+          "status"
+        ],
+        "form": [
+          "code",
+          "name",
+          "parentCode",
+          "level",
+          "path",
+          "sortOrder",
+          "status",
+          "description"
+        ]
+      },
+      "codegen": {
+        "mode": "scaffold",
+        "model": "AreaCode",
+        "table": "platform_area_codes"
+      }
+    },
+    {
+      "name": "auditLogs",
+      "code": "audit-logs",
+      "label": {
+        "zh": "操作审计",
+        "en": "Audit Logs"
+      },
+      "group": "operations",
+      "menu": {
+        "parentCode": "logs",
+        "path": "/audit-logs",
+        "icon": "history",
+        "sortOrder": 310,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "auditLogs",
+        "list": "/audit-logs",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/audit-logs",
+      "permissions": {
+        "read": "admin:audit-log:read"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/audit-logs/queries",
+          "permission": "admin:audit-log:read"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "actor",
+            "label": {
+              "zh": "操作人",
+              "en": "Actor"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "action",
+            "label": {
+              "zh": "动作",
+              "en": "Action"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "resource",
+            "label": {
+              "zh": "资源",
+              "en": "Resource"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "targetId",
+            "label": {
+              "zh": "目标 ID",
+              "en": "Target ID"
+            },
+            "type": "text",
+            "search": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "targetCode",
+            "label": {
+              "zh": "目标编码",
+              "en": "Target Code"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "targetName",
+            "label": {
+              "zh": "目标名称",
+              "en": "Target Name"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "provider",
+            "label": {
+              "zh": "提供方",
+              "en": "Provider"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "sessionId",
+            "label": {
+              "zh": "会话 ID",
+              "en": "Session ID"
+            },
+            "type": "text",
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "createdAt",
+            "label": {
+              "zh": "发生时间",
+              "en": "Created At"
+            },
+            "type": "datetime",
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "traceId",
+            "label": {
+              "zh": "链路 ID",
+              "en": "Trace ID"
+            },
+            "type": "text",
+            "search": true,
+            "detail": true,
+            "readOnly": true
+          }
+        ],
+        "search": [
+          "actor",
+          "action",
+          "resource",
+          "targetCode",
+          "targetName",
+          "provider",
+          "traceId"
+        ],
+        "table": [
+          "actor",
+          "action",
+          "resource",
+          "targetCode",
+          "targetName",
+          "provider",
+          "createdAt"
+        ],
+        "form": []
+      },
+      "codegen": {
+        "mode": "readOnly",
+        "model": "AuditLog",
+        "table": "platform_audit_logs"
+      }
+    },
+    {
+      "name": "loginLogs",
+      "code": "login-logs",
+      "label": {
+        "zh": "登录日志",
+        "en": "Login Logs"
+      },
+      "group": "operations",
+      "menu": {
+        "parentCode": "logs",
+        "path": "/login-logs",
+        "icon": "desktop",
+        "sortOrder": 320,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "loginLogs",
+        "list": "/login-logs",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/login-logs",
+      "permissions": {
+        "read": "admin:login-log:read"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/login-logs/queries",
+          "permission": "admin:login-log:read"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "username",
+            "label": {
+              "zh": "用户",
+              "en": "User"
+            },
+            "type": "text",
+            "search": true,
+            "table": true
+          },
+          {
+            "key": "provider",
+            "label": {
+              "zh": "登录方式",
+              "en": "Provider"
+            },
+            "type": "text",
+            "search": true,
+            "table": true
+          },
+          {
+            "key": "ip",
+            "label": {
+              "zh": "IP",
+              "en": "IP"
+            },
+            "type": "text",
+            "search": true,
+            "table": true
+          },
+          {
+            "key": "createdAt",
+            "label": {
+              "zh": "时间",
+              "en": "Created At"
+            },
+            "type": "datetime",
+            "table": true,
+            "detail": true
+          }
+        ],
+        "search": [
+          "username",
+          "provider",
+          "ip"
+        ],
+        "table": [
+          "username",
+          "provider",
+          "ip",
+          "createdAt"
+        ],
+        "form": []
+      },
+      "codegen": {
+        "mode": "readOnly",
+        "model": "LoginLog",
+        "table": "platform_login_logs"
+      }
+    },
+    {
+      "name": "errorLogs",
+      "code": "error-logs",
+      "label": {
+        "zh": "错误日志",
+        "en": "Error Logs"
+      },
+      "group": "operations",
+      "menu": {
+        "parentCode": "logs",
+        "path": "/error-logs",
+        "icon": "warning",
+        "sortOrder": 330,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "errorLogs",
+        "list": "/error-logs",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/error-logs",
+      "permissions": {
+        "read": "admin:error-log:read"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/error-logs/queries",
+          "permission": "admin:error-log:read"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "level",
+            "label": {
+              "zh": "级别",
+              "en": "Level"
+            },
+            "type": "text",
+            "search": true,
+            "table": true
+          },
+          {
+            "key": "message",
+            "label": {
+              "zh": "信息",
+              "en": "Message"
+            },
+            "type": "textarea",
+            "search": true,
+            "table": true,
+            "detail": true
+          },
+          {
+            "key": "traceId",
+            "label": {
+              "zh": "追踪 ID",
+              "en": "Trace ID"
+            },
+            "type": "text",
+            "search": true,
+            "table": true
+          },
+          {
+            "key": "createdAt",
+            "label": {
+              "zh": "时间",
+              "en": "Created At"
+            },
+            "type": "datetime",
+            "table": true,
+            "detail": true
+          }
+        ],
+        "search": [
+          "level",
+          "message",
+          "traceId"
+        ],
+        "table": [
+          "level",
+          "message",
+          "traceId",
+          "createdAt"
+        ],
+        "form": []
+      },
+      "codegen": {
+        "mode": "readOnly",
+        "model": "ErrorLog",
+        "table": "platform_error_logs"
+      }
+    },
+    {
+      "name": "files",
+      "code": "files",
+      "label": {
+        "zh": "文件管理",
+        "en": "Files"
+      },
+      "group": "operations",
+      "menu": {
+        "parentCode": "storage",
+        "path": "/files",
+        "icon": "upload",
+        "sortOrder": 340,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "files",
+        "list": "/files",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/files",
+      "permissions": {
+        "read": "admin:file:read",
+        "create": "admin:file:create",
+        "delete": "admin:file:delete"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/files/queries",
+          "permission": "admin:file:read"
+        },
+        {
+          "method": "GET",
+          "path": "/api/admin/files/:id/content",
+          "permission": "admin:file:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/files",
+          "permission": "admin:file:create",
+          "auditAction": "file.create"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/files/upload",
+          "permission": "admin:file:create",
+          "auditAction": "file.upload"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/admin/files/:id",
+          "permission": "admin:file:delete",
+          "auditAction": "file.delete"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "name",
+            "label": {
+              "zh": "文件名",
+              "en": "Filename"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true
+          },
+          {
+            "key": "code",
+            "label": {
+              "zh": "存储键",
+              "en": "Storage Key"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "table": true,
+            "form": true,
+            "options": [
+              "enabled",
+              "disabled"
+            ]
+          },
+          {
+            "key": "description",
+            "label": {
+              "zh": "描述",
+              "en": "Description"
+            },
+            "type": "textarea",
+            "form": true,
+            "detail": true
+          },
+          {
+            "key": "mimeType",
+            "label": {
+              "zh": "类型",
+              "en": "MIME Type"
+            },
+            "type": "text",
+            "search": true,
+            "table": true
+          },
+          {
+            "key": "size",
+            "label": {
+              "zh": "大小",
+              "en": "Size"
+            },
+            "type": "number",
+            "table": true
+          },
+          {
+            "key": "storageDriver",
+            "label": {
+              "zh": "存储驱动",
+              "en": "Storage Driver"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "storageKey",
+            "label": {
+              "zh": "对象键",
+              "en": "Object Key"
+            },
+            "type": "text",
+            "search": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "storagePath",
+            "label": {
+              "zh": "存储路径",
+              "en": "Storage Path"
+            },
+            "type": "text",
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "publicUrl",
+            "label": {
+              "zh": "公开地址",
+              "en": "Public URL"
+            },
+            "type": "text",
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "createdAt",
+            "label": {
+              "zh": "上传时间",
+              "en": "Created At"
+            },
+            "type": "datetime",
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "updatedAt",
+            "label": {
+              "zh": "更新时间",
+              "en": "Updated At"
+            },
+            "type": "datetime",
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          }
+        ],
+        "search": [
+          "name",
+          "code",
+          "mimeType",
+          "storageDriver",
+          "createdAt"
+        ],
+        "table": [
+          "name",
+          "mimeType",
+          "size",
+          "storageDriver",
+          "createdAt"
+        ],
+        "form": [
+          "name",
+          "status",
+          "description",
+          "mimeType"
+        ]
+      },
+      "codegen": {
+        "mode": "custom",
+        "model": "FileObject",
+        "table": "platform_files",
+        "reason": "Upload flow needs storage adapter integration."
+      }
+    },
+    {
+      "name": "sessions",
+      "code": "sessions",
+      "label": {
+        "zh": "在线会话",
+        "en": "Sessions"
+      },
+      "group": "operations",
+      "menu": {
+        "parentCode": "security",
+        "path": "/sessions",
+        "icon": "wifi",
+        "sortOrder": 350,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "sessions",
+        "list": "/sessions",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/sessions",
+      "permissions": {
+        "read": "admin:session:read",
+        "delete": "admin:session:delete"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/sessions/queries",
+          "permission": "admin:session:read"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/admin/sessions/:id",
+          "permission": "admin:session:delete",
+          "auditAction": "session.delete"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "username",
+            "label": {
+              "zh": "用户",
+              "en": "User"
+            },
+            "type": "text",
+            "search": true,
+            "table": true
+          },
+          {
+            "key": "tokenType",
+            "label": {
+              "zh": "令牌类型",
+              "en": "Token Type"
+            },
+            "type": "text",
+            "search": true,
+            "table": true
+          },
+          {
+            "key": "expiresAt",
+            "label": {
+              "zh": "过期时间",
+              "en": "Expires At"
+            },
+            "type": "datetime",
+            "table": true
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "table": true,
+            "options": [
+              "active",
+              "revoked"
+            ]
+          }
+        ],
+        "search": [
+          "username",
+          "tokenType",
+          "status"
+        ],
+        "table": [
+          "username",
+          "tokenType",
+          "expiresAt",
+          "status"
+        ],
+        "form": []
+      },
+      "codegen": {
+        "mode": "readOnly",
+        "model": "Session",
+        "table": "platform_sessions"
+      }
+    },
+    {
+      "name": "versions",
+      "code": "versions",
+      "label": {
+        "zh": "版本管理",
+        "en": "Versions"
+      },
+      "group": "operations",
+      "menu": {
+        "parentCode": "release",
+        "path": "/versions",
+        "icon": "cluster",
+        "sortOrder": 360,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "versions",
+        "list": "/versions",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/versions",
+      "permissions": {
+        "read": "admin:version:read",
+        "create": "admin:version:create",
+        "update": "admin:version:update"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/versions/queries",
+          "permission": "admin:version:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/versions",
+          "permission": "admin:version:create",
+          "auditAction": "version.create"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/admin/versions/:id",
+          "permission": "admin:version:update",
+          "auditAction": "version.update"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "version",
+            "label": {
+              "zh": "版本号",
+              "en": "Version"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "channel",
+            "label": {
+              "zh": "渠道",
+              "en": "Channel"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "table": true,
+            "form": true,
+            "options": [
+              "draft",
+              "released",
+              "disabled"
+            ]
+          },
+          {
+            "key": "releasedAt",
+            "label": {
+              "zh": "发布时间",
+              "en": "Released At"
+            },
+            "type": "datetime",
+            "table": true,
+            "form": true
+          }
+        ],
+        "search": [
+          "version",
+          "channel",
+          "status"
+        ],
+        "table": [
+          "version",
+          "channel",
+          "status",
+          "releasedAt"
+        ],
+        "form": [
+          "version",
+          "channel",
+          "status",
+          "releasedAt"
+        ]
+      },
+      "codegen": {
+        "mode": "scaffold",
+        "model": "Version",
+        "table": "platform_versions"
+      }
+    },
+    {
+      "name": "apiTokens",
+      "code": "api-tokens",
+      "label": {
+        "zh": "API Token",
+        "en": "API Tokens"
+      },
+      "group": "operations",
+      "menu": {
+        "parentCode": "security",
+        "path": "/api-tokens",
+        "icon": "key",
+        "sortOrder": 370,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "apiTokens",
+        "list": "/api-tokens",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/api-tokens",
+      "permissions": {
+        "read": "admin:api-token:read",
+        "create": "admin:api-token:create",
+        "delete": "admin:api-token:delete"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/api-tokens/queries",
+          "permission": "admin:api-token:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/api-tokens",
+          "permission": "admin:api-token:create",
+          "auditAction": "api_token.create"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/admin/api-tokens/:id",
+          "permission": "admin:api-token:delete",
+          "auditAction": "api_token.delete"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "name",
+            "label": {
+              "zh": "名称",
+              "en": "Name"
+            },
+            "type": "text",
+            "required": true,
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "scope",
+            "label": {
+              "zh": "作用域",
+              "en": "Scope"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "expiresAt",
+            "label": {
+              "zh": "过期时间",
+              "en": "Expires At"
+            },
+            "type": "datetime",
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "table": true,
+            "options": [
+              "active",
+              "revoked"
+            ]
+          }
+        ],
+        "search": [
+          "name",
+          "scope",
+          "status"
+        ],
+        "table": [
+          "name",
+          "scope",
+          "expiresAt",
+          "status"
+        ],
+        "form": [
+          "name",
+          "scope",
+          "expiresAt"
+        ]
+      },
+      "codegen": {
+        "mode": "custom",
+        "model": "APIToken",
+        "table": "platform_api_tokens",
+        "reason": "Token creation returns secret once and requires special response handling."
+      }
+    },
+    {
+      "name": "capabilities",
+      "code": "capabilities",
+      "label": {
+        "zh": "能力清单",
+        "en": "Capabilities"
+      },
+      "group": "foundation",
+      "menu": {
+        "parentCode": "runtime",
+        "path": "/capabilities",
+        "icon": "branches",
+        "sortOrder": 410,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "capabilities",
+        "list": "/capabilities",
+        "component": "CapabilityConsole"
+      },
+      "apiBase": "/api/capabilities",
+      "permissions": {
+        "read": "admin:capability:read"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/capabilities",
+          "permission": "admin:capability:read"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "id",
+            "label": {
+              "zh": "能力 ID",
+              "en": "Capability ID"
+            },
+            "type": "text",
+            "search": true,
+            "table": true
+          },
+          {
+            "key": "name",
+            "label": {
+              "zh": "名称",
+              "en": "Name"
+            },
+            "type": "text",
+            "search": true,
+            "table": true
+          },
+          {
+            "key": "version",
+            "label": {
+              "zh": "版本",
+              "en": "Version"
+            },
+            "type": "text",
+            "table": true
+          }
+        ],
+        "search": [
+          "id",
+          "name"
+        ],
+        "table": [
+          "id",
+          "name",
+          "version"
+        ],
+        "form": []
+      },
+      "codegen": {
+        "mode": "custom",
+        "reason": "Capability registry is runtime-composed from plugin manifests."
+      }
+    },
+    {
+      "name": "demoData",
+      "code": "demo-data",
+      "label": {
+        "zh": "演示数据",
+        "en": "Demo Data"
+      },
+      "group": "foundation",
+      "menu": {
+        "parentCode": "runtime",
+        "path": "/demo-data",
+        "icon": "database",
+        "sortOrder": 420,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "demoData",
+        "list": "/demo-data",
+        "component": "DemoDataConsole"
+      },
+      "apiBase": "/api/admin/demo-data",
+      "permissions": {
+        "read": "admin:demo-data:read",
+        "apply": "admin:demo-data:apply"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/admin/demo-data",
+          "permission": "admin:demo-data:read"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/demo-data/:capabilityId/:datasetId/apply",
+          "permission": "admin:demo-data:apply",
+          "auditAction": "demo_data.apply"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "capabilityId",
+            "label": {
+              "zh": "能力",
+              "en": "Capability"
+            },
+            "type": "text",
+            "search": true,
+            "table": true
+          },
+          {
+            "key": "title",
+            "label": {
+              "zh": "数据集",
+              "en": "Dataset"
+            },
+            "type": "text",
+            "search": true,
+            "table": true
+          },
+          {
+            "key": "records",
+            "label": {
+              "zh": "记录数",
+              "en": "Records"
+            },
+            "type": "number",
+            "table": true
+          }
+        ],
+        "search": [
+          "capabilityId",
+          "title"
+        ],
+        "table": [
+          "capabilityId",
+          "title",
+          "records"
+        ],
+        "form": []
+      },
+      "codegen": {
+        "mode": "custom",
+        "reason": "Demo data is capability-provided and applied through capability hooks."
+      }
+    },
+    {
+      "name": "branding",
+      "code": "branding",
+      "label": {
+        "zh": "品牌配置",
+        "en": "Branding"
+      },
+      "group": "foundation",
+      "menu": {
+        "parentCode": "configuration",
+        "path": "/branding",
+        "icon": "skin",
+        "sortOrder": 430,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "branding",
+        "list": "/branding",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/platform/branding",
+      "permissions": {
+        "read": "admin:branding:read",
+        "update": "admin:branding:update"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/platform/branding",
+          "permission": "admin:branding:read"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/platform/branding",
+          "permission": "admin:branding:update",
+          "auditAction": "branding.update"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "productName",
+            "label": {
+              "zh": "产品名称",
+              "en": "Product Name"
+            },
+            "type": "text",
+            "required": true,
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "shortName",
+            "label": {
+              "zh": "简称",
+              "en": "Short Name"
+            },
+            "type": "text",
+            "form": true
+          },
+          {
+            "key": "primaryColor",
+            "label": {
+              "zh": "主色",
+              "en": "Primary Color"
+            },
+            "type": "color",
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "defaultTheme",
+            "label": {
+              "zh": "默认主题",
+              "en": "Default Theme"
+            },
+            "type": "select",
+            "table": true,
+            "form": true,
+            "options": [
+              "tech",
+              "white",
+              "black",
+              "warm"
+            ]
+          }
+        ],
+        "search": [
+          "productName",
+          "shortName"
+        ],
+        "table": [
+          "productName",
+          "primaryColor",
+          "defaultTheme"
+        ],
+        "form": [
+          "productName",
+          "shortName",
+          "primaryColor",
+          "defaultTheme"
+        ]
+      },
+      "codegen": {
+        "mode": "custom",
+        "reason": "Branding is a singleton configuration resource."
+      }
+    },
+    {
+      "name": "settings",
+      "code": "settings",
+      "label": {
+        "zh": "系统设置",
+        "en": "Settings"
+      },
+      "group": "foundation",
+      "menu": {
+        "parentCode": "configuration",
+        "path": "/settings",
+        "icon": "setting",
+        "sortOrder": 440,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "settings",
+        "list": "/settings",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/settings",
+      "permissions": {
+        "read": "admin:settings:read",
+        "update": "admin:settings:update"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/admin/settings",
+          "permission": "admin:settings:read"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/admin/settings",
+          "permission": "admin:settings:update",
+          "auditAction": "settings.update"
+        }
+      ],
+      "schema": {
+        "fields": [
+          {
+            "key": "key",
+            "label": {
+              "zh": "配置键",
+              "en": "Key"
+            },
+            "type": "text",
+            "search": true,
+            "table": true
+          },
+          {
+            "key": "value",
+            "label": {
+              "zh": "配置值",
+              "en": "Value"
+            },
+            "type": "text",
+            "table": true,
+            "form": true
+          },
+          {
+            "key": "group",
+            "label": {
+              "zh": "分组",
+              "en": "Group"
+            },
+            "type": "text",
+            "search": true,
+            "table": true
+          },
+          {
+            "key": "updatedAt",
+            "label": {
+              "zh": "更新时间",
+              "en": "Updated At"
+            },
+            "type": "datetime",
+            "table": true,
+            "detail": true
+          }
+        ],
+        "search": [
+          "key",
+          "group"
+        ],
+        "table": [
+          "key",
+          "value",
+          "group",
+          "updatedAt"
+        ],
+        "form": [
+          "value"
+        ]
+      },
+      "codegen": {
+        "mode": "custom",
+        "reason": "Settings combine global and capability-provided configuration."
+      }
+    }
+  ]
+}

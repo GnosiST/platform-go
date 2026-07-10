@@ -1,4 +1,5 @@
 const API_BASE = import.meta.env.VITE_PLATFORM_API_BASE ?? "/api";
+const AUTH_TOKEN_KEY = "platform.auth.token";
 
 export type PlatformResponse<T> = {
   data?: T;
@@ -12,6 +13,125 @@ export type CapabilityItem = {
   id: string;
   name: string;
   version: string;
+};
+
+export type BrandingConfig = {
+  productName: string;
+  shortName: string;
+  logoUrl: string;
+  faviconUrl: string;
+  primaryColor: string;
+  defaultTheme: string;
+  loginTitle: string;
+  loginSubtitle: string;
+  supportEmail: string;
+};
+
+export type AuthProvider = {
+  id: string;
+  kind: "demo" | "wechat" | string;
+  title: LocalizedText;
+  description: LocalizedText;
+  enabled: boolean;
+  configured: boolean;
+  configKeys?: string[];
+};
+
+export type AuthProviderList = {
+  items: AuthProvider[];
+};
+
+export type AuthLoginInput = {
+  provider: string;
+  username?: string;
+  code?: string;
+};
+
+export type AuthLoginResult = {
+  token: string;
+  expiresAt: string;
+  principal: AdminCurrentSession;
+};
+
+export type AdminCurrentSession = {
+  user: {
+    id: string;
+    username: string;
+    name: string;
+    tenantCode?: string;
+    orgUnitCode?: string;
+    areaCode?: string;
+  };
+  roles: string[];
+  permissions: string[];
+  deniedPermissions?: string[];
+};
+
+export type AdminMenuItem = {
+  name: string;
+  route: string;
+  parent: string;
+  isExternal: boolean;
+  cacheEnabled: boolean;
+  resource: string;
+  title: LocalizedText;
+  description: LocalizedText;
+  permission: string;
+  group: string;
+  icon: string;
+  order: number;
+};
+
+export type AdminMenuList = {
+  items: AdminMenuItem[];
+};
+
+export type AdminDemoDataItem = {
+  id: string;
+  capabilityId: string;
+  resource: string;
+  title: LocalizedText;
+  description: LocalizedText;
+  records: number;
+};
+
+export type AdminDemoDataList = {
+  items: AdminDemoDataItem[];
+};
+
+export type AdminDemoDataApplyResult = {
+  id: string;
+  capabilityId: string;
+  resource: string;
+  applied: number;
+};
+
+export type AdminOpenAPIOperation = {
+  operationId?: string;
+  summary?: string;
+  description?: string;
+  tags?: string[];
+  "x-platform-resource"?: string;
+  "x-platform-permission"?: string;
+  "x-platform-codegen-mode"?: string;
+};
+
+export type AdminOpenAPIDocument = {
+  openapi: string;
+  info: {
+    title: string;
+    version: string;
+    description?: string;
+  };
+  paths: Record<string, Record<string, AdminOpenAPIOperation>>;
+  tags?: Array<{ name: string; description?: string }>;
+  components?: {
+    schemas?: Record<string, unknown>;
+    securitySchemes?: Record<string, unknown>;
+  };
+  "x-generated-by"?: string;
+  "x-source"?: string;
+  "x-source-version"?: string;
 };
 
 export type AdminResourceRecord = {
@@ -32,21 +152,211 @@ export type AdminResourceInput = {
   values?: Record<string, string>;
 };
 
+export type LocalizedText = {
+  zh: string;
+  en: string;
+};
+
+export type AdminResourceFieldOption = {
+  value: string;
+  label: LocalizedText;
+};
+
+export type AdminResourceFormGroup = {
+  key: string;
+  label: LocalizedText;
+  description?: LocalizedText;
+};
+
+export type AdminResourceFormLayout = "single-column" | "grouped-sections" | "two-column-density" | "side-detail-preview";
+export type AdminResourceRuntimeSlotRegion = "form.header" | "form.section.before" | "form.section.after" | "form.footer" | "field.control" | "side.preview";
+export type AdminResourceRuntimeSlotVariant = "compact" | "info" | "warning" | "preview" | "inline";
+export type AdminResourceRuntimeSlotDataBindingMode = "record" | "formValues" | "resource" | "none";
+
+export type AdminResourceRuntimeSlotDataBinding = {
+  mode?: AdminResourceRuntimeSlotDataBindingMode;
+  fields?: string[];
+};
+
+export type AdminResourceRuntimeSlot = {
+  slotId: string;
+  region: AdminResourceRuntimeSlotRegion;
+  label: LocalizedText;
+  description: LocalizedText;
+  permission?: string;
+  visibleWhen?: string;
+  targetSection?: string;
+  targetField?: string;
+  dataBinding?: AdminResourceRuntimeSlotDataBinding;
+  variant?: AdminResourceRuntimeSlotVariant;
+  order?: number;
+};
+
+export type AdminResourceFieldValidation = {
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  pattern?: string;
+};
+
+export type AdminResourceFieldRelationFilter = {
+  field: string;
+  operator: AdminResourceQueryOperator;
+  value: string;
+};
+
+export type AdminResourceFieldRelation = {
+  resource: string;
+  valueField: string;
+  labelField: string;
+  multiple?: boolean;
+  filters?: AdminResourceFieldRelationFilter[];
+  sortField?: string;
+  sortOrder?: "asc" | "desc";
+  display?: "select" | "tree";
+  parentField?: string;
+  pathField?: string;
+  rootValue?: string;
+};
+
+export type AdminResourceField = {
+  key: string;
+  label: LocalizedText;
+  type: "text" | "textarea" | "select" | "multiselect" | "datetime" | "switch" | "number" | "color";
+  source: "record" | "values";
+  group?: string;
+  help?: LocalizedText;
+  required?: boolean;
+  readOnly?: boolean;
+  searchable?: boolean;
+  filterable?: boolean;
+  sortable?: boolean;
+  localizable?: boolean;
+  inTable?: boolean;
+  inForm?: boolean;
+  inDetail?: boolean;
+  width?: number;
+  options?: Array<AdminResourceFieldOption & { parentValue?: string; pathValue?: string }>;
+  relation?: AdminResourceFieldRelation;
+  validation?: AdminResourceFieldValidation;
+};
+
+export type AdminResourcePermissions = {
+  read: string;
+  create: string;
+  update: string;
+  delete: string;
+};
+
+export type AdminResourceActionConfirm = {
+  title: LocalizedText;
+  description?: LocalizedText;
+  okText?: LocalizedText;
+};
+
+export type AdminResourceAction = {
+  key: string;
+  label: LocalizedText;
+  kind: "row" | "batch" | "resource";
+  tone?: "default" | "primary" | "danger" | "warning";
+  icon?: string;
+  permission: string;
+  route?: string;
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  confirm?: AdminResourceActionConfirm;
+  auditAction?: string;
+  refresh?: boolean;
+};
+
+export type AdminResourcePanel = {
+  key: string;
+  label: LocalizedText;
+  kind: "fields" | "permissions" | "audit" | "approval" | "files" | "custom";
+  permission?: string;
+  component?: string;
+  order?: number;
+  empty?: LocalizedText;
+};
+
+export type AdminResourceSchema = {
+  resource: string;
+  title: LocalizedText;
+  description: LocalizedText;
+  permissions: AdminResourcePermissions;
+  formGroups?: AdminResourceFormGroup[];
+  formLayout?: AdminResourceFormLayout;
+  fields: AdminResourceField[];
+  actions?: AdminResourceAction[];
+  panels?: AdminResourcePanel[];
+  runtimeSlots?: AdminResourceRuntimeSlot[];
+  searchFields: string[];
+  defaultSortKey?: string;
+};
+
 export type AdminResourceList = {
   resource: string;
   items: AdminResourceRecord[];
 };
 
+export type AdminResourceQueryOperator = "contains" | "=" | "!=" | ">" | ">=" | "<" | "<=";
+
+export type AdminResourceQueryCondition = {
+  field: string;
+  operator: AdminResourceQueryOperator;
+  value: string;
+};
+
+export type AdminResourceQuerySort = {
+  field: string;
+  order: "asc" | "desc";
+};
+
+export type AdminResourceQueryInput = {
+  keywords?: string[];
+  conditions?: AdminResourceQueryCondition[];
+  sort?: AdminResourceQuerySort[];
+  page?: number;
+  pageSize?: number;
+};
+
+export type AdminResourceQueryResult = AdminResourceList & {
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 export type AdminResourceMutation = {
   resource: string;
   record: AdminResourceRecord;
+  token?: string;
+};
+
+export type AdminResourceActionResult = {
+  record?: AdminResourceRecord;
+  transition?: unknown;
+};
+
+export type AdminPolicyReviewActionResult = {
+  review: AdminResourceRecord;
+  role?: AdminResourceRecord;
+  audit?: AdminResourceRecord;
+};
+
+export type AdminPolicyReviewExport = {
+  exportedBy: string;
+  exportedAt: string;
+  reviews: AdminResourceRecord[];
+  audits: AdminResourceRecord[];
 };
 
 export async function request<T>(path: `/${string}`, init?: RequestInit): Promise<T> {
+  const token = getAuthToken();
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
   });
@@ -57,12 +367,110 @@ export async function request<T>(path: `/${string}`, init?: RequestInit): Promis
   return payload.data as T;
 }
 
+export function getAuthToken() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  return window.localStorage.getItem(AUTH_TOKEN_KEY) ?? "";
+}
+
+export function setAuthToken(token: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  if (token) {
+    window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+    return;
+  }
+  window.localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
+export function clearAuthToken() {
+  setAuthToken("");
+}
+
 export function listCapabilities() {
   return request<CapabilityItem[]>("/capabilities");
 }
 
+export function getBrandingConfig() {
+  return request<BrandingConfig>("/platform/branding");
+}
+
+export function listAuthProviders() {
+  return request<AuthProviderList>("/auth/providers");
+}
+
+export async function loginWithAuthProvider(input: AuthLoginInput) {
+  const result = await request<AuthLoginResult>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  setAuthToken(result.token);
+  return result;
+}
+
+export async function refreshCurrentSession() {
+  const result = await request<AuthLoginResult>("/auth/refresh", {
+    method: "POST",
+  });
+  setAuthToken(result.token);
+  return result;
+}
+
+export async function logoutCurrentSession() {
+  try {
+    await request<{ revoked: boolean }>("/auth/logout", {
+      method: "POST",
+    });
+  } finally {
+    clearAuthToken();
+  }
+}
+
+export function getCurrentAdminSession() {
+  return request<AdminCurrentSession>("/admin/session/current");
+}
+
+export function listAdminMenus() {
+  return request<AdminMenuList>("/admin/menus");
+}
+
+export function listAdminDemoData() {
+  return request<AdminDemoDataList>("/admin/demo-data");
+}
+
+export async function getAdminOpenAPI() {
+  const token = getAuthToken();
+  const response = await fetch(`${API_BASE}/openapi.json`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload?.error?.message ?? `HTTP ${response.status}`);
+  }
+  return payload as AdminOpenAPIDocument;
+}
+
+export function applyAdminDemoData(capabilityId: string, datasetId: string) {
+  return request<AdminDemoDataApplyResult>(`/admin/demo-data/${capabilityId}/${datasetId}/apply` as `/${string}`, {
+    method: "POST",
+  });
+}
+
 export function listAdminResource(resource: string) {
   return request<AdminResourceList>(`/admin/resources/${resource}` as `/${string}`);
+}
+
+export function queryAdminResource(resource: string, input: AdminResourceQueryInput) {
+  return request<AdminResourceQueryResult>(`/admin/resources/${resource}/query` as `/${string}`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function getAdminResourceSchema(resource: string) {
+  return request<AdminResourceSchema>(`/admin/resources/${resource}/schema` as `/${string}`);
 }
 
 export function createAdminResource(resource: string, input: AdminResourceInput) {
@@ -83,4 +491,72 @@ export function deleteAdminResource(resource: string, id: string) {
   return request<{ deleted: boolean; resource: string }>(`/admin/resources/${resource}/${id}` as `/${string}`, {
     method: "DELETE",
   });
+}
+
+export function executeAdminResourceAction(action: AdminResourceAction, record: AdminResourceRecord, metadata: Record<string, string> = {}) {
+  if (!action.route) {
+    throw new Error("Custom action route is not declared.");
+  }
+  const path = action.route.replace(":id", encodeURIComponent(record.id)).replace(/^\/api/, "") as `/${string}`;
+  const method = action.method ?? "POST";
+  return request<AdminResourceActionResult>(path, {
+    method,
+    body: method === "GET" || method === "DELETE" ? undefined : JSON.stringify(metadata),
+  });
+}
+
+export function requestAdminPolicyReview(id: string) {
+  return request<AdminPolicyReviewActionResult>(`/admin/policy-reviews/${encodeURIComponent(id)}/request` as `/${string}`, {
+    method: "POST",
+  });
+}
+
+export function approveAdminPolicyReview(id: string) {
+  return request<AdminPolicyReviewActionResult>(`/admin/policy-reviews/${encodeURIComponent(id)}/approve` as `/${string}`, {
+    method: "POST",
+  });
+}
+
+export function rejectAdminPolicyReview(id: string, reason: string) {
+  return request<AdminPolicyReviewActionResult>(`/admin/policy-reviews/${encodeURIComponent(id)}/reject` as `/${string}`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function exportAdminPolicyReviews() {
+  return request<AdminPolicyReviewExport>("/admin/policy-reviews/export", {
+    method: "GET",
+  });
+}
+
+export async function uploadAdminFile(file: File) {
+  const token = getAuthToken();
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch(`${API_BASE}/admin/files/upload`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: formData,
+  });
+  const payload = (await response.json()) as PlatformResponse<AdminResourceMutation>;
+  if (!response.ok || payload.error) {
+    throw new Error(payload.error?.message ?? `HTTP ${response.status}`);
+  }
+  return payload.data as AdminResourceMutation;
+}
+
+export function adminFileContentUrl(id: string) {
+  return `${API_BASE}/admin/files/${encodeURIComponent(id)}/content`;
+}
+
+export async function getAdminFileBlob(id: string) {
+  const token = getAuthToken();
+  const response = await fetch(adminFileContentUrl(id), {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  return response.blob();
 }

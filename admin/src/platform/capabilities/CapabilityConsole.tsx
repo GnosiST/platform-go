@@ -6,16 +6,24 @@ import {
   EditOutlined,
   EyeOutlined,
   FileSearchOutlined,
-  FilterOutlined,
   PlusOutlined,
-  ReloadOutlined,
-  SearchOutlined,
   SettingOutlined,
   StopOutlined,
 } from "@ant-design/icons";
-import { Alert, Button, Empty, Input, Progress, Segmented, Space, Spin, Table, Tag, Typography } from "antd";
+import { Button, Progress, Segmented, Space, Tag, Typography } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import type { Dictionary, Language } from "../i18n";
+import {
+  AdminActionButton,
+  AdminFeedback,
+  AdminMetricStrip,
+  AdminPage,
+  PlatformDataTable,
+  PlatformOverflowText,
+  type PlatformDataTableColumn,
+  type PlatformDataTableFilterField,
+  type PlatformDataTableFilterValue,
+} from "../ui";
 import type { CapabilityKind, CapabilityView } from "./metadata";
 
 type CapabilityConsoleProps = {
@@ -39,6 +47,7 @@ export function CapabilityConsole({
 }: CapabilityConsoleProps) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<CapabilityFilter>("all");
+  const [tableFilters, setTableFilters] = useState<Record<string, PlatformDataTableFilterValue>>({});
   const [selectedID, setSelectedID] = useState("");
   const [installedOptionals, setInstalledOptionals] = useState<string[]>([]);
 
@@ -71,9 +80,9 @@ export function CapabilityConsole({
       ]
         .join(" ")
         .toLowerCase();
-      return matchesFilter && (!normalizedQuery || haystack.includes(normalizedQuery));
+      return matchesFilter && matchesCapabilityFilters(capability, tableFilters, language) && (!normalizedQuery || haystack.includes(normalizedQuery));
     });
-  }, [allCapabilities, filter, query]);
+  }, [allCapabilities, filter, language, query, tableFilters]);
 
   const selectedCapability = useMemo(() => {
     return (
@@ -96,7 +105,43 @@ export function CapabilityConsole({
   const healthyCount = allCapabilities.filter((capability) => capability.health === "healthy").length;
   const healthPercent = Math.round((healthyCount / Math.max(allCapabilities.length, 1)) * 100);
 
-  const columns = [
+  const filterFields = useMemo<PlatformDataTableFilterField[]>(
+    () => [
+      {
+        key: "kind",
+        label: dictionary.type,
+        type: "select",
+        options: [
+          { value: "core", label: dictionary.core },
+          { value: "plugin", label: dictionary.plugin },
+          { value: "optional", label: dictionary.optionalTab },
+          { value: "disabled", label: dictionary.disabledTab },
+        ],
+      },
+      {
+        key: "health",
+        label: dictionary.healthStatus,
+        type: "select",
+        options: [
+          { value: "healthy", label: dictionary.healthy },
+          { value: "warning", label: dictionary.warning },
+          { value: "error", label: dictionary.error },
+        ],
+      },
+      {
+        key: "domain",
+        label: dictionary.domain,
+        type: "select",
+        options: Array.from(new Map(allCapabilities.map((capability) => [capability.domain.en, capability.domain])).values()).map((domain) => ({
+          value: domain.en,
+          label: domain[language],
+        })),
+      },
+    ],
+    [allCapabilities, dictionary, language],
+  );
+
+  const columns: PlatformDataTableColumn<CapabilityView>[] = [
     {
       title: dictionary.capability,
       dataIndex: "label",
@@ -104,8 +149,8 @@ export function CapabilityConsole({
       width: 150,
       render: (_: unknown, record: CapabilityView) => (
         <div className="capability-name-cell">
-          <Typography.Text strong>{record.label[language]}</Typography.Text>
-          <Typography.Text className="secondary-text">{record.label[language === "zh" ? "en" : "zh"]}</Typography.Text>
+          <PlatformOverflowText strong value={record.label[language]} />
+          <PlatformOverflowText className="secondary-text" value={record.label[language === "zh" ? "en" : "zh"]} />
         </div>
       ),
     },
@@ -114,14 +159,14 @@ export function CapabilityConsole({
       dataIndex: "id",
       key: "id",
       width: 130,
-      render: (id: string) => <Typography.Text code>{id}</Typography.Text>,
+      render: (id: string) => <PlatformOverflowText code value={id} />,
     },
     {
       title: dictionary.domain,
       dataIndex: "domain",
       key: "domain",
       width: 150,
-      render: (_: unknown, record: CapabilityView) => <span>{record.domain[language]}</span>,
+      render: (_: unknown, record: CapabilityView) => <PlatformOverflowText value={record.domain[language]} />,
     },
     {
       title: dictionary.type,
@@ -146,6 +191,7 @@ export function CapabilityConsole({
       dataIndex: "version",
       key: "version",
       width: 90,
+      render: (version: string) => <PlatformOverflowText value={version} />,
     },
     {
       title: dictionary.actions,
@@ -154,102 +200,116 @@ export function CapabilityConsole({
       width: 100,
       render: (_: unknown, record: CapabilityView) => (
         <Space size={4}>
-          <Button icon={<EyeOutlined />} size="small" type="text" onClick={() => setSelectedID(record.id)} />
-          <Button icon={<EditOutlined />} size="small" type="text" />
-          <Button icon={<CopyOutlined />} size="small" type="text" />
+          <AdminActionButton
+            icon={<EyeOutlined />}
+            label={dictionary.openDetail}
+            size="small"
+            type="text"
+            onClick={() => setSelectedID(record.id)}
+          />
+          <AdminActionButton icon={<EditOutlined />} label={dictionary.edit} size="small" type="text" />
+          <AdminActionButton icon={<CopyOutlined />} label={dictionary.copy} size="small" type="text" />
         </Space>
       ),
     },
   ];
 
   return (
-    <section className="capability-console">
-      <div className="page-heading">
-        <div>
-          <Typography.Title level={1}>{dictionary.pageTitle}</Typography.Title>
-          <Typography.Paragraph>{dictionary.pageSubtitle}</Typography.Paragraph>
-        </div>
-        <Space className="page-actions">
-          <Button icon={<DownloadOutlined />}>{dictionary.import}</Button>
-          <Button icon={<PlusOutlined />} type="primary">
+    <AdminPage
+      className="capability-console"
+      title={dictionary.pageTitle}
+      description={dictionary.pageSubtitle}
+      actions={
+        <Space>
+          <AdminActionButton icon={<DownloadOutlined />} label={dictionary.import}>
+            {dictionary.import}
+          </AdminActionButton>
+          <AdminActionButton icon={<PlusOutlined />} label={dictionary.addCapability} type="primary">
             {dictionary.addCapability}
-          </Button>
+          </AdminActionButton>
         </Space>
-      </div>
-
-      {error ? <Alert className="api-alert" type="warning" message={dictionary.apiUnavailable} description={error} showIcon /> : null}
-
-      <div className="summary-band">
-        <div className="summary-metrics">
-          <Metric label={dictionary.totalCapabilities} value={allCapabilities.length} />
-          <Metric label={dictionary.enabled} value={enabledCount} accent />
-          <Metric label={dictionary.optional} value={optionalCount} warning />
-          <Metric label={dictionary.disabled} value={disabledCount} />
-          <Metric label={dictionary.domains} value={domainCount} />
-          <Metric label={dictionary.installedPlugins} value={installedOptionals.length} />
-        </div>
-        <div className="health-panel">
-          <div>
-            <Typography.Text strong>{dictionary.installHealth}</Typography.Text>
-            <div className="health-legend">
-              <span className="legend-item healthy">{dictionary.healthy}</span>
-              <span className="legend-item warning">{dictionary.warning}</span>
-              <span className="legend-item error">{dictionary.error}</span>
+      }
+      summary={
+        <div className="summary-band">
+          <AdminMetricStrip
+            className="summary-metrics"
+            items={[
+              { key: "total", label: dictionary.totalCapabilities, value: allCapabilities.length },
+              { key: "enabled", label: dictionary.enabled, value: enabledCount, tone: "accent" },
+              { key: "optional", label: dictionary.optional, value: optionalCount, tone: "warning" },
+              { key: "disabled", label: dictionary.disabled, value: disabledCount },
+              { key: "domains", label: dictionary.domains, value: domainCount },
+              { key: "installed", label: dictionary.installedPlugins, value: installedOptionals.length },
+            ]}
+          />
+          <div className="health-panel">
+            <div>
+              <Typography.Text strong>{dictionary.installHealth}</Typography.Text>
+              <div className="health-legend">
+                <span className="legend-item healthy">{dictionary.healthy}</span>
+                <span className="legend-item warning">{dictionary.warning}</span>
+                <span className="legend-item error">{dictionary.error}</span>
+              </div>
             </div>
+            <Progress percent={healthPercent} type="circle" size={82} strokeColor="var(--success)" />
           </div>
-          <Progress percent={healthPercent} type="circle" size={82} strokeColor="var(--success)" />
         </div>
-      </div>
+      }
+    >
+      {error ? <AdminFeedback className="api-alert" type="warning" message={dictionary.apiUnavailable} description={error} /> : null}
 
       <div className="console-grid">
-        <div className="capability-workspace">
-          <div className="table-toolbar">
-            <Segmented
-              value={filter}
-              onChange={(value) => setFilter(value as CapabilityFilter)}
-              options={[
-                { value: "all", label: dictionary.all },
-                { value: "core", label: dictionary.core },
-                { value: "plugin", label: dictionary.plugin },
-                { value: "optional", label: dictionary.optionalTab },
-                { value: "disabled", label: dictionary.disabledTab },
-              ]}
-            />
-            <div className="table-actions">
-              <Input
-                className="capability-search"
-                prefix={<SearchOutlined />}
-                placeholder={dictionary.searchCapability}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
+        <div className="capability-workspace-stack">
+          <PlatformDataTable
+            actions={
+              <Segmented
+                value={filter}
+                onChange={(value) => setFilter(value as CapabilityFilter)}
+                options={[
+                  { value: "all", label: dictionary.all },
+                  { value: "core", label: dictionary.core },
+                  { value: "plugin", label: dictionary.plugin },
+                  { value: "optional", label: dictionary.optionalTab },
+                  { value: "disabled", label: dictionary.disabledTab },
+                ]}
               />
-              <Button icon={<FilterOutlined />}>{dictionary.filter}</Button>
-              <Button icon={<ReloadOutlined />} />
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="loading-panel">
-              <Spin />
-            </div>
-          ) : filteredCapabilities.length === 0 ? (
-            <Empty />
-          ) : (
-            <>
-              <Table
-                className="capability-table"
-                columns={columns}
-                dataSource={filteredCapabilities}
-                pagination={false}
-                rowKey="id"
-                rowClassName={(record) => (record.id === selectedCapability?.id ? "selected-row" : "")}
-                scroll={{ x: 860 }}
-                onRow={(record) => ({
-                  onClick: () => setSelectedID(record.id),
-                })}
-              />
+            }
+            className="capability-workspace"
+            columns={columns}
+            dataSource={filteredCapabilities}
+            filterFields={filterFields}
+            filterValues={tableFilters}
+            labels={{
+              search: dictionary.searchCapability,
+              refresh: dictionary.refresh,
+              columns: dictionary.tableColumns,
+              rowActions: dictionary.actions,
+              selected: (count) => formatTemplate(dictionary.selectedItems, { count: String(count) }),
+              selectRow: (key) => formatTemplate(dictionary.selectRow, { key }),
+              clearSelection: dictionary.clearSelection,
+              empty: dictionary.emptyData,
+              filters: dictionary.advancedFilters,
+              clearFilters: dictionary.clearFilters,
+              querySyntax: dictionary.querySyntax,
+              querySyntaxHint: dictionary.querySyntaxHint,
+              filterStartDate: dictionary.filterStartDate,
+              filterEndDate: dictionary.filterEndDate,
+              filterMin: dictionary.filterMin,
+              filterMax: dictionary.filterMax,
+              filterNoFields: dictionary.filterNoFields,
+              activeFilters: (count) => formatTemplate(dictionary.activeFilters, { count: String(count) }),
+              pageSize: dictionary.pageSize,
+              goToPage: dictionary.goToPage,
+              page: dictionary.page,
+              paginationRange: dictionary.paginationRange,
+              visibleColumns: (visible, total) => formatTemplate(dictionary.visibleColumns, { visible: String(visible), total: String(total) }),
+              selectAllColumns: dictionary.selectAllColumns,
+              resetColumns: dictionary.resetColumns,
+            }}
+            loading={loading}
+            mobileCards={(items) => (
               <div className="capability-mobile-list">
-                {filteredCapabilities.map((capability) => (
+                {items.map((capability) => (
                   <button
                     className={capability.id === selectedCapability?.id ? "mobile-capability-card active" : "mobile-capability-card"}
                     key={capability.id}
@@ -264,8 +324,26 @@ export function CapabilityConsole({
                   </button>
                 ))}
               </div>
-            </>
-          )}
+            )}
+            pagination={{
+              defaultPageSize: 10,
+              showTotal: (total, range) =>
+                formatTemplate(dictionary.paginationRange, {
+                  start: String(range[0]),
+                  end: String(range[1]),
+                  total: String(total),
+                }),
+            }}
+            rowKey="id"
+            scrollX={940}
+            searchPlaceholder={dictionary.searchCapability}
+            searchValue={query}
+            selectedRowKey={selectedCapability?.id}
+            onClearFilters={() => setTableFilters({})}
+            onFilterChange={(key, value) => setTableFilters((current) => ({ ...current, [key]: value }))}
+            onRowClick={(record) => setSelectedID(record.id)}
+            onSearchChange={setQuery}
+          />
 
           <section className="optional-section">
             <div className="section-title-row">
@@ -304,16 +382,7 @@ export function CapabilityConsole({
 
         <CapabilityInspector capability={selectedCapability} dictionary={dictionary} language={language} />
       </div>
-    </section>
-  );
-}
-
-function Metric({ label, value, accent, warning }: { label: string; value: number; accent?: boolean; warning?: boolean }) {
-  return (
-    <div className="metric">
-      <Typography.Text>{label}</Typography.Text>
-      <strong className={accent ? "accent" : warning ? "warning" : ""}>{value}</strong>
-    </div>
+    </AdminPage>
   );
 }
 
@@ -411,6 +480,38 @@ function CapabilityInspector({
   );
 }
 
+function matchesCapabilityFilters(
+  capability: CapabilityView,
+  filters: Record<string, PlatformDataTableFilterValue>,
+  language: Language,
+) {
+  return Object.entries(filters).every(([key, value]) => {
+    if (!filterValueActive(value)) {
+      return true;
+    }
+    if (typeof value !== "string") {
+      return true;
+    }
+    switch (key) {
+    case "kind":
+      return capability.kind === value;
+    case "health":
+      return capability.health === value;
+    case "domain":
+      return capability.domain.en === value || capability.domain[language] === value;
+    default:
+      return true;
+    }
+  });
+}
+
+function filterValueActive(value: PlatformDataTableFilterValue) {
+  if (typeof value === "string") {
+    return value.trim() !== "";
+  }
+  return Boolean(value.from || value.to);
+}
+
 function kindLabel(dictionary: Dictionary, kind: CapabilityKind) {
   const labels = {
     core: dictionary.coreCapability,
@@ -419,4 +520,8 @@ function kindLabel(dictionary: Dictionary, kind: CapabilityKind) {
     disabled: dictionary.disabledCapability,
   };
   return labels[kind];
+}
+
+function formatTemplate(template: string, values: Record<string, string>) {
+  return Object.entries(values).reduce((result, [key, value]) => result.replaceAll(`{${key}}`, value), template);
 }

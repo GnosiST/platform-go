@@ -1,0 +1,125 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-admin-api-boundary.json",
+  "capturedAt": "2026-07-07",
+  "purpose": "Machine-checkable admin API boundary and query-security contract. Admin UI code must use the platform API client, list queries must use structured POST bodies, and backend query execution must stay schema-whitelisted and injection-safe.",
+  "reference": {
+    "project": "zshenmez",
+    "sourceSignals": [
+      "admin/src/apiBoundary.ts",
+      "admin/src/querySecurity.ts",
+      "admin/scripts/check-api-boundary.mjs",
+      "api/internal/httpapi/query_security_test.go"
+    ],
+    "promotionDecision": "foundation-gate"
+  },
+  "adminSourceBoundary": {
+    "root": "admin/src",
+    "allowedDirectFetchFiles": [
+      "admin/src/platform/api/client.ts"
+    ],
+    "ignoredFiles": [
+      "admin/src/platform/i18n.ts"
+    ],
+    "forbiddenRequestTargets": [
+      "/api/app",
+      "/app",
+      "encoded app API path",
+      "absolute admin URL"
+    ],
+    "forbiddenCollectionQueryTransport": [
+      "?filters",
+      "filters["
+    ]
+  },
+  "querySecurity": {
+    "transport": "POST /api/admin/resources/:resource/query",
+    "payload": "structured-json",
+    "rawSQLAllowed": false,
+    "sqlLikeInputPolicy": "parse-to-structured-conditions-or-treat-as-literal-value",
+    "fieldWhitelistSource": "resource schema",
+    "sensitiveFieldsAllowed": false,
+    "sortWhitelistRequired": true,
+    "maxValueLength": 256,
+    "operators": [
+      "contains",
+      "=",
+      "!=",
+      ">",
+      ">=",
+      "<",
+      "<="
+    ]
+  },
+  "requiredSourceSnippets": [
+    {
+      "path": "admin/src/platform/api/client.ts",
+      "contains": "export function queryAdminResource"
+    },
+    {
+      "path": "admin/src/platform/api/client.ts",
+      "contains": "`/admin/resources/${resource}/query`"
+    },
+    {
+      "path": "admin/src/platform/api/client.ts",
+      "contains": "method: \"POST\""
+    },
+    {
+      "path": "admin/src/platform/refine/dataProvider.ts",
+      "contains": "const result = await queryAdminResource"
+    },
+    {
+      "path": "admin/src/platform/refine/dataProvider.ts",
+      "contains": "meta?.conditions"
+    },
+    {
+      "path": "admin/src/platform/refine/dataProvider.ts",
+      "contains": "sortersToQuerySort"
+    },
+    {
+      "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "contains": "queryOperatorToAdminOperator"
+    },
+    {
+      "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "contains": "dictionary.advancedFilters"
+    },
+    {
+      "path": "internal/platform/adminresource/query.go",
+      "contains": "query field is not declared by resource schema"
+    },
+    {
+      "path": "internal/platform/adminresource/query.go",
+      "contains": "sensitive field cannot be queried"
+    },
+    {
+      "path": "internal/platform/adminresource/query.go",
+      "contains": "sensitive field cannot be sorted"
+    },
+    {
+      "path": "internal/platform/adminresource/query.go",
+      "contains": "maxQueryValueLength  = 256"
+    },
+    {
+      "path": "internal/platform/adminresource/store_test.go",
+      "contains": "TestStoreQueryRejectsUnsafeConditions"
+    },
+    {
+      "path": "internal/platform/adminresource/store_test.go",
+      "contains": "TestStoreQueryTreatsSQLLikeValuesAsLiterals"
+    },
+    {
+      "path": "internal/platform/httpapi/server_test.go",
+      "contains": "TestAdminResourceQueryEndpointRejectsUnsafeField"
+    },
+    {
+      "path": "resources/generated/openapi.admin.json",
+      "contains": "raw input must never be concatenated into SQL"
+    }
+  ],
+  "requiredValidators": [
+    "scripts/validate-platform-admin-api-boundary.mjs"
+  ],
+  "requiredTests": [
+    "scripts/platform-admin-api-boundary.test.mjs"
+  ]
+}

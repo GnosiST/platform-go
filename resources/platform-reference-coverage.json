@@ -1,0 +1,462 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-reference-coverage.json",
+  "reference": {
+    "project": "zshenmez",
+    "resourceManifest": "resources/admin-resources.json",
+    "capturedAt": "2026-07-06",
+    "note": "Common foundation coverage inferred from the reference project's admin resource manifest. Business resources stay outside the default platform contract."
+  },
+  "referenceResourceParity": [
+    {
+      "referenceResource": "dashboard",
+      "referenceGroup": "root",
+      "classification": "foundation",
+      "foundationArea": "dashboard",
+      "platformResources": ["overview"],
+      "capabilities": ["admin-shell"]
+    },
+    {
+      "referenceResource": "roles",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "rbac-and-menu",
+      "platformResources": ["roles"],
+      "capabilities": ["rbac"]
+    },
+    {
+      "referenceResource": "role-groups",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "rbac-and-menu",
+      "platformResources": ["role-groups"],
+      "capabilities": ["rbac"]
+    },
+    {
+      "referenceResource": "menus",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "rbac-and-menu",
+      "platformResources": ["menus"],
+      "capabilities": ["menu"]
+    },
+    {
+      "referenceResource": "api-resources",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "api-governance",
+      "platformResources": ["api-resources", "api-docs"],
+      "capabilities": ["api-resource"]
+    },
+    {
+      "referenceResource": "users",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "identity-and-tenancy",
+      "platformResources": ["users", "app-identities"],
+      "capabilities": ["identity"]
+    },
+    {
+      "referenceResource": "tenants",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "identity-and-tenancy",
+      "platformResources": ["tenants"],
+      "capabilities": ["tenant"]
+    },
+    {
+      "referenceResource": "org-units",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "identity-and-tenancy",
+      "platformResources": ["org-units", "area-codes"],
+      "capabilities": ["identity", "dictionary"]
+    },
+    {
+      "referenceResource": "permissions",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "rbac-and-menu",
+      "platformResources": ["permissions"],
+      "capabilities": ["rbac"]
+    },
+    {
+      "referenceResource": "dictionaries",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "dictionary-parameters-branding",
+      "platformResources": ["dictionaries", "dictionary-parameters", "area-codes"],
+      "capabilities": ["dictionary"]
+    },
+    {
+      "referenceResource": "audit-logs",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "audit-and-operations",
+      "platformResources": ["audit-logs"],
+      "capabilities": ["audit"]
+    },
+    {
+      "referenceResource": "parameters",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "dictionary-parameters-branding",
+      "platformResources": ["parameters", "settings", "branding"],
+      "capabilities": ["parameter"]
+    },
+    {
+      "referenceResource": "api-tokens",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "api-governance",
+      "platformResources": ["api-tokens"],
+      "capabilities": ["system-admin"]
+    },
+    {
+      "referenceResource": "login-logs",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "audit-and-operations",
+      "platformResources": ["login-logs"],
+      "capabilities": ["audit"]
+    },
+    {
+      "referenceResource": "versions",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "audit-and-operations",
+      "platformResources": ["versions"],
+      "capabilities": ["system-admin"]
+    },
+    {
+      "referenceResource": "error-logs",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "audit-and-operations",
+      "platformResources": ["error-logs"],
+      "capabilities": ["audit"]
+    },
+    {
+      "referenceResource": "files",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "file-storage",
+      "platformResources": ["files"],
+      "capabilities": ["file-storage"]
+    },
+    {
+      "referenceResource": "sessions",
+      "referenceGroup": "system",
+      "classification": "foundation",
+      "foundationArea": "audit-and-operations",
+      "platformResources": ["sessions"],
+      "capabilities": ["session"]
+    },
+    {
+      "referenceResource": "role-applications",
+      "referenceGroup": "business-access",
+      "classification": "business",
+      "businessArea": "business-access",
+      "expectedCapability": "external-business-capability"
+    },
+    {
+      "referenceResource": "public-profiles",
+      "referenceGroup": "business-content",
+      "classification": "business",
+      "businessArea": "business-content",
+      "expectedCapability": "external-business-capability"
+    },
+    {
+      "referenceResource": "portfolio-works",
+      "referenceGroup": "business-content",
+      "classification": "business",
+      "businessArea": "business-content",
+      "expectedCapability": "external-business-capability"
+    },
+    {
+      "referenceResource": "favorites",
+      "referenceGroup": "business-content",
+      "classification": "business",
+      "businessArea": "business-content",
+      "expectedCapability": "external-business-capability"
+    },
+    {
+      "referenceResource": "tasks",
+      "referenceGroup": "business-dispatch",
+      "classification": "business",
+      "businessArea": "business-dispatch",
+      "expectedCapability": "external-business-capability"
+    },
+    {
+      "referenceResource": "transfer-applications",
+      "referenceGroup": "business-dispatch",
+      "classification": "business",
+      "businessArea": "business-dispatch",
+      "expectedCapability": "external-business-capability"
+    },
+    {
+      "referenceResource": "transfer-edges",
+      "referenceGroup": "business-dispatch",
+      "classification": "business",
+      "businessArea": "business-dispatch",
+      "expectedCapability": "external-business-capability"
+    },
+    {
+      "referenceResource": "task-check-ins",
+      "referenceGroup": "business-fulfillment",
+      "classification": "business",
+      "businessArea": "business-fulfillment",
+      "expectedCapability": "external-business-capability"
+    },
+    {
+      "referenceResource": "task-completion-confirmations",
+      "referenceGroup": "business-fulfillment",
+      "classification": "business",
+      "businessArea": "business-fulfillment",
+      "expectedCapability": "external-business-capability"
+    },
+    {
+      "referenceResource": "support-tickets",
+      "referenceGroup": "business-support",
+      "classification": "business",
+      "businessArea": "business-support",
+      "expectedCapability": "external-business-capability"
+    },
+    {
+      "referenceResource": "personnel",
+      "referenceGroup": "optional-governance",
+      "classification": "extension",
+      "extensionArea": "personnel-and-positions",
+      "expectedCapability": "personnel"
+    },
+    {
+      "referenceResource": "employees",
+      "referenceGroup": "optional-governance",
+      "classification": "extension",
+      "extensionArea": "personnel-and-positions",
+      "expectedCapability": "personnel"
+    },
+    {
+      "referenceResource": "staff",
+      "referenceGroup": "optional-governance",
+      "classification": "extension",
+      "extensionArea": "personnel-and-positions",
+      "expectedCapability": "personnel"
+    },
+    {
+      "referenceResource": "employeeProfiles",
+      "referenceGroup": "optional-governance",
+      "classification": "extension",
+      "extensionArea": "personnel-and-positions",
+      "expectedCapability": "personnel"
+    },
+    {
+      "referenceResource": "positions",
+      "referenceGroup": "optional-governance",
+      "classification": "extension",
+      "extensionArea": "personnel-and-positions",
+      "expectedCapability": "personnel"
+    },
+    {
+      "referenceResource": "positionAssignments",
+      "referenceGroup": "optional-governance",
+      "classification": "extension",
+      "extensionArea": "personnel-and-positions",
+      "expectedCapability": "personnel"
+    }
+  ],
+  "nonResourceParity": [
+    {
+      "referenceCapability": "storage-settings",
+      "referenceModules": ["api/internal/model/model.go", "api/internal/store/store.go"],
+      "classification": "foundation",
+      "foundationArea": "dictionary-parameters-branding",
+      "platformResources": ["settings", "parameters", "files"],
+      "capabilities": ["parameter", "file-storage"],
+      "note": "The reference storage_settings model maps to reusable platform settings/parameters plus file-storage configuration. It is not promoted as a separate default resource."
+    },
+    {
+      "referenceCapability": "admin-api-boundary-query-security",
+      "referenceModules": ["admin/src/apiBoundary.ts", "admin/src/querySecurity.ts", "admin/scripts/check-api-boundary.mjs", "api/internal/httpapi/query_security_test.go"],
+      "classification": "foundation",
+      "foundationArea": "api-governance",
+      "platformResources": ["api-resources", "api-docs"],
+      "capabilities": ["api-resource", "system-admin"],
+      "note": "The reference admin API boundary and query-security checks map to a reusable platform gate: admin UI requests must use the platform API client, collection filters must use structured POST bodies, and backend query execution must stay schema-whitelisted and sensitive-field safe."
+    },
+    {
+      "referenceCapability": "app-phone-binding",
+      "referenceModules": ["docs/api-contract.md"],
+      "classification": "extension",
+      "extensionArea": "app-phone-identity",
+      "expectedCapability": "app-phone",
+      "expectedProfile": "platform-app-ready",
+      "appRoutes": ["POST /api/app/identity/phone-verifications", "POST /api/app/identity/phone-bindings"],
+      "defaultPlatformPolicy": "excluded",
+      "note": "Phone verification and binding are reusable App identity capabilities, but stay out of platform-default unless an app-facing profile enables app-phone."
+    },
+    {
+      "referenceCapability": "user-addresses",
+      "referenceModules": ["api/internal/model/model.go"],
+      "classification": "extension",
+      "extensionArea": "detailed-addresses",
+      "expectedCapability": "owning-capability",
+      "defaultPlatformPolicy": "excluded",
+      "note": "Area codes are foundation regional master data. Detailed delivery/contact addresses remain owned by the business or optional capability until repeated reusable demand justifies a platform address module."
+    },
+    {
+      "referenceCapability": "user-org-memberships",
+      "referenceModules": ["api/internal/database/entities.go", "docs/data-model.md", "docs/platform-architecture.md"],
+      "classification": "extension",
+      "extensionArea": "multi-org-membership",
+      "expectedCapability": "owning-capability",
+      "defaultPlatformPolicy": "excluded",
+      "note": "The reference user_org_memberships model preserves multi-organization assignment, but its docs state V1 only exposes a primary org. The platform default maps the primary org through users.orgUnitCode; multi-org memberships stay in an optional identity, personnel or consuming capability until repeated reusable demand justifies promotion."
+    }
+  ],
+  "foundation": [
+    {
+      "area": "dashboard",
+      "referenceResources": ["dashboard"],
+      "platformResources": ["overview"],
+      "capabilities": ["admin-shell"],
+      "capabilityResources": ["overview"]
+    },
+    {
+      "area": "identity-and-tenancy",
+      "referenceResources": ["tenants", "users", "orgUnits"],
+      "platformResources": ["tenants", "users", "orgUnits", "areaCodes", "appIdentities"],
+      "capabilities": ["dictionary", "tenant", "identity"],
+      "capabilityResources": ["area-codes", "tenants", "org-units", "users", "app-identities"]
+    },
+    {
+      "area": "rbac-and-menu",
+      "referenceResources": ["roles", "roleGroups", "permissions", "menus"],
+      "platformResources": ["roles", "roleGroups", "permissions", "menus"],
+      "capabilities": ["rbac", "menu"],
+      "capabilityResources": ["roles", "role-groups", "permissions", "menus"]
+    },
+    {
+      "area": "api-governance",
+      "referenceResources": ["apiResources", "apiTokens"],
+      "platformResources": ["apiResources", "apiDocs", "apiTokens"],
+      "capabilities": ["api-resource", "system-admin"],
+      "capabilityResources": ["api-resources", "api-docs", "api-tokens"]
+    },
+    {
+      "area": "dictionary-parameters-branding",
+      "referenceResources": ["dictionaries", "parameters"],
+      "platformResources": ["dictionaries", "dictionary-parameters", "parameters", "settings", "branding"],
+      "capabilities": ["dictionary", "parameter"],
+      "capabilityResources": ["dictionaries", "dictionary-parameters", "parameters", "settings", "branding"]
+    },
+    {
+      "area": "audit-and-operations",
+      "referenceResources": ["auditLogs", "loginLogs", "errorLogs", "versions", "sessions"],
+      "platformResources": ["auditLogs", "loginLogs", "errorLogs", "versions", "sessions", "monitoring"],
+      "capabilities": ["audit", "session", "system-admin"],
+      "capabilityResources": ["audit-logs", "login-logs", "error-logs", "sessions", "versions", "monitoring"],
+      "appRoutes": ["POST /api/app/auth/login", "GET /api/app/session/current", "POST /api/app/auth/logout"]
+    },
+    {
+      "area": "file-storage",
+      "referenceResources": ["files"],
+      "platformResources": ["files"],
+      "capabilities": ["file-storage"],
+      "capabilityResources": ["files"],
+      "appRoutes": ["POST /api/app/files", "GET /api/app/files/:id/content"]
+    },
+    {
+      "area": "auth-providers",
+      "referenceModules": ["api/internal/httpapi/app_auth_test.go", "api/internal/httpapi/wechat.go"],
+      "platformResources": ["appIdentities"],
+      "capabilities": ["session", "wechat-login"],
+      "authProviders": ["demo", "wechat"],
+      "appRoutes": ["POST /api/app/auth/login", "GET /api/app/session/current", "POST /api/app/auth/logout"]
+    },
+    {
+      "area": "demo-data",
+      "referenceModules": ["api/cmd/demo-data-reset/main.go", "api/internal/store/framework_seed.go"],
+      "platformResources": ["demoData"],
+      "capabilities": ["demo-data"],
+      "capabilityResources": ["demo-data"]
+    }
+  ],
+  "businessBoundary": [
+    {
+      "area": "business-access",
+      "referenceResources": ["roleApplications"],
+      "appRoutes": ["POST /api/app/zshenmez/role-applications"],
+      "expectedCapability": "external-business-capability",
+      "mustStayOutOfDefaultPlatform": true
+    },
+    {
+      "area": "business-content",
+      "referenceResources": ["publicProfiles", "portfolioWorks", "favorites"],
+      "appRoutes": ["GET /api/app/zshenmez/public-profiles"],
+      "expectedCapability": "external-business-capability",
+      "mustStayOutOfDefaultPlatform": true
+    },
+    {
+      "area": "business-dispatch",
+      "referenceResources": ["tasks", "transferApplications", "transferEdges"],
+      "appRoutes": [
+        "GET /api/app/zshenmez/tasks",
+        "POST /api/app/zshenmez/tasks",
+        "POST /api/app/zshenmez/tasks/:taskCode/transfer-applications"
+      ],
+      "expectedCapability": "external-business-capability",
+      "mustStayOutOfDefaultPlatform": true
+    },
+    {
+      "area": "business-fulfillment",
+      "referenceResources": ["taskCheckIns", "taskCompletionConfirmations"],
+      "appRoutes": [
+        "POST /api/app/zshenmez/tasks/:taskCode/check-ins",
+        "POST /api/app/zshenmez/tasks/:taskCode/completion-confirmations"
+      ],
+      "expectedCapability": "external-business-capability",
+      "mustStayOutOfDefaultPlatform": true
+    },
+    {
+      "area": "business-support",
+      "referenceResources": ["supportTickets"],
+      "appRoutes": ["POST /api/app/zshenmez/support-tickets"],
+      "expectedCapability": "external-business-capability",
+      "mustStayOutOfDefaultPlatform": true
+    }
+  ],
+  "extensionBoundary": [
+    {
+      "area": "app-phone-identity",
+      "referenceCapabilities": ["app-phone-binding"],
+      "expectedCapability": "app-phone",
+      "profile": "platform-app-ready",
+      "mustStayOutOfDefaultPlatform": true,
+      "note": "Reusable App phone verification and binding attach through the optional app-phone capability, not the default admin foundation."
+    },
+    {
+      "area": "detailed-addresses",
+      "referenceCapabilities": ["user-addresses"],
+      "expectedCapability": "owning-capability",
+      "mustStayOutOfDefaultPlatform": true,
+      "sharedOwnershipFields": ["tenantCode", "orgUnitCode", "areaCode", "userCode"],
+      "note": "The default foundation exposes areaCode on tenants, org units and users. Full address records stay in the owning capability until promoted through a separate reusable address capability."
+    },
+    {
+      "area": "multi-org-membership",
+      "referenceCapabilities": ["user-org-memberships"],
+      "expectedCapability": "owning-capability",
+      "mustStayOutOfDefaultPlatform": true,
+      "sharedOwnershipFields": ["tenantCode", "orgUnitCode", "userCode"],
+      "note": "The default foundation exposes a primary org assignment through users.orgUnitCode. Multi-org membership rows stay in an optional identity, personnel or consuming capability until a separate reusable identity-membership spec promotes them."
+    },
+    {
+      "area": "personnel-and-positions",
+      "referenceResources": ["personnel", "employees", "staff", "employeeProfiles", "positions", "positionAssignments"],
+      "expectedCapability": "personnel",
+      "mustStayOutOfDefaultPlatform": true,
+      "sharedOwnershipFields": ["tenantCode", "orgUnitCode", "areaCode"],
+      "note": "Users and org units cover platform account and department governance. Personnel files, positions and employment assignments belong in an optional personnel capability when a business domain needs HR-style modeling."
+    }
+  ]
+}

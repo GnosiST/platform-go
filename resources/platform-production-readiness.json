@@ -1,0 +1,531 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-production-readiness.json",
+  "capturedAt": "2026-07-06",
+  "purpose": "Machine-checkable production readiness contract for platform runtime configuration and preflight gates.",
+  "runtimeGate": {
+    "source": "internal/platform/config/config.go",
+    "function": "ValidateRuntime",
+    "tests": [
+      {
+        "path": "internal/platform/config/config_test.go",
+        "names": [
+          "TestValidateRuntimeRejectsProductionWithoutPersistentRuntime",
+          "TestValidateRuntimeRejectsProductionShortJWTSecret",
+          "TestValidateRuntimeRejectsProductionNonGORMDrivers",
+          "TestValidateRuntimeRejectsProductionRedisWithoutAddress",
+          "TestValidateRuntimeRejectsProductionDemoAuthProvider",
+          "TestValidateRuntimeAcceptsProductionBaseline"
+        ]
+      }
+    ],
+    "requiredSnippets": [
+      "production runtime requires PLATFORM_JWT_SECRET to be changed from the development default",
+      "production runtime requires PLATFORM_JWT_SECRET to be at least 32 characters",
+      "production runtime requires PLATFORM_ADMIN_RESOURCE_DRIVER to be mysql, postgres, or sqlite",
+      "production runtime requires PLATFORM_SESSION_DRIVER to be mysql, postgres, or sqlite",
+      "production runtime requires PLATFORM_LIFECYCLE_HISTORY_DRIVER to be mysql, postgres, or sqlite",
+      "production runtime requires PLATFORM_CACHE_DRIVER=redis",
+      "production runtime must not enable demo-data capability",
+      "production runtime requires PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true"
+    ]
+  },
+  "requiredEnv": [
+    {
+      "name": "PLATFORM_RUNTIME_ENV",
+      "purpose": "Selects production mode so startup runs the strict runtime gate.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_JWT_SECRET",
+      "purpose": "Production admin and app bearer token signing secret; must be non-default and at least 32 characters.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_ADMIN_RESOURCE_DRIVER",
+      "purpose": "Selects the GORM-backed admin resource repository in production.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_ADMIN_RESOURCE_DSN",
+      "purpose": "Database DSN for the GORM-backed admin resource repository.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_SESSION_DRIVER",
+      "purpose": "Selects the GORM-backed session repository in production.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md",
+        "docs/platform-auth.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_SESSION_DSN",
+      "purpose": "Database DSN for repository-backed sessions.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md",
+        "docs/platform-auth.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_LIFECYCLE_HISTORY_DRIVER",
+      "purpose": "Selects the GORM-backed lifecycle history repository in production.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_LIFECYCLE_HISTORY_DSN",
+      "purpose": "Database DSN for lifecycle migration and seed history.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_CACHE_DRIVER",
+      "purpose": "Selects Redis-backed cache and invalidation bus for production.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md",
+        "docs/platform-cache.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_REDIS_ADDR",
+      "purpose": "Redis endpoint used for cache reads and distributed invalidation events.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md",
+        "docs/platform-cache.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER",
+      "purpose": "Disables the built-in demo auth provider in production so local harness login cannot be used in deployed runtimes.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md",
+        "docs/platform-auth.md"
+      ]
+    }
+  ],
+  "preflightCommands": [
+    {
+      "id": "production-runtime-tests",
+      "command": "rtk go test ./internal/platform/config",
+      "purpose": "Verifies production runtime rejection and accepted baseline."
+    },
+    {
+      "id": "production-env-audit",
+      "command": "rtk node scripts/validate-platform-production-env.mjs",
+      "purpose": "Verifies the standard production env template and provides strict secret validation for private production env files."
+    },
+    {
+      "id": "capability-contracts",
+      "command": "rtk node scripts/validate-platform-capability-contracts.mjs",
+      "purpose": "Verifies plugin-style capability classifications, default/profile policy and external business boundaries before changing enabled capabilities."
+    },
+    {
+      "id": "capability-profiles",
+      "command": "rtk node scripts/validate-platform-capability-profiles.mjs",
+      "purpose": "Verifies runtime capability profiles before changing PLATFORM_CAPABILITIES."
+    },
+    {
+      "id": "admin-resource-contract",
+      "command": "rtk node scripts/validate-admin-resources.mjs",
+      "purpose": "Verifies admin resource, relation, generated-contract and platform gate freshness."
+    },
+    {
+      "id": "governance-topology",
+      "command": "rtk node scripts/validate-platform-governance-topology.mjs",
+      "purpose": "Verifies tenant, org-unit, role-group, area-code and optional personnel governance boundaries."
+    },
+    {
+      "id": "form-schema-layout-slots",
+      "command": "rtk node scripts/validate-platform-form-schema-layout-slots.mjs",
+      "purpose": "Verifies schema-driven form layout presets and slot boundaries before visual promotion."
+    },
+    {
+      "id": "engineering-capabilities",
+      "command": "rtk node scripts/validate-platform-engineering-capabilities.mjs",
+      "purpose": "Verifies stack, generated artifacts and engineering capability gates."
+    },
+    {
+      "id": "codegen-source-writing-readiness",
+      "command": "rtk node scripts/validate-platform-codegen-source-writing-readiness.mjs",
+      "purpose": "Verifies code generation remains preview-first and source-writing stays disabled until a reviewed promotion gate exists."
+    },
+    {
+      "id": "reference-discovery",
+      "command": "rtk node scripts/validate-platform-reference-discovery.mjs",
+      "purpose": "Verifies source-backed reference capability discovery before coverage or promotion decisions."
+    },
+    {
+      "id": "reference-coverage",
+      "command": "rtk node scripts/validate-platform-reference-coverage.mjs",
+      "purpose": "Verifies reusable foundation coverage and business boundary isolation."
+    },
+    {
+      "id": "admin-api-boundary",
+      "command": "rtk node scripts/validate-platform-admin-api-boundary.mjs",
+      "purpose": "Verifies admin requests use the platform API client and list queries stay structured, schema-whitelisted and injection-safe."
+    },
+    {
+      "id": "app-client-api-boundary",
+      "command": "rtk node scripts/validate-platform-app-client-api-boundary.mjs",
+      "purpose": "Verifies downstream App, H5 and mini-program clients stay behind generated App clients or platform request/upload ports."
+    },
+    {
+      "id": "personnel-runtime-readiness",
+      "command": "rtk node scripts/validate-platform-personnel-runtime-readiness.mjs",
+      "purpose": "Verifies optional personnel profile readiness without leaking HR resources into the default foundation."
+    },
+    {
+      "id": "foundation-task-graph",
+      "command": "rtk node scripts/validate-platform-foundation-task-graph.mjs",
+      "purpose": "Verifies the full task inventory, dependency order, resource-lock policies and parallel batch conflict rules before release planning."
+    },
+    {
+      "id": "foundation-alignment",
+      "command": "rtk node scripts/validate-platform-foundation-alignment.mjs",
+      "purpose": "Verifies approved stack, task dependencies, capability boundaries, reference extraction, visual gates and objective conflict policy."
+    },
+    {
+      "id": "task-execution-audit",
+      "command": "rtk node scripts/validate-platform-task-execution-audit.mjs",
+      "purpose": "Verifies full task inventory, unfinished promotion blockers, resource-lock conflicts and visual workflow gates before continuing implementation."
+    },
+    {
+      "id": "goal-completion-audit",
+      "command": "rtk node scripts/validate-platform-goal-completion-audit.mjs",
+      "purpose": "Verifies the active platform foundation goal is not marked complete while controlled unfinished nodes or external promotion blockers remain active."
+    },
+    {
+      "id": "node-closeout-audit",
+      "command": "rtk node scripts/validate-platform-node-closeout-audit.mjs",
+      "purpose": "Verifies every implemented task node has neat-freak cleanup, closeout evidence, resource-lock review, objective-conflict review and visual design-gate evidence where required."
+    },
+    {
+      "id": "objective-conformance",
+      "command": "rtk node scripts/validate-platform-objective-conformance.mjs",
+      "purpose": "Verifies the persistent platform foundation objective remains aligned across stack, reference-only boundaries, task blockers, visual gates, deployment topology and closeout policy."
+    },
+    {
+      "id": "promotion-evidence-templates",
+      "command": "rtk node scripts/validate-platform-promotion-evidence-templates.mjs",
+      "purpose": "Verifies draft-only promotion evidence templates, the non-submitted draft package generator and the submitted evidence package validator align with production-auth and source-writing approval schemas without becoming approval evidence."
+    },
+    {
+      "id": "admin-i18n",
+      "command": "rtk node scripts/validate-admin-i18n.mjs",
+      "purpose": "Verifies shared admin UI text keeps Chinese and English dictionaries synchronized."
+    },
+    {
+      "id": "admin-ui-contracts",
+      "command": "rtk node scripts/validate-admin-ui-contracts.mjs",
+      "purpose": "Verifies shared admin UI components, relation controls and resource console contracts."
+    },
+    {
+      "id": "admin-ui-contract-tests",
+      "command": "rtk node --test scripts/admin-ui-contracts.test.mjs",
+      "purpose": "Verifies the admin UI contract validator itself catches componentized table and settings-drawer drift."
+    },
+    {
+      "id": "admin-build",
+      "command": "rtk npm --prefix admin run build",
+      "purpose": "Runs admin i18n, Refine, UI contract, TypeScript and Vite production build checks."
+    },
+    {
+      "id": "git-diff-check",
+      "command": "rtk git diff --check",
+      "purpose": "Rejects whitespace and patch formatting errors before release work."
+    },
+    {
+      "id": "platform-capability-audit",
+      "command": "rtk go run ./cmd/platform-contracts audit --stdout",
+      "purpose": "Verifies enabled manifest coverage from the Go capability source."
+    },
+    {
+      "id": "production-auth-hardening",
+      "command": "rtk node scripts/validate-platform-production-auth-hardening.mjs",
+      "purpose": "Verifies JWT/session/provider hardening policy, token-rotation boundaries and refresh-token family promotion gates."
+    },
+    {
+      "id": "production-auth-promotion-review",
+      "command": "rtk node scripts/generate-production-auth-promotion-review.mjs",
+      "purpose": "Generates the non-mutating production auth promotion review packet with blockers, missing evidence and required preflight gates."
+    },
+    {
+      "id": "refresh-token-family-promotion",
+      "command": "rtk node scripts/validate-platform-refresh-token-family-promotion.mjs",
+      "purpose": "Verifies independent refresh-token-family runtime remains blocked until storage, reuse detection, revocation, Redis convergence and audit evidence are approved."
+    },
+    {
+      "id": "cache-invalidation",
+      "command": "rtk node scripts/validate-platform-cache-invalidation.mjs",
+      "purpose": "Verifies cache targets, invalidation rules, Redis pub/sub boundaries and session reload convergence."
+    },
+    {
+      "id": "deployment-topology",
+      "command": "rtk node scripts/validate-platform-deployment-topology.mjs",
+      "purpose": "Verifies deployment topology, Vercel boundary and production runtime requirements."
+    },
+    {
+      "id": "production-readiness",
+      "command": "rtk node scripts/validate-platform-production-readiness.mjs",
+      "purpose": "Verifies this production readiness contract stays aligned with code and docs."
+    },
+    {
+      "id": "platform-operations-plan",
+      "command": "rtk node scripts/generate-platform-operations-plan.mjs",
+      "purpose": "Generates the non-mutating production operations dry-run plan from readiness policies."
+    }
+  ],
+  "preflightRunner": {
+    "script": "scripts/run-platform-production-preflight.mjs",
+    "listCommand": "rtk node scripts/run-platform-production-preflight.mjs --list",
+    "dryRunCommand": "rtk node scripts/run-platform-production-preflight.mjs",
+    "policyCommand": "rtk node scripts/run-platform-production-preflight.mjs --policy <policy-id>",
+    "commandCommand": "rtk node scripts/run-platform-production-preflight.mjs --command <command-id>",
+    "runCommand": "rtk node scripts/run-platform-production-preflight.mjs --run",
+    "strictEnvCommand": "rtk node scripts/run-platform-production-preflight.mjs --command production-env-audit --strict-env-file <private-production-env>",
+    "docs": [
+      "README.md",
+      "docs/platform-deployment.md",
+      "docs/platform-capability-development.md"
+    ],
+    "tests": [
+      "scripts/platform-production-preflight-runner.test.mjs"
+    ]
+  },
+  "policyPreflightRequirements": [
+    {
+      "policy": "config-backup-export",
+      "requiredCommands": [
+        "capability-contracts",
+        "capability-profiles",
+        "app-client-api-boundary",
+        "cache-invalidation",
+        "task-execution-audit",
+        "objective-conformance",
+        "production-env-audit"
+      ],
+      "reason": "Configuration backup/export can affect capability shape, cached settings and release task visibility."
+    },
+    {
+      "policy": "config-import-restore",
+      "requiredCommands": [
+        "capability-contracts",
+        "capability-profiles",
+        "app-client-api-boundary",
+        "cache-invalidation",
+        "task-execution-audit",
+        "objective-conformance",
+        "production-env-audit"
+      ],
+      "reason": "Configuration restore can change enabled capability surfaces, cached resources and task-state evidence."
+    },
+    {
+      "policy": "database-migration",
+      "requiredCommands": [
+        "capability-contracts",
+        "capability-profiles",
+        "task-execution-audit",
+        "objective-conformance",
+        "production-env-audit"
+      ],
+      "reason": "Database migration must stay aligned with enabled capability profiles and unfinished promotion blockers."
+    },
+    {
+      "policy": "token-rotation",
+      "requiredCommands": [
+        "cache-invalidation",
+        "production-auth-promotion-review",
+        "refresh-token-family-promotion",
+        "task-execution-audit",
+        "objective-conformance",
+        "admin-ui-contract-tests",
+        "production-env-audit"
+      ],
+      "reason": "Credential rotation requires cache/session invalidation planning, production auth promotion review evidence, refresh-token family promotion checks and visible release task state."
+    }
+  ],
+  "operationPolicies": [
+    {
+      "id": "config-backup-export",
+      "purpose": "Require reviewable backups or exports before production configuration changes, restores or generated contract promotion.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md"
+      ],
+      "preflightCommands": [
+        "production-env-audit",
+        "capability-contracts",
+        "capability-profiles",
+        "admin-resource-contract",
+        "governance-topology",
+        "form-schema-layout-slots",
+        "engineering-capabilities",
+        "codegen-source-writing-readiness",
+        "app-client-api-boundary",
+        "personnel-runtime-readiness",
+        "cache-invalidation",
+        "task-execution-audit",
+        "foundation-alignment",
+        "objective-conformance",
+        "production-readiness",
+        "platform-operations-plan"
+      ],
+      "requiresHumanReview": true,
+      "rollbackRequirement": "Keep the previous generated contracts, platform configuration export and database backup reference available before applying a production configuration change.",
+      "auditRequirement": "Record operator, timestamp, target environment, artifact locations and validation command output in the release or operations log.",
+      "prohibitedActions": [
+        "overwrite production configuration without a reviewed backup artifact",
+        "promote generated contracts when validate-admin-resources or engineering-capabilities fails"
+      ]
+    },
+    {
+      "id": "config-import-restore",
+      "purpose": "Keep configuration import and restore workflows outside default runtime APIs until dry-run, diff, review and rollback gates are explicitly implemented.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md"
+      ],
+      "preflightCommands": [
+        "production-env-audit",
+        "capability-contracts",
+        "capability-profiles",
+        "admin-resource-contract",
+        "governance-topology",
+        "form-schema-layout-slots",
+        "codegen-source-writing-readiness",
+        "reference-discovery",
+        "reference-coverage",
+        "app-client-api-boundary",
+        "personnel-runtime-readiness",
+        "cache-invalidation",
+        "task-execution-audit",
+        "foundation-alignment",
+        "objective-conformance",
+        "production-readiness",
+        "platform-operations-plan"
+      ],
+      "requiresHumanReview": true,
+      "rollbackRequirement": "Every restore must identify the source backup, target environment, dry-run diff and rollback artifact before runtime data is changed.",
+      "auditRequirement": "A restore must write an operation record with actor, reason, source artifact, affected resources and validation output.",
+      "prohibitedActions": [
+        "add a destructive import API to the default platform runtime",
+        "restore production data without dry-run diff and human approval"
+      ]
+    },
+    {
+      "id": "database-migration",
+      "purpose": "Keep database migration execution tied to lifecycle manifests, GORM repositories, idempotency history and production preflight checks.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md"
+      ],
+      "preflightCommands": [
+        "production-runtime-tests",
+        "production-env-audit",
+        "capability-contracts",
+        "capability-profiles",
+        "platform-capability-audit",
+        "personnel-runtime-readiness",
+        "task-execution-audit",
+        "foundation-alignment",
+        "objective-conformance",
+        "production-readiness",
+        "platform-operations-plan"
+      ],
+      "requiresHumanReview": true,
+      "rollbackRequirement": "Schema changes must include a rollback or forward-fix plan and a database backup reference before production execution.",
+      "auditRequirement": "Migration operations must record capability, migration id, executor, target DSN class, startedAt, finishedAt and result.",
+      "prohibitedActions": [
+        "run destructive migrations outside capability lifecycle declarations",
+        "run production migrations without GORM-backed lifecycle history"
+      ]
+    },
+    {
+      "id": "token-rotation",
+      "purpose": "Require explicit session, JWT secret and API-token rotation planning before changing production credentials.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md",
+        "docs/platform-auth.md"
+      ],
+      "preflightCommands": [
+        "production-runtime-tests",
+        "production-env-audit",
+        "production-auth-hardening",
+        "production-auth-promotion-review",
+        "refresh-token-family-promotion",
+        "cache-invalidation",
+        "task-execution-audit",
+        "foundation-alignment",
+        "objective-conformance",
+        "admin-i18n",
+        "admin-ui-contracts",
+        "admin-ui-contract-tests",
+        "admin-build",
+        "git-diff-check",
+        "production-readiness",
+        "platform-operations-plan"
+      ],
+      "requiresHumanReview": true,
+      "rollbackRequirement": "Rotation plans must identify overlap windows, invalidation behavior and rollback handling for admin JWTs, app JWTs and pgo_ API tokens.",
+      "auditRequirement": "Credential rotations must record actor, scope, affected token classes, invalidation decision and verification commands without logging secret values.",
+      "prohibitedActions": [
+        "log raw JWT secrets, OpenID, UnionID or API token values",
+        "rotate production secrets without session impact review"
+      ]
+    }
+  ],
+  "productionEnvAudit": {
+    "validator": "scripts/validate-platform-production-env.mjs",
+    "defaultEnvFile": "deploy/env/production.example.env",
+    "strictCommand": "rtk node scripts/validate-platform-production-env.mjs --env-file <private-production-env> --strict-secrets",
+    "docs": [
+      "README.md",
+      "docs/platform-deployment.md",
+      "docs/platform-capability-development.md"
+    ],
+    "requiredSourceSnippets": [
+      {
+        "path": "scripts/validate-platform-production-env.mjs",
+        "contains": "--strict-secrets"
+      },
+      {
+        "path": "scripts/validate-platform-production-env.mjs",
+        "contains": "PLATFORM_CAPABILITIES must not include demo-data in production"
+      },
+      {
+        "path": "scripts/validate-platform-production-env.mjs",
+        "contains": "PLATFORM_CACHE_DRIVER must be redis"
+      },
+      {
+        "path": "scripts/platform-production-env.test.mjs",
+        "contains": "rejects the standard template when strict secret checks are enabled"
+      },
+      {
+        "path": "deploy/env/production.example.env",
+        "contains": "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true"
+      }
+    ]
+  }
+}

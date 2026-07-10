@@ -1,0 +1,1581 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-foundation-task-graph.json",
+  "capturedAt": "2026-07-06",
+  "purpose": "Execution dependency and conflict-control graph for the reusable platform foundation.",
+  "approvedStack": {
+    "backend": [
+      "Gin",
+      "GORM",
+      "Casbin",
+      "JWT"
+    ],
+    "frontend": [
+      "Refine",
+      "React",
+      "Ant Design"
+    ]
+  },
+  "phases": [
+    {
+      "id": "stack-and-contracts",
+      "order": 10,
+      "label": {
+        "zh": "技术栈与契约",
+        "en": "Stack And Contracts"
+      }
+    },
+    {
+      "id": "runtime-and-security",
+      "order": 20,
+      "label": {
+        "zh": "运行时与安全",
+        "en": "Runtime And Security"
+      }
+    },
+    {
+      "id": "admin-experience",
+      "order": 30,
+      "label": {
+        "zh": "管理后台体验",
+        "en": "Admin Experience"
+      }
+    },
+    {
+      "id": "extension-boundaries",
+      "order": 40,
+      "label": {
+        "zh": "扩展边界",
+        "en": "Extension Boundaries"
+      }
+    },
+    {
+      "id": "production-governance",
+      "order": 50,
+      "label": {
+        "zh": "生产治理",
+        "en": "Production Governance"
+      }
+    }
+  ],
+  "resourceLocks": [
+    "target-stack",
+    "capability-manifest",
+    "capability-profile",
+    "admin-resource-contract",
+    "admin-resource-api",
+    "rbac-policy",
+    "casbin-policy",
+    "jwt-session",
+    "storage-runtime",
+    "cache-runtime",
+    "production-config",
+    "admin-ui",
+    "i18n",
+    "browser-qa",
+    "openapi",
+    "app-api-contract",
+    "codegen",
+    "audit-policy",
+    "docs"
+  ],
+  "resourceLockPolicies": [
+    {
+      "lock": "target-stack",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "技术栈路线会影响所有后续实现，必须串行评审。",
+        "en": "Target stack changes affect all downstream implementation and must be reviewed serially."
+      }
+    },
+    {
+      "lock": "capability-manifest",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "能力声明是插件接入合同，避免并行改动产生注册漂移。",
+        "en": "Capability manifests are plugin entry contracts; parallel edits can create registration drift."
+      }
+    },
+    {
+      "lock": "capability-profile",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "能力组合影响启用面和生产 profile，必须避免并行冲突。",
+        "en": "Capability profiles affect enabled surfaces and production profiles, so conflicting parallel work is blocked."
+      }
+    },
+    {
+      "lock": "admin-resource-contract",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "后台资源合同驱动 OpenAPI、代码生成和 UI，不能并行改写。",
+        "en": "Admin resource contracts drive OpenAPI, codegen and UI, so concurrent rewrites are blocked."
+      }
+    },
+    {
+      "lock": "admin-resource-api",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "通用资源 API 是前后端共享边界，改动需要串行验证。",
+        "en": "The generic resource API is a shared frontend/backend boundary and needs serial validation."
+      }
+    },
+    {
+      "lock": "rbac-policy",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "权限码、数据范围和菜单可见性必须保持一致。",
+        "en": "Permission codes, data scopes and menu visibility must stay aligned."
+      }
+    },
+    {
+      "lock": "casbin-policy",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "Casbin 授权语义影响生产访问控制，不能和 RBAC 改动脱节。",
+        "en": "Casbin authorization semantics affect production access control and must not drift from RBAC changes."
+      }
+    },
+    {
+      "lock": "jwt-session",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "JWT、会话和 Provider 影响认证安全边界。",
+        "en": "JWT, session and provider changes affect the authentication security boundary."
+      }
+    },
+    {
+      "lock": "storage-runtime",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "持久化运行时和迁移路径需要单一写入责任。",
+        "en": "Storage runtime and migration paths need a single writer responsibility."
+      }
+    },
+    {
+      "lock": "cache-runtime",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "缓存和 Redis 失效规则会影响多实例一致性。",
+        "en": "Cache and Redis invalidation rules affect multi-instance consistency."
+      }
+    },
+    {
+      "lock": "production-config",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "生产配置门禁会影响发布和运维策略。",
+        "en": "Production configuration gates affect release and operations policy."
+      }
+    },
+    {
+      "lock": "admin-ui",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "后台 UI 组件和布局需要统一设计与浏览器验收。",
+        "en": "Admin UI components and layout need unified design and browser validation."
+      }
+    },
+    {
+      "lock": "i18n",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "共享组件文案必须中英文同步，避免分支漂移。",
+        "en": "Shared component copy must keep Chinese and English dictionaries synchronized."
+      }
+    },
+    {
+      "lock": "browser-qa",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "浏览器截图和响应式验收需要稳定页面状态。",
+        "en": "Browser screenshots and responsive QA need stable page state."
+      }
+    },
+    {
+      "lock": "openapi",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "OpenAPI 是外部集成和生成器输入。",
+        "en": "OpenAPI is an external integration and generator input."
+      }
+    },
+    {
+      "lock": "app-api-contract",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "App API 合同影响小程序和业务能力接入。",
+        "en": "App API contracts affect mini-program and business capability integration."
+      }
+    },
+    {
+      "lock": "codegen",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "代码生成和源码写入策略必须保持 dry-run 与评审边界。",
+        "en": "Codegen and source-writing policy must preserve dry-run and review boundaries."
+      }
+    },
+    {
+      "lock": "audit-policy",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "审计策略影响生产操作和权限评审证据。",
+        "en": "Audit policy affects production operation and permission-review evidence."
+      }
+    },
+    {
+      "lock": "docs",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "项目文档是协作事实源，任务节点更新时需要串行收口。",
+        "en": "Project docs are the collaboration source of truth and need serial closure during task updates."
+      }
+    }
+  ],
+  "resourceLockConflictGroups": [
+    {
+      "id": "admin-visual-surface",
+      "locks": [
+        "admin-ui",
+        "i18n",
+        "browser-qa"
+      ],
+      "reason": {
+        "zh": "视觉、文案和浏览器验收必须作为一个体验面串行收口。",
+        "en": "Visual UI, copy and browser QA must close as one experience surface."
+      }
+    },
+    {
+      "id": "contract-generation-surface",
+      "locks": [
+        "admin-resource-contract",
+        "admin-resource-api",
+        "openapi",
+        "app-api-contract",
+        "codegen"
+      ],
+      "reason": {
+        "zh": "资源合同、API 合同和生成器互为输入输出，不能拆开并行改。",
+        "en": "Resource contracts, API contracts and generators feed each other and must not be edited in conflicting parallel work."
+      }
+    },
+    {
+      "id": "auth-policy-runtime",
+      "locks": [
+        "rbac-policy",
+        "casbin-policy",
+        "jwt-session",
+        "cache-runtime",
+        "production-config"
+      ],
+      "reason": {
+        "zh": "权限、认证、缓存和生产配置共同决定访问控制运行语义。",
+        "en": "Authorization, authentication, cache and production configuration jointly define access-control runtime semantics."
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "id": "stack-alignment-and-architecture",
+      "title": {
+        "zh": "技术路线对齐",
+        "en": "Stack Alignment And Architecture"
+      },
+      "phase": "stack-and-contracts",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "target-stack",
+        "docs"
+      ],
+      "dependsOn": [],
+      "evidence": {
+        "docs": [
+          "docs/platform-stack-alignment-audit.md",
+          "docs/platform-foundation-task-map.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-engineering-capabilities.mjs"
+        ]
+      }
+    },
+    {
+      "id": "capability-manifest-contract",
+      "title": {
+        "zh": "能力 Manifest 契约",
+        "en": "Capability Manifest Contract"
+      },
+      "phase": "stack-and-contracts",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "capability-manifest"
+      ],
+      "dependsOn": [
+        "stack-alignment-and-architecture"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/admin-capability-registration.md",
+          "docs/platform-capability-development.md"
+        ],
+        "tests": [
+          "internal/platform/capability/admin_contract_test.go",
+          "internal/platform/capability/app_contract_test.go"
+        ]
+      }
+    },
+    {
+      "id": "resource-schema-contract",
+      "title": {
+        "zh": "资源 Schema 与字段配置",
+        "en": "Resource Schema And Field Contract"
+      },
+      "phase": "stack-and-contracts",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "admin-resource-contract",
+        "admin-resource-api"
+      ],
+      "dependsOn": [
+        "capability-manifest-contract"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/admin-resource-schema.md"
+        ],
+        "validators": [
+          "scripts/validate-admin-resources.mjs"
+        ],
+        "tests": [
+          "internal/platform/adminresource/store_test.go"
+        ]
+      }
+    },
+    {
+      "id": "capability-profile-composition-gate",
+      "title": {
+        "zh": "能力组合 Profile 门禁",
+        "en": "Capability Profile Composition Gate"
+      },
+      "phase": "stack-and-contracts",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "capability-profile",
+        "capability-manifest",
+        "docs"
+      ],
+      "dependsOn": [
+        "capability-manifest-contract",
+        "resource-schema-contract"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-capability-development.md",
+          "docs/platform-foundation-task-map.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-capability-profiles.mjs"
+        ],
+        "tests": [
+          "scripts/platform-capability-profiles.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "capability-contract-governance",
+      "title": {
+        "zh": "插件式能力契约治理",
+        "en": "Plugin-Style Capability Contract Governance"
+      },
+      "phase": "stack-and-contracts",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "capability-manifest",
+        "capability-profile",
+        "docs"
+      ],
+      "dependsOn": [
+        "capability-manifest-contract",
+        "capability-profile-composition-gate"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-capability-development.md",
+          "docs/platform-foundation-task-map.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-capability-contracts.mjs"
+        ],
+        "tests": [
+          "scripts/platform-capability-contracts.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "rbac-menu-data-scope",
+      "title": {
+        "zh": "RBAC、动态菜单与数据范围",
+        "en": "RBAC, Dynamic Menus And Data Scope"
+      },
+      "phase": "runtime-and-security",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "rbac-policy",
+        "casbin-policy",
+        "admin-resource-api"
+      ],
+      "dependsOn": [
+        "resource-schema-contract"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/admin-rbac-menu.md"
+        ],
+        "tests": [
+          "internal/platform/adminresource/store_test.go",
+          "internal/platform/httpapi/server_test.go"
+        ]
+      }
+    },
+    {
+      "id": "governance-org-area-role-groups",
+      "title": {
+        "zh": "租户、组织、角色组与地址码治理",
+        "en": "Tenant, Org, Role Group And Area Governance"
+      },
+      "phase": "runtime-and-security",
+      "scope": "governance",
+      "status": "implemented",
+      "resourceLocks": [
+        "admin-resource-contract",
+        "rbac-policy",
+        "docs"
+      ],
+      "dependsOn": [
+        "rbac-menu-data-scope"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-06-platform-go-governance-boundary-design.md",
+          "docs/platform-foundation-task-map.md"
+        ],
+        "validators": [
+          "scripts/validate-admin-resources.mjs",
+          "scripts/validate-platform-governance-topology.mjs"
+        ],
+        "tests": [
+          "internal/platform/adminresource/store_test.go",
+          "internal/platform/httpapi/server_test.go",
+          "scripts/platform-governance-topology.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "auth-session-provider-jwt-wechat",
+      "title": {
+        "zh": "认证、会话、JWT 与微信登录边界",
+        "en": "Auth, Session, JWT And WeChat Provider Boundary"
+      },
+      "phase": "runtime-and-security",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "jwt-session",
+        "capability-manifest"
+      ],
+      "dependsOn": [
+        "rbac-menu-data-scope"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-auth.md"
+        ],
+        "tests": [
+          "internal/platform/httpapi/server_test.go"
+        ]
+      }
+    },
+    {
+      "id": "gorm-storage-runtime",
+      "title": {
+        "zh": "GORM 持久化运行时",
+        "en": "GORM Storage Runtime"
+      },
+      "phase": "runtime-and-security",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "storage-runtime"
+      ],
+      "dependsOn": [
+        "resource-schema-contract"
+      ],
+      "evidence": {
+        "tests": [
+          "internal/platform/adminresource/gorm_store_test.go",
+          "internal/platform/session/store_test.go"
+        ]
+      }
+    },
+    {
+      "id": "cache-redis-invalidation",
+      "title": {
+        "zh": "缓存与 Redis 失效总线",
+        "en": "Cache And Redis Invalidation Bus"
+      },
+      "phase": "runtime-and-security",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "cache-runtime"
+      ],
+      "dependsOn": [
+        "auth-session-provider-jwt-wechat",
+        "rbac-menu-data-scope"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-cache.md"
+        ],
+        "tests": [
+          "internal/platform/httpapi/server_test.go"
+        ]
+      }
+    },
+    {
+      "id": "production-persistence-correctness",
+      "title": {
+        "zh": "生产持久化正确性",
+        "en": "Production Persistence Correctness"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "storage-runtime",
+        "cache-runtime",
+        "admin-resource-api",
+        "docs"
+      ],
+      "dependsOn": [
+        "gorm-storage-runtime",
+        "cache-redis-invalidation"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-10-platform-production-persistence-correctness-design.md",
+          "docs/platform-cache.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-foundation-task-map.md",
+          ".superpowers/sdd/task-4-report.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-cache-invalidation.mjs",
+          "scripts/validate-platform-foundation-task-graph.mjs",
+          "scripts/validate-platform-foundation-alignment.mjs",
+          "scripts/validate-platform-task-execution-audit.mjs",
+          "scripts/validate-platform-goal-completion-audit.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs",
+          "scripts/validate-platform-objective-conformance.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs"
+        ],
+        "tests": [
+          "internal/platform/session/store_test.go",
+          "internal/platform/session/gorm_repository_test.go",
+          "internal/platform/adminresource/store_test.go",
+          "internal/platform/adminresource/gorm_store_test.go",
+          "internal/platform/httpapi/server_test.go",
+          "scripts/platform-cache-invalidation.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "production-runtime-gate",
+      "title": {
+        "zh": "生产运行门禁",
+        "en": "Production Runtime Gate"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "production-config"
+      ],
+      "dependsOn": [
+        "gorm-storage-runtime",
+        "cache-redis-invalidation",
+        "auth-session-provider-jwt-wechat"
+      ],
+      "evidence": {
+        "docs": [
+          "README.md",
+          "docs/platform-capability-development.md"
+        ],
+        "tests": [
+          "internal/platform/config/config_test.go"
+        ]
+      }
+    },
+    {
+      "id": "production-readiness-preflight",
+      "title": {
+        "zh": "生产就绪预检",
+        "en": "Production Readiness Preflight"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "production-config",
+        "docs"
+      ],
+      "dependsOn": [
+        "production-runtime-gate",
+        "cache-redis-invalidation"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-foundation-task-map.md",
+          "docs/platform-capability-development.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-production-readiness.mjs"
+        ],
+        "tests": [
+          "scripts/platform-production-readiness.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "openapi-app-contracts",
+      "title": {
+        "zh": "OpenAPI 与 App 路由契约",
+        "en": "OpenAPI And App Route Contracts"
+      },
+      "phase": "stack-and-contracts",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "openapi",
+        "app-api-contract"
+      ],
+      "dependsOn": [
+        "resource-schema-contract",
+        "auth-session-provider-jwt-wechat"
+      ],
+      "phaseDependencyExceptions": [
+        {
+          "dependency": "auth-session-provider-jwt-wechat",
+          "reason": {
+            "zh": "App OpenAPI 与 App 路由契约需要复用已确认的认证、会话和 tokenType 边界；这是合同节点对认证边界的显式输入，不代表技术栈契约阶段可以任意依赖运行时实现。",
+            "en": "App OpenAPI and app route contracts reuse the confirmed auth, session and tokenType boundary. This is an explicit contract input from the auth boundary, not a general allowance for stack-contract tasks to depend on runtime implementation."
+          }
+        }
+      ],
+      "evidence": {
+        "validators": [
+          "scripts/generate-admin-openapi.mjs",
+          "scripts/generate-app-openapi.mjs"
+        ],
+        "tests": [
+          "scripts/app-contract-generators.test.mjs",
+          "scripts/admin-resource-contract-generators.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "admin-api-boundary-query-security",
+      "title": {
+        "zh": "后台 API 边界与查询安全",
+        "en": "Admin API Boundary And Query Security"
+      },
+      "phase": "stack-and-contracts",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "admin-resource-api",
+        "openapi",
+        "docs"
+      ],
+      "dependsOn": [
+        "resource-schema-contract",
+        "openapi-app-contracts"
+      ],
+      "evidence": {
+        "docs": [
+          "resources/platform-admin-api-boundary.json",
+          "docs/admin-resource-schema.md",
+          "docs/platform-foundation-task-map.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-admin-api-boundary.mjs"
+        ],
+        "tests": [
+          "scripts/platform-admin-api-boundary.test.mjs",
+          "internal/platform/adminresource/store_test.go",
+          "internal/platform/httpapi/server_test.go"
+        ]
+      }
+    },
+    {
+      "id": "codegen-preview-scaffold",
+      "title": {
+        "zh": "代码生成器预览与安全脚手架",
+        "en": "Codegen Preview And Safe Scaffold"
+      },
+      "phase": "stack-and-contracts",
+      "scope": "foundation",
+      "status": "implemented",
+      "statusReason": {
+        "zh": "代码生成器的安全预览能力已实现：合同预览、脚手架计划、生成文件草稿和晋级审查包都可生成并校验；所有输出仍限制在 `resources/generated/`，源码写入显式禁用，避免未评审生成器改写运行时代码。",
+        "en": "The safe preview code generator is implemented: contract previews, scaffold plans, generated-file drafts and promotion review packets can be generated and validated. Outputs remain confined to `resources/generated/`, and runtime source writing stays explicitly disabled to prevent unreviewed generators from mutating runtime code."
+      },
+      "completionGate": {
+        "zh": "后续若要写入运行时代码，必须通过独立的 `source-writing-codegen-promotion` 节点，完成源码写入规格、人工评审、差异评审、回滚和目标族测试映射。",
+        "en": "Any future runtime source writing must go through the separate `source-writing-codegen-promotion` node with a source-writing spec, human review, diff review, rollback and target-family test mapping."
+      },
+      "resourceLocks": [
+        "codegen"
+      ],
+      "dependsOn": [
+        "resource-schema-contract",
+        "openapi-app-contracts"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-foundation-task-map.md",
+          "docs/admin-resource-schema.md",
+          "docs/superpowers/specs/2026-07-06-platform-go-codegen-source-writing-readiness-design.md"
+        ],
+        "validators": [
+          "scripts/generate-admin-codegen-preview.mjs",
+          "scripts/generate-admin-scaffold-plan.mjs",
+          "scripts/generate-admin-scaffold-files.mjs",
+          "scripts/generate-admin-scaffold-draft.mjs",
+          "scripts/generate-admin-scaffold-promotion-review.mjs",
+          "scripts/validate-platform-codegen-source-writing-readiness.mjs"
+        ],
+        "tests": [
+          "scripts/admin-scaffold-plan.test.mjs",
+          "scripts/platform-codegen-source-writing-readiness.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "codegen-source-writing-readiness",
+      "title": {
+        "zh": "源码生成准入门禁",
+        "en": "Source-Writing Codegen Readiness"
+      },
+      "phase": "stack-and-contracts",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "codegen",
+        "docs"
+      ],
+      "dependsOn": [
+        "codegen-preview-scaffold"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-06-platform-go-codegen-source-writing-readiness-design.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+          "scripts/generate-admin-scaffold-promotion-review.mjs"
+        ],
+        "tests": [
+          "scripts/platform-codegen-source-writing-readiness.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "admin-ui-shell-and-list-components",
+      "title": {
+        "zh": "管理后台 Shell 与列表组件",
+        "en": "Admin Shell And List Components"
+      },
+      "phase": "admin-experience",
+      "scope": "admin-ui",
+      "status": "implemented",
+      "visual": true,
+      "designGate": [
+        "superpowers:brainstorming",
+        "product-design"
+      ],
+      "resourceLocks": [
+        "admin-ui",
+        "i18n",
+        "browser-qa"
+      ],
+      "dependsOn": [
+        "resource-schema-contract",
+        "rbac-menu-data-scope",
+        "auth-session-provider-jwt-wechat",
+        "admin-api-boundary-query-security"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/admin-ui-foundation.md"
+        ],
+        "validators": [
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs"
+        ],
+        "tests": [
+          "scripts/admin-ui-contracts.test.mjs"
+        ],
+        "screenshots": [
+          "tmp/product-design/visual-product-design-qa-20260706/02-menus-list-desktop-1440x1024.png",
+          "tmp/product-design/visual-product-design-qa-20260706/07-column-menu-black-1440x1024.png",
+          "tmp/product-design/visual-product-design-qa-20260706/08-filter-menu-black-1440x1024.png",
+          "tmp/product-design/visual-product-design-qa-20260706/11-menus-mobile-390x844-after-fix.png",
+          "tmp/product-design/visual-product-design-qa-20260707/01-sidebar-collapsed-flat-nav-1440x1024.png"
+        ]
+      }
+    },
+    {
+      "id": "branding-demo-data-dashboard",
+      "title": {
+        "zh": "品牌配置、演示数据与通用仪表盘",
+        "en": "Branding, Demo Data And Common Dashboard"
+      },
+      "phase": "admin-experience",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "admin-ui",
+        "admin-resource-contract"
+      ],
+      "dependsOn": [
+        "admin-ui-shell-and-list-components",
+        "auth-session-provider-jwt-wechat"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-branding.md",
+          "docs/platform-demo-data.md"
+        ],
+        "tests": [
+          "internal/platform/httpapi/server_test.go"
+        ]
+      }
+    },
+    {
+      "id": "personnel-extension-boundary",
+      "title": {
+        "zh": "人员与岗位可选能力边界",
+        "en": "Personnel And Position Extension Boundary"
+      },
+      "phase": "extension-boundaries",
+      "scope": "governance",
+      "status": "implemented",
+      "resourceLocks": [
+        "capability-manifest",
+        "capability-profile",
+        "admin-resource-contract",
+        "docs"
+      ],
+      "dependsOn": [
+        "governance-org-area-role-groups",
+        "capability-profile-composition-gate",
+        "resource-schema-contract"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-06-platform-go-governance-boundary-design.md",
+          "docs/platform-foundation-task-map.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-capability-profiles.mjs",
+          "scripts/validate-platform-reference-coverage.mjs",
+          "scripts/validate-admin-resources.mjs",
+          "scripts/validate-platform-personnel-runtime-readiness.mjs"
+        ],
+        "tests": [
+          "internal/platform/core/capabilities_test.go",
+          "scripts/platform-capability-profiles.test.mjs",
+          "scripts/admin-resource-contract-generators.test.mjs",
+          "scripts/platform-reference-coverage.test.mjs",
+          "scripts/platform-personnel-runtime-readiness.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "notification-extension-boundary",
+      "title": {
+        "zh": "通知中心可选能力边界",
+        "en": "Notification Extension Boundary"
+      },
+      "phase": "extension-boundaries",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "capability-manifest",
+        "capability-profile",
+        "admin-resource-contract",
+        "docs"
+      ],
+      "dependsOn": [
+        "capability-profile-composition-gate",
+        "resource-schema-contract",
+        "auth-session-provider-jwt-wechat"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-capability-development.md",
+          "docs/platform-foundation-task-map.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-capability-profiles.mjs",
+          "scripts/validate-admin-resources.mjs"
+        ],
+        "tests": [
+          "internal/platform/core/capabilities_test.go",
+          "scripts/platform-capability-profiles.test.mjs",
+          "scripts/admin-resource-contract-generators.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "job-extension-boundary",
+      "title": {
+        "zh": "任务调度可选能力边界",
+        "en": "Job Extension Boundary"
+      },
+      "phase": "extension-boundaries",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "capability-manifest",
+        "capability-profile",
+        "admin-resource-contract",
+        "docs"
+      ],
+      "dependsOn": [
+        "capability-profile-composition-gate",
+        "resource-schema-contract",
+        "auth-session-provider-jwt-wechat"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-capability-development.md",
+          "docs/platform-roadmap.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-capability-profiles.mjs",
+          "scripts/validate-admin-resources.mjs"
+        ],
+        "tests": [
+          "internal/platform/core/capabilities_test.go",
+          "scripts/platform-capability-profiles.test.mjs",
+          "scripts/admin-resource-contract-generators.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "visual-product-design-qa",
+      "title": {
+        "zh": "可视化体验设计与浏览器验收",
+        "en": "Visual Product Design And Browser QA"
+      },
+      "phase": "admin-experience",
+      "scope": "admin-ui",
+      "status": "implemented",
+      "visual": true,
+      "designGate": [
+        "superpowers:brainstorming",
+        "product-design"
+      ],
+      "resourceLocks": [
+        "admin-ui",
+        "i18n",
+        "browser-qa"
+      ],
+      "dependsOn": [
+        "admin-ui-shell-and-list-components"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/admin-ui-foundation.md",
+          "design-qa.md"
+        ],
+        "validators": [
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs"
+        ],
+        "tests": [
+          "admin/package.json"
+        ],
+        "screenshots": [
+          "tmp/product-design/visual-product-design-qa-20260706/04-user-menu-desktop-1440x1024.png",
+          "tmp/product-design/visual-product-design-qa-20260706/05-settings-black-layout-tab-1440x1024.png",
+          "tmp/product-design/visual-product-design-qa-20260706/06-sidebar-collapsed-black-1440x1024.png",
+          "tmp/product-design/visual-product-design-qa-20260706/07-column-menu-black-1440x1024.png",
+          "tmp/product-design/visual-product-design-qa-20260706/08-filter-menu-black-1440x1024.png",
+          "tmp/product-design/visual-product-design-qa-20260706/09-work-tab-context-menu-black-1440x1024.png",
+          "tmp/product-design/visual-product-design-qa-20260706/11-menus-mobile-390x844-after-fix.png",
+          "tmp/product-design/visual-product-design-qa-20260706/12-dashboard-desktop-1440x1024-after-fix.png"
+        ]
+      }
+    },
+    {
+      "id": "policy-review-and-audit-workflow",
+      "title": {
+        "zh": "生产策略评审与审计流程",
+        "en": "Production Policy Review And Audit Workflow"
+      },
+      "phase": "production-governance",
+      "scope": "governance",
+      "status": "implemented",
+      "resourceLocks": [
+        "audit-policy",
+        "docs"
+      ],
+      "dependsOn": [
+        "production-readiness-preflight",
+        "rbac-menu-data-scope"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-foundation-task-map.md",
+          "docs/platform-capability-development.md"
+        ],
+        "tests": [
+          "internal/platform/core/capabilities_test.go",
+          "internal/platform/adminresource/policy_review_test.go",
+          "internal/platform/httpapi/server_test.go",
+          "scripts/admin-resource-contract-generators.test.mjs",
+          "scripts/platform-capability-profiles.test.mjs"
+        ],
+        "validators": [
+          "scripts/validate-platform-capability-profiles.mjs",
+          "scripts/validate-admin-resources.mjs"
+        ]
+      }
+    },
+    {
+      "id": "production-auth-provider-hardening",
+      "title": {
+        "zh": "生产认证与 Provider 加固",
+        "en": "Production Auth And Provider Hardening"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "implemented",
+      "statusReason": {
+        "zh": "生产认证硬化已作为平台底座完成：JWT、服务端会话、滑动续期、吊销、API Token、App Token、Provider 边界、Provider 运行时策略、Provider 矩阵 manifest 覆盖、密钥轮换证据、结构化审批证据 schema、operations plan schema 透传和审计禁泄露字段均可机器校验；独立 refresh-token 家族存储、GORM 仓储、轮换、复用检测和审计脱敏运行切片已实现但默认禁用。",
+        "en": "Production auth hardening is complete as a platform foundation capability: JWTs, server-side sessions, sliding renewal, revocation, API tokens, app tokens, provider boundaries, provider runtime policy, Provider Promotion Matrix manifest coverage, credential-rotation evidence, structured approval evidence schema, operations-plan schema propagation and forbidden audit secret fields are machine-checkable. The independent refresh-token-family store, GORM repository, rotation, reuse detection and audit-redaction runtime slice is implemented but disabled by default."
+      },
+      "completionGate": {
+        "zh": "底座完成不等于启用独立 refresh-token 家族。未来如需把 refresh-token 家族绑定到默认 /api/auth/refresh 或启用未审查 Provider，仍必须先完成外部生产审批包、Redis/持久化一致性证据、轮换复放审计样本、Provider 密钥轮换 Runbook、回滚方案和生产预检测试输出。",
+        "en": "Foundation completion does not enable independent refresh-token families. Future binding of refresh-token families to the default /api/auth/refresh endpoint, or enabling an unreviewed provider, still requires the external production approval package, Redis/persistence convergence evidence, rotation replay audit samples, provider secret rotation runbook, rollback plan and production-preflight test output."
+      },
+      "resourceLocks": [
+        "jwt-session",
+        "production-config",
+        "cache-runtime",
+        "docs"
+      ],
+      "dependsOn": [
+        "auth-session-provider-jwt-wechat",
+        "cache-redis-invalidation",
+        "production-readiness-preflight"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-auth.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-foundation-task-map.md",
+          "docs/platform-capability-development.md",
+          "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-production-auth-hardening.mjs",
+          "scripts/validate-platform-refresh-token-family-promotion.mjs",
+          "scripts/generate-production-auth-promotion-review.mjs",
+          "scripts/validate-platform-production-readiness.mjs"
+        ],
+        "tests": [
+          "scripts/platform-production-auth-hardening.test.mjs",
+          "scripts/platform-refresh-token-family-promotion.test.mjs",
+          "scripts/platform-production-readiness.test.mjs"
+        ],
+        "generated": [
+          "resources/generated/production-auth-promotion-review.json"
+        ]
+      }
+    },
+    {
+      "id": "form-schema-layout-and-slots",
+      "title": {
+        "zh": "表单 Schema 布局与插槽规则",
+        "en": "Form Schema Layout And Slot Rules"
+      },
+      "phase": "admin-experience",
+      "scope": "admin-ui",
+      "status": "implemented",
+      "visual": true,
+      "contractGateOnly": false,
+      "designGate": [
+        "superpowers:brainstorming",
+        "product-design"
+      ],
+      "statusReason": {
+        "zh": "表单布局与插槽能力已晋级为受控实现：PlatformResourceForm 支持 Schema 分组、帮助文案、校验、关系选择、AntD Form 透传、Refine CRUD、受控 source-level React slots、schema 驱动的 two-column-density、runtime slot descriptor、前端 slot registry 和 side-detail-preview 右侧预览栏。runtime slot 仍只允许描述符和 allowlisted registry 渲染器，源码写入、后端 React 组件名、动态组件路径和 raw script 继续禁止。",
+        "en": "Form layout and slot capability is now a controlled implementation: PlatformResourceForm supports schema groups, help text, validation, relation controls, Ant Design Form prop passthrough, Refine CRUD, controlled source-level React slots, schema-driven two-column-density, runtime slot descriptors, a frontend slot registry and the side-detail-preview rail. Runtime slots still allow only descriptors and allowlisted registry renderers; source writing, backend React component names, dynamic component paths and raw scripts remain forbidden."
+      },
+      "completionGate": {
+        "zh": "后续增强必须继续保持 registry allowlist、i18n、权限过滤、AntD Form 控件透传和 Refine CRUD 边界；业务包只能在组合根注册自有 renderer，不得让平台 core 或通用 shell import 业务代码。",
+        "en": "Follow-on enhancements must preserve registry allowlists, i18n, permission filtering, Ant Design Form control passthrough and Refine CRUD boundaries. Business packages may register their renderers at the composition root only; platform core and the generic shell must not import business code."
+      },
+      "resourceLocks": [
+        "admin-resource-contract",
+        "admin-ui",
+        "i18n",
+        "browser-qa",
+        "docs"
+      ],
+      "dependsOn": [
+        "resource-schema-contract",
+        "admin-ui-shell-and-list-components"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/admin-resource-schema.md",
+          "docs/admin-ui-foundation.md",
+          "docs/platform-foundation-task-map.md",
+          "docs/superpowers/specs/2026-07-08-form-runtime-slots-side-preview-design.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-form-schema-layout-slots.mjs",
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs"
+        ],
+        "tests": [
+          "scripts/platform-form-schema-layout-slots.test.mjs",
+          "internal/platform/capability/admin_contract_test.go",
+          "internal/platform/adminresource/store_test.go",
+          "admin/package.json"
+        ],
+        "screenshots": [
+          "tmp/product-design/form-schema-layout-20260707/02-menus-edit-desktop-scroll-1440x1024.png",
+          "tmp/product-design/form-schema-layout-20260707/03-menus-edit-mobile-single-column-390x844.png",
+          "tmp/product-design/form-runtime-slots-side-preview-20260708/01-menus-side-preview-desktop-1440x1024.png",
+          "tmp/product-design/form-runtime-slots-side-preview-20260708/02-menus-side-preview-mobile-390x844.png"
+        ]
+      }
+    },
+    {
+      "id": "refine-custom-panels-and-actions",
+      "title": {
+        "zh": "Refine 自定义面板与动作迁移",
+        "en": "Refine Custom Panels And Actions Migration"
+      },
+      "phase": "admin-experience",
+      "scope": "admin-ui",
+      "status": "implemented",
+      "visual": true,
+      "designGate": [
+        "superpowers:brainstorming",
+        "product-design"
+      ],
+      "statusReason": {
+        "zh": "资源路由、读权限守卫和 CRUD 已经通过 Refine 接入；自定义动作/面板已有元数据契约、示例资源、通用抽屉 Tab、安全空态、统一 action executor、i18n、UI/资源校验与浏览器截图证据。后续业务动作必须由外部业务能力通过 manifest 和自有路由接入，平台 UI 不内置具体业务包。",
+        "en": "Resource routing, read guards and CRUD are wired through Refine. Custom actions and panels have metadata contracts, sample resources, generic drawer tabs, safe empty states, a unified action executor, i18n, UI/resource validation and browser screenshot evidence. Future business actions must be provided by external business capabilities through manifests and owned routes; the platform UI ships no concrete business package."
+      },
+      "completionGate": {
+        "zh": "后续增强应继续保持能力路由和面板数据源由能力包拥有；更复杂的审批、文件和业务面板需要另走 product-design、i18n、浏览器截图和能力包内测试。",
+        "en": "Follow-on enhancements must keep capability routes and panel data sources owned by capability packages. Richer approval, file and business panels require separate product-design, i18n, browser screenshot and capability-owned tests."
+      },
+      "resourceLocks": [
+        "admin-ui",
+        "admin-resource-api",
+        "i18n",
+        "browser-qa",
+        "docs"
+      ],
+      "dependsOn": [
+        "resource-schema-contract",
+        "admin-ui-shell-and-list-components"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/admin-ui-foundation.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-foundation-task-map.md",
+          "docs/superpowers/specs/2026-07-07-refine-custom-panels-and-actions-design.md"
+        ],
+        "validators": [
+          "scripts/validate-admin-resources.mjs",
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs"
+        ],
+        "tests": [
+          "internal/platform/capability/admin_contract_test.go",
+          "internal/platform/adminresource/store_test.go",
+          "internal/apps/admin_routes_test.go",
+          "scripts/validate-admin-resources.test.mjs"
+        ],
+        "screenshots": [
+          "tmp/product-design/refine-custom-panels-and-actions-20260707/01-menus-list-custom-actions-desktop-1440x1024.png",
+          "tmp/product-design/refine-custom-panels-and-actions-20260707/02-row-custom-action-dropdown-desktop-1440x1024.png",
+          "tmp/product-design/refine-custom-panels-and-actions-20260707/03-detail-drawer-tabs-desktop-1440x1024.png",
+          "tmp/product-design/refine-custom-panels-and-actions-20260707/04-detail-drawer-audit-panel-desktop-1440x1024.png",
+          "tmp/product-design/refine-custom-panels-and-actions-20260707/05-selection-batch-command-bar-desktop-1440x1024.png",
+          "tmp/product-design/refine-custom-panels-and-actions-20260707/06-menus-mobile-custom-actions-390x844.png"
+        ]
+      }
+    },
+    {
+      "id": "file-storage-preview-and-audit-workflow",
+      "title": {
+        "zh": "文件预览与操作审计体验",
+        "en": "File Preview And Operation Audit Experience"
+      },
+      "phase": "admin-experience",
+      "scope": "admin-ui",
+      "status": "implemented",
+      "visual": true,
+      "contractGateOnly": false,
+      "designGate": [
+        "superpowers:brainstorming",
+        "product-design"
+      ],
+      "statusReason": {
+        "zh": "已按组件化方案在 files 通用资源控制台内实现上传、预览、下载、删除、元数据抽屉、审计 tab、移动文件卡片和主题同步样式；审计资源未暴露时降级展示声明事件，不发起无效 audit-logs 请求。",
+        "en": "Implemented upload, preview, download, delete, metadata drawer, audit tab, mobile file cards and theme-synced styling inside the files generic resource console. When the audit resource is not exposed, the audit tab degrades to declared events without invalid audit-logs requests."
+      },
+      "completionGate": {
+        "zh": "完成证据：superpowers:brainstorming 与 product-design brief 已按既定组件化方案执行；浏览器截图覆盖桌面预览、桌面审计、移动卡片和移动预览；当前导航控制台无错误且 fetch/xhr 无 4xx/5xx。",
+        "en": "Completion evidence: the established componentized superpowers:brainstorming and product-design brief was followed; browser screenshots cover desktop preview, desktop audit, mobile cards and mobile preview; the current navigation has no console errors and no fetch/xhr 4xx/5xx."
+      },
+      "resourceLocks": [
+        "storage-runtime",
+        "audit-policy",
+        "admin-ui",
+        "i18n",
+        "browser-qa",
+        "docs"
+      ],
+      "dependsOn": [
+        "admin-ui-shell-and-list-components",
+        "branding-demo-data-dashboard"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-capability-development.md",
+          "docs/admin-ui-foundation.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-foundation-task-map.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-file-storage-experience.mjs",
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs"
+        ],
+        "tests": [
+          "scripts/platform-file-storage-experience.test.mjs"
+        ],
+        "checks": [
+          "rtk npm --prefix admin run build"
+        ],
+        "screenshots": [
+          "tmp/product-design/file-storage-experience-20260707/01-files-preview-drawer-desktop-1440x1024.png",
+          "tmp/product-design/file-storage-experience-20260707/02-files-audit-drawer-desktop-1440x1024.png",
+          "tmp/product-design/file-storage-experience-20260707/03-files-mobile-card-pagination-390x844.png",
+          "tmp/product-design/file-storage-experience-20260707/04-files-mobile-preview-drawer-390x844.png"
+        ]
+      }
+    },
+    {
+      "id": "policy-review-custom-ui",
+      "title": {
+        "zh": "策略评审自定义控制台",
+        "en": "Policy Review Custom Console"
+      },
+      "phase": "production-governance",
+      "scope": "admin-ui",
+      "status": "implemented",
+      "visual": true,
+      "designGate": [
+        "superpowers:brainstorming",
+        "product-design"
+      ],
+      "statusReason": {
+        "zh": "策略评审自定义控制台已作为可选平台治理 UI 实现：PolicyReviewConsole 覆盖评审队列、状态筛选、提交、通过、驳回、证据导出、变更摘要和审计轨迹；审计查询使用 audit-logs schema 声明的 createdAt 排序，避免被后端安全查询门禁拒绝。",
+        "en": "The policy-review custom console is implemented as an optional platform-governance UI. PolicyReviewConsole covers the review queue, status filtering, request, approve, reject, evidence export, change summary and audit trail; audit queries sort by the audit-logs schema-declared createdAt field so the backend safe-query gate accepts them."
+      },
+      "completionGate": {
+        "zh": "完成证据：浏览器截图覆盖桌面评审队列、驳回弹窗、变更摘要、审计轨迹、导出入口和 390px 窄屏响应式；API 行为测试、i18n、UI 合同、前端构建和任务图校验继续作为回归门禁。",
+        "en": "Completion evidence: browser screenshots cover the desktop review queue, reject modal, change summary, audit trail, export entry and 390px narrow responsive viewport; API behavior tests, i18n, UI contracts, frontend build and task-graph validation remain regression gates."
+      },
+      "resourceLocks": [
+        "audit-policy",
+        "admin-ui",
+        "i18n",
+        "browser-qa",
+        "docs"
+      ],
+      "dependsOn": [
+        "policy-review-and-audit-workflow",
+        "visual-product-design-qa"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-capability-development.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-foundation-task-map.md",
+          "docs/superpowers/specs/2026-07-07-policy-review-custom-ui-design.md"
+        ],
+        "validators": [
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs",
+          "scripts/validate-platform-foundation-task-graph.mjs"
+        ],
+        "tests": [
+          "internal/platform/adminresource/policy_review_test.go",
+          "internal/platform/httpapi/server_test.go",
+          "admin/package.json"
+        ],
+        "checks": [
+          "rtk npm --prefix admin run build",
+          "rtk go test ./internal/platform/adminresource ./internal/platform/httpapi"
+        ],
+        "screenshots": [
+          "tmp/product-design/policy-review-custom-ui-20260707/01-policy-review-queue-desktop-1440x1024.png",
+          "tmp/product-design/policy-review-custom-ui-20260707/02-policy-review-reject-modal-desktop-1440x1024.png",
+          "tmp/product-design/policy-review-custom-ui-20260707/03-policy-review-mobile-390x844.png",
+          "tmp/product-design/policy-review-custom-ui-20260707/04-policy-review-audit-trail-desktop-1440x1024.png"
+        ]
+      }
+    },
+    {
+      "id": "source-writing-codegen-promotion",
+      "title": {
+        "zh": "源码写入代码生成骨架门禁",
+        "en": "Source-Writing Codegen Skeleton Gate"
+      },
+      "phase": "stack-and-contracts",
+      "scope": "foundation",
+      "status": "implemented",
+      "statusReason": {
+        "zh": "源码生成器当前完成范围是骨架、入口、预览、脚手架草稿、目标族映射、运行时目标白名单和晋级审查包；源码写入仍显式禁用，生成物只能作为评审 artifact。",
+        "en": "The current source generator scope is skeleton, entrypoints, previews, scaffold drafts, target-family mappings, runtime target allowlists and promotion review packets. Source writing remains explicitly disabled and generated files are review artifacts only."
+      },
+      "completionGate": {
+        "zh": "未来如需把生成器从 dry-run 改为受控源码写入，必须另走独立源码写入规格、平台/生成器/运行时/运维批准、完成证据 artifact schema、晋级审查包批准、运行时目标白名单、冲突处理、回滚方案和每个目标族的 `rtk` 测试映射。",
+        "en": "Future promotion from dry-run to controlled source writing requires a separate source-writing spec, platform/codegen/runtime/operations approval, completed-evidence artifact schema, approved promotion review packet, runtime target allowlist, conflict handling, rollback plan and `rtk` test mappings per target family."
+      },
+      "resourceLocks": [
+        "codegen",
+        "docs"
+      ],
+      "dependsOn": [
+        "codegen-preview-scaffold",
+        "codegen-source-writing-readiness"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-06-platform-go-codegen-source-writing-readiness-design.md",
+          "docs/admin-resource-schema.md",
+          "docs/platform-foundation-task-map.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-codegen-source-writing-readiness.mjs"
+        ],
+        "tests": [
+          "scripts/platform-codegen-source-writing-readiness.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "task-dependency-governance",
+      "title": {
+        "zh": "任务依赖与冲突治理",
+        "en": "Task Dependency And Conflict Governance"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "docs"
+      ],
+      "dependsOn": [
+        "production-readiness-preflight",
+        "codegen-source-writing-readiness",
+        "visual-product-design-qa"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-foundation-task-map.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-foundation-task-graph.mjs"
+        ],
+        "tests": [
+          "scripts/platform-foundation-task-graph.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "reference-discovery-classification-gate",
+      "title": {
+        "zh": "参考项目发现与能力分类门禁",
+        "en": "Reference Discovery And Capability Classification Gate"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "docs"
+      ],
+      "dependsOn": [
+        "personnel-extension-boundary",
+        "task-dependency-governance"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-foundation-task-map.md",
+          "docs/platform-capability-development.md",
+          "docs/platform-roadmap.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-reference-discovery.mjs"
+        ],
+        "tests": [
+          "scripts/platform-reference-discovery.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "reference-coverage-boundary-gate",
+      "title": {
+        "zh": "参考覆盖与业务边界门禁",
+        "en": "Reference Coverage And Business Boundary Gate"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "admin-resource-contract",
+        "docs"
+      ],
+      "dependsOn": [
+        "personnel-extension-boundary",
+        "task-dependency-governance",
+        "reference-discovery-classification-gate"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-foundation-task-map.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-reference-coverage.mjs",
+          "scripts/validate-platform-reference-discovery.mjs"
+        ],
+        "tests": [
+          "scripts/platform-reference-coverage.test.mjs",
+          "scripts/platform-reference-discovery.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "node-closeout-audit",
+      "title": {
+        "zh": "节点收口审计",
+        "en": "Node Closeout Audit"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "docs"
+      ],
+      "dependsOn": [
+        "task-dependency-governance"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-foundation-task-map.md",
+          "docs/platform-capability-development.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-node-closeout-audit.mjs"
+        ],
+        "tests": [
+          "scripts/platform-node-closeout-audit.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "foundation-alignment-audit",
+      "title": {
+        "zh": "底座目标一致性与冲突审计",
+        "en": "Foundation Goal Alignment And Conflict Audit"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "implemented",
+      "resourceLocks": [
+        "target-stack",
+        "capability-profile",
+        "admin-resource-contract",
+        "codegen",
+        "docs"
+      ],
+      "dependsOn": [
+        "task-dependency-governance",
+        "capability-contract-governance",
+        "node-closeout-audit",
+        "reference-coverage-boundary-gate",
+        "codegen-source-writing-readiness",
+        "production-readiness-preflight",
+        "governance-org-area-role-groups",
+        "production-auth-provider-hardening"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-foundation-task-map.md",
+          "README.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-foundation-alignment.mjs"
+        ],
+        "tests": [
+          "scripts/platform-foundation-alignment.test.mjs"
+        ]
+      }
+    }
+  ],
+  "parallelBatches": [
+    {
+      "id": "non-visual-contract-gates",
+      "description": "Independent non-visual gates that can run after resource schema and auth boundaries are stable.",
+      "taskIds": [
+        "openapi-app-contracts",
+        "cache-redis-invalidation"
+      ]
+    },
+    {
+      "id": "extension-planning",
+      "description": "Extension-boundary planning that must stay outside platform default runtime source.",
+      "taskIds": [
+        "personnel-extension-boundary"
+      ]
+    },
+    {
+      "id": "visual-qa-isolated",
+      "description": "Visual QA must stay isolated from non-visual backend contract work.",
+      "taskIds": [
+        "visual-product-design-qa"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,4008 @@
+{
+  "generatedBy": "cmd/platform-contracts admin-resources",
+  "source": "capability.Manifest.Admin.Resources",
+  "sourceMode": "go-manifest",
+  "sourceVersion": "0.1.0",
+  "resourceCount": 27,
+  "capabilities": [
+    "admin-shell",
+    "api-resource",
+    "audit",
+    "demo-data",
+    "dictionary",
+    "file-storage",
+    "identity",
+    "menu",
+    "parameter",
+    "rbac",
+    "session",
+    "system-admin",
+    "tenant"
+  ],
+  "permissions": [
+    "admin:api-docs:create",
+    "admin:api-docs:delete",
+    "admin:api-docs:read",
+    "admin:api-docs:update",
+    "admin:api-resource:create",
+    "admin:api-resource:delete",
+    "admin:api-resource:read",
+    "admin:api-resource:update",
+    "admin:api-token:create",
+    "admin:api-token:delete",
+    "admin:api-token:read",
+    "admin:api-token:update",
+    "admin:app-identity:create",
+    "admin:app-identity:delete",
+    "admin:app-identity:read",
+    "admin:app-identity:update",
+    "admin:area-code:create",
+    "admin:area-code:delete",
+    "admin:area-code:read",
+    "admin:area-code:update",
+    "admin:audit-log:create",
+    "admin:audit-log:delete",
+    "admin:audit-log:read",
+    "admin:audit-log:update",
+    "admin:branding:create",
+    "admin:branding:delete",
+    "admin:branding:read",
+    "admin:branding:update",
+    "admin:capability:create",
+    "admin:capability:delete",
+    "admin:capability:read",
+    "admin:capability:update",
+    "admin:demo-data:create",
+    "admin:demo-data:delete",
+    "admin:demo-data:read",
+    "admin:demo-data:update",
+    "admin:dictionary-parameter:create",
+    "admin:dictionary-parameter:delete",
+    "admin:dictionary-parameter:read",
+    "admin:dictionary-parameter:update",
+    "admin:dictionary:create",
+    "admin:dictionary:delete",
+    "admin:dictionary:read",
+    "admin:dictionary:update",
+    "admin:error-log:create",
+    "admin:error-log:delete",
+    "admin:error-log:read",
+    "admin:error-log:update",
+    "admin:file:create",
+    "admin:file:delete",
+    "admin:file:read",
+    "admin:file:update",
+    "admin:login-log:create",
+    "admin:login-log:delete",
+    "admin:login-log:read",
+    "admin:login-log:update",
+    "admin:menu:create",
+    "admin:menu:delete",
+    "admin:menu:read",
+    "admin:menu:update",
+    "admin:monitoring:create",
+    "admin:monitoring:delete",
+    "admin:monitoring:read",
+    "admin:monitoring:update",
+    "admin:org-unit:create",
+    "admin:org-unit:delete",
+    "admin:org-unit:read",
+    "admin:org-unit:update",
+    "admin:overview:create",
+    "admin:overview:delete",
+    "admin:overview:read",
+    "admin:overview:update",
+    "admin:parameter:create",
+    "admin:parameter:delete",
+    "admin:parameter:read",
+    "admin:parameter:update",
+    "admin:permission:create",
+    "admin:permission:delete",
+    "admin:permission:read",
+    "admin:permission:update",
+    "admin:role-group:create",
+    "admin:role-group:delete",
+    "admin:role-group:read",
+    "admin:role-group:update",
+    "admin:role:create",
+    "admin:role:delete",
+    "admin:role:read",
+    "admin:role:update",
+    "admin:session:create",
+    "admin:session:delete",
+    "admin:session:read",
+    "admin:session:update",
+    "admin:settings:create",
+    "admin:settings:delete",
+    "admin:settings:read",
+    "admin:settings:update",
+    "admin:tenant:create",
+    "admin:tenant:delete",
+    "admin:tenant:read",
+    "admin:tenant:update",
+    "admin:user:create",
+    "admin:user:delete",
+    "admin:user:read",
+    "admin:user:update",
+    "admin:version:create",
+    "admin:version:delete",
+    "admin:version:read",
+    "admin:version:update"
+  ],
+  "resources": [
+    {
+      "capabilityId": "api-resource",
+      "resource": "api-docs",
+      "title": {
+        "zh": "API 文档",
+        "en": "API Docs"
+      },
+      "description": {
+        "zh": "OpenAPI 文档、权限码和接口契约。",
+        "en": "OpenAPI docs, permission codes, and API contracts."
+      },
+      "permissionPrefix": "admin:api-docs",
+      "permissions": {
+        "create": "admin:api-docs:create",
+        "delete": "admin:api-docs:delete",
+        "read": "admin:api-docs:read",
+        "update": "admin:api-docs:update"
+      },
+      "menu": {
+        "route": "/api-docs",
+        "group": "governance",
+        "icon": "book",
+        "order": 125
+      }
+    },
+    {
+      "capabilityId": "api-resource",
+      "resource": "api-resources",
+      "title": {
+        "zh": "API 资源",
+        "en": "API Resources"
+      },
+      "description": {
+        "zh": "接口资源、权限码和调用边界。",
+        "en": "API resources, permission codes, and invocation boundaries."
+      },
+      "permissionPrefix": "admin:api-resource",
+      "permissions": {
+        "create": "admin:api-resource:create",
+        "delete": "admin:api-resource:delete",
+        "read": "admin:api-resource:read",
+        "update": "admin:api-resource:update"
+      },
+      "menu": {
+        "route": "/api-resources",
+        "group": "governance",
+        "icon": "apiResources",
+        "order": 120
+      }
+    },
+    {
+      "capabilityId": "system-admin",
+      "resource": "api-tokens",
+      "title": {
+        "zh": "API Token",
+        "en": "API Tokens"
+      },
+      "description": {
+        "zh": "平台集成调用令牌，只在签发时返回明文。",
+        "en": "Platform integration tokens; secret is returned once when issued."
+      },
+      "permissionPrefix": "admin:api-token",
+      "permissions": {
+        "create": "admin:api-token:create",
+        "delete": "admin:api-token:delete",
+        "read": "admin:api-token:read",
+        "update": "admin:api-token:update"
+      },
+      "menu": {
+        "route": "/api-tokens",
+        "parent": "security",
+        "group": "operations",
+        "icon": "key",
+        "order": 370,
+        "cache": true
+      },
+      "fields": [
+        {
+          "key": "name",
+          "label": {
+            "zh": "名称",
+            "en": "Name"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 110,
+          "options": [
+            {
+              "value": "active",
+              "label": {
+                "zh": "有效",
+                "en": "Active"
+              }
+            },
+            {
+              "value": "revoked",
+              "label": {
+                "zh": "已撤销",
+                "en": "Revoked"
+              }
+            },
+            {
+              "value": "expired",
+              "label": {
+                "zh": "已过期",
+                "en": "Expired"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "scope",
+          "label": {
+            "zh": "作用域",
+            "en": "Scope"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 260,
+          "validation": {}
+        },
+        {
+          "key": "tokenPrefix",
+          "label": {
+            "zh": "令牌前缀",
+            "en": "Token Prefix"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 140,
+          "validation": {}
+        },
+        {
+          "key": "expiresAt",
+          "label": {
+            "zh": "过期时间",
+            "en": "Expires At"
+          },
+          "type": "datetime",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "createdAt",
+          "label": {
+            "zh": "签发时间",
+            "en": "Created At"
+          },
+          "type": "datetime",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "revokedAt",
+          "label": {
+            "zh": "撤销时间",
+            "en": "Revoked At"
+          },
+          "type": "datetime",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        }
+      ],
+      "searchFields": [
+        "name",
+        "status",
+        "scope",
+        "tokenPrefix",
+        "expiresAt"
+      ],
+      "defaultSortKey": "createdAt"
+    },
+    {
+      "capabilityId": "identity",
+      "resource": "app-identities",
+      "title": {
+        "zh": "App 身份绑定",
+        "en": "App Identities"
+      },
+      "description": {
+        "zh": "App 登录 provider 与平台 App 用户的安全绑定。",
+        "en": "Safe bindings between app login providers and platform app users."
+      },
+      "permissionPrefix": "admin:app-identity",
+      "permissions": {
+        "create": "admin:app-identity:create",
+        "delete": "admin:app-identity:delete",
+        "read": "admin:app-identity:read",
+        "update": "admin:app-identity:update"
+      },
+      "menu": {
+        "route": "/app-identities",
+        "parent": "identity",
+        "group": "foundation",
+        "icon": "user",
+        "order": 45,
+        "cache": true
+      },
+      "fields": [
+        {
+          "key": "name",
+          "label": {
+            "zh": "名称",
+            "en": "Name"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "code",
+          "label": {
+            "zh": "绑定编码",
+            "en": "Binding Code"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inDetail": true,
+          "width": 190,
+          "validation": {}
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 110,
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "provider",
+          "label": {
+            "zh": "登录方式",
+            "en": "Provider"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 120,
+          "validation": {}
+        },
+        {
+          "key": "providerKind",
+          "label": {
+            "zh": "方式类型",
+            "en": "Provider Kind"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 120,
+          "validation": {}
+        },
+        {
+          "key": "providerScope",
+          "label": {
+            "zh": "作用域",
+            "en": "Scope"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 140,
+          "validation": {}
+        },
+        {
+          "key": "maskedSubject",
+          "label": {
+            "zh": "脱敏标识",
+            "en": "Masked Subject"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "providerSubjectHash",
+          "label": {
+            "zh": "标识哈希",
+            "en": "Subject Hash"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "inDetail": true,
+          "width": 260,
+          "validation": {}
+        },
+        {
+          "key": "appUsername",
+          "label": {
+            "zh": "App 用户",
+            "en": "App User"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "createdAt",
+          "label": {
+            "zh": "创建时间",
+            "en": "Created At"
+          },
+          "type": "datetime",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "lastLoginAt",
+          "label": {
+            "zh": "最近登录",
+            "en": "Last Login"
+          },
+          "type": "datetime",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "description",
+          "label": {
+            "zh": "描述",
+            "en": "Description"
+          },
+          "type": "textarea",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inDetail": true,
+          "width": 220,
+          "validation": {}
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "status",
+        "provider",
+        "providerKind",
+        "providerScope",
+        "maskedSubject",
+        "appUsername",
+        "createdAt",
+        "lastLoginAt"
+      ],
+      "defaultSortKey": "lastLoginAt"
+    },
+    {
+      "capabilityId": "dictionary",
+      "resource": "area-codes",
+      "title": {
+        "zh": "地址码",
+        "en": "Area Codes"
+      },
+      "description": {
+        "zh": "通用行政区划或业务区域编码，供租户、机构和人员引用。",
+        "en": "Common administrative or business area codes referenced by tenants, org units, and users."
+      },
+      "permissionPrefix": "admin:area-code",
+      "permissions": {
+        "create": "admin:area-code:create",
+        "delete": "admin:area-code:delete",
+        "read": "admin:area-code:read",
+        "update": "admin:area-code:update"
+      },
+      "menu": {
+        "route": "/area-codes",
+        "parent": "configuration",
+        "group": "governance",
+        "icon": "cluster",
+        "order": 135,
+        "cache": true
+      },
+      "fields": [
+        {
+          "key": "code",
+          "label": {
+            "zh": "地址码",
+            "en": "Area Code"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 150,
+          "validation": {}
+        },
+        {
+          "key": "name",
+          "label": {
+            "zh": "区域名称",
+            "en": "Area Name"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "parentCode",
+          "label": {
+            "zh": "上级地址码",
+            "en": "Parent Code"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 150,
+          "relation": {
+            "resource": "area-codes",
+            "valueField": "code",
+            "labelField": "name",
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc",
+            "display": "tree",
+            "parentField": "parentCode",
+            "pathField": "path"
+          },
+          "validation": {}
+        },
+        {
+          "key": "level",
+          "label": {
+            "zh": "层级",
+            "en": "Level"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 130,
+          "options": [
+            {
+              "value": "country",
+              "label": {
+                "zh": "国家",
+                "en": "Country"
+              }
+            },
+            {
+              "value": "province",
+              "label": {
+                "zh": "省/直辖市",
+                "en": "Province"
+              }
+            },
+            {
+              "value": "city",
+              "label": {
+                "zh": "城市",
+                "en": "City"
+              }
+            },
+            {
+              "value": "district",
+              "label": {
+                "zh": "区县",
+                "en": "District"
+              }
+            },
+            {
+              "value": "street",
+              "label": {
+                "zh": "街道",
+                "en": "Street"
+              }
+            },
+            {
+              "value": "custom",
+              "label": {
+                "zh": "自定义",
+                "en": "Custom"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "path",
+          "label": {
+            "zh": "层级路径",
+            "en": "Path"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {}
+        },
+        {
+          "key": "sortOrder",
+          "label": {
+            "zh": "排序",
+            "en": "Sort Order"
+          },
+          "type": "number",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 110,
+          "validation": {}
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "description",
+          "label": {
+            "zh": "说明",
+            "en": "Description"
+          },
+          "type": "textarea",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {}
+        },
+        {
+          "key": "updatedAt",
+          "label": {
+            "zh": "更新时间",
+            "en": "Updated At"
+          },
+          "type": "datetime",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "status",
+        "description",
+        "parentCode",
+        "level",
+        "path"
+      ],
+      "defaultSortKey": "sortOrder"
+    },
+    {
+      "capabilityId": "audit",
+      "resource": "audit-logs",
+      "title": {
+        "zh": "审计日志",
+        "en": "Audit Logs"
+      },
+      "description": {
+        "zh": "操作审计和日志留痕。",
+        "en": "Operation audit and activity trails."
+      },
+      "permissionPrefix": "admin:audit-log",
+      "permissions": {
+        "create": "admin:audit-log:create",
+        "delete": "admin:audit-log:delete",
+        "read": "admin:audit-log:read",
+        "update": "admin:audit-log:update"
+      },
+      "menu": {
+        "route": "/audit-logs",
+        "group": "governance",
+        "icon": "audit",
+        "order": 110
+      }
+    },
+    {
+      "capabilityId": "parameter",
+      "resource": "branding",
+      "title": {
+        "zh": "品牌配置",
+        "en": "Branding"
+      },
+      "description": {
+        "zh": "平台品牌、主题和登录展示配置。",
+        "en": "Platform branding, theme, and login presentation configuration."
+      },
+      "permissionPrefix": "admin:branding",
+      "permissions": {
+        "create": "admin:branding:create",
+        "delete": "admin:branding:delete",
+        "read": "admin:branding:read",
+        "update": "admin:branding:update"
+      },
+      "menu": {
+        "route": "/branding",
+        "parent": "configuration",
+        "group": "foundation",
+        "icon": "settings",
+        "order": 308,
+        "cache": true
+      },
+      "fields": [
+        {
+          "key": "name",
+          "label": {
+            "zh": "配置名称",
+            "en": "Config Name"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "code",
+          "label": {
+            "zh": "配置编码",
+            "en": "Config Code"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inDetail": true,
+          "width": 160,
+          "validation": {}
+        },
+        {
+          "key": "productName",
+          "label": {
+            "zh": "产品名称",
+            "en": "Product Name"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "shortName",
+          "label": {
+            "zh": "简称",
+            "en": "Short Name"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "validation": {}
+        },
+        {
+          "key": "primaryColor",
+          "label": {
+            "zh": "主色",
+            "en": "Primary Color"
+          },
+          "type": "color",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "validation": {}
+        },
+        {
+          "key": "defaultTheme",
+          "label": {
+            "zh": "默认主题",
+            "en": "Default Theme"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 140,
+          "options": [
+            {
+              "value": "tech",
+              "label": {
+                "zh": "科技风",
+                "en": "Tech"
+              }
+            },
+            {
+              "value": "white",
+              "label": {
+                "zh": "高级白",
+                "en": "Premium White"
+              }
+            },
+            {
+              "value": "black",
+              "label": {
+                "zh": "炫酷黑",
+                "en": "Cool Black"
+              }
+            },
+            {
+              "value": "warm",
+              "label": {
+                "zh": "温暖黄",
+                "en": "Warm Yellow"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "updatedAt",
+          "label": {
+            "zh": "更新时间",
+            "en": "Updated At"
+          },
+          "type": "datetime",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "productName",
+        "shortName",
+        "defaultTheme"
+      ],
+      "defaultSortKey": "updatedAt"
+    },
+    {
+      "capabilityId": "admin-shell",
+      "resource": "capabilities",
+      "title": {
+        "zh": "能力清单",
+        "en": "Capabilities"
+      },
+      "description": {
+        "zh": "查看当前平台启用的能力包。",
+        "en": "View enabled platform capability packages."
+      },
+      "permissionPrefix": "admin:capability",
+      "permissions": {
+        "create": "admin:capability:create",
+        "delete": "admin:capability:delete",
+        "read": "admin:capability:read",
+        "update": "admin:capability:update"
+      },
+      "menu": {
+        "route": "/capabilities",
+        "group": "foundation",
+        "icon": "capabilities",
+        "order": 20
+      }
+    },
+    {
+      "capabilityId": "demo-data",
+      "resource": "demo-data",
+      "title": {
+        "zh": "演示数据",
+        "en": "Demo Data"
+      },
+      "description": {
+        "zh": "声明式演示数据集。",
+        "en": "Declarative demo data sets."
+      },
+      "permissionPrefix": "admin:demo-data",
+      "permissions": {
+        "create": "admin:demo-data:create",
+        "delete": "admin:demo-data:delete",
+        "read": "admin:demo-data:read",
+        "update": "admin:demo-data:update"
+      },
+      "menu": {
+        "route": "/demo-data",
+        "group": "operations",
+        "icon": "dictParams",
+        "order": 205
+      }
+    },
+    {
+      "capabilityId": "dictionary",
+      "resource": "dictionaries",
+      "title": {
+        "zh": "字典管理",
+        "en": "Dictionaries"
+      },
+      "description": {
+        "zh": "字典目录、枚举分类和业务选项分组。",
+        "en": "Dictionary catalogs, enum categories, and business option groups."
+      },
+      "permissionPrefix": "admin:dictionary",
+      "permissions": {
+        "create": "admin:dictionary:create",
+        "delete": "admin:dictionary:delete",
+        "read": "admin:dictionary:read",
+        "update": "admin:dictionary:update"
+      },
+      "menu": {
+        "route": "/dictionaries",
+        "parent": "configuration",
+        "group": "governance",
+        "icon": "dictParams",
+        "order": 128,
+        "cache": true
+      },
+      "fields": [
+        {
+          "key": "code",
+          "label": {
+            "zh": "字典编码",
+            "en": "Dictionary Code"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "validation": {}
+        },
+        {
+          "key": "name",
+          "label": {
+            "zh": "字典名称",
+            "en": "Dictionary Name"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "itemCount",
+          "label": {
+            "zh": "条目数",
+            "en": "Items"
+          },
+          "type": "number",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 110,
+          "validation": {}
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "description",
+          "label": {
+            "zh": "说明",
+            "en": "Description"
+          },
+          "type": "textarea",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {}
+        },
+        {
+          "key": "updatedAt",
+          "label": {
+            "zh": "更新时间",
+            "en": "Updated At"
+          },
+          "type": "datetime",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "status",
+        "description"
+      ],
+      "defaultSortKey": "updatedAt"
+    },
+    {
+      "capabilityId": "dictionary",
+      "resource": "dictionary-parameters",
+      "title": {
+        "zh": "字典参数",
+        "en": "Dictionary Parameters"
+      },
+      "description": {
+        "zh": "字典项、枚举值和可复用配置选项。",
+        "en": "Dictionary entries, enum values, and reusable configuration options."
+      },
+      "permissionPrefix": "admin:dictionary-parameter",
+      "permissions": {
+        "create": "admin:dictionary-parameter:create",
+        "delete": "admin:dictionary-parameter:delete",
+        "read": "admin:dictionary-parameter:read",
+        "update": "admin:dictionary-parameter:update"
+      },
+      "menu": {
+        "route": "/dictionary-parameters",
+        "parent": "configuration",
+        "group": "governance",
+        "icon": "dictParams",
+        "order": 130,
+        "cache": true
+      },
+      "fields": [
+        {
+          "key": "code",
+          "label": {
+            "zh": "参数编码",
+            "en": "Parameter Code"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 170,
+          "validation": {}
+        },
+        {
+          "key": "name",
+          "label": {
+            "zh": "参数名称",
+            "en": "Parameter Name"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "dictionaryCode",
+          "label": {
+            "zh": "所属字典",
+            "en": "Dictionary"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "relation": {
+            "resource": "dictionaries",
+            "valueField": "code",
+            "labelField": "name",
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc"
+          },
+          "validation": {}
+        },
+        {
+          "key": "value",
+          "label": {
+            "zh": "参数值",
+            "en": "Value"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "valueType",
+          "label": {
+            "zh": "值类型",
+            "en": "Value Type"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "options": [
+            {
+              "value": "text",
+              "label": {
+                "zh": "文本",
+                "en": "Text"
+              }
+            },
+            {
+              "value": "number",
+              "label": {
+                "zh": "数字",
+                "en": "Number"
+              }
+            },
+            {
+              "value": "boolean",
+              "label": {
+                "zh": "布尔",
+                "en": "Boolean"
+              }
+            },
+            {
+              "value": "json",
+              "label": {
+                "zh": "JSON",
+                "en": "JSON"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "sortOrder",
+          "label": {
+            "zh": "排序",
+            "en": "Sort Order"
+          },
+          "type": "number",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 110,
+          "validation": {}
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "description",
+          "label": {
+            "zh": "说明",
+            "en": "Description"
+          },
+          "type": "textarea",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {}
+        },
+        {
+          "key": "updatedAt",
+          "label": {
+            "zh": "更新时间",
+            "en": "Updated At"
+          },
+          "type": "datetime",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "status",
+        "description",
+        "dictionaryCode",
+        "value",
+        "valueType"
+      ],
+      "defaultSortKey": "sortOrder"
+    },
+    {
+      "capabilityId": "audit",
+      "resource": "error-logs",
+      "title": {
+        "zh": "错误日志",
+        "en": "Error Logs"
+      },
+      "description": {
+        "zh": "运行错误、异常和排查记录。",
+        "en": "Runtime errors, exceptions and troubleshooting records."
+      },
+      "permissionPrefix": "admin:error-log",
+      "permissions": {
+        "create": "admin:error-log:create",
+        "delete": "admin:error-log:delete",
+        "read": "admin:error-log:read",
+        "update": "admin:error-log:update"
+      },
+      "menu": {
+        "route": "/error-logs",
+        "group": "operations",
+        "icon": "warning",
+        "order": 330
+      }
+    },
+    {
+      "capabilityId": "file-storage",
+      "resource": "files",
+      "title": {
+        "zh": "文件管理",
+        "en": "Files"
+      },
+      "description": {
+        "zh": "文件对象、存储位置和下载治理。",
+        "en": "File objects, storage locations, and download governance."
+      },
+      "permissionPrefix": "admin:file",
+      "permissions": {
+        "create": "admin:file:create",
+        "delete": "admin:file:delete",
+        "read": "admin:file:read",
+        "update": "admin:file:update"
+      },
+      "menu": {
+        "route": "/files",
+        "parent": "storage",
+        "group": "operations",
+        "icon": "upload",
+        "order": 340,
+        "cache": true
+      },
+      "fields": [
+        {
+          "key": "name",
+          "label": {
+            "zh": "文件名",
+            "en": "Filename"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {}
+        },
+        {
+          "key": "code",
+          "label": {
+            "zh": "存储键",
+            "en": "Storage Key"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inDetail": true,
+          "width": 240,
+          "validation": {}
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "description",
+          "label": {
+            "zh": "描述",
+            "en": "Description"
+          },
+          "type": "textarea",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {}
+        },
+        {
+          "key": "mimeType",
+          "label": {
+            "zh": "类型",
+            "en": "MIME Type"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "validation": {}
+        },
+        {
+          "key": "size",
+          "label": {
+            "zh": "大小",
+            "en": "Size"
+          },
+          "type": "number",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 120,
+          "validation": {}
+        },
+        {
+          "key": "storageDriver",
+          "label": {
+            "zh": "存储驱动",
+            "en": "Storage Driver"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inDetail": true,
+          "width": 140,
+          "validation": {}
+        },
+        {
+          "key": "storageKey",
+          "label": {
+            "zh": "对象键",
+            "en": "Object Key"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inDetail": true,
+          "width": 260,
+          "validation": {}
+        },
+        {
+          "key": "storagePath",
+          "label": {
+            "zh": "存储路径",
+            "en": "Storage Path"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inDetail": true,
+          "width": 260,
+          "validation": {}
+        },
+        {
+          "key": "publicUrl",
+          "label": {
+            "zh": "公开地址",
+            "en": "Public URL"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inDetail": true,
+          "width": 260,
+          "validation": {}
+        },
+        {
+          "key": "createdAt",
+          "label": {
+            "zh": "上传时间",
+            "en": "Created At"
+          },
+          "type": "datetime",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "updatedAt",
+          "label": {
+            "zh": "更新时间",
+            "en": "Updated At"
+          },
+          "type": "datetime",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "description",
+        "mimeType",
+        "storageDriver",
+        "createdAt"
+      ],
+      "defaultSortKey": "createdAt"
+    },
+    {
+      "capabilityId": "audit",
+      "resource": "login-logs",
+      "title": {
+        "zh": "登录日志",
+        "en": "Login Logs"
+      },
+      "description": {
+        "zh": "登录认证记录和安全追踪。",
+        "en": "Login authentication records and security tracing."
+      },
+      "permissionPrefix": "admin:login-log",
+      "permissions": {
+        "create": "admin:login-log:create",
+        "delete": "admin:login-log:delete",
+        "read": "admin:login-log:read",
+        "update": "admin:login-log:update"
+      },
+      "menu": {
+        "route": "/login-logs",
+        "group": "operations",
+        "icon": "desktop",
+        "order": 320
+      }
+    },
+    {
+      "capabilityId": "menu",
+      "resource": "menus",
+      "title": {
+        "zh": "菜单",
+        "en": "Menus"
+      },
+      "description": {
+        "zh": "后台菜单和资源入口。",
+        "en": "Admin menus and resource entries."
+      },
+      "permissionPrefix": "admin:menu",
+      "permissions": {
+        "create": "admin:menu:create",
+        "delete": "admin:menu:delete",
+        "read": "admin:menu:read",
+        "update": "admin:menu:update"
+      },
+      "menu": {
+        "route": "/menus",
+        "group": "foundation",
+        "icon": "menus",
+        "order": 60
+      }
+    },
+    {
+      "capabilityId": "system-admin",
+      "resource": "monitoring",
+      "title": {
+        "zh": "监控",
+        "en": "Monitoring"
+      },
+      "description": {
+        "zh": "实例、服务、健康状态和告警摘要。",
+        "en": "Instances, services, health state, and alert summaries."
+      },
+      "permissionPrefix": "admin:monitoring",
+      "permissions": {
+        "create": "admin:monitoring:create",
+        "delete": "admin:monitoring:delete",
+        "read": "admin:monitoring:read",
+        "update": "admin:monitoring:update"
+      },
+      "menu": {
+        "route": "/monitoring",
+        "parent": "runtime",
+        "group": "operations",
+        "icon": "monitoring",
+        "order": 210,
+        "cache": true
+      },
+      "fields": [
+        {
+          "key": "code",
+          "label": {
+            "zh": "监控编码",
+            "en": "Monitor Code"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 170,
+          "validation": {}
+        },
+        {
+          "key": "name",
+          "label": {
+            "zh": "监控名称",
+            "en": "Monitor Name"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "targetType",
+          "label": {
+            "zh": "目标类型",
+            "en": "Target Type"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 130,
+          "options": [
+            {
+              "value": "instance",
+              "label": {
+                "zh": "实例",
+                "en": "Instance"
+              }
+            },
+            {
+              "value": "service",
+              "label": {
+                "zh": "服务",
+                "en": "Service"
+              }
+            },
+            {
+              "value": "endpoint",
+              "label": {
+                "zh": "端点",
+                "en": "Endpoint"
+              }
+            },
+            {
+              "value": "job",
+              "label": {
+                "zh": "任务",
+                "en": "Job"
+              }
+            },
+            {
+              "value": "queue",
+              "label": {
+                "zh": "队列",
+                "en": "Queue"
+              }
+            },
+            {
+              "value": "custom",
+              "label": {
+                "zh": "自定义",
+                "en": "Custom"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "health",
+          "label": {
+            "zh": "健康状态",
+            "en": "Health"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 120,
+          "options": [
+            {
+              "value": "healthy",
+              "label": {
+                "zh": "健康",
+                "en": "Healthy"
+              }
+            },
+            {
+              "value": "warning",
+              "label": {
+                "zh": "预警",
+                "en": "Warning"
+              }
+            },
+            {
+              "value": "error",
+              "label": {
+                "zh": "异常",
+                "en": "Error"
+              }
+            },
+            {
+              "value": "unknown",
+              "label": {
+                "zh": "未知",
+                "en": "Unknown"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "endpoint",
+          "label": {
+            "zh": "端点",
+            "en": "Endpoint"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {}
+        },
+        {
+          "key": "lastSeenAt",
+          "label": {
+            "zh": "最近上报",
+            "en": "Last Seen"
+          },
+          "type": "datetime",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "alertCount",
+          "label": {
+            "zh": "告警数",
+            "en": "Alerts"
+          },
+          "type": "number",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 110,
+          "validation": {}
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "description",
+          "label": {
+            "zh": "说明",
+            "en": "Description"
+          },
+          "type": "textarea",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {}
+        },
+        {
+          "key": "updatedAt",
+          "label": {
+            "zh": "更新时间",
+            "en": "Updated At"
+          },
+          "type": "datetime",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "status",
+        "description",
+        "targetType",
+        "health",
+        "endpoint",
+        "lastSeenAt"
+      ],
+      "defaultSortKey": "lastSeenAt"
+    },
+    {
+      "capabilityId": "identity",
+      "resource": "org-units",
+      "title": {
+        "zh": "组织机构",
+        "en": "Org Units"
+      },
+      "description": {
+        "zh": "租户下的集团、公司、分支、部门、团队和门店层级。",
+        "en": "Group, company, branch, department, team, and store hierarchy under tenants."
+      },
+      "permissionPrefix": "admin:org-unit",
+      "permissions": {
+        "create": "admin:org-unit:create",
+        "delete": "admin:org-unit:delete",
+        "read": "admin:org-unit:read",
+        "update": "admin:org-unit:update"
+      },
+      "menu": {
+        "route": "/org-units",
+        "parent": "identity",
+        "group": "foundation",
+        "icon": "cluster",
+        "order": 45,
+        "cache": true
+      },
+      "fields": [
+        {
+          "key": "code",
+          "label": {
+            "zh": "机构编码",
+            "en": "Org Unit Code"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "validation": {}
+        },
+        {
+          "key": "name",
+          "label": {
+            "zh": "机构名称",
+            "en": "Org Unit Name"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "type",
+          "label": {
+            "zh": "类型",
+            "en": "Type"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 130,
+          "options": [
+            {
+              "value": "group",
+              "label": {
+                "zh": "集团",
+                "en": "Group"
+              }
+            },
+            {
+              "value": "company",
+              "label": {
+                "zh": "公司",
+                "en": "Company"
+              }
+            },
+            {
+              "value": "branch",
+              "label": {
+                "zh": "分支机构",
+                "en": "Branch"
+              }
+            },
+            {
+              "value": "organization",
+              "label": {
+                "zh": "机构",
+                "en": "Organization"
+              }
+            },
+            {
+              "value": "department",
+              "label": {
+                "zh": "部门",
+                "en": "Department"
+              }
+            },
+            {
+              "value": "team",
+              "label": {
+                "zh": "团队",
+                "en": "Team"
+              }
+            },
+            {
+              "value": "store",
+              "label": {
+                "zh": "门店",
+                "en": "Store"
+              }
+            },
+            {
+              "value": "custom",
+              "label": {
+                "zh": "自定义",
+                "en": "Custom"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "tenantCode",
+          "label": {
+            "zh": "租户",
+            "en": "Tenant"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 150,
+          "relation": {
+            "resource": "tenants",
+            "valueField": "code",
+            "labelField": "name",
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc"
+          },
+          "validation": {}
+        },
+        {
+          "key": "parentCode",
+          "label": {
+            "zh": "上级机构",
+            "en": "Parent"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "relation": {
+            "resource": "org-units",
+            "valueField": "code",
+            "labelField": "name",
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc",
+            "display": "tree",
+            "parentField": "parentCode"
+          },
+          "validation": {}
+        },
+        {
+          "key": "areaCode",
+          "label": {
+            "zh": "地址码",
+            "en": "Area Code"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 140,
+          "relation": {
+            "resource": "area-codes",
+            "valueField": "code",
+            "labelField": "name",
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc",
+            "display": "tree",
+            "parentField": "parentCode",
+            "pathField": "path"
+          },
+          "validation": {}
+        },
+        {
+          "key": "sortOrder",
+          "label": {
+            "zh": "排序",
+            "en": "Sort Order"
+          },
+          "type": "number",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 110,
+          "validation": {}
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "description",
+          "label": {
+            "zh": "描述",
+            "en": "Description"
+          },
+          "type": "textarea",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {}
+        },
+        {
+          "key": "updatedAt",
+          "label": {
+            "zh": "更新时间",
+            "en": "Updated At"
+          },
+          "type": "datetime",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "status",
+        "description",
+        "type",
+        "tenantCode",
+        "parentCode",
+        "areaCode"
+      ],
+      "defaultSortKey": "sortOrder"
+    },
+    {
+      "capabilityId": "admin-shell",
+      "resource": "overview",
+      "title": {
+        "zh": "概览",
+        "en": "Overview"
+      },
+      "description": {
+        "zh": "平台底座运行概览。",
+        "en": "Platform foundation overview."
+      },
+      "permissionPrefix": "admin:overview",
+      "permissions": {
+        "create": "admin:overview:create",
+        "delete": "admin:overview:delete",
+        "read": "admin:overview:read",
+        "update": "admin:overview:update"
+      },
+      "menu": {
+        "route": "/overview",
+        "group": "foundation",
+        "icon": "overview",
+        "order": 10
+      }
+    },
+    {
+      "capabilityId": "parameter",
+      "resource": "parameters",
+      "title": {
+        "zh": "参数管理",
+        "en": "Parameters"
+      },
+      "description": {
+        "zh": "平台参数、运行开关和能力配置键值。",
+        "en": "Platform parameters, runtime switches, and capability configuration key-values."
+      },
+      "permissionPrefix": "admin:parameter",
+      "permissions": {
+        "create": "admin:parameter:create",
+        "delete": "admin:parameter:delete",
+        "read": "admin:parameter:read",
+        "update": "admin:parameter:update"
+      },
+      "menu": {
+        "route": "/parameters",
+        "parent": "configuration",
+        "group": "governance",
+        "icon": "dictParams",
+        "order": 132,
+        "cache": true
+      },
+      "fields": [
+        {
+          "key": "code",
+          "label": {
+            "zh": "参数键",
+            "en": "Parameter Key"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "name",
+          "label": {
+            "zh": "参数名称",
+            "en": "Parameter Name"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "value",
+          "label": {
+            "zh": "参数值",
+            "en": "Value"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {}
+        },
+        {
+          "key": "group",
+          "label": {
+            "zh": "分组",
+            "en": "Group"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 140,
+          "validation": {}
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "description",
+          "label": {
+            "zh": "说明",
+            "en": "Description"
+          },
+          "type": "textarea",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {}
+        },
+        {
+          "key": "updatedAt",
+          "label": {
+            "zh": "更新时间",
+            "en": "Updated At"
+          },
+          "type": "datetime",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "status",
+        "description",
+        "value",
+        "group"
+      ],
+      "defaultSortKey": "updatedAt"
+    },
+    {
+      "capabilityId": "rbac",
+      "resource": "permissions",
+      "title": {
+        "zh": "权限",
+        "en": "Permissions"
+      },
+      "description": {
+        "zh": "能力、资源、菜单和接口共用的权限码目录。",
+        "en": "Permission catalog shared by capabilities, resources, menus, and APIs."
+      },
+      "permissionPrefix": "admin:permission",
+      "permissions": {
+        "create": "admin:permission:create",
+        "delete": "admin:permission:delete",
+        "read": "admin:permission:read",
+        "update": "admin:permission:update"
+      },
+      "menu": {
+        "route": "/permissions",
+        "group": "foundation",
+        "icon": "roles",
+        "order": 55
+      }
+    },
+    {
+      "capabilityId": "rbac",
+      "resource": "role-groups",
+      "title": {
+        "zh": "角色组",
+        "en": "Role Groups"
+      },
+      "description": {
+        "zh": "用于角色分类、治理和授权维护，不直接授予权限。",
+        "en": "Classifies roles for governance and authorization maintenance without granting permissions directly."
+      },
+      "permissionPrefix": "admin:role-group",
+      "permissions": {
+        "create": "admin:role-group:create",
+        "delete": "admin:role-group:delete",
+        "read": "admin:role-group:read",
+        "update": "admin:role-group:update"
+      },
+      "menu": {
+        "route": "/role-groups",
+        "parent": "access",
+        "group": "foundation",
+        "icon": "roles",
+        "order": 48,
+        "cache": true
+      },
+      "fields": [
+        {
+          "key": "code",
+          "label": {
+            "zh": "分组编码",
+            "en": "Group Code"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "validation": {}
+        },
+        {
+          "key": "name",
+          "label": {
+            "zh": "分组名称",
+            "en": "Group Name"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "parentCode",
+          "label": {
+            "zh": "上级角色组",
+            "en": "Parent Group"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "relation": {
+            "resource": "role-groups",
+            "valueField": "code",
+            "labelField": "name",
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc",
+            "display": "tree",
+            "parentField": "parentCode"
+          },
+          "validation": {}
+        },
+        {
+          "key": "sortOrder",
+          "label": {
+            "zh": "排序",
+            "en": "Sort Order"
+          },
+          "type": "number",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 110,
+          "validation": {}
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "description",
+          "label": {
+            "zh": "说明",
+            "en": "Description"
+          },
+          "type": "textarea",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {}
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "status",
+        "description",
+        "parentCode"
+      ],
+      "defaultSortKey": "sortOrder"
+    },
+    {
+      "capabilityId": "rbac",
+      "resource": "roles",
+      "title": {
+        "zh": "角色",
+        "en": "Roles"
+      },
+      "description": {
+        "zh": "角色、权限和授权策略。",
+        "en": "Roles, permissions, and authorization policies."
+      },
+      "permissionPrefix": "admin:role",
+      "permissions": {
+        "create": "admin:role:create",
+        "delete": "admin:role:delete",
+        "read": "admin:role:read",
+        "update": "admin:role:update"
+      },
+      "menu": {
+        "route": "/roles",
+        "parent": "access",
+        "group": "foundation",
+        "icon": "roles",
+        "order": 50,
+        "cache": true
+      },
+      "fields": [
+        {
+          "key": "code",
+          "label": {
+            "zh": "角色编码",
+            "en": "Code"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "validation": {}
+        },
+        {
+          "key": "name",
+          "label": {
+            "zh": "角色名称",
+            "en": "Name"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "groupCode",
+          "label": {
+            "zh": "角色组",
+            "en": "Role Group"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 150,
+          "relation": {
+            "resource": "role-groups",
+            "valueField": "code",
+            "labelField": "name",
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc",
+            "display": "tree",
+            "parentField": "parentCode"
+          },
+          "validation": {}
+        },
+        {
+          "key": "dataScope",
+          "label": {
+            "zh": "数据范围",
+            "en": "Data Scope"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 190,
+          "options": [
+            {
+              "value": "all",
+              "label": {
+                "zh": "全部数据",
+                "en": "All Data"
+              }
+            },
+            {
+              "value": "current_org",
+              "label": {
+                "zh": "当前机构",
+                "en": "Current Org"
+              }
+            },
+            {
+              "value": "current_and_children",
+              "label": {
+                "zh": "当前及下级机构",
+                "en": "Current And Children"
+              }
+            },
+            {
+              "value": "custom_orgs",
+              "label": {
+                "zh": "自定义机构",
+                "en": "Custom Orgs"
+              }
+            },
+            {
+              "value": "current_area",
+              "label": {
+                "zh": "当前区域",
+                "en": "Current Area"
+              }
+            },
+            {
+              "value": "current_and_children_areas",
+              "label": {
+                "zh": "当前及下级区域",
+                "en": "Current And Children Areas"
+              }
+            },
+            {
+              "value": "custom_areas",
+              "label": {
+                "zh": "自定义区域",
+                "en": "Custom Areas"
+              }
+            },
+            {
+              "value": "self",
+              "label": {
+                "zh": "仅本人",
+                "en": "Self"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "dataScopeOrgCodes",
+          "label": {
+            "zh": "数据机构",
+            "en": "Data Orgs"
+          },
+          "type": "multiselect",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "relation": {
+            "resource": "org-units",
+            "valueField": "code",
+            "labelField": "name",
+            "multiple": true,
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc",
+            "display": "tree",
+            "parentField": "parentCode"
+          },
+          "validation": {}
+        },
+        {
+          "key": "dataScopeAreaCodes",
+          "label": {
+            "zh": "数据区域",
+            "en": "Data Areas"
+          },
+          "type": "multiselect",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "relation": {
+            "resource": "area-codes",
+            "valueField": "code",
+            "labelField": "name",
+            "multiple": true,
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc",
+            "display": "tree",
+            "parentField": "parentCode",
+            "pathField": "path"
+          },
+          "validation": {}
+        },
+        {
+          "key": "permissions",
+          "label": {
+            "zh": "权限码",
+            "en": "Permissions"
+          },
+          "type": "multiselect",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 260,
+          "relation": {
+            "resource": "permissions",
+            "valueField": "code",
+            "labelField": "name",
+            "multiple": true,
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc"
+          },
+          "validation": {}
+        },
+        {
+          "key": "denyPermissions",
+          "label": {
+            "zh": "拒绝权限",
+            "en": "Deny Permissions"
+          },
+          "type": "multiselect",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 260,
+          "relation": {
+            "resource": "permissions",
+            "valueField": "code",
+            "labelField": "name",
+            "multiple": true,
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc"
+          },
+          "validation": {}
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ],
+          "validation": {}
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "status",
+        "groupCode",
+        "dataScope",
+        "dataScopeOrgCodes",
+        "dataScopeAreaCodes",
+        "denyPermissions"
+      ],
+      "defaultSortKey": "updatedAt"
+    },
+    {
+      "capabilityId": "session",
+      "resource": "sessions",
+      "title": {
+        "zh": "在线会话",
+        "en": "Sessions"
+      },
+      "description": {
+        "zh": "后台和 App 会话、有效期与撤销状态。",
+        "en": "Admin and app sessions, expiration and revocation state."
+      },
+      "permissionPrefix": "admin:session",
+      "permissions": {
+        "create": "admin:session:create",
+        "delete": "admin:session:delete",
+        "read": "admin:session:read",
+        "update": "admin:session:update"
+      },
+      "menu": {
+        "route": "/sessions",
+        "group": "operations",
+        "icon": "wifi",
+        "order": 350
+      }
+    },
+    {
+      "capabilityId": "parameter",
+      "resource": "settings",
+      "title": {
+        "zh": "设置",
+        "en": "Settings"
+      },
+      "description": {
+        "zh": "平台配置和品牌设置。",
+        "en": "Platform configuration and branding."
+      },
+      "permissionPrefix": "admin:settings",
+      "permissions": {
+        "create": "admin:settings:create",
+        "delete": "admin:settings:delete",
+        "read": "admin:settings:read",
+        "update": "admin:settings:update"
+      },
+      "menu": {
+        "route": "/settings",
+        "group": "security",
+        "icon": "settings",
+        "order": 310
+      }
+    },
+    {
+      "capabilityId": "tenant",
+      "resource": "tenants",
+      "title": {
+        "zh": "租户",
+        "en": "Tenants"
+      },
+      "description": {
+        "zh": "租户空间、隔离边界和区域归属。",
+        "en": "Tenant spaces, isolation boundaries, and regional ownership."
+      },
+      "permissionPrefix": "admin:tenant",
+      "permissions": {
+        "create": "admin:tenant:create",
+        "delete": "admin:tenant:delete",
+        "read": "admin:tenant:read",
+        "update": "admin:tenant:update"
+      },
+      "menu": {
+        "route": "/tenants",
+        "parent": "identity",
+        "group": "foundation",
+        "icon": "tenants",
+        "order": 30,
+        "cache": true
+      },
+      "fields": [
+        {
+          "key": "code",
+          "label": {
+            "zh": "租户编码",
+            "en": "Tenant Code"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "validation": {}
+        },
+        {
+          "key": "name",
+          "label": {
+            "zh": "租户名称",
+            "en": "Tenant Name"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        },
+        {
+          "key": "areaCode",
+          "label": {
+            "zh": "地址码",
+            "en": "Area Code"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 140,
+          "relation": {
+            "resource": "area-codes",
+            "valueField": "code",
+            "labelField": "name",
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc",
+            "display": "tree",
+            "parentField": "parentCode",
+            "pathField": "path"
+          },
+          "validation": {}
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "description",
+          "label": {
+            "zh": "描述",
+            "en": "Description"
+          },
+          "type": "textarea",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {}
+        },
+        {
+          "key": "updatedAt",
+          "label": {
+            "zh": "更新时间",
+            "en": "Updated At"
+          },
+          "type": "datetime",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "status",
+        "description",
+        "areaCode"
+      ],
+      "defaultSortKey": "updatedAt"
+    },
+    {
+      "capabilityId": "identity",
+      "resource": "users",
+      "title": {
+        "zh": "用户",
+        "en": "Users"
+      },
+      "description": {
+        "zh": "后台用户、账号、组织归属和角色绑定。",
+        "en": "Admin users, accounts, organization ownership, and role bindings."
+      },
+      "permissionPrefix": "admin:user",
+      "permissions": {
+        "create": "admin:user:create",
+        "delete": "admin:user:delete",
+        "read": "admin:user:read",
+        "update": "admin:user:update"
+      },
+      "menu": {
+        "route": "/users",
+        "parent": "identity",
+        "group": "foundation",
+        "icon": "users",
+        "order": 40,
+        "cache": true
+      },
+      "fields": [
+        {
+          "key": "code",
+          "label": {
+            "zh": "用户名",
+            "en": "Username"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "validation": {}
+        },
+        {
+          "key": "name",
+          "label": {
+            "zh": "姓名",
+            "en": "Name"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "validation": {}
+        },
+        {
+          "key": "tenantCode",
+          "label": {
+            "zh": "租户",
+            "en": "Tenant"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 150,
+          "relation": {
+            "resource": "tenants",
+            "valueField": "code",
+            "labelField": "name",
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc"
+          },
+          "validation": {}
+        },
+        {
+          "key": "orgUnitCode",
+          "label": {
+            "zh": "机构",
+            "en": "Org Unit"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "relation": {
+            "resource": "org-units",
+            "valueField": "code",
+            "labelField": "name",
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc",
+            "display": "tree",
+            "parentField": "parentCode"
+          },
+          "validation": {}
+        },
+        {
+          "key": "areaCode",
+          "label": {
+            "zh": "地址码",
+            "en": "Area Code"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 140,
+          "relation": {
+            "resource": "area-codes",
+            "valueField": "code",
+            "labelField": "name",
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc",
+            "display": "tree",
+            "parentField": "parentCode",
+            "pathField": "path"
+          },
+          "validation": {}
+        },
+        {
+          "key": "roles",
+          "label": {
+            "zh": "角色",
+            "en": "Roles"
+          },
+          "type": "multiselect",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "relation": {
+            "resource": "roles",
+            "valueField": "code",
+            "labelField": "name",
+            "multiple": true,
+            "filters": [
+              {
+                "field": "status",
+                "operator": "=",
+                "value": "enabled"
+              }
+            ],
+            "sortField": "name",
+            "sortOrder": "asc"
+          },
+          "validation": {}
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ],
+          "validation": {}
+        },
+        {
+          "key": "description",
+          "label": {
+            "zh": "描述",
+            "en": "Description"
+          },
+          "type": "textarea",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {}
+        },
+        {
+          "key": "updatedAt",
+          "label": {
+            "zh": "更新时间",
+            "en": "Updated At"
+          },
+          "type": "datetime",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {}
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "status",
+        "description",
+        "tenantCode",
+        "orgUnitCode",
+        "areaCode",
+        "roles"
+      ],
+      "defaultSortKey": "updatedAt"
+    },
+    {
+      "capabilityId": "system-admin",
+      "resource": "versions",
+      "title": {
+        "zh": "版本管理",
+        "en": "Versions"
+      },
+      "description": {
+        "zh": "平台版本、发布记录和运行基线。",
+        "en": "Platform versions, release records and runtime baselines."
+      },
+      "permissionPrefix": "admin:version",
+      "permissions": {
+        "create": "admin:version:create",
+        "delete": "admin:version:delete",
+        "read": "admin:version:read",
+        "update": "admin:version:update"
+      },
+      "menu": {
+        "route": "/versions",
+        "group": "operations",
+        "icon": "cluster",
+        "order": 360
+      }
+    }
+  ]
+}

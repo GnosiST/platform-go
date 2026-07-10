@@ -1,0 +1,111 @@
+# Platform UI Optimization Assessment
+
+Date: 2026-07-10
+Status: reviewed, pending activation
+
+## Purpose
+
+This assessment records when and how to use two design aids without disrupting the closed platform-foundation goal:
+
+- `ui-ux-pro-max` for implementation-level admin UI quality, accessibility, responsive behavior and shared-component hardening;
+- `design-taste-frontend` for the visual direction of login, brand-entry, landing, portfolio, marketing or deliberate redesign surfaces.
+
+These are follow-on optimization candidates. They do not reopen `resources/platform-foundation-task-graph.json` until a design is approved and an implementation node is intentionally activated.
+
+## Current Evidence
+
+The current run inspected the local admin at `1280x720` and `390x844` with fresh browser captures:
+
+- `tmp/product-design/ui-optimization-audit-20260710/01-login-current.png`
+- `tmp/product-design/ui-optimization-audit-20260710/02-dashboard-desktop-current.png`
+- `tmp/product-design/ui-optimization-audit-20260710/04-menus-desktop-current.png`
+- `tmp/product-design/ui-optimization-audit-20260710/06-menus-mobile-top-current.png`
+- `tmp/product-design/ui-optimization-audit-20260710/07-dashboard-mobile-current.png`
+
+Observed strengths:
+
+- the admin shell, resource routes, mobile resource cards and integrated pagination remain functional;
+- desktop and mobile captures have no page-level horizontal overflow;
+- shared Ant Design and platform wrappers provide a stable base for system-level improvements;
+- active navigation, localized visible labels, explicit form labels and semantic table structures are present.
+
+Observed risks:
+
+- the authenticated mobile shell places global search, account actions, primary navigation, work tabs and two context controls in five persistent bands before page content; the first page heading begins after roughly 300px of browser height;
+- many mobile controls measure 30-32px high, including navigation, work tabs, icon actions and table toolbar buttons, below the 44px touch-target baseline used by the requested UI/UX review;
+- the default focus-ring rule is conditional on `.visual-aid-enabled`; shared custom controls need a visible focus baseline even when that preference is off;
+- the mobile navigation button and alert button rely on icon-derived accessible names instead of explicit localized `aria-label` values;
+- the desktop `menus` table at 1280px truncates several high-value columns, reducing scan and comparison quality even though the page itself does not overflow;
+- an expired or invalid stored session can expose the raw `unauthorized` backend message on the login screen instead of a localized recovery message;
+- the login/brand entry uses a large empty split hero, a one-hue dark treatment and generic capability claims. It is coherent, but it does not yet show real product proof or a distinctive brand asset.
+
+Evidence limits:
+
+- screenshots and DOM inspection do not prove WCAG conformance;
+- color contrast, screen-reader announcements, zoom/reflow, reduced motion, keyboard route focus and modal focus return still require focused automated and manual tests;
+- no standalone landing, portfolio or marketing page exists in the current repository, so the aesthetic task is conditional rather than an immediate admin redesign.
+
+## Candidate A: Admin UI System Quality Hardening
+
+Requested aid: `ui-ux-pro-max`
+
+Priority: P1 after the production persistence correctness work described in `docs/superpowers/specs/2026-07-10-platform-production-persistence-correctness-design.md`, before the next large admin capability or downstream business UI is added.
+
+Activation gate:
+
+- the current P0 production persistence correctness slice is implemented and its shared repository contracts are stable;
+- a short `superpowers:brainstorming` design is approved for mobile navigation density, focus behavior and table prioritization;
+- the task is added to the execution graph with `admin-ui`, `i18n`, `browser-qa` and `docs` resource locks.
+
+Implementation scope:
+
+- make visible focus treatment a default platform behavior; keep the visual-aid preference as an enhancement rather than the only focus-ring source;
+- add a skip-to-content path and move focus to the page heading or main region after route changes;
+- add explicit localized accessible names for icon-only shell and table controls;
+- bring mobile interactive hit areas to at least 44px without inflating desktop density;
+- reduce authenticated mobile chrome so page content is visible earlier, using progressive disclosure for secondary navigation, work tabs and environment/tenant context;
+- preserve mobile cards, but review card information priority, active state, pagination order and long-label wrapping at 375/390px;
+- define table priority columns and overflow behavior at 1024/1280px so high-value data remains scannable and full values remain discoverable;
+- normalize stale-session and authentication errors into localized, actionable recovery feedback;
+- respect `prefers-reduced-motion` for route and panel transitions;
+- add browser and contract tests for target size, focus visibility, reduced motion, narrow chrome geometry, table/card switching and localized icon labels.
+
+Acceptance evidence:
+
+- browser captures at 375x812, 390x844, 768x1024, 1024x768, 1280x720 and 1440x1024;
+- keyboard walkthrough covering login, global navigation, one resource list, create/edit modal and settings drawer;
+- automated checks for no horizontal page overflow, visible focus styles, explicit icon labels and mobile hit-area geometry;
+- admin i18n, UI contract tests, React build and focused browser console review remain green.
+
+## Candidate B: Brand Entry And Public-Surface Visual Redesign
+
+Requested aid: `design-taste-frontend`
+
+Priority: P2 deferred until a public-facing surface or an approved login/brand-entry redesign has a real product-positioning goal.
+
+Activation triggers:
+
+- a landing, portfolio, marketing or public product page is added;
+- product name, audience, primary promise, brand assets and primary conversion action are approved;
+- or the login page is explicitly promoted from a utility authentication screen into a product/brand entry experience.
+
+Scope boundary:
+
+- apply the aesthetic direction to login, branding, public documentation and future marketing surfaces;
+- do not apply marketing composition, oversized promotional typography or decorative card grids to CRUD consoles, policy review, file management or other repeated operational workflows;
+- show the actual product or a clear product state when a public hero needs media; avoid generic abstract decoration and empty atmospheric space;
+- make the brand or literal product offer a first-viewport signal, with restrained supporting copy and one clear primary action;
+- keep responsive, accessible and performance acceptance criteria owned by Candidate A rather than trading usability for visual novelty.
+
+Completion gate:
+
+- three bounded visual directions are reviewed against the same content and viewport set;
+- one direction is approved through `superpowers:brainstorming` and Product Design;
+- final implementation has real brand/product assets, desktop/mobile screenshots, contrast checks and no regression to login completion speed.
+
+## Scheduling Decision
+
+1. Finish production persistence correctness and contract stabilization first.
+2. Activate Candidate A before the next large admin feature or downstream business-console adoption so later UI does not multiply current shell and accessibility debt.
+3. Keep Candidate B deferred until there is a real brand/public-surface brief. If only the admin console changes, use Candidate A and the existing quiet operational design language.
+4. When either candidate activates, add an explicit task-graph node, localized status reason, completion gate, design gates, resource locks and fresh screenshot evidence. The closed 34/34 foundation goal remains unchanged until that activation decision.

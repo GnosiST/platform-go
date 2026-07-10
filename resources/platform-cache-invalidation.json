@@ -1,0 +1,112 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-cache-invalidation.json",
+  "capturedAt": "2026-07-07",
+  "purpose": "Machine-checkable cache and invalidation contract for platform read caches, Redis pub/sub invalidation, repository-backed session convergence, and independent admin Store reload ordering.",
+  "taskGraph": {
+    "path": "resources/platform-foundation-task-graph.json",
+    "taskId": "cache-redis-invalidation",
+    "requiredStatus": "implemented"
+  },
+  "engineeringCapability": "runtime-cache-invalidation",
+  "cacheTargets": [
+    {
+      "id": "branding",
+      "key": "admin:branding",
+      "sourceOfTruth": "admin resources settings/branding",
+      "invalidationResources": ["settings", "branding"]
+    },
+    {
+      "id": "principal",
+      "keyPrefix": "admin:principal:",
+      "sourceOfTruth": "users, roles and permissions resources",
+      "invalidationResources": ["users", "roles", "permissions"]
+    },
+    {
+      "id": "menus",
+      "keyPrefix": "admin:menus:",
+      "sourceOfTruth": "menus plus current principal permissions",
+      "invalidationResources": ["menus", "users", "roles", "permissions"]
+    },
+    {
+      "id": "schemas",
+      "keyPrefix": "admin:schema:",
+      "sourceOfTruth": "capability manifests and admin resource schemas",
+      "invalidationResources": ["permissions"]
+    },
+    {
+      "id": "permissions",
+      "key": "admin:permissions:list",
+      "sourceOfTruth": "capability manifests and permission resources",
+      "invalidationResources": ["permissions"]
+    },
+    {
+      "id": "auth-providers",
+      "key": "admin:auth-providers",
+      "sourceOfTruth": "enabled capability auth provider manifests",
+      "invalidationResources": ["capability-restart"]
+    }
+  ],
+  "invalidationRules": [
+    {
+      "resource": "settings",
+      "operations": ["delete:admin:branding"]
+    },
+    {
+      "resource": "branding",
+      "operations": ["delete:admin:branding"]
+    },
+    {
+      "resource": "menus",
+      "operations": ["deletePrefix:admin:menus:"]
+    },
+    {
+      "resource": "users",
+      "operations": ["invalidatePolicyAuthorizer", "deletePrefix:admin:menus:", "deletePrefix:admin:principal:"]
+    },
+    {
+      "resource": "roles",
+      "operations": ["invalidatePolicyAuthorizer", "deletePrefix:admin:menus:", "deletePrefix:admin:principal:"]
+    },
+    {
+      "resource": "permissions",
+      "operations": [
+        "invalidatePolicyAuthorizer",
+        "deletePrefix:admin:menus:",
+        "deletePrefix:admin:principal:",
+        "delete:admin:permissions:list",
+        "deletePrefix:admin:schema:"
+      ]
+    },
+    {
+      "resource": "sessions",
+      "operations": ["reloadSessionRepository"]
+    }
+  ],
+  "busPolicy": {
+    "eventShape": { "resource": "string" },
+    "publishEmptyResource": "ignore",
+    "localInvalidationBeforePublish": true,
+    "redisChannel": "platform:cache:invalidations",
+    "sessionEventResource": "sessions",
+    "sessionEventBehavior": "reloadSessionRepository",
+    "adminEventBehavior": "reloadAdminResourceStoreBeforeDerivedCacheInvalidation",
+    "adminReloadFailureBehavior": "preserveDerivedCaches",
+    "businessCapabilitiesMayUsePort": "cache.InvalidationBus",
+    "businessCapabilitiesMustNotImportRedis": true
+  },
+  "noCachePolicy": {
+    "forbiddenTargets": ["raw tokens", "passwords", "WeChat secrets", "OAuth codes", "audit writes", "unpersisted write payloads"],
+    "sourceOfTruthRequired": true,
+    "clearInvalidationPointRequired": true
+  },
+  "runtimeEvidence": [
+    "internal/platform/httpapi/server.go",
+    "internal/platform/cache/invalidation.go",
+    "internal/platform/cache/redis_invalidation.go",
+    "internal/platform/httpapi/server_test.go",
+    "internal/platform/cache/cache_test.go",
+    "docs/platform-cache.md"
+  ],
+  "validators": ["scripts/validate-platform-cache-invalidation.mjs"],
+  "tests": ["scripts/platform-cache-invalidation.test.mjs"]
+}

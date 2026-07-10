@@ -8,6 +8,11 @@ admin/dist/
 # local environment
 .env
 .env.*
+.codex/
+.codegraph/
+.superpowers/
+.platform/
+.vite/
 
 # OS/editor
 .DS_Store

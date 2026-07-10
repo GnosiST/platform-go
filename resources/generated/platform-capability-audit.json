@@ -1,0 +1,308 @@
+{
+  "generatedBy": "cmd/platform-contracts audit",
+  "source": "capability.Manifest",
+  "sourceMode": "go-manifest",
+  "sourceVersion": "0.1.0",
+  "status": "pass",
+  "capabilityCount": 14,
+  "resourceCount": 27,
+  "routeCount": 5,
+  "appRouteHandlerCount": 5,
+  "adminPermissionCount": 108,
+  "appPermissionCount": 0,
+  "authProviderCount": 2,
+  "demoDataSetCount": 1,
+  "migrationCount": 14,
+  "seedCount": 14,
+  "capabilities": [
+    {
+      "id": "dictionary",
+      "name": "Dictionary",
+      "version": "0.1.0",
+      "adminResources": [
+        "area-codes",
+        "dictionaries",
+        "dictionary-parameters"
+      ],
+      "migrations": [
+        "core-dictionary-0001"
+      ],
+      "seeds": [
+        "core-dictionary-seed-0001"
+      ]
+    },
+    {
+      "id": "tenant",
+      "name": "Tenant",
+      "version": "0.1.0",
+      "dependencies": [
+        "dictionary"
+      ],
+      "adminResources": [
+        "tenants"
+      ],
+      "migrations": [
+        "core-tenant-0001"
+      ],
+      "seeds": [
+        "core-tenant-seed-0001"
+      ]
+    },
+    {
+      "id": "identity",
+      "name": "Identity",
+      "version": "0.1.0",
+      "dependencies": [
+        "tenant"
+      ],
+      "adminResources": [
+        "app-identities",
+        "org-units",
+        "users"
+      ],
+      "migrations": [
+        "core-identity-0001"
+      ],
+      "seeds": [
+        "core-identity-seed-0001"
+      ]
+    },
+    {
+      "id": "session",
+      "name": "Session",
+      "version": "0.1.0",
+      "dependencies": [
+        "identity"
+      ],
+      "adminResources": [
+        "sessions"
+      ],
+      "appRoutes": [
+        "GET /api/app/session/current",
+        "POST /api/app/auth/login",
+        "POST /api/app/auth/logout"
+      ],
+      "appRouteHandlers": [
+        "GET /api/app/session/current",
+        "POST /api/app/auth/login",
+        "POST /api/app/auth/logout"
+      ],
+      "authProviders": [
+        "demo"
+      ],
+      "migrations": [
+        "core-session-0001"
+      ],
+      "seeds": [
+        "core-session-seed-0001"
+      ]
+    },
+    {
+      "id": "rbac",
+      "name": "RBAC",
+      "version": "0.1.0",
+      "dependencies": [
+        "identity",
+        "tenant"
+      ],
+      "adminResources": [
+        "permissions",
+        "role-groups",
+        "roles"
+      ],
+      "migrations": [
+        "core-rbac-0001"
+      ],
+      "seeds": [
+        "core-rbac-seed-0001"
+      ]
+    },
+    {
+      "id": "menu",
+      "name": "Menu",
+      "version": "0.1.0",
+      "dependencies": [
+        "rbac"
+      ],
+      "adminResources": [
+        "menus"
+      ],
+      "migrations": [
+        "core-menu-0001"
+      ],
+      "seeds": [
+        "core-menu-seed-0001"
+      ]
+    },
+    {
+      "id": "api-resource",
+      "name": "API Resource",
+      "version": "0.1.0",
+      "dependencies": [
+        "rbac"
+      ],
+      "adminResources": [
+        "api-docs",
+        "api-resources"
+      ],
+      "migrations": [
+        "core-api-resource-0001"
+      ],
+      "seeds": [
+        "core-api-resource-seed-0001"
+      ]
+    },
+    {
+      "id": "audit",
+      "name": "Audit",
+      "version": "0.1.0",
+      "dependencies": [
+        "identity",
+        "tenant"
+      ],
+      "adminResources": [
+        "audit-logs",
+        "error-logs",
+        "login-logs"
+      ],
+      "migrations": [
+        "core-audit-0001"
+      ],
+      "seeds": [
+        "core-audit-seed-0001"
+      ]
+    },
+    {
+      "id": "wechat-login",
+      "name": "WeChat Login",
+      "version": "0.1.0",
+      "dependencies": [
+        "audit",
+        "identity",
+        "session"
+      ],
+      "authProviders": [
+        "wechat"
+      ],
+      "migrations": [
+        "core-wechat-login-0001"
+      ],
+      "seeds": [
+        "core-wechat-login-seed-0001"
+      ]
+    },
+    {
+      "id": "parameter",
+      "name": "Parameter",
+      "version": "0.1.0",
+      "dependencies": [
+        "audit",
+        "tenant"
+      ],
+      "adminResources": [
+        "branding",
+        "parameters",
+        "settings"
+      ],
+      "migrations": [
+        "core-parameter-0001"
+      ],
+      "seeds": [
+        "core-parameter-seed-0001"
+      ]
+    },
+    {
+      "id": "file-storage",
+      "name": "File Storage",
+      "version": "0.1.0",
+      "dependencies": [
+        "audit",
+        "identity",
+        "parameter",
+        "tenant"
+      ],
+      "adminResources": [
+        "files"
+      ],
+      "appRoutes": [
+        "GET /api/app/files/:id/content",
+        "POST /api/app/files"
+      ],
+      "appRouteHandlers": [
+        "GET /api/app/files/:id/content",
+        "POST /api/app/files"
+      ],
+      "migrations": [
+        "core-file-storage-0001"
+      ],
+      "seeds": [
+        "core-file-storage-seed-0001"
+      ]
+    },
+    {
+      "id": "admin-shell",
+      "name": "Admin Shell",
+      "version": "0.1.0",
+      "dependencies": [
+        "identity",
+        "menu",
+        "rbac",
+        "session"
+      ],
+      "adminResources": [
+        "capabilities",
+        "overview"
+      ],
+      "migrations": [
+        "core-admin-shell-0001"
+      ],
+      "seeds": [
+        "core-admin-shell-seed-0001"
+      ]
+    },
+    {
+      "id": "demo-data",
+      "name": "Demo Data",
+      "version": "0.1.0",
+      "dependencies": [
+        "admin-shell",
+        "tenant"
+      ],
+      "adminResources": [
+        "demo-data"
+      ],
+      "demoDataSets": [
+        "platform-demo-tenants"
+      ],
+      "migrations": [
+        "core-demo-data-0001"
+      ],
+      "seeds": [
+        "core-demo-data-seed-0001"
+      ]
+    },
+    {
+      "id": "system-admin",
+      "name": "System Admin",
+      "version": "0.1.0",
+      "dependencies": [
+        "admin-shell",
+        "api-resource",
+        "audit",
+        "dictionary",
+        "parameter"
+      ],
+      "adminResources": [
+        "api-tokens",
+        "monitoring",
+        "versions"
+      ],
+      "migrations": [
+        "core-system-admin-0001"
+      ],
+      "seeds": [
+        "core-system-admin-seed-0001"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,194 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-governance-topology.json",
+  "capturedAt": "2026-07-07",
+  "purpose": "Machine-checkable governance topology for tenant, organization, role-group, area-code and optional personnel boundaries.",
+  "governanceEvaluation": {
+    "tenantOnlySupport": {
+      "decision": "rejected",
+      "reason": "Tenant-only ownership is not flexible enough for reusable admin foundations. The default platform must include tenant-owned organization units for institutions, departments, teams, stores and custom hierarchies.",
+      "requiredDefaultResource": "org-units",
+      "requiredTenantBoundary": "org-units.tenantCode",
+      "supportedOrgUnitTypes": ["group", "company", "branch", "organization", "department", "team", "store", "custom"],
+      "parallelDefaultResources": "forbidden"
+    },
+    "roleGroups": {
+      "decision": "supported-as-classification",
+      "reason": "Role groups improve role catalog management, especially for large systems, but must not become hidden permission inheritance or membership ownership.",
+      "resource": "role-groups",
+      "roleField": "roles.groupCode",
+      "treeField": "role-groups.parentCode",
+      "forbiddenSemantics": ["permission-grant", "role-membership", "permission-inheritance", "data-scope-ownership"],
+      "policyOwners": {
+        "permissionOwner": "roles",
+        "membershipOwner": "users.roles",
+        "dataScopeOwner": "roles.dataScope"
+      }
+    },
+    "areaCodes": {
+      "decision": "supported-as-shared-master-data",
+      "reason": "Area codes are reusable regional master data and optional ownership metadata. Regional authorization must be explicit through role data scopes, not inferred from address-code references.",
+      "resource": "area-codes",
+      "defaultResourceRequired": true,
+      "attachmentRequiredByDefault": false,
+      "defaultAttachments": ["tenants.areaCode", "org-units.areaCode", "users.areaCode"],
+      "optionalAttachments": ["personnel-profiles.areaCode"],
+      "authorizationConsumer": "roles.dataScopeAreaCodes",
+      "implicitAuthorization": false,
+      "detailedAddressesDefault": "excluded"
+    },
+    "personnel": {
+      "decision": "optional-capability",
+      "capability": "personnel",
+      "profile": "platform-personnel-ready",
+      "reason": "Personnel files, positions and assignments are reusable in some products but too heavy for every platform foundation. They must reuse tenant, org-unit, user and area-code relations when enabled."
+    }
+  },
+  "defaultFoundation": {
+    "mustIncludeResources": ["tenants", "org-units", "users", "roles", "role-groups", "area-codes"],
+    "mustExcludeResources": ["personnel-profiles", "positions", "position-assignments", "organizations", "departments", "regions", "employees", "user-addresses", "addresses"],
+    "mustExcludeCapabilities": ["personnel"]
+  },
+  "resourceContracts": [
+    {
+      "resource": "tenants",
+      "fields": [
+        {
+          "key": "areaCode",
+          "relationResource": "area-codes",
+          "display": "tree",
+          "parentField": "parentCode",
+          "pathField": "path",
+          "requiredPolicy": "optional"
+        }
+      ]
+    },
+    {
+      "resource": "org-units",
+      "fields": [
+        { "key": "type", "type": "select", "required": true, "options": ["group", "company", "branch", "organization", "department", "team", "store", "custom"] },
+        { "key": "tenantCode", "relationResource": "tenants", "required": true },
+        { "key": "parentCode", "relationResource": "org-units", "display": "tree", "parentField": "parentCode" },
+        { "key": "areaCode", "relationResource": "area-codes", "display": "tree", "parentField": "parentCode", "pathField": "path", "requiredPolicy": "optional" }
+      ]
+    },
+    {
+      "resource": "users",
+      "fields": [
+        { "key": "tenantCode", "relationResource": "tenants", "required": true },
+        { "key": "orgUnitCode", "relationResource": "org-units", "display": "tree", "parentField": "parentCode", "requiredPolicy": "optional" },
+        { "key": "areaCode", "relationResource": "area-codes", "display": "tree", "parentField": "parentCode", "pathField": "path", "requiredPolicy": "optional" },
+        { "key": "roles", "relationResource": "roles", "multiple": true }
+      ]
+    },
+    {
+      "resource": "area-codes",
+      "fields": [
+        { "key": "parentCode", "relationResource": "area-codes", "display": "tree", "parentField": "parentCode", "pathField": "path" },
+        { "key": "level", "type": "select", "options": ["country", "province", "city", "district", "street", "custom"] },
+        { "key": "path", "type": "text" }
+      ]
+    },
+    {
+      "resource": "role-groups",
+      "classificationOnly": true,
+      "fields": [
+        { "key": "parentCode", "relationResource": "role-groups", "display": "tree", "parentField": "parentCode" }
+      ]
+    },
+    {
+      "resource": "roles",
+      "fields": [
+        { "key": "groupCode", "relationResource": "role-groups", "display": "tree", "parentField": "parentCode" },
+        { "key": "dataScope", "type": "select", "required": true, "options": ["all", "current_org", "current_and_children", "custom_orgs", "current_area", "current_and_children_areas", "custom_areas", "self"] },
+        { "key": "dataScopeOrgCodes", "relationResource": "org-units", "display": "tree", "multiple": true, "parentField": "parentCode" },
+        { "key": "dataScopeAreaCodes", "relationResource": "area-codes", "display": "tree", "multiple": true, "parentField": "parentCode", "pathField": "path" },
+        { "key": "permissions", "relationResource": "permissions", "multiple": true },
+        { "key": "denyPermissions", "relationResource": "permissions", "multiple": true }
+      ]
+    }
+  ],
+  "roleGroupPolicy": {
+    "mode": "classification-only",
+    "forbiddenFieldTerms": ["permission", "datascope", "scope", "inherit", "includedrole", "rolecodes", "membership", "membercodes", "usercodes"],
+    "permissionOwner": "roles",
+    "membershipOwner": "users.roles",
+    "dataScopeOwner": "roles.dataScope",
+    "inheritance": "forbidden",
+    "reviewOwnerCapability": "policy-review"
+  },
+  "orgUnitPolicy": {
+    "mode": "single-tree",
+    "resource": "org-units",
+    "requiredDefault": true,
+    "levels": ["group", "company", "branch", "organization", "department", "team", "store", "custom"],
+    "tenantBoundaryField": "tenantCode",
+    "parentField": "parentCode",
+    "areaField": "areaCode",
+    "forbiddenDefaultResources": ["organizations", "departments", "regions", "employees"],
+    "personnelOwnerCapability": "personnel"
+  },
+  "areaCodePolicy": {
+    "mode": "shared-master-data",
+    "defaultResourceRequired": true,
+    "attachmentRequiredByDefault": false,
+    "implicitAuthorization": false,
+    "dataScopeOwner": "roles.dataScopeAreaCodes",
+    "attachmentFields": ["tenants.areaCode", "org-units.areaCode", "users.areaCode", "personnel-profiles.areaCode"],
+    "authorizationConsumers": ["roles.dataScopeAreaCodes"],
+    "detailedAddressPolicy": {
+      "defaultFoundation": "excluded",
+      "owner": "owning-capability",
+      "promotionRule": "promote-only-after-two-reusable-capabilities"
+    },
+    "defaultConsumers": ["tenants", "org-units", "users"],
+    "optionalConsumers": ["personnel-profiles"],
+    "levels": ["country", "province", "city", "district", "street", "custom"]
+  },
+  "personnelBoundary": {
+    "defaultCapability": "excluded",
+    "profile": "platform-personnel-ready",
+    "capability": "personnel",
+    "resources": ["personnel-profiles", "positions", "position-assignments"],
+    "sharedResources": ["tenants", "org-units", "area-codes", "users"],
+    "resourceContracts": [
+      {
+        "resource": "personnel-profiles",
+        "fields": [
+          { "key": "tenantCode", "relationResource": "tenants" },
+          { "key": "orgUnitCode", "relationResource": "org-units", "display": "tree", "parentField": "parentCode" },
+          { "key": "areaCode", "relationResource": "area-codes", "display": "tree", "parentField": "parentCode", "pathField": "path", "requiredPolicy": "optional" },
+          { "key": "userCode", "relationResource": "users", "requiredPolicy": "optional" }
+        ]
+      },
+      {
+        "resource": "positions",
+        "fields": [
+          { "key": "tenantCode", "relationResource": "tenants" },
+          { "key": "orgUnitCode", "relationResource": "org-units", "display": "tree", "parentField": "parentCode" }
+        ]
+      },
+      {
+        "resource": "position-assignments",
+        "fields": [
+          { "key": "personnelCode", "relationResource": "personnel-profiles", "required": true },
+          { "key": "positionCode", "relationResource": "positions", "required": true },
+          { "key": "tenantCode", "relationResource": "tenants" },
+          { "key": "orgUnitCode", "relationResource": "org-units", "display": "tree", "parentField": "parentCode" }
+        ]
+      }
+    ]
+  },
+  "profileRequirements": {
+    "defaultProfiles": ["minimal-admin", "platform-default"],
+    "defaultMustIncludeResources": ["tenants", "org-units", "users", "roles", "role-groups", "area-codes"],
+    "defaultMustExcludeCapabilities": ["personnel"],
+    "personnelProfile": "platform-personnel-ready",
+    "personnelMustIncludeResources": ["personnel-profiles", "positions", "position-assignments", "tenants", "org-units", "area-codes", "users"]
+  },
+  "documents": [
+    "docs/superpowers/specs/2026-07-06-platform-go-governance-boundary-design.md",
+    "docs/admin-resource-schema.md",
+    "docs/platform-capability-development.md",
+    "docs/admin-rbac-menu.md"
+  ]
+}

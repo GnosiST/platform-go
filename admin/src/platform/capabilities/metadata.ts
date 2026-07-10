@@ -56,7 +56,11 @@ const capabilityMetadata: Record<string, Omit<CapabilityView, keyof CapabilityIt
     health: "healthy",
     owner: "Platform Team",
     dependencies: ["identity"],
-    apis: [{ method: "DELETE", path: "/api/sessions/{id}", summary: { zh: "撤销会话", en: "Revoke session" } }],
+    apis: [
+      { method: "POST", path: "/api/auth/refresh", summary: { zh: "续期会话", en: "Refresh session" } },
+      { method: "POST", path: "/api/auth/logout", summary: { zh: "退出登录", en: "Logout" } },
+      { method: "DELETE", path: "/api/sessions/{id}", summary: { zh: "撤销会话", en: "Revoke session" } },
+    ],
   },
   rbac: {
     label: { zh: "RBAC", en: "RBAC" },
@@ -103,7 +107,7 @@ const capabilityMetadata: Record<string, Omit<CapabilityView, keyof CapabilityIt
     health: "warning",
     owner: "Platform Team",
     dependencies: ["tenant", "identity"],
-    apis: [{ method: "GET", path: "/api/audit/events", summary: { zh: "审计事件", en: "Audit events" } }],
+    apis: [{ method: "GET", path: "/api/admin/resources/audit-logs", summary: { zh: "审计日志", en: "Audit logs" } }],
   },
   dictionary: {
     label: { zh: "字典", en: "Dictionary" },
@@ -156,6 +160,10 @@ export const optionalCapabilities: CapabilityView[] = [
   makeOptional("file-storage", { zh: "文件存储", en: "File Storage" }, { zh: "本地与 S3 兼容上传、预览、下载和删除。", en: "Local and S3-compatible upload, preview, download, and delete." }),
   makeOptional("branding", { zh: "品牌配置", en: "Branding" }, { zh: "产品名称、Logo、主题和登录页文案。", en: "Product name, logo, theme, and login copy." }),
   makeOptional("demo-seed", { zh: "演示数据", en: "Demo Seed" }, { zh: "演示数据包、重置行为和 fixture 槽位。", en: "Demo packs, reset behavior, and fixture slots." }),
+  makeOptional("policy-review", { zh: "策略评审", en: "Policy Review" }, { zh: "角色、权限和数据范围变更的可选审批台账。", en: "Optional approval ledger for role, permission, and data-scope changes." }),
+  makeOptional("personnel", { zh: "人员组织", en: "Personnel" }, { zh: "人员档案、岗位和任职关系，可按需接入企业组织管理。", en: "Personnel profiles, positions, and assignments for optional enterprise organization management." }),
+  makeOptional("notification", { zh: "通知中心", en: "Notification" }, { zh: "站内通知、模板和投递记录，可供平台能力和业务能力复用。", en: "In-app notifications, templates, and delivery records reusable by platform and business capabilities." }),
+  makeOptional("job", { zh: "任务调度", en: "Job Scheduling" }, { zh: "任务定义、运行记录和尝试台账，可按需接入调度执行器。", en: "Job definitions, run records, and attempt ledgers with pluggable scheduler execution later." }),
   makeOptional("workflow", { zh: "工作流", en: "Workflow" }, { zh: "流程定义、任务调度和审批动作。", en: "Workflow definitions, job scheduling, and approval actions." }),
 ];
 

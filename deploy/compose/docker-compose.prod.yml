@@ -1,0 +1,86 @@
+services:
+  platform-api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: api
+    environment:
+      PLATFORM_RUNTIME_ENV: ${PLATFORM_RUNTIME_ENV:?required}
+      PLATFORM_HTTP_ADDR: ${PLATFORM_HTTP_ADDR:-0.0.0.0:9200}
+      PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:?required}
+      PLATFORM_CAPABILITIES: ${PLATFORM_CAPABILITIES:?required}
+      PLATFORM_DISABLE_DEMO_AUTH_PROVIDER: ${PLATFORM_DISABLE_DEMO_AUTH_PROVIDER:?required}
+      PLATFORM_ADMIN_RESOURCE_DRIVER: ${PLATFORM_ADMIN_RESOURCE_DRIVER:?required}
+      PLATFORM_ADMIN_RESOURCE_DSN: ${PLATFORM_ADMIN_RESOURCE_DSN:?required}
+      PLATFORM_SESSION_DRIVER: ${PLATFORM_SESSION_DRIVER:?required}
+      PLATFORM_SESSION_DSN: ${PLATFORM_SESSION_DSN:?required}
+      PLATFORM_LIFECYCLE_HISTORY_DRIVER: ${PLATFORM_LIFECYCLE_HISTORY_DRIVER:?required}
+      PLATFORM_LIFECYCLE_HISTORY_DSN: ${PLATFORM_LIFECYCLE_HISTORY_DSN:?required}
+      PLATFORM_CACHE_DRIVER: ${PLATFORM_CACHE_DRIVER:?required}
+      PLATFORM_REDIS_ADDR: ${PLATFORM_REDIS_ADDR:?required}
+      PLATFORM_REDIS_PASSWORD: ${PLATFORM_REDIS_PASSWORD:-}
+      PLATFORM_REDIS_DB: ${PLATFORM_REDIS_DB:-0}
+      PLATFORM_FILE_STORAGE_DRIVER: ${PLATFORM_FILE_STORAGE_DRIVER:-local}
+      PLATFORM_FILE_STORAGE_LOCAL_DIR: ${PLATFORM_FILE_STORAGE_LOCAL_DIR:-/app/.platform/uploads}
+      PLATFORM_FILE_STORAGE_PUBLIC_URL: ${PLATFORM_FILE_STORAGE_PUBLIC_URL:-/uploads}
+    depends_on:
+      platform-mysql:
+        condition: service_healthy
+      platform-redis:
+        condition: service_healthy
+    volumes:
+      - platform_uploads:/app/.platform/uploads
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9200/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  platform-admin:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: admin-static
+    depends_on:
+      platform-api:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - platform_uploads:/var/lib/platform-go/uploads:ro
+    restart: unless-stopped
+
+  platform-mysql:
+    image: mysql:8.4
+    command: ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?required}
+      MYSQL_USER: ${MYSQL_USER:?required}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?required}
+    volumes:
+      - platform_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  platform-redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - platform_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  platform_mysql:
+  platform_redis:
+  platform_uploads:

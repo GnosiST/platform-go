@@ -1,0 +1,321 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-capability-profiles.json",
+  "runtimeDefault": "platform-default",
+  "businessCapabilities": [
+    "external-business-capability"
+  ],
+  "profiles": [
+    {
+      "id": "minimal-admin",
+      "label": {
+        "zh": "最小后台底座",
+        "en": "Minimal Admin Foundation"
+      },
+      "purpose": "Smallest reusable admin foundation for tenant, identity, RBAC, menu and shell work.",
+      "capabilities": [
+        "dictionary",
+        "tenant",
+        "identity",
+        "session",
+        "rbac",
+        "menu",
+        "admin-shell"
+      ],
+      "mustIncludeResources": [
+        "area-codes",
+        "tenants",
+        "org-units",
+        "users",
+        "roles",
+        "role-groups",
+        "permissions",
+        "menus",
+        "sessions",
+        "capabilities",
+        "overview"
+      ],
+      "mustExcludeCapabilities": [
+        "external-business-capability",
+        "policy-review",
+        "personnel",
+        "notification",
+        "job",
+        "file-storage",
+        "demo-data",
+        "system-admin"
+      ]
+    },
+    {
+      "id": "platform-default",
+      "label": {
+        "zh": "默认平台底座",
+        "en": "Default Platform Foundation"
+      },
+      "purpose": "Default reusable platform foundation used by config.Load when PLATFORM_CAPABILITIES is not set.",
+      "default": true,
+      "capabilities": [
+        "tenant",
+        "identity",
+        "session",
+        "rbac",
+        "menu",
+        "api-resource",
+        "audit",
+        "wechat-login",
+        "dictionary",
+        "parameter",
+        "file-storage",
+        "admin-shell",
+        "demo-data",
+        "system-admin"
+      ],
+      "mustIncludeResources": [
+        "tenants",
+        "users",
+        "org-units",
+        "roles",
+        "role-groups",
+        "permissions",
+        "menus",
+        "api-resources",
+        "api-docs",
+        "audit-logs",
+        "login-logs",
+        "error-logs",
+        "dictionaries",
+        "dictionary-parameters",
+        "area-codes",
+        "parameters",
+        "branding",
+        "settings",
+        "files",
+        "capabilities",
+        "overview",
+        "demo-data",
+        "monitoring",
+        "versions",
+        "api-tokens"
+      ],
+      "mustExcludeCapabilities": [
+        "external-business-capability",
+        "policy-review",
+        "personnel",
+        "notification",
+        "job",
+        "app-phone"
+      ]
+    },
+    {
+      "id": "platform-app-ready",
+      "label": {
+        "zh": "App 能力底座",
+        "en": "App-Ready Platform Foundation"
+      },
+      "purpose": "Default platform plus optional app phone verification and binding capability.",
+      "capabilities": [
+        "tenant",
+        "identity",
+        "session",
+        "rbac",
+        "menu",
+        "api-resource",
+        "audit",
+        "wechat-login",
+        "app-phone",
+        "dictionary",
+        "parameter",
+        "file-storage",
+        "admin-shell",
+        "demo-data",
+        "system-admin"
+      ],
+      "mustIncludeResources": [
+        "app-phone-verifications",
+        "app-phone-bindings",
+        "app-identities",
+        "sessions",
+        "audit-logs"
+      ],
+      "mustExcludeCapabilities": [
+        "external-business-capability",
+        "policy-review",
+        "personnel",
+        "notification",
+        "job"
+      ]
+    },
+    {
+      "id": "platform-personnel-ready",
+      "label": {
+        "zh": "人员组织增强",
+        "en": "Personnel-Ready Platform Foundation"
+      },
+      "purpose": "Default platform foundation plus optional personnel profiles, positions and position assignments for enterprise organization management.",
+      "capabilities": [
+        "tenant",
+        "identity",
+        "session",
+        "rbac",
+        "menu",
+        "api-resource",
+        "audit",
+        "wechat-login",
+        "dictionary",
+        "parameter",
+        "file-storage",
+        "personnel",
+        "admin-shell",
+        "demo-data",
+        "system-admin"
+      ],
+      "mustIncludeCapabilities": [
+        "personnel"
+      ],
+      "mustIncludeResources": [
+        "personnel-profiles",
+        "positions",
+        "position-assignments",
+        "tenants",
+        "org-units",
+        "area-codes",
+        "users"
+      ],
+      "mustExcludeCapabilities": [
+        "external-business-capability",
+        "policy-review",
+        "notification",
+        "job",
+        "app-phone"
+      ]
+    },
+    {
+      "id": "platform-notification-ready",
+      "label": {
+        "zh": "通知能力底座",
+        "en": "Notification-Ready Platform Foundation"
+      },
+      "purpose": "Default platform foundation plus optional in-app notification templates, notification records and delivery ledgers.",
+      "capabilities": [
+        "tenant",
+        "identity",
+        "session",
+        "rbac",
+        "menu",
+        "api-resource",
+        "audit",
+        "wechat-login",
+        "dictionary",
+        "parameter",
+        "file-storage",
+        "notification",
+        "admin-shell",
+        "demo-data",
+        "system-admin"
+      ],
+      "mustIncludeCapabilities": [
+        "notification"
+      ],
+      "mustIncludeResources": [
+        "notification-templates",
+        "notifications",
+        "notification-deliveries",
+        "tenants",
+        "users",
+        "audit-logs"
+      ],
+      "mustExcludeCapabilities": [
+        "external-business-capability",
+        "policy-review",
+        "personnel",
+        "job",
+        "app-phone"
+      ]
+    },
+    {
+      "id": "platform-job-ready",
+      "label": {
+        "zh": "任务调度底座",
+        "en": "Job-Ready Platform Foundation"
+      },
+      "purpose": "Default platform foundation plus optional job definitions, run records and attempt ledgers without bundling a worker engine.",
+      "capabilities": [
+        "tenant",
+        "identity",
+        "session",
+        "rbac",
+        "menu",
+        "api-resource",
+        "audit",
+        "wechat-login",
+        "dictionary",
+        "parameter",
+        "file-storage",
+        "job",
+        "admin-shell",
+        "demo-data",
+        "system-admin"
+      ],
+      "mustIncludeCapabilities": [
+        "job"
+      ],
+      "mustIncludeResources": [
+        "job-definitions",
+        "job-runs",
+        "job-run-attempts",
+        "tenants",
+        "users",
+        "audit-logs"
+      ],
+      "mustExcludeCapabilities": [
+        "external-business-capability",
+        "policy-review",
+        "personnel",
+        "notification",
+        "app-phone"
+      ]
+    },
+    {
+      "id": "enterprise-governance",
+      "label": {
+        "zh": "企业治理增强",
+        "en": "Enterprise Governance Extension"
+      },
+      "purpose": "Default platform foundation plus optional policy review ledger for deployments that require approval states before RBAC policy changes.",
+      "capabilities": [
+        "tenant",
+        "identity",
+        "session",
+        "rbac",
+        "menu",
+        "api-resource",
+        "audit",
+        "policy-review",
+        "wechat-login",
+        "dictionary",
+        "parameter",
+        "file-storage",
+        "admin-shell",
+        "demo-data",
+        "system-admin"
+      ],
+      "mustIncludeCapabilities": [
+        "policy-review"
+      ],
+      "mustIncludeResources": [
+        "policy-reviews",
+        "roles",
+        "role-groups",
+        "permissions",
+        "audit-logs",
+        "users"
+      ],
+      "mustExcludeCapabilities": [
+        "external-business-capability",
+        "personnel",
+        "notification",
+        "job",
+        "app-phone"
+      ]
+    }
+  ]
+}

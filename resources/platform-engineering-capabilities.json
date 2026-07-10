@@ -1,0 +1,2575 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-engineering-capabilities.json",
+  "capturedAt": "2026-07-06",
+  "purpose": "Machine-checkable engineering capability coverage for the reusable platform foundation.",
+  "stack": {
+    "backend": [
+      "Gin",
+      "GORM",
+      "Casbin",
+      "JWT"
+    ],
+    "frontend": [
+      "Refine",
+      "React",
+      "Ant Design"
+    ]
+  },
+  "capabilities": [
+    {
+      "id": "dynamic-admin-resources",
+      "label": {
+        "zh": "动态后台资源",
+        "en": "Dynamic Admin Resources"
+      },
+      "status": "implemented",
+      "purpose": "Declare reusable admin resources once and generate menus, routes, permissions, schemas and Refine metadata from the same contract.",
+      "evidence": {
+        "sourcePaths": [
+          "resources/admin-resources.json",
+          "scripts/generate-admin-resource-contract.mjs",
+          "internal/platform/httpapi/server.go"
+        ],
+        "generatedFiles": [
+          "resources/generated/admin-resource-contract.json"
+        ],
+        "adminResources": [
+          "tenants",
+          "users",
+          "org-units",
+          "roles",
+          "role-groups",
+          "area-codes",
+          "permissions",
+          "menus"
+        ],
+        "adminOpenAPIPaths": [
+          "/api/admin/resources/tenants/query",
+          "/api/admin/resources/users/query"
+        ]
+      }
+    },
+    {
+      "id": "dynamic-menus",
+      "label": {
+        "zh": "动态菜单",
+        "en": "Dynamic Menus"
+      },
+      "status": "implemented",
+      "purpose": "Load menu entries from backend resources and filter them by current permissions.",
+      "dependsOn": [
+        "dynamic-admin-resources",
+        "permission-codes"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "internal/platform/adminresource/menu.go",
+          "internal/platform/httpapi/server.go",
+          "admin/src/platform/shell/AdminShell.tsx"
+        ],
+        "adminResources": [
+          "menus"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "internal/platform/httpapi/server.go",
+            "contains": "api.GET(\"/admin/menus\", s.adminMenus)"
+          },
+          {
+            "path": "admin/src/platform/shell/AdminShell.tsx",
+            "contains": "buildNavigationTree"
+          }
+        ]
+      }
+    },
+    {
+      "id": "permission-codes",
+      "label": {
+        "zh": "权限码",
+        "en": "Permission Codes"
+      },
+      "status": "implemented",
+      "purpose": "Use manifest-derived permission codes for backend authorization, menus and Refine access control.",
+      "evidence": {
+        "sourcePaths": [
+          "internal/platform/adminresource/permission.go",
+          "internal/platform/adminresource/authorization.go",
+          "admin/src/platform/refine/accessControlProvider.ts",
+          "admin/src/platform/refine/permissions.ts"
+        ],
+        "adminResources": [
+          "roles",
+          "role-groups",
+          "permissions"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "admin/src/platform/refine/permissions.ts",
+            "contains": "permissionForRefineAction"
+          },
+          {
+            "path": "internal/platform/httpapi/server.go",
+            "contains": "s.authorize(ctx"
+          }
+        ]
+      }
+    },
+    {
+      "id": "resource-schema-form-engine",
+      "label": {
+        "zh": "资源 Schema 与表单生成",
+        "en": "Resource Schema And Form Engine"
+      },
+      "status": "implemented",
+      "purpose": "Render list, search, filter, table, form, detail and relation controls from resource schemas.",
+      "dependsOn": [
+        "dynamic-admin-resources"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "internal/platform/adminresource/schema.go",
+          "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "admin/src/platform/ui/PlatformTreeSelect.tsx"
+        ],
+        "validators": [
+          "scripts/validate-admin-ui-contracts.mjs"
+        ],
+        "generatedFiles": [
+          "resources/generated/admin-codegen-preview.json"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+            "contains": "function FieldInput({ field, language, ...controlProps }"
+          },
+          {
+            "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+            "contains": "resourceFormSections"
+          }
+        ]
+      }
+    },
+    {
+      "id": "form-schema-layout-slot-gate",
+      "label": {
+        "zh": "表单布局与插槽门禁",
+        "en": "Form Layout And Slot Gate"
+      },
+      "status": "implemented",
+      "purpose": "Keep schema-driven form layout presets, controlled source-level React slots, controlled runtime slot descriptors and side-detail-preview machine-checkable behind product-design, i18n, UI contract, build and browser evidence gates.",
+      "dependsOn": [
+        "resource-schema-form-engine",
+        "task-dependency-governance"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-form-schema-layout-slots.json",
+          "scripts/validate-platform-form-schema-layout-slots.mjs",
+          "scripts/validate-admin-ui-contracts.mjs",
+          "resources/platform-foundation-task-graph.json",
+          "admin/src/platform/ui/PlatformResourceForm.tsx",
+          "admin/src/platform/ui/formSlotRegistry.tsx",
+          "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "internal/platform/adminresource/schema.go"
+        ],
+        "validators": [
+          "scripts/validate-platform-form-schema-layout-slots.mjs",
+          "scripts/validate-admin-ui-contracts.mjs",
+          "scripts/platform-form-schema-layout-slots.test.mjs"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "resources/platform-form-schema-layout-slots.json",
+            "contains": "\"runtimeSlots\": \"controlled\""
+          },
+          {
+            "path": "resources/platform-form-schema-layout-slots.json",
+            "contains": "\"sourceLevelReactSlots\": \"controlled\""
+          },
+          {
+            "path": "resources/platform-form-schema-layout-slots.json",
+            "contains": "\"arbitraryComponentInjection\": \"forbidden\""
+          },
+          {
+            "path": "admin/src/platform/ui/PlatformResourceForm.tsx",
+            "contains": "export function PlatformResourceForm"
+          },
+          {
+            "path": "admin/src/platform/ui/PlatformResourceForm.tsx",
+            "contains": "fieldControl?: (field: TField, defaultControl: ReactNode) => ReactNode"
+          },
+          {
+            "path": "resources/platform-form-schema-layout-slots.json",
+            "contains": "\"field.control\""
+          },
+          {
+            "path": "resources/platform-form-schema-layout-slots.json",
+            "contains": "\"product-design\""
+          },
+          {
+            "path": "scripts/validate-platform-form-schema-layout-slots.mjs",
+            "contains": "promotionState.runtimeSlots must be controlled"
+          },
+          {
+            "path": "scripts/validate-platform-form-schema-layout-slots.mjs",
+            "contains": "allowedSlotRegions.${id}.status must stay implemented"
+          },
+          {
+            "path": "resources/platform-foundation-task-graph.json",
+            "contains": "\"contractGateOnly\": false"
+          },
+          {
+            "path": "admin/src/platform/ui/formSlotRegistry.tsx",
+            "contains": "createAdminFormSlotRegistry"
+          },
+          {
+            "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+            "contains": "buildRuntimeFormSlots"
+          },
+          {
+            "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+            "contains": "function FieldInput({ field, language, ...controlProps }"
+          },
+          {
+            "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+            "contains": "<PlatformResourceForm"
+          },
+          {
+            "path": "internal/platform/adminresource/schema.go",
+            "contains": "FormGroups     []FormGroupDefinition"
+          }
+        ]
+      }
+    },
+    {
+      "id": "governance-org-area-role-groups",
+      "label": {
+        "zh": "组织、角色组与地址码治理",
+        "en": "Org, Role Group And Area Governance"
+      },
+      "status": "implemented",
+      "purpose": "Keep tenants, org units, users, role groups, roles and area codes as reusable governance primitives with schema relations, row-level data scopes and regression gates.",
+      "dependsOn": [
+        "dynamic-admin-resources",
+        "permission-codes",
+        "resource-schema-form-engine"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/admin-resources.json",
+          "resources/platform-governance-topology.json",
+          "internal/platform/adminresource/schema.go",
+          "internal/platform/adminresource/data_scope.go",
+          "docs/superpowers/specs/2026-07-06-platform-go-governance-boundary-design.md"
+        ],
+        "validators": [
+          "scripts/validate-admin-resources.mjs",
+          "scripts/validate-platform-governance-topology.mjs",
+          "scripts/validate-platform-foundation-task-graph.mjs"
+        ],
+        "adminResources": [
+          "tenants",
+          "org-units",
+          "users",
+          "role-groups",
+          "roles",
+          "area-codes"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "scripts/validate-admin-resources.mjs",
+            "contains": "tenants must declare areaCode relation to area-codes"
+          },
+          {
+            "path": "scripts/validate-admin-resources.mjs",
+            "contains": "org-units tenantCode must be required"
+          },
+          {
+            "path": "scripts/validate-admin-resources.mjs",
+            "contains": "requiredOrgUnitTypeOptions = [\"group\", \"company\", \"branch\", \"organization\", \"department\", \"team\", \"store\", \"custom\"]"
+          },
+          {
+            "path": "scripts/validate-admin-resources.mjs",
+            "contains": "users orgUnitCode must stay optional by default"
+          },
+          {
+            "path": "scripts/validate-admin-resources.mjs",
+            "contains": "role-groups must stay classification-only"
+          },
+          {
+            "path": "scripts/validate-admin-resources.mjs",
+            "contains": "\"country\", \"province\", \"city\", \"district\", \"street\", \"custom\""
+          },
+          {
+            "path": "scripts/validate-platform-governance-topology.mjs",
+            "contains": "must stay optional by default"
+          },
+          {
+            "path": "scripts/validate-platform-governance-topology.mjs",
+            "contains": "roleGroupPolicy.membershipOwner must stay users.roles"
+          },
+          {
+            "path": "scripts/validate-platform-governance-topology.mjs",
+            "contains": "areaCodePolicy.detailedAddressPolicy.defaultFoundation must stay excluded"
+          },
+          {
+            "path": "scripts/validate-platform-governance-topology.mjs",
+            "contains": "areaCodePolicy.detailedAddressPolicy.promotionRule must stay promote-only-after-two-reusable-capabilities"
+          },
+          {
+            "path": "scripts/validate-platform-governance-topology.mjs",
+            "contains": "defaultFoundation.mustExcludeResources must include detailed address resource ${resource}"
+          },
+          {
+            "path": "scripts/validate-platform-governance-topology.mjs",
+            "contains": "orgUnitPolicy.mode must stay single-tree"
+          },
+          {
+            "path": "scripts/validate-platform-governance-topology.mjs",
+            "contains": "orgUnitPolicy.requiredDefault must stay true"
+          },
+          {
+            "path": "scripts/validate-platform-governance-topology.mjs",
+            "contains": "defaultFoundation.mustIncludeResources must include ${resource}"
+          },
+          {
+            "path": "scripts/validate-platform-governance-topology.mjs",
+            "contains": "defaultFoundation.mustIncludeResources must not include optional personnel resource ${resource}"
+          },
+          {
+            "path": "scripts/validate-platform-governance-topology.mjs",
+            "contains": "profileRequirements.defaultMustExcludeCapabilities must include personnel"
+          },
+          {
+            "path": "scripts/validate-platform-governance-topology.mjs",
+            "contains": "governanceEvaluation.tenantOnlySupport.decision must stay rejected"
+          },
+          {
+            "path": "scripts/validate-platform-governance-topology.mjs",
+            "contains": "governanceEvaluation.roleGroups.decision must stay supported-as-classification"
+          },
+          {
+            "path": "scripts/validate-platform-governance-topology.mjs",
+            "contains": "governanceEvaluation.areaCodes.decision must stay supported-as-shared-master-data"
+          },
+          {
+            "path": "scripts/validate-platform-governance-topology.mjs",
+            "contains": "governanceEvaluation.personnel.decision must stay optional-capability"
+          },
+          {
+            "path": "scripts/validate-platform-governance-topology.mjs",
+            "contains": "validatePersonnelContract(topology, profiles, errors)"
+          },
+          {
+            "path": "resources/platform-governance-topology.json",
+            "contains": "\"implicitAuthorization\": false"
+          },
+          {
+            "path": "resources/platform-governance-topology.json",
+            "contains": "\"governanceEvaluation\""
+          },
+          {
+            "path": "resources/platform-governance-topology.json",
+            "contains": "\"decision\": \"rejected\""
+          },
+          {
+            "path": "resources/platform-governance-topology.json",
+            "contains": "\"decision\": \"supported-as-classification\""
+          },
+          {
+            "path": "resources/platform-governance-topology.json",
+            "contains": "\"decision\": \"supported-as-shared-master-data\""
+          },
+          {
+            "path": "resources/platform-governance-topology.json",
+            "contains": "\"decision\": \"optional-capability\""
+          },
+          {
+            "path": "resources/platform-governance-topology.json",
+            "contains": "\"membershipOwner\": \"users.roles\""
+          },
+          {
+            "path": "resources/platform-governance-topology.json",
+            "contains": "\"defaultFoundation\": \"excluded\""
+          },
+          {
+            "path": "resources/platform-governance-topology.json",
+            "contains": "\"promotionRule\": \"promote-only-after-two-reusable-capabilities\""
+          },
+          {
+            "path": "resources/platform-governance-topology.json",
+            "contains": "\"user-addresses\""
+          },
+          {
+            "path": "resources/platform-governance-topology.json",
+            "contains": "\"resource\": \"personnel-profiles\""
+          },
+          {
+            "path": "resources/platform-governance-topology.json",
+            "contains": "\"mode\": \"single-tree\""
+          },
+          {
+            "path": "resources/platform-governance-topology.json",
+            "contains": "\"levels\": [\"group\", \"company\", \"branch\", \"organization\", \"department\", \"team\", \"store\", \"custom\"]"
+          },
+          {
+            "path": "scripts/validate-platform-capability-profiles.mjs",
+            "contains": "must declare ${label} resource ${resource} in mustIncludeResources"
+          },
+          {
+            "path": "scripts/validate-platform-capability-profiles.mjs",
+            "contains": "[\"personnel-profiles\", \"positions\", \"position-assignments\", \"tenants\", \"org-units\", \"area-codes\", \"users\"]"
+          },
+          {
+            "path": "internal/platform/adminresource/store_test.go",
+            "contains": "TestPersonnelCapabilityReusesGovernanceRelations"
+          },
+          {
+            "path": "internal/platform/adminresource/data_scope.go",
+            "contains": "areaCodeAndDescendantCodesLocked"
+          }
+        ]
+      }
+    },
+    {
+      "id": "capability-contract-governance",
+      "label": {
+        "zh": "能力契约治理",
+        "en": "Capability Contract Governance"
+      },
+      "status": "implemented",
+      "purpose": "Classify every built-in, optional and external business capability as a plugin-style governance contract without bloating the runtime Manifest struct.",
+      "dependsOn": [
+        "governance-org-area-role-groups",
+        "dynamic-admin-resources"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-capability-contracts.json",
+          "resources/platform-capability-profiles.json",
+          "internal/platform/core/capabilities.go"
+        ],
+        "validators": [
+          "scripts/validate-platform-capability-contracts.mjs"
+        ],
+        "tests": [
+          "scripts/platform-capability-contracts.test.mjs"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "resources/platform-capability-contracts.json",
+            "contains": "\"profilePolicy\": \"business-external-only\""
+          },
+          {
+            "path": "resources/platform-capability-contracts.json",
+            "contains": "\"profilePolicy\": \"profile-only\""
+          },
+          {
+            "path": "scripts/validate-platform-capability-contracts.mjs",
+            "contains": "appears in profiles but is missing from platform capability contracts"
+          },
+          {
+            "path": "scripts/validate-platform-capability-contracts.mjs",
+            "contains": "must match capability audit output"
+          }
+        ]
+      }
+    },
+    {
+      "id": "capability-profile-composition-gate",
+      "label": {
+        "zh": "能力组合 Profile 门禁",
+        "en": "Capability Profile Composition Gate"
+      },
+      "status": "implemented",
+      "purpose": "Keep reusable capability compositions machine-checkable so deployments can enable minimal, default, app-ready, enterprise-governance or business-reference profiles without leaking optional governance or business modules into the platform default.",
+      "dependsOn": [
+        "dynamic-admin-resources",
+        "governance-org-area-role-groups"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-capability-profiles.json",
+          "scripts/validate-platform-capability-profiles.mjs",
+          "internal/platform/config/config.go",
+          "cmd/platform-contracts/main.go"
+        ],
+        "validators": [
+          "scripts/validate-platform-capability-profiles.mjs",
+          "scripts/platform-capability-profiles.test.mjs"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "resources/platform-capability-profiles.json",
+            "contains": "external-business-capability"
+          },
+          {
+            "path": "resources/platform-capability-profiles.json",
+            "contains": "\"enterprise-governance\""
+          },
+          {
+            "path": "scripts/platform-capability-profiles.test.mjs",
+            "contains": "keeps policy review as an optional enterprise governance profile"
+          },
+          {
+            "path": "scripts/validate-platform-capability-profiles.mjs",
+            "contains": "profile ${profile.id} failed capability audit"
+          },
+          {
+            "path": "scripts/validate-platform-capability-profiles.mjs",
+            "contains": "requiresAdditionalManifests"
+          },
+          {
+            "path": "scripts/validate-platform-capability-profiles.mjs",
+            "contains": "is not registered in internal/apps/manifests.go"
+          },
+          {
+            "path": "internal/platform/config/config.go",
+            "contains": "var defaultCapabilities"
+          }
+        ]
+      }
+    },
+    {
+      "id": "personnel-runtime-readiness",
+      "label": {
+        "zh": "人员与岗位可选运行门禁",
+        "en": "Personnel Optional Runtime Readiness"
+      },
+      "status": "implemented",
+      "purpose": "Prove the optional personnel capability stays out of the default runtime while platform-personnel-ready produces admin resources, permissions, frontend entries and OpenAPI schemas for personnel profiles, positions and position assignments.",
+      "dependsOn": [
+        "capability-profile-composition-gate",
+        "governance-org-area-role-groups",
+        "openapi-api-docs"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-capability-profiles.json",
+          "internal/platform/core/capabilities.go",
+          "resources/platform-governance-topology.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-personnel-runtime-readiness.mjs"
+        ],
+        "tests": [
+          "scripts/platform-personnel-runtime-readiness.test.mjs"
+        ],
+        "adminResources": [
+          "tenants",
+          "org-units",
+          "users",
+          "area-codes"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "scripts/validate-platform-personnel-runtime-readiness.mjs",
+            "contains": "default admin contract must not include optional personnel resource ${resource}"
+          },
+          {
+            "path": "scripts/validate-platform-personnel-runtime-readiness.mjs",
+            "contains": "default capability audit must not enable personnel"
+          },
+          {
+            "path": "scripts/validate-platform-personnel-runtime-readiness.mjs",
+            "contains": "personnel contract frontend must include ${resource}"
+          },
+          {
+            "path": "scripts/validate-platform-personnel-runtime-readiness.mjs",
+            "contains": "personnel OpenAPI must include path ${openAPIPath}"
+          },
+          {
+            "path": "scripts/platform-personnel-runtime-readiness.test.mjs",
+            "contains": "rejects personnel-enabled contracts without OpenAPI, frontend or permission coverage"
+          }
+        ]
+      }
+    },
+    {
+      "id": "openapi-api-docs",
+      "label": {
+        "zh": "Swagger/API 文档",
+        "en": "Swagger/API Docs"
+      },
+      "status": "implemented",
+      "purpose": "Generate admin and app OpenAPI contracts and serve the admin document behind a permission-checked route.",
+      "dependsOn": [
+        "dynamic-admin-resources",
+        "permission-codes"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "scripts/generate-admin-openapi.mjs",
+          "scripts/generate-app-openapi.mjs",
+          "admin/src/platform/api-docs/APIDocsPage.tsx",
+          "internal/platform/httpapi/server.go"
+        ],
+        "generatedFiles": [
+          "resources/generated/openapi.admin.json",
+          "resources/generated/openapi.app.json"
+        ],
+        "adminResources": [
+          "api-docs",
+          "api-resources"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "internal/platform/httpapi/server.go",
+            "contains": "api.GET(\"/openapi.json\", s.openapi)"
+          },
+          {
+            "path": "internal/platform/httpapi/server.go",
+            "contains": "admin:api-docs:read"
+          }
+        ]
+      }
+    },
+    {
+      "id": "admin-api-boundary-query-security",
+      "label": {
+        "zh": "后台 API 边界与查询安全",
+        "en": "Admin API Boundary And Query Security"
+      },
+      "status": "implemented",
+      "purpose": "Keep admin requests behind the platform API client and keep list queries as structured, schema-whitelisted POST payloads instead of raw SQL or query-string filters.",
+      "dependsOn": [
+        "dynamic-admin-resources",
+        "openapi-api-docs",
+        "resource-schema-form-engine"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-admin-api-boundary.json",
+          "admin/src/platform/api/client.ts",
+          "admin/src/platform/refine/dataProvider.ts",
+          "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "internal/platform/adminresource/query.go"
+        ],
+        "validators": [
+          "scripts/validate-platform-admin-api-boundary.mjs"
+        ],
+        "tests": [
+          "scripts/platform-admin-api-boundary.test.mjs",
+          "internal/platform/adminresource/store_test.go",
+          "internal/platform/httpapi/server_test.go"
+        ],
+        "adminOpenAPIPaths": [
+          "/api/admin/resources/tenants/query"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "resources/platform-admin-api-boundary.json",
+            "contains": "\"promotionDecision\": \"foundation-gate\""
+          },
+          {
+            "path": "scripts/validate-platform-admin-api-boundary.mjs",
+            "contains": "calls fetch() outside the platform API client"
+          },
+          {
+            "path": "scripts/validate-platform-admin-api-boundary.mjs",
+            "contains": "AdminQueryRequest must document that raw input is never concatenated into SQL"
+          },
+          {
+            "path": "admin/src/platform/api/client.ts",
+            "contains": "export function queryAdminResource"
+          },
+          {
+            "path": "admin/src/platform/refine/dataProvider.ts",
+            "contains": "meta?.conditions"
+          },
+          {
+            "path": "internal/platform/adminresource/query.go",
+            "contains": "sensitive field cannot be queried"
+          },
+          {
+            "path": "internal/platform/adminresource/query.go",
+            "contains": "query field is not declared by resource schema"
+          },
+          {
+            "path": "internal/platform/adminresource/store_test.go",
+            "contains": "TestStoreQueryTreatsSQLLikeValuesAsLiterals"
+          },
+          {
+            "path": "internal/platform/httpapi/server_test.go",
+            "contains": "TestAdminResourceQueryEndpointRejectsUnsafeField"
+          }
+        ]
+      }
+    },
+    {
+      "id": "safe-codegen-scaffold",
+      "label": {
+        "zh": "代码生成器安全预览",
+        "en": "Safe Codegen Scaffold"
+      },
+      "status": "implemented",
+      "purpose": "Produce codegen previews, generated scaffold drafts and non-mutating promotion review packets as an implemented safe scaffold; runtime source writing remains disabled until source-writing is explicitly designed and approved.",
+      "dependsOn": [
+        "dynamic-admin-resources",
+        "resource-schema-form-engine"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "scripts/generate-admin-codegen-preview.mjs",
+          "scripts/generate-admin-scaffold-plan.mjs",
+          "scripts/generate-admin-scaffold-files.mjs",
+          "scripts/generate-admin-scaffold-draft.mjs",
+          "scripts/generate-admin-scaffold-promotion-review.mjs"
+        ],
+        "generatedFiles": [
+          "resources/generated/admin-codegen-preview.json",
+          "resources/generated/admin-scaffold-plan.json",
+          "resources/generated/admin-scaffold-files.json",
+          "resources/generated/admin-scaffold-draft.md",
+          "resources/generated/admin-scaffold-promotion-review.json"
+        ],
+        "validators": [
+          "scripts/admin-scaffold-plan.test.mjs"
+        ],
+        "scaffoldPlan": {
+          "sourceWriting": "disabled",
+          "dryRun": true,
+          "allowedWriteRoots": [
+            "resources/generated/scaffold/"
+          ],
+          "conflictCount": 0,
+          "unsafePathCount": 0
+        }
+      }
+    },
+    {
+      "id": "codegen-source-writing-readiness",
+      "label": {
+        "zh": "源码生成准入门禁",
+        "en": "Source-Writing Codegen Readiness"
+      },
+      "status": "implemented",
+      "purpose": "Keep future source-writing generation behind explicit spec, platform/codegen/runtime/operations approvals, completed-evidence artifact schema, diff review, scaffold promotion review, target-family test mapping and scaffold safety gates while the current generator remains dry-run only.",
+      "dependsOn": [
+        "safe-codegen-scaffold",
+        "task-dependency-governance"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-codegen-source-writing-readiness.json",
+          "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+          "scripts/generate-admin-scaffold-promotion-review.mjs"
+        ],
+        "generatedFiles": [
+          "resources/generated/admin-scaffold-promotion-review.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+          "scripts/platform-codegen-source-writing-readiness.test.mjs"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "resources/platform-codegen-source-writing-readiness.json",
+            "contains": "\"sourceWriting\": \"disabled\""
+          },
+          {
+            "path": "resources/platform-codegen-source-writing-readiness.json",
+            "contains": "\"targetFamilies\""
+          },
+          {
+            "path": "resources/platform-codegen-source-writing-readiness.json",
+            "contains": "\"runtimeTargetPolicy\""
+          },
+          {
+            "path": "resources/platform-codegen-source-writing-readiness.json",
+            "contains": "\"requires-separate-architecture-spec\""
+          },
+          {
+            "path": "resources/platform-codegen-source-writing-readiness.json",
+            "contains": "\"backend-models\""
+          },
+          {
+            "path": "resources/platform-codegen-source-writing-readiness.json",
+            "contains": "\"resources/generated/admin-scaffold-promotion-review.json\""
+          },
+          {
+            "path": "resources/platform-codegen-source-writing-readiness.json",
+            "contains": "\"operations-owner\""
+          },
+          {
+            "path": "resources/platform-codegen-source-writing-readiness.json",
+            "contains": "\"completedEvidenceSchema\""
+          },
+          {
+            "path": "resources/platform-codegen-source-writing-readiness.json",
+            "contains": "\"artifactHashPolicy\""
+          },
+          {
+            "path": "resources/platform-codegen-source-writing-readiness.json",
+            "contains": "\"artifactURIPolicy\""
+          },
+          {
+            "path": "resources/generated/admin-scaffold-promotion-review.json",
+            "contains": "\"runtimeTargetPolicy\""
+          },
+          {
+            "path": "resources/generated/admin-scaffold-promotion-review.json",
+            "contains": "\"operations-owner\""
+          },
+          {
+            "path": "resources/generated/admin-scaffold-promotion-review.json",
+            "contains": "\"completedEvidenceSchema\""
+          },
+          {
+            "path": "resources/generated/admin-scaffold-promotion-review.json",
+            "contains": "\"artifactHashPolicy\""
+          },
+          {
+            "path": "resources/generated/admin-scaffold-promotion-review.json",
+            "contains": "\"artifactURIPolicy\""
+          },
+          {
+            "path": "resources/generated/admin-scaffold-promotion-review.json",
+            "contains": "\"promotion\": \"manual-review-required\""
+          },
+          {
+            "path": "resources/generated/admin-scaffold-promotion-review.json",
+            "contains": "\"decision\": \"not-approved\""
+          },
+          {
+            "path": "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+            "contains": "targetFamilies must not be empty"
+          },
+          {
+            "path": "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+            "contains": "runtimeTargetPolicy.mode must be explicit-root-registry"
+          },
+          {
+            "path": "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+            "contains": "must be declared in runtimeTargetPolicy.roots"
+          },
+          {
+            "path": "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+            "contains": "references unknown scaffold role"
+          },
+          {
+            "path": "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+            "contains": "admin scaffold promotion review must remain not-approved"
+          },
+          {
+            "path": "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+            "contains": "mode.sourceWriting disabled"
+          },
+          {
+            "path": "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+            "contains": "sourceWritingApprovalPackage.completedEvidenceSchema.requiredFields"
+          },
+          {
+            "path": "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+            "contains": "artifactHashPolicy.algorithm must be sha256"
+          },
+          {
+            "path": "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+            "contains": "artifactURIPolicy.sourceOfTruth must be external-review-artifacts"
+          },
+          {
+            "path": "scripts/platform-codegen-source-writing-readiness.test.mjs",
+            "contains": "rejects source-writing approval packages without a completed evidence artifact schema"
+          },
+          {
+            "path": "scripts/platform-codegen-source-writing-readiness.test.mjs",
+            "contains": "rejects source-writing approval packages without a strong artifact hash policy"
+          },
+          {
+            "path": "scripts/platform-codegen-source-writing-readiness.test.mjs",
+            "contains": "rejects source-writing approval packages without an external artifact URI policy"
+          }
+        ]
+      }
+    },
+    {
+      "id": "system-management",
+      "label": {
+        "zh": "基础系统管理",
+        "en": "Base System Management"
+      },
+      "status": "implemented",
+      "purpose": "Provide standard system management resources for identity, RBAC, menus, audit, configuration, versions, files, sessions, monitoring and API tokens.",
+      "dependsOn": [
+        "dynamic-admin-resources",
+        "permission-codes"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "internal/platform/core/capabilities.go",
+          "resources/admin-resources.json"
+        ],
+        "adminResources": [
+          "tenants",
+          "users",
+          "org-units",
+          "roles",
+          "role-groups",
+          "permissions",
+          "menus",
+          "api-resources",
+          "api-docs",
+          "audit-logs",
+          "login-logs",
+          "error-logs",
+          "dictionaries",
+          "dictionary-parameters",
+          "area-codes",
+          "parameters",
+          "branding",
+          "settings",
+          "files",
+          "sessions",
+          "versions",
+          "api-tokens"
+        ]
+      }
+    },
+    {
+      "id": "file-operation-audit-contract",
+      "label": {
+        "zh": "文件操作审计契约",
+        "en": "File Operation Audit Contract"
+      },
+      "status": "implemented",
+      "purpose": "Record successful upload, content-read and delete operations for file resources through the shared audit-log resource while avoiding success audits for failed object deletions.",
+      "dependsOn": [
+        "system-management",
+        "permission-codes"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "internal/platform/httpapi/server.go",
+          "resources/admin-resources.json"
+        ],
+        "tests": [
+          "internal/platform/httpapi/server_test.go"
+        ],
+        "adminResources": [
+          "files",
+          "audit-logs"
+        ],
+        "adminOpenAPIPaths": [
+          "/api/admin/files/upload",
+          "/api/admin/files/{id}/content",
+          "/api/admin/resources/files/{id}"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "internal/platform/httpapi/server.go",
+            "contains": "if err := s.recordFileAudit(ctx, \"file.upload\", record); err != nil"
+          },
+          {
+            "path": "internal/platform/httpapi/server.go",
+            "contains": "if err := s.recordFileAudit(ctx, \"file.content\", record); err != nil"
+          },
+          {
+            "path": "internal/platform/httpapi/server.go",
+            "contains": "if err := s.recordFileAudit(ctx, \"file.delete\", record); err != nil"
+          },
+          {
+            "path": "internal/platform/httpapi/server.go",
+            "contains": "func (s *Server) recordFileAudit(ctx *gin.Context, action string, record adminresource.Record) error"
+          },
+          {
+            "path": "internal/platform/httpapi/server_test.go",
+            "contains": "TestAdminFileDeleteDoesNotAuditFailedObjectDeletion"
+          },
+          {
+            "path": "internal/platform/httpapi/server_test.go",
+            "contains": "file.delete"
+          }
+        ]
+      }
+    },
+    {
+      "id": "file-storage-admin-experience",
+      "label": {
+        "zh": "文件存储后台体验",
+        "en": "File Storage Admin Experience"
+      },
+      "status": "implemented",
+      "purpose": "Provide the files generic resource console extension for upload, authenticated preview, download, metadata inspection, audit visualization and mobile file cards without changing the object-store port or creating a standalone file manager.",
+      "dependsOn": [
+        "file-operation-audit-contract",
+        "resource-schema-form-engine",
+        "dynamic-menus"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "admin/src/platform/api/client.ts",
+          "admin/src/platform/refine/ResourceRoutePage.tsx",
+          "admin/src/styles.css",
+          "resources/platform-file-storage-experience.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-file-storage-experience.mjs",
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs"
+        ],
+        "tests": [
+          "scripts/platform-file-storage-experience.test.mjs"
+        ],
+        "checks": [
+          "rtk npm --prefix admin run build"
+        ],
+        "screenshots": [
+          "tmp/product-design/file-storage-experience-20260707/01-files-preview-drawer-desktop-1440x1024.png",
+          "tmp/product-design/file-storage-experience-20260707/02-files-audit-drawer-desktop-1440x1024.png",
+          "tmp/product-design/file-storage-experience-20260707/03-files-mobile-card-pagination-390x844.png",
+          "tmp/product-design/file-storage-experience-20260707/04-files-mobile-preview-drawer-390x844.png"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+            "contains": "function FileResourceInspector"
+          },
+          {
+            "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+            "contains": "uploadAdminFile(file)"
+          },
+          {
+            "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+            "contains": "getAdminFileBlob(record.id)"
+          },
+          {
+            "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+            "contains": "availableResourceRoutes.includes(\"/audit-logs\")"
+          },
+          {
+            "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+            "contains": "function FileExpectedAuditEvents"
+          },
+          {
+            "path": "admin/src/platform/api/client.ts",
+            "contains": "export async function uploadAdminFile(file: File)"
+          },
+          {
+            "path": "admin/src/platform/refine/ResourceRoutePage.tsx",
+            "contains": "availableResourceRoutes={availableResourceRoutes}"
+          },
+          {
+            "path": "resources/platform-file-storage-experience.json",
+            "contains": "\"implementationStatus\": \"implemented\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "app-route-contracts",
+      "label": {
+        "zh": "App 动态路由契约",
+        "en": "App Route Contracts"
+      },
+      "status": "implemented",
+      "purpose": "Declare business-facing app routes in capability manifests and wrap session routes with app-token authorization.",
+      "dependsOn": [
+        "permission-codes"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "internal/platform/capability/app_contract.go",
+          "internal/platform/approute/registration.go",
+          "internal/platform/httpapi/app_routes.go",
+          "cmd/platform-api/main.go",
+          "scripts/generate-app-openapi.mjs",
+          "scripts/generate-app-codegen-preview.mjs"
+        ],
+        "generatedFiles": [
+          "resources/generated/app-route-contract.json",
+          "resources/generated/openapi.app.json",
+          "resources/generated/app-codegen-preview.json"
+        ],
+        "appOpenAPIPaths": [
+          "/api/app/auth/login",
+          "/api/app/session/current"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "internal/platform/approute/registration.go",
+            "contains": "type Registration struct"
+          },
+          {
+            "path": "internal/platform/httpapi/app_routes.go",
+            "contains": "registerManifestAppRoutes"
+          },
+          {
+            "path": "internal/platform/httpapi/app_routes.go",
+            "contains": "withAppRoutePolicy"
+          },
+          {
+            "path": "cmd/platform-api/main.go",
+            "contains": "apps.DefaultAppRoutes(resources)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "app-client-api-boundary",
+      "label": {
+        "zh": "App 客户端 API 边界",
+        "en": "App Client API Boundary"
+      },
+      "status": "implemented",
+      "purpose": "Keep downstream App, H5 and mini-program clients behind generated App clients or platform request/upload ports so business pages cannot hand-write request, upload or Authorization wiring.",
+      "dependsOn": [
+        "app-route-contracts",
+        "admin-api-boundary-query-security"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-app-client-api-boundary.json",
+          "scripts/generate-app-codegen-preview.mjs",
+          "docs/platform-capability-development.md",
+          "docs/platform-foundation-task-map.md",
+          "docs/platform-roadmap.md"
+        ],
+        "generatedFiles": [
+          "resources/generated/app-route-contract.json",
+          "resources/generated/openapi.app.json",
+          "resources/generated/app-codegen-preview.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-app-client-api-boundary.mjs"
+        ],
+        "tests": [
+          "scripts/platform-app-client-api-boundary.test.mjs"
+        ],
+        "appOpenAPIPaths": [
+          "/api/app/auth/login",
+          "/api/app/session/current"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "resources/platform-app-client-api-boundary.json",
+            "contains": "\"promotionDecision\": \"foundation-gate\""
+          },
+          {
+            "path": "resources/platform-app-client-api-boundary.json",
+            "contains": "\"generatedClientBoundary\": \"future-app/src/platform/api/appClient.ts\""
+          },
+          {
+            "path": "scripts/validate-platform-app-client-api-boundary.mjs",
+            "contains": "forbiddenPageLevelPatterns"
+          },
+          {
+            "path": "resources/generated/app-codegen-preview.json",
+            "contains": "Generated clients must stay behind the app API boundary"
+          },
+          {
+            "path": "resources/generated/openapi.app.json",
+            "contains": "\"description\": \"App bearer token with tokenType=app.\""
+          },
+          {
+            "path": "docs/platform-capability-development.md",
+            "contains": "App client API boundary"
+          }
+        ]
+      }
+    },
+    {
+      "id": "production-runtime-gate",
+      "label": {
+        "zh": "生产运行门禁",
+        "en": "Production Runtime Gate"
+      },
+      "status": "implemented",
+      "purpose": "Validate runtime configuration before API startup so production deployments cannot use development secrets, memory-only stores or missing Redis invalidation by accident.",
+      "dependsOn": [
+        "system-management",
+        "runtime-cache-invalidation"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "internal/platform/config/config.go",
+          "cmd/platform-api/main.go",
+          "README.md",
+          "docs/platform-capability-development.md"
+        ],
+        "validators": [
+          "internal/platform/config/config_test.go"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "internal/platform/config/config.go",
+            "contains": "func (c Config) ValidateRuntime() error"
+          },
+          {
+            "path": "internal/platform/config/config.go",
+            "contains": "production runtime requires PLATFORM_CACHE_DRIVER=redis"
+          },
+          {
+            "path": "cmd/platform-api/main.go",
+            "contains": "cfg.ValidateRuntime()"
+          }
+        ]
+      }
+    },
+    {
+      "id": "production-readiness-preflight",
+      "label": {
+        "zh": "生产就绪预检",
+        "en": "Production Readiness Preflight"
+      },
+      "status": "implemented",
+      "purpose": "Keep production runtime environment variables, documentation, validation tests, preflight commands and non-mutating operations plans aligned before deployment.",
+      "dependsOn": [
+        "production-runtime-gate",
+        "production-auth-hardening-gate",
+        "runtime-cache-invalidation"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-production-readiness.json",
+          "scripts/run-platform-production-preflight.mjs",
+          "scripts/validate-platform-production-readiness.mjs",
+          "scripts/generate-platform-operations-plan.mjs",
+          "README.md",
+          "docs/platform-deployment.md",
+          "docs/platform-capability-development.md",
+          "scripts/validate-platform-production-env.mjs",
+          "deploy/env/production.example.env"
+        ],
+        "generatedFiles": [
+          "resources/generated/platform-operations-plan.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-production-readiness.mjs",
+          "scripts/platform-production-readiness.test.mjs",
+          "scripts/platform-production-preflight-runner.test.mjs",
+          "scripts/platform-operations-plan.test.mjs"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "resources/platform-production-readiness.json",
+            "contains": "\"PLATFORM_RUNTIME_ENV\""
+          },
+          {
+            "path": "resources/platform-production-readiness.json",
+            "contains": "\"operationPolicies\""
+          },
+          {
+            "path": "resources/platform-production-readiness.json",
+            "contains": "\"platform-operations-plan\""
+          },
+          {
+            "path": "resources/platform-production-readiness.json",
+            "contains": "\"preflightRunner\""
+          },
+          {
+            "path": "resources/platform-production-readiness.json",
+            "contains": "\"config-import-restore\""
+          },
+          {
+            "path": "resources/platform-production-readiness.json",
+            "contains": "\"production-auth-hardening\""
+          },
+          {
+            "path": "resources/generated/platform-operations-plan.json",
+            "contains": "\"productionAuthHardeningSource\": \"resources/platform-production-auth-hardening.json\""
+          },
+          {
+            "path": "resources/generated/platform-operations-plan.json",
+            "contains": "\"providerPromotionMatrix\""
+          },
+          {
+            "path": "resources/generated/platform-operations-plan.json",
+            "contains": "\"preflightRunner\""
+          },
+          {
+            "path": "resources/platform-production-readiness.json",
+            "contains": "\"governance-topology\""
+          },
+          {
+            "path": "resources/platform-production-readiness.json",
+            "contains": "\"form-schema-layout-slots\""
+          },
+          {
+            "path": "scripts/validate-platform-production-readiness.mjs",
+            "contains": "is not read by config.Load"
+          },
+          {
+            "path": "scripts/validate-platform-production-readiness.mjs",
+            "contains": "missing required preflight command"
+          },
+          {
+            "path": "scripts/validate-platform-production-readiness.mjs",
+            "contains": "missing required operation policy"
+          },
+          {
+            "path": "scripts/validate-platform-production-readiness.mjs",
+            "contains": "platform operations plan must keep runtimeMutation disabled"
+          },
+          {
+            "path": "scripts/validate-platform-production-readiness.mjs",
+            "contains": "validatePreflightRunner(readiness, errors)"
+          },
+          {
+            "path": "scripts/validate-platform-production-readiness.mjs",
+            "contains": "validateProviderPromotionPlan(plan, productionAuth, errors)"
+          },
+          {
+            "path": "scripts/run-platform-production-preflight.mjs",
+            "contains": "Unknown preflight policy"
+          },
+          {
+            "path": "scripts/run-platform-production-preflight.mjs",
+            "contains": "--strict-env-file"
+          },
+          {
+            "path": "scripts/generate-platform-operations-plan.mjs",
+            "contains": "runtimeMutation: \"disabled\""
+          },
+          {
+            "path": "scripts/generate-platform-operations-plan.mjs",
+            "contains": "preflightRunner: readiness.preflightRunner"
+          },
+          {
+            "path": "scripts/generate-platform-operations-plan.mjs",
+            "contains": "providerPromotionMatrix"
+          },
+          {
+            "path": "scripts/platform-production-preflight-runner.test.mjs",
+            "contains": "does not execute selected commands unless --run is explicit"
+          },
+          {
+            "path": "scripts/platform-operations-plan.test.mjs",
+            "contains": "rejects operations plans that weaken provider promotion controls"
+          },
+          {
+            "path": "README.md",
+            "contains": "Production baseline: set `PLATFORM_RUNTIME_ENV=production`"
+          },
+          {
+            "path": "README.md",
+            "contains": "scripts/run-platform-production-preflight.mjs --list"
+          },
+          {
+            "path": "docs/platform-deployment.md",
+            "contains": "scripts/run-platform-production-preflight.mjs --policy database-migration"
+          },
+          {
+            "path": "resources/platform-production-readiness.json",
+            "contains": "\"production-env-audit\""
+          },
+          {
+            "path": "resources/platform-production-readiness.json",
+            "contains": "\"productionEnvAudit\""
+          },
+          {
+            "path": "scripts/validate-platform-production-readiness.mjs",
+            "contains": "productionEnvAudit.strictCommand must include --strict-secrets"
+          },
+          {
+            "path": "scripts/validate-platform-production-env.mjs",
+            "contains": "PLATFORM_CAPABILITIES must not include demo-data in production"
+          },
+          {
+            "path": "scripts/platform-production-env.test.mjs",
+            "contains": "rejects the standard template when strict secret checks are enabled"
+          },
+          {
+            "path": "resources/generated/platform-operations-plan.json",
+            "contains": "\"production-env-audit\""
+          }
+        ],
+        "tests": [
+          "scripts/platform-production-env.test.mjs",
+          "scripts/platform-production-preflight-runner.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "production-auth-hardening-gate",
+      "label": {
+        "zh": "生产认证硬化门禁",
+        "en": "Production Auth Hardening Gate"
+      },
+      "status": "implemented",
+      "purpose": "Keep JWT session renewal, provider adapter controls, credential rotation and the implemented-disabled refresh-token-family runtime slice machine-checkable without enabling token-family behavior by default.",
+      "dependsOn": [
+        "production-runtime-gate",
+        "app-route-contracts",
+        "runtime-cache-invalidation"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-production-auth-hardening.json",
+          "scripts/generate-production-auth-promotion-review.mjs",
+          "docs/platform-auth.md",
+          "docs/platform-foundation-task-map.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-capability-development.md"
+        ],
+        "generatedFiles": [
+          "resources/generated/production-auth-promotion-review.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-production-auth-hardening.mjs"
+        ],
+        "tests": [
+          "scripts/platform-production-auth-hardening.test.mjs",
+          "scripts/platform-production-readiness.test.mjs",
+          "scripts/platform-operations-plan.test.mjs"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"refreshTokenFamily\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"status\": \"implemented-disabled\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"defaultRuntime\": \"disabled\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"secret-rotation-plan\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"raw-provider-subject-never-in-audit\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"providerRuntimePolicy\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"providerPromotionMatrix\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"manifestCoverage\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"completedEvidenceSchema\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"refreshTokenFamilyTestRefs\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"providerIds\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"providerControls\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"runtimeTestRefs\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"artifactHashPolicy\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"artifactURIPolicy\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"productionUsage\": \"local-harness-only\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"productionUsage\": \"optional-production-provider\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"defaultDenyUnconfiguredProviders\": true"
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"productionForbiddenCapabilities\": [\"demo-data\"]"
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"rawSubjectStorage\": \"hash-and-mask-only\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"token-rotation\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"promotionReview\""
+          },
+          {
+            "path": "resources/platform-production-readiness.json",
+            "contains": "\"production-auth-promotion-review\""
+          },
+          {
+            "path": "internal/platform/config/config.go",
+            "contains": "production runtime must not enable demo-data capability"
+          },
+          {
+            "path": "scripts/validate-platform-production-auth-hardening.mjs",
+            "contains": "refreshTokenFamily status must stay implemented-disabled"
+          },
+          {
+            "path": "internal/platform/refreshtoken/store.go",
+            "contains": "ErrRefreshTokenReuseDetected"
+          },
+          {
+            "path": "internal/platform/refreshtoken/gorm_repository.go",
+            "contains": "platform_refresh_token_families"
+          },
+          {
+            "path": "internal/platform/refreshtoken/store_test.go",
+            "contains": "TestStoreRotatesRefreshTokenAndDetectsReuse"
+          },
+          {
+            "path": "scripts/validate-platform-production-auth-hardening.mjs",
+            "contains": "providerRuntimePolicy.defaultDenyUnconfiguredProviders must stay true"
+          },
+          {
+            "path": "scripts/validate-platform-production-auth-hardening.mjs",
+            "contains": "providerRuntimePolicy.productionForbiddenCapabilities"
+          },
+          {
+            "path": "scripts/validate-platform-production-auth-hardening.mjs",
+            "contains": "\"providerRuntimePolicy.requiredTests\""
+          },
+          {
+            "path": "scripts/validate-platform-production-auth-hardening.mjs",
+            "contains": "validateProviderPromotionMatrix(contract, capabilityAudit, errors)"
+          },
+          {
+            "path": "scripts/validate-platform-production-auth-hardening.mjs",
+            "contains": "providerPromotionMatrix must include manifest-declared provider"
+          },
+          {
+            "path": "scripts/validate-platform-production-auth-hardening.mjs",
+            "contains": "refresh-token-family-tests-required-before-runtime-mutation"
+          },
+          {
+            "path": "scripts/validate-platform-production-auth-hardening.mjs",
+            "contains": "validateProductionPromotionReview"
+          },
+          {
+            "path": "scripts/validate-platform-production-auth-hardening.mjs",
+            "contains": "artifactHashPolicy.algorithm must be sha256"
+          },
+          {
+            "path": "scripts/validate-platform-production-auth-hardening.mjs",
+            "contains": "artifactURIPolicy.sourceOfTruth must be external-review-artifacts"
+          },
+          {
+            "path": "scripts/generate-production-auth-promotion-review.mjs",
+            "contains": "manualReview"
+          },
+          {
+            "path": "scripts/generate-production-auth-promotion-review.mjs",
+            "contains": "production approval package is blocked"
+          },
+          {
+            "path": "scripts/generate-platform-operations-plan.mjs",
+            "contains": "completedEvidenceSchema"
+          },
+          {
+            "path": "scripts/generate-platform-operations-plan.mjs",
+            "contains": "artifactURIPolicy"
+          },
+          {
+            "path": "scripts/validate-platform-production-readiness.mjs",
+            "contains": "productionPromotionApprovalPackage.completedEvidenceSchema.${field}"
+          },
+          {
+            "path": "scripts/validate-platform-production-readiness.mjs",
+            "contains": "completedEvidenceSchema.artifactURIPolicy must match production auth hardening contract"
+          },
+          {
+            "path": "scripts/platform-production-auth-hardening.test.mjs",
+            "contains": "rejects provider promotion matrices that drop wechat production controls"
+          },
+          {
+            "path": "scripts/platform-operations-plan.test.mjs",
+            "contains": "rejects operations plans that drop production auth completed evidence schema"
+          },
+          {
+            "path": "resources/generated/platform-operations-plan.json",
+            "contains": "\"completedEvidenceSchema\""
+          },
+          {
+            "path": "resources/generated/production-auth-promotion-review.json",
+            "contains": "\"decision\": \"not-approved\""
+          },
+          {
+            "path": "resources/generated/production-auth-promotion-review.json",
+            "contains": "\"production-auth-promotion-review\""
+          },
+          {
+            "path": "scripts/platform-production-auth-hardening.test.mjs",
+            "contains": "rejects manifest-declared auth providers missing from the provider promotion matrix"
+          },
+          {
+            "path": "scripts/platform-production-auth-hardening.test.mjs",
+            "contains": "rejects production auth promotion reviews that approve active blockers"
+          },
+          {
+            "path": "scripts/platform-production-auth-hardening.test.mjs",
+            "contains": "rejects promotion approval packages without a strong artifact hash policy"
+          },
+          {
+            "path": "scripts/platform-production-auth-hardening.test.mjs",
+            "contains": "rejects promotion approval packages without an external artifact URI policy"
+          },
+          {
+            "path": "scripts/platform-production-readiness.test.mjs",
+            "contains": "rejects missing production auth promotion review preflight"
+          },
+          {
+            "path": "scripts/validate-platform-production-auth-hardening.mjs",
+            "contains": "production readiness must include operation policy"
+          },
+          {
+            "path": "docs/platform-auth.md",
+            "contains": "sliding session renewal, not a separate refresh-token rotation model"
+          },
+          {
+            "path": "docs/platform-auth.md",
+            "contains": "Provider Promotion Matrix"
+          },
+          {
+            "path": "docs/platform-auth.md",
+            "contains": "Production runtime must not enable the `demo-data` capability"
+          },
+          {
+            "path": "docs/platform-auth.md",
+            "contains": "Provider-backed app login must deny unconfigured providers by default"
+          },
+          {
+            "path": "docs/platform-auth.md",
+            "contains": "resources/platform-production-auth-hardening.json"
+          }
+        ]
+      }
+    },
+    {
+      "id": "runtime-cache-invalidation",
+      "label": {
+        "zh": "运行缓存与失效",
+        "en": "Runtime Cache And Invalidation"
+      },
+      "status": "implemented",
+      "purpose": "Use local cache plus optional Redis invalidation so menus, principals, policies and sessions refresh after writes.",
+      "dependsOn": [
+        "permission-codes",
+        "dynamic-menus"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "internal/platform/cache",
+          "internal/platform/httpapi/server.go",
+          "docs/platform-cache.md",
+          "resources/platform-cache-invalidation.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-cache-invalidation.mjs"
+        ],
+        "tests": [
+          "scripts/platform-cache-invalidation.test.mjs",
+          "internal/platform/cache/cache_test.go",
+          "internal/platform/httpapi/server_test.go"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "internal/platform/httpapi/server.go",
+            "contains": "subscribeInvalidations"
+          },
+          {
+            "path": "internal/platform/httpapi/server.go",
+            "contains": "invalidateCachesForResourceLocal"
+          }
+        ]
+      }
+    },
+    {
+      "id": "production-persistence-correctness",
+      "label": {
+        "zh": "生产持久化正确性",
+        "en": "Production Persistence Correctness"
+      },
+      "status": "implemented",
+      "purpose": "Keep multi-process GORM sessions record-scoped, protect admin resource snapshots with revision CAS, and reload independent peer Stores before derived-cache invalidation without treating Redis Pub/Sub as a durable consistency log.",
+      "dependsOn": [
+        "production-runtime-gate",
+        "runtime-cache-invalidation"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "internal/platform/session/store.go",
+          "internal/platform/session/gorm_repository.go",
+          "internal/platform/session/file_repository.go",
+          "internal/platform/session/sql_repository.go",
+          "internal/platform/adminresource/repository.go",
+          "internal/platform/adminresource/store.go",
+          "internal/platform/adminresource/gorm_store.go",
+          "internal/platform/adminresource/file_store.go",
+          "internal/platform/adminresource/sql_store.go",
+          "internal/platform/httpapi/server.go",
+          "docs/superpowers/specs/2026-07-10-platform-production-persistence-correctness-design.md",
+          "docs/platform-cache.md",
+          ".superpowers/sdd/task-1-report.md",
+          ".superpowers/sdd/task-2-report.md",
+          ".superpowers/sdd/task-3-report.md",
+          ".superpowers/sdd/task-4-report.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-cache-invalidation.mjs",
+          "scripts/validate-platform-foundation-task-graph.mjs",
+          "scripts/validate-platform-foundation-alignment.mjs",
+          "scripts/validate-platform-task-execution-audit.mjs",
+          "scripts/validate-platform-goal-completion-audit.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs",
+          "scripts/validate-platform-objective-conformance.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs"
+        ],
+        "tests": [
+          "internal/platform/session/store_test.go",
+          "internal/platform/session/gorm_repository_test.go",
+          "internal/platform/session/file_repository_test.go",
+          "internal/platform/session/sql_repository_test.go",
+          "internal/platform/adminresource/store_test.go",
+          "internal/platform/adminresource/gorm_store_test.go",
+          "internal/platform/adminresource/file_store_test.go",
+          "internal/platform/adminresource/sql_store_test.go",
+          "internal/platform/httpapi/server_test.go",
+          "scripts/platform-cache-invalidation.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "deployment-topology-gate",
+      "label": {
+        "zh": "部署拓扑门禁",
+        "en": "Deployment Topology Gate"
+      },
+      "status": "implemented",
+      "purpose": "Keep Vercel optional for admin static hosting, keep the Go API on a long-lived-service default, and require separate evidence before any full-stack Vercel runtime promotion.",
+      "dependsOn": [
+        "production-runtime-gate",
+        "production-readiness-preflight",
+        "runtime-cache-invalidation"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-deployment-topology.json",
+          "docs/platform-deployment.md",
+          "Dockerfile",
+          ".dockerignore",
+          "deploy/compose/docker-compose.prod.yml",
+          "deploy/nginx/platform.conf",
+          "deploy/env/production.example.env",
+          "deploy/vercel/admin.vercel.json",
+          "README.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-deployment-topology.mjs"
+        ],
+        "tests": [
+          "scripts/platform-deployment-topology.test.mjs"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "resources/platform-deployment-topology.json",
+            "contains": "\"vercelRequired\": false"
+          },
+          {
+            "path": "resources/platform-deployment-topology.json",
+            "contains": "\"defaultApiRuntime\": \"long-lived-service\""
+          },
+          {
+            "path": "resources/platform-deployment-topology.json",
+            "contains": "\"fullStackVercelGo\": \"requires-separate-adapter-spec\""
+          },
+      {
+        "path": "docs/platform-deployment.md",
+        "contains": "Vercel is optional"
+      },
+      {
+        "path": "docs/platform-deployment.md",
+        "contains": "deploy/vercel/admin.vercel.json"
+      },
+      {
+        "path": "docs/platform-deployment.md",
+        "contains": "not the default deployment target for the Gin API process"
+      },
+      {
+        "path": "resources/platform-deployment-topology.json",
+        "contains": "\"adapterScope\": \"admin-static-only\""
+      },
+      {
+        "path": "resources/platform-deployment-topology.json",
+        "contains": "\"adapterPackage\""
+      },
+      {
+        "path": "resources/platform-deployment-topology.json",
+        "contains": "\"copyTarget\": \"admin/vercel.json\""
+      },
+      {
+        "path": "deploy/vercel/admin.vercel.json",
+        "contains": "\"framework\": \"vite\""
+      },
+      {
+        "path": "deploy/vercel/admin.vercel.json",
+        "contains": "\"outputDirectory\": \"dist\""
+      },
+      {
+        "path": "resources/platform-production-readiness.json",
+        "contains": "\"deployment-topology\""
+          },
+          {
+            "path": "README.md",
+            "contains": "docs/platform-deployment.md"
+          },
+          {
+            "path": "Dockerfile",
+            "contains": "FROM golang:1.26-alpine AS api-builder"
+          },
+          {
+            "path": "deploy/compose/docker-compose.prod.yml",
+            "contains": "target: api"
+          },
+          {
+            "path": "deploy/nginx/platform.conf",
+            "contains": "proxy_pass http://platform_api"
+          },
+          {
+            "path": "scripts/validate-platform-deployment-topology.mjs",
+            "contains": "decision.vercelRequired must stay false"
+          },
+          {
+            "path": "scripts/validate-platform-deployment-topology.mjs",
+            "contains": "vercel admin adapter must not declare API rewrites"
+          },
+          {
+            "path": "scripts/platform-deployment-topology.test.mjs",
+            "contains": "rejects Vercel admin adapter templates that include API runtime wiring"
+          }
+        ]
+      }
+    },
+    {
+      "id": "task-dependency-governance",
+      "label": {
+        "zh": "任务依赖与冲突治理",
+        "en": "Task Dependency And Conflict Governance"
+      },
+      "status": "implemented",
+      "purpose": "Keep the full platform foundation task list, dependencies, approved stack route, resource locks, parallel batches, unfinished promotion blockers and visual design gates machine-checkable.",
+      "dependsOn": [
+        "production-runtime-gate",
+        "safe-codegen-scaffold"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-foundation-task-graph.json",
+          "resources/platform-task-execution-audit.json",
+          "scripts/validate-platform-foundation-task-graph.mjs",
+          "scripts/validate-platform-task-execution-audit.mjs",
+          "docs/platform-foundation-task-map.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-foundation-task-graph.mjs",
+          "scripts/validate-platform-task-execution-audit.mjs",
+          "scripts/platform-foundation-task-graph.test.mjs"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "scripts/validate-platform-foundation-task-graph.mjs",
+            "contains": "dependency cycle detected"
+          },
+          {
+            "path": "scripts/validate-platform-task-execution-audit.mjs",
+            "contains": "required unfinished task is missing from task graph"
+          },
+          {
+            "path": "scripts/validate-platform-task-execution-audit.mjs",
+            "contains": "must not be implemented while its execution audit blockers are still active"
+          },
+          {
+            "path": "scripts/validate-platform-task-execution-audit.mjs",
+            "contains": "scripts/validate-platform-promotion-evidence-package.mjs"
+          },
+          {
+            "path": "scripts/validate-platform-task-execution-audit.mjs",
+            "contains": "external absolute artifact URI evidence"
+          },
+          {
+            "path": "scripts/validate-platform-foundation-task-graph.mjs",
+            "contains": "cannot depend on later-phase task"
+          },
+          {
+            "path": "scripts/validate-platform-foundation-task-graph.mjs",
+            "contains": "phaseDependencyExceptions"
+          },
+          {
+            "path": "scripts/validate-platform-foundation-task-graph.mjs",
+            "contains": "contains dependent tasks"
+          },
+          {
+            "path": "scripts/validate-platform-foundation-task-graph.mjs",
+            "contains": "resourceLockPolicies must describe"
+          },
+          {
+            "path": "scripts/validate-platform-foundation-task-graph.mjs",
+            "contains": "resource lock group conflict"
+          },
+          {
+            "path": "scripts/validate-platform-foundation-task-graph.mjs",
+            "contains": "\"screenshots\""
+          },
+          {
+            "path": "scripts/validate-platform-foundation-task-graph.mjs",
+            "contains": "has unsupported design gate"
+          },
+          {
+            "path": "scripts/validate-platform-foundation-task-graph.mjs",
+            "contains": "must declare screenshot evidence"
+          },
+          {
+            "path": "resources/platform-foundation-task-graph.json",
+            "contains": "\"designGate\": ["
+          },
+          {
+            "path": "resources/platform-foundation-task-graph.json",
+            "contains": "\"production-auth-provider-hardening\""
+          },
+          {
+            "path": "resources/platform-foundation-task-graph.json",
+            "contains": "\"form-schema-layout-and-slots\""
+          },
+          {
+            "path": "resources/platform-foundation-task-graph.json",
+            "contains": "\"source-writing-codegen-promotion\""
+          },
+          {
+            "path": "resources/platform-task-execution-audit.json",
+            "contains": "scripts/validate-platform-promotion-evidence-package.mjs"
+          },
+          {
+            "path": "resources/platform-task-execution-audit.json",
+            "contains": "external absolute artifact URI evidence"
+          },
+          {
+            "path": "scripts/platform-foundation-task-graph.test.mjs",
+            "contains": "tracks completed platform foundation work and promoted visual task nodes"
+          },
+          {
+            "path": "scripts/platform-task-execution-audit.test.mjs",
+            "contains": "rejects execution audits that omit the submitted promotion evidence package validator"
+          },
+          {
+            "path": "scripts/platform-task-execution-audit.test.mjs",
+            "contains": "rejects promotion blockers that do not require external artifact URI evidence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "reference-discovery-gate",
+      "label": {
+        "zh": "参考项目发现分类门禁",
+        "en": "Reference Discovery Classification Gate"
+      },
+      "status": "implemented",
+      "purpose": "Require zshenmez reference capabilities to be inspected from source evidence and classified as foundation, optional extension, business-only or deferred before they can influence platform coverage or default profiles.",
+      "dependsOn": [
+        "task-dependency-governance"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-reference-discovery.json",
+          "resources/platform-reference-coverage.json",
+          "resources/platform-capability-profiles.json",
+          "scripts/validate-platform-reference-discovery.mjs"
+        ],
+        "validators": [
+          "scripts/validate-platform-reference-discovery.mjs"
+        ],
+        "tests": [
+          "scripts/platform-reference-discovery.test.mjs"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "resources/platform-reference-discovery.json",
+            "contains": "\"classificationRules\""
+          },
+          {
+            "path": "resources/platform-reference-discovery.json",
+            "contains": "\"sourceSets\""
+          },
+          {
+            "path": "resources/platform-reference-discovery.json",
+            "contains": "\"demo-data-reset\""
+          },
+          {
+            "path": "resources/platform-reference-discovery.json",
+            "contains": "\"mustStayBusinessOnly\""
+          },
+          {
+            "path": "resources/platform-reference-discovery.json",
+            "contains": "\"business-dispatch-transfer\""
+          },
+          {
+            "path": "resources/platform-reference-discovery.json",
+            "contains": "\"personnel-position-governance\""
+          },
+          {
+            "path": "scripts/validate-platform-reference-discovery.mjs",
+            "contains": "validateCoverageExplained"
+          },
+          {
+            "path": "scripts/validate-platform-reference-discovery.mjs",
+            "contains": "platform-default must not enable"
+          },
+          {
+            "path": "scripts/validate-platform-reference-discovery.mjs",
+            "contains": "evidence signal ${signal} is missing from declared sourceSets"
+          },
+          {
+            "path": "scripts/platform-reference-discovery.test.mjs",
+            "contains": "rejects candidate evidence signals that are absent from declared source sets"
+          },
+          {
+            "path": "scripts/platform-reference-discovery.test.mjs",
+            "contains": "rejects business candidates that are promoted into a platform capability"
+          }
+        ]
+      }
+    },
+    {
+      "id": "reference-coverage-boundary-gate",
+      "label": {
+        "zh": "参考项目覆盖边界门禁",
+        "en": "Reference Coverage Boundary Gate"
+      },
+      "status": "implemented",
+      "purpose": "Keep reusable platform coverage, optional extension and business boundaries, and reference-project parity claims checked at area, per-resource and non-resource capability levels against admin contracts, capability audit output, capability profiles and optional reference manifests.",
+      "dependsOn": [
+        "dynamic-admin-resources",
+        "task-dependency-governance",
+        "reference-discovery-gate"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-reference-coverage.json",
+          "resources/platform-reference-discovery.json",
+          "resources/platform-capability-profiles.json",
+          "scripts/validate-platform-reference-coverage.mjs",
+          "scripts/validate-platform-reference-discovery.mjs",
+          "resources/platform-foundation-task-graph.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-reference-coverage.mjs",
+          "scripts/platform-reference-coverage.test.mjs"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "scripts/validate-platform-reference-coverage.mjs",
+            "contains": "requiredFoundationAreas"
+          },
+          {
+            "path": "scripts/validate-platform-reference-discovery.mjs",
+            "contains": "validateCoverageExplained"
+          },
+          {
+            "path": "scripts/validate-platform-reference-coverage.mjs",
+            "contains": "validateReferenceResourceParity"
+          },
+          {
+            "path": "scripts/validate-platform-reference-coverage.mjs",
+            "contains": "resolveReferenceManifestPath"
+          },
+          {
+            "path": "scripts/validate-platform-reference-coverage.mjs",
+            "contains": "validateNonResourceParity"
+          },
+          {
+            "path": "scripts/validate-platform-reference-coverage.mjs",
+            "contains": "requiredNonResourceCapabilities"
+          },
+          {
+            "path": "scripts/validate-platform-reference-coverage.mjs",
+            "contains": "must declare at least one platform capability"
+          },
+          {
+            "path": "scripts/validate-platform-reference-coverage.mjs",
+            "contains": "coverage for ${capabilityID} is missing capability resource"
+          },
+          {
+            "path": "scripts/validate-platform-reference-coverage.mjs",
+            "contains": "missing capability app route"
+          },
+          {
+            "path": "scripts/validate-platform-reference-coverage.mjs",
+            "contains": "missing from reference businessBoundary"
+          },
+          {
+            "path": "resources/platform-reference-coverage.json",
+            "contains": "\"referenceResourceParity\""
+          },
+          {
+            "path": "resources/platform-reference-coverage.json",
+            "contains": "\"nonResourceParity\""
+          },
+          {
+            "path": "resources/platform-reference-coverage.json",
+            "contains": "\"storage-settings\""
+          },
+          {
+            "path": "resources/platform-reference-coverage.json",
+            "contains": "\"user-addresses\""
+          },
+          {
+            "path": "scripts/platform-reference-coverage.test.mjs",
+            "contains": "uses the reference discovery manifest by default"
+          }
+        ]
+      }
+    },
+    {
+      "id": "foundation-alignment-audit",
+      "label": {
+        "zh": "底座目标一致性审计",
+        "en": "Foundation Alignment Audit"
+      },
+      "status": "implemented",
+      "purpose": "Cross-check approved stack, task graph, engineering capabilities, reference discovery and coverage, governance topology, capability profiles, visual design gates, source-writing safety, production gates and objective conflict policy so platform work cannot drift away from the active foundation objective.",
+      "dependsOn": [
+        "task-dependency-governance",
+        "reference-discovery-gate",
+        "reference-coverage-boundary-gate",
+        "codegen-source-writing-readiness",
+        "production-readiness-preflight"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-foundation-alignment-audit.json",
+          "resources/platform-production-readiness.json",
+          "scripts/validate-platform-foundation-alignment.mjs",
+          "docs/platform-foundation-task-map.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-foundation-alignment.mjs",
+          "scripts/platform-foundation-alignment.test.mjs"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "resources/platform-foundation-alignment-audit.json",
+            "contains": "\"approvedStack\""
+          },
+          {
+            "path": "resources/platform-foundation-alignment-audit.json",
+            "contains": "\"objectiveConflictPolicy\""
+          },
+          {
+            "path": "resources/platform-foundation-alignment-audit.json",
+            "contains": "\"app-phone-identity\""
+          },
+          {
+            "path": "resources/platform-foundation-alignment-audit.json",
+            "contains": "\"detailed-addresses\""
+          },
+          {
+            "path": "resources/platform-foundation-alignment-audit.json",
+            "contains": "\"requiredFutureTaskNodes\""
+          },
+          {
+            "path": "resources/platform-foundation-alignment-audit.json",
+            "contains": "\"sourceWriting\": \"disabled\""
+          },
+          {
+            "path": "resources/platform-production-readiness.json",
+            "contains": "\"foundation-alignment\""
+          },
+          {
+            "path": "resources/platform-production-readiness.json",
+            "contains": "\"admin-build\""
+          },
+          {
+            "path": "scripts/validate-platform-foundation-alignment.mjs",
+            "contains": "validateObjectiveConflictPolicy"
+          },
+          {
+            "path": "scripts/validate-platform-foundation-alignment.mjs",
+            "contains": "objective conflict policy requires production preflight command"
+          },
+          {
+            "path": "scripts/validate-platform-foundation-alignment.mjs",
+            "contains": "required goal node"
+          },
+          {
+            "path": "scripts/validate-platform-foundation-alignment.mjs",
+            "contains": "required optional boundary"
+          },
+          {
+            "path": "scripts/validate-platform-foundation-alignment.mjs",
+            "contains": "future task node is missing"
+          },
+          {
+            "path": "scripts/validate-platform-foundation-alignment.mjs",
+            "contains": "must not enable ${capability}"
+          },
+          {
+            "path": "scripts/validate-platform-foundation-alignment.mjs",
+            "contains": "visual task"
+          }
+        ]
+      }
+    },
+    {
+      "id": "goal-completion-audit",
+      "label": {
+        "zh": "目标完成审计",
+        "en": "Goal Completion Audit"
+      },
+      "status": "implemented",
+      "purpose": "Keep the active reusable platform foundation goal completion claim tied to current task evidence, business-neutral reference boundaries, approved stack alignment, visual design gates and explicit production/codegen promotion blockers.",
+      "dependsOn": [
+        "foundation-alignment-audit",
+        "task-dependency-governance",
+        "reference-discovery-gate",
+        "reference-coverage-boundary-gate",
+        "deployment-topology-gate",
+        "production-auth-hardening-gate",
+        "codegen-source-writing-readiness"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-goal-completion-audit.json",
+          "scripts/generate-platform-promotion-evidence-templates.mjs",
+          "scripts/generate-platform-promotion-evidence-package-draft.mjs",
+          "scripts/validate-platform-goal-completion-audit.mjs",
+          "scripts/validate-platform-promotion-evidence-templates.mjs",
+          "scripts/validate-platform-promotion-evidence-package.mjs",
+          "resources/platform-deployment-topology.json",
+          "resources/platform-task-execution-audit.json",
+          "README.md",
+          "AGENTS.md"
+        ],
+        "generatedFiles": [
+          "resources/generated/platform-promotion-evidence-templates.json",
+          "resources/generated/platform-promotion-evidence-package-draft.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-goal-completion-audit.mjs",
+          "scripts/validate-platform-promotion-evidence-templates.mjs",
+          "scripts/validate-platform-promotion-evidence-package.mjs"
+        ],
+        "tests": [
+          "scripts/platform-goal-completion-audit.test.mjs",
+          "scripts/platform-promotion-evidence-templates.test.mjs",
+          "scripts/platform-promotion-evidence-package-draft.test.mjs",
+          "scripts/platform-promotion-evidence-package.test.mjs"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "resources/platform-goal-completion-audit.json",
+            "contains": "\"completionStatus\": \"complete\""
+          },
+          {
+            "path": "resources/platform-goal-completion-audit.json",
+            "contains": "\"businessReferenceMode\": \"reference-only\""
+          },
+          {
+            "path": "resources/platform-goal-completion-audit.json",
+            "contains": "\"production-auth-promotion-gate\""
+          },
+          {
+            "path": "resources/platform-goal-completion-audit.json",
+            "contains": "\"source-writing-codegen-promotion-gate\""
+          },
+          {
+            "path": "resources/platform-goal-completion-audit.json",
+            "contains": "\"deployment-topology-runtime-boundary\""
+          },
+          {
+            "path": "resources/platform-goal-completion-audit.json",
+            "contains": "external absolute artifact URI evidence"
+          },
+          {
+            "path": "resources/platform-goal-completion-audit.json",
+            "contains": "\"deploy/compose/docker-compose.prod.yml\""
+          },
+          {
+            "path": "scripts/validate-platform-goal-completion-audit.mjs",
+            "contains": "completionStatus must be complete when all foundation task nodes are implemented"
+          },
+          {
+            "path": "scripts/validate-platform-goal-completion-audit.mjs",
+            "contains": "not a business migration target"
+          },
+          {
+            "path": "scripts/validate-platform-goal-completion-audit.mjs",
+            "contains": "engineering capability matrix must include goal-completion-audit"
+          },
+          {
+            "path": "scripts/validate-platform-goal-completion-audit.mjs",
+            "contains": "deployment topology decision.vercelRequired must stay false"
+          },
+          {
+            "path": "scripts/validate-platform-goal-completion-audit.mjs",
+            "contains": "deployment package must stay implemented"
+          },
+          {
+            "path": "scripts/validate-platform-goal-completion-audit.mjs",
+            "contains": "external absolute artifact URI evidence"
+          },
+          {
+            "path": "scripts/validate-platform-goal-completion-audit.mjs",
+            "contains": "promotion-evidence-template-gate evidence.validators"
+          },
+          {
+            "path": "resources/generated/platform-promotion-evidence-templates.json",
+            "contains": "\"status\": \"draft-template\""
+          },
+          {
+            "path": "resources/generated/platform-promotion-evidence-templates.json",
+            "contains": "\"submittedEvidenceValidator\""
+          },
+          {
+            "path": "resources/generated/platform-promotion-evidence-templates.json",
+            "contains": "\"draftPackageGenerator\""
+          },
+          {
+            "path": "resources/generated/platform-promotion-evidence-templates.json",
+            "contains": "\"reviewContext\""
+          },
+          {
+            "path": "resources/generated/platform-promotion-evidence-templates.json",
+            "contains": "\"artifactURIPolicy\""
+          },
+          {
+            "path": "resources/generated/platform-promotion-evidence-package-draft.json",
+            "contains": "\"approvalState\": \"draft-submission\""
+          },
+          {
+            "path": "resources/generated/platform-promotion-evidence-package-draft.json",
+            "contains": "\"reviewContext\""
+          },
+          {
+            "path": "scripts/validate-platform-promotion-evidence-templates.mjs",
+            "contains": "mode.approvalState must stay not-submitted"
+          },
+          {
+            "path": "scripts/validate-platform-promotion-evidence-templates.mjs",
+            "contains": "validateSourceWritingReviewContext"
+          },
+          {
+            "path": "scripts/validate-platform-promotion-evidence-templates.mjs",
+            "contains": "must not contain completed approval values"
+          },
+          {
+            "path": "scripts/validate-platform-promotion-evidence-templates.mjs",
+            "contains": "completedEvidenceSchema.artifactURIPolicy must match source approval package"
+          },
+          {
+            "path": "scripts/validate-platform-promotion-evidence-package.mjs",
+            "contains": "approvedBy must not equal owner"
+          },
+          {
+            "path": "scripts/validate-platform-promotion-evidence-package.mjs",
+            "contains": "validateProductionAuthCoverage"
+          },
+          {
+            "path": "scripts/validate-platform-promotion-evidence-package.mjs",
+            "contains": "validateSourceWritingCoverage"
+          },
+          {
+            "path": "scripts/validate-platform-promotion-evidence-package.mjs",
+            "contains": "must not include forbidden field"
+          },
+          {
+            "path": "scripts/validate-platform-promotion-evidence-package.mjs",
+            "contains": "validArtifactURI"
+          },
+          {
+            "path": "scripts/platform-promotion-evidence-package.test.mjs",
+            "contains": "rejects submitted evidence with local or private artifact URIs"
+          },
+          {
+            "path": "scripts/platform-goal-completion-audit.test.mjs",
+            "contains": "rejects future promotion gates that drop external artifact URI evidence"
+          },
+          {
+            "path": "scripts/platform-goal-completion-audit.test.mjs",
+            "contains": "rejects completion audits whose promotion evidence gate omits the submitted package validator"
+          }
+        ]
+      }
+    },
+    {
+      "id": "node-closeout-audit",
+      "label": {
+        "zh": "节点收口审计",
+        "en": "Node Closeout Audit"
+      },
+      "status": "implemented",
+      "purpose": "Keep every implemented foundation task node tied to neat-freak cleanup, evidence paths, resource-lock review, objective-conflict review and visual design-gate evidence before the node is treated as closed.",
+      "dependsOn": [
+        "task-dependency-governance",
+        "goal-completion-audit"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-node-closeout-audit.json",
+          "resources/platform-foundation-task-graph.json",
+          "scripts/validate-platform-node-closeout-audit.mjs"
+        ],
+        "validators": [
+          "scripts/validate-platform-node-closeout-audit.mjs"
+        ],
+        "tests": [
+          "scripts/platform-node-closeout-audit.test.mjs"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "resources/platform-node-closeout-audit.json",
+            "contains": "\"implementedTasksRequireCloseout\": true"
+          },
+          {
+            "path": "resources/platform-node-closeout-audit.json",
+            "contains": "\"neatFreakRequired\": true"
+          },
+          {
+            "path": "resources/platform-node-closeout-audit.json",
+            "contains": "\"superpowers:brainstorming\""
+          },
+          {
+            "path": "resources/platform-node-closeout-audit.json",
+            "contains": "\"product-design\""
+          },
+          {
+            "path": "scripts/validate-platform-node-closeout-audit.mjs",
+            "contains": "implemented task ${task.id} must declare node closeout evidence"
+          },
+          {
+            "path": "scripts/validate-platform-node-closeout-audit.mjs",
+            "contains": "must reference an implemented task"
+          },
+          {
+            "path": "scripts/platform-node-closeout-audit.test.mjs",
+            "contains": "rejects implemented task nodes without closeout evidence"
+          },
+          {
+            "path": "scripts/platform-node-closeout-audit.test.mjs",
+            "contains": "rejects visual closeouts that lack brainstorming and product-design evidence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "objective-conformance-gate",
+      "label": {
+        "zh": "目标一致性总控门禁",
+        "en": "Objective Conformance Gate"
+      },
+      "status": "implemented",
+      "purpose": "Keep the persistent reusable platform foundation objective machine-checkable across approved stack, reference-only zshenmez usage, task blockers, visual workflow gates, deployment topology, production preflight and closeout knowledge cleanup.",
+      "dependsOn": [
+        "foundation-alignment-audit",
+        "goal-completion-audit",
+        "node-closeout-audit",
+        "task-dependency-governance",
+        "deployment-topology-gate",
+        "production-readiness-preflight"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-objective-conformance.json",
+          "resources/platform-foundation-alignment-audit.json",
+          "resources/platform-goal-completion-audit.json",
+          "resources/platform-node-closeout-audit.json",
+          "resources/platform-task-execution-audit.json",
+          "resources/platform-production-readiness.json",
+          "resources/platform-deployment-topology.json",
+          "scripts/validate-platform-objective-conformance.mjs",
+          "docs/platform-foundation-task-map.md",
+          "docs/platform-roadmap.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-objective-conformance.mjs"
+        ],
+        "tests": [
+          "scripts/platform-objective-conformance.test.mjs"
+        ],
+        "requiredSourceSnippets": [
+          {
+            "path": "resources/platform-objective-conformance.json",
+            "contains": "\"objectiveMode\": \"persistent-full-scope\""
+          },
+          {
+            "path": "resources/platform-objective-conformance.json",
+            "contains": "\"mode\": \"reference-only\""
+          },
+          {
+            "path": "resources/platform-objective-conformance.json",
+            "contains": "\"defaultPlatformBusinessMigration\": \"forbidden\""
+          },
+          {
+            "path": "resources/platform-objective-conformance.json",
+            "contains": "\"requiredOrder\": [\"superpowers:brainstorming\", \"product-design\"]"
+          },
+          {
+            "path": "resources/platform-objective-conformance.json",
+            "contains": "\"neatFreakRequiredForNodeCloseout\": true"
+          },
+          {
+            "path": "resources/platform-objective-conformance.json",
+            "contains": "\"nodeCloseoutAudit\": \"resources/platform-node-closeout-audit.json\""
+          },
+          {
+            "path": "resources/platform-objective-conformance.json",
+            "contains": "\"goalCompletionStatus\": \"complete\""
+          },
+          {
+            "path": "resources/platform-objective-conformance.json",
+            "contains": "\"vercelRequired\": false"
+          },
+          {
+            "path": "scripts/validate-platform-objective-conformance.mjs",
+            "contains": "referenceProjectPolicy.mode must stay reference-only"
+          },
+          {
+            "path": "scripts/validate-platform-objective-conformance.mjs",
+            "contains": "visualPolicy.requiredOrder must stay superpowers:brainstorming before product-design"
+          },
+          {
+            "path": "scripts/validate-platform-objective-conformance.mjs",
+            "contains": "closeoutPolicy.neatFreakRequiredForNodeCloseout must stay true"
+          },
+          {
+            "path": "scripts/validate-platform-objective-conformance.mjs",
+            "contains": "closeoutPolicy.nodeCloseoutAudit must be resources/platform-node-closeout-audit.json"
+          },
+          {
+            "path": "scripts/validate-platform-objective-conformance.mjs",
+            "contains": "deployment decision.vercelRequired must stay false"
+          },
+          {
+            "path": "scripts/platform-objective-conformance.test.mjs",
+            "contains": "rejects turning zshenmez from reference-only input into a migration source"
+          },
+          {
+            "path": "scripts/platform-objective-conformance.test.mjs",
+            "contains": "rejects node closeout without the neat-freak knowledge cleanup gate"
+          },
+          {
+            "path": "scripts/platform-objective-conformance.test.mjs",
+            "contains": "rejects closeout policies without the node closeout audit contract"
+          }
+        ]
+      }
+    }
+  ]
+}

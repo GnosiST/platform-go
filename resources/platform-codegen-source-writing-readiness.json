@@ -1,0 +1,259 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-codegen-source-writing-readiness.json",
+  "capturedAt": "2026-07-06",
+  "purpose": "Machine-checkable readiness policy for future source-writing code generation.",
+  "mode": {
+    "sourceWriting": "disabled",
+    "requiresExplicitSpec": true,
+    "requiresHumanReview": true,
+    "requiresDiffReview": true,
+    "requiresTestMapping": true
+  },
+  "sourceWritingApprovalPackage": {
+    "status": "blocked",
+    "sourceOfTruth": "external-review-artifacts",
+    "defaultRuntimeMutation": "forbidden",
+    "requiredApprovals": [
+      "platform-architect",
+      "codegen-owner",
+      "runtime-owner",
+      "operations-owner"
+    ],
+    "requiredEvidence": [
+      {
+        "id": "explicit-source-writing-spec",
+        "owner": "platform-architect",
+        "evidenceKind": "architecture-spec",
+        "description": "Separate source-writing specification that names generated families, runtime roots, conflict policy, rollback and verification commands."
+      },
+      {
+        "id": "approved-promotion-review-packet",
+        "owner": "codegen-owner",
+        "evidenceKind": "signed-review-record",
+        "description": "Human approval of resources/generated/admin-scaffold-promotion-review.json after reviewing generated hashes and target-family mappings."
+      },
+      {
+        "id": "diff-review",
+        "owner": "runtime-owner",
+        "evidenceKind": "reviewed-diff",
+        "description": "Review evidence for every runtime source file that would be created or overwritten by generated output."
+      },
+      {
+        "id": "rollback-plan",
+        "owner": "operations-owner",
+        "evidenceKind": "rollback-runbook",
+        "description": "Rollback steps for reverting generated runtime source writes and regenerated artifacts without damaging handwritten code."
+      },
+      {
+        "id": "target-family-test-run",
+        "owner": "codegen-owner",
+        "evidenceKind": "test-output",
+        "description": "Captured output for every target family test command declared in this readiness contract."
+      },
+      {
+        "id": "runtime-target-owner-approval",
+        "owner": "runtime-owner",
+        "evidenceKind": "root-owner-approval",
+        "description": "Approval from each runtime target root owner before generated files can be promoted into that root."
+      }
+    ],
+    "completedEvidence": [],
+    "prohibitedEvidence": [
+      "text-only approval",
+      "missing reviewed diff",
+      "missing rollback plan",
+      "missing target-family test output",
+      "runtime mutation enabled in review packet"
+    ],
+    "mustNotEnableSourceWriting": true,
+    "completedEvidenceSchema": {
+      "requiredFields": ["id", "owner", "evidenceKind", "artifactURI", "artifactHash", "approvedBy", "approvedAt", "reviewedCommit", "targetFamilies", "runtimeTargets", "verificationCommands", "rollbackCommands"],
+      "approvalRules": [
+        "artifact-id-must-match-requiredEvidence",
+        "approvedBy-must-not-equal-owner",
+        "all-required-owners-represented",
+        "all-target-families-covered",
+        "runtime-target-owner-approval-required",
+        "reviewed-diff-required-per-runtime-target",
+        "artifact-hash-must-be-sha256-hex",
+        "artifact-uri-must-be-external-review-artifact",
+        "verification-commands-must-use-rtk",
+        "rollback-commands-required-before-runtime-mutation"
+      ],
+      "forbiddenFields": ["secret", "token", "password", "credential", "privateKey"],
+      "artifactHashPolicy": {
+        "algorithm": "sha256",
+        "format": "prefix-hex",
+        "prefix": "sha256:",
+        "hexLength": 64,
+        "casing": "lowercase"
+      },
+      "artifactURIPolicy": {
+        "sourceOfTruth": "external-review-artifacts",
+        "allowedSchemes": ["https", "s3", "gs"],
+        "forbiddenSchemes": ["file", "http"],
+        "forbidRelativePaths": true,
+        "forbidLocalAbsolutePaths": true,
+        "forbidLocalhost": true,
+        "forbidPrivateNetworkHosts": true
+      }
+    }
+  },
+  "requiredSourceArtifacts": [
+    "resources/generated/admin-resource-contract.json",
+    "resources/generated/admin-codegen-preview.json",
+    "resources/generated/admin-scaffold-plan.json",
+    "resources/generated/admin-scaffold-files.json",
+    "resources/generated/admin-scaffold-draft.md",
+    "resources/generated/admin-scaffold-promotion-review.json"
+  ],
+  "allowedRuntimeTargets": [
+    "internal/platform/model/",
+    "internal/platform/repository/",
+    "internal/platform/httpapi/",
+    "internal/platform/adminresource/",
+    "admin/src/platform/resources/",
+    "admin/src/platform/refine/"
+  ],
+  "runtimeTargetPolicy": {
+    "mode": "explicit-root-registry",
+    "newRootPolicy": "requires-separate-architecture-spec",
+    "roots": [
+      {
+        "path": "internal/platform/model/",
+        "status": "proposed",
+        "owner": "platform-storage",
+        "promotionGate": "source-writing-codegen-promotion",
+        "requiresExistingDirectory": false,
+        "requiresSeparateSpec": true,
+        "purpose": "Future generated GORM model package; not an active runtime package until promoted by a separate source-writing spec."
+      },
+      {
+        "path": "internal/platform/repository/",
+        "status": "proposed",
+        "owner": "platform-storage",
+        "promotionGate": "source-writing-codegen-promotion",
+        "requiresExistingDirectory": false,
+        "requiresSeparateSpec": true,
+        "purpose": "Future generated repository package; current runtime repositories stay behind existing platform storage/adminresource adapters."
+      },
+      {
+        "path": "internal/platform/httpapi/",
+        "status": "existing",
+        "owner": "platform-http",
+        "promotionGate": "source-writing-codegen-promotion",
+        "requiresExistingDirectory": true,
+        "requiresSeparateSpec": true,
+        "purpose": "Existing Gin HTTP API package; source-writing route promotion requires explicit route ownership and tests."
+      },
+      {
+        "path": "internal/platform/adminresource/",
+        "status": "existing",
+        "owner": "admin-resource-engine",
+        "promotionGate": "source-writing-codegen-promotion",
+        "requiresExistingDirectory": true,
+        "requiresSeparateSpec": true,
+        "purpose": "Existing admin resource engine package; generated code must not bypass schema/query/data-scope contracts."
+      },
+      {
+        "path": "admin/src/platform/resources/",
+        "status": "existing",
+        "owner": "admin-ui",
+        "promotionGate": "source-writing-codegen-promotion",
+        "requiresExistingDirectory": true,
+        "requiresSeparateSpec": true,
+        "purpose": "Existing admin resource frontend package; generated pages must keep Refine and platform UI wrappers."
+      },
+      {
+        "path": "admin/src/platform/refine/",
+        "status": "existing",
+        "owner": "admin-ui",
+        "promotionGate": "source-writing-codegen-promotion",
+        "requiresExistingDirectory": true,
+        "requiresSeparateSpec": true,
+        "purpose": "Existing Refine integration package; generated source must preserve provider contracts."
+      }
+    ]
+  },
+  "blockedRuntimeTargets": [
+    ".git/",
+    ".codegraph/",
+    "node_modules/",
+    "admin/node_modules/",
+    "resources/generated/",
+    "docs/",
+    "scripts/",
+    "go.mod",
+    "go.sum",
+    "admin/package.json",
+    "admin/package-lock.json"
+  ],
+  "promotionRules": [
+    {
+      "id": "generated-marker-required",
+      "description": "Future source writes must include a generated marker in generated-only files.",
+      "required": true
+    },
+    {
+      "id": "no-handwritten-overwrite",
+      "description": "Future source writes must treat existing files without the generated marker as conflicts.",
+      "required": true
+    },
+    {
+      "id": "review-scaffold-first",
+      "description": "Future source writes must be promoted from generated scaffold files, not from raw templates.",
+      "required": true
+    },
+    {
+      "id": "test-command-required",
+      "description": "Future source writes must declare at least one test or validator command per promoted target family.",
+      "required": true
+    }
+  ],
+  "targetFamilies": [
+    {
+      "id": "backend-models",
+      "purpose": "Future GORM model source promotion from generated model drafts.",
+      "scaffoldRoles": ["gormModelDraft"],
+      "runtimeTargets": ["internal/platform/model/"],
+      "testCommands": ["rtk go test ./internal/platform/adminresource ./internal/platform/core"]
+    },
+    {
+      "id": "repositories",
+      "purpose": "Future repository source promotion from generated repository drafts.",
+      "scaffoldRoles": ["repositoryDraft"],
+      "runtimeTargets": ["internal/platform/repository/", "internal/platform/adminresource/"],
+      "testCommands": ["rtk go test ./internal/platform/adminresource"]
+    },
+    {
+      "id": "api-routes",
+      "purpose": "Future Gin route source promotion from generated route drafts.",
+      "scaffoldRoles": ["routeDraft"],
+      "runtimeTargets": ["internal/platform/httpapi/"],
+      "testCommands": ["rtk go test ./internal/platform/httpapi"]
+    },
+    {
+      "id": "admin-resource-pages",
+      "purpose": "Future Refine admin resource source promotion from generated page drafts.",
+      "scaffoldRoles": ["refinePageDraft"],
+      "runtimeTargets": ["admin/src/platform/resources/", "admin/src/platform/refine/"],
+      "testCommands": ["rtk node scripts/validate-admin-ui-contracts.mjs", "rtk npm --prefix admin run build"]
+    },
+    {
+      "id": "contract-tests",
+      "purpose": "Future contract test source promotion from generated test drafts.",
+      "scaffoldRoles": ["contractTestDraft"],
+      "runtimeTargets": ["internal/platform/adminresource/"],
+      "testCommands": ["rtk go test ./internal/platform/adminresource"]
+    }
+  ],
+  "preflightCommands": [
+    "rtk node scripts/generate-admin-codegen-preview.mjs",
+    "rtk node scripts/generate-admin-scaffold-plan.mjs",
+    "rtk node scripts/generate-admin-scaffold-files.mjs",
+    "rtk node scripts/generate-admin-scaffold-draft.mjs",
+    "rtk node scripts/generate-admin-scaffold-promotion-review.mjs",
+    "rtk node scripts/validate-platform-codegen-source-writing-readiness.mjs",
+    "rtk node scripts/validate-admin-resources.mjs"
+  ]
+}

@@ -4,9 +4,11 @@
 
 **Goal:** Build the first runnable `platform-go` framework skeleton with kernel types, capability lifecycle registration, default core capability manifests, HTTP introspection endpoints, and a compilable admin shell.
 
-**Architecture:** This plan implements the first slice of the approved capability architecture. It creates a monolithic deployable skeleton with engineering-level capability packages, typed internal interfaces, lifecycle validation, and a thin HTTP adapter. Business features, optional WeChat/file/branding implementations, and `zshenmez-business` parity migration are intentionally deferred to later plans.
+**Architecture:** This plan implements the first slice of the approved capability architecture. It creates a monolithic deployable skeleton with engineering-level capability packages, typed internal interfaces, lifecycle validation, and a thin HTTP adapter. Business features, optional WeChat/file/branding implementations, and `external-business-capability` parity migration are intentionally deferred to later plans.
 
 **Tech Stack:** Go 1.26, Gin, TypeScript, React, Vite, Ant Design.
+
+**Status on 2026-07-06:** Completed as the initial runnable skeleton baseline. The current codebase has moved beyond this plan into the stack-aligned Gin + GORM + Casbin + JWT / Refine + React + Ant Design foundation tracked by `docs/platform-roadmap.md` and `docs/platform-foundation-task-map.md`; keep this file as historical implementation context, not active work.
 
 ---
 
@@ -20,7 +22,7 @@ The approved architecture covers multiple subsystems. This plan only implements 
 - HTTP health and capability introspection.
 - Minimal admin frontend shell and capability list.
 
-This plan does not implement full tenant/user/RBAC persistence, WeChat login, file storage, code generation, demo seed, or `zshenmez-business`.
+This plan does not implement full tenant/user/RBAC persistence, WeChat login, file storage, code generation, demo seed, or `external-business-capability`.
 
 ## File Structure
 
@@ -63,7 +65,7 @@ Create:
 - Create: `internal/platform/kernel/context.go`
 - Create: `internal/platform/kernel/errors.go`
 
-- [ ] **Step 1: Write failing context tests**
+- [x] **Step 1: Write failing context tests**
 
 Create `go.mod`:
 
@@ -139,7 +141,7 @@ func TestExecutionContextRejectsMissingTenantScope(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the failing tests**
+- [x] **Step 2: Run the failing tests**
 
 Run:
 
@@ -149,7 +151,7 @@ rtk go test ./internal/platform/kernel
 
 Expected: FAIL because `ExecutionContext`, `Actor`, `TenantScope`, `PermissionIntent`, `IsCode`, and `ErrCodeInvalidExecutionContext` are undefined.
 
-- [ ] **Step 3: Implement context and error types**
+- [x] **Step 3: Implement context and error types**
 
 Create `internal/platform/kernel/errors.go`:
 
@@ -275,7 +277,7 @@ func (e ExecutionContext) ValidatePermissioned() error {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run:
 
@@ -285,7 +287,7 @@ rtk go test ./internal/platform/kernel
 
 Expected: FAIL because `UnitOfWork` is undefined. That failure is acceptable and will be resolved in Task 2.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Do not commit yet. Commit after Task 2 when the kernel package compiles.
 
@@ -296,7 +298,7 @@ Do not commit yet. Commit after Task 2 when the kernel package compiles.
 - Create: `internal/platform/kernel/uow.go`
 - Modify: `internal/platform/kernel/context.go`
 
-- [ ] **Step 1: Write failing Unit of Work tests**
+- [x] **Step 1: Write failing Unit of Work tests**
 
 Create `internal/platform/kernel/uow_test.go`:
 
@@ -340,7 +342,7 @@ func TestNoopUnitOfWorkReturnsCallbackError(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the failing tests**
+- [x] **Step 2: Run the failing tests**
 
 Run:
 
@@ -350,7 +352,7 @@ rtk go test ./internal/platform/kernel
 
 Expected: FAIL because `NoopUnitOfWork` and `UnitOfWork` are undefined.
 
-- [ ] **Step 3: Implement Unit of Work**
+- [x] **Step 3: Implement Unit of Work**
 
 Create `internal/platform/kernel/uow.go`:
 
@@ -373,7 +375,7 @@ func (NoopUnitOfWork) Do(ctx context.Context, fn func(context.Context) error) er
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run:
 
@@ -383,7 +385,7 @@ rtk go test ./internal/platform/kernel
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 rtk git add go.mod internal/platform/kernel
@@ -397,7 +399,7 @@ rtk git commit -m "feat: add platform kernel primitives"
 - Create: `internal/platform/capability/registry.go`
 - Create: `internal/platform/capability/registry_test.go`
 
-- [ ] **Step 1: Write failing registry tests**
+- [x] **Step 1: Write failing registry tests**
 
 Create `internal/platform/capability/registry_test.go`:
 
@@ -496,7 +498,7 @@ func mustRegister(t *testing.T, registry *Registry, manifest Manifest) {
 }
 ```
 
-- [ ] **Step 2: Run the failing tests**
+- [x] **Step 2: Run the failing tests**
 
 Run:
 
@@ -506,7 +508,7 @@ rtk go test ./internal/platform/capability
 
 Expected: FAIL because the capability package is not implemented.
 
-- [ ] **Step 3: Implement manifest types**
+- [x] **Step 3: Implement manifest types**
 
 Create `internal/platform/capability/manifest.go`:
 
@@ -540,7 +542,7 @@ type Hook func(context.Context, Runtime) error
 type Runtime struct{}
 ```
 
-- [ ] **Step 4: Implement registry**
+- [x] **Step 4: Implement registry**
 
 Create `internal/platform/capability/registry.go`:
 
@@ -645,7 +647,7 @@ func (r *Registry) RunLifecycle(ctx context.Context, enabled []ID, runtime Runti
 }
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run:
 
@@ -655,7 +657,7 @@ rtk go test ./internal/platform/capability
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 rtk git add internal/platform/capability
@@ -668,7 +670,7 @@ rtk git commit -m "feat: add capability registry"
 - Create: `internal/platform/config/config.go`
 - Create: `internal/platform/config/config_test.go`
 
-- [ ] **Step 1: Write failing config tests**
+- [x] **Step 1: Write failing config tests**
 
 Create `internal/platform/config/config_test.go`:
 
@@ -705,7 +707,7 @@ func TestLoadParsesCapabilities(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the failing tests**
+- [x] **Step 2: Run the failing tests**
 
 Run:
 
@@ -715,7 +717,7 @@ rtk go test ./internal/platform/config
 
 Expected: FAIL because config package is not implemented.
 
-- [ ] **Step 3: Implement config**
+- [x] **Step 3: Implement config**
 
 Create `internal/platform/config/config.go`:
 
@@ -778,7 +780,7 @@ func csvEnv(key string, fallback []string) []string {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run:
 
@@ -788,7 +790,7 @@ rtk go test ./internal/platform/config
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 rtk git add internal/platform/config
@@ -801,7 +803,7 @@ rtk git commit -m "feat: add platform config loading"
 - Create: `internal/platform/core/capabilities.go`
 - Create: `internal/platform/core/capabilities_test.go`
 
-- [ ] **Step 1: Write failing core manifest test**
+- [x] **Step 1: Write failing core manifest test**
 
 Create `internal/platform/core/capabilities_test.go`:
 
@@ -840,7 +842,7 @@ func TestDefaultManifestsResolve(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the failing test**
+- [x] **Step 2: Run the failing test**
 
 Run:
 
@@ -850,7 +852,7 @@ rtk go test ./internal/platform/core
 
 Expected: FAIL because `DefaultManifests` is undefined.
 
-- [ ] **Step 3: Implement core manifests**
+- [x] **Step 3: Implement core manifests**
 
 Create `internal/platform/core/capabilities.go`:
 
@@ -876,7 +878,7 @@ func DefaultManifests() []capability.Manifest {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run:
 
@@ -886,7 +888,7 @@ rtk go test ./internal/platform/core
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 rtk git add internal/platform/core
@@ -901,7 +903,7 @@ rtk git commit -m "feat: declare core governance capabilities"
 - Create: `internal/platform/httpapi/server.go`
 - Create: `internal/platform/httpapi/server_test.go`
 
-- [ ] **Step 1: Add Gin dependency**
+- [x] **Step 1: Add Gin dependency**
 
 Run:
 
@@ -911,7 +913,7 @@ rtk go get github.com/gin-gonic/gin@v1.12.0
 
 Expected: `go.mod` and `go.sum` are updated.
 
-- [ ] **Step 2: Write failing HTTP tests**
+- [x] **Step 2: Write failing HTTP tests**
 
 Create `internal/platform/httpapi/server_test.go`:
 
@@ -959,7 +961,7 @@ func TestCapabilitiesEndpoint(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Run the failing tests**
+- [x] **Step 3: Run the failing tests**
 
 Run:
 
@@ -969,7 +971,7 @@ rtk go test ./internal/platform/httpapi
 
 Expected: FAIL because HTTP server package is not implemented.
 
-- [ ] **Step 4: Implement HTTP response and server**
+- [x] **Step 4: Implement HTTP response and server**
 
 Create `internal/platform/httpapi/response.go`:
 
@@ -1050,7 +1052,7 @@ func (s *Server) capabilitiesList(ctx *gin.Context) {
 }
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run:
 
@@ -1060,7 +1062,7 @@ rtk go test ./internal/platform/httpapi
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 rtk git add go.mod go.sum internal/platform/httpapi
@@ -1072,7 +1074,7 @@ rtk git commit -m "feat: add platform HTTP runtime"
 **Files:**
 - Create: `cmd/platform-api/main.go`
 
-- [ ] **Step 1: Create runnable API command**
+- [x] **Step 1: Create runnable API command**
 
 Create `cmd/platform-api/main.go`:
 
@@ -1111,7 +1113,7 @@ func main() {
 }
 ```
 
-- [ ] **Step 2: Run full Go tests**
+- [x] **Step 2: Run full Go tests**
 
 Run:
 
@@ -1121,7 +1123,7 @@ rtk go test ./...
 
 Expected: PASS.
 
-- [ ] **Step 3: Smoke the API command**
+- [x] **Step 3: Smoke the API command**
 
 Run:
 
@@ -1131,7 +1133,7 @@ rtk proxy sh -lc 'PLATFORM_HTTP_ADDR=127.0.0.1:19200 go run ./cmd/platform-api &
 
 Expected: the command prints a JSON health response containing `"ok":true` and exits after stopping the temporary server.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 rtk git add cmd/platform-api
@@ -1152,7 +1154,7 @@ rtk git commit -m "feat: wire platform API command"
 - Create: `admin/src/platform/resources/registry.ts`
 - Create: `admin/src/styles.css`
 
-- [ ] **Step 1: Create admin package files**
+- [x] **Step 1: Create admin package files**
 
 Create `admin/package.json`:
 
@@ -1241,7 +1243,7 @@ Create `admin/index.html`:
 </html>
 ```
 
-- [ ] **Step 2: Create admin source files**
+- [x] **Step 2: Create admin source files**
 
 Create `admin/src/platform/resources/registry.ts`:
 
@@ -1476,7 +1478,7 @@ body {
 }
 ```
 
-- [ ] **Step 3: Install and typecheck admin**
+- [x] **Step 3: Install and typecheck admin**
 
 Run:
 
@@ -1487,7 +1489,7 @@ rtk npm --prefix admin run typecheck
 
 Expected: typecheck PASS.
 
-- [ ] **Step 4: Build admin**
+- [x] **Step 4: Build admin**
 
 Run:
 
@@ -1497,7 +1499,7 @@ rtk npm --prefix admin run build
 
 Expected: build PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 rtk git add admin
@@ -1509,14 +1511,14 @@ rtk git commit -m "feat: add admin shell skeleton"
 **Files:**
 - Create: `README.md`
 
-- [ ] **Step 1: Write README**
+- [x] **Step 1: Write README**
 
 Create `README.md`:
 
 ```markdown
 # platform-go
 
-Reusable operations platform foundation extracted from the `zshenmez` platform work.
+Reusable operations platform foundation informed by reusable management patterns observed in `zshenmez`.
 
 ## Current Slice
 
@@ -1570,7 +1572,7 @@ rtk git diff --check
 ```
 ```
 
-- [ ] **Step 2: Run full verification**
+- [x] **Step 2: Run full verification**
 
 Run:
 
@@ -1583,7 +1585,7 @@ rtk git diff --check
 
 Expected: all commands PASS.
 
-- [ ] **Step 3: Check git status**
+- [x] **Step 3: Check git status**
 
 Run:
 
@@ -1593,7 +1595,7 @@ rtk git status --short
 
 Expected: only planned files are modified or untracked.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 rtk git add README.md

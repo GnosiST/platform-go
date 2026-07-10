@@ -1,0 +1,2905 @@
+{
+  "generatedBy": "scripts/generate-admin-codegen-preview.mjs",
+  "source": "resources/generated/admin-resource-contract.json",
+  "sourceVersion": "0.1.0",
+  "resourceCount": 27,
+  "summary": {
+    "modes": {
+      "custom": [
+        "apiDocs",
+        "apiTokens",
+        "branding",
+        "capabilities",
+        "demoData",
+        "dictionary-parameters",
+        "files",
+        "monitoring",
+        "overview",
+        "settings"
+      ],
+      "readOnly": [
+        "auditLogs",
+        "errorLogs",
+        "loginLogs",
+        "sessions"
+      ],
+      "readOnlySeeded": [
+        "permissions"
+      ],
+      "scaffold": [
+        "apiResources",
+        "appIdentities",
+        "areaCodes",
+        "dictionaries",
+        "menus",
+        "orgUnits",
+        "parameters",
+        "roleGroups",
+        "roles",
+        "tenants",
+        "users",
+        "versions"
+      ]
+    },
+    "templateCandidates": [
+      "apiResources",
+      "appIdentities",
+      "areaCodes",
+      "auditLogs",
+      "dictionaries",
+      "errorLogs",
+      "loginLogs",
+      "menus",
+      "orgUnits",
+      "parameters",
+      "permissions",
+      "roleGroups",
+      "roles",
+      "sessions",
+      "tenants",
+      "users",
+      "versions"
+    ],
+    "manualReview": [
+      "apiDocs",
+      "apiTokens",
+      "branding",
+      "capabilities",
+      "demoData",
+      "dictionary-parameters",
+      "files",
+      "monitoring",
+      "overview",
+      "settings"
+    ],
+    "writeResources": [
+      "apiResources",
+      "apiTokens",
+      "appIdentities",
+      "areaCodes",
+      "branding",
+      "demoData",
+      "dictionaries",
+      "dictionary-parameters",
+      "files",
+      "menus",
+      "monitoring",
+      "orgUnits",
+      "parameters",
+      "permissions",
+      "roleGroups",
+      "roles",
+      "sessions",
+      "settings",
+      "tenants",
+      "users",
+      "versions"
+    ],
+    "permissions": [
+      "admin:api-docs:read",
+      "admin:api-resource:create",
+      "admin:api-resource:delete",
+      "admin:api-resource:read",
+      "admin:api-resource:update",
+      "admin:api-token:create",
+      "admin:api-token:delete",
+      "admin:api-token:read",
+      "admin:app-identity:create",
+      "admin:app-identity:delete",
+      "admin:app-identity:read",
+      "admin:app-identity:update",
+      "admin:area-code:create",
+      "admin:area-code:delete",
+      "admin:area-code:read",
+      "admin:area-code:update",
+      "admin:audit-log:read",
+      "admin:branding:read",
+      "admin:branding:update",
+      "admin:capability:read",
+      "admin:demo-data:apply",
+      "admin:demo-data:read",
+      "admin:dictionary-parameter:create",
+      "admin:dictionary-parameter:delete",
+      "admin:dictionary-parameter:read",
+      "admin:dictionary-parameter:update",
+      "admin:dictionary:create",
+      "admin:dictionary:delete",
+      "admin:dictionary:read",
+      "admin:dictionary:update",
+      "admin:error-log:read",
+      "admin:file:create",
+      "admin:file:delete",
+      "admin:file:read",
+      "admin:login-log:read",
+      "admin:menu:create",
+      "admin:menu:delete",
+      "admin:menu:read",
+      "admin:menu:update",
+      "admin:monitoring:create",
+      "admin:monitoring:delete",
+      "admin:monitoring:read",
+      "admin:monitoring:update",
+      "admin:org-unit:create",
+      "admin:org-unit:delete",
+      "admin:org-unit:read",
+      "admin:org-unit:update",
+      "admin:overview:read",
+      "admin:parameter:create",
+      "admin:parameter:delete",
+      "admin:parameter:read",
+      "admin:parameter:update",
+      "admin:permission:create",
+      "admin:permission:delete",
+      "admin:permission:read",
+      "admin:permission:update",
+      "admin:role-group:create",
+      "admin:role-group:delete",
+      "admin:role-group:read",
+      "admin:role-group:update",
+      "admin:role:create",
+      "admin:role:delete",
+      "admin:role:read",
+      "admin:role:update",
+      "admin:session:delete",
+      "admin:session:read",
+      "admin:settings:read",
+      "admin:settings:update",
+      "admin:tenant:create",
+      "admin:tenant:delete",
+      "admin:tenant:read",
+      "admin:tenant:update",
+      "admin:user:create",
+      "admin:user:delete",
+      "admin:user:read",
+      "admin:user:update",
+      "admin:version:create",
+      "admin:version:read",
+      "admin:version:update"
+    ],
+    "routeCount": 82,
+    "schemaCount": 27
+  },
+  "guardrails": [
+    "This preview is read-only and must not overwrite Go, React or Markdown files.",
+    "Source-writing code generation is deferred until GORM models and repository contracts are stable.",
+    "Every write route must keep permission code, tenant scope and audit action together.",
+    "Runtime form slot descriptors are controlled by schema and frontend registries; source-writing form generators remain disabled.",
+    "Resource-localized data uses schema.localizedFields plus <field>Zh/<field>En values; business resources can opt in per field."
+  ],
+  "resources": [
+    {
+      "resource": "apiDocs",
+      "code": "api-docs",
+      "label": {
+        "zh": "API 文档",
+        "en": "API Docs"
+      },
+      "group": "system",
+      "codegenMode": "custom",
+      "generationLevel": "manualReview",
+      "backend": {
+        "model": null,
+        "table": null,
+        "apiBase": "/api/openapi.json",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "GET",
+            "path": "/api/admin/resources/api-docs",
+            "permission": "admin:api-docs:read",
+            "operationId": "apiDocs.read",
+            "mutates": false,
+            "auditActionCandidate": null
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "apiDocs",
+        "adminPath": "/api-docs",
+        "component": "APIDocsPage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 3,
+        "search": [
+          "title",
+          "version"
+        ],
+        "filter": [
+          "routeCount"
+        ],
+        "sort": [
+          "routeCount",
+          "title",
+          "version"
+        ],
+        "table": [
+          "title",
+          "version",
+          "routeCount"
+        ],
+        "form": [],
+        "localizedFields": []
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": false,
+        "actionCandidates": []
+      }
+    },
+    {
+      "resource": "apiResources",
+      "code": "api-resources",
+      "label": {
+        "zh": "API 资源",
+        "en": "API Resources"
+      },
+      "group": "system",
+      "codegenMode": "scaffold",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "APIResource",
+        "table": "platform_api_resources",
+        "apiBase": "/api/admin/api-resources",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/api-resources/:id",
+            "permission": "admin:api-resource:delete",
+            "operationId": "apiResources.delete",
+            "mutates": true,
+            "auditActionCandidate": "api_resource.delete"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/api-resources",
+            "permission": "admin:api-resource:create",
+            "operationId": "apiResources.create",
+            "mutates": true,
+            "auditActionCandidate": "api_resource.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/api-resources/query",
+            "permission": "admin:api-resource:read",
+            "operationId": "apiResources.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/api-resources/:id",
+            "permission": "admin:api-resource:update",
+            "operationId": "apiResources.update",
+            "mutates": true,
+            "auditActionCandidate": "api_resource.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "apiResources",
+        "adminPath": "/api-resources",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 4,
+        "search": [
+          "method",
+          "path",
+          "permission"
+        ],
+        "filter": [
+          "method",
+          "path",
+          "permission",
+          "status"
+        ],
+        "sort": [
+          "method",
+          "path",
+          "permission",
+          "status"
+        ],
+        "table": [
+          "method",
+          "path",
+          "permission",
+          "status"
+        ],
+        "form": [
+          "method",
+          "path",
+          "permission",
+          "status"
+        ],
+        "localizedFields": []
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "api_resource.create",
+          "api_resource.delete",
+          "api_resource.update"
+        ]
+      }
+    },
+    {
+      "resource": "apiTokens",
+      "code": "api-tokens",
+      "label": {
+        "zh": "API Token",
+        "en": "API Tokens"
+      },
+      "group": "operations",
+      "codegenMode": "custom",
+      "generationLevel": "manualReview",
+      "backend": {
+        "model": "APIToken",
+        "table": "platform_api_tokens",
+        "apiBase": "/api/admin/api-tokens",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/api-tokens/:id",
+            "permission": "admin:api-token:delete",
+            "operationId": "apiTokens.delete",
+            "mutates": true,
+            "auditActionCandidate": "api_token.delete"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/api-tokens",
+            "permission": "admin:api-token:create",
+            "operationId": "apiTokens.create",
+            "mutates": true,
+            "auditActionCandidate": "api_token.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/api-tokens/query",
+            "permission": "admin:api-token:read",
+            "operationId": "apiTokens.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "apiTokens",
+        "adminPath": "/api-tokens",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 4,
+        "search": [
+          "name",
+          "scope",
+          "status"
+        ],
+        "filter": [
+          "expiresAt",
+          "name",
+          "scope",
+          "status"
+        ],
+        "sort": [
+          "expiresAt",
+          "name",
+          "scope",
+          "status"
+        ],
+        "table": [
+          "name",
+          "scope",
+          "expiresAt",
+          "status"
+        ],
+        "form": [
+          "name",
+          "scope",
+          "expiresAt"
+        ],
+        "localizedFields": [
+          "name"
+        ]
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "api_token.create",
+          "api_token.delete"
+        ]
+      }
+    },
+    {
+      "resource": "appIdentities",
+      "code": "app-identities",
+      "label": {
+        "zh": "App 身份绑定",
+        "en": "App Identities"
+      },
+      "group": "system",
+      "codegenMode": "scaffold",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "AppIdentity",
+        "table": "platform_app_identities",
+        "apiBase": "/api/admin/app-identities",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/app-identities/:id",
+            "permission": "admin:app-identity:delete",
+            "operationId": "appIdentities.delete",
+            "mutates": true,
+            "auditActionCandidate": "app_identity.delete"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/app-identities",
+            "permission": "admin:app-identity:create",
+            "operationId": "appIdentities.create",
+            "mutates": true,
+            "auditActionCandidate": "app_identity.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/app-identities/query",
+            "permission": "admin:app-identity:read",
+            "operationId": "appIdentities.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/app-identities/:id",
+            "permission": "admin:app-identity:update",
+            "operationId": "appIdentities.update",
+            "mutates": true,
+            "auditActionCandidate": "app_identity.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "appIdentities",
+        "adminPath": "/app-identities",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 12,
+        "search": [
+          "appUsername",
+          "code",
+          "maskedSubject",
+          "name",
+          "provider",
+          "providerKind",
+          "providerScope",
+          "status"
+        ],
+        "filter": [
+          "appUsername",
+          "code",
+          "createdAt",
+          "lastLoginAt",
+          "maskedSubject",
+          "name",
+          "provider",
+          "providerKind",
+          "providerScope",
+          "status"
+        ],
+        "sort": [
+          "appUsername",
+          "createdAt",
+          "lastLoginAt",
+          "maskedSubject",
+          "name",
+          "provider",
+          "providerKind",
+          "providerScope",
+          "status"
+        ],
+        "table": [
+          "provider",
+          "providerKind",
+          "maskedSubject",
+          "appUsername",
+          "lastLoginAt",
+          "status"
+        ],
+        "form": [
+          "status"
+        ],
+        "localizedFields": [
+          "description",
+          "name"
+        ]
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "app_identity.create",
+          "app_identity.delete",
+          "app_identity.update"
+        ]
+      }
+    },
+    {
+      "resource": "areaCodes",
+      "code": "area-codes",
+      "label": {
+        "zh": "地址码",
+        "en": "Area Codes"
+      },
+      "group": "system",
+      "codegenMode": "scaffold",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "AreaCode",
+        "table": "platform_area_codes",
+        "apiBase": "/api/admin/area-codes",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/area-codes/:id",
+            "permission": "admin:area-code:delete",
+            "operationId": "areaCodes.delete",
+            "mutates": true,
+            "auditActionCandidate": "area_code.delete"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/area-codes",
+            "permission": "admin:area-code:create",
+            "operationId": "areaCodes.create",
+            "mutates": true,
+            "auditActionCandidate": "area_code.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/area-codes/query",
+            "permission": "admin:area-code:read",
+            "operationId": "areaCodes.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/area-codes/:id",
+            "permission": "admin:area-code:update",
+            "operationId": "areaCodes.update",
+            "mutates": true,
+            "auditActionCandidate": "area_code.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "areaCodes",
+        "adminPath": "/area-codes",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 8,
+        "search": [
+          "code",
+          "level",
+          "name",
+          "parentCode",
+          "path",
+          "status"
+        ],
+        "filter": [
+          "code",
+          "level",
+          "name",
+          "parentCode",
+          "path",
+          "sortOrder",
+          "status"
+        ],
+        "sort": [
+          "code",
+          "level",
+          "name",
+          "parentCode",
+          "path",
+          "sortOrder",
+          "status"
+        ],
+        "table": [
+          "code",
+          "name",
+          "parentCode",
+          "level",
+          "path",
+          "sortOrder",
+          "status"
+        ],
+        "form": [
+          "code",
+          "name",
+          "parentCode",
+          "level",
+          "path",
+          "sortOrder",
+          "status",
+          "description"
+        ],
+        "localizedFields": [
+          "description",
+          "name"
+        ]
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "area_code.create",
+          "area_code.delete",
+          "area_code.update"
+        ]
+      }
+    },
+    {
+      "resource": "auditLogs",
+      "code": "audit-logs",
+      "label": {
+        "zh": "操作审计",
+        "en": "Audit Logs"
+      },
+      "group": "operations",
+      "codegenMode": "readOnly",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "AuditLog",
+        "table": "platform_audit_logs",
+        "apiBase": "/api/admin/audit-logs",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/audit-logs/query",
+            "permission": "admin:audit-log:read",
+            "operationId": "auditLogs.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "auditLogs",
+        "adminPath": "/audit-logs",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 10,
+        "search": [
+          "action",
+          "actor",
+          "provider",
+          "resource",
+          "targetCode",
+          "targetName",
+          "traceId"
+        ],
+        "filter": [
+          "action",
+          "actor",
+          "createdAt",
+          "provider",
+          "resource",
+          "targetCode",
+          "targetId",
+          "targetName",
+          "traceId"
+        ],
+        "sort": [
+          "action",
+          "actor",
+          "createdAt",
+          "provider",
+          "resource",
+          "targetCode",
+          "targetName"
+        ],
+        "table": [
+          "actor",
+          "action",
+          "resource",
+          "targetCode",
+          "targetName",
+          "provider",
+          "createdAt"
+        ],
+        "form": [],
+        "localizedFields": []
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": false,
+        "actionCandidates": []
+      }
+    },
+    {
+      "resource": "branding",
+      "code": "branding",
+      "label": {
+        "zh": "品牌配置",
+        "en": "Branding"
+      },
+      "group": "foundation",
+      "codegenMode": "custom",
+      "generationLevel": "manualReview",
+      "backend": {
+        "model": null,
+        "table": null,
+        "apiBase": "/api/platform/branding",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "GET",
+            "path": "/api/admin/resources/branding",
+            "permission": "admin:branding:read",
+            "operationId": "branding.read",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/branding",
+            "permission": "admin:branding:update",
+            "operationId": "branding.update",
+            "mutates": true,
+            "auditActionCandidate": "branding.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "branding",
+        "adminPath": "/branding",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 4,
+        "search": [
+          "productName",
+          "shortName"
+        ],
+        "filter": [
+          "defaultTheme"
+        ],
+        "sort": [
+          "defaultTheme",
+          "primaryColor",
+          "productName"
+        ],
+        "table": [
+          "productName",
+          "primaryColor",
+          "defaultTheme"
+        ],
+        "form": [
+          "productName",
+          "shortName",
+          "primaryColor",
+          "defaultTheme"
+        ],
+        "localizedFields": []
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "branding.update"
+        ]
+      }
+    },
+    {
+      "resource": "capabilities",
+      "code": "capabilities",
+      "label": {
+        "zh": "能力清单",
+        "en": "Capabilities"
+      },
+      "group": "foundation",
+      "codegenMode": "custom",
+      "generationLevel": "manualReview",
+      "backend": {
+        "model": null,
+        "table": null,
+        "apiBase": "/api/capabilities",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "GET",
+            "path": "/api/admin/resources/capabilities",
+            "permission": "admin:capability:read",
+            "operationId": "capabilities.read",
+            "mutates": false,
+            "auditActionCandidate": null
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "capabilities",
+        "adminPath": "/capabilities",
+        "component": "CapabilityConsole",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 3,
+        "search": [
+          "id",
+          "name"
+        ],
+        "filter": [
+          "id",
+          "name"
+        ],
+        "sort": [
+          "id",
+          "name",
+          "version"
+        ],
+        "table": [
+          "id",
+          "name",
+          "version"
+        ],
+        "form": [],
+        "localizedFields": [
+          "name"
+        ]
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": false,
+        "actionCandidates": []
+      }
+    },
+    {
+      "resource": "demoData",
+      "code": "demo-data",
+      "label": {
+        "zh": "演示数据",
+        "en": "Demo Data"
+      },
+      "group": "foundation",
+      "codegenMode": "custom",
+      "generationLevel": "manualReview",
+      "backend": {
+        "model": null,
+        "table": null,
+        "apiBase": "/api/admin/demo-data",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "GET",
+            "path": "/api/admin/resources/demo-data",
+            "permission": "admin:demo-data:read",
+            "operationId": "demoData.read",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/demo-data/:capabilityId/:datasetId/apply",
+            "permission": "admin:demo-data:apply",
+            "operationId": "demoData.apply",
+            "mutates": true,
+            "auditActionCandidate": "demo_data.apply"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "demoData",
+        "adminPath": "/demo-data",
+        "component": "DemoDataConsole",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 3,
+        "search": [
+          "capabilityId",
+          "title"
+        ],
+        "filter": [
+          "capabilityId",
+          "records",
+          "title"
+        ],
+        "sort": [
+          "capabilityId",
+          "records",
+          "title"
+        ],
+        "table": [
+          "capabilityId",
+          "title",
+          "records"
+        ],
+        "form": [],
+        "localizedFields": []
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "demo_data.apply"
+        ]
+      }
+    },
+    {
+      "resource": "dictionaries",
+      "code": "dictionaries",
+      "label": {
+        "zh": "字典管理",
+        "en": "Dictionaries"
+      },
+      "group": "system",
+      "codegenMode": "scaffold",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "Dictionary",
+        "table": "platform_dictionaries",
+        "apiBase": "/api/admin/dictionaries",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/dictionaries/:id",
+            "permission": "admin:dictionary:delete",
+            "operationId": "dictionaries.delete",
+            "mutates": true,
+            "auditActionCandidate": "dictionary.delete"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/dictionaries",
+            "permission": "admin:dictionary:create",
+            "operationId": "dictionaries.create",
+            "mutates": true,
+            "auditActionCandidate": "dictionary.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/dictionaries/query",
+            "permission": "admin:dictionary:read",
+            "operationId": "dictionaries.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/dictionaries/:id",
+            "permission": "admin:dictionary:update",
+            "operationId": "dictionaries.update",
+            "mutates": true,
+            "auditActionCandidate": "dictionary.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "dictionaries",
+        "adminPath": "/dictionaries",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 4,
+        "search": [
+          "code",
+          "name",
+          "status"
+        ],
+        "filter": [
+          "code",
+          "itemCount",
+          "name",
+          "status"
+        ],
+        "sort": [
+          "code",
+          "itemCount",
+          "name",
+          "status"
+        ],
+        "table": [
+          "code",
+          "name",
+          "itemCount",
+          "status"
+        ],
+        "form": [
+          "code",
+          "name",
+          "status"
+        ],
+        "localizedFields": [
+          "name"
+        ]
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "dictionary.create",
+          "dictionary.delete",
+          "dictionary.update"
+        ]
+      }
+    },
+    {
+      "resource": "dictionary-parameters",
+      "code": "dictionary-parameters",
+      "label": {
+        "zh": "字典参数",
+        "en": "Dictionary Parameters"
+      },
+      "group": "governance",
+      "codegenMode": "custom",
+      "generationLevel": "manualReview",
+      "backend": {
+        "model": null,
+        "table": null,
+        "apiBase": "/api/admin/dictionary-parameters",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/dictionary-parameters/:id",
+            "permission": "admin:dictionary-parameter:delete",
+            "operationId": "dictionary-parameters.delete",
+            "mutates": true,
+            "auditActionCandidate": "dictionary_parameter.delete"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/dictionary-parameters",
+            "permission": "admin:dictionary-parameter:create",
+            "operationId": "dictionary-parameters.create",
+            "mutates": true,
+            "auditActionCandidate": "dictionary_parameter.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/dictionary-parameters/query",
+            "permission": "admin:dictionary-parameter:read",
+            "operationId": "dictionary-parameters.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/dictionary-parameters/:id",
+            "permission": "admin:dictionary-parameter:update",
+            "operationId": "dictionary-parameters.update",
+            "mutates": true,
+            "auditActionCandidate": "dictionary_parameter.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "dictionary-parameters",
+        "adminPath": "/dictionary-parameters",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 9,
+        "search": [
+          "code",
+          "description",
+          "dictionaryCode",
+          "name",
+          "status",
+          "value",
+          "valueType"
+        ],
+        "filter": [
+          "code",
+          "dictionaryCode",
+          "name",
+          "sortOrder",
+          "status",
+          "updatedAt",
+          "value",
+          "valueType"
+        ],
+        "sort": [
+          "code",
+          "dictionaryCode",
+          "name",
+          "sortOrder",
+          "status",
+          "updatedAt",
+          "value",
+          "valueType"
+        ],
+        "table": [
+          "code",
+          "name",
+          "dictionaryCode",
+          "value",
+          "valueType",
+          "sortOrder",
+          "status",
+          "updatedAt"
+        ],
+        "form": [
+          "code",
+          "name",
+          "dictionaryCode",
+          "value",
+          "valueType",
+          "sortOrder",
+          "status",
+          "description"
+        ],
+        "localizedFields": []
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "dictionary_parameter.create",
+          "dictionary_parameter.delete",
+          "dictionary_parameter.update"
+        ]
+      }
+    },
+    {
+      "resource": "errorLogs",
+      "code": "error-logs",
+      "label": {
+        "zh": "错误日志",
+        "en": "Error Logs"
+      },
+      "group": "operations",
+      "codegenMode": "readOnly",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "ErrorLog",
+        "table": "platform_error_logs",
+        "apiBase": "/api/admin/error-logs",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/error-logs/query",
+            "permission": "admin:error-log:read",
+            "operationId": "errorLogs.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "errorLogs",
+        "adminPath": "/error-logs",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 4,
+        "search": [
+          "level",
+          "message",
+          "traceId"
+        ],
+        "filter": [
+          "createdAt",
+          "level",
+          "message",
+          "traceId"
+        ],
+        "sort": [
+          "createdAt",
+          "level",
+          "traceId"
+        ],
+        "table": [
+          "level",
+          "message",
+          "traceId",
+          "createdAt"
+        ],
+        "form": [],
+        "localizedFields": []
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": false,
+        "actionCandidates": []
+      }
+    },
+    {
+      "resource": "files",
+      "code": "files",
+      "label": {
+        "zh": "文件管理",
+        "en": "Files"
+      },
+      "group": "operations",
+      "codegenMode": "custom",
+      "generationLevel": "manualReview",
+      "backend": {
+        "model": "FileObject",
+        "table": "platform_files",
+        "apiBase": "/api/admin/files",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/files/:id",
+            "permission": "admin:file:delete",
+            "operationId": "files.delete",
+            "mutates": true,
+            "auditActionCandidate": "file.delete"
+          },
+          {
+            "method": "GET",
+            "path": "/api/admin/files/:id/content",
+            "permission": "admin:file:read",
+            "operationId": "files.read",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/files/upload",
+            "permission": "admin:file:create",
+            "operationId": "files.upload",
+            "mutates": true,
+            "auditActionCandidate": "file.upload"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/files",
+            "permission": "admin:file:create",
+            "operationId": "files.create",
+            "mutates": true,
+            "auditActionCandidate": "file.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/files/query",
+            "permission": "admin:file:read",
+            "operationId": "files.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "files",
+        "adminPath": "/files",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 12,
+        "search": [
+          "code",
+          "createdAt",
+          "mimeType",
+          "name",
+          "storageDriver"
+        ],
+        "filter": [
+          "code",
+          "createdAt",
+          "mimeType",
+          "name",
+          "size",
+          "status",
+          "storageDriver",
+          "storageKey",
+          "updatedAt"
+        ],
+        "sort": [
+          "code",
+          "createdAt",
+          "mimeType",
+          "name",
+          "size",
+          "status",
+          "storageDriver",
+          "updatedAt"
+        ],
+        "table": [
+          "name",
+          "mimeType",
+          "size",
+          "storageDriver",
+          "createdAt"
+        ],
+        "form": [
+          "name",
+          "status",
+          "description",
+          "mimeType"
+        ],
+        "localizedFields": [
+          "description",
+          "name"
+        ]
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "file.create",
+          "file.delete",
+          "file.upload"
+        ]
+      }
+    },
+    {
+      "resource": "loginLogs",
+      "code": "login-logs",
+      "label": {
+        "zh": "登录日志",
+        "en": "Login Logs"
+      },
+      "group": "operations",
+      "codegenMode": "readOnly",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "LoginLog",
+        "table": "platform_login_logs",
+        "apiBase": "/api/admin/login-logs",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/login-logs/query",
+            "permission": "admin:login-log:read",
+            "operationId": "loginLogs.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "loginLogs",
+        "adminPath": "/login-logs",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 4,
+        "search": [
+          "ip",
+          "provider",
+          "username"
+        ],
+        "filter": [
+          "createdAt",
+          "ip",
+          "provider",
+          "username"
+        ],
+        "sort": [
+          "createdAt",
+          "ip",
+          "provider",
+          "username"
+        ],
+        "table": [
+          "username",
+          "provider",
+          "ip",
+          "createdAt"
+        ],
+        "form": [],
+        "localizedFields": []
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": false,
+        "actionCandidates": []
+      }
+    },
+    {
+      "resource": "menus",
+      "code": "menus",
+      "label": {
+        "zh": "菜单管理",
+        "en": "Menus"
+      },
+      "group": "system",
+      "codegenMode": "scaffold",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "Menu",
+        "table": "platform_menus",
+        "apiBase": "/api/admin/menus",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/menus/:id",
+            "permission": "admin:menu:delete",
+            "operationId": "menus.delete",
+            "mutates": true,
+            "auditActionCandidate": "menu.delete"
+          },
+          {
+            "method": "GET",
+            "path": "/api/admin/navigation/menus",
+            "permission": "admin:menu:read",
+            "operationId": "menus.read",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/menus",
+            "permission": "admin:menu:create",
+            "operationId": "menus.create",
+            "mutates": true,
+            "auditActionCandidate": "menu.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/menus/query",
+            "permission": "admin:menu:read",
+            "operationId": "menus.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/menus/:id",
+            "permission": "admin:menu:update",
+            "operationId": "menus.update",
+            "mutates": true,
+            "auditActionCandidate": "menu.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "menus",
+        "adminPath": "/menus",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 7,
+        "search": [
+          "code",
+          "name",
+          "path"
+        ],
+        "filter": [
+          "code",
+          "external",
+          "keepAlive",
+          "name",
+          "visible"
+        ],
+        "sort": [
+          "code",
+          "external",
+          "keepAlive",
+          "name",
+          "parentCode",
+          "path",
+          "visible"
+        ],
+        "table": [
+          "code",
+          "name",
+          "path",
+          "parentCode",
+          "external",
+          "keepAlive",
+          "visible"
+        ],
+        "form": [
+          "code",
+          "name",
+          "path",
+          "parentCode",
+          "external",
+          "keepAlive",
+          "visible"
+        ],
+        "localizedFields": [
+          "name"
+        ]
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "menu.create",
+          "menu.delete",
+          "menu.update"
+        ]
+      }
+    },
+    {
+      "resource": "monitoring",
+      "code": "monitoring",
+      "label": {
+        "zh": "监控",
+        "en": "Monitoring"
+      },
+      "group": "operations",
+      "codegenMode": "custom",
+      "generationLevel": "manualReview",
+      "backend": {
+        "model": null,
+        "table": null,
+        "apiBase": "/api/admin/monitoring",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/monitoring/:id",
+            "permission": "admin:monitoring:delete",
+            "operationId": "monitoring.delete",
+            "mutates": true,
+            "auditActionCandidate": "monitoring.delete"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/monitoring",
+            "permission": "admin:monitoring:create",
+            "operationId": "monitoring.create",
+            "mutates": true,
+            "auditActionCandidate": "monitoring.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/monitoring/query",
+            "permission": "admin:monitoring:read",
+            "operationId": "monitoring.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/monitoring/:id",
+            "permission": "admin:monitoring:update",
+            "operationId": "monitoring.update",
+            "mutates": true,
+            "auditActionCandidate": "monitoring.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "monitoring",
+        "adminPath": "/monitoring",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 10,
+        "search": [
+          "code",
+          "description",
+          "endpoint",
+          "health",
+          "lastSeenAt",
+          "name",
+          "status",
+          "targetType"
+        ],
+        "filter": [
+          "alertCount",
+          "code",
+          "endpoint",
+          "health",
+          "lastSeenAt",
+          "name",
+          "status",
+          "targetType",
+          "updatedAt"
+        ],
+        "sort": [
+          "alertCount",
+          "code",
+          "endpoint",
+          "health",
+          "lastSeenAt",
+          "name",
+          "status",
+          "targetType",
+          "updatedAt"
+        ],
+        "table": [
+          "code",
+          "name",
+          "targetType",
+          "health",
+          "endpoint",
+          "lastSeenAt",
+          "alertCount",
+          "status",
+          "updatedAt"
+        ],
+        "form": [
+          "code",
+          "name",
+          "targetType",
+          "endpoint",
+          "status",
+          "description"
+        ],
+        "localizedFields": []
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "monitoring.create",
+          "monitoring.delete",
+          "monitoring.update"
+        ]
+      }
+    },
+    {
+      "resource": "orgUnits",
+      "code": "org-units",
+      "label": {
+        "zh": "组织机构",
+        "en": "Org Units"
+      },
+      "group": "system",
+      "codegenMode": "scaffold",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "OrgUnit",
+        "table": "platform_org_units",
+        "apiBase": "/api/admin/org-units",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/org-units/:id",
+            "permission": "admin:org-unit:delete",
+            "operationId": "orgUnits.delete",
+            "mutates": true,
+            "auditActionCandidate": "org_unit.delete"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/org-units",
+            "permission": "admin:org-unit:create",
+            "operationId": "orgUnits.create",
+            "mutates": true,
+            "auditActionCandidate": "org_unit.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/org-units/query",
+            "permission": "admin:org-unit:read",
+            "operationId": "orgUnits.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/org-units/:id",
+            "permission": "admin:org-unit:update",
+            "operationId": "orgUnits.update",
+            "mutates": true,
+            "auditActionCandidate": "org_unit.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "orgUnits",
+        "adminPath": "/org-units",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 9,
+        "search": [
+          "areaCode",
+          "code",
+          "name",
+          "parentCode",
+          "status",
+          "tenantCode",
+          "type"
+        ],
+        "filter": [
+          "areaCode",
+          "code",
+          "name",
+          "parentCode",
+          "sortOrder",
+          "status",
+          "tenantCode",
+          "type"
+        ],
+        "sort": [
+          "areaCode",
+          "code",
+          "name",
+          "parentCode",
+          "sortOrder",
+          "status",
+          "tenantCode",
+          "type"
+        ],
+        "table": [
+          "code",
+          "name",
+          "type",
+          "tenantCode",
+          "parentCode",
+          "areaCode",
+          "sortOrder",
+          "status"
+        ],
+        "form": [
+          "code",
+          "name",
+          "type",
+          "tenantCode",
+          "parentCode",
+          "areaCode",
+          "sortOrder",
+          "status",
+          "description"
+        ],
+        "localizedFields": [
+          "description",
+          "name"
+        ]
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "org_unit.create",
+          "org_unit.delete",
+          "org_unit.update"
+        ]
+      }
+    },
+    {
+      "resource": "overview",
+      "code": "overview",
+      "label": {
+        "zh": "概览",
+        "en": "Overview"
+      },
+      "group": "foundation",
+      "codegenMode": "custom",
+      "generationLevel": "manualReview",
+      "backend": {
+        "model": null,
+        "table": null,
+        "apiBase": "/api/admin/overview",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "GET",
+            "path": "/api/admin/resources/overview",
+            "permission": "admin:overview:read",
+            "operationId": "overview.read",
+            "mutates": false,
+            "auditActionCandidate": null
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "overview",
+        "adminPath": "/overview",
+        "component": "DashboardPage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 2,
+        "search": [],
+        "filter": [],
+        "sort": [
+          "metric",
+          "value"
+        ],
+        "table": [
+          "metric",
+          "value"
+        ],
+        "form": [],
+        "localizedFields": []
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": false,
+        "actionCandidates": []
+      }
+    },
+    {
+      "resource": "parameters",
+      "code": "parameters",
+      "label": {
+        "zh": "参数管理",
+        "en": "Parameters"
+      },
+      "group": "system",
+      "codegenMode": "scaffold",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "Parameter",
+        "table": "platform_parameters",
+        "apiBase": "/api/admin/parameters",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/parameters/:id",
+            "permission": "admin:parameter:delete",
+            "operationId": "parameters.delete",
+            "mutates": true,
+            "auditActionCandidate": "parameter.delete"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/parameters",
+            "permission": "admin:parameter:create",
+            "operationId": "parameters.create",
+            "mutates": true,
+            "auditActionCandidate": "parameter.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/parameters/query",
+            "permission": "admin:parameter:read",
+            "operationId": "parameters.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/parameters/:id",
+            "permission": "admin:parameter:update",
+            "operationId": "parameters.update",
+            "mutates": true,
+            "auditActionCandidate": "parameter.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "parameters",
+        "adminPath": "/parameters",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 4,
+        "search": [
+          "group",
+          "key",
+          "status"
+        ],
+        "filter": [
+          "group",
+          "key",
+          "status"
+        ],
+        "sort": [
+          "group",
+          "key",
+          "status",
+          "value"
+        ],
+        "table": [
+          "key",
+          "value",
+          "group",
+          "status"
+        ],
+        "form": [
+          "key",
+          "value",
+          "group",
+          "status"
+        ],
+        "localizedFields": []
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "parameter.create",
+          "parameter.delete",
+          "parameter.update"
+        ]
+      }
+    },
+    {
+      "resource": "permissions",
+      "code": "permissions",
+      "label": {
+        "zh": "权限码",
+        "en": "Permissions"
+      },
+      "group": "system",
+      "codegenMode": "readOnlySeeded",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "Permission",
+        "table": "platform_permissions",
+        "apiBase": "/api/admin/permissions",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/permissions/:id",
+            "permission": "admin:permission:delete",
+            "operationId": "permissions.delete",
+            "mutates": true,
+            "auditActionCandidate": "permission.delete"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/permissions",
+            "permission": "admin:permission:create",
+            "operationId": "permissions.create",
+            "mutates": true,
+            "auditActionCandidate": "permission.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/permissions/query",
+            "permission": "admin:permission:read",
+            "operationId": "permissions.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/permissions/:id",
+            "permission": "admin:permission:update",
+            "operationId": "permissions.update",
+            "mutates": true,
+            "auditActionCandidate": "permission.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "permissions",
+        "adminPath": "/permissions",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 4,
+        "search": [
+          "code",
+          "module",
+          "name"
+        ],
+        "filter": [
+          "code",
+          "module",
+          "name"
+        ],
+        "sort": [
+          "code",
+          "module",
+          "name"
+        ],
+        "table": [
+          "code",
+          "name",
+          "module"
+        ],
+        "form": [
+          "code",
+          "name",
+          "module",
+          "description"
+        ],
+        "localizedFields": [
+          "description",
+          "name"
+        ]
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "permission.create",
+          "permission.delete",
+          "permission.update"
+        ]
+      }
+    },
+    {
+      "resource": "roleGroups",
+      "code": "role-groups",
+      "label": {
+        "zh": "角色组",
+        "en": "Role Groups"
+      },
+      "group": "system",
+      "codegenMode": "scaffold",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "RoleGroup",
+        "table": "platform_role_groups",
+        "apiBase": "/api/admin/role-groups",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/role-groups/:id",
+            "permission": "admin:role-group:delete",
+            "operationId": "roleGroups.delete",
+            "mutates": true,
+            "auditActionCandidate": "role_group.delete"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/role-groups",
+            "permission": "admin:role-group:create",
+            "operationId": "roleGroups.create",
+            "mutates": true,
+            "auditActionCandidate": "role_group.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/role-groups/query",
+            "permission": "admin:role-group:read",
+            "operationId": "roleGroups.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/role-groups/:id",
+            "permission": "admin:role-group:update",
+            "operationId": "roleGroups.update",
+            "mutates": true,
+            "auditActionCandidate": "role_group.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "roleGroups",
+        "adminPath": "/role-groups",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 6,
+        "search": [
+          "code",
+          "name",
+          "parentCode",
+          "status"
+        ],
+        "filter": [
+          "code",
+          "name",
+          "parentCode",
+          "sortOrder",
+          "status"
+        ],
+        "sort": [
+          "code",
+          "name",
+          "parentCode",
+          "sortOrder",
+          "status"
+        ],
+        "table": [
+          "code",
+          "name",
+          "parentCode",
+          "sortOrder",
+          "status"
+        ],
+        "form": [
+          "code",
+          "name",
+          "parentCode",
+          "sortOrder",
+          "description",
+          "status"
+        ],
+        "localizedFields": [
+          "description",
+          "name"
+        ]
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "role_group.create",
+          "role_group.delete",
+          "role_group.update"
+        ]
+      }
+    },
+    {
+      "resource": "roles",
+      "code": "roles",
+      "label": {
+        "zh": "角色管理",
+        "en": "Roles"
+      },
+      "group": "system",
+      "codegenMode": "scaffold",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "Role",
+        "table": "platform_roles",
+        "apiBase": "/api/admin/roles",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/roles/:id",
+            "permission": "admin:role:delete",
+            "operationId": "roles.delete",
+            "mutates": true,
+            "auditActionCandidate": "role.delete"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/roles",
+            "permission": "admin:role:create",
+            "operationId": "roles.create",
+            "mutates": true,
+            "auditActionCandidate": "role.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/roles/query",
+            "permission": "admin:role:read",
+            "operationId": "roles.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/roles/:id",
+            "permission": "admin:role:update",
+            "operationId": "roles.update",
+            "mutates": true,
+            "auditActionCandidate": "role.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "roles",
+        "adminPath": "/roles",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 9,
+        "search": [
+          "code",
+          "dataScope",
+          "dataScopeAreaCodes",
+          "dataScopeOrgCodes",
+          "denyPermissions",
+          "groupCode",
+          "name",
+          "status"
+        ],
+        "filter": [
+          "code",
+          "dataScope",
+          "dataScopeAreaCodes",
+          "dataScopeOrgCodes",
+          "denyPermissions",
+          "groupCode",
+          "name",
+          "permissions",
+          "status"
+        ],
+        "sort": [
+          "code",
+          "dataScope",
+          "groupCode",
+          "name",
+          "status"
+        ],
+        "table": [
+          "code",
+          "name",
+          "groupCode",
+          "dataScope",
+          "status"
+        ],
+        "form": [
+          "code",
+          "name",
+          "groupCode",
+          "dataScope",
+          "dataScopeOrgCodes",
+          "dataScopeAreaCodes",
+          "permissions",
+          "denyPermissions",
+          "status"
+        ],
+        "localizedFields": [
+          "name"
+        ]
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "role.create",
+          "role.delete",
+          "role.update"
+        ]
+      }
+    },
+    {
+      "resource": "sessions",
+      "code": "sessions",
+      "label": {
+        "zh": "在线会话",
+        "en": "Sessions"
+      },
+      "group": "operations",
+      "codegenMode": "readOnly",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "Session",
+        "table": "platform_sessions",
+        "apiBase": "/api/admin/sessions",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/sessions/:id",
+            "permission": "admin:session:delete",
+            "operationId": "sessions.delete",
+            "mutates": true,
+            "auditActionCandidate": "session.delete"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/sessions/query",
+            "permission": "admin:session:read",
+            "operationId": "sessions.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "sessions",
+        "adminPath": "/sessions",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 4,
+        "search": [
+          "status",
+          "tokenType",
+          "username"
+        ],
+        "filter": [
+          "expiresAt",
+          "status",
+          "tokenType",
+          "username"
+        ],
+        "sort": [
+          "expiresAt",
+          "status",
+          "tokenType",
+          "username"
+        ],
+        "table": [
+          "username",
+          "tokenType",
+          "expiresAt",
+          "status"
+        ],
+        "form": [],
+        "localizedFields": []
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "session.delete"
+        ]
+      }
+    },
+    {
+      "resource": "settings",
+      "code": "settings",
+      "label": {
+        "zh": "系统设置",
+        "en": "Settings"
+      },
+      "group": "foundation",
+      "codegenMode": "custom",
+      "generationLevel": "manualReview",
+      "backend": {
+        "model": null,
+        "table": null,
+        "apiBase": "/api/admin/settings",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "GET",
+            "path": "/api/admin/resources/settings",
+            "permission": "admin:settings:read",
+            "operationId": "settings.read",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/settings",
+            "permission": "admin:settings:update",
+            "operationId": "settings.update",
+            "mutates": true,
+            "auditActionCandidate": "settings.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "settings",
+        "adminPath": "/settings",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 4,
+        "search": [
+          "group",
+          "key"
+        ],
+        "filter": [
+          "group",
+          "key",
+          "updatedAt"
+        ],
+        "sort": [
+          "group",
+          "key",
+          "updatedAt",
+          "value"
+        ],
+        "table": [
+          "key",
+          "value",
+          "group",
+          "updatedAt"
+        ],
+        "form": [
+          "value"
+        ],
+        "localizedFields": []
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "settings.update"
+        ]
+      }
+    },
+    {
+      "resource": "tenants",
+      "code": "tenants",
+      "label": {
+        "zh": "租户管理",
+        "en": "Tenants"
+      },
+      "group": "system",
+      "codegenMode": "scaffold",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "Tenant",
+        "table": "platform_tenants",
+        "apiBase": "/api/admin/tenants",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/tenants/:id",
+            "permission": "admin:tenant:delete",
+            "operationId": "tenants.delete",
+            "mutates": true,
+            "auditActionCandidate": "tenant.delete"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/tenants",
+            "permission": "admin:tenant:create",
+            "operationId": "tenants.create",
+            "mutates": true,
+            "auditActionCandidate": "tenant.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/tenants/query",
+            "permission": "admin:tenant:read",
+            "operationId": "tenants.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/tenants/:id",
+            "permission": "admin:tenant:update",
+            "operationId": "tenants.update",
+            "mutates": true,
+            "auditActionCandidate": "tenant.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "tenants",
+        "adminPath": "/tenants",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 5,
+        "search": [
+          "areaCode",
+          "code",
+          "name",
+          "status"
+        ],
+        "filter": [
+          "areaCode",
+          "code",
+          "name",
+          "status",
+          "updatedAt"
+        ],
+        "sort": [
+          "areaCode",
+          "code",
+          "name",
+          "status",
+          "updatedAt"
+        ],
+        "table": [
+          "code",
+          "name",
+          "areaCode",
+          "status",
+          "updatedAt"
+        ],
+        "form": [
+          "code",
+          "name",
+          "areaCode",
+          "status"
+        ],
+        "localizedFields": [
+          "name"
+        ]
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "tenant.create",
+          "tenant.delete",
+          "tenant.update"
+        ]
+      }
+    },
+    {
+      "resource": "users",
+      "code": "users",
+      "label": {
+        "zh": "用户管理",
+        "en": "Users"
+      },
+      "group": "system",
+      "codegenMode": "scaffold",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "User",
+        "table": "platform_users",
+        "apiBase": "/api/admin/users",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "DELETE",
+            "path": "/api/admin/resources/users/:id",
+            "permission": "admin:user:delete",
+            "operationId": "users.delete",
+            "mutates": true,
+            "auditActionCandidate": "user.delete"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/users",
+            "permission": "admin:user:create",
+            "operationId": "users.create",
+            "mutates": true,
+            "auditActionCandidate": "user.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/users/query",
+            "permission": "admin:user:read",
+            "operationId": "users.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/users/:id",
+            "permission": "admin:user:update",
+            "operationId": "users.update",
+            "mutates": true,
+            "auditActionCandidate": "user.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "users",
+        "adminPath": "/users",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 8,
+        "search": [
+          "areaCode",
+          "code",
+          "name",
+          "orgUnitCode",
+          "status",
+          "tenantCode"
+        ],
+        "filter": [
+          "areaCode",
+          "code",
+          "name",
+          "orgUnitCode",
+          "roles",
+          "status",
+          "tenantCode",
+          "updatedAt"
+        ],
+        "sort": [
+          "areaCode",
+          "code",
+          "name",
+          "orgUnitCode",
+          "status",
+          "tenantCode",
+          "updatedAt"
+        ],
+        "table": [
+          "code",
+          "name",
+          "tenantCode",
+          "orgUnitCode",
+          "areaCode",
+          "roles",
+          "status",
+          "updatedAt"
+        ],
+        "form": [
+          "code",
+          "name",
+          "tenantCode",
+          "orgUnitCode",
+          "areaCode",
+          "roles",
+          "status"
+        ],
+        "localizedFields": [
+          "name"
+        ]
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "user.create",
+          "user.delete",
+          "user.update"
+        ]
+      }
+    },
+    {
+      "resource": "versions",
+      "code": "versions",
+      "label": {
+        "zh": "版本管理",
+        "en": "Versions"
+      },
+      "group": "operations",
+      "codegenMode": "scaffold",
+      "generationLevel": "templateCandidate",
+      "backend": {
+        "model": "Version",
+        "table": "platform_versions",
+        "apiBase": "/api/admin/versions",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/versions",
+            "permission": "admin:version:create",
+            "operationId": "versions.create",
+            "mutates": true,
+            "auditActionCandidate": "version.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/versions/query",
+            "permission": "admin:version:read",
+            "operationId": "versions.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/versions/:id",
+            "permission": "admin:version:update",
+            "operationId": "versions.update",
+            "mutates": true,
+            "auditActionCandidate": "version.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "versions",
+        "adminPath": "/versions",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 4,
+        "search": [
+          "channel",
+          "status",
+          "version"
+        ],
+        "filter": [
+          "channel",
+          "releasedAt",
+          "status",
+          "version"
+        ],
+        "sort": [
+          "channel",
+          "releasedAt",
+          "status",
+          "version"
+        ],
+        "table": [
+          "version",
+          "channel",
+          "status",
+          "releasedAt"
+        ],
+        "form": [
+          "version",
+          "channel",
+          "status",
+          "releasedAt"
+        ],
+        "localizedFields": []
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "version.create",
+          "version.update"
+        ]
+      }
+    }
+  ]
+}

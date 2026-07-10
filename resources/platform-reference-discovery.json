@@ -1,0 +1,271 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-reference-discovery.json",
+  "capturedAt": "2026-07-07",
+  "purpose": "Machine-checkable discovery record for reusable, optional and business-only capabilities observed in the zshenmez reference project before promoting anything into the platform foundation.",
+  "reference": {
+    "project": "zshenmez",
+    "root": "/Users/irainbow/Documents/DevelopmentSpace/myProject/zshenmez",
+    "policy": "Reference capabilities must be classified from source evidence before platform promotion. Default platform promotion is allowed only for business-neutral foundation capabilities already mapped by platform-reference-coverage."
+  },
+  "sourceSets": [
+    {
+      "id": "admin-resource-manifest",
+      "paths": ["resources/admin-resources.json"],
+      "requiredSignals": ["dashboard", "role-groups", "org-units", "api-tokens", "support-tickets"]
+    },
+    {
+      "id": "backend-models",
+      "paths": ["api/internal/model/model.go", "api/internal/database/entities.go"],
+      "requiredSignals": ["StorageSettings", "UserOrgMembership", "UserAddress", "RoleApplication", "Task", "TransferApplication", "SupportTicket"]
+    },
+    {
+      "id": "http-routes",
+      "paths": ["api/internal/httpapi/server.go", "api/internal/httpapi/handlers.go", "api/internal/httpapi/wechat.go"],
+      "requiredSignals": ["admin.GET(\"/storage-settings\"", "app.POST(\"/me/phone-bindings\"", "app.GET(\"/me/addresses\"", "app.GET(\"/tasks\"", "app.POST(\"/support-tickets\""]
+    },
+    {
+      "id": "admin-query-security",
+      "paths": ["admin/src/apiBoundary.ts", "admin/src/querySecurity.ts", "admin/scripts/check-api-boundary.mjs", "api/internal/httpapi/query_security_test.go"],
+      "requiredSignals": ["assertAdminPath", "assertSafeCollectionFilters", "Sensitive filter field cannot be sent", "Admin API boundary contract passed", "POST /sessions/queries"]
+    },
+    {
+      "id": "app-client-api-boundary",
+      "paths": [
+        "docs/mvp1-handoff-2026-06-19.md",
+        "docs/auth-rbac-multitenancy.md",
+        "docs/api-contract.md",
+        "miniprogram-native-v2/tests/apiPorts.test.ts",
+        "miniprogram-native-v2/scripts/check-boundary.mjs",
+        "miniprogram-native-v2/src/api/appRequest.ts",
+        "miniprogram-native-v2/src/api/appUpload.ts"
+      ],
+      "requiredSignals": [
+        "不能直接在业务页里手写",
+        "C 端请求层固定",
+        "builds app API URLs and strips caller Authorization headers",
+        "use src/api/appUpload.ts instead of wx.uploadFile",
+        "headers.Authorization = `Bearer ${token}`",
+        "wx.request({"
+      ]
+    },
+    {
+      "id": "architecture-docs",
+      "paths": ["docs/api-contract.md", "docs/auth-rbac-multitenancy.md", "docs/data-model.md", "docs/platform-architecture.md"],
+      "requiredSignals": ["tenant_id", "org_units", "user_org_memberships", "role_groups", "active_sessions", "file_assets", "POST /api/app/tasks"]
+    },
+    {
+      "id": "demo-data-reset",
+      "paths": ["api/cmd/demo-data-reset/main.go", "api/internal/store/store.go"],
+      "requiredSignals": ["ResetDemoData", "seedDemoResources", "demo data reset complete"]
+    }
+  ],
+  "classificationRules": {
+    "foundation": "Business-neutral capability that multiple projects need and that maps to platform base capabilities or default resources.",
+    "extension": "Reusable capability that should remain opt-in through a profile or owning capability because not every platform deployment needs it.",
+    "business": "Domain workflow or resource that must stay under internal/apps/<app> and outside platform-default.",
+    "deferred": "Candidate that is useful but must not be promoted without a separate spec, repeated demand, and a target profile.",
+    "promotionRule": "Do not promote a capability into platform-default unless it has source evidence, a foundation coverage area, manifest resources or app routes, i18n/admin contract coverage when UI-facing, and default-platform leakage tests."
+  },
+  "candidates": [
+    {
+      "id": "dashboard-shell",
+      "classification": "foundation",
+      "coverageArea": "dashboard",
+      "platformCapabilities": ["admin-shell"],
+      "platformResources": ["overview"],
+      "sourceSets": ["admin-resource-manifest"],
+      "evidenceSignals": ["dashboard"],
+      "decision": "reuse-as-foundation"
+    },
+    {
+      "id": "identity-tenancy-org",
+      "classification": "foundation",
+      "coverageArea": "identity-and-tenancy",
+      "platformCapabilities": ["tenant", "identity", "dictionary"],
+      "platformResources": ["tenants", "users", "org-units", "area-codes", "app-identities"],
+      "sourceSets": ["admin-resource-manifest", "backend-models", "architecture-docs"],
+      "evidenceSignals": ["Tenant", "User", "OrgUnit", "tenant_id", "org_units"],
+      "decision": "reuse-as-foundation"
+    },
+    {
+      "id": "rbac-menu-permissions",
+      "classification": "foundation",
+      "coverageArea": "rbac-and-menu",
+      "platformCapabilities": ["rbac", "menu"],
+      "platformResources": ["roles", "role-groups", "permissions", "menus"],
+      "sourceSets": ["admin-resource-manifest", "backend-models", "architecture-docs"],
+      "evidenceSignals": ["Role", "RoleGroup", "Menu", "role_groups"],
+      "decision": "reuse-as-foundation"
+    },
+    {
+      "id": "api-governance",
+      "classification": "foundation",
+      "coverageArea": "api-governance",
+      "platformCapabilities": ["api-resource", "system-admin"],
+      "platformResources": ["api-resources", "api-docs", "api-tokens"],
+      "sourceSets": ["admin-resource-manifest", "backend-models"],
+      "evidenceSignals": ["APIResource", "APIToken", "api-tokens"],
+      "decision": "reuse-as-foundation"
+    },
+    {
+      "id": "dictionary-parameters-storage-settings",
+      "classification": "foundation",
+      "coverageArea": "dictionary-parameters-branding",
+      "platformCapabilities": ["dictionary", "parameter", "file-storage"],
+      "platformResources": ["dictionaries", "dictionary-parameters", "parameters", "settings", "branding", "files"],
+      "nonResourceCapabilities": ["storage-settings"],
+      "sourceSets": ["admin-resource-manifest", "backend-models", "http-routes", "architecture-docs"],
+      "evidenceSignals": ["Dictionary", "StorageSettings", "admin.GET(\"/storage-settings\""],
+      "decision": "map-to-existing-foundation"
+    },
+    {
+      "id": "audit-session-operations",
+      "classification": "foundation",
+      "coverageArea": "audit-and-operations",
+      "platformCapabilities": ["audit", "session", "system-admin"],
+      "platformResources": ["audit-logs", "login-logs", "error-logs", "sessions", "versions", "monitoring"],
+      "sourceSets": ["admin-resource-manifest", "backend-models", "architecture-docs"],
+      "evidenceSignals": ["LoginLog", "ErrorLog", "active_sessions", "versions"],
+      "decision": "reuse-as-foundation"
+    },
+    {
+      "id": "file-storage-assets",
+      "classification": "foundation",
+      "coverageArea": "file-storage",
+      "platformCapabilities": ["file-storage"],
+      "platformResources": ["files"],
+      "sourceSets": ["admin-resource-manifest", "backend-models", "http-routes", "architecture-docs"],
+      "evidenceSignals": ["FileAsset", "file_assets", "/api/app/files"],
+      "decision": "reuse-as-foundation"
+    },
+    {
+      "id": "auth-provider-wechat-demo",
+      "classification": "foundation",
+      "coverageArea": "auth-providers",
+      "platformCapabilities": ["session", "wechat-login"],
+      "authProviders": ["demo", "wechat"],
+      "sourceSets": ["http-routes", "architecture-docs"],
+      "evidenceSignals": ["wechat", "/api/app/sessions", "tokenType"],
+      "decision": "reuse-as-foundation"
+    },
+    {
+      "id": "demo-data-reset",
+      "classification": "foundation",
+      "coverageArea": "demo-data",
+      "platformCapabilities": ["demo-data"],
+      "platformResources": ["demo-data"],
+      "sourceSets": ["demo-data-reset"],
+      "evidenceSignals": ["ResetDemoData", "seedDemoResources"],
+      "decision": "reuse-as-foundation-but-forbidden-in-production"
+    },
+    {
+      "id": "app-phone-identity",
+      "classification": "extension",
+      "extensionArea": "app-phone-identity",
+      "expectedCapability": "app-phone",
+      "expectedProfile": "platform-app-ready",
+      "nonResourceCapabilities": ["app-phone-binding"],
+      "sourceSets": ["backend-models", "http-routes", "architecture-docs"],
+      "evidenceSignals": ["AppPhoneBindingRequest", "app.POST(\"/me/phone-bindings\"", "app.POST(\"/phone-verification-codes\""],
+      "decision": "keep-optional-profile"
+    },
+    {
+      "id": "detailed-addresses",
+      "classification": "extension",
+      "extensionArea": "detailed-addresses",
+      "expectedCapability": "owning-capability",
+      "nonResourceCapabilities": ["user-addresses"],
+      "sourceSets": ["backend-models", "http-routes", "architecture-docs"],
+      "evidenceSignals": ["UserAddress", "app.GET(\"/me/addresses\""],
+      "decision": "keep-out-of-default-until-repeated-reuse"
+    },
+    {
+      "id": "multi-org-membership",
+      "classification": "extension",
+      "extensionArea": "multi-org-membership",
+      "expectedCapability": "owning-capability",
+      "nonResourceCapabilities": ["user-org-memberships"],
+      "sourceSets": ["backend-models", "architecture-docs"],
+      "evidenceSignals": ["UserOrgMembership", "user_org_memberships"],
+      "decision": "keep-primary-org-in-default-and-defer-multi-org-extension"
+    },
+    {
+      "id": "personnel-position-governance",
+      "classification": "extension",
+      "extensionArea": "personnel-and-positions",
+      "expectedCapability": "personnel",
+      "sourceSets": ["architecture-docs"],
+      "evidenceSignals": ["role_profiles", "org_units"],
+      "decision": "map-to-optional-personnel-profile"
+    },
+    {
+      "id": "role-application-access",
+      "classification": "business",
+      "businessArea": "business-access",
+      "expectedCapability": "external-business-capability",
+      "sourceSets": ["admin-resource-manifest", "backend-models", "http-routes", "architecture-docs"],
+      "evidenceSignals": ["RoleApplication", "app.POST(\"/role-applications\""],
+      "decision": "keep-in-business-capability"
+    },
+    {
+      "id": "business-content-profiles-portfolio-favorites",
+      "classification": "business",
+      "businessArea": "business-content",
+      "expectedCapability": "external-business-capability",
+      "sourceSets": ["admin-resource-manifest", "backend-models", "http-routes", "architecture-docs"],
+      "evidenceSignals": ["PublicProfile", "PortfolioWork", "Favorite", "app.GET(\"/public-profiles\""],
+      "decision": "keep-in-business-capability"
+    },
+    {
+      "id": "business-dispatch-transfer",
+      "classification": "business",
+      "businessArea": "business-dispatch",
+      "expectedCapability": "external-business-capability",
+      "sourceSets": ["admin-resource-manifest", "backend-models", "http-routes", "architecture-docs"],
+      "evidenceSignals": ["Task", "TransferApplication", "TransferEdge", "app.GET(\"/tasks\"", "app.GET(\"/transfer-opportunities\""],
+      "decision": "keep-in-business-capability"
+    },
+    {
+      "id": "business-fulfillment-confirmations",
+      "classification": "business",
+      "businessArea": "business-fulfillment",
+      "expectedCapability": "external-business-capability",
+      "sourceSets": ["backend-models", "http-routes", "architecture-docs"],
+      "evidenceSignals": ["TaskCheckIn", "TaskCompletionConfirmation", "app.POST(\"/task-check-ins\""],
+      "decision": "keep-in-business-capability"
+    },
+    {
+      "id": "business-support-tickets",
+      "classification": "business",
+      "businessArea": "business-support",
+      "expectedCapability": "external-business-capability",
+      "sourceSets": ["admin-resource-manifest", "backend-models", "http-routes", "architecture-docs"],
+      "evidenceSignals": ["SupportTicket", "app.POST(\"/support-tickets\""],
+      "decision": "keep-in-business-capability"
+    },
+    {
+      "id": "query-security-and-api-boundary",
+      "classification": "foundation",
+      "coverageArea": "api-governance",
+      "platformCapabilities": ["api-resource", "system-admin"],
+      "platformResources": ["api-resources", "api-docs"],
+      "sourceSets": ["admin-query-security", "http-routes", "architecture-docs"],
+      "evidenceSignals": ["assertAdminPath", "assertSafeCollectionFilters", "Admin API boundary contract passed", "/api/admin/*", "/api/app/*"],
+      "decision": "reuse-as-foundation-gate"
+    },
+    {
+      "id": "app-client-api-boundary",
+      "classification": "foundation",
+      "coverageArea": "api-governance",
+      "platformCapabilities": ["api-resource", "system-admin"],
+      "platformResources": ["api-resources", "api-docs"],
+      "sourceSets": ["app-client-api-boundary", "architecture-docs"],
+      "evidenceSignals": ["不能直接在业务页里手写", "C 端请求层固定", "builds app API URLs and strips caller Authorization headers", "use src/api/appUpload.ts instead of wx.uploadFile", "/api/app/*"],
+      "decision": "reuse-as-foundation-gate"
+    }
+  ],
+  "mustStayBusinessOnly": ["role-application-access", "business-content-profiles-portfolio-favorites", "business-dispatch-transfer", "business-fulfillment-confirmations", "business-support-tickets"],
+  "mustStayOptional": ["app-phone-identity", "detailed-addresses", "multi-org-membership", "personnel-position-governance"],
+  "mustStayOutOfDefaultProfile": ["external-business-capability", "app-phone", "personnel"],
+  "documents": ["docs/platform-capability-development.md", "docs/platform-foundation-task-map.md", "docs/platform-roadmap.md"]
+}

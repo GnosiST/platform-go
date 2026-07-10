@@ -1,0 +1,1699 @@
+{
+  "generatedBy": "scripts/generate-admin-scaffold-promotion-review.mjs",
+  "sources": {
+    "scaffoldPlan": "resources/generated/admin-scaffold-plan.json",
+    "scaffoldFiles": "resources/generated/admin-scaffold-files.json",
+    "readiness": "resources/platform-codegen-source-writing-readiness.json"
+  },
+  "sourceVersion": "0.1.0",
+  "mode": {
+    "dryRun": true,
+    "sourceWriting": "disabled",
+    "runtimeMutation": "disabled",
+    "promotion": "manual-review-required"
+  },
+  "summary": {
+    "targetFamilyCount": 5,
+    "scaffoldRoleCount": 5,
+    "resourceCount": 27,
+    "candidateResourceCount": 17,
+    "manualReviewResourceCount": 10,
+    "candidateFileCount": 85,
+    "generatedFileCount": 85,
+    "conflictCount": 0,
+    "unsafePathCount": 0,
+    "blockerCount": 0
+  },
+  "reviewGates": {
+    "requiresExplicitSpec": true,
+    "requiresHumanReview": true,
+    "requiresDiffReview": true,
+    "requiresTestMapping": true,
+    "promotionRules": [
+      {
+        "id": "generated-marker-required",
+        "required": true
+      },
+      {
+        "id": "no-handwritten-overwrite",
+        "required": true
+      },
+      {
+        "id": "review-scaffold-first",
+        "required": true
+      },
+      {
+        "id": "test-command-required",
+        "required": true
+      }
+    ]
+  },
+  "sourceWritingApprovalPackage": {
+    "status": "blocked",
+    "sourceOfTruth": "external-review-artifacts",
+    "defaultRuntimeMutation": "forbidden",
+    "requiredApprovals": [
+      "platform-architect",
+      "codegen-owner",
+      "runtime-owner",
+      "operations-owner"
+    ],
+    "requiredEvidence": [
+      {
+        "id": "explicit-source-writing-spec",
+        "owner": "platform-architect",
+        "evidenceKind": "architecture-spec",
+        "description": "Separate source-writing specification that names generated families, runtime roots, conflict policy, rollback and verification commands."
+      },
+      {
+        "id": "approved-promotion-review-packet",
+        "owner": "codegen-owner",
+        "evidenceKind": "signed-review-record",
+        "description": "Human approval of resources/generated/admin-scaffold-promotion-review.json after reviewing generated hashes and target-family mappings."
+      },
+      {
+        "id": "diff-review",
+        "owner": "runtime-owner",
+        "evidenceKind": "reviewed-diff",
+        "description": "Review evidence for every runtime source file that would be created or overwritten by generated output."
+      },
+      {
+        "id": "rollback-plan",
+        "owner": "operations-owner",
+        "evidenceKind": "rollback-runbook",
+        "description": "Rollback steps for reverting generated runtime source writes and regenerated artifacts without damaging handwritten code."
+      },
+      {
+        "id": "target-family-test-run",
+        "owner": "codegen-owner",
+        "evidenceKind": "test-output",
+        "description": "Captured output for every target family test command declared in this readiness contract."
+      },
+      {
+        "id": "runtime-target-owner-approval",
+        "owner": "runtime-owner",
+        "evidenceKind": "root-owner-approval",
+        "description": "Approval from each runtime target root owner before generated files can be promoted into that root."
+      }
+    ],
+    "completedEvidence": [],
+    "prohibitedEvidence": [
+      "text-only approval",
+      "missing reviewed diff",
+      "missing rollback plan",
+      "missing target-family test output",
+      "runtime mutation enabled in review packet"
+    ],
+    "mustNotEnableSourceWriting": true,
+    "completedEvidenceSchema": {
+      "requiredFields": [
+        "id",
+        "owner",
+        "evidenceKind",
+        "artifactURI",
+        "artifactHash",
+        "approvedBy",
+        "approvedAt",
+        "reviewedCommit",
+        "targetFamilies",
+        "runtimeTargets",
+        "verificationCommands",
+        "rollbackCommands"
+      ],
+      "approvalRules": [
+        "artifact-id-must-match-requiredEvidence",
+        "approvedBy-must-not-equal-owner",
+        "all-required-owners-represented",
+        "all-target-families-covered",
+        "runtime-target-owner-approval-required",
+        "reviewed-diff-required-per-runtime-target",
+        "artifact-hash-must-be-sha256-hex",
+        "artifact-uri-must-be-external-review-artifact",
+        "verification-commands-must-use-rtk",
+        "rollback-commands-required-before-runtime-mutation"
+      ],
+      "forbiddenFields": [
+        "secret",
+        "token",
+        "password",
+        "credential",
+        "privateKey"
+      ],
+      "artifactHashPolicy": {
+        "algorithm": "sha256",
+        "format": "prefix-hex",
+        "prefix": "sha256:",
+        "hexLength": 64,
+        "casing": "lowercase"
+      },
+      "artifactURIPolicy": {
+        "sourceOfTruth": "external-review-artifacts",
+        "allowedSchemes": [
+          "https",
+          "s3",
+          "gs"
+        ],
+        "forbiddenSchemes": [
+          "file",
+          "http"
+        ],
+        "forbidRelativePaths": true,
+        "forbidLocalAbsolutePaths": true,
+        "forbidLocalhost": true,
+        "forbidPrivateNetworkHosts": true
+      }
+    }
+  },
+  "runtimeTargetPolicy": {
+    "mode": "explicit-root-registry",
+    "newRootPolicy": "requires-separate-architecture-spec",
+    "roots": [
+      {
+        "path": "internal/platform/model/",
+        "status": "proposed",
+        "owner": "platform-storage",
+        "promotionGate": "source-writing-codegen-promotion",
+        "requiresExistingDirectory": false,
+        "requiresSeparateSpec": true,
+        "purpose": "Future generated GORM model package; not an active runtime package until promoted by a separate source-writing spec."
+      },
+      {
+        "path": "internal/platform/repository/",
+        "status": "proposed",
+        "owner": "platform-storage",
+        "promotionGate": "source-writing-codegen-promotion",
+        "requiresExistingDirectory": false,
+        "requiresSeparateSpec": true,
+        "purpose": "Future generated repository package; current runtime repositories stay behind existing platform storage/adminresource adapters."
+      },
+      {
+        "path": "internal/platform/httpapi/",
+        "status": "existing",
+        "owner": "platform-http",
+        "promotionGate": "source-writing-codegen-promotion",
+        "requiresExistingDirectory": true,
+        "requiresSeparateSpec": true,
+        "purpose": "Existing Gin HTTP API package; source-writing route promotion requires explicit route ownership and tests."
+      },
+      {
+        "path": "internal/platform/adminresource/",
+        "status": "existing",
+        "owner": "admin-resource-engine",
+        "promotionGate": "source-writing-codegen-promotion",
+        "requiresExistingDirectory": true,
+        "requiresSeparateSpec": true,
+        "purpose": "Existing admin resource engine package; generated code must not bypass schema/query/data-scope contracts."
+      },
+      {
+        "path": "admin/src/platform/resources/",
+        "status": "existing",
+        "owner": "admin-ui",
+        "promotionGate": "source-writing-codegen-promotion",
+        "requiresExistingDirectory": true,
+        "requiresSeparateSpec": true,
+        "purpose": "Existing admin resource frontend package; generated pages must keep Refine and platform UI wrappers."
+      },
+      {
+        "path": "admin/src/platform/refine/",
+        "status": "existing",
+        "owner": "admin-ui",
+        "promotionGate": "source-writing-codegen-promotion",
+        "requiresExistingDirectory": true,
+        "requiresSeparateSpec": true,
+        "purpose": "Existing Refine integration package; generated source must preserve provider contracts."
+      }
+    ]
+  },
+  "manualReview": {
+    "required": true,
+    "requiredBeforeSourceWriting": true,
+    "decision": "not-approved",
+    "reasons": [
+      "Runtime source writing is disabled.",
+      "Generated scaffold files are review artifacts, not runtime source changes.",
+      "Each target family must pass its mapped test commands before any future promotion.",
+      "Human review and diff review remain required before enabling source-writing generation."
+    ],
+    "preflightCommands": [
+      "rtk node scripts/generate-admin-codegen-preview.mjs",
+      "rtk node scripts/generate-admin-scaffold-plan.mjs",
+      "rtk node scripts/generate-admin-scaffold-files.mjs",
+      "rtk node scripts/generate-admin-scaffold-draft.mjs",
+      "rtk node scripts/generate-admin-scaffold-promotion-review.mjs",
+      "rtk node scripts/validate-platform-codegen-source-writing-readiness.mjs",
+      "rtk node scripts/validate-admin-resources.mjs"
+    ]
+  },
+  "targetFamilies": [
+    {
+      "id": "backend-models",
+      "purpose": "Future GORM model source promotion from generated model drafts.",
+      "scaffoldRoles": [
+        "gormModelDraft"
+      ],
+      "runtimeTargets": [
+        "internal/platform/model/"
+      ],
+      "runtimeTargetRoots": [
+        {
+          "target": "internal/platform/model/",
+          "root": "internal/platform/model/",
+          "status": "proposed",
+          "owner": "platform-storage",
+          "requiresSeparateSpec": true
+        }
+      ],
+      "testCommands": [
+        "rtk go test ./internal/platform/adminresource ./internal/platform/core"
+      ],
+      "summary": {
+        "resourceCount": 17,
+        "reviewItemCount": 17,
+        "generatedArtifactCount": 17,
+        "conflictCount": 0
+      },
+      "reviewItems": [
+        {
+          "resource": "apiResources",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/apiResources/backend/APIResource.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/APIResource.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "d05136f0c9aff7b37e9f5bed449c948695dfc1929d047b8aebe61555a0546eca",
+          "reviewRequired": true
+        },
+        {
+          "resource": "appIdentities",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/appIdentities/backend/AppIdentity.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/AppIdentity.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "2ed31fa7ff48c8e6bb46e630de90ee2b82c6dde7fb10e51664d62c30ca986f8c",
+          "reviewRequired": true
+        },
+        {
+          "resource": "areaCodes",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/areaCodes/backend/AreaCode.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/AreaCode.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "eff34078c03d82861586a98d879650c5e5a90dd1f2aec17a47d2dd4ce3b47282",
+          "reviewRequired": true
+        },
+        {
+          "resource": "auditLogs",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/auditLogs/backend/AuditLog.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/AuditLog.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "3ad8ce3133210da9282662b6c4e1edff02132ecf8d014e9f81b073de4cd6c1c1",
+          "reviewRequired": true
+        },
+        {
+          "resource": "dictionaries",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/dictionaries/backend/Dictionary.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/Dictionary.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "0e6efacb8c5ba61b8490972d0e901da44261d2b7103c4e3bbdaba97abc9c44c8",
+          "reviewRequired": true
+        },
+        {
+          "resource": "errorLogs",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/errorLogs/backend/ErrorLog.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/ErrorLog.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "6fc6aa2b115d73b536110814f31014f47ab66f83bbc852c0d6085793bc4807e7",
+          "reviewRequired": true
+        },
+        {
+          "resource": "loginLogs",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/loginLogs/backend/LoginLog.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/LoginLog.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "ac503c2028aa0d0c1edd9b24c83b835a3c3fb71d049b54ecd817e1eb3e08b2e6",
+          "reviewRequired": true
+        },
+        {
+          "resource": "menus",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/menus/backend/Menu.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/Menu.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "46004c62d1ea8ed941f90f67de1e0385a71346a0b5706fe548b1e1c1f6e20563",
+          "reviewRequired": true
+        },
+        {
+          "resource": "orgUnits",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/orgUnits/backend/OrgUnit.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/OrgUnit.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "dfbe45aaf793b62a8425e3615db1fc101adff3695842047ca94f4ff316206461",
+          "reviewRequired": true
+        },
+        {
+          "resource": "parameters",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/parameters/backend/Parameter.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/Parameter.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "f71c9e9246b128fcf3b987d15337e64a4b1d24d910ebba5ee198a8a4cbbf6178",
+          "reviewRequired": true
+        },
+        {
+          "resource": "permissions",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/permissions/backend/Permission.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/Permission.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "c1151d85212525196b708dc329a35058fc4c04fb3dd96b1a2ed5f8a3d0bef4b8",
+          "reviewRequired": true
+        },
+        {
+          "resource": "roleGroups",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/roleGroups/backend/RoleGroup.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/RoleGroup.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "7e1f07132a8cc29b6e30c6a1f32df9fec51999020aa125ce52cdb299fb6f1c02",
+          "reviewRequired": true
+        },
+        {
+          "resource": "roles",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/roles/backend/Role.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/Role.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "0022df8497c7563fa0a3f6b7a4790e77d64d6be13c80e1cdcdfaa8a1b35625e7",
+          "reviewRequired": true
+        },
+        {
+          "resource": "sessions",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/sessions/backend/Session.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/Session.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "a50ad7f9352201639de5ed130f1176bfe059e1e4bf9c7318ba125f946d92aeba",
+          "reviewRequired": true
+        },
+        {
+          "resource": "tenants",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/tenants/backend/Tenant.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/Tenant.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "6eb0263b52cde2fa9d1b6f708f224fcb9d5f71139b9b4691630f0ccc3bfc648b",
+          "reviewRequired": true
+        },
+        {
+          "resource": "users",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/users/backend/User.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/User.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "0575e09925ba788b4967221987b97ee8cfbf2434d3440d271f04aaeb1a73f7a4",
+          "reviewRequired": true
+        },
+        {
+          "resource": "versions",
+          "role": "gormModelDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/versions/backend/Version.go.txt",
+          "eventualRuntimeTarget": "internal/platform/model/Version.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "fab502b116e5e661d8079ddc37568e706c33ed68cf457759330cced9211fb480",
+          "reviewRequired": true
+        }
+      ]
+    },
+    {
+      "id": "repositories",
+      "purpose": "Future repository source promotion from generated repository drafts.",
+      "scaffoldRoles": [
+        "repositoryDraft"
+      ],
+      "runtimeTargets": [
+        "internal/platform/repository/",
+        "internal/platform/adminresource/"
+      ],
+      "runtimeTargetRoots": [
+        {
+          "target": "internal/platform/repository/",
+          "root": "internal/platform/repository/",
+          "status": "proposed",
+          "owner": "platform-storage",
+          "requiresSeparateSpec": true
+        },
+        {
+          "target": "internal/platform/adminresource/",
+          "root": "internal/platform/adminresource/",
+          "status": "existing",
+          "owner": "admin-resource-engine",
+          "requiresSeparateSpec": true
+        }
+      ],
+      "testCommands": [
+        "rtk go test ./internal/platform/adminresource"
+      ],
+      "summary": {
+        "resourceCount": 17,
+        "reviewItemCount": 17,
+        "generatedArtifactCount": 17,
+        "conflictCount": 0
+      },
+      "reviewItems": [
+        {
+          "resource": "apiResources",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/apiResources/backend/apiResources-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "c9f8d324d9b10d2224c816e13fec1a5ddd22313125da28cacdb3640e17fa69c3",
+          "reviewRequired": true
+        },
+        {
+          "resource": "appIdentities",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/appIdentities/backend/appIdentities-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "34d8dd9d0a06deff6e75ccc13150d4ce76a64d9f8daf2edb4211746b8e11a38f",
+          "reviewRequired": true
+        },
+        {
+          "resource": "areaCodes",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/areaCodes/backend/areaCodes-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "3cf0ac2ceac8f8626acd8c3e940efcbd6cdbf910593bedde59505969abef5c1e",
+          "reviewRequired": true
+        },
+        {
+          "resource": "auditLogs",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/auditLogs/backend/auditLogs-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "925cb5b8db6c7a7aedb7ced42580dfc3ff3a0ca5a57ded361d65e68001c30c8b",
+          "reviewRequired": true
+        },
+        {
+          "resource": "dictionaries",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/dictionaries/backend/dictionaries-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "fd9f46858ff357c042f8238045379f034176b38b7511079791d382ddd50b2702",
+          "reviewRequired": true
+        },
+        {
+          "resource": "errorLogs",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/errorLogs/backend/errorLogs-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "0288c925d7046304b6e68336a6bfb91f17313eafcf78a8b247b4ee34c35a4946",
+          "reviewRequired": true
+        },
+        {
+          "resource": "loginLogs",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/loginLogs/backend/loginLogs-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "7532d676ae461be9ab77bc865c9b2c4e1d8bee69938e972dd4b3bba4e129df54",
+          "reviewRequired": true
+        },
+        {
+          "resource": "menus",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/menus/backend/menus-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "9c18d69434cade957dac38aa8a819b670f019c53b84bc729e974ab7e724f3f9f",
+          "reviewRequired": true
+        },
+        {
+          "resource": "orgUnits",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/orgUnits/backend/orgUnits-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "26ab050970479d55e324c3c37710cd5ff87849615730cf0638768a2cc35ab9e4",
+          "reviewRequired": true
+        },
+        {
+          "resource": "parameters",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/parameters/backend/parameters-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "9b271df6542d3362af04f226a0dff305598fe4ab493784ac8b122c031adf0571",
+          "reviewRequired": true
+        },
+        {
+          "resource": "permissions",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/permissions/backend/permissions-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "8474e1f5df24b379eeb36676f557945b4301f42d03cba3a5a6924744200cc27a",
+          "reviewRequired": true
+        },
+        {
+          "resource": "roleGroups",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/roleGroups/backend/roleGroups-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "a6af2a8107882bf04a11dcb4f1d6d8c40c2226c79e0bed4f1489a44a9c4fa876",
+          "reviewRequired": true
+        },
+        {
+          "resource": "roles",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/roles/backend/roles-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "470af0ce5727c4a66a7bbfe5409d0601cf857ef14bb7c61033d43ffd17707b72",
+          "reviewRequired": true
+        },
+        {
+          "resource": "sessions",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/sessions/backend/sessions-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "c62f4305aea5990b333e50accdda386152b61791df891c8a1876a4131ce2722d",
+          "reviewRequired": true
+        },
+        {
+          "resource": "tenants",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/tenants/backend/tenants-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "609290b7a2c910f3d8c33bcedc8f8eb9210290a864369419e3cedd6c96f4c3ba",
+          "reviewRequired": true
+        },
+        {
+          "resource": "users",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/users/backend/users-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "b9a5997427725d1510ccdf328d4e13500ce45ccd4501cb6f247946715fd1301a",
+          "reviewRequired": true
+        },
+        {
+          "resource": "versions",
+          "role": "repositoryDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/versions/backend/versions-repository.go.txt",
+          "eventualRuntimeTarget": "internal/platform/repository",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "566a51fc82d7eab457658b3664b27895e38d98e0f03e80d9f24b70fde82a16e0",
+          "reviewRequired": true
+        }
+      ]
+    },
+    {
+      "id": "api-routes",
+      "purpose": "Future Gin route source promotion from generated route drafts.",
+      "scaffoldRoles": [
+        "routeDraft"
+      ],
+      "runtimeTargets": [
+        "internal/platform/httpapi/"
+      ],
+      "runtimeTargetRoots": [
+        {
+          "target": "internal/platform/httpapi/",
+          "root": "internal/platform/httpapi/",
+          "status": "existing",
+          "owner": "platform-http",
+          "requiresSeparateSpec": true
+        }
+      ],
+      "testCommands": [
+        "rtk go test ./internal/platform/httpapi"
+      ],
+      "summary": {
+        "resourceCount": 17,
+        "reviewItemCount": 17,
+        "generatedArtifactCount": 17,
+        "conflictCount": 0
+      },
+      "reviewItems": [
+        {
+          "resource": "apiResources",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/apiResources/backend/apiResources-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "3700f61c8bcf65129bf54efac8f7b997fc03ad059f4829a08f0e70c331e1775d",
+          "reviewRequired": true
+        },
+        {
+          "resource": "appIdentities",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/appIdentities/backend/appIdentities-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "3f704aa08549b2a562037a3f6c8fe59d7c428fbed7a6c426e7d7328eab30bdb8",
+          "reviewRequired": true
+        },
+        {
+          "resource": "areaCodes",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/areaCodes/backend/areaCodes-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "6d22c4ac847c5cfd0175c8a005703f09b29603c8eb6adb1cccafe94f3de889ab",
+          "reviewRequired": true
+        },
+        {
+          "resource": "auditLogs",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/auditLogs/backend/auditLogs-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "68d9320e00e1082b973b745b6c0e4ceb5346a0746fe8f89dcd8345160bee8d3a",
+          "reviewRequired": true
+        },
+        {
+          "resource": "dictionaries",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/dictionaries/backend/dictionaries-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "2a5015c10fdfb0b2aa36b6eb4ebf8d59ec38b8aab5d716124c3283c00f2c401b",
+          "reviewRequired": true
+        },
+        {
+          "resource": "errorLogs",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/errorLogs/backend/errorLogs-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "260fe227963b8264aae5d8e62d64a3b03f9c3abdb37629f26a62d39ac0734231",
+          "reviewRequired": true
+        },
+        {
+          "resource": "loginLogs",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/loginLogs/backend/loginLogs-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "8d10dbe2dedad3bf9d9e29dd7947c54013a87471a86f54b9a0f43d30251f4a32",
+          "reviewRequired": true
+        },
+        {
+          "resource": "menus",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/menus/backend/menus-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "adbc279bbf0aebf057b06528662859e004148ee3d8c6789e0004db6d01c3a3ff",
+          "reviewRequired": true
+        },
+        {
+          "resource": "orgUnits",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/orgUnits/backend/orgUnits-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "488aca1e7737e1316ce264d860ce888bb3db29b54ff90e0973fd662cb58b3bbd",
+          "reviewRequired": true
+        },
+        {
+          "resource": "parameters",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/parameters/backend/parameters-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "2aa5d41a0ac2912916205780d10b4b978e9c98b1b4abf61277b155b7539d7895",
+          "reviewRequired": true
+        },
+        {
+          "resource": "permissions",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/permissions/backend/permissions-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "a3d748891c8efbb651f193ad17c0819367262a37efccbc28a84dd25291236537",
+          "reviewRequired": true
+        },
+        {
+          "resource": "roleGroups",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/roleGroups/backend/roleGroups-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "61a04c4d70a74d9ecb6e10cbce4d47e091f285a9d81d6a1c3befabb71c6accc2",
+          "reviewRequired": true
+        },
+        {
+          "resource": "roles",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/roles/backend/roles-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "7c4229ce3787c9a8775867b4fa151b561c6b4dcfe7e52955fe977d84dc26f1fa",
+          "reviewRequired": true
+        },
+        {
+          "resource": "sessions",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/sessions/backend/sessions-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "3ea831b84bcb4d882ead489c9f05c5003a793a897d0c5fca30a0982204e706ea",
+          "reviewRequired": true
+        },
+        {
+          "resource": "tenants",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/tenants/backend/tenants-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "91a5dd0985d4dc03771db49307cd164c0b77e7871ee6557125dfc8db51089265",
+          "reviewRequired": true
+        },
+        {
+          "resource": "users",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/users/backend/users-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "241e4250cef7d095a18dd6c989fdc13e4a767cc1c350c860dd29a7a4b6458bd9",
+          "reviewRequired": true
+        },
+        {
+          "resource": "versions",
+          "role": "routeDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/versions/backend/versions-routes.go.txt",
+          "eventualRuntimeTarget": "internal/platform/httpapi/server.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "e7678e40eb88b3a0a6abe12ad11d3e937f741abe584332ed47f361554ba30e8f",
+          "reviewRequired": true
+        }
+      ]
+    },
+    {
+      "id": "admin-resource-pages",
+      "purpose": "Future Refine admin resource source promotion from generated page drafts.",
+      "scaffoldRoles": [
+        "refinePageDraft"
+      ],
+      "runtimeTargets": [
+        "admin/src/platform/resources/",
+        "admin/src/platform/refine/"
+      ],
+      "runtimeTargetRoots": [
+        {
+          "target": "admin/src/platform/resources/",
+          "root": "admin/src/platform/resources/",
+          "status": "existing",
+          "owner": "admin-ui",
+          "requiresSeparateSpec": true
+        },
+        {
+          "target": "admin/src/platform/refine/",
+          "root": "admin/src/platform/refine/",
+          "status": "existing",
+          "owner": "admin-ui",
+          "requiresSeparateSpec": true
+        }
+      ],
+      "testCommands": [
+        "rtk node scripts/validate-admin-ui-contracts.mjs",
+        "rtk npm --prefix admin run build"
+      ],
+      "summary": {
+        "resourceCount": 17,
+        "reviewItemCount": 17,
+        "generatedArtifactCount": 17,
+        "conflictCount": 0
+      },
+      "reviewItems": [
+        {
+          "resource": "apiResources",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/apiResources/frontend/apiResourcesResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "f8c07ce3a841d26f7564ef2b8133b575fb6a0524fd2664eb5e928258c8a66cc7",
+          "reviewRequired": true
+        },
+        {
+          "resource": "appIdentities",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/appIdentities/frontend/appIdentitiesResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "113bd05caafdde0a1eccd8af47a48fb2ef795bb3f41056454306c068b2a905fa",
+          "reviewRequired": true
+        },
+        {
+          "resource": "areaCodes",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/areaCodes/frontend/areaCodesResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "1948bb3f08313cade99d43ff3b30cdf07706bd3f9283e2d0859eaf7329e8be44",
+          "reviewRequired": true
+        },
+        {
+          "resource": "auditLogs",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/auditLogs/frontend/auditLogsResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "9c0e2e646fb3296d99a5450208b42d95803ba909cae53e8cfbc1c98999ee3933",
+          "reviewRequired": true
+        },
+        {
+          "resource": "dictionaries",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/dictionaries/frontend/dictionariesResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "5e231590629afc45635ec37fe0b11cecb0f293b33b93c6026f8eb7fd9bd454ee",
+          "reviewRequired": true
+        },
+        {
+          "resource": "errorLogs",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/errorLogs/frontend/errorLogsResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "668f7ce6e91dc773df2168278627c19b8113055329f3ea10cad9d78e8c2191f6",
+          "reviewRequired": true
+        },
+        {
+          "resource": "loginLogs",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/loginLogs/frontend/loginLogsResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "bcc85f82705080a383c50142205e0a549e6a8abb9ecb724b41ff72689f2dc0d6",
+          "reviewRequired": true
+        },
+        {
+          "resource": "menus",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/menus/frontend/menusResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "a183f9c9be4db4228dba4fc016eddafc5a190aeb72e38619c850ac92cad81647",
+          "reviewRequired": true
+        },
+        {
+          "resource": "orgUnits",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/orgUnits/frontend/orgUnitsResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "f04e627d47cd55a8131c6d3d2759d7795064ac76cb320bba21e0649a33c2d2a0",
+          "reviewRequired": true
+        },
+        {
+          "resource": "parameters",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/parameters/frontend/parametersResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "d6cad0839faf602956da72b0d71ec7fc630f1a69b118539356a3ff7186b25aaf",
+          "reviewRequired": true
+        },
+        {
+          "resource": "permissions",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/permissions/frontend/permissionsResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "c1f9ddec0b3579f00bfafe46da5a40f12cb3c52cf1cce3b986a94ec7b6910d03",
+          "reviewRequired": true
+        },
+        {
+          "resource": "roleGroups",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/roleGroups/frontend/roleGroupsResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "53b7464bd702ef9836d9600f3032d8d2f9d6d41a3e1b5f415ef68787b9734c1d",
+          "reviewRequired": true
+        },
+        {
+          "resource": "roles",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/roles/frontend/rolesResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "6a5f1fad60c5cd57db04bc556eb166f7677be5eddded959fb4e11181be6fb0d4",
+          "reviewRequired": true
+        },
+        {
+          "resource": "sessions",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/sessions/frontend/sessionsResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "96cb4ac280897158e38248a6ae788a6c789e020273412c58d3692d6dce7b37a9",
+          "reviewRequired": true
+        },
+        {
+          "resource": "tenants",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/tenants/frontend/tenantsResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "171ecef06fc1ff03d44db573714f2e0d44297c7fea8f9deba07a32623b7bbd42",
+          "reviewRequired": true
+        },
+        {
+          "resource": "users",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/users/frontend/usersResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "d8b0b613b07889ad25395099b9e95321a8f218350f4e1ea2709a8482e507bef3",
+          "reviewRequired": true
+        },
+        {
+          "resource": "versions",
+          "role": "refinePageDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/versions/frontend/versionsResource.tsx.txt",
+          "eventualRuntimeTarget": "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "7df95b914cc900760c52de41c185718af7696887b0df94014814dae16d44adbf",
+          "reviewRequired": true
+        }
+      ]
+    },
+    {
+      "id": "contract-tests",
+      "purpose": "Future contract test source promotion from generated test drafts.",
+      "scaffoldRoles": [
+        "contractTestDraft"
+      ],
+      "runtimeTargets": [
+        "internal/platform/adminresource/"
+      ],
+      "runtimeTargetRoots": [
+        {
+          "target": "internal/platform/adminresource/",
+          "root": "internal/platform/adminresource/",
+          "status": "existing",
+          "owner": "admin-resource-engine",
+          "requiresSeparateSpec": true
+        }
+      ],
+      "testCommands": [
+        "rtk go test ./internal/platform/adminresource"
+      ],
+      "summary": {
+        "resourceCount": 17,
+        "reviewItemCount": 17,
+        "generatedArtifactCount": 17,
+        "conflictCount": 0
+      },
+      "reviewItems": [
+        {
+          "resource": "apiResources",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/apiResources/tests/apiResources-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/apiResources_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "8d5daffb5413181ddd3b747b4b1f3a54f822036690ca8aa5b297ab9f7f0ca742",
+          "reviewRequired": true
+        },
+        {
+          "resource": "appIdentities",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/appIdentities/tests/appIdentities-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/appIdentities_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "9b68435e01d5782f516b3b8ed0d4b63cf46ca382920d382bef2ccd3c1168b2c8",
+          "reviewRequired": true
+        },
+        {
+          "resource": "areaCodes",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/areaCodes/tests/areaCodes-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/areaCodes_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "7eb28ad4851db0f455da701618f82f2ca27841975de97af883acdf39bad4dd9c",
+          "reviewRequired": true
+        },
+        {
+          "resource": "auditLogs",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/auditLogs/tests/auditLogs-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/auditLogs_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "2d398a74a3577ec5ff382c7eddc6eef8185f973d86a9f0dbca346512006ae761",
+          "reviewRequired": true
+        },
+        {
+          "resource": "dictionaries",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/dictionaries/tests/dictionaries-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/dictionaries_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "ff350d08bffb312929f3e140880d7b9a70f929e7766e3ae4f83669a2841df381",
+          "reviewRequired": true
+        },
+        {
+          "resource": "errorLogs",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/errorLogs/tests/errorLogs-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/errorLogs_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "d48d11234c71a801d067845256bc55d8e918892a34288cdd6784e6bcd2635474",
+          "reviewRequired": true
+        },
+        {
+          "resource": "loginLogs",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/loginLogs/tests/loginLogs-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/loginLogs_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "25b04fbd3d955e611c887bdbe9e62dadce12197136c9ea61b019c3eee96a561a",
+          "reviewRequired": true
+        },
+        {
+          "resource": "menus",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/menus/tests/menus-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/menus_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "30df72332cf394af8360fe7fc3da2dda75f9e56f7f08c6f0b4af0cd5bf2617b4",
+          "reviewRequired": true
+        },
+        {
+          "resource": "orgUnits",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/orgUnits/tests/orgUnits-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/orgUnits_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "610bb2e9762dbcb8e98e27906e1283c8fcf0d77429effc0b4ce782b741e49ebd",
+          "reviewRequired": true
+        },
+        {
+          "resource": "parameters",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/parameters/tests/parameters-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/parameters_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "170e0dc318b88b25d4616c4ecf59f67ad4f379c87d20d74b252c18f74bb6e9f5",
+          "reviewRequired": true
+        },
+        {
+          "resource": "permissions",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/permissions/tests/permissions-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/permissions_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "2e2c442d9aadbf7437f0e2e339ab92083678f4b3e7eaf911529df9f116bc31bd",
+          "reviewRequired": true
+        },
+        {
+          "resource": "roleGroups",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/roleGroups/tests/roleGroups-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/roleGroups_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "faf1f736e255f73b384d845bcc294bbc9de717e70e4e5a2d9b4a98cc25ebd154",
+          "reviewRequired": true
+        },
+        {
+          "resource": "roles",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/roles/tests/roles-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/roles_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "461d30d76bbf24f5ea13f8288a220f7d40f8112270666bee0494a3a34b655ae4",
+          "reviewRequired": true
+        },
+        {
+          "resource": "sessions",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/sessions/tests/sessions-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/sessions_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "30b85147d91ceaa0e23da164ed5f6494f7bb6ede1c0b462b00556c566d4276d5",
+          "reviewRequired": true
+        },
+        {
+          "resource": "tenants",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/tenants/tests/tenants-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/tenants_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "97a8aac98e24e9b78e507abbd81b2d592854381a2e8dcb4acaff72e2d7c2823c",
+          "reviewRequired": true
+        },
+        {
+          "resource": "users",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/users/tests/users-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/users_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "772a15ab94f0b6b582fd68ebccb786205e4d13dc854d0977dd69275d1cc5411e",
+          "reviewRequired": true
+        },
+        {
+          "resource": "versions",
+          "role": "contractTestDraft",
+          "scaffoldPath": "resources/generated/scaffold/admin/versions/tests/versions-resource-contract.test.go.txt",
+          "eventualRuntimeTarget": "internal/platform/adminresource/versions_test.go",
+          "status": "regeneratable",
+          "conflict": false,
+          "generatedArtifact": true,
+          "contentSha256": "481ff8a0003a878290891460bf0975d03a1769dcb73c9f69f1896e2e8621238f",
+          "reviewRequired": true
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "resource": "apiDocs",
+      "code": "api-docs",
+      "generationLevel": "manualReview",
+      "dryRunStatus": "manualReviewOnly",
+      "manualReviewReason": "Resource uses custom codegen mode and must be implemented by a capability-specific adapter.",
+      "candidateFileCount": 0,
+      "targetFamilies": []
+    },
+    {
+      "resource": "apiResources",
+      "code": "api-resources",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "apiTokens",
+      "code": "api-tokens",
+      "generationLevel": "manualReview",
+      "dryRunStatus": "manualReviewOnly",
+      "manualReviewReason": "Resource uses custom codegen mode and must be implemented by a capability-specific adapter.",
+      "candidateFileCount": 0,
+      "targetFamilies": []
+    },
+    {
+      "resource": "appIdentities",
+      "code": "app-identities",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "areaCodes",
+      "code": "area-codes",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "auditLogs",
+      "code": "audit-logs",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "branding",
+      "code": "branding",
+      "generationLevel": "manualReview",
+      "dryRunStatus": "manualReviewOnly",
+      "manualReviewReason": "Resource uses custom codegen mode and must be implemented by a capability-specific adapter.",
+      "candidateFileCount": 0,
+      "targetFamilies": []
+    },
+    {
+      "resource": "capabilities",
+      "code": "capabilities",
+      "generationLevel": "manualReview",
+      "dryRunStatus": "manualReviewOnly",
+      "manualReviewReason": "Resource uses custom codegen mode and must be implemented by a capability-specific adapter.",
+      "candidateFileCount": 0,
+      "targetFamilies": []
+    },
+    {
+      "resource": "demoData",
+      "code": "demo-data",
+      "generationLevel": "manualReview",
+      "dryRunStatus": "manualReviewOnly",
+      "manualReviewReason": "Resource uses custom codegen mode and must be implemented by a capability-specific adapter.",
+      "candidateFileCount": 0,
+      "targetFamilies": []
+    },
+    {
+      "resource": "dictionaries",
+      "code": "dictionaries",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "dictionary-parameters",
+      "code": "dictionary-parameters",
+      "generationLevel": "manualReview",
+      "dryRunStatus": "manualReviewOnly",
+      "manualReviewReason": "Resource uses custom codegen mode and must be implemented by a capability-specific adapter.",
+      "candidateFileCount": 0,
+      "targetFamilies": []
+    },
+    {
+      "resource": "errorLogs",
+      "code": "error-logs",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "files",
+      "code": "files",
+      "generationLevel": "manualReview",
+      "dryRunStatus": "manualReviewOnly",
+      "manualReviewReason": "Resource uses custom codegen mode and must be implemented by a capability-specific adapter.",
+      "candidateFileCount": 0,
+      "targetFamilies": []
+    },
+    {
+      "resource": "loginLogs",
+      "code": "login-logs",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "menus",
+      "code": "menus",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "monitoring",
+      "code": "monitoring",
+      "generationLevel": "manualReview",
+      "dryRunStatus": "manualReviewOnly",
+      "manualReviewReason": "Resource uses custom codegen mode and must be implemented by a capability-specific adapter.",
+      "candidateFileCount": 0,
+      "targetFamilies": []
+    },
+    {
+      "resource": "orgUnits",
+      "code": "org-units",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "overview",
+      "code": "overview",
+      "generationLevel": "manualReview",
+      "dryRunStatus": "manualReviewOnly",
+      "manualReviewReason": "Resource uses custom codegen mode and must be implemented by a capability-specific adapter.",
+      "candidateFileCount": 0,
+      "targetFamilies": []
+    },
+    {
+      "resource": "parameters",
+      "code": "parameters",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "permissions",
+      "code": "permissions",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "roleGroups",
+      "code": "role-groups",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "roles",
+      "code": "roles",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "sessions",
+      "code": "sessions",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "settings",
+      "code": "settings",
+      "generationLevel": "manualReview",
+      "dryRunStatus": "manualReviewOnly",
+      "manualReviewReason": "Resource uses custom codegen mode and must be implemented by a capability-specific adapter.",
+      "candidateFileCount": 0,
+      "targetFamilies": []
+    },
+    {
+      "resource": "tenants",
+      "code": "tenants",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "users",
+      "code": "users",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    },
+    {
+      "resource": "versions",
+      "code": "versions",
+      "generationLevel": "templateCandidate",
+      "dryRunStatus": "safePreview",
+      "manualReviewReason": null,
+      "candidateFileCount": 5,
+      "targetFamilies": [
+        "admin-resource-pages",
+        "api-routes",
+        "backend-models",
+        "contract-tests",
+        "repositories"
+      ]
+    }
+  ],
+  "blockers": []
+}

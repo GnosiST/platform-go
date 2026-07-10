@@ -1,0 +1,22 @@
+# VCS and local agent state
+.git
+.codex
+.codegraph
+.superpowers
+
+# Dependencies and build output
+node_modules
+admin/node_modules
+dist
+admin/dist
+
+# Local runtime state
+.platform
+.vite
+tmp
+*.log
+
+# Local secrets
+.env
+.env.*
+!deploy/env/*.example.env

@@ -1,0 +1,204 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-file-storage-experience.json",
+  "capturedAt": "2026-07-07",
+  "purpose": "Machine-checkable design and promotion gate for the file-storage admin preview, download and audit experience without changing the object storage port.",
+  "taskGraph": {
+    "path": "resources/platform-foundation-task-graph.json",
+    "taskId": "file-storage-preview-and-audit-workflow",
+    "statusBeforePromotion": [
+      "planned",
+      "preview"
+    ],
+    "promotionStatus": "implemented"
+  },
+  "currentRuntime": {
+    "status": "implemented-backend-foundation",
+    "capability": "file-storage",
+    "resource": "files",
+    "implementationRoots": [
+      "internal/platform/storage",
+      "internal/platform/httpapi/server.go",
+      "internal/platform/core/capabilities.go"
+    ],
+    "objectStorePort": "storage.ObjectStore",
+    "objectStoreAdapters": [
+      "local",
+      "s3"
+    ],
+    "adminEndpoints": [
+      "POST /api/admin/files/upload",
+      "GET /api/admin/files/:id/content",
+      "DELETE /api/admin/resources/files/:id"
+    ],
+    "auditActions": [
+      "file.upload",
+      "file.content",
+      "file.delete"
+    ],
+    "tests": [
+      "internal/platform/httpapi/server_test.go",
+      "internal/platform/storage/object_test.go",
+      "internal/platform/bootstrap/file_storage_test.go"
+    ],
+    "mustNotChangeForUiPromotion": [
+      "storage.ObjectStore",
+      "storage.ObjectSaveInput",
+      "storage.ObjectMetadata"
+    ]
+  },
+  "designGate": {
+    "status": "implemented",
+    "requiredOrder": [
+      "superpowers:brainstorming",
+      "product-design"
+    ],
+    "recommendedApproach": "generic-resource-console-extension",
+    "rejectedApproaches": [
+      "standalone-file-manager-page",
+      "storage-operations-console"
+    ],
+    "productDesignStatus": "approved",
+    "browserQaStatus": "passed",
+    "implementationStatus": "implemented",
+    "approvedDesignBrief": {
+      "zh": "在 files 通用资源路由内扩展文件体验，不新增独立文件管理器；桌面使用表格和右侧抽屉，移动端使用文件卡片和抽屉；抽屉包含元数据、预览、审计；上传、预览、下载和删除全部走平台 API 与通用组件。",
+      "en": "Extend the files generic resource route instead of creating a standalone file manager. Desktop uses table plus right drawer, mobile uses file cards plus drawer. The drawer includes metadata, preview and audit. Upload, preview, download and delete use platform APIs and shared components."
+    },
+    "browserEvidence": {
+      "capturedAt": "2026-07-07",
+      "tool": "chrome-devtools",
+      "screenshots": [
+        {
+          "label": "desktop files list with preview drawer",
+          "path": "tmp/product-design/file-storage-experience-20260707/01-files-preview-drawer-desktop-1440x1024.png",
+          "viewport": "1440x1024",
+          "assertions": [
+            "files route stays inside GenericResourceConsole",
+            "text preview renders through authenticated blob fetch",
+            "upload/download/delete actions are visible"
+          ]
+        },
+        {
+          "label": "desktop files audit panel",
+          "path": "tmp/product-design/file-storage-experience-20260707/02-files-audit-drawer-desktop-1440x1024.png",
+          "viewport": "1440x1024",
+          "assertions": [
+            "audit tab is visible in the drawer",
+            "audit-log resource absence degrades to declared file operation events",
+            "no global error notification is shown"
+          ]
+        },
+        {
+          "label": "mobile files card and pagination",
+          "path": "tmp/product-design/file-storage-experience-20260707/03-files-mobile-card-pagination-390x844.png",
+          "viewport": "390x844",
+          "assertions": [
+            "mobile file card replaces the table before pagination",
+            "pagination remains below the card list",
+            "file icon, name, mime type, size and status fit without overlap"
+          ]
+        },
+        {
+          "label": "mobile files preview drawer",
+          "path": "tmp/product-design/file-storage-experience-20260707/04-files-mobile-preview-drawer-390x844.png",
+          "viewport": "390x844",
+          "assertions": [
+            "drawer opens from the mobile file card",
+            "preview tab renders text content",
+            "drawer actions remain reachable"
+          ]
+        }
+      ],
+      "runtimeChecks": [
+        "Demo login opened /files and uploaded platform-preview.txt through the hidden file input path.",
+        "Current navigation console errors and warnings: none.",
+        "Current navigation fetch/xhr requests returned 200, including /api/admin/files/:id/content.",
+        "Audit-log queries are skipped when /audit-logs is not exposed in the current resource list."
+      ]
+    }
+  },
+  "experienceContract": {
+    "surface": "files generic resource route",
+    "platformComponents": [
+      "AdminPage",
+      "AdminListPanel",
+      "PlatformDataTable",
+      "AdminActionButton",
+      "AdminFeedback",
+      "PlatformOverflowText",
+      "Drawer",
+      "Tabs"
+    ],
+    "requiredPanels": [
+      "metadata",
+      "preview",
+      "audit"
+    ],
+    "requiredActions": [
+      "upload",
+      "preview",
+      "download",
+      "delete"
+    ],
+    "previewTypes": [
+      "image",
+      "text",
+      "pdf",
+      "unsupported-fallback"
+    ],
+    "metadataFields": [
+      "name",
+      "mimeType",
+      "size",
+      "storageDriver",
+      "storageKey",
+      "publicUrl",
+      "createdAt",
+      "updatedAt"
+    ],
+    "auditVisualization": [
+      "file.upload",
+      "file.content",
+      "file.delete"
+    ],
+    "errorStates": [
+      "object-not-found",
+      "preview-not-supported",
+      "download-failed",
+      "delete-failed",
+      "permission-denied"
+    ],
+    "responsiveRequirements": [
+      "desktop table with drawer preview",
+      "mobile file cards before pagination",
+      "theme-synced drawer and preview surface",
+      "compact operation bar aligned with PlatformDataTable"
+    ],
+    "auditFallback": {
+      "zh": "当当前菜单/资源清单未暴露 audit-logs 时，审计 tab 不发起无效请求，展示 file.upload、file.content、file.delete 声明事件；审计资源接入后自动查询真实时间线。",
+      "en": "When audit-logs is not exposed by the current menu/resource list, the audit tab avoids invalid requests and shows declared file.upload, file.content and file.delete events. Once the audit resource is connected, it queries and shows the real timeline."
+    }
+  },
+  "promotionEvidenceRequired": {
+    "docs": [
+      "docs/platform-capability-development.md",
+      "docs/admin-ui-foundation.md",
+      "docs/platform-roadmap.md",
+      "docs/platform-foundation-task-map.md"
+    ],
+    "validators": [
+      "scripts/validate-platform-file-storage-experience.mjs",
+      "scripts/validate-admin-i18n.mjs",
+      "scripts/validate-admin-ui-contracts.mjs"
+    ],
+    "tests": [
+      "scripts/platform-file-storage-experience.test.mjs",
+      "rtk npm --prefix admin run build"
+    ],
+    "screenshots": [
+      "desktop files list with preview drawer",
+      "desktop files audit panel",
+      "mobile files card and preview flow"
+    ]
+  }
+}

@@ -1,0 +1,380 @@
+{
+  "generatedBy": "scripts/generate-production-auth-promotion-review.mjs",
+  "sources": {
+    "productionAuthHardening": "resources/platform-production-auth-hardening.json",
+    "refreshTokenFamilyPromotion": "resources/platform-refresh-token-family-promotion.json",
+    "productionReadiness": "resources/platform-production-readiness.json",
+    "taskExecutionAudit": "resources/platform-task-execution-audit.json"
+  },
+  "sourceCapturedAt": {
+    "productionAuthHardening": "2026-07-07",
+    "refreshTokenFamilyPromotion": "2026-07-07",
+    "productionReadiness": "2026-07-06",
+    "taskExecutionAudit": "2026-07-07"
+  },
+  "mode": {
+    "dryRun": true,
+    "runtimeMutation": "disabled",
+    "refreshTokenFamilyRuntime": "disabled",
+    "providerRuntimeMutation": "disabled",
+    "promotion": "manual-review-required"
+  },
+  "summary": {
+    "requiredEvidenceCount": 7,
+    "completedEvidenceCount": 0,
+    "missingEvidenceCount": 7,
+    "blockerCount": 5,
+    "providerPromotionCount": 2,
+    "optionalProductionProviderCount": 1,
+    "tokenRotationPreflightCommandCount": 16
+  },
+  "currentRuntime": {
+    "taskId": "production-auth-provider-hardening",
+    "sessionModel": "renew-same-server-side-session-and-issue-new-jwt",
+    "slidingRenewalStatus": "implemented",
+    "notARefreshTokenFamily": true,
+    "refreshTokenFamilyStatus": "implemented-disabled",
+    "refreshTokenFamilyPromotionStatus": "implemented"
+  },
+  "approvalPackage": {
+    "status": "blocked",
+    "sourceOfTruth": "external-review-artifacts",
+    "defaultRuntimeMutation": "forbidden",
+    "requiredApprovals": [
+      "security-owner",
+      "platform-architect",
+      "operations-owner"
+    ],
+    "requiredEvidence": [
+      {
+        "id": "session-policy-review",
+        "owner": "security-owner",
+        "evidenceKind": "signed-security-review",
+        "description": "Signed review confirming the deployed session policy, JWT/session revocation model, provider risk posture and audit redaction requirements."
+      },
+      {
+        "id": "refresh-token-family-runtime-spec",
+        "owner": "platform-architect",
+        "evidenceKind": "architecture-spec",
+        "description": "Separate runtime specification for refresh-token-family storage, rotation, reuse detection, revocation scope and provider separation."
+      },
+      {
+        "id": "credential-rotation-runbook",
+        "owner": "operations-owner",
+        "evidenceKind": "rotation-runbook",
+        "description": "Production runbook for JWT signing-secret rotation, API-token rotation, session invalidation decisions, overlap windows and rollback."
+      },
+      {
+        "id": "provider-secret-rotation-runbook",
+        "owner": "operations-owner",
+        "evidenceKind": "provider-rotation-runbook",
+        "description": "Provider credential owner and rotation runbook for every enabled production provider, including configured WeChat miniapp credentials."
+      },
+      {
+        "id": "runtime-test-output",
+        "owner": "security-owner",
+        "evidenceKind": "test-output",
+        "description": "Captured output for session, refresh-token-family, provider, Redis/session invalidation and audit redaction tests before promotion."
+      },
+      {
+        "id": "audit-redaction-sample",
+        "owner": "security-owner",
+        "evidenceKind": "redacted-audit-sample",
+        "description": "Redacted audit sample showing login, refresh, logout, provider failure and replay/reuse paths without raw credentials or provider subjects."
+      },
+      {
+        "id": "rollback-plan",
+        "owner": "operations-owner",
+        "evidenceKind": "rollback-runbook",
+        "description": "Rollback plan for disabling promoted session/provider behavior while preserving authoritative server-side session revocation."
+      }
+    ],
+    "completedEvidence": [],
+    "missingEvidence": [
+      "session-policy-review",
+      "refresh-token-family-runtime-spec",
+      "credential-rotation-runbook",
+      "provider-secret-rotation-runbook",
+      "runtime-test-output",
+      "audit-redaction-sample",
+      "rollback-plan"
+    ],
+    "prohibitedEvidence": [
+      "text-only approval",
+      "single-person self approval",
+      "missing reuse-detection tests",
+      "missing revocation tests",
+      "missing Redis/session invalidation convergence",
+      "missing audit redaction evidence",
+      "missing provider rotation runbook",
+      "runtime mutation without rollback plan"
+    ],
+    "completedEvidenceSchema": {
+      "requiredFields": [
+        "id",
+        "owner",
+        "evidenceKind",
+        "artifactURI",
+        "artifactHash",
+        "approvedBy",
+        "approvedAt",
+        "reviewedCommit",
+        "environment",
+        "verificationCommands",
+        "rollbackCommands",
+        "auditSampleRefs",
+        "providerRotationRunbookRefs",
+        "refreshTokenFamilyTestRefs",
+        "providerIds",
+        "providerControls",
+        "runtimeTestRefs"
+      ],
+      "approvalRules": [
+        "artifact-id-must-match-requiredEvidence",
+        "approvedBy-must-not-equal-owner",
+        "all-required-owners-represented",
+        "artifact-hash-required",
+        "artifact-hash-must-be-sha256-hex",
+        "artifact-uri-must-be-external-review-artifact",
+        "verification-commands-must-use-rtk",
+        "rollback-evidence-required-before-runtime-mutation",
+        "provider-rotation-runbook-required-before-provider-promotion",
+        "refresh-token-family-tests-required-before-runtime-mutation",
+        "redacted-audit-sample-required-before-promotion",
+        "provider-controls-covered-before-promotion",
+        "provider-runtime-tests-required-before-promotion",
+        "production-environment-required"
+      ],
+      "forbiddenFields": [
+        "jwt",
+        "bearerToken",
+        "refreshToken",
+        "apiToken",
+        "openid",
+        "unionid",
+        "phone",
+        "secret",
+        "password",
+        "privateKey",
+        "tokenHash",
+        "providerSubject",
+        "rawSubject"
+      ],
+      "artifactHashPolicy": {
+        "algorithm": "sha256",
+        "format": "prefix-hex",
+        "prefix": "sha256:",
+        "hexLength": 64,
+        "casing": "lowercase"
+      },
+      "artifactURIPolicy": {
+        "sourceOfTruth": "external-review-artifacts",
+        "allowedSchemes": [
+          "https",
+          "s3",
+          "gs"
+        ],
+        "forbiddenSchemes": [
+          "file",
+          "http"
+        ],
+        "forbidRelativePaths": true,
+        "forbidLocalAbsolutePaths": true,
+        "forbidLocalhost": true,
+        "forbidPrivateNetworkHosts": true
+      }
+    }
+  },
+  "refreshTokenFamilyGate": {
+    "allowedOnlyWhen": [
+      "offline-renewal-required",
+      "token-family-reuse-detection-required",
+      "separate-refresh-token-storage-approved",
+      "rotation-replay-audit-approved"
+    ],
+    "dataModelRequiredFields": [
+      "familyId",
+      "tokenId",
+      "parentTokenId",
+      "sessionId",
+      "username",
+      "tenantId",
+      "tokenType",
+      "issuedAt",
+      "expiresAt",
+      "rotatedAt",
+      "revokedAt",
+      "reusedAt",
+      "replacedByTokenId",
+      "tokenHash"
+    ],
+    "rotationRequiredSteps": [
+      "validate-current-token-hash",
+      "mark-current-token-rotated",
+      "insert-next-token-generation",
+      "renew-server-side-session",
+      "publish-sessions-invalidation",
+      "write-redacted-rotation-audit"
+    ],
+    "reuseDetectionEffects": [
+      "mark-family-compromised",
+      "revoke-related-server-side-session",
+      "publish-sessions-invalidation",
+      "write-redacted-reuse-audit",
+      "reject-with-stable-auth-error"
+    ],
+    "auditForbiddenRawFields": [
+      "jwt",
+      "bearerToken",
+      "refreshToken",
+      "tokenHash",
+      "apiToken",
+      "openid",
+      "unionid",
+      "phone",
+      "secret"
+    ]
+  },
+  "providerPromotionMatrix": {
+    "source": "resources/platform-production-auth-hardening.json",
+    "defaultPolicy": "Provider adapters stay manifest-declared and composition-root injected. A provider can be visible before it is configured, but production use requires explicit configuration, secret ownership, rotation runbook, subject redaction, normalized errors and runtime tests.",
+    "newProviderRequirements": [
+      "manifest-declared-provider",
+      "composition-root-injected-resolver",
+      "config-key-contract",
+      "secret-owner",
+      "rotation-runbook",
+      "hash-and-mask-subject-storage",
+      "unconfigured-provider-rejection-test",
+      "configured-provider-only-login-test",
+      "provider-error-normalization-test",
+      "audit-redaction-test"
+    ],
+    "providers": [
+      {
+        "id": "demo",
+        "capability": "session",
+        "kind": "demo",
+        "productionUsage": "local-harness-only",
+        "adapterBoundary": "built-in-demo-login",
+        "configKeys": [],
+        "requiredControls": [
+          "audit-redaction",
+          "provider-specific-error-normalization"
+        ],
+        "requiresSecretOwner": false,
+        "rotationRunbookRequired": false,
+        "subjectRedactionRequired": true,
+        "unconfiguredProviderRejectionRequired": false,
+        "errorNormalizationRequired": true,
+        "rawCredentialExposureAllowed": false,
+        "rawSubjectExposureAllowed": false
+      },
+      {
+        "id": "wechat",
+        "capability": "wechat-login",
+        "kind": "wechat",
+        "productionUsage": "optional-production-provider",
+        "adapterBoundary": "httpapi.AppIdentityResolver",
+        "configKeys": [
+          "PLATFORM_WECHAT_MINIAPP_APP_ID",
+          "PLATFORM_WECHAT_MINIAPP_SECRET",
+          "PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT"
+        ],
+        "requiredControls": [
+          "secret-rotation-plan",
+          "provider-subject-redaction",
+          "raw-provider-subject-never-in-response",
+          "raw-provider-subject-never-in-audit",
+          "configured-provider-only-login",
+          "provider-specific-error-normalization"
+        ],
+        "requiresSecretOwner": true,
+        "rotationRunbookRequired": true,
+        "subjectRedactionRequired": true,
+        "unconfiguredProviderRejectionRequired": true,
+        "errorNormalizationRequired": true,
+        "rawCredentialExposureAllowed": false,
+        "rawSubjectExposureAllowed": false
+      }
+    ]
+  },
+  "preflight": {
+    "productionReadinessCommandIds": [
+      "production-runtime-tests",
+      "production-env-audit",
+      "capability-contracts",
+      "capability-profiles",
+      "admin-resource-contract",
+      "governance-topology",
+      "form-schema-layout-slots",
+      "engineering-capabilities",
+      "codegen-source-writing-readiness",
+      "reference-discovery",
+      "reference-coverage",
+      "admin-api-boundary",
+      "app-client-api-boundary",
+      "personnel-runtime-readiness",
+      "foundation-task-graph",
+      "foundation-alignment",
+      "task-execution-audit",
+      "goal-completion-audit",
+      "node-closeout-audit",
+      "objective-conformance",
+      "promotion-evidence-templates",
+      "admin-i18n",
+      "admin-ui-contracts",
+      "admin-ui-contract-tests",
+      "admin-build",
+      "git-diff-check",
+      "platform-capability-audit",
+      "production-auth-hardening",
+      "production-auth-promotion-review",
+      "refresh-token-family-promotion",
+      "cache-invalidation",
+      "deployment-topology",
+      "production-readiness",
+      "platform-operations-plan"
+    ],
+    "tokenRotationPolicyCommands": [
+      "production-runtime-tests",
+      "production-env-audit",
+      "production-auth-hardening",
+      "production-auth-promotion-review",
+      "refresh-token-family-promotion",
+      "cache-invalidation",
+      "task-execution-audit",
+      "foundation-alignment",
+      "objective-conformance",
+      "admin-i18n",
+      "admin-ui-contracts",
+      "admin-ui-contract-tests",
+      "admin-build",
+      "git-diff-check",
+      "production-readiness",
+      "platform-operations-plan"
+    ],
+    "tokenRotationPolicyRequiresHumanReview": true,
+    "tokenRotationRollbackRequirement": "Rotation plans must identify overlap windows, invalidation behavior and rollback handling for admin JWTs, app JWTs and pgo_ API tokens.",
+    "tokenRotationAuditRequirement": "Credential rotations must record actor, scope, affected token classes, invalidation decision and verification commands without logging secret values."
+  },
+  "manualReview": {
+    "required": true,
+    "decision": "not-approved",
+    "reasons": [
+      "refresh-token-family default runtime is disabled pending production approval",
+      "production approval package is blocked",
+      "production approval package is missing 7 required evidence artifacts",
+      "resources/platform-production-auth-hardening.json sessionCredentialPolicy.refreshTokenFamily.defaultRuntime is disabled",
+      "resources/platform-production-auth-hardening.json productionPromotionApprovalPackage.status is blocked"
+    ],
+    "requiredBeforeRuntimeMutation": true
+  },
+  "blockers": [
+    "refresh-token-family default runtime is disabled pending production approval",
+    "production approval package is blocked",
+    "production approval package is missing 7 required evidence artifacts",
+    "resources/platform-production-auth-hardening.json sessionCredentialPolicy.refreshTokenFamily.defaultRuntime is disabled",
+    "resources/platform-production-auth-hardening.json productionPromotionApprovalPackage.status is blocked"
+  ]
+}

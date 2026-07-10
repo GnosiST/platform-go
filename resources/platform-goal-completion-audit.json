@@ -1,0 +1,401 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-goal-completion-audit.json",
+  "capturedAt": "2026-07-08",
+  "purpose": "Machine-checkable completion audit for the active reusable platform foundation goal. It keeps completion claims tied to current task evidence, business-neutral boundaries, approved stack alignment, visual design gates and explicit non-mutating future promotion gates.",
+  "completionStatus": "complete",
+  "completionPolicy": {
+    "mustNotMarkGoalCompleteWhileUnfinishedNodesExist": true,
+    "mustNotSelfCertifyExternalApprovalEvidence": true,
+    "businessReferenceMode": "reference-only",
+    "requiredControlledUnfinishedNodes": []
+  },
+  "approvedStack": {
+    "backend": ["Gin", "GORM", "Casbin", "JWT"],
+    "frontend": ["Refine", "React", "Ant Design"]
+  },
+  "taskSummary": {
+    "expectedTotal": 35,
+    "expectedImplemented": 35,
+    "expectedControlledUnfinished": 0
+  },
+  "requirements": [
+    {
+      "id": "approved-stack-route",
+      "label": {
+        "zh": "技术路线对齐",
+        "en": "Approved Stack Route"
+      },
+      "status": "verified",
+      "evidence": {
+        "sourcePaths": [
+          "go.mod",
+          "admin/package.json",
+          "docs/platform-stack-alignment-audit.md",
+          "resources/platform-engineering-capabilities.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-engineering-capabilities.mjs"
+        ]
+      }
+    },
+    {
+      "id": "business-neutral-reference-boundary",
+      "label": {
+        "zh": "业务中立参考边界",
+        "en": "Business-Neutral Reference Boundary"
+      },
+      "status": "verified",
+      "evidence": {
+        "sourcePaths": [
+          "README.md",
+          "AGENTS.md",
+          "resources/platform-reference-discovery.json",
+          "resources/platform-reference-coverage.json",
+          "resources/platform-capability-profiles.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-reference-discovery.mjs",
+          "scripts/validate-platform-reference-coverage.mjs",
+          "scripts/validate-platform-capability-profiles.mjs"
+        ]
+      }
+    },
+    {
+      "id": "capability-profile-and-plugin-composition",
+      "label": {
+        "zh": "能力 Profile 与插件化组合",
+        "en": "Capability Profile And Plugin Composition"
+      },
+      "status": "verified",
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-capability-profiles.json",
+          "resources/platform-capability-contracts.json",
+          "internal/platform/capability/manifest.go",
+          "internal/platform/capability/registry.go"
+        ],
+        "validators": [
+          "scripts/validate-platform-capability-contracts.mjs",
+          "scripts/validate-platform-capability-profiles.mjs"
+        ]
+      }
+    },
+    {
+      "id": "common-admin-resource-schema-api",
+      "label": {
+        "zh": "通用后台资源 Schema 与 API",
+        "en": "Common Admin Resource Schema And API"
+      },
+      "status": "verified",
+      "evidence": {
+        "sourcePaths": [
+          "resources/admin-resources.json",
+          "internal/platform/adminresource/schema.go",
+          "internal/platform/adminresource/query.go",
+          "internal/platform/httpapi/admin_routes.go"
+        ],
+        "validators": [
+          "scripts/validate-admin-resources.mjs",
+          "scripts/validate-platform-admin-api-boundary.mjs"
+        ]
+      }
+    },
+    {
+      "id": "admin-ui-i18n-design-gates",
+      "label": {
+        "zh": "后台 UI、国际化与设计门禁",
+        "en": "Admin UI, I18n And Design Gates"
+      },
+      "status": "verified",
+      "evidence": {
+        "sourcePaths": [
+          "admin/src/platform/ui",
+          "admin/src/platform/i18n.ts",
+          "resources/platform-form-schema-layout-slots.json",
+          "docs/admin-ui-foundation.md"
+        ],
+        "validators": [
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs",
+          "scripts/validate-platform-form-schema-layout-slots.mjs"
+        ],
+        "tests": [
+          "scripts/admin-ui-contracts.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "reference-coverage-floor",
+      "label": {
+        "zh": "参考项目通用能力覆盖底线",
+        "en": "Reference Coverage Floor"
+      },
+      "status": "verified",
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-reference-discovery.json",
+          "resources/platform-reference-coverage.json",
+          "docs/platform-foundation-task-map.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-reference-discovery.mjs",
+          "scripts/validate-platform-reference-coverage.mjs"
+        ]
+      }
+    },
+    {
+      "id": "task-dependency-conflict-governance",
+      "label": {
+        "zh": "任务依赖与冲突治理",
+        "en": "Task Dependency And Conflict Governance"
+      },
+      "status": "verified",
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-foundation-task-graph.json",
+          "resources/platform-task-execution-audit.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-foundation-task-graph.mjs",
+          "scripts/validate-platform-task-execution-audit.mjs"
+        ]
+      }
+    },
+    {
+      "id": "deployment-topology-runtime-boundary",
+      "label": {
+        "zh": "部署拓扑与运行边界",
+        "en": "Deployment Topology And Runtime Boundary"
+      },
+      "status": "verified",
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-deployment-topology.json",
+          "docs/platform-deployment.md",
+          "Dockerfile",
+          ".dockerignore",
+          "deploy/compose/docker-compose.prod.yml",
+          "deploy/nginx/platform.conf",
+          "deploy/env/production.example.env",
+          "deploy/vercel/admin.vercel.json",
+          "resources/platform-production-readiness.json",
+          "resources/platform-engineering-capabilities.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-deployment-topology.mjs",
+          "scripts/validate-platform-production-readiness.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs"
+        ],
+        "tests": [
+          "scripts/platform-deployment-topology.test.mjs",
+          "scripts/platform-production-readiness.test.mjs",
+          "scripts/platform-engineering-capabilities.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "production-auth-promotion-gate",
+      "label": {
+        "zh": "生产认证晋级门禁",
+        "en": "Production Auth Promotion Gate"
+      },
+      "status": "verified",
+      "requiredBeforeRuntimeMutation": [
+        "security-owner approval",
+        "platform-architect approval",
+        "operations-owner approval",
+        "runtime test output bundle including refresh-token-family tests",
+        "redis session invalidation convergence evidence",
+        "rotation replay audit evidence",
+        "provider rotation runbook",
+        "rollback plan",
+        "structured approval evidence package",
+        "external absolute artifact URI evidence"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-production-auth-hardening.json",
+          "resources/platform-refresh-token-family-promotion.json",
+          "resources/generated/production-auth-promotion-review.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-production-auth-hardening.mjs",
+          "scripts/validate-platform-refresh-token-family-promotion.mjs"
+        ]
+      }
+    },
+    {
+      "id": "source-writing-codegen-promotion-gate",
+      "label": {
+        "zh": "源码写入代码生成晋级门禁",
+        "en": "Source-Writing Codegen Promotion Gate"
+      },
+      "status": "verified",
+      "requiredBeforeRuntimeMutation": [
+        "source-writing architecture spec",
+        "platform-architect approval",
+        "codegen-owner approval",
+        "runtime-owner approval",
+        "operations-owner approval",
+        "approved promotion review packet",
+        "reviewed diff",
+        "target-family test output",
+        "runtime target owner approval",
+        "rollback plan",
+        "structured source-writing approval evidence package",
+        "external absolute artifact URI evidence"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-codegen-source-writing-readiness.json",
+          "resources/generated/admin-scaffold-promotion-review.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-codegen-source-writing-readiness.mjs"
+        ]
+      }
+    },
+    {
+      "id": "promotion-evidence-template-gate",
+      "label": {
+        "zh": "晋级证据包模板门禁",
+        "en": "Promotion Evidence Template Gate"
+      },
+      "status": "verified",
+      "evidence": {
+        "sourcePaths": [
+          "scripts/generate-platform-promotion-evidence-templates.mjs",
+          "scripts/generate-platform-promotion-evidence-package-draft.mjs",
+          "scripts/validate-platform-promotion-evidence-templates.mjs",
+          "scripts/validate-platform-promotion-evidence-package.mjs"
+        ],
+        "generatedFiles": [
+          "resources/generated/platform-promotion-evidence-templates.json",
+          "resources/generated/platform-promotion-evidence-package-draft.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-promotion-evidence-templates.mjs",
+          "scripts/validate-platform-promotion-evidence-package.mjs"
+        ],
+        "tests": [
+          "scripts/platform-promotion-evidence-templates.test.mjs",
+          "scripts/platform-promotion-evidence-package-draft.test.mjs",
+          "scripts/platform-promotion-evidence-package.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "production-persistence-correctness",
+      "label": {
+        "zh": "生产持久化正确性",
+        "en": "Production Persistence Correctness"
+      },
+      "status": "verified",
+      "evidence": {
+        "sourcePaths": [
+          "internal/platform/session/store.go",
+          "internal/platform/session/gorm_repository.go",
+          "internal/platform/session/file_repository.go",
+          "internal/platform/session/sql_repository.go",
+          "internal/platform/adminresource/repository.go",
+          "internal/platform/adminresource/store.go",
+          "internal/platform/adminresource/gorm_store.go",
+          "internal/platform/adminresource/file_store.go",
+          "internal/platform/adminresource/sql_store.go",
+          "internal/platform/httpapi/server.go",
+          "docs/superpowers/specs/2026-07-10-platform-production-persistence-correctness-design.md",
+          "docs/platform-cache.md",
+          ".superpowers/sdd/task-1-report.md",
+          ".superpowers/sdd/task-2-report.md",
+          ".superpowers/sdd/task-3-report.md",
+          ".superpowers/sdd/task-4-report.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-cache-invalidation.mjs",
+          "scripts/validate-platform-foundation-task-graph.mjs",
+          "scripts/validate-platform-foundation-alignment.mjs",
+          "scripts/validate-platform-task-execution-audit.mjs",
+          "scripts/validate-platform-goal-completion-audit.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs",
+          "scripts/validate-platform-objective-conformance.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs"
+        ],
+        "tests": [
+          "internal/platform/session/store_test.go",
+          "internal/platform/session/gorm_repository_test.go",
+          "internal/platform/session/file_repository_test.go",
+          "internal/platform/session/sql_repository_test.go",
+          "internal/platform/adminresource/store_test.go",
+          "internal/platform/adminresource/gorm_store_test.go",
+          "internal/platform/adminresource/file_store_test.go",
+          "internal/platform/adminresource/sql_store_test.go",
+          "internal/platform/httpapi/server_test.go",
+          "scripts/platform-cache-invalidation.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "completion-state-control",
+      "label": {
+        "zh": "目标完成状态控制",
+        "en": "Goal Completion State Control"
+      },
+      "status": "verified",
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-goal-completion-audit.json",
+          "resources/platform-task-execution-audit.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-goal-completion-audit.mjs"
+        ],
+        "tests": [
+          "scripts/platform-goal-completion-audit.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "objective-conformance-control",
+      "label": {
+        "zh": "目标一致性总控",
+        "en": "Objective Conformance Control"
+      },
+      "status": "verified",
+      "evidence": {
+        "sourcePaths": [
+          "resources/platform-objective-conformance.json",
+          "resources/platform-foundation-alignment-audit.json",
+          "resources/platform-task-execution-audit.json",
+          "resources/platform-production-readiness.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-objective-conformance.mjs"
+        ],
+        "tests": [
+          "scripts/platform-objective-conformance.test.mjs"
+        ]
+      }
+    },
+    {
+      "id": "quality-closeout-gate",
+      "label": {
+        "zh": "质量收口门禁",
+        "en": "Quality Closeout Gate"
+      },
+      "status": "verified",
+      "evidence": {
+        "sourcePaths": [
+          "AGENTS.md",
+          "resources/platform-node-closeout-audit.json",
+          "docs/platform-foundation-task-map.md",
+          "docs/platform-roadmap.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-goal-completion-audit.mjs",
+          "scripts/validate-platform-task-execution-audit.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs"
+        ]
+      }
+    }
+  ]
+}

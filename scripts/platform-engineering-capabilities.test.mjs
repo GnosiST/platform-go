@@ -1,0 +1,405 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { describe, it } from "node:test";
+
+const repoRoot = path.resolve(import.meta.dirname, "..");
+
+function runValidator(args = []) {
+  return spawnSync(process.execPath, ["scripts/validate-platform-engineering-capabilities.mjs", ...args], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+}
+
+function readJSON(relativePath) {
+  return JSON.parse(fs.readFileSync(path.join(repoRoot, relativePath), "utf8"));
+}
+
+function tempJSON(name, value) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-engineering-capabilities-"));
+  const filePath = path.join(tempDir, name);
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+  return filePath;
+}
+
+function tempText(name, value) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-engineering-capabilities-"));
+  const filePath = path.join(tempDir, name);
+  fs.writeFileSync(filePath, value);
+  return filePath;
+}
+
+const stackSourcePaths = [
+  "internal/platform/httpapi/server.go",
+  "internal/platform/adminresource/gorm_store.go",
+  "internal/platform/authz/casbin.go",
+  "internal/platform/adminresource/authorization.go",
+  "admin/src/App.tsx",
+  "admin/src/platform/refine/dataProvider.ts",
+  "admin/src/platform/refine/accessControlProvider.ts",
+];
+
+function tempStackSourceRoot(mutator) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-stack-sources-"));
+  for (const relativePath of stackSourcePaths) {
+    const source = path.join(repoRoot, relativePath);
+    const target = path.join(tempDir, relativePath);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(source, target);
+  }
+  mutator(tempDir);
+  return tempDir;
+}
+
+describe("validate-platform-engineering-capabilities", () => {
+  it("accepts current engineering capability coverage", () => {
+    const result = runValidator();
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Validated \d+ platform engineering capabilities/);
+  });
+
+  it("rejects missing evidence paths", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities[0].evidence.sourcePaths.push("missing/not-real.ts");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /evidence path is missing or unsafe: missing\/not-real\.ts/);
+  });
+
+  it("rejects missing test evidence paths", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    const referenceDiscovery = matrix.capabilities.find((capability) => capability.id === "reference-discovery-gate");
+    referenceDiscovery.evidence.tests.push("missing/not-real.test.go");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /evidence path is missing or unsafe: missing\/not-real\.test\.go/);
+  });
+
+  it("rejects resources missing from the admin contract", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities[0].evidence.adminResources.push("missing-resource");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing admin resource missing-resource/);
+  });
+
+  it("rejects required engineering capability gaps", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "production-runtime-gate");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability production-runtime-gate/);
+  });
+
+  it("rejects missing task dependency governance", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "task-dependency-governance");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability task-dependency-governance/);
+  });
+
+  it("rejects missing reference coverage boundary gate", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "reference-coverage-boundary-gate");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability reference-coverage-boundary-gate/);
+  });
+
+  it("rejects missing reference discovery gate", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "reference-discovery-gate");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability reference-discovery-gate/);
+  });
+
+  it("rejects missing personnel runtime readiness gate", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "personnel-runtime-readiness");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability personnel-runtime-readiness/);
+  });
+
+  it("rejects missing production readiness preflight gate", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "production-readiness-preflight");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability production-readiness-preflight/);
+  });
+
+  it("rejects missing deployment topology gate", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "deployment-topology-gate");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability deployment-topology-gate/);
+  });
+
+  it("rejects missing app client API boundary gate", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "app-client-api-boundary");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability app-client-api-boundary/);
+  });
+
+  it("rejects missing goal completion audit gate", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "goal-completion-audit");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability goal-completion-audit/);
+  });
+
+  it("rejects missing node closeout audit gate", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "node-closeout-audit");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability node-closeout-audit/);
+  });
+
+  it("rejects missing production auth hardening gate", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "production-auth-hardening-gate");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability production-auth-hardening-gate/);
+  });
+
+  it("rejects cache invalidation capabilities that do not cite the cache contract gate", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    const capability = matrix.capabilities.find((item) => item.id === "runtime-cache-invalidation");
+    capability.evidence.sourcePaths = capability.evidence.sourcePaths.filter((item) => item !== "resources/platform-cache-invalidation.json");
+    capability.evidence.validators = [];
+    capability.evidence.tests = [];
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /runtime-cache-invalidation must cite resources\/platform-cache-invalidation\.json/);
+    assert.match(result.stderr, /runtime-cache-invalidation must cite validate-platform-cache-invalidation\.mjs/);
+    assert.match(result.stderr, /runtime-cache-invalidation must cite platform-cache-invalidation\.test\.mjs/);
+  });
+
+  it("rejects deployment topology gates without deployment evidence", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    const capability = matrix.capabilities.find((item) => item.id === "deployment-topology-gate");
+    capability.evidence.sourcePaths = capability.evidence.sourcePaths.filter((item) => item !== "resources/platform-deployment-topology.json");
+    capability.evidence.validators = [];
+    capability.evidence.tests = [];
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /deployment-topology-gate must cite resources\/platform-deployment-topology\.json/);
+    assert.match(result.stderr, /deployment-topology-gate must cite validate-platform-deployment-topology\.mjs/);
+    assert.match(result.stderr, /deployment-topology-gate must cite platform-deployment-topology\.test\.mjs/);
+  });
+
+  it("rejects app client API boundary gates without contract evidence", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    const capability = matrix.capabilities.find((item) => item.id === "app-client-api-boundary");
+    capability.evidence.sourcePaths = capability.evidence.sourcePaths.filter((item) => item !== "resources/platform-app-client-api-boundary.json");
+    capability.evidence.validators = [];
+    capability.evidence.tests = [];
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /app-client-api-boundary must cite resources\/platform-app-client-api-boundary\.json/);
+    assert.match(result.stderr, /app-client-api-boundary must cite validate-platform-app-client-api-boundary\.mjs/);
+    assert.match(result.stderr, /app-client-api-boundary must cite platform-app-client-api-boundary\.test\.mjs/);
+  });
+
+  it("rejects missing org, role group and area governance gate", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "governance-org-area-role-groups");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability governance-org-area-role-groups/);
+  });
+
+  it("rejects missing form schema layout slot gate", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "form-schema-layout-slot-gate");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability form-schema-layout-slot-gate/);
+  });
+
+  it("rejects missing capability profile composition gate", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "capability-profile-composition-gate");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability capability-profile-composition-gate/);
+  });
+
+  it("rejects capability contract governance gates without contract evidence", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    const capability = matrix.capabilities.find((item) => item.id === "capability-contract-governance");
+    capability.evidence.sourcePaths = capability.evidence.sourcePaths.filter((item) => item !== "resources/platform-capability-contracts.json");
+    capability.evidence.validators = [];
+    capability.evidence.tests = [];
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /capability-contract-governance must cite resources\/platform-capability-contracts\.json/);
+    assert.match(result.stderr, /capability-contract-governance must cite validate-platform-capability-contracts\.mjs/);
+    assert.match(result.stderr, /capability-contract-governance must cite platform-capability-contracts\.test\.mjs/);
+  });
+
+  it("rejects missing codegen source-writing readiness gate", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "codegen-source-writing-readiness");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability codegen-source-writing-readiness/);
+  });
+
+  it("keeps safe codegen scaffold implemented while source writing is disabled", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    const capability = matrix.capabilities.find((item) => item.id === "safe-codegen-scaffold");
+
+    assert.equal(capability.status, "implemented");
+    assert.equal(capability.evidence.scaffoldPlan.sourceWriting, "disabled");
+    assert.equal(capability.evidence.scaffoldPlan.dryRun, true);
+    assert.ok(capability.evidence.generatedFiles.includes("resources/generated/admin-scaffold-promotion-review.json"));
+  });
+
+  it("rejects safe codegen scaffold status drift back to preview", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    const capability = matrix.capabilities.find((item) => item.id === "safe-codegen-scaffold");
+    capability.status = "preview-scaffold";
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /safe-codegen-scaffold status must be implemented/);
+  });
+
+  it("rejects missing file operation audit contract", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((capability) => capability.id !== "file-operation-audit-contract");
+    const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+    const result = runValidator(["--matrix", matrixPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability file-operation-audit-contract/);
+  });
+
+  it("rejects scaffold plans that enable source writing", () => {
+    const scaffoldPlan = readJSON("resources/generated/admin-scaffold-plan.json");
+    scaffoldPlan.mode.sourceWriting = "enabled";
+    const scaffoldPlanPath = tempJSON("admin-scaffold-plan.json", scaffoldPlan);
+
+    const result = runValidator(["--scaffold-plan", scaffoldPlanPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /scaffold plan mode\.sourceWriting must be disabled/);
+  });
+
+  it("rejects backend stack dependency drift", () => {
+    const goMod = fs.readFileSync(path.join(repoRoot, "go.mod"), "utf8").replace("github.com/casbin/casbin/v2 v2.135.0\n", "");
+    const goModPath = tempText("go.mod", goMod);
+
+    const result = runValidator(["--go-mod", goModPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /backend stack dependency Casbin is missing from go\.mod/);
+  });
+
+  it("rejects frontend stack dependency drift", () => {
+    const adminPackage = readJSON("admin/package.json");
+    delete adminPackage.dependencies["@refinedev/core"];
+    const adminPackagePath = tempJSON("package.json", adminPackage);
+
+    const result = runValidator(["--admin-package", adminPackagePath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /frontend stack dependency Refine core is missing from admin\/package\.json/);
+  });
+
+  it("rejects target stack source wiring drift even when dependencies remain installed", () => {
+    const stackSourceRoot = tempStackSourceRoot((root) => {
+      const appPath = path.join(root, "admin/src/App.tsx");
+      const source = fs.readFileSync(appPath, "utf8").replace("accessControlProvider={accessControlProvider}", "accessControlProvider={undefined}");
+      fs.writeFileSync(appPath, source);
+    });
+
+    const result = runValidator(["--stack-source-root", stackSourceRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Refine runtime providers must include accessControlProvider=\{accessControlProvider\}/);
+  });
+});

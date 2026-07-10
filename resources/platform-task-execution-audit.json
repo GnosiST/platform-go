@@ -1,0 +1,83 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-task-execution-audit.json",
+  "capturedAt": "2026-07-07",
+  "purpose": "Machine-checkable execution audit for the active platform foundation goal: every task node, dependency, resource lock, parallel batch, future runtime-promotion gate and visual workflow gate must remain explicit before implementation continues.",
+  "taskGraph": "resources/platform-foundation-task-graph.json",
+  "alignmentAudit": "resources/platform-foundation-alignment-audit.json",
+  "engineeringCapability": "task-dependency-governance",
+  "statusPolicy": {
+    "implementedRequiresEvidence": true,
+    "unfinishedRequiresStatusReason": true,
+    "unfinishedRequiresCompletionGate": true,
+    "futureTaskNodesMustNotDisappear": true,
+    "visualTasksRequireProductDesign": true,
+    "resourceLocksMustDeclarePolicies": true,
+    "parallelBatchesMustAvoidResourceLockGroups": true,
+    "parallelBatchesMustAvoidResourceLockConflicts": true,
+    "parallelBatchesMustAvoidDependencyPaths": true
+  },
+  "requiredUnfinishedNodes": [],
+  "knownPromotionBlockers": [
+    {
+      "taskId": "production-auth-provider-hardening",
+      "runtimeMutationBlockedWhile": [
+        "resources/platform-production-auth-hardening.json sessionCredentialPolicy.refreshTokenFamily.defaultRuntime is disabled",
+        "resources/platform-production-auth-hardening.json productionPromotionApprovalPackage.status is blocked"
+      ],
+      "requiredEvidenceBeforePromotion": [
+        "runtime test output bundle including refresh-token-family tests",
+        "token-family revocation evidence",
+        "redis session invalidation convergence evidence",
+        "rotation replay audit evidence",
+        "security-owner approval",
+        "platform-architect approval",
+        "operations-owner approval",
+        "structured approval evidence package",
+        "provider rotation runbook",
+        "rollback plan",
+        "audit redaction sample",
+        "external absolute artifact URI evidence"
+      ]
+    },
+    {
+      "taskId": "source-writing-codegen-promotion",
+      "runtimeMutationBlockedWhile": [
+        "resources/platform-codegen-source-writing-readiness.json mode.sourceWriting is disabled",
+        "resources/platform-codegen-source-writing-readiness.json sourceWritingApprovalPackage.status is blocked",
+        "resources/generated/admin-scaffold-promotion-review.json manualReview.decision is not-approved"
+      ],
+      "requiredEvidenceBeforePromotion": [
+        "source-writing architecture spec",
+        "platform-architect approval",
+        "codegen-owner approval",
+        "runtime-owner approval",
+        "approved promotion review packet",
+        "reviewed diff",
+        "target-family test mapping",
+        "target-family test output",
+        "runtime target owner approval",
+        "rollback plan",
+        "structured source-writing approval evidence package",
+        "external absolute artifact URI evidence"
+      ]
+    }
+  ],
+  "requiredValidators": [
+    "scripts/validate-platform-task-execution-audit.mjs",
+    "scripts/validate-platform-foundation-task-graph.mjs",
+    "scripts/validate-platform-foundation-alignment.mjs",
+    "scripts/validate-platform-engineering-capabilities.mjs",
+    "scripts/validate-platform-admin-api-boundary.mjs",
+    "scripts/validate-platform-app-client-api-boundary.mjs",
+    "scripts/validate-platform-file-storage-experience.mjs",
+    "scripts/validate-platform-refresh-token-family-promotion.mjs",
+    "scripts/validate-platform-goal-completion-audit.mjs",
+    "scripts/validate-platform-node-closeout-audit.mjs",
+    "scripts/validate-platform-objective-conformance.mjs",
+    "scripts/validate-platform-promotion-evidence-templates.mjs",
+    "scripts/validate-platform-promotion-evidence-package.mjs"
+  ],
+  "requiredTests": [
+    "scripts/platform-task-execution-audit.test.mjs"
+  ]
+}

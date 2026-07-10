@@ -7,26 +7,33 @@ import {
   BookOutlined,
   BranchesOutlined,
   CloudServerOutlined,
+  CloseOutlined,
   ControlOutlined,
   DatabaseOutlined,
-  FileSearchOutlined,
+  DownOutlined,
   GlobalOutlined,
   HomeOutlined,
   MenuFoldOutlined,
   MenuOutlined,
-  MoonOutlined,
+  MenuUnfoldOutlined,
   PartitionOutlined,
+  PushpinOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
   SettingOutlined,
   TeamOutlined,
+  UploadOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Avatar, Badge, Button, Drawer, Input, Select, Segmented, Space, Tooltip, Typography } from "antd";
-import { useMemo, useState, type ReactNode } from "react";
+import { Avatar, Badge, Button, Drawer, Dropdown, Input, Space, Tag, Tooltip, Typography, type MenuProps } from "antd";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import type { AdminCurrentSession, BrandingConfig } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
-import { adminLayoutModes, themeNames, type AdminLayoutMode, type ThemeName } from "../theme";
+import { themeTokens, type AdminLayoutMode, type ThemeName } from "../theme";
 import type { AdminResourceDefinition } from "../resources/registry";
+import { PlatformDropdownPanel, PlatformDropdownPlugin, SystemSettingsDrawer, type AdminUIConfig } from "../ui";
+
+const HOME_ROUTE = "/overview";
 
 type AdminShellProps = {
   resources: AdminResourceDefinition[];
@@ -34,11 +41,16 @@ type AdminShellProps = {
   dictionary: Dictionary;
   themeName: ThemeName;
   layoutMode: AdminLayoutMode;
+  uiConfig: AdminUIConfig;
+  branding: BrandingConfig | null;
+  session: AdminCurrentSession;
   activeRoute: string;
   onLanguageChange: (language: Language) => void;
   onThemeChange: (theme: ThemeName) => void;
   onLayoutModeChange: (mode: AdminLayoutMode) => void;
+  onUIConfigChange: (config: AdminUIConfig) => void;
   onRouteChange: (route: string) => void;
+  onLogout: () => void;
   children: ReactNode;
 };
 
@@ -54,9 +66,30 @@ const iconMap = {
   dictParams: DatabaseOutlined,
   monitoring: CloudServerOutlined,
   settings: SettingOutlined,
+  upload: UploadOutlined,
 } as const;
 
 const groupOrder: Array<AdminResourceDefinition["group"]> = ["foundation", "governance", "operations", "security"];
+const navParentOrder = [
+  "runtime",
+  "identity",
+  "access",
+  "resources",
+  "audit",
+  "configuration",
+  "governance",
+  "system",
+  "logs",
+  "storage",
+  "security",
+  "release",
+  "business",
+  "business/access",
+  "business/content",
+  "business/dispatch",
+  "business/fulfillment",
+  "business/support",
+];
 
 export function AdminShell({
   resources,
@@ -64,52 +97,152 @@ export function AdminShell({
   dictionary,
   themeName,
   layoutMode,
+  uiConfig,
+  branding,
+  session,
   activeRoute,
   onLanguageChange,
   onThemeChange,
   onLayoutModeChange,
+  onUIConfigChange,
   onRouteChange,
+  onLogout,
   children,
 }: AdminShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [openContext, setOpenContext] = useState<"environment" | "tenant" | null>(null);
+  const [openTabRoutes, setOpenTabRoutes] = useState<string[]>(() => uniqueRoutes([HOME_ROUTE, activeRoute]));
   const activeResource = resources.find((resource) => resource.route === activeRoute) ?? resources[0];
+  const resourcesByRoute = useMemo(() => new Map(resources.map((resource) => [resource.route, resource])), [resources]);
   const groupedResources = useMemo(
     () =>
-      groupOrder.map((group) => ({
-        group,
-        label: dictionary[group],
-        resources: resources.filter((resource) => resource.group === group),
-      })),
+      groupOrder
+        .map((group) => ({
+          group,
+          label: dictionary[group],
+          resources: resources.filter((resource) => resource.group === group),
+        }))
+        .filter((group) => group.resources.length > 0),
     [dictionary, resources],
   );
+  const activeGroup = groupedResources.find((group) => group.resources.some((resource) => resource.route === activeRoute)) ?? groupedResources[0];
+  const openTabs = openTabRoutes
+    .map((route) => resourcesByRoute.get(route))
+    .filter((resource): resource is AdminResourceDefinition => Boolean(resource));
+  const targetLanguage = language === "zh" ? "en" : "zh";
+  const displayName = session.user.name || session.user.username || dictionary.admin;
+  const avatarLetter = (displayName.trim()[0] || "A").toUpperCase();
+  const shellStyle = {
+    "--sidebar-width": `${uiConfig.sidebarCollapsed ? 64 : uiConfig.sidebarWidth}px`,
+    "--menu-item-height": `${uiConfig.menuItemHeight}px`,
+    "--primary": uiConfig.customPrimary,
+  } as CSSProperties;
 
-  const shellClass = `platform-shell layout-${layoutMode}`;
+  useEffect(() => {
+    if (!resourcesByRoute.has(activeRoute)) {
+      return;
+    }
+    setOpenTabRoutes((current) => uniqueRoutes([HOME_ROUTE, ...current.filter((route) => resourcesByRoute.has(route)), activeRoute]));
+  }, [activeRoute, resourcesByRoute]);
+
+  const openResource = (resource: AdminResourceDefinition) => {
+    if (resource.isExternal) {
+      window.open(resource.route, "_blank", "noopener,noreferrer");
+      return;
+    }
+    onRouteChange(resource.route);
+  };
+
+  const closeWorkTab = (route: string) => {
+    if (route === HOME_ROUTE) {
+      return;
+    }
+    const nextRoutes = uniqueRoutes([HOME_ROUTE, ...openTabRoutes.filter((tabRoute) => tabRoute !== route && tabRoute !== HOME_ROUTE)]);
+    const fallbackRoute = nextRoutes.at(-1) ?? HOME_ROUTE;
+    setOpenTabRoutes(nextRoutes);
+    if (route === activeRoute && fallbackRoute !== activeRoute) {
+      onRouteChange(fallbackRoute);
+    }
+  };
+
+  const closeWorkTabs = (mode: "current" | "others" | "all" | "left" | "right", route: string) => {
+    const index = openTabRoutes.indexOf(route);
+    const nextRoutes = (() => {
+      switch (mode) {
+      case "current":
+        return openTabRoutes.filter((tabRoute) => tabRoute !== route || tabRoute === HOME_ROUTE);
+      case "others":
+        return openTabRoutes.filter((tabRoute) => tabRoute === HOME_ROUTE || tabRoute === route);
+      case "all":
+        return [HOME_ROUTE];
+      case "left":
+        return openTabRoutes.filter((tabRoute, tabIndex) => tabRoute === HOME_ROUTE || tabIndex >= index);
+      case "right":
+        return openTabRoutes.filter((tabRoute, tabIndex) => tabRoute === HOME_ROUTE || tabIndex <= index);
+      }
+    })();
+    const normalizedRoutes = uniqueRoutes([HOME_ROUTE, ...nextRoutes]).filter((tabRoute) => resourcesByRoute.has(tabRoute));
+    const fallbackRoute = normalizedRoutes.includes(activeRoute) ? activeRoute : normalizedRoutes.at(-1) ?? HOME_ROUTE;
+    setOpenTabRoutes(normalizedRoutes);
+    if (fallbackRoute !== activeRoute) {
+      onRouteChange(fallbackRoute);
+    }
+  };
+
+  const changeTheme = (nextTheme: ThemeName) => {
+    onThemeChange(nextTheme);
+    onUIConfigChange({ ...uiConfig, customPrimary: themeTokens[nextTheme].primary });
+  };
+  const toggleSidebar = () => onUIConfigChange({ ...uiConfig, sidebarCollapsed: !uiConfig.sidebarCollapsed });
+
+  const shellClass = [
+    "platform-shell",
+    `layout-${layoutMode}`,
+    uiConfig.sidebarCollapsed && layoutMode !== "top" ? "sider-collapsed" : "",
+    uiConfig.pageTransition ? "transition-enabled" : "",
+    uiConfig.watermark ? "watermark-enabled" : "",
+    uiConfig.visualAid ? "visual-aid-enabled" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <div className={shellClass} data-theme={themeName} data-layout={layoutMode}>
-      <aside className="platform-sider" aria-label="Primary navigation">
-        <Brand dictionary={dictionary} compact={layoutMode === "split"} />
+    <div className={shellClass} data-theme={themeName} data-layout={layoutMode} data-density={uiConfig.density} style={shellStyle}>
+      <aside className="platform-sider" aria-label={dictionary.primaryNavigation}>
+        <Brand
+          dictionary={dictionary}
+          branding={branding}
+          compact={layoutMode === "split" || uiConfig.sidebarCollapsed}
+          collapsed={uiConfig.sidebarCollapsed}
+          collapseLabel={dictionary.collapseSidebar}
+          expandLabel={dictionary.expandSidebar}
+          onToggleCollapse={toggleSidebar}
+        />
         {layoutMode === "split" ? (
-          <SplitPrimaryNav groupedResources={groupedResources} activeRoute={activeRoute} onRouteChange={onRouteChange} />
+          <SplitPrimaryNav groupedResources={groupedResources} activeRoute={activeRoute} onResourceOpen={openResource} />
         ) : (
           <SideNavigation
             groupedResources={groupedResources}
             activeRoute={activeRoute}
             language={language}
-            onRouteChange={onRouteChange}
+            dictionary={dictionary}
+            collapsed={uiConfig.sidebarCollapsed}
+            onResourceOpen={openResource}
           />
         )}
         <div className="platform-version">platform-go v0.1.0</div>
       </aside>
 
       {layoutMode === "split" ? (
-        <aside className="platform-secondary-nav" aria-label="Secondary navigation">
-          <Typography.Text className="secondary-nav-title">{dictionary.foundation}</Typography.Text>
+        <aside className="platform-secondary-nav" aria-label={dictionary.secondaryNavigation}>
+          <Typography.Text className="secondary-nav-title">{activeGroup?.label}</Typography.Text>
           <SideNavigation
-            groupedResources={groupedResources.filter((group) => group.group === "foundation")}
+            groupedResources={activeGroup ? [activeGroup] : []}
             activeRoute={activeRoute}
             language={language}
-            onRouteChange={onRouteChange}
+            dictionary={dictionary}
+            onResourceOpen={openResource}
           />
         </aside>
       ) : null}
@@ -118,85 +251,160 @@ export function AdminShell({
         <header className="platform-topbar">
           <div className="topbar-left">
             <Button className="mobile-nav-button" icon={<MenuOutlined />} onClick={() => setMobileNavOpen(true)} />
+            {layoutMode !== "top" ? (
+              <Tooltip title={uiConfig.sidebarCollapsed ? dictionary.expandSidebar : dictionary.collapseSidebar}>
+                <Button
+                  aria-label={uiConfig.sidebarCollapsed ? dictionary.expandSidebar : dictionary.collapseSidebar}
+                  className="desktop-sider-toggle"
+                  icon={uiConfig.sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                  onClick={toggleSidebar}
+                />
+              </Tooltip>
+            ) : null}
             <BreadcrumbLabel dictionary={dictionary} activeTitle={activeResource?.title[language] ?? ""} />
           </div>
           <Input
+            aria-label={dictionary.topSearch}
+            autoComplete="off"
             className="global-search"
+            id="platform-global-search"
+            name="globalSearch"
             prefix={<SearchOutlined />}
             suffix={<span className="keyboard-hint">⌘ {dictionary.commandHint}</span>}
             placeholder={dictionary.topSearch}
           />
           <Space className="topbar-actions" size={8}>
-            <Select
-              aria-label={dictionary.theme}
-              className="theme-select"
-              value={themeName}
-              onChange={onThemeChange}
-              options={themeNames.map((name) => ({ value: name, label: themeLabel(dictionary, name) }))}
-            />
-            <Select
-              aria-label={dictionary.language}
-              className="language-select"
-              value={language}
-              onChange={onLanguageChange}
-              options={[
-                { value: "zh", label: dictionary.cn },
-                { value: "en", label: dictionary.en },
-              ]}
-            />
+            <Tooltip title={`${dictionary.switchLanguage}: ${targetLanguage === "zh" ? dictionary.cn : dictionary.en}`}>
+              <Button
+                aria-label={dictionary.switchLanguage}
+                className="topbar-icon-button language-toggle-button"
+                icon={<GlobalOutlined />}
+                onClick={() => onLanguageChange(targetLanguage)}
+              />
+            </Tooltip>
             <Tooltip title={dictionary.alerts}>
               <Badge count={3} size="small">
-                <Button icon={<BellOutlined />} />
+                <Button className="topbar-icon-button" icon={<BellOutlined />} />
               </Badge>
             </Tooltip>
-            <Avatar className="admin-avatar">A</Avatar>
-            <Typography.Text className="admin-name">{dictionary.admin}</Typography.Text>
+            <Button className="user-menu-trigger" aria-label={dictionary.userSettings} onClick={() => setSettingsOpen(true)}>
+              <Avatar size={28} className="admin-avatar">
+                {avatarLetter}
+              </Avatar>
+              <span className="user-menu-name">{displayName}</span>
+              <SettingOutlined />
+            </Button>
           </Space>
         </header>
 
-        <nav className="platform-resource-tabs" aria-label={dictionary.historyTabs}>
-          {resources.slice(0, 8).map((resource) => (
-            <button
-              key={resource.route}
-              className={resource.route === activeRoute ? "resource-tab active" : "resource-tab"}
-              type="button"
-              onClick={() => onRouteChange(resource.route)}
-            >
-              {resource.title[language]}
-            </button>
-          ))}
-        </nav>
+        {layoutMode === "top" || layoutMode === "mixed" ? (
+          <section className={layoutMode === "mixed" ? "platform-top-nav compact" : "platform-top-nav"} aria-label={dictionary.primaryNavigation}>
+            <TopNavigation
+              groupedResources={groupedResources}
+              activeRoute={activeRoute}
+              language={language}
+              dictionary={dictionary}
+              onResourceOpen={openResource}
+            />
+          </section>
+        ) : null}
 
-        <section className="platform-toolbar-band">
-          <Segmented
-            className="layout-switcher"
-            value={layoutMode}
-            onChange={(value) => onLayoutModeChange(value as AdminLayoutMode)}
-            options={adminLayoutModes.map((mode) => ({ value: mode, label: layoutLabel(dictionary, mode) }))}
-          />
+        <section className={uiConfig.showWorkTabs ? "platform-workbar" : "platform-workbar without-tabs"}>
+          {uiConfig.showWorkTabs ? (
+            <nav className="platform-work-tabs" aria-label={dictionary.workTabs}>
+              {openTabs.map((resource) => {
+                const Icon = iconMap[resource.icon as keyof typeof iconMap] ?? BookOutlined;
+                const isPinned = resource.route === HOME_ROUTE;
+                return (
+                  <Dropdown
+                    key={resource.route}
+                    trigger={["contextMenu"]}
+                    menu={{
+                      items: workTabMenuItems(dictionary, resource.route, openTabRoutes),
+                      onClick: ({ key }) => closeWorkTabs(key as "current" | "others" | "all" | "left" | "right", resource.route),
+                    }}
+                  >
+                    <div className={resource.route === activeRoute ? "work-tab active" : "work-tab"}>
+                      <button className="work-tab-label" type="button" onClick={() => openResource(resource)}>
+                        <Icon />
+                        <span>{resource.title[language]}</span>
+                        {isPinned ? (
+                          <Tooltip title={dictionary.pinnedTab}>
+                            <PushpinOutlined className="work-tab-pin" />
+                          </Tooltip>
+                        ) : null}
+                      </button>
+                      {isPinned ? null : (
+                        <Tooltip title={dictionary.closeTab}>
+                          <button
+                            aria-label={`${dictionary.closeTab}: ${resource.title[language]}`}
+                            className="work-tab-close"
+                            type="button"
+                            onClick={() => closeWorkTab(resource.route)}
+                          >
+                            <CloseOutlined />
+                          </button>
+                        </Tooltip>
+                      )}
+                    </div>
+                  </Dropdown>
+                );
+              })}
+            </nav>
+          ) : null}
           <div className="context-controls">
-            <Select
-              className="context-select"
-              value="prod"
-              options={[{ value: "prod", label: dictionary.production }]}
-              aria-label={dictionary.environment}
-            />
-            <Select
-              className="context-select"
-              value="platform"
-              options={[{ value: "platform", label: `${dictionary.platformTenant} (platform)` }]}
-              aria-label={dictionary.tenant}
-            />
+            <PlatformDropdownPlugin
+              open={openContext === "environment"}
+              content={(
+                <ContextPanel
+                  title={dictionary.environmentContext}
+                  description={dictionary.environmentContextHelp}
+                  label={dictionary.environment}
+                  value={dictionary.production}
+                  dictionary={dictionary}
+                />
+              )}
+              onOpenChange={(open) => setOpenContext(open ? "environment" : null)}
+            >
+              <Button className="context-chip" aria-label={dictionary.environmentContext}>
+                <span>{dictionary.environment}</span>
+                <strong>{dictionary.production}</strong>
+                <DownOutlined />
+              </Button>
+            </PlatformDropdownPlugin>
+            <PlatformDropdownPlugin
+              open={openContext === "tenant"}
+              content={(
+                <ContextPanel
+                  title={dictionary.tenantContext}
+                  description={dictionary.tenantContextHelp}
+                  label={dictionary.tenant}
+                  value={`${dictionary.platformTenant} (platform)`}
+                  dictionary={dictionary}
+                />
+              )}
+              onOpenChange={(open) => setOpenContext(open ? "tenant" : null)}
+            >
+              <Button className="context-chip" aria-label={dictionary.tenantContext}>
+                <span>{dictionary.tenant}</span>
+                <strong>{`${dictionary.platformTenant} (platform)`}</strong>
+                <DownOutlined />
+              </Button>
+            </PlatformDropdownPlugin>
           </div>
         </section>
 
-        <section className="platform-content">{children}</section>
+        <section className="platform-content" data-watermark={`${branding?.shortName || "platform-go"} · ${displayName}`}>
+          {children}
+        </section>
       </main>
 
       <Drawer
-        title="platform-go"
+        title={branding?.shortName || branding?.productName || "platform-go"}
+        getContainer={false}
         open={mobileNavOpen}
         placement="left"
+        rootStyle={{ position: "absolute" }}
         width={320}
         onClose={() => setMobileNavOpen(false)}
       >
@@ -204,28 +412,73 @@ export function AdminShell({
           groupedResources={groupedResources}
           activeRoute={activeRoute}
           language={language}
-          onRouteChange={(route) => {
-            onRouteChange(route);
+          dictionary={dictionary}
+          onResourceOpen={(resource) => {
+            openResource(resource);
             setMobileNavOpen(false);
           }}
         />
       </Drawer>
+      <SystemSettingsDrawer
+        open={settingsOpen}
+        language={language}
+        dictionary={dictionary}
+        themeName={themeName}
+        layoutMode={layoutMode}
+        uiConfig={uiConfig}
+        branding={branding}
+        session={session}
+        onClose={() => setSettingsOpen(false)}
+        onThemeChange={changeTheme}
+        onLayoutModeChange={onLayoutModeChange}
+        onUIConfigChange={onUIConfigChange}
+        onLogout={onLogout}
+      />
     </div>
   );
 }
 
-function Brand({ dictionary, compact }: { dictionary: Dictionary; compact?: boolean }) {
+function Brand({
+  dictionary,
+  branding,
+  compact,
+  collapsed,
+  collapseLabel,
+  expandLabel,
+  onToggleCollapse,
+}: {
+  dictionary: Dictionary;
+  branding: BrandingConfig | null;
+  compact?: boolean;
+  collapsed: boolean;
+  collapseLabel: string;
+  expandLabel: string;
+  onToggleCollapse: () => void;
+}) {
+  const title = branding?.shortName || branding?.productName || "platform-go";
+  const subtitle = branding?.productName || dictionary.appSubtitle;
+  const label = collapsed ? expandLabel : collapseLabel;
   return (
     <div className={compact ? "platform-brand compact" : "platform-brand"}>
-      <div className="platform-logo">
-        <ControlOutlined />
-      </div>
-      {compact ? null : (
-        <div>
-          <Typography.Text className="platform-title">platform-go</Typography.Text>
-          <Typography.Text className="platform-subtitle">{dictionary.appSubtitle}</Typography.Text>
+      <div className="platform-brand-main">
+        <div className="platform-logo">
+          {branding?.logoUrl ? <img alt="" src={branding.logoUrl} /> : <ControlOutlined />}
         </div>
-      )}
+        {compact ? null : (
+          <div>
+            <Typography.Text className="platform-title">{title}</Typography.Text>
+            <Typography.Text className="platform-subtitle">{subtitle}</Typography.Text>
+          </div>
+        )}
+      </div>
+      <Tooltip title={label}>
+        <Button
+          aria-label={label}
+          className="brand-collapse-button"
+          icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+          onClick={onToggleCollapse}
+        />
+      </Tooltip>
     </div>
   );
 }
@@ -234,34 +487,51 @@ function SideNavigation({
   groupedResources,
   activeRoute,
   language,
-  onRouteChange,
+  dictionary,
+  collapsed = false,
+  onResourceOpen,
 }: {
   groupedResources: Array<{ group: AdminResourceDefinition["group"]; label: string; resources: AdminResourceDefinition[] }>;
   activeRoute: string;
   language: Language;
-  onRouteChange: (route: string) => void;
+  dictionary: Dictionary;
+  collapsed?: boolean;
+  onResourceOpen: (resource: AdminResourceDefinition) => void;
 }) {
+  if (collapsed) {
+    return (
+      <div className="side-nav collapsed-flat">
+        {groupedResources.map((group) => (
+          <div className="side-nav-group" key={group.group}>
+            <Typography.Text className="side-nav-group-title">{group.label}</Typography.Text>
+            <div className="side-nav-tree">
+              {group.resources.map((resource) => (
+                <SideNavResourceButton
+                  key={resource.route}
+                  resource={resource}
+                  active={resource.route === activeRoute}
+                  language={language}
+                  onResourceOpen={onResourceOpen}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="side-nav">
-      {groupedResources.map((group) => (
-        <div className="side-nav-group" key={group.group}>
-          <Typography.Text className="side-nav-group-title">{group.label}</Typography.Text>
-          {group.resources.map((resource) => {
-            const Icon = iconMap[resource.icon as keyof typeof iconMap] ?? BookOutlined;
-            return (
-              <button
-                className={resource.route === activeRoute ? "side-nav-item active" : "side-nav-item"}
-                key={resource.route}
-                type="button"
-                onClick={() => onRouteChange(resource.route)}
-              >
-                <Icon />
-                <span>{resource.title[language]}</span>
-              </button>
-            );
-          })}
-        </div>
-      ))}
+      {groupedResources.map((group) => {
+        const tree = buildNavigationTree(group.resources, dictionary, language);
+        return (
+          <div className="side-nav-group" key={group.group}>
+            <Typography.Text className="side-nav-group-title">{group.label}</Typography.Text>
+            <NavTree nodes={tree} activeRoute={activeRoute} language={language} onResourceOpen={onResourceOpen} />
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -269,11 +539,11 @@ function SideNavigation({
 function SplitPrimaryNav({
   groupedResources,
   activeRoute,
-  onRouteChange,
+  onResourceOpen,
 }: {
   groupedResources: Array<{ group: AdminResourceDefinition["group"]; label: string; resources: AdminResourceDefinition[] }>;
   activeRoute: string;
-  onRouteChange: (route: string) => void;
+  onResourceOpen: (resource: AdminResourceDefinition) => void;
 }) {
   const groupIcons = {
     foundation: AppstoreOutlined,
@@ -293,7 +563,12 @@ function SplitPrimaryNav({
             key={group.group}
             title={group.label}
             type="button"
-            onClick={() => onRouteChange(group.resources[0]?.route ?? "/capabilities")}
+            onClick={() => {
+              const firstResource = group.resources[0];
+              if (firstResource) {
+                onResourceOpen(firstResource);
+              }
+            }}
           >
             <Icon />
             <span>{group.label}</span>
@@ -304,32 +579,252 @@ function SplitPrimaryNav({
   );
 }
 
+function TopNavigation({
+  groupedResources,
+  activeRoute,
+  language,
+  dictionary,
+  onResourceOpen,
+}: {
+  groupedResources: Array<{ group: AdminResourceDefinition["group"]; label: string; resources: AdminResourceDefinition[] }>;
+  activeRoute: string;
+  language: Language;
+  dictionary: Dictionary;
+  onResourceOpen: (resource: AdminResourceDefinition) => void;
+}) {
+  return (
+    <div className="top-resource-nav">
+      {groupedResources.map((group) => {
+        const active = group.resources.some((resource) => resource.route === activeRoute);
+        return (
+          <Dropdown
+            key={group.group}
+            menu={{
+              items: group.resources.map((resource) => {
+                const Icon = iconMap[resource.icon as keyof typeof iconMap] ?? BookOutlined;
+                return {
+                  key: resource.route,
+                  icon: <Icon />,
+                  label: resource.title[language],
+                };
+              }),
+              onClick: ({ key }) => {
+                const resource = group.resources.find((item) => item.route === key);
+                if (resource) {
+                  onResourceOpen(resource);
+                }
+              },
+            }}
+            overlayClassName="platform-dropdown-overlay"
+            trigger={["click"]}
+          >
+            <Button className={active ? "top-resource-nav-item active" : "top-resource-nav-item"}>
+              <span>{group.label}</span>
+              <DownOutlined />
+            </Button>
+          </Dropdown>
+        );
+      })}
+    </div>
+  );
+}
+
 function BreadcrumbLabel({ dictionary, activeTitle }: { dictionary: Dictionary; activeTitle: string }) {
   return (
     <div className="breadcrumb-label">
       <Typography.Text>{dictionary.allSystems}</Typography.Text>
-      <MenuFoldOutlined />
       <Typography.Text className="breadcrumb-current">{activeTitle}</Typography.Text>
     </div>
   );
 }
 
-function themeLabel(dictionary: Dictionary, themeName: ThemeName) {
-  const labels = {
-    tech: dictionary.themeTech,
-    white: dictionary.themeWhite,
-    black: dictionary.themeBlack,
-    warm: dictionary.themeWarm,
-  };
-  return labels[themeName];
+type NavNode = {
+  key: string;
+  label: string;
+  order: number;
+  resource?: AdminResourceDefinition;
+  children: NavNode[];
+};
+
+function buildNavigationTree(resources: AdminResourceDefinition[], dictionary: Dictionary, language: Language) {
+  const roots: NavNode[] = [];
+
+  resources.forEach((resource, resourceIndex) => {
+    const parentPath = (resource.parent ?? "")
+      .split("/")
+      .map((segment) => segment.trim())
+      .filter(Boolean);
+    let siblings = roots;
+    let nodePath = "";
+
+    parentPath.forEach((segment) => {
+      nodePath = nodePath ? `${nodePath}/${segment}` : segment;
+      let node = siblings.find((item) => item.key === nodePath);
+      if (!node) {
+        node = {
+          key: nodePath,
+          label: navigationParentLabel(dictionary, nodePath),
+          order: navParentOrder.includes(nodePath) ? navParentOrder.indexOf(nodePath) : navParentOrder.length,
+          children: [],
+        };
+        siblings.push(node);
+      }
+      siblings = node.children;
+    });
+
+    siblings.push({
+      key: resource.route,
+      label: resource.title[language],
+      order: navParentOrder.length + resourceIndex,
+      resource,
+      children: [],
+    });
+  });
+
+  return sortNavNodes(roots);
 }
 
-function layoutLabel(dictionary: Dictionary, mode: AdminLayoutMode) {
-  const labels = {
-    side: dictionary.layoutSide,
-    top: dictionary.layoutTop,
-    mixed: dictionary.layoutMixed,
-    split: dictionary.layoutSplit,
+function sortNavNodes(nodes: NavNode[]): NavNode[] {
+  return [...nodes]
+    .sort((left, right) => left.order - right.order || left.label.localeCompare(right.label))
+    .map((node) => ({ ...node, children: sortNavNodes(node.children) }));
+}
+
+function NavTree({
+  nodes,
+  activeRoute,
+  language,
+  onResourceOpen,
+}: {
+  nodes: NavNode[];
+  activeRoute: string;
+  language: Language;
+  onResourceOpen: (resource: AdminResourceDefinition) => void;
+}) {
+  return (
+    <div className="side-nav-tree">
+      {nodes.map((node) => {
+        if (node.resource) {
+          return (
+            <SideNavResourceButton
+              key={node.key}
+              resource={node.resource}
+              active={node.resource.route === activeRoute}
+              language={language}
+              onResourceOpen={onResourceOpen}
+            />
+          );
+        }
+
+        return (
+          <details className="side-nav-branch" key={node.key} open={nodeHasActive(node, activeRoute)}>
+            <summary>{node.label}</summary>
+            <NavTree nodes={node.children} activeRoute={activeRoute} language={language} onResourceOpen={onResourceOpen} />
+          </details>
+        );
+      })}
+    </div>
+  );
+}
+
+function SideNavResourceButton({
+  resource,
+  active,
+  language,
+  onResourceOpen,
+}: {
+  resource: AdminResourceDefinition;
+  active: boolean;
+  language: Language;
+  onResourceOpen: (resource: AdminResourceDefinition) => void;
+}) {
+  const Icon = iconMap[resource.icon as keyof typeof iconMap] ?? BookOutlined;
+  return (
+    <button
+      aria-label={resource.title[language]}
+      className={active ? "side-nav-item active" : "side-nav-item"}
+      title={resource.title[language]}
+      type="button"
+      onClick={() => onResourceOpen(resource)}
+    >
+      <Icon />
+      <span className="side-nav-label">{resource.title[language]}</span>
+      {resource.isExternal ? <GlobalOutlined className="side-nav-extra-icon" /> : null}
+    </button>
+  );
+}
+
+function nodeHasActive(node: NavNode, activeRoute: string): boolean {
+  return node.children.some((child) => child.resource?.route === activeRoute || nodeHasActive(child, activeRoute));
+}
+
+function navigationParentLabel(dictionary: Dictionary, nodePath: string) {
+  const labels: Record<string, string> = {
+    runtime: dictionary.navRuntime,
+    identity: dictionary.navIdentity,
+    access: dictionary.navAccess,
+    resources: dictionary.navResources,
+    audit: dictionary.navAudit,
+    configuration: dictionary.navConfiguration,
+    governance: dictionary.navGovernance,
+    system: dictionary.navSystem,
+    logs: dictionary.navLogs,
+    storage: dictionary.navStorage,
+    security: dictionary.navSecurity,
+    release: dictionary.navRelease,
+    business: dictionary.navBusiness,
+    "business/access": dictionary.navBusinessAccess,
+    "business/content": dictionary.navBusinessContent,
+    "business/dispatch": dictionary.navBusinessDispatch,
+    "business/fulfillment": dictionary.navBusinessFulfillment,
+    "business/support": dictionary.navBusinessSupport,
   };
-  return labels[mode];
+  return labels[nodePath] ?? nodePath.split("/").at(-1)?.replace(/[-_]/g, " ") ?? nodePath;
+}
+
+function workTabMenuItems(dictionary: Dictionary, route: string, routes: string[]): MenuProps["items"] {
+  const index = routes.indexOf(route);
+  const isPinned = route === HOME_ROUTE;
+  return [
+    { key: "current", label: dictionary.closeCurrentTab, disabled: isPinned },
+    { key: "others", label: dictionary.closeOtherTabs, disabled: routes.length <= 1 },
+    { key: "all", label: dictionary.closeAllTabs, disabled: routes.length <= 1 },
+    { type: "divider" },
+    { key: "left", label: dictionary.closeTabsToLeft, disabled: index <= 1 },
+    { key: "right", label: dictionary.closeTabsToRight, disabled: index < 0 || index >= routes.length - 1 },
+  ];
+}
+
+function ContextPanel({
+  title,
+  description,
+  label,
+  value,
+  dictionary,
+}: {
+  title: string;
+  description: string;
+  label: string;
+  value: string;
+  dictionary: Dictionary;
+}) {
+  return (
+    <PlatformDropdownPanel
+      className="context-dropdown-panel"
+      title={title}
+      description={description}
+      width={320}
+      footer={<Tag>{dictionary.readOnlyContext}</Tag>}
+    >
+      <div className="context-dropdown-current">
+        <Typography.Text type="secondary">{dictionary.currentContext}</Typography.Text>
+        <strong>{label}</strong>
+        <Typography.Text>{value}</Typography.Text>
+      </div>
+    </PlatformDropdownPanel>
+  );
+}
+
+function uniqueRoutes(routes: string[]) {
+  return routes.filter((route, index) => route && routes.indexOf(route) === index);
 }

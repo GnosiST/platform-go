@@ -1,0 +1,111 @@
+{
+  "generatedBy": "scripts/generate-app-codegen-preview.mjs",
+  "source": "resources/generated/app-route-contract.json",
+  "sourceVersion": "0.1.0",
+  "securityDomain": "app",
+  "summary": {
+    "routeCount": 5,
+    "capabilities": [
+      "file-storage",
+      "session"
+    ],
+    "permissions": [],
+    "authModes": {
+      "public": 1,
+      "session": 4
+    }
+  },
+  "guardrails": [
+    "This preview is read-only and must not overwrite app or business frontend files.",
+    "Generated clients must stay behind the app API boundary; pages must not call request, upload or Authorization headers directly.",
+    "App routes use tokenType=app; admin JWTs and pgo_ API tokens must not be accepted by generated app clients.",
+    "Source-writing code generation remains deferred until route handlers and app identity binding are stable."
+  ],
+  "routes": [
+    {
+      "capabilityId": "session",
+      "method": "POST",
+      "path": "/api/app/auth/login",
+      "auth": "public",
+      "permission": "",
+      "operationId": "appAuthLogin",
+      "securityDomain": "app",
+      "client": {
+        "basePath": "/api/app",
+        "tokenType": "none",
+        "apiClientFile": "future-app/src/platform/api/appClient.ts"
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.app.json"
+      }
+    },
+    {
+      "capabilityId": "session",
+      "method": "POST",
+      "path": "/api/app/auth/logout",
+      "auth": "session",
+      "permission": "",
+      "operationId": "appAuthLogout",
+      "securityDomain": "app",
+      "client": {
+        "basePath": "/api/app",
+        "tokenType": "app",
+        "apiClientFile": "future-app/src/platform/api/appClient.ts"
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.app.json"
+      }
+    },
+    {
+      "capabilityId": "file-storage",
+      "method": "POST",
+      "path": "/api/app/files",
+      "auth": "session",
+      "permission": "",
+      "operationId": "appFilesCreate",
+      "securityDomain": "app",
+      "client": {
+        "basePath": "/api/app",
+        "tokenType": "app",
+        "apiClientFile": "future-app/src/platform/api/appClient.ts"
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.app.json"
+      }
+    },
+    {
+      "capabilityId": "file-storage",
+      "method": "GET",
+      "path": "/api/app/files/:id/content",
+      "auth": "session",
+      "permission": "",
+      "operationId": "appFilesContent",
+      "securityDomain": "app",
+      "client": {
+        "basePath": "/api/app",
+        "tokenType": "app",
+        "apiClientFile": "future-app/src/platform/api/appClient.ts"
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.app.json"
+      }
+    },
+    {
+      "capabilityId": "session",
+      "method": "GET",
+      "path": "/api/app/session/current",
+      "auth": "session",
+      "permission": "",
+      "operationId": "appSessionCurrent",
+      "securityDomain": "app",
+      "client": {
+        "basePath": "/api/app",
+        "tokenType": "app",
+        "apiClientFile": "future-app/src/platform/api/appClient.ts"
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.app.json"
+      }
+    }
+  ]
+}

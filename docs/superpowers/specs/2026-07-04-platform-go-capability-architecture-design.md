@@ -4,7 +4,7 @@ Date: 2026-07-04
 
 ## Purpose
 
-`platform-go` is a reusable operations platform foundation extracted from the current `zshenmez` platform work. It should preserve the existing management-backend strength while making common capabilities selectable, replaceable and extensible for future business projects.
+`platform-go` is a reusable operations platform foundation informed by reusable management-backend patterns observed in the current `zshenmez` platform work. It should preserve common management-backend strength while making platform capabilities selectable, replaceable and extensible for future business projects. Concrete `zshenmez` business workflows are reference evidence only and must not ship inside the default foundation.
 
 The platform is not a runtime plugin marketplace and not a low-code-only admin generator. The first version is a single deployable service with engineering-level capability packages compiled into the project and enabled by configuration.
 
@@ -15,7 +15,7 @@ The source system in `zshenmez` already proves several reusable ideas:
 - Gin + GORM + Casbin backend with admin and app token separation.
 - Refine + React + Ant Design management backend.
 - Tenant, user, RBAC, menu, API resource, dictionary, parameter, audit, file and session governance.
-- A resource manifest in `resources/admin-resources.json` that keeps menus, permissions, API routes, Refine resources and generated previews aligned.
+- A base resource manifest in `resources/admin-resources.json`, plus capability-declared admin resources, keeping menus, permissions, API routes, Refine resources and generated previews aligned.
 - Complex business admin resources for role applications, tasks, transfer chains, fulfillment, public profiles, portfolio works, favorites and support tickets.
 
 The same source system also exposes the main extraction risks:
@@ -25,16 +25,16 @@ The same source system also exposes the main extraction risks:
 - `api/internal/httpapi/server.go` registers `/api/app` and `/api/admin` routes in one server method.
 - Seed data and framework menus include both platform system resources and `zshenmez` business menus.
 
-The architecture must reduce those coupling points without reducing the current `zshenmez` admin capability.
+The architecture must reduce those coupling points without losing reference coverage for reusable management-backend capabilities.
 
 ## Goals
 
 - Provide a reusable platform foundation for future business projects.
 - Keep first-party core governance available by default: tenant, identity, session, RBAC, menu, API resource, audit, dictionary, parameter, admin shell and system admin resources.
-- Allow optional common capability packages such as WeChat login, file storage, branding, demo seed, notifications, jobs, OpenAPI, code generation and AI.
-- Allow business capability packages such as `zshenmez-business` to register routes, permissions, menus, admin resources, custom actions and data models without editing platform core.
+- Allow optional common capability packages such as WeChat login, file storage, demo seed, notifications, jobs, OpenAPI, code generation and AI, while keeping branding configuration under the parameter capability.
+- Allow downstream business capability packages to register routes, permissions, menus, admin resources, custom actions and data models without editing platform core.
 - Provide one internal Go calling model and one external adapter model so business code does not depend on platform internals.
-- Prove the architecture with `zshenmez-business` parity: the current management-backend capability must not regress.
+- Prove the architecture through reference coverage gates: reusable platform capabilities cover common management scenarios, while business-only `zshenmez` resources remain outside `platform-go`.
 
 ## Non-goals
 
@@ -44,6 +44,7 @@ The architecture must reduce those coupling points without reducing the current 
 - No broad low-code engine that tries to express every business workflow in JSON.
 - No automatic source-code overwrite from generation scripts in v1.
 - No microservice split in the first implementation.
+- No migration of concrete `zshenmez` business entities, flows, menus, routes, stores, demo fixtures or state machines into `platform-go`.
 
 ## Architecture Summary
 
@@ -64,7 +65,7 @@ First-party Optional Capabilities
   notification / job / openapi / codegen / AI
 
 Application Capabilities
-  zshenmez-business / future business modules
+  downstream business packages / future business modules
 ```
 
 The first implementation should stay monolithic at deployment time. Modularity is expressed through capability packages, typed interfaces and registries, not through runtime-loaded binaries or separate services.
@@ -119,12 +120,12 @@ Optional capabilities are common platform features that can be enabled per proje
 | `notification` | identity, audit | In-app notifications and future external delivery adapters |
 | `job` | registry, audit | Scheduled jobs and execution logs |
 | `openapi` | route registry, api-resource | OpenAPI export and API docs |
-| `codegen` | resource contract | Generated previews and scaffold drafts, without overwriting source by default |
+| `codegen` | resource contract | Generated previews, scaffold dry-run safety plans, generated scaffold file packages and scaffold drafts, without overwriting source by default |
 | `AI` | identity, audit, parameter | Provider configuration, permissioned calls and call audit |
 
 ### Application Capabilities
 
-Business modules live here. For the first proof, `zshenmez-business` is the parity capability:
+Business modules live here and attach from downstream repositories or independent packages. `platform-go` may keep reference coverage records for the following `zshenmez` workflows, but it must not ship their concrete models, stores, menus, routes or state machines:
 
 - role applications and review actions;
 - task ledger, detail drawer and status update;
@@ -134,7 +135,7 @@ Business modules live here. For the first proof, `zshenmez-business` is the pari
 - support tickets and handler notes;
 - business demo seed data.
 
-Business capabilities may depend on core and optional capabilities, but platform core must not depend on business capabilities.
+Business capabilities may depend on core and optional capabilities, but platform core must not depend on business capabilities. The `external-business-capability` name is only a reference-classification owner in the current governance records, not an executable profile bundled by the foundation.
 
 ## Capability Manifest
 
@@ -193,9 +194,10 @@ Examples:
 - `file-storage` requires `tenant`, `identity`, `parameter` and `audit`.
 - `branding` requires `parameter` and `admin-shell`.
 - `demo-seed` depends on the seed registry and any target capabilities whose fixtures it uses.
-- `zshenmez-business` requires core governance and may require `file-storage`, `wechat-login`, `admin-resource-engine` and `demo-seed`.
+- Downstream business capabilities require core governance plus any optional platform capabilities they consume, such as `dictionary` for area ownership, `file-storage` for attachments, `wechat-login` for app identity, admin resource contracts for management pages and `demo-data` for fixtures.
 
 Missing dependencies are startup failures. Cycles are startup failures.
+Admin resource relations are also startup-validated: a declared `Relation.Resource` must be provided by the enabled manifest set, and relation value, label, filter, sort, parent and path fields must be exposed by the target resource. The current core graph keeps `dictionary` before `tenant` because `tenant.areaCode` consumes the shared `area-codes` resource.
 
 ## Unified Calling Model
 
@@ -262,7 +264,7 @@ Examples:
 
 - WeChat login may create a user, create a login identity, create a session and record a login log.
 - File upload may create a file asset, write storage metadata and record audit.
-- Task status update in `zshenmez-business` may update a task, write audit and enqueue notifications.
+- A downstream business task-status update may update a task, write audit and enqueue notifications through public platform ports.
 
 The platform provides Unit of Work entrypoints so capabilities can compose writes without exposing raw stores to business code.
 
@@ -350,9 +352,9 @@ Seed is also capability-driven:
 - core seed creates platform tenant, default roles, permissions, menus, API resources and initial admin user;
 - optional capability seed creates capability-specific baseline rows;
 - demo seed packs are explicit and resettable;
-- business demo data lives in business capability packages.
+- business demo data lives in downstream application packages when a product chooses to provide it.
 
-`zshenmez` demo data must move into `zshenmez-business` fixtures, not platform core.
+`zshenmez` demo data must not be migrated into platform core. If a future downstream `zshenmez` package needs demo fixtures, that package owns them through public platform contracts.
 
 ## Branding Strategy
 
@@ -382,7 +384,7 @@ The reusable capability owns:
 - session issuance;
 - login audit.
 
-Business capabilities own role-specific outcomes. For example, `zshenmez-business` owns whether a user becomes customer, worker or merchant and which review workflow is required.
+Downstream business capabilities own role-specific outcomes. For example, a product-specific capability owns whether a user becomes customer, worker or merchant and which review workflow is required.
 
 ## Error Contract
 
@@ -424,7 +426,7 @@ internal/platform/capabilities/wechatlogin
 internal/platform/capabilities/filestorage
 internal/platform/capabilities/branding
 internal/platform/capabilities/demoseed
-internal/apps/zshenmez
+external application packages
 ```
 
 Frontend packages use the same split:
@@ -436,7 +438,7 @@ admin/src/platform/resources
 admin/src/platform/capabilities
 admin/src/capabilities/fileStorage
 admin/src/capabilities/branding
-admin/src/apps/zshenmez
+admin/src/apps/<business>
 ```
 
 Rules:
@@ -539,7 +541,7 @@ Write actions declare audit metadata in the capability manifest and record throu
 
 Rules:
 
-- audit action names use `capability.resource.action`, for example `identity.user.create` or `zshenmez.task.status.update`;
+- audit action names use `capability.resource.action`, for example `identity.user.create` or `business.task.status.update`;
 - services record audit with actor, tenant, target type, target ID and note;
 - handlers must not invent audit action names;
 - seed and system jobs use a system actor.
@@ -565,7 +567,7 @@ Frontend calls use typed capability clients:
 platformApi.admin.request(...)
 platformApi.identity.users.query(...)
 platformApi.files.upload(...)
-platformApi.zshenmez.tasks.updateStatus(...)
+businessApi.tasks.updateStatus(...)
 ```
 
 Rules:
@@ -581,11 +583,13 @@ Rules:
 Configuration is capability-scoped:
 
 ```text
-PLATFORM_CAPABILITIES=wechat-login,file-storage,branding,zshenmez-business
+PLATFORM_CAPABILITIES=dictionary,tenant,identity,session,rbac,menu,audit,admin-shell,wechat-login,parameter,file-storage
 PLATFORM_BRANDING_PRODUCT_NAME=...
 PLATFORM_FILE_STORAGE_DRIVER=...
 PLATFORM_WECHAT_MINIAPP_APP_ID=...
 ```
+
+Downstream business packages may add their own capability IDs in their own composition root; `platform-go` must not require or ship those IDs by default.
 
 Rules:
 
@@ -600,7 +604,7 @@ The codegen capability is preview-first in v1.
 
 Rules:
 
-- manifests generate contracts, previews and scaffold drafts;
+- manifests generate contracts, previews, scaffold dry-run safety plans, generated scaffold file packages and scaffold drafts;
 - generated previews are stable and reviewable;
 - generation does not overwrite Go or React source by default;
 - any future source-writing generator must have an explicit dry-run, diff review and test gate;
@@ -641,15 +645,16 @@ The architecture requires tests at four levels:
    - seed behavior;
    - disabled capability behavior.
 
-4. Parity tests:
-   - `zshenmez-business` preserves existing management backend resources, menus and workflows;
+4. Reference coverage tests:
+   - reusable foundation candidates from `zshenmez` are mapped to platform capabilities;
+   - business-only resources, app routes and workflows stay classified outside `platform-go`;
    - admin build passes;
    - backend tests pass;
    - resource contract validation passes.
 
-## zshenmez Parity Acceptance
+## zshenmez Reference Acceptance
 
-`zshenmez-business` is the first real validation target. The platform is not accepted until it proves no regression for:
+`zshenmez` is a reference coverage target, not a migration target. The platform is acceptable when it proves the reusable foundation covers common management scenarios and keeps these business workflows outside the default contract:
 
 - business menu grouping;
 - role application review;
@@ -662,7 +667,7 @@ The architecture requires tests at four levels:
 - audit logging for write actions;
 - permissions and menu filtering.
 
-The parity target is functional equivalence, not identical source structure.
+The acceptance target is boundary correctness, not functional migration. Business packages that want these workflows must implement them outside `platform-go` through public capability manifests, resource schemas and route registration contracts.
 
 ## Implementation Slices
 
@@ -687,15 +692,15 @@ The parity target is functional equivalence, not identical source structure.
 - Add WeChat login.
 - Add demo seed framework.
 
-### Slice 4: zshenmez Business Capability
+### Slice 4: External Business Integration Guidance
 
-- Move business models, routes, menus, permissions and admin definitions into `zshenmez-business`.
-- Preserve current business backend capability through parity tests.
+- Keep `zshenmez` business models, routes, menus, permissions and admin definitions outside `platform-go`.
+- Provide integration guidance and reference coverage gates so a downstream business package can attach through manifests without editing platform core.
 
 ### Slice 5: Resource Contract And Codegen Preview
 
 - Evolve the existing admin resource manifest into platform capability contracts.
-- Keep generation as preview and scaffold draft only.
+- Keep generation as preview, scaffold dry-run safety plan, generated scaffold file package and scaffold draft only.
 - Add validators for manifests and registered resources.
 
 ## Risks And Controls
@@ -708,7 +713,7 @@ The parity target is functional equivalence, not identical source structure.
 | Admin resource engine only supports CRUD | Include actions, forms, drawers, modals, detail panels and custom pages in v1 |
 | Disabling capabilities destroys data | v1 disable is non-destructive only |
 | Resource manifest becomes fake single source of truth | Use manifest for contracts, Go interfaces for behavior |
-| Existing `zshenmez` admin capability regresses | Require `zshenmez-business` parity acceptance |
+| `zshenmez` business concepts leak into the default foundation | Require reference discovery, reference coverage and profile-leakage validators |
 | First version overbuilds plugin infrastructure | No runtime hot-plug, no marketplace, no external plugin process |
 
 ## Decision Summary
@@ -718,5 +723,5 @@ The parity target is functional equivalence, not identical source structure.
 - Use typed internal Go interfaces plus external HTTP/Admin adapters.
 - Require actor, tenant, permission and transaction context for capability calls.
 - Replace the giant admin resource page with an admin resource engine.
-- Treat `zshenmez-business` as the first parity proof.
+- Treat external business integration as a downstream package concern, with `zshenmez` used only as reference coverage evidence.
 - Keep code generation as validation and scaffold preview in v1.

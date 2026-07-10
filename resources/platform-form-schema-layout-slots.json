@@ -1,0 +1,228 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-form-schema-layout-slots.json",
+  "capturedAt": "2026-07-08",
+  "purpose": "Machine-checkable contract gate for schema-driven admin form layout, controlled runtime slot descriptors and side-preview extension boundaries after visual promotion.",
+  "status": "implemented",
+  "promotionState": {
+    "runtimeSlots": "controlled",
+    "sourceLevelReactSlots": "controlled",
+    "visualImplementation": "implemented",
+    "sourceWriting": "disabled",
+    "arbitraryComponentInjection": "forbidden"
+  },
+  "supportedToday": {
+    "schemaFields": ["Schema.FormGroups", "Schema.FormLayout", "AdminResource.FormLayout", "FieldDefinition.Group", "FieldDefinition.Help", "FieldDefinition.Validation", "FieldDefinition.Relation"],
+    "frontendFunctions": ["PlatformResourceForm", "normalizeFormLayoutPreset", "formModalWidth", "resourceFormSections", "FieldInput", "fieldRules", "loadRelationOptions", "mergeRelationOptions"],
+    "refineHooks": ["useList", "useCreate", "useUpdate", "useDelete", "useDataProvider"],
+    "antdControls": ["Form", "Input", "InputNumber", "Select", "Switch", "Modal", "Drawer", "PlatformTreeSelect"]
+  },
+  "allowedLayoutPresets": [
+    {
+      "id": "single-column",
+      "status": "implemented",
+      "default": true,
+      "description": "Current flat vertical Ant Design Form behavior."
+    },
+    {
+      "id": "grouped-sections",
+      "status": "implemented",
+      "description": "Current schema formGroups plus field.group section rendering."
+    },
+    {
+      "id": "two-column-density",
+      "status": "implemented",
+      "description": "Compact two-column form layout for repeated dense resources, driven by the schema formLayout enum and responsive CSS."
+    },
+    {
+      "id": "side-detail-preview",
+      "status": "implemented",
+      "description": "Controlled form plus preview or inspector layout for resources that need continuous detail comparison."
+    }
+  ],
+  "allowedSlotRegions": [
+    {
+      "id": "form.header",
+      "status": "implemented",
+      "owner": "platform-ui",
+      "requiredCapabilities": ["i18n", "permission-checks"]
+    },
+    {
+      "id": "form.section.before",
+      "status": "implemented",
+      "owner": "platform-ui",
+      "requiredCapabilities": ["i18n"]
+    },
+    {
+      "id": "form.section.after",
+      "status": "implemented",
+      "owner": "platform-ui",
+      "requiredCapabilities": ["i18n"]
+    },
+    {
+      "id": "form.footer",
+      "status": "implemented",
+      "owner": "platform-ui",
+      "requiredCapabilities": ["i18n", "permission-checks"]
+    },
+    {
+      "id": "field.control",
+      "status": "implemented",
+      "owner": "capability-page",
+      "requiredCapabilities": ["AntD Form control props passthrough", "i18n"]
+    },
+    {
+      "id": "side.preview",
+      "status": "implemented",
+      "owner": "platform-ui",
+      "requiredCapabilities": ["i18n", "permission-checks"]
+    }
+  ],
+  "runtimeSlotDescriptor": {
+    "status": "implemented",
+    "fields": ["slotId", "region", "label", "description", "permission", "visibleWhen", "targetSection", "targetField", "dataBinding", "variant", "order"],
+    "requiredLocalizedFields": ["label", "description"],
+    "allowedRegions": ["form.header", "form.section.before", "form.section.after", "form.footer", "field.control", "side.preview"],
+    "allowedDataBindingModes": ["record", "formValues", "resource", "none"],
+    "allowedVariants": ["compact", "info", "warning", "preview", "inline"],
+    "forbiddenFields": ["component", "componentName", "componentPath", "import", "script", "html"]
+  },
+  "forbiddenPatterns": [
+    "arbitrary-runtime-component-paths",
+    "raw-script-slots",
+    "business-page-form-forks-for-standard-crud",
+    "unlocalized-slot-labels",
+    "permissionless-custom-actions",
+    "backend-manifest-react-component-names",
+    "source-writing-without-review"
+  ],
+  "requiredPromotionGates": [
+    "superpowers:brainstorming",
+    "product-design",
+    "validate-admin-i18n",
+    "validate-admin-ui-contracts",
+    "admin-build",
+    "browser-screenshots"
+  ],
+  "browserEvidence": [
+    {
+      "path": "tmp/product-design/form-schema-layout-20260707/02-menus-edit-desktop-scroll-1440x1024.png",
+      "viewport": "1440x1024",
+      "assertions": [
+        "two-column-density modal width stays at 760px on desktop",
+        "dense menu edit form uses internal modal-body scrolling",
+        "modal footer remains visible inside the viewport"
+      ]
+    },
+    {
+      "path": "tmp/product-design/form-schema-layout-20260707/03-menus-edit-mobile-single-column-390x844.png",
+      "viewport": "390x844",
+      "assertions": [
+        "two-column-density collapses to one column on narrow screens",
+        "no horizontal overflow appears",
+        "modal footer remains visible inside the viewport"
+      ]
+    },
+    {
+      "path": "tmp/product-design/form-runtime-slots-side-preview-20260708/01-menus-side-preview-desktop-1440x1024.png",
+      "viewport": "1440x1024",
+      "assertions": [
+        "side-detail-preview edit modal renders a 300px preview rail beside the editable form",
+        "record summary, permission summary and localized preview runtime slot cards are visible",
+        "menu edit values hydrate into the form and slot data bindings"
+      ]
+    },
+    {
+      "path": "tmp/product-design/form-runtime-slots-side-preview-20260708/02-menus-side-preview-mobile-390x844.png",
+      "viewport": "390x844",
+      "assertions": [
+        "side-detail-preview preview rail collapses below the editable form on narrow screens",
+        "record summary, permission summary and localized preview cards remain readable at 390px",
+        "no horizontal overflow appears while the modal footer remains visible"
+      ]
+    }
+  ],
+  "requiredSourceEvidence": [
+    {
+      "path": "internal/platform/adminresource/schema.go",
+      "contains": "FormGroups     []FormGroupDefinition"
+    },
+    {
+      "path": "internal/platform/adminresource/schema.go",
+      "contains": "FormLayout     string"
+    },
+    {
+      "path": "internal/platform/adminresource/schema.go",
+      "contains": "case \"single-column\", \"grouped-sections\", \"two-column-density\", \"side-detail-preview\":"
+    },
+    {
+      "path": "internal/platform/capability/manifest.go",
+      "contains": "FormLayout       string"
+    },
+    {
+      "path": "internal/platform/adminresource/schema.go",
+      "contains": "Group       string"
+    },
+    {
+      "path": "admin/src/platform/api/client.ts",
+      "contains": "export type AdminResourceFormLayout"
+    },
+    {
+      "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "contains": "resourceFormSections(formFields, schema.formGroups ?? [], language, dictionary)"
+    },
+    {
+      "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "contains": "normalizeFormLayoutPreset(schema.formLayout, formFields)"
+    },
+    {
+      "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "contains": "width={formModalWidth(formLayoutPreset)}"
+    },
+    {
+      "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "contains": "<PlatformResourceForm"
+    },
+    {
+      "path": "admin/src/platform/ui/PlatformResourceForm.tsx",
+      "contains": "export function PlatformResourceForm"
+    },
+    {
+      "path": "admin/src/platform/ui/PlatformResourceForm.tsx",
+      "contains": "fieldControl?: (field: TField, defaultControl: ReactNode) => ReactNode"
+    },
+    {
+      "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "contains": "function FieldInput({ field, language, ...controlProps }"
+    },
+    {
+      "path": "admin/src/platform/ui/PlatformResourceForm.tsx",
+      "contains": "className={formClassName} layout=\"vertical\""
+    },
+    {
+      "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "contains": "useCreate<AdminResourceRecord"
+    },
+    {
+      "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "contains": "useUpdate<AdminResourceRecord"
+    },
+    {
+      "path": "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "contains": "useDataProvider()"
+    },
+    {
+      "path": "scripts/validate-admin-ui-contracts.mjs",
+      "contains": "FieldInput must pass Form control props"
+    },
+    {
+      "path": "scripts/generate-admin-codegen-preview.mjs",
+      "contains": "Runtime form slot descriptors are controlled"
+    }
+  ],
+  "documents": [
+    "docs/admin-resource-schema.md",
+    "docs/admin-ui-foundation.md",
+    "docs/platform-capability-development.md",
+    "docs/platform-foundation-task-map.md"
+  ]
+}

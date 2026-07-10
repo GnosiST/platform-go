@@ -1,0 +1,333 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-foundation-alignment-audit.json",
+  "capturedAt": "2026-07-07",
+  "purpose": "Machine-checkable alignment audit for the active platform foundation goal: approved stack, task dependencies, reference coverage, capability boundaries, governance topology, visual design gates and source-writing safety must not conflict.",
+  "approvedStack": {
+    "backend": [
+      "Gin",
+      "GORM",
+      "Casbin",
+      "JWT"
+    ],
+    "frontend": [
+      "Refine",
+      "React",
+      "Ant Design"
+    ]
+  },
+  "contracts": {
+    "taskGraph": "resources/platform-foundation-task-graph.json",
+    "engineeringCapabilities": "resources/platform-engineering-capabilities.json",
+    "referenceDiscovery": "resources/platform-reference-discovery.json",
+    "referenceCoverage": "resources/platform-reference-coverage.json",
+    "adminApiBoundary": "resources/platform-admin-api-boundary.json",
+    "appClientApiBoundary": "resources/platform-app-client-api-boundary.json",
+    "governanceTopology": "resources/platform-governance-topology.json",
+    "capabilityContracts": "resources/platform-capability-contracts.json",
+    "capabilityProfiles": "resources/platform-capability-profiles.json",
+    "codegenReadiness": "resources/platform-codegen-source-writing-readiness.json",
+    "productionReadiness": "resources/platform-production-readiness.json",
+    "deploymentTopology": "resources/platform-deployment-topology.json",
+    "productionAuthHardening": "resources/platform-production-auth-hardening.json",
+    "refreshTokenFamilyPromotion": "resources/platform-refresh-token-family-promotion.json",
+    "formSchemaLayoutSlots": "resources/platform-form-schema-layout-slots.json",
+    "fileStorageExperience": "resources/platform-file-storage-experience.json",
+    "taskExecutionAudit": "resources/platform-task-execution-audit.json"
+  },
+  "requiredTaskNodes": [
+    "stack-alignment-and-architecture",
+    "resource-schema-contract",
+    "capability-contract-governance",
+    "rbac-menu-data-scope",
+    "governance-org-area-role-groups",
+    "auth-session-provider-jwt-wechat",
+    "gorm-storage-runtime",
+    "cache-redis-invalidation",
+    "production-persistence-correctness",
+    "openapi-app-contracts",
+    "admin-api-boundary-query-security",
+    "codegen-preview-scaffold",
+    "codegen-source-writing-readiness",
+    "admin-ui-shell-and-list-components",
+    "form-schema-layout-and-slots",
+    "personnel-extension-boundary",
+    "notification-extension-boundary",
+    "job-extension-boundary",
+    "visual-product-design-qa",
+    "reference-discovery-classification-gate",
+    "node-closeout-audit",
+    "foundation-alignment-audit",
+    "production-readiness-preflight",
+    "production-auth-provider-hardening",
+    "source-writing-codegen-promotion"
+  ],
+  "requiredFutureTaskNodes": [],
+  "nonDroppableGoalNodes": [
+    "stack-alignment-and-architecture",
+    "governance-org-area-role-groups",
+    "codegen-source-writing-readiness",
+    "admin-api-boundary-query-security",
+    "visual-product-design-qa",
+    "production-readiness-preflight",
+    "production-persistence-correctness"
+  ],
+  "nonDroppableEngineeringCapabilities": [
+    "governance-org-area-role-groups",
+    "capability-contract-governance",
+    "form-schema-layout-slot-gate",
+    "codegen-source-writing-readiness",
+    "admin-api-boundary-query-security",
+    "app-client-api-boundary",
+    "system-management",
+    "runtime-cache-invalidation",
+    "production-persistence-correctness",
+    "file-operation-audit-contract",
+    "file-storage-admin-experience",
+    "objective-conformance-gate",
+    "reference-discovery-gate",
+    "personnel-runtime-readiness",
+    "production-readiness-preflight",
+    "deployment-topology-gate"
+  ],
+  "requiredEngineeringCapabilities": [
+    "dynamic-admin-resources",
+    "dynamic-menus",
+    "permission-codes",
+    "resource-schema-form-engine",
+    "governance-org-area-role-groups",
+    "form-schema-layout-slot-gate",
+    "capability-contract-governance",
+    "capability-profile-composition-gate",
+    "openapi-api-docs",
+    "admin-api-boundary-query-security",
+    "app-client-api-boundary",
+    "safe-codegen-scaffold",
+    "codegen-source-writing-readiness",
+    "system-management",
+    "app-route-contracts",
+    "production-runtime-gate",
+    "production-auth-hardening-gate",
+    "runtime-cache-invalidation",
+    "production-persistence-correctness",
+    "file-operation-audit-contract",
+    "file-storage-admin-experience",
+    "task-dependency-governance",
+    "foundation-alignment-audit",
+    "goal-completion-audit",
+    "node-closeout-audit",
+    "objective-conformance-gate",
+    "reference-discovery-gate",
+    "reference-coverage-boundary-gate",
+    "personnel-runtime-readiness",
+    "production-readiness-preflight",
+    "deployment-topology-gate"
+  ],
+  "requiredReferenceFoundationAreas": [
+    "dashboard",
+    "identity-and-tenancy",
+    "rbac-and-menu",
+    "api-governance",
+    "dictionary-parameters-branding",
+    "audit-and-operations",
+    "file-storage",
+    "auth-providers",
+    "demo-data"
+  ],
+  "requiredBusinessBoundaries": [
+    "business-access",
+    "business-content",
+    "business-dispatch",
+    "business-fulfillment",
+    "business-support"
+  ],
+  "requiredOptionalBoundaries": [
+    "app-phone-identity",
+    "detailed-addresses",
+    "personnel-and-positions"
+  ],
+  "defaultPlatformBoundary": {
+    "defaultProfile": "platform-default",
+    "mustExcludeBusinessCapabilities": [
+      "external-business-capability"
+    ],
+    "mustExcludeOptionalCapabilities": [
+      "policy-review",
+      "personnel",
+      "notification",
+      "job",
+      "app-phone"
+    ],
+    "requiredGovernanceResources": [
+      "tenants",
+      "org-units",
+      "users",
+      "roles",
+      "role-groups",
+      "area-codes"
+    ]
+  },
+  "objectiveConflictPolicy": {
+    "mode": "fail-fast",
+    "purpose": "Prevent the platform foundation goal from drifting through incompatible task order, hidden business coupling, skipped design gates, weak reference extraction evidence or incomplete validation loops.",
+    "requiredTaskDependencyPaths": [
+      {
+        "from": "foundation-alignment-audit",
+        "to": "task-dependency-governance"
+      },
+      {
+        "from": "foundation-alignment-audit",
+        "to": "capability-contract-governance"
+      },
+      {
+        "from": "foundation-alignment-audit",
+        "to": "reference-discovery-classification-gate"
+      },
+      {
+        "from": "foundation-alignment-audit",
+        "to": "reference-coverage-boundary-gate"
+      },
+      {
+        "from": "foundation-alignment-audit",
+        "to": "codegen-source-writing-readiness"
+      },
+      {
+        "from": "foundation-alignment-audit",
+        "to": "admin-api-boundary-query-security"
+      },
+      {
+        "from": "foundation-alignment-audit",
+        "to": "production-readiness-preflight"
+      },
+      {
+        "from": "foundation-alignment-audit",
+        "to": "governance-org-area-role-groups"
+      },
+      {
+        "from": "foundation-alignment-audit",
+        "to": "visual-product-design-qa"
+      },
+      {
+        "from": "foundation-alignment-audit",
+        "to": "node-closeout-audit"
+      },
+      {
+        "from": "foundation-alignment-audit",
+        "to": "production-auth-provider-hardening"
+      }
+    ],
+    "requiredEngineeringCapabilities": [
+      "task-dependency-governance",
+      "reference-discovery-gate",
+      "reference-coverage-boundary-gate",
+      "capability-contract-governance",
+      "node-closeout-audit",
+      "admin-api-boundary-query-security",
+      "app-client-api-boundary",
+      "foundation-alignment-audit",
+      "goal-completion-audit",
+      "objective-conformance-gate",
+      "file-storage-admin-experience",
+      "production-readiness-preflight",
+      "deployment-topology-gate"
+    ],
+    "requiredValidators": [
+      "scripts/validate-platform-foundation-task-graph.mjs",
+      "scripts/validate-platform-engineering-capabilities.mjs",
+      "scripts/validate-platform-reference-discovery.mjs",
+      "scripts/validate-platform-reference-coverage.mjs",
+      "scripts/validate-platform-admin-api-boundary.mjs",
+      "scripts/validate-platform-app-client-api-boundary.mjs",
+      "scripts/validate-platform-capability-contracts.mjs",
+      "scripts/validate-platform-task-execution-audit.mjs",
+      "scripts/validate-platform-goal-completion-audit.mjs",
+      "scripts/validate-platform-objective-conformance.mjs",
+      "scripts/validate-platform-promotion-evidence-templates.mjs",
+      "scripts/validate-platform-file-storage-experience.mjs",
+      "scripts/validate-platform-refresh-token-family-promotion.mjs",
+      "scripts/validate-platform-deployment-topology.mjs",
+      "scripts/validate-admin-i18n.mjs",
+      "scripts/validate-admin-ui-contracts.mjs"
+    ],
+    "requiredProductionPreflightCommands": [
+      "reference-discovery",
+      "reference-coverage",
+      "admin-api-boundary",
+      "app-client-api-boundary",
+      "capability-contracts",
+      "foundation-alignment",
+      "task-execution-audit",
+      "goal-completion-audit",
+      "node-closeout-audit",
+      "objective-conformance",
+      "promotion-evidence-templates",
+      "deployment-topology",
+      "admin-i18n",
+      "admin-ui-contracts",
+      "admin-ui-contract-tests",
+      "admin-build",
+      "git-diff-check"
+    ],
+    "referenceExtractionRequiresDiscovery": true,
+    "visualWorkRequiresProductDesign": true,
+    "defaultProfileMustStayBusinessNeutral": true
+  },
+  "deploymentPolicy": {
+    "vercelRequired": false,
+    "vercelAdminUsage": "optional-static-admin",
+    "selectedTopology": "single-service-production",
+    "defaultApiRuntime": "long-lived-service",
+    "fullStackVercelGo": "requires-separate-adapter-spec"
+  },
+  "visualDesignGate": {
+    "requiredForVisualTasks": [
+      "superpowers:brainstorming",
+      "product-design"
+    ],
+    "requiredOrder": [
+      "superpowers:brainstorming",
+      "product-design"
+    ],
+    "visualTasksMustHaveScreenshots": true
+  },
+  "codegenPolicy": {
+    "sourceWriting": "disabled",
+    "runtimeMutation": "disabled",
+    "promotionReview": "resources/generated/admin-scaffold-promotion-review.json",
+    "promotionDecision": "not-approved",
+    "previewTask": "codegen-preview-scaffold",
+    "readinessTask": "codegen-source-writing-readiness"
+  },
+  "requiredValidators": [
+    "scripts/validate-platform-foundation-task-graph.mjs",
+    "scripts/validate-platform-engineering-capabilities.mjs",
+    "scripts/validate-platform-reference-discovery.mjs",
+    "scripts/validate-platform-reference-coverage.mjs",
+    "scripts/validate-platform-admin-api-boundary.mjs",
+    "scripts/validate-platform-app-client-api-boundary.mjs",
+    "scripts/validate-platform-governance-topology.mjs",
+    "scripts/validate-platform-capability-contracts.mjs",
+    "scripts/validate-platform-form-schema-layout-slots.mjs",
+    "scripts/validate-platform-personnel-runtime-readiness.mjs",
+    "scripts/validate-platform-capability-profiles.mjs",
+    "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+    "scripts/validate-platform-production-readiness.mjs",
+    "scripts/validate-platform-production-auth-hardening.mjs",
+    "scripts/validate-platform-refresh-token-family-promotion.mjs",
+    "scripts/validate-platform-deployment-topology.mjs",
+    "scripts/validate-platform-file-storage-experience.mjs",
+    "scripts/validate-platform-task-execution-audit.mjs",
+    "scripts/validate-platform-goal-completion-audit.mjs",
+    "scripts/validate-platform-objective-conformance.mjs",
+    "scripts/validate-platform-promotion-evidence-templates.mjs",
+    "scripts/validate-admin-i18n.mjs",
+    "scripts/validate-admin-ui-contracts.mjs",
+    "scripts/validate-admin-resources.mjs"
+  ],
+  "documents": [
+    "README.md",
+    "AGENTS.md",
+    "docs/platform-foundation-task-map.md",
+    "docs/platform-capability-development.md",
+    "docs/platform-roadmap.md"
+  ]
+}

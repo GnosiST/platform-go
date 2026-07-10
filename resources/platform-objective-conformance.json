@@ -1,0 +1,141 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-objective-conformance.json",
+  "capturedAt": "2026-07-08",
+  "purpose": "Machine-checkable conformance contract for the persistent reusable platform foundation objective. It keeps stack choices, business-neutral reference use, future promotion gates, visual gates, deployment boundaries and closeout discipline aligned before further implementation continues.",
+  "objectiveMode": "persistent-full-scope",
+  "approvedStack": {
+    "backend": ["Gin", "GORM", "Casbin", "JWT"],
+    "frontend": ["Refine", "React", "Ant Design"]
+  },
+  "referenceProjectPolicy": {
+    "referenceProject": "/Users/irainbow/Documents/DevelopmentSpace/myProject/zshenmez",
+    "mode": "reference-only",
+    "defaultPlatformBusinessMigration": "forbidden",
+    "businessCapabilityOwnership": "external-business-capability",
+    "foundationExtractionRequiresDiscovery": true
+  },
+  "qualityPolicy": {
+    "architectureFirst": true,
+    "noArtificialStacking": true,
+    "noCompromiseImplementation": true,
+    "conflictResolution": "objective-wins",
+    "businessNeutralFoundation": true
+  },
+  "taskControlPolicy": {
+    "taskGraph": "resources/platform-foundation-task-graph.json",
+    "taskExecutionAudit": "resources/platform-task-execution-audit.json",
+    "requiresResourceLocks": true,
+    "requiresDependencyConflictChecks": true,
+    "requiresTaskGraphBeforeNewNode": true,
+    "requiredUnfinishedNodes": []
+  },
+  "capabilityPolicy": {
+    "contract": "resources/platform-capability-contracts.json",
+    "profiles": "resources/platform-capability-profiles.json",
+    "defaultProfile": "platform-default",
+    "businessCapabilityOwnership": "external-business-capability",
+    "runtimeManifestMutation": "forbidden",
+    "defaultProfileBusinessCapabilitiesAllowed": false
+  },
+  "visualPolicy": {
+    "requiredOrder": ["superpowers:brainstorming", "product-design"],
+    "requiredForVisualTasks": true,
+    "productDesignRequiredForVisualImplementation": true,
+    "i18nRequiredForSharedAdminComponents": true
+  },
+  "closeoutPolicy": {
+    "neatFreakRequiredForNodeCloseout": true,
+    "knowledgeCleanupBeforeNodeCloseout": true,
+    "nodeCloseoutAudit": "resources/platform-node-closeout-audit.json",
+    "docsRoots": ["README.md", "AGENTS.md", "docs/"]
+  },
+  "deploymentPolicy": {
+    "vercelRequired": false,
+    "vercelAdminUsage": "optional-static-admin",
+    "selectedTopology": "single-service-production",
+    "defaultApiRuntime": "long-lived-service",
+    "fullStackVercelGo": "requires-separate-adapter-spec"
+  },
+  "completionPolicy": {
+    "goalCompletionStatus": "complete",
+    "mustNotMarkCompleteWhileBlockersActive": true,
+    "mustNotSelfCertifyExternalApprovalEvidence": true,
+    "controlledBlockers": []
+  },
+  "futurePromotionGates": [
+    {
+      "taskId": "production-auth-provider-hardening",
+      "contract": "resources/platform-production-auth-hardening.json",
+      "requiredEvidenceBeforeRuntimeMutation": [
+        "security-owner approval",
+        "platform-architect approval",
+        "operations-owner approval",
+        "runtime test output bundle including refresh-token-family tests",
+        "redis session invalidation convergence evidence",
+        "rotation replay audit evidence",
+        "structured approval evidence package",
+        "external absolute artifact URI evidence"
+      ]
+    },
+    {
+      "taskId": "source-writing-codegen-promotion",
+      "contract": "resources/platform-codegen-source-writing-readiness.json",
+      "requiredEvidenceBeforeRuntimeMutation": [
+        "source-writing architecture spec",
+        "platform-architect approval",
+        "codegen-owner approval",
+        "runtime-owner approval",
+        "reviewed diff",
+        "target-family test output",
+        "structured source-writing approval evidence package",
+        "external absolute artifact URI evidence"
+      ]
+    }
+  ],
+  "evidence": {
+    "contracts": [
+      "resources/platform-objective-conformance.json",
+      "resources/platform-foundation-task-graph.json",
+      "resources/platform-foundation-alignment-audit.json",
+      "resources/platform-task-execution-audit.json",
+      "resources/platform-goal-completion-audit.json",
+      "resources/platform-engineering-capabilities.json",
+      "resources/platform-capability-contracts.json",
+      "resources/platform-production-readiness.json",
+      "resources/platform-deployment-topology.json",
+      "resources/platform-node-closeout-audit.json"
+    ],
+    "validators": [
+      "scripts/validate-platform-objective-conformance.mjs",
+      "scripts/validate-platform-foundation-task-graph.mjs",
+      "scripts/validate-platform-foundation-alignment.mjs",
+      "scripts/validate-platform-task-execution-audit.mjs",
+      "scripts/validate-platform-goal-completion-audit.mjs",
+      "scripts/validate-platform-node-closeout-audit.mjs",
+      "scripts/validate-platform-engineering-capabilities.mjs",
+      "scripts/validate-platform-capability-contracts.mjs",
+      "scripts/validate-platform-production-readiness.mjs",
+      "scripts/validate-platform-deployment-topology.mjs"
+    ],
+    "tests": [
+      "scripts/platform-capability-contracts.test.mjs",
+      "scripts/platform-foundation-task-graph.test.mjs",
+      "scripts/platform-objective-conformance.test.mjs",
+      "scripts/platform-foundation-alignment.test.mjs",
+      "scripts/platform-goal-completion-audit.test.mjs",
+      "scripts/platform-task-execution-audit.test.mjs",
+      "scripts/platform-node-closeout-audit.test.mjs",
+      "scripts/platform-deployment-topology.test.mjs",
+      "scripts/platform-engineering-capabilities.test.mjs",
+      "scripts/platform-production-readiness.test.mjs",
+      "scripts/admin-ui-contracts.test.mjs"
+    ],
+    "docs": [
+      "README.md",
+      "AGENTS.md",
+      "docs/platform-foundation-task-map.md",
+      "docs/platform-roadmap.md",
+      "docs/platform-deployment.md"
+    ]
+  }
+}

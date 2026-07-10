@@ -1,0 +1,366 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-production-auth-hardening.json",
+  "capturedAt": "2026-07-07",
+  "purpose": "Machine-checkable production auth hardening policy for JWT sessions, provider adapters, credential rotation and future refresh-token family promotion.",
+  "taskGraph": {
+    "path": "resources/platform-foundation-task-graph.json",
+    "taskId": "production-auth-provider-hardening",
+    "allowedStatusesBeforePromotion": ["deferred", "planned", "preview"],
+    "promotionStatus": "implemented"
+  },
+  "currentCredentialClasses": [
+    {
+      "id": "admin-jwt",
+      "tokenType": "admin",
+      "source": "internal/platform/authjwt/token.go",
+      "authoritativeRevocation": "server-side-session",
+      "rotationPolicy": "jwt-signing-secret-plus-session-invalidation",
+      "rawSecretMustNotBeLogged": true
+    },
+    {
+      "id": "app-jwt",
+      "tokenType": "app",
+      "source": "internal/platform/authjwt/token.go",
+      "authoritativeRevocation": "server-side-session",
+      "rotationPolicy": "jwt-signing-secret-plus-session-invalidation",
+      "rawSecretMustNotBeLogged": true
+    },
+    {
+      "id": "api-token",
+      "tokenPrefix": "pgo_",
+      "source": "internal/platform/httpapi/server.go",
+      "authoritativeRevocation": "api-tokens-resource",
+      "rotationPolicy": "issue-new-token-and-revoke-old-token",
+      "rawSecretMustNotBeLogged": true
+    }
+  ],
+  "sessionCredentialPolicy": {
+    "sessionStore": {
+      "productionDriver": "gorm",
+      "invalidationResource": "sessions",
+      "distributedInvalidationRequired": true,
+      "evidence": ["docs/platform-auth.md", "docs/platform-cache.md", "internal/platform/session/store.go"]
+    },
+    "slidingRenewal": {
+      "status": "implemented",
+      "endpoint": "POST /api/auth/refresh",
+      "model": "renew-same-server-side-session-and-issue-new-jwt",
+      "notARefreshTokenFamily": true
+    },
+    "productionSessionPolicy": {
+      "status": "specified",
+      "path": "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md",
+      "requiredDecisions": [
+        "current-runtime-sliding-renewal-boundary",
+        "refresh-token-family-data-model",
+        "reuse-detection-revokes-family-and-session",
+        "revocation-scope-matrix",
+        "redis-invalidation-not-source-of-truth",
+        "audit-redaction-and-replay-evidence",
+        "provider-rotation-separation"
+      ],
+      "runtimePromotion": "blocked-until-production-approval-package-approved"
+    },
+    "refreshTokenFamily": {
+      "status": "implemented-disabled",
+      "defaultRuntime": "disabled",
+      "runtimeBinding": "available-but-not-bound-to-default-refresh-endpoint",
+      "promotionReadinessContract": "resources/platform-refresh-token-family-promotion.json",
+      "allowedOnlyWhen": [
+        "offline-renewal-required",
+        "token-family-reuse-detection-required",
+        "separate-refresh-token-storage-approved",
+        "rotation-replay-audit-approved"
+      ],
+      "specification": "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md",
+      "implementedRuntimeEvidence": [
+        "internal/platform/refreshtoken/store.go",
+        "internal/platform/refreshtoken/gorm_repository.go",
+        "internal/platform/refreshtoken/store_test.go",
+        "internal/platform/refreshtoken/gorm_repository_test.go"
+      ],
+      "requiredProductionEnablementEvidence": [
+        "hashed refresh-token-family storage",
+        "rotation lineage and reuse-detection tests",
+        "revocation scope tests",
+        "redis session invalidation convergence",
+        "audit redaction for refresh replay",
+        "provider rotation separation"
+      ],
+      "promotionGate": "independent production session-policy spec, disabled token-family runtime, reuse-detection tests, revocation tests, audit evidence, external approval package and rollback evidence"
+    }
+  },
+  "productionPromotionApprovalPackage": {
+    "status": "blocked",
+    "sourceOfTruth": "external-review-artifacts",
+    "defaultRuntimeMutation": "forbidden",
+    "requiredApprovals": [
+      "security-owner",
+      "platform-architect",
+      "operations-owner"
+    ],
+    "requiredEvidence": [
+      {
+        "id": "session-policy-review",
+        "owner": "security-owner",
+        "evidenceKind": "signed-security-review",
+        "description": "Signed review confirming the deployed session policy, JWT/session revocation model, provider risk posture and audit redaction requirements."
+      },
+      {
+        "id": "refresh-token-family-runtime-spec",
+        "owner": "platform-architect",
+        "evidenceKind": "architecture-spec",
+        "description": "Separate runtime specification for refresh-token-family storage, rotation, reuse detection, revocation scope and provider separation."
+      },
+      {
+        "id": "credential-rotation-runbook",
+        "owner": "operations-owner",
+        "evidenceKind": "rotation-runbook",
+        "description": "Production runbook for JWT signing-secret rotation, API-token rotation, session invalidation decisions, overlap windows and rollback."
+      },
+      {
+        "id": "provider-secret-rotation-runbook",
+        "owner": "operations-owner",
+        "evidenceKind": "provider-rotation-runbook",
+        "description": "Provider credential owner and rotation runbook for every enabled production provider, including configured WeChat miniapp credentials."
+      },
+      {
+        "id": "runtime-test-output",
+        "owner": "security-owner",
+        "evidenceKind": "test-output",
+        "description": "Captured output for session, refresh-token-family, provider, Redis/session invalidation and audit redaction tests before promotion."
+      },
+      {
+        "id": "audit-redaction-sample",
+        "owner": "security-owner",
+        "evidenceKind": "redacted-audit-sample",
+        "description": "Redacted audit sample showing login, refresh, logout, provider failure and replay/reuse paths without raw credentials or provider subjects."
+      },
+      {
+        "id": "rollback-plan",
+        "owner": "operations-owner",
+        "evidenceKind": "rollback-runbook",
+        "description": "Rollback plan for disabling promoted session/provider behavior while preserving authoritative server-side session revocation."
+      }
+    ],
+    "completedEvidence": [],
+    "prohibitedEvidence": [
+      "text-only approval",
+      "single-person self approval",
+      "missing reuse-detection tests",
+      "missing revocation tests",
+      "missing Redis/session invalidation convergence",
+      "missing audit redaction evidence",
+      "missing provider rotation runbook",
+      "runtime mutation without rollback plan"
+    ],
+    "mustNotEnableRefreshTokenFamily": true,
+    "mustNotEnableUnreviewedProvider": true,
+    "completedEvidenceSchema": {
+      "requiredFields": [
+        "id",
+        "owner",
+        "evidenceKind",
+        "artifactURI",
+        "artifactHash",
+        "approvedBy",
+        "approvedAt",
+        "reviewedCommit",
+        "environment",
+        "verificationCommands",
+        "rollbackCommands",
+        "auditSampleRefs",
+        "providerRotationRunbookRefs",
+        "refreshTokenFamilyTestRefs",
+        "providerIds",
+        "providerControls",
+        "runtimeTestRefs"
+      ],
+      "approvalRules": [
+        "artifact-id-must-match-requiredEvidence",
+        "approvedBy-must-not-equal-owner",
+        "all-required-owners-represented",
+        "artifact-hash-required",
+        "artifact-hash-must-be-sha256-hex",
+        "artifact-uri-must-be-external-review-artifact",
+        "verification-commands-must-use-rtk",
+        "rollback-evidence-required-before-runtime-mutation",
+        "provider-rotation-runbook-required-before-provider-promotion",
+        "refresh-token-family-tests-required-before-runtime-mutation",
+        "redacted-audit-sample-required-before-promotion",
+        "provider-controls-covered-before-promotion",
+        "provider-runtime-tests-required-before-promotion",
+        "production-environment-required"
+      ],
+      "forbiddenFields": [
+        "jwt",
+        "bearerToken",
+        "refreshToken",
+        "apiToken",
+        "openid",
+        "unionid",
+        "phone",
+        "secret",
+        "password",
+        "privateKey",
+        "tokenHash",
+        "providerSubject",
+        "rawSubject"
+      ],
+      "artifactHashPolicy": {
+        "algorithm": "sha256",
+        "format": "prefix-hex",
+        "prefix": "sha256:",
+        "hexLength": 64,
+        "casing": "lowercase"
+      },
+      "artifactURIPolicy": {
+        "sourceOfTruth": "external-review-artifacts",
+        "allowedSchemes": ["https", "s3", "gs"],
+        "forbiddenSchemes": ["file", "http"],
+        "forbidRelativePaths": true,
+        "forbidLocalAbsolutePaths": true,
+        "forbidLocalhost": true,
+        "forbidPrivateNetworkHosts": true
+      }
+    }
+  },
+  "providerAdapterPolicy": {
+    "boundary": "httpapi.AppIdentityResolver",
+    "defaultConfiguredProviders": ["demo"],
+    "optionalProviders": ["wechat"],
+    "requiredControls": [
+      "secret-rotation-plan",
+      "provider-subject-redaction",
+      "raw-provider-subject-never-in-response",
+      "raw-provider-subject-never-in-audit",
+      "configured-provider-only-login",
+      "provider-specific-error-normalization"
+    ],
+    "productionPromotionRequires": [
+      "provider credential owner",
+      "secret storage and rotation runbook",
+      "subject hash and masking proof",
+      "login failure audit policy",
+      "contract tests for unconfigured provider rejection"
+    ]
+  },
+  "providerRuntimePolicy": {
+    "adapterRegistration": "manifest-declared-and-composition-root-injected",
+    "defaultDenyUnconfiguredProviders": true,
+    "configuredProviderOnlyLogin": true,
+    "rawSubjectStorage": "hash-and-mask-only",
+    "responseRawSubjectAllowed": false,
+    "auditRawSubjectAllowed": false,
+    "genericResourceRawSubjectAllowed": false,
+    "requiredTests": [
+      "unconfigured-provider-rejection",
+      "subject-redaction",
+      "configured-provider-only-login",
+      "provider-error-normalization",
+      "production-demo-capability-rejection"
+    ],
+    "productionForbiddenCapabilities": ["demo-data"],
+    "productionForbiddenAuthProviders": ["demo"],
+    "runtimeEvidence": [
+      "internal/platform/config/config.go",
+      "internal/platform/config/config_test.go",
+      "cmd/platform-api/main.go",
+      "internal/platform/httpapi/server.go",
+      "internal/platform/httpapi/app_identity.go",
+      "internal/platform/authprovider/resolver.go",
+      "internal/platform/authprovider/wechat/resolver.go",
+      "internal/platform/authprovider/wechat/resolver_test.go",
+      "internal/platform/httpapi/server_test.go",
+      "internal/platform/authprovider/resolver_test.go"
+    ]
+  },
+  "providerPromotionMatrix": {
+    "defaultPolicy": "Provider adapters stay manifest-declared and composition-root injected. A provider can be visible before it is configured, but production use requires explicit configuration, secret ownership, rotation runbook, subject redaction, normalized errors and runtime tests.",
+    "manifestCoverage": {
+      "source": "resources/generated/platform-capability-audit.json",
+      "required": true,
+      "policy": "Every auth provider declared by enabled capability manifests must have a providerPromotionMatrix entry before production promotion."
+    },
+    "providers": [
+      {
+        "id": "demo",
+        "capability": "session",
+        "kind": "demo",
+        "productionUsage": "local-harness-only",
+        "adapterBoundary": "built-in-demo-login",
+        "configKeys": [],
+        "requiredControls": ["audit-redaction", "provider-specific-error-normalization"],
+        "requiresSecretOwner": false,
+        "rotationRunbookRequired": false,
+        "subjectRedactionRequired": true,
+        "unconfiguredProviderRejectionRequired": false,
+        "errorNormalizationRequired": true,
+        "rawCredentialExposureAllowed": false,
+        "rawSubjectExposureAllowed": false,
+        "manifestEvidence": [
+          { "path": "internal/platform/core/capabilities.go", "contains": "authProvider(\"demo\", \"demo\"" }
+        ],
+        "runtimeEvidence": [
+          { "path": "internal/platform/httpapi/server.go", "contains": "case \"demo\":" },
+          { "path": "internal/platform/httpapi/server_test.go", "contains": "TestAuthProvidersEndpointReturnsCapabilityDeclaredProviders" },
+          { "path": "internal/platform/httpapi/server_test.go", "contains": "TestDisabledDemoAuthProviderDoesNotLeakDiscoveryOrLogin" },
+          { "path": "internal/platform/config/config_test.go", "contains": "TestValidateRuntimeRejectsProductionDemoAuthProvider" }
+        ]
+      },
+      {
+        "id": "wechat",
+        "capability": "wechat-login",
+        "kind": "wechat",
+        "productionUsage": "optional-production-provider",
+        "adapterBoundary": "httpapi.AppIdentityResolver",
+        "configKeys": ["PLATFORM_WECHAT_MINIAPP_APP_ID", "PLATFORM_WECHAT_MINIAPP_SECRET", "PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT"],
+        "requiredControls": ["secret-rotation-plan", "provider-subject-redaction", "raw-provider-subject-never-in-response", "raw-provider-subject-never-in-audit", "configured-provider-only-login", "provider-specific-error-normalization"],
+        "requiresSecretOwner": true,
+        "rotationRunbookRequired": true,
+        "subjectRedactionRequired": true,
+        "unconfiguredProviderRejectionRequired": true,
+        "errorNormalizationRequired": true,
+        "rawCredentialExposureAllowed": false,
+        "rawSubjectExposureAllowed": false,
+        "manifestEvidence": [
+          { "path": "internal/platform/core/capabilities.go", "contains": "authProvider(\"wechat\", \"wechat\"" }
+        ],
+        "runtimeEvidence": [
+          { "path": "internal/platform/authprovider/resolver.go", "contains": "AppIdentityResolverFromConfig" },
+          { "path": "internal/platform/authprovider/wechat/resolver.go", "contains": "ErrProviderResolveFailed" },
+          { "path": "internal/platform/bootstrap/capabilities.go", "contains": "configureAuthProvidersFromConfig" },
+          { "path": "internal/platform/httpapi/server_test.go", "contains": "APP_AUTH_PROVIDER_NOT_CONFIGURED" },
+          { "path": "internal/platform/authprovider/wechat/resolver_test.go", "contains": "TestResolverNormalizesProviderErrorForWechatErrorCode" },
+          { "path": "internal/platform/authprovider/wechat/resolver_test.go", "contains": "TestResolverBacksConfiguredHTTPAppLoginWithoutLeakingProviderSubjects" }
+        ]
+      }
+    ],
+    "newProviderRequirements": ["manifest-declared-provider", "composition-root-injected-resolver", "config-key-contract", "secret-owner", "rotation-runbook", "hash-and-mask-subject-storage", "unconfigured-provider-rejection-test", "configured-provider-only-login-test", "provider-error-normalization-test", "audit-redaction-test"]
+  },
+  "credentialRotationPolicy": {
+    "requiredProductionReadinessPolicy": "token-rotation",
+    "affectedCredentialClasses": ["admin-jwt", "app-jwt", "api-token"],
+    "requiredPlanFields": ["overlapWindow", "invalidationDecision", "affectedTokenClasses", "rollbackHandling", "verificationCommands"],
+    "secretRedactionRequired": true
+  },
+  "auditPolicy": {
+    "requiredActions": ["auth.login", "auth.refresh", "auth.logout", "app.auth.login", "app.auth.logout", "api_token.create", "api_token.update", "api_token.revoke"],
+    "forbiddenRawFields": ["jwt", "bearerToken", "refreshToken", "apiToken", "openid", "unionid", "phone", "secret"],
+    "allowedAuthAuditFields": ["actor", "action", "resource", "sessionId", "provider", "createdAt"],
+    "sessionIdentifier": "shortSessionID",
+    "runtimeEvidence": [
+      "internal/platform/httpapi/server.go",
+      "internal/platform/httpapi/server_test.go",
+      "docs/platform-auth.md"
+    ]
+  },
+  "promotionReview": {
+    "path": "resources/generated/production-auth-promotion-review.json",
+    "generator": "scripts/generate-production-auth-promotion-review.mjs",
+    "decision": "not-approved",
+    "runtimeMutation": "disabled"
+  },
+  "documents": ["docs/platform-auth.md", "docs/platform-foundation-task-map.md", "docs/platform-roadmap.md", "docs/platform-capability-development.md"],
+  "validators": ["scripts/validate-platform-production-auth-hardening.mjs", "scripts/validate-platform-refresh-token-family-promotion.mjs", "scripts/validate-platform-production-readiness.mjs", "scripts/generate-production-auth-promotion-review.mjs"]
+}

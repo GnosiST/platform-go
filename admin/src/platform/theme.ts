@@ -18,6 +18,7 @@ export const themeTokens = {
     text: "#172033",
     muted: "#657083",
     sidebarText: "#d8e4f7",
+    selected: "#edf4ff",
   },
   white: {
     primary: "#2459d6",
@@ -32,6 +33,7 @@ export const themeTokens = {
     text: "#171b26",
     muted: "#667085",
     sidebarText: "#283344",
+    selected: "#eff5ff",
   },
   black: {
     primary: "#5b8cff",
@@ -46,6 +48,7 @@ export const themeTokens = {
     text: "#edf3ff",
     muted: "#9aa7bd",
     sidebarText: "#dbe7ff",
+    selected: "#182b4d",
   },
   warm: {
     primary: "#9f6a18",
@@ -60,5 +63,6 @@ export const themeTokens = {
     text: "#272116",
     muted: "#756a5a",
     sidebarText: "#f4e9d6",
+    selected: "#f7e8cc",
   },
 } as const;
