@@ -23,7 +23,16 @@
     ],
     "unfinishedTasksMustNotHaveCloseout": true
   },
-  "pendingNodeEvidence": [],
+  "pendingNodeEvidence": [
+    "runtime-security-containment",
+    "admin-watermark-export-governance",
+    "sensitive-data-protection-runtime",
+    "sensitive-data-historical-migration",
+    "open-source-portability",
+    "public-docs-community",
+    "public-docs-site",
+    "github-release-publication"
+  ],
   "nodeCloseouts": [
     {
       "taskId": "stack-alignment-and-architecture",

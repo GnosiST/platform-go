@@ -27,7 +27,16 @@
     "requiresResourceLocks": true,
     "requiresDependencyConflictChecks": true,
     "requiresTaskGraphBeforeNewNode": true,
-    "requiredUnfinishedNodes": []
+    "requiredUnfinishedNodes": [
+      "runtime-security-containment",
+      "admin-watermark-export-governance",
+      "sensitive-data-protection-runtime",
+      "sensitive-data-historical-migration",
+      "open-source-portability",
+      "public-docs-community",
+      "public-docs-site",
+      "github-release-publication"
+    ]
   },
   "capabilityPolicy": {
     "contract": "resources/platform-capability-contracts.json",
@@ -57,10 +66,19 @@
     "fullStackVercelGo": "requires-separate-adapter-spec"
   },
   "completionPolicy": {
-    "goalCompletionStatus": "complete",
+    "goalCompletionStatus": "not-complete-controlled",
     "mustNotMarkCompleteWhileBlockersActive": true,
     "mustNotSelfCertifyExternalApprovalEvidence": true,
-    "controlledBlockers": []
+    "controlledBlockers": [
+      "runtime-security-containment",
+      "admin-watermark-export-governance",
+      "sensitive-data-protection-runtime",
+      "sensitive-data-historical-migration",
+      "open-source-portability",
+      "public-docs-community",
+      "public-docs-site",
+      "github-release-publication"
+    ]
   },
   "futurePromotionGates": [
     {

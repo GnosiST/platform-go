@@ -16,7 +16,16 @@
     "parallelBatchesMustAvoidResourceLockConflicts": true,
     "parallelBatchesMustAvoidDependencyPaths": true
   },
-  "requiredUnfinishedNodes": [],
+  "requiredUnfinishedNodes": [
+    "runtime-security-containment",
+    "admin-watermark-export-governance",
+    "sensitive-data-protection-runtime",
+    "sensitive-data-historical-migration",
+    "open-source-portability",
+    "public-docs-community",
+    "public-docs-site",
+    "github-release-publication"
+  ],
   "knownPromotionBlockers": [
     {
       "taskId": "production-auth-provider-hardening",

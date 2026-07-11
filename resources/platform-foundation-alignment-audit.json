@@ -63,7 +63,16 @@
     "admin-ui-system-quality-hardening",
     "production-admin-oidc-auth"
   ],
-  "requiredFutureTaskNodes": [],
+  "requiredFutureTaskNodes": [
+    "runtime-security-containment",
+    "admin-watermark-export-governance",
+    "sensitive-data-protection-runtime",
+    "sensitive-data-historical-migration",
+    "open-source-portability",
+    "public-docs-community",
+    "public-docs-site",
+    "github-release-publication"
+  ],
   "nonDroppableGoalNodes": [
     "stack-alignment-and-architecture",
     "governance-org-area-role-groups",
@@ -72,7 +81,15 @@
     "visual-product-design-qa",
     "production-readiness-preflight",
     "production-persistence-correctness",
-    "admin-ui-system-quality-hardening"
+    "admin-ui-system-quality-hardening",
+    "runtime-security-containment",
+    "admin-watermark-export-governance",
+    "sensitive-data-protection-runtime",
+    "sensitive-data-historical-migration",
+    "open-source-portability",
+    "public-docs-community",
+    "public-docs-site",
+    "github-release-publication"
   ],
   "nonDroppableEngineeringCapabilities": [
     "governance-org-area-role-groups",
@@ -90,7 +107,12 @@
     "reference-discovery-gate",
     "personnel-runtime-readiness",
     "production-readiness-preflight",
-    "deployment-topology-gate"
+    "deployment-topology-gate",
+    "runtime-security-containment",
+    "admin-watermark-export-governance",
+    "sensitive-data-protection",
+    "open-source-portability",
+    "public-documentation-and-release"
   ],
   "requiredEngineeringCapabilities": [
     "dynamic-admin-resources",
@@ -123,7 +145,12 @@
     "reference-coverage-boundary-gate",
     "personnel-runtime-readiness",
     "production-readiness-preflight",
-    "deployment-topology-gate"
+    "deployment-topology-gate",
+    "runtime-security-containment",
+    "admin-watermark-export-governance",
+    "sensitive-data-protection",
+    "open-source-portability",
+    "public-documentation-and-release"
   ],
   "requiredReferenceFoundationAreas": [
     "dashboard",

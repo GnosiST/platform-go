@@ -2588,6 +2588,122 @@
           }
         ]
       }
+    },
+    {
+      "id": "runtime-security-containment",
+      "label": {
+        "zh": "运行时安全收敛",
+        "en": "Runtime Security Containment"
+      },
+      "status": "partial",
+      "purpose": "Centralize resource write and projection policy, digest-only sessions, private files, transport security, rate limiting and redacted audit/export boundaries before public release.",
+      "dependsOn": [
+        "production-runtime-gate",
+        "production-auth-hardening-gate",
+        "production-persistence-correctness"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-12-runtime-security-hardening-design.md",
+          "docs/superpowers/plans/2026-07-12-runtime-security-containment.md"
+        ],
+        "taskIds": [
+          "runtime-security-containment"
+        ]
+      }
+    },
+    {
+      "id": "admin-watermark-export-governance",
+      "label": {
+        "zh": "管理台水印与导出治理",
+        "en": "Admin Watermark And Export Governance"
+      },
+      "status": "partial",
+      "purpose": "Provide one accessible, responsive watermark policy for screen counts and policy-review JSON export provenance without changing canonical or original artifacts.",
+      "dependsOn": [
+        "system-management",
+        "file-operation-audit-contract",
+        "runtime-security-containment"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-12-admin-watermark-export-design.md",
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+        ],
+        "taskIds": [
+          "admin-watermark-export-governance"
+        ]
+      }
+    },
+    {
+      "id": "sensitive-data-protection",
+      "label": {
+        "zh": "敏感数据保护",
+        "en": "Sensitive Data Protection"
+      },
+      "status": "partial",
+      "purpose": "Provide versioned field policies, application-layer encryption, blind indexes and controlled historical migration for recoverable personal data.",
+      "dependsOn": [
+        "dynamic-admin-resources",
+        "production-persistence-correctness",
+        "runtime-security-containment"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-12-sensitive-data-encryption-design.md",
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+        ],
+        "taskIds": [
+          "sensitive-data-protection-runtime",
+          "sensitive-data-historical-migration"
+        ]
+      }
+    },
+    {
+      "id": "open-source-portability",
+      "label": {
+        "zh": "开源可移植性",
+        "en": "Open Source Portability"
+      },
+      "status": "partial",
+      "purpose": "Make fresh clones portable without private paths, sibling repositories or agent-only tooling and produce a sanitized public release tree.",
+      "dependsOn": [
+        "runtime-security-containment",
+        "admin-watermark-export-governance",
+        "sensitive-data-protection"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+        ],
+        "taskIds": [
+          "open-source-portability"
+        ]
+      }
+    },
+    {
+      "id": "public-documentation-and-release",
+      "label": {
+        "zh": "公开文档与发布",
+        "en": "Public Documentation And Release"
+      },
+      "status": "partial",
+      "purpose": "Deliver public community documentation, a bilingual Docusaurus site, GitHub Pages, CI and the sanitized v0.1.0 repository release.",
+      "dependsOn": [
+        "open-source-portability"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+        ],
+        "taskIds": [
+          "public-docs-community",
+          "public-docs-site",
+          "github-release-publication"
+        ]
+      }
     }
   ]
 }

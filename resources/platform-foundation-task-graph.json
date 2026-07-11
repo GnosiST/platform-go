@@ -76,7 +76,12 @@
     "app-api-contract",
     "codegen",
     "audit-policy",
-    "docs"
+    "docs",
+    "data-protection",
+    "migration-runtime",
+    "open-source-release",
+    "public-docs-site",
+    "github-publication"
   ],
   "resourceLockPolicies": [
     {
@@ -230,6 +235,46 @@
         "zh": "项目文档是协作事实源，任务节点更新时需要串行收口。",
         "en": "Project docs are the collaboration source of truth and need serial closure during task updates."
       }
+    },
+    {
+      "lock": "data-protection",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "字段分类、密钥、加密和盲索引共同决定敏感数据边界，必须串行评审。",
+        "en": "Field classification, keys, encryption and blind indexes jointly define the sensitive-data boundary and require serial review."
+      }
+    },
+    {
+      "lock": "migration-runtime",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "历史数据迁移会修改持久化状态，必须保持单一执行责任和可恢复游标。",
+        "en": "Historical data migration mutates persisted state and requires one execution owner with recoverable cursors."
+      }
+    },
+    {
+      "lock": "open-source-release",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "开源可移植性、许可证和发布树必须在同一审查边界内收口。",
+        "en": "Open-source portability, licensing and the release tree must close within one review boundary."
+      }
+    },
+    {
+      "lock": "public-docs-site",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "公开文档站点的内容、构建、元数据和截图需要稳定的单一发布面。",
+        "en": "Public documentation content, builds, metadata and screenshots need one stable publication surface."
+      }
+    },
+    {
+      "lock": "github-publication",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "远端仓库、Pages、Release 和可见性切换属于最终外部状态变更，必须串行执行。",
+        "en": "Remote repository, Pages, Release and visibility changes are final external-state mutations and must run serially."
+      }
     }
   ],
   "resourceLockConflictGroups": [
@@ -271,6 +316,31 @@
       "reason": {
         "zh": "权限、认证、缓存和生产配置共同决定访问控制运行语义。",
         "en": "Authorization, authentication, cache and production configuration jointly define access-control runtime semantics."
+      }
+    },
+    {
+      "id": "data-protection-surface",
+      "locks": [
+        "data-protection",
+        "storage-runtime",
+        "admin-resource-contract"
+      ],
+      "reason": {
+        "zh": "敏感字段策略、存储格式和资源合同必须作为同一数据保护面串行变更。",
+        "en": "Sensitive field policy, storage format and resource contracts must change serially as one data-protection surface."
+      }
+    },
+    {
+      "id": "public-release-surface",
+      "locks": [
+        "open-source-release",
+        "public-docs-site",
+        "github-publication",
+        "docs"
+      ],
+      "reason": {
+        "zh": "开源发布树、公开站点、GitHub 状态和文档不能并行漂移。",
+        "en": "The open-source release tree, public site, GitHub state and documentation must not drift in parallel."
       }
     }
   ],
@@ -1716,6 +1786,294 @@
           "description": "Neat-freak documentation and knowledge cleanup evidence followed by a closed node-closeout audit entry."
         }
       ]
+    },
+    {
+      "id": "runtime-security-containment",
+      "title": {
+        "zh": "运行时安全收敛",
+        "en": "Runtime Security Containment"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "资源写入、会话摘要、手机号校验、私有文件、HTTPS 和滥用控制的实现计划已批准，但运行时代码尚未完成。",
+        "en": "The resource-write, session-digest, phone-verification, private-file, HTTPS and abuse-control plan is approved, but runtime implementation is not complete."
+      },
+      "completionGate": {
+        "zh": "完成运行时安全计划的七个 TDD 切片、全量安全验证、文档同步和节点收口审计。",
+        "en": "Complete all seven runtime-security TDD slices, full security verification, documentation sync and node closeout audit."
+      },
+      "resourceLocks": [
+        "admin-resource-contract",
+        "jwt-session",
+        "storage-runtime",
+        "cache-runtime",
+        "production-config",
+        "audit-policy"
+      ],
+      "dependsOn": [
+        "production-admin-oidc-auth",
+        "production-persistence-correctness"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
+          "docs/superpowers/specs/2026-07-12-runtime-security-hardening-design.md",
+          "docs/superpowers/plans/2026-07-12-runtime-security-containment.md"
+        ]
+      }
+    },
+    {
+      "id": "admin-watermark-export-governance",
+      "title": {
+        "zh": "管理台水印与导出治理",
+        "en": "Admin Watermark And Export Governance"
+      },
+      "phase": "production-governance",
+      "scope": "admin-ui",
+      "status": "pending",
+      "statusReason": {
+        "zh": "统一水印开关、显示数量和策略评审 JSON 导出元数据已有批准设计，尚未实现和完成浏览器验收。",
+        "en": "The unified watermark switch, display counts and policy-review JSON export metadata have an approved design but are not implemented or browser-accepted."
+      },
+      "completionGate": {
+        "zh": "完成配置兼容、1/4/9/16 屏幕布局、导出元数据、双语无障碍控件和真实浏览器证据。",
+        "en": "Complete config compatibility, 1/4/9/16 screen layouts, export metadata, bilingual accessible controls and real browser evidence."
+      },
+      "visual": true,
+      "designGate": [
+        "superpowers:brainstorming",
+        "product-design"
+      ],
+      "resourceLocks": [
+        "admin-ui",
+        "i18n",
+        "browser-qa",
+        "audit-policy",
+        "docs"
+      ],
+      "dependsOn": [
+        "runtime-security-containment",
+        "admin-ui-system-quality-hardening"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
+          "docs/superpowers/specs/2026-07-12-admin-watermark-export-design.md",
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+        ]
+      }
+    },
+    {
+      "id": "sensitive-data-protection-runtime",
+      "title": {
+        "zh": "敏感数据保护运行时",
+        "en": "Sensitive Data Protection Runtime"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "字段策略、AES-256-GCM 信封和盲索引设计已批准，密钥提供器和持久化边界尚未实现。",
+        "en": "Field policies, AES-256-GCM envelopes and blind indexes are approved, but key providers and persistence boundaries are not implemented."
+      },
+      "completionGate": {
+        "zh": "完成版本化加密、授权后解密、精确匹配盲索引、不可变格式门禁和密钥轮换测试。",
+        "en": "Complete versioned encryption, post-authorization decryption, exact-match blind indexes, immutable-format gates and key-rotation tests."
+      },
+      "resourceLocks": [
+        "data-protection",
+        "admin-resource-contract",
+        "storage-runtime",
+        "production-config"
+      ],
+      "dependsOn": [
+        "runtime-security-containment",
+        "resource-schema-contract",
+        "gorm-storage-runtime"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
+          "docs/superpowers/specs/2026-07-12-sensitive-data-encryption-design.md",
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+        ]
+      }
+    },
+    {
+      "id": "sensitive-data-historical-migration",
+      "title": {
+        "zh": "敏感数据历史迁移",
+        "en": "Sensitive Data Historical Migration"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "历史明文盘点、批次迁移、校验、恢复和回滚尚未在加密运行时基础上实现。",
+        "en": "Historical plaintext inventory, batch migration, verification, resume and rollback are not yet implemented on the encryption runtime."
+      },
+      "completionGate": {
+        "zh": "实现 dry-run、租户批次游标、幂等迁移、完整性校验、备份恢复演练和可审计回滚。",
+        "en": "Implement dry-run, tenant batch cursors, idempotent migration, integrity verification, backup-restore rehearsal and auditable rollback."
+      },
+      "resourceLocks": [
+        "data-protection",
+        "migration-runtime",
+        "storage-runtime",
+        "docs"
+      ],
+      "dependsOn": [
+        "sensitive-data-protection-runtime",
+        "production-persistence-correctness"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
+          "docs/superpowers/specs/2026-07-12-sensitive-data-encryption-design.md",
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+        ]
+      }
+    },
+    {
+      "id": "open-source-portability",
+      "title": {
+        "zh": "开源可移植性",
+        "en": "Open Source Portability"
+      },
+      "phase": "production-governance",
+      "scope": "governance",
+      "status": "pending",
+      "statusReason": {
+        "zh": "公开模块路径、无私有依赖的 fresh-clone 验证和净化发布树尚未完成。",
+        "en": "The public module path, private-dependency-free fresh-clone validation and sanitized release tree are not complete."
+      },
+      "completionGate": {
+        "zh": "完成模块路径迁移、跟踪参考快照、无 rtk 公共命令、历史与发布树扫描以及独立外部能力示例。",
+        "en": "Complete module-path migration, tracked reference snapshots, public commands without rtk, history/release-tree scans and the independent external-capability example."
+      },
+      "resourceLocks": [
+        "open-source-release",
+        "codegen",
+        "docs"
+      ],
+      "dependsOn": [
+        "admin-watermark-export-governance",
+        "sensitive-data-historical-migration"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
+          "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+        ]
+      }
+    },
+    {
+      "id": "public-docs-community",
+      "title": {
+        "zh": "公开文档与社区治理",
+        "en": "Public Documentation And Community Governance"
+      },
+      "phase": "production-governance",
+      "scope": "governance",
+      "status": "pending",
+      "statusReason": {
+        "zh": "许可证、贡献、安全、支持、治理、变更记录和双语核心使用文档尚未形成公开发布质量。",
+        "en": "Licensing, contribution, security, support, governance, changelog and bilingual core usage docs are not yet publication-ready."
+      },
+      "completionGate": {
+        "zh": "完成 Apache-2.0/NOTICE、社区文件、开发与运维手册、配置/API/升级参考和链接校验。",
+        "en": "Complete Apache-2.0/NOTICE, community files, developer/operator guides, configuration/API/upgrade references and link validation."
+      },
+      "resourceLocks": [
+        "open-source-release",
+        "docs"
+      ],
+      "dependsOn": [
+        "open-source-portability"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
+          "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+        ]
+      }
+    },
+    {
+      "id": "public-docs-site",
+      "title": {
+        "zh": "公开文档站点",
+        "en": "Public Documentation Site"
+      },
+      "phase": "production-governance",
+      "scope": "governance",
+      "status": "pending",
+      "statusReason": {
+        "zh": "Docusaurus 中文默认、英文核心指南、真实截图和 GitHub Pages 构建尚未实现。",
+        "en": "The Chinese-default Docusaurus site, English core guides, real screenshots and GitHub Pages build are not implemented."
+      },
+      "completionGate": {
+        "zh": "完成 Product Design 方向、design-taste-frontend 审美复核、站点构建、SEO 元数据和移动/桌面浏览器验收。",
+        "en": "Complete Product Design direction, design-taste-frontend art review, site build, SEO metadata and mobile/desktop browser acceptance."
+      },
+      "visual": true,
+      "designGate": [
+        "superpowers:brainstorming",
+        "product-design"
+      ],
+      "resourceLocks": [
+        "public-docs-site",
+        "i18n",
+        "browser-qa",
+        "docs"
+      ],
+      "dependsOn": [
+        "public-docs-community"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
+          "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+        ]
+      }
+    },
+    {
+      "id": "github-release-publication",
+      "title": {
+        "zh": "GitHub 发布与仓库展示",
+        "en": "GitHub Release And Repository Publication"
+      },
+      "phase": "production-governance",
+      "scope": "governance",
+      "status": "pending",
+      "statusReason": {
+        "zh": "目标仓库尚未创建，净化分支、CI、Pages、Release 和公开可见性尚未验证。",
+        "en": "The target repository does not exist and the sanitized branch, CI, Pages, Release and public visibility are not verified."
+      },
+      "completionGate": {
+        "zh": "在本地 RC 完成后创建私有 staging 仓库，验证净化提交、CI/Pages/v0.1.0，再公开并完成仓库装修。",
+        "en": "After the local RC is complete, create a private staging repository, verify the sanitized commit, CI, Pages and v0.1.0, then publish and finish repository presentation."
+      },
+      "resourceLocks": [
+        "github-publication",
+        "open-source-release",
+        "public-docs-site"
+      ],
+      "dependsOn": [
+        "public-docs-site",
+        "open-source-portability"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
+          "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+        ]
+      }
     }
   ],
   "parallelBatches": [

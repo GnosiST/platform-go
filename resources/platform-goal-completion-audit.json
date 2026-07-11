@@ -2,21 +2,30 @@
   "$schema": "https://platform-go.local/schemas/platform-goal-completion-audit.json",
   "capturedAt": "2026-07-11",
   "purpose": "Machine-checkable completion audit for the active reusable platform foundation goal. It keeps completion claims tied to current task evidence, business-neutral boundaries, approved stack alignment, visual design gates and explicit non-mutating future promotion gates.",
-  "completionStatus": "complete",
+  "completionStatus": "not-complete-controlled",
   "completionPolicy": {
     "mustNotMarkGoalCompleteWhileUnfinishedNodesExist": true,
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "businessReferenceMode": "reference-only",
-    "requiredControlledUnfinishedNodes": []
+    "requiredControlledUnfinishedNodes": [
+      "runtime-security-containment",
+      "admin-watermark-export-governance",
+      "sensitive-data-protection-runtime",
+      "sensitive-data-historical-migration",
+      "open-source-portability",
+      "public-docs-community",
+      "public-docs-site",
+      "github-release-publication"
+    ]
   },
   "approvedStack": {
     "backend": ["Gin", "GORM", "Casbin", "JWT"],
     "frontend": ["Refine", "React", "Ant Design"]
   },
   "taskSummary": {
-    "expectedTotal": 37,
+    "expectedTotal": 45,
     "expectedImplemented": 37,
-    "expectedControlledUnfinished": 0
+    "expectedControlledUnfinished": 8
   },
   "requirements": [
     {
