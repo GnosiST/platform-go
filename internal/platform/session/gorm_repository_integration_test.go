@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +13,23 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
+
+func TestSessionIntegrationDatabaseNameGuard(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		safe bool
+	}{
+		{name: "platform_session_integration_test", safe: true},
+		{name: "platform_session_integration_ci", safe: true},
+		{name: "platform_test", safe: false},
+		{name: "platform_production", safe: false},
+		{name: "", safe: false},
+	} {
+		if got := safeSessionIntegrationDatabase(tt.name); got != tt.safe {
+			t.Fatalf("safeSessionIntegrationDatabase(%q) = %t, want %t", tt.name, got, tt.safe)
+		}
+	}
+}
 
 func TestGORMRepositoryMigratesLegacySchemaOnMySQL(t *testing.T) {
 	dsn := os.Getenv("PLATFORM_TEST_MYSQL_DSN")
@@ -82,8 +100,28 @@ func openSessionIntegrationDB(t *testing.T, dialector gorm.Dialector) *gorm.DB {
 	if err := sqlDB.PingContext(context.Background()); err != nil {
 		t.Fatalf("database ping error = %v", err)
 	}
+	requireSafeSessionIntegrationDatabase(t, db)
 	t.Cleanup(func() { _ = sqlDB.Close() })
 	return db
+}
+
+func requireSafeSessionIntegrationDatabase(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	query := "SELECT current_database()"
+	if db.Dialector.Name() == "mysql" {
+		query = "SELECT DATABASE()"
+	}
+	var name string
+	if err := db.Raw(query).Scan(&name).Error; err != nil {
+		t.Fatalf("read integration database name error = %v", err)
+	}
+	if !safeSessionIntegrationDatabase(name) {
+		t.Fatalf("refusing destructive session integration test against database %q", name)
+	}
+}
+
+func safeSessionIntegrationDatabase(name string) bool {
+	return strings.HasPrefix(strings.TrimSpace(name), "platform_session_integration_")
 }
 
 func resetSessionIntegrationTables(t *testing.T, db *gorm.DB) {

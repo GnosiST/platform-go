@@ -62,6 +62,7 @@ Implemented. Public Store and HTTP/JWT call sites still use the opaque raw sessi
 ## Live Database Verification
 
 - Added opt-in GORM integration tests that create real legacy raw-token tables and verify migration removes the raw marker, removes the `token` column, installs `token_digest`, empties legacy sessions and leaves no replacement/legacy tables.
+- Integration tests refuse to run destructive table setup unless the connected database name starts with `platform_session_integration_`.
 - MySQL 8.4.10 passed five recovery states: legacy current table, replacement-only, legacy-only, digest current with both leftovers, and legacy current with replacement.
 - PostgreSQL 17.10 passed the transactional legacy-table replacement path.
 - Both database suites were rerun after persisted-digest validation was added and passed against isolated temporary containers.
