@@ -175,6 +175,60 @@ func TestStoreRejectsCredentialLikeCompoundNamesWithoutProtectedPolicy(t *testin
 	}
 }
 
+func TestStoreRejectsUnsupportedPoliciesAndSensitiveRecordStorage(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		mutate func(*FieldDefinition)
+	}{
+		{name: "sensitivity", mutate: func(field *FieldDefinition) { field.Sensitivity = "classified" }},
+		{name: "storage mode", mutate: func(field *FieldDefinition) { field.StorageMode = "vault" }},
+		{name: "response mode", mutate: func(field *FieldDefinition) { field.ResponseMode = "redacted" }},
+		{name: "export mode", mutate: func(field *FieldDefinition) { field.ExportMode = "redacted" }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			store := NewStoreFromCapabilities(core.DefaultManifests())
+			schema := store.schemas["tenants"]
+			for index := range schema.Fields {
+				if schema.Fields[index].Key == "isolation" {
+					tt.mutate(&schema.Fields[index])
+				}
+			}
+			store.schemas["tenants"] = schema
+			if err := store.validateWriteValues("tenants", map[string]string{"isolation": "shared"}, WriteOriginInternal); !errors.Is(err, ErrInvalidRecord) {
+				t.Fatalf("validateWriteValues() error = %v, want ErrInvalidRecord", err)
+			}
+		})
+	}
+
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	schema := store.schemas["tenants"]
+	for index := range schema.Fields {
+		if schema.Fields[index].Key == "name" {
+			schema.Fields[index].Sensitivity = capability.FieldSensitivitySensitive
+			schema.Fields[index].StorageMode = capability.FieldStorageHashed
+			schema.Fields[index].ResponseMode = capability.FieldProjectionOmitted
+			schema.Fields[index].ExportMode = capability.FieldProjectionOmitted
+		}
+	}
+	store.schemas["tenants"] = schema
+	if err := store.validateWriteInput("tenants", WriteInput{Name: "derived-name-hash"}, WriteOriginInternal); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("validateWriteInput(sensitive record field) error = %v, want ErrInvalidRecord", err)
+	}
+}
+
+func TestStoreRejectsCredentialNamesWithRepeatedDerivedSuffixes(t *testing.T) {
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	schema := store.schemas["tenants"]
+	schema.Fields = append(schema.Fields, FieldDefinition{
+		Key: "apiTokenHashDigest", Source: "values", Sensitivity: capability.FieldSensitivityPublic,
+		StorageMode: capability.FieldStoragePlain, ResponseMode: capability.FieldProjectionFull, ExportMode: capability.FieldProjectionFull,
+	})
+	store.schemas["tenants"] = schema
+	if err := store.validateWriteValues("tenants", map[string]string{"apiTokenHashDigest": "raw-token-marker"}, WriteOriginInternal); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("validateWriteValues(apiTokenHashDigest) error = %v, want ErrInvalidRecord", err)
+	}
+}
+
 func TestProjectRecordDropsLegacyUnknownAndResponseOmittedValues(t *testing.T) {
 	store := NewStoreFromCapabilities(core.DefaultManifests())
 	legacyRecord := Record{

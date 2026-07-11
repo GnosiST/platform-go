@@ -622,8 +622,14 @@ func validAdminSecurityFieldPolicy(sensitivity string, storageMode string, respo
 func adminSecurityFieldName(key string) bool {
 	normalized := strings.ToLower(strings.NewReplacer("_", "", "-", "", ".", "").Replace(strings.TrimSpace(key)))
 	base := normalized
-	for _, suffix := range []string{"hash", "digest"} {
-		base = strings.TrimSuffix(base, suffix)
+	for {
+		previous := base
+		for _, suffix := range []string{"hash", "digest"} {
+			base = strings.TrimSuffix(base, suffix)
+		}
+		if base == previous {
+			break
+		}
 	}
 	if (base == "code" || base == "session") && base != normalized {
 		return true

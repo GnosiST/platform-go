@@ -261,6 +261,7 @@ func TestValidateAdminSurfaceValidatesFieldSecurityPolicies(t *testing.T) {
 		{name: "masked credential disguise", key: "maskedToken", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
 		{name: "masked personal disguise", key: "maskedPhone", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
 		{name: "compound token", key: "apiToken", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
+		{name: "multi suffix token", key: "apiTokenHashDigest", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
 		{name: "token value", key: "tokenValue", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
 		{name: "compound secret", key: "authSecret", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
 		{name: "masked password", key: "maskedPassword", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},

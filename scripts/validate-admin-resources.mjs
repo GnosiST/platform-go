@@ -91,9 +91,15 @@ function validSecurityFieldPolicy(sensitivity, storageMode, responseMode, export
 function isSecurityFieldName(key) {
   const normalized = String(key ?? "").trim().toLowerCase().replaceAll(/[_\-.]/g, "");
   let base = normalized;
-  for (const suffix of ["hash", "digest"]) {
-    if (base.endsWith(suffix)) {
-      base = base.slice(0, -suffix.length);
+  for (;;) {
+    const previous = base;
+    for (const suffix of ["hash", "digest"]) {
+      if (base.endsWith(suffix)) {
+        base = base.slice(0, -suffix.length);
+      }
+    }
+    if (base === previous) {
+      break;
     }
   }
   if (["code", "session"].includes(base) && base !== normalized) {

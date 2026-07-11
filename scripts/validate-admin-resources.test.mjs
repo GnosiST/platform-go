@@ -123,6 +123,11 @@ describe("validate-admin-resources field security policies", () => {
       /security field names require masked personal or protected non-public storage/,
     ],
     [
+      "multi-suffix credential name",
+      { key: "apiTokenHashDigest", sensitivity: "public", storageMode: "plain", responseMode: "full", exportMode: "full" },
+      /security field names require masked personal or protected non-public storage/,
+    ],
+    [
       "token value",
       { key: "tokenValue", sensitivity: "public", storageMode: "plain", responseMode: "full", exportMode: "full" },
       /security field names require masked personal or protected non-public storage/,

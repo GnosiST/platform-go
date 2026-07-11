@@ -92,6 +92,18 @@ func (s *Store) validateWriteInput(resource string, input WriteInput, origin Wri
 }
 
 func validateFieldWrite(key string, value string, field FieldDefinition, origin WriteOrigin) error {
+	if !validFieldSensitivity(field.Sensitivity) {
+		return invalidSecurityField(key, "has unsupported sensitivity")
+	}
+	if !validFieldStorageMode(field.StorageMode) {
+		return invalidSecurityField(key, "has unsupported storage mode")
+	}
+	if !validFieldProjectionMode(field.ResponseMode) {
+		return invalidSecurityField(key, "has unsupported response mode")
+	}
+	if !validFieldProjectionMode(field.ExportMode) {
+		return invalidSecurityField(key, "has unsupported export mode")
+	}
 	if origin == WriteOriginExternal && field.ReadOnly {
 		return invalidSecurityField(key, "is read-only")
 	}
@@ -101,6 +113,9 @@ func validateFieldWrite(key string, value string, field FieldDefinition, origin 
 	protectedSensitivity := field.Sensitivity == capability.FieldSensitivityPersonal ||
 		field.Sensitivity == capability.FieldSensitivitySensitive ||
 		field.Sensitivity == capability.FieldSensitivitySecret
+	if (field.Sensitivity == capability.FieldSensitivitySensitive || field.Sensitivity == capability.FieldSensitivitySecret) && field.Source == "record" {
+		return invalidSecurityField(key, "sensitive or secret values cannot use record storage")
+	}
 	if protectedSensitivity && field.StorageMode == capability.FieldStoragePlain {
 		return invalidSecurityField(key, "requires protected storage")
 	}
@@ -129,11 +144,44 @@ func invalidSecurityField(field string, reason string) error {
 	return fmt.Errorf("%w: field %s %s", ErrInvalidRecord, field, reason)
 }
 
+func validFieldSensitivity(value string) bool {
+	switch value {
+	case capability.FieldSensitivityPublic, capability.FieldSensitivityInternal, capability.FieldSensitivityPersonal, capability.FieldSensitivitySensitive, capability.FieldSensitivitySecret:
+		return true
+	default:
+		return false
+	}
+}
+
+func validFieldStorageMode(value string) bool {
+	switch value {
+	case capability.FieldStoragePlain, capability.FieldStorageMasked, capability.FieldStorageHashed, capability.FieldStorageEncrypted:
+		return true
+	default:
+		return false
+	}
+}
+
+func validFieldProjectionMode(value string) bool {
+	switch value {
+	case capability.FieldProjectionFull, capability.FieldProjectionMasked, capability.FieldProjectionPrivileged, capability.FieldProjectionOmitted:
+		return true
+	default:
+		return false
+	}
+}
+
 func prohibitedRawField(key string) bool {
 	normalized := strings.ToLower(strings.NewReplacer("_", "", "-", "", ".", "").Replace(strings.TrimSpace(key)))
 	base := normalized
-	for _, suffix := range []string{"hash", "digest"} {
-		base = strings.TrimSuffix(base, suffix)
+	for {
+		previous := base
+		for _, suffix := range []string{"hash", "digest"} {
+			base = strings.TrimSuffix(base, suffix)
+		}
+		if base == previous {
+			break
+		}
 	}
 	if (base == "code" || base == "session") && base != normalized {
 		return true
