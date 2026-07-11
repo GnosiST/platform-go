@@ -125,6 +125,27 @@ func TestResolverNormalizesIDTokenVerificationFailures(t *testing.T) {
 			},
 			redacted: "raw-audience-marker",
 		},
+		{
+			name: "signature corruption",
+			mutate: func(provider *oidcProviderFixture) {
+				provider.SetCorruptIDTokenSignature()
+			},
+			redacted: "subject-123",
+		},
+		{
+			name: "expired token",
+			mutate: func(provider *oidcProviderFixture) {
+				provider.SetExpiredIDToken()
+			},
+			redacted: "subject-123",
+		},
+		{
+			name: "empty subject",
+			mutate: func(provider *oidcProviderFixture) {
+				provider.SetClaimSubject("")
+			},
+			redacted: "subject-123",
+		},
 	}
 
 	for _, test := range tests {
@@ -275,7 +296,10 @@ type oidcProviderFixture struct {
 	claimIssuer   string
 	claimAudience string
 	claimNonce    string
+	claimSubject  string
 	now           time.Time
+	expiredToken  bool
+	corruptToken  bool
 	tokenStatus   int
 	tokenBody     string
 	tokenRequests []oidcTokenRequest
@@ -295,7 +319,7 @@ func newOIDCProviderFixture(t *testing.T) *oidcProviderFixture {
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
-	fixture := &oidcProviderFixture{t: t, key: key}
+	fixture := &oidcProviderFixture{t: t, key: key, claimSubject: "subject-123"}
 	fixture.server = httptest.NewServer(http.HandlerFunc(fixture.handle))
 	return fixture
 }
@@ -342,6 +366,24 @@ func (f *oidcProviderFixture) SetClaimNonce(nonce string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.claimNonce = nonce
+}
+
+func (f *oidcProviderFixture) SetClaimSubject(subject string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.claimSubject = subject
+}
+
+func (f *oidcProviderFixture) SetExpiredIDToken() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.expiredToken = true
+}
+
+func (f *oidcProviderFixture) SetCorruptIDTokenSignature() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.corruptToken = true
 }
 
 func (f *oidcProviderFixture) SetTokenError(status int, body string) {
@@ -425,7 +467,10 @@ func (f *oidcProviderFixture) handleToken(response http.ResponseWriter, request 
 	issuer := f.claimIssuer
 	audience := f.claimAudience
 	nonce := f.claimNonce
+	subject := f.claimSubject
 	now := f.now
+	expiredToken := f.expiredToken
+	corruptToken := f.corruptToken
 	f.mu.Unlock()
 	if status != 0 {
 		response.Header().Set("Content-Type", "application/json")
@@ -437,7 +482,10 @@ func (f *oidcProviderFixture) handleToken(response http.ResponseWriter, request 
 		response.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	idToken := f.signIDToken(issuer, audience, nonce, now)
+	idToken := f.signIDToken(issuer, audience, nonce, subject, now, expiredToken)
+	if corruptToken {
+		idToken = corruptIDTokenSignature(idToken)
+	}
 	f.mu.Lock()
 	f.lastIDToken = idToken
 	f.mu.Unlock()
@@ -448,15 +496,21 @@ func (f *oidcProviderFixture) handleToken(response http.ResponseWriter, request 
 	})
 }
 
-func (f *oidcProviderFixture) signIDToken(issuer string, audience string, nonce string, now time.Time) string {
+func (f *oidcProviderFixture) signIDToken(issuer string, audience string, nonce string, subject string, now time.Time, expired bool) string {
 	header, _ := json.Marshal(map[string]string{"alg": "RS256", "kid": "fixture-key", "typ": "JWT"})
 	now = now.UTC()
+	expiresAt := now.Add(5 * time.Minute)
+	issuedAt := now.Add(-time.Second)
+	if expired {
+		expiresAt = now.Add(-time.Minute)
+		issuedAt = now.Add(-2 * time.Minute)
+	}
 	claims, _ := json.Marshal(map[string]any{
 		"iss":   issuer,
-		"sub":   "subject-123",
+		"sub":   subject,
 		"aud":   audience,
-		"exp":   now.Add(5 * time.Minute).Unix(),
-		"iat":   now.Add(-time.Second).Unix(),
+		"exp":   expiresAt.Unix(),
+		"iat":   issuedAt.Unix(),
 		"nonce": nonce,
 	})
 	signingInput := base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(claims)
@@ -467,6 +521,22 @@ func (f *oidcProviderFixture) signIDToken(issuer string, audience string, nonce 
 		return ""
 	}
 	return signingInput + "." + base64.RawURLEncoding.EncodeToString(signature)
+}
+
+func corruptIDTokenSignature(idToken string) string {
+	signingInput, signature, ok := strings.Cut(idToken, ".")
+	if !ok {
+		return idToken
+	}
+	payload, signature, ok := strings.Cut(signature, ".")
+	if !ok || signature == "" {
+		return idToken
+	}
+	replacement := byte('A')
+	if signature[0] == replacement {
+		replacement = 'B'
+	}
+	return signingInput + "." + payload + "." + string(replacement) + signature[1:]
 }
 
 func (f *oidcProviderFixture) writeJSON(response http.ResponseWriter, payload any) {
