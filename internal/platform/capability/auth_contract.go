@@ -29,6 +29,9 @@ func ValidateAuthProviderDeclarations(manifests []Manifest) error {
 			if !hasLocalizedText(provider.Description) {
 				return fmt.Errorf("capability %q auth provider %q description is required", manifest.ID, providerID)
 			}
+			if err := validateAuthProviderAudiences(manifest.ID, providerID, provider.Audiences); err != nil {
+				return err
+			}
 			if err := validateAuthProviderConfigKeys(manifest.ID, providerID, provider.ConfigKeys); err != nil {
 				return err
 			}
@@ -37,6 +40,25 @@ func ValidateAuthProviderDeclarations(manifests []Manifest) error {
 			}
 			providers[providerID] = manifest.ID
 		}
+	}
+	return nil
+}
+
+func validateAuthProviderAudiences(owner ID, providerID string, audiences []AuthProviderAudience) error {
+	if len(audiences) == 0 {
+		return fmt.Errorf("capability %q auth provider %q audience is required", owner, providerID)
+	}
+	seen := map[AuthProviderAudience]struct{}{}
+	for _, audience := range audiences {
+		switch audience {
+		case AuthProviderAudienceAdmin, AuthProviderAudienceApp:
+		default:
+			return fmt.Errorf("capability %q auth provider %q unknown audience %q", owner, providerID, audience)
+		}
+		if _, exists := seen[audience]; exists {
+			return fmt.Errorf("capability %q auth provider %q duplicate audience %q", owner, providerID, audience)
+		}
+		seen[audience] = struct{}{}
 	}
 	return nil
 }

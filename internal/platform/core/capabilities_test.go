@@ -414,14 +414,17 @@ func TestDefaultManifestsExposeDemoDataDeclarations(t *testing.T) {
 
 func TestDefaultManifestsExposeAuthProviderDeclarations(t *testing.T) {
 	manifests := DefaultManifests()
-	var demoFound, wechatFound bool
+	var demoFound, wechatFound, oidcFound bool
 	for _, manifest := range manifests {
 		for _, provider := range manifest.AuthProviders {
-			if provider.ID == "demo" && provider.Kind == "demo" && provider.Configured {
+			if provider.ID == "demo" && provider.Kind == "demo" && provider.Configured && provider.SupportsAudience(capability.AuthProviderAudienceAdmin) && provider.SupportsAudience(capability.AuthProviderAudienceApp) {
 				demoFound = true
 			}
-			if provider.ID == "wechat" && provider.Kind == "wechat" && !provider.Configured {
+			if provider.ID == "wechat" && provider.Kind == "wechat" && !provider.Configured && provider.SupportsAudience(capability.AuthProviderAudienceApp) && !provider.SupportsAudience(capability.AuthProviderAudienceAdmin) {
 				wechatFound = true
+			}
+			if manifest.ID == "admin-oidc" && provider.ID == "oidc" && provider.Kind == "oidc" && !provider.Configured && provider.SupportsAudience(capability.AuthProviderAudienceAdmin) && !provider.SupportsAudience(capability.AuthProviderAudienceApp) && slices.Equal(provider.ConfigKeys, []string{"PLATFORM_ADMIN_OIDC_ISSUER_URL", "PLATFORM_ADMIN_OIDC_CLIENT_ID", "PLATFORM_ADMIN_OIDC_CLIENT_SECRET", "PLATFORM_ADMIN_OIDC_REDIRECT_URL"}) {
+				oidcFound = true
 			}
 		}
 	}
@@ -430,6 +433,40 @@ func TestDefaultManifestsExposeAuthProviderDeclarations(t *testing.T) {
 	}
 	if !wechatFound {
 		t.Fatalf("DefaultManifests() missing unconfigured wechat auth provider")
+	}
+	if !oidcFound {
+		t.Fatalf("DefaultManifests() missing unconfigured admin oidc auth provider")
+	}
+}
+
+func TestDefaultManifestsExposeAdminOIDCIdentityResourceWithoutRawIdentifiers(t *testing.T) {
+	var identityResource capability.AdminResource
+	for _, manifest := range DefaultManifests() {
+		if manifest.ID != "admin-oidc" {
+			continue
+		}
+		for _, resource := range manifest.Admin.Resources {
+			if resource.Resource == "admin-identities" {
+				identityResource = resource
+			}
+		}
+	}
+	if identityResource.Resource == "" {
+		t.Fatalf("DefaultManifests() missing admin-identities resource")
+	}
+	fields := map[string]struct{}{}
+	for _, field := range identityResource.Fields {
+		fields[field.Key] = struct{}{}
+	}
+	for _, required := range []string{"provider", "providerKind", "issuerHash", "providerSubjectHash", "platformUsername", "createdAt", "lastLoginAt"} {
+		if _, ok := fields[required]; !ok {
+			t.Fatalf("admin-identities fields missing %q: %+v", required, identityResource.Fields)
+		}
+	}
+	for _, forbidden := range []string{"issuer", "subject", "providerSubject"} {
+		if _, ok := fields[forbidden]; ok {
+			t.Fatalf("admin-identities exposes raw identifier field %q", forbidden)
+		}
 	}
 }
 

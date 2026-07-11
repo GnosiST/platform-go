@@ -17,6 +17,7 @@ func TestValidateAuthProviderDeclarationsAcceptsLocalizedProviderWithConfigKeys(
 					Description: Text("微信 code 换取登录态。", "WeChat code exchange login."),
 					Enabled:     true,
 					ConfigKeys:  []string{"PLATFORM_WECHAT_MINIAPP_APP_ID", "PLATFORM_WECHAT_MINIAPP_SECRET"},
+					Audiences:   []AuthProviderAudience{AuthProviderAudienceApp},
 				},
 			},
 		},
@@ -32,13 +33,13 @@ func TestValidateAuthProviderDeclarationsRejectsDuplicateProviderIDs(t *testing.
 		{
 			ID: "session",
 			AuthProviders: []AuthProvider{
-				{ID: "demo", Kind: "demo", Title: Text("演示登录", "Demo Login"), Description: Text("演示登录。", "Demo login."), Enabled: true, Configured: true},
+				{ID: "demo", Kind: "demo", Title: Text("演示登录", "Demo Login"), Description: Text("演示登录。", "Demo login."), Enabled: true, Configured: true, Audiences: []AuthProviderAudience{AuthProviderAudienceAdmin}},
 			},
 		},
 		{
 			ID: "wechat-login",
 			AuthProviders: []AuthProvider{
-				{ID: " demo ", Kind: "wechat", Title: Text("微信登录", "WeChat Login"), Description: Text("微信登录。", "WeChat login."), Enabled: true},
+				{ID: " demo ", Kind: "wechat", Title: Text("微信登录", "WeChat Login"), Description: Text("微信登录。", "WeChat login."), Enabled: true, Audiences: []AuthProviderAudience{AuthProviderAudienceApp}},
 			},
 		},
 	}
@@ -55,7 +56,7 @@ func TestValidateAuthProviderDeclarationsRejectsMissingKind(t *testing.T) {
 		{
 			ID: "session",
 			AuthProviders: []AuthProvider{
-				{ID: "demo", Title: Text("演示登录", "Demo Login"), Description: Text("演示登录。", "Demo login."), Enabled: true, Configured: true},
+				{ID: "demo", Title: Text("演示登录", "Demo Login"), Description: Text("演示登录。", "Demo login."), Enabled: true, Configured: true, Audiences: []AuthProviderAudience{AuthProviderAudienceAdmin}},
 			},
 		},
 	}
@@ -69,8 +70,8 @@ func TestValidateAuthProviderDeclarationsRejectsMissingKind(t *testing.T) {
 
 func TestValidateAuthProviderDeclarationsRejectsInvalidIDOrKind(t *testing.T) {
 	for _, provider := range []AuthProvider{
-		{ID: "WeChat", Kind: "wechat", Title: Text("微信登录", "WeChat Login"), Description: Text("微信登录。", "WeChat login.")},
-		{ID: "wechat", Kind: "OAuth2", Title: Text("微信登录", "WeChat Login"), Description: Text("微信登录。", "WeChat login.")},
+		{ID: "WeChat", Kind: "wechat", Title: Text("微信登录", "WeChat Login"), Description: Text("微信登录。", "WeChat login."), Audiences: []AuthProviderAudience{AuthProviderAudienceApp}},
+		{ID: "wechat", Kind: "OAuth2", Title: Text("微信登录", "WeChat Login"), Description: Text("微信登录。", "WeChat login."), Audiences: []AuthProviderAudience{AuthProviderAudienceApp}},
 	} {
 		t.Run(provider.ID+"/"+provider.Kind, func(t *testing.T) {
 			err := ValidateAuthProviderDeclarations([]Manifest{{ID: "wechat-login", AuthProviders: []AuthProvider{provider}}})
@@ -90,6 +91,7 @@ func TestValidateAuthProviderDeclarationsRejectsMissingLocalizedDescription(t *t
 		Kind:        "wechat",
 		Title:       Text("微信登录", "WeChat Login"),
 		Description: Text("微信登录。", ""),
+		Audiences:   []AuthProviderAudience{AuthProviderAudienceApp},
 	}
 
 	err := ValidateAuthProviderDeclarations([]Manifest{{ID: "wechat-login", AuthProviders: []AuthProvider{provider}}})
@@ -116,6 +118,7 @@ func TestValidateAuthProviderDeclarationsRejectsInvalidConfigKeys(t *testing.T) 
 				Title:       Text("微信登录", "WeChat Login"),
 				Description: Text("微信登录。", "WeChat login."),
 				ConfigKeys:  keys,
+				Audiences:   []AuthProviderAudience{AuthProviderAudienceApp},
 			}
 
 			err := ValidateAuthProviderDeclarations([]Manifest{{ID: "wechat-login", AuthProviders: []AuthProvider{provider}}})
@@ -126,5 +129,50 @@ func TestValidateAuthProviderDeclarationsRejectsInvalidConfigKeys(t *testing.T) 
 				t.Fatalf("ValidateAuthProviderDeclarations() error = %v, want config key error", err)
 			}
 		})
+	}
+}
+
+func TestValidateAuthProviderDeclarationsRequiresAudience(t *testing.T) {
+	provider := AuthProvider{
+		ID: "oidc", Kind: "oidc", Enabled: true,
+		Title:       Text("OIDC 登录", "OIDC Login"),
+		Description: Text("OIDC 后台登录。", "OIDC Admin login."),
+	}
+	err := ValidateAuthProviderDeclarations([]Manifest{{ID: "admin-oidc", AuthProviders: []AuthProvider{provider}}})
+	if err == nil || !strings.Contains(err.Error(), "audience is required") {
+		t.Fatalf("ValidateAuthProviderDeclarations() error = %v, want audience required", err)
+	}
+}
+
+func TestValidateAuthProviderDeclarationsRejectsDuplicateAudience(t *testing.T) {
+	provider := AuthProvider{
+		ID: "oidc", Kind: "oidc", Enabled: true,
+		Title:       Text("OIDC 登录", "OIDC Login"),
+		Description: Text("OIDC 后台登录。", "OIDC Admin login."),
+		Audiences:   []AuthProviderAudience{AuthProviderAudienceAdmin, AuthProviderAudienceAdmin},
+	}
+	err := ValidateAuthProviderDeclarations([]Manifest{{ID: "admin-oidc", AuthProviders: []AuthProvider{provider}}})
+	if err == nil || !strings.Contains(err.Error(), "duplicate audience") {
+		t.Fatalf("ValidateAuthProviderDeclarations() error = %v, want duplicate audience", err)
+	}
+}
+
+func TestValidateAuthProviderDeclarationsRequiresKnownAudience(t *testing.T) {
+	provider := AuthProvider{
+		ID: "oidc", Kind: "oidc", Enabled: true,
+		Title:       Text("OIDC 登录", "OIDC Login"),
+		Description: Text("OIDC 后台登录。", "OIDC Admin login."),
+		Audiences:   []AuthProviderAudience{"unknown"},
+	}
+	err := ValidateAuthProviderDeclarations([]Manifest{{ID: "admin-oidc", AuthProviders: []AuthProvider{provider}}})
+	if err == nil || !strings.Contains(err.Error(), "unknown audience") {
+		t.Fatalf("ValidateAuthProviderDeclarations() error = %v, want unknown audience", err)
+	}
+}
+
+func TestAuthProviderSupportsAudience(t *testing.T) {
+	provider := AuthProvider{Audiences: []AuthProviderAudience{AuthProviderAudienceAdmin}}
+	if !provider.SupportsAudience(AuthProviderAudienceAdmin) || provider.SupportsAudience(AuthProviderAudienceApp) {
+		t.Fatalf("audience support mismatch: %+v", provider.Audiences)
 	}
 }

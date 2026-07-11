@@ -10,13 +10,14 @@ func DefaultManifests() []capability.Manifest {
 	return []capability.Manifest{
 		{ID: "tenant", Name: "Tenant", Version: "0.1.0", Dependencies: []capability.ID{"dictionary"}, Admin: adminSurface(tenantAdminResource()), Migrations: lifecycleMigrations("tenant"), Seeds: lifecycleSeeds("tenant")},
 		{ID: "identity", Name: "Identity", Version: "0.1.0", Dependencies: []capability.ID{"tenant"}, Admin: adminSurface(userAdminResource(), appIdentityAdminResource(), orgUnitAdminResource()), Migrations: lifecycleMigrations("identity"), Seeds: lifecycleSeeds("identity")},
-		{ID: "session", Name: "Session", Version: "0.1.0", Dependencies: []capability.ID{"identity"}, Admin: adminSurface(adminResource("sessions", "在线会话", "Sessions", "后台和 App 会话、有效期与撤销状态。", "Admin and app sessions, expiration and revocation state.", "admin:session", "/sessions", "operations", "wifi", 350)), App: appSurface(appRoute("POST", "/api/app/auth/login", capability.AppRouteAuthPublic, "", "App 登录。", "App login."), appRoute("GET", "/api/app/session/current", capability.AppRouteAuthSession, "", "读取 App 当前会话。", "Read current app session."), appRoute("POST", "/api/app/auth/logout", capability.AppRouteAuthSession, "", "退出 App 会话。", "Log out app session.")), AuthProviders: []capability.AuthProvider{authProvider("demo", "demo", "演示登录", "Demo Login", "本地开发演示账号登录。", "Local demo account login.", true)}, Migrations: lifecycleMigrations("session"), Seeds: lifecycleSeeds("session")},
+		{ID: "session", Name: "Session", Version: "0.1.0", Dependencies: []capability.ID{"identity"}, Admin: adminSurface(adminResource("sessions", "在线会话", "Sessions", "后台和 App 会话、有效期与撤销状态。", "Admin and app sessions, expiration and revocation state.", "admin:session", "/sessions", "operations", "wifi", 350)), App: appSurface(appRoute("POST", "/api/app/auth/login", capability.AppRouteAuthPublic, "", "App 登录。", "App login."), appRoute("GET", "/api/app/session/current", capability.AppRouteAuthSession, "", "读取 App 当前会话。", "Read current app session."), appRoute("POST", "/api/app/auth/logout", capability.AppRouteAuthSession, "", "退出 App 会话。", "Log out app session.")), AuthProviders: []capability.AuthProvider{authProvider("demo", "demo", "演示登录", "Demo Login", "本地开发演示账号登录。", "Local demo account login.", true, []capability.AuthProviderAudience{capability.AuthProviderAudienceAdmin, capability.AuthProviderAudienceApp})}, Migrations: lifecycleMigrations("session"), Seeds: lifecycleSeeds("session")},
 		{ID: "rbac", Name: "RBAC", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity"}, Admin: adminSurface(roleGroupAdminResource(), roleAdminResource(), adminResource("permissions", "权限", "Permissions", "能力、资源、菜单和接口共用的权限码目录。", "Permission catalog shared by capabilities, resources, menus, and APIs.", "admin:permission", "/permissions", "foundation", "roles", 55)), Migrations: lifecycleMigrations("rbac"), Seeds: lifecycleSeeds("rbac")},
 		{ID: "menu", Name: "Menu", Version: "0.1.0", Dependencies: []capability.ID{"rbac"}, Admin: adminSurface(adminResource("menus", "菜单", "Menus", "后台菜单和资源入口。", "Admin menus and resource entries.", "admin:menu", "/menus", "foundation", "menus", 60)), Migrations: lifecycleMigrations("menu"), Seeds: lifecycleSeeds("menu")},
 		{ID: "api-resource", Name: "API Resource", Version: "0.1.0", Dependencies: []capability.ID{"rbac"}, Admin: adminSurface(adminResource("api-resources", "API 资源", "API Resources", "接口资源、权限码和调用边界。", "API resources, permission codes, and invocation boundaries.", "admin:api-resource", "/api-resources", "governance", "apiResources", 120), adminResource("api-docs", "API 文档", "API Docs", "OpenAPI 文档、权限码和接口契约。", "OpenAPI docs, permission codes, and API contracts.", "admin:api-docs", "/api-docs", "governance", "book", 125)), Migrations: lifecycleMigrations("api-resource"), Seeds: lifecycleSeeds("api-resource")},
 		{ID: "audit", Name: "Audit", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity"}, Admin: adminSurface(adminResource("audit-logs", "审计日志", "Audit Logs", "操作审计和日志留痕。", "Operation audit and activity trails.", "admin:audit-log", "/audit-logs", "governance", "audit", 110), adminResource("login-logs", "登录日志", "Login Logs", "登录认证记录和安全追踪。", "Login authentication records and security tracing.", "admin:login-log", "/login-logs", "operations", "desktop", 320), adminResource("error-logs", "错误日志", "Error Logs", "运行错误、异常和排查记录。", "Runtime errors, exceptions and troubleshooting records.", "admin:error-log", "/error-logs", "operations", "warning", 330)), Migrations: lifecycleMigrations("audit"), Seeds: lifecycleSeeds("audit")},
 		{ID: "policy-review", Name: "Policy Review", Version: "0.1.0", Dependencies: []capability.ID{"rbac", "audit", "identity"}, Admin: adminSurface(policyReviewAdminResource()), Migrations: lifecycleMigrations("policy-review"), Seeds: lifecycleSeeds("policy-review")},
-		{ID: "wechat-login", Name: "WeChat Login", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "audit"}, AuthProviders: []capability.AuthProvider{authProvider("wechat", "wechat", "微信登录", "WeChat Login", "微信 code 换取登录态。", "WeChat code exchange login.", false, "PLATFORM_WECHAT_MINIAPP_APP_ID", "PLATFORM_WECHAT_MINIAPP_SECRET", "PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT")}, Migrations: lifecycleMigrations("wechat-login"), Seeds: lifecycleSeeds("wechat-login")},
+		{ID: "wechat-login", Name: "WeChat Login", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "audit"}, AuthProviders: []capability.AuthProvider{authProvider("wechat", "wechat", "微信登录", "WeChat Login", "微信 code 换取登录态。", "WeChat code exchange login.", false, []capability.AuthProviderAudience{capability.AuthProviderAudienceApp}, "PLATFORM_WECHAT_MINIAPP_APP_ID", "PLATFORM_WECHAT_MINIAPP_SECRET", "PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT")}, Migrations: lifecycleMigrations("wechat-login"), Seeds: lifecycleSeeds("wechat-login")},
+		{ID: "admin-oidc", Name: "Admin OIDC", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "audit"}, Admin: adminSurface(adminIdentityAdminResource()), AuthProviders: []capability.AuthProvider{authProvider("oidc", "oidc", "企业单点登录", "Enterprise SSO", "通过 OpenID Connect 登录管理台。", "Sign in to Admin through OpenID Connect.", false, []capability.AuthProviderAudience{capability.AuthProviderAudienceAdmin}, "PLATFORM_ADMIN_OIDC_ISSUER_URL", "PLATFORM_ADMIN_OIDC_CLIENT_ID", "PLATFORM_ADMIN_OIDC_CLIENT_SECRET", "PLATFORM_ADMIN_OIDC_REDIRECT_URL")}, Migrations: lifecycleMigrations("admin-oidc"), Seeds: lifecycleSeeds("admin-oidc")},
 		{ID: "app-phone", Name: "App Phone", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "audit"}, Admin: adminSurface(appPhoneVerificationAdminResource(), appPhoneBindingAdminResource()), App: appSurface(appRoute("POST", "/api/app/identity/phone-verifications", capability.AppRouteAuthSession, "", "创建 App 手机验证码。", "Create app phone verification."), appRoute("POST", "/api/app/identity/phone-bindings", capability.AppRouteAuthSession, "", "绑定 App 手机号。", "Bind app phone number.")), Migrations: lifecycleMigrations("app-phone"), Seeds: lifecycleSeeds("app-phone")},
 		{ID: "notification", Name: "Notification", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity", "audit"}, Admin: adminSurface(notificationTemplateAdminResource(), notificationAdminResource(), notificationDeliveryAdminResource()), Migrations: lifecycleMigrations("notification"), Seeds: lifecycleSeeds("notification")},
 		{ID: "job", Name: "Job", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity", "audit"}, Admin: adminSurface(jobDefinitionAdminResource(), jobRunAdminResource(), jobRunAttemptAdminResource()), Migrations: lifecycleMigrations("job"), Seeds: lifecycleSeeds("job")},
@@ -48,7 +49,7 @@ func appRoute(method string, path string, auth capability.AppRouteAuth, permissi
 	}
 }
 
-func authProvider(id string, kind string, titleZH string, titleEN string, descriptionZH string, descriptionEN string, configured bool, configKeys ...string) capability.AuthProvider {
+func authProvider(id string, kind string, titleZH string, titleEN string, descriptionZH string, descriptionEN string, configured bool, audiences []capability.AuthProviderAudience, configKeys ...string) capability.AuthProvider {
 	return capability.AuthProvider{
 		ID:          id,
 		Kind:        kind,
@@ -57,6 +58,7 @@ func authProvider(id string, kind string, titleZH string, titleEN string, descri
 		Enabled:     true,
 		Configured:  configured,
 		ConfigKeys:  append([]string(nil), configKeys...),
+		Audiences:   append([]capability.AuthProviderAudience(nil), audiences...),
 	}
 }
 
@@ -692,6 +694,34 @@ func appIdentityAdminResource() capability.AdminResource {
 			adminField("description", "描述", "Description", "textarea", "record", false, false, false, false, false, true, 220, nil),
 		},
 		SearchFields:   []string{"name", "code", "status", "provider", "providerKind", "providerScope", "maskedSubject", "appUsername", "createdAt", "lastLoginAt"},
+		DefaultSortKey: "lastLoginAt",
+	}
+}
+
+func adminIdentityAdminResource() capability.AdminResource {
+	return capability.AdminResource{
+		Resource:         "admin-identities",
+		Title:            capability.Text("后台身份绑定", "Admin Identities"),
+		Description:      capability.Text("后台登录 provider 与平台管理员的脱敏安全绑定。", "Privacy-safe bindings between Admin login providers and platform administrators."),
+		PermissionPrefix: "admin:admin-identity",
+		Menu: capability.AdminMenu{
+			Route:  "/admin-identities",
+			Parent: "identity",
+			Group:  "foundation",
+			Icon:   "user",
+			Order:  47,
+			Cache:  true,
+		},
+		Fields: []capability.AdminField{
+			adminField("provider", "登录方式", "Provider", "text", "values", true, true, true, true, false, true, 120, nil),
+			adminField("providerKind", "方式类型", "Provider Kind", "text", "values", true, true, true, true, false, true, 120, nil),
+			adminField("issuerHash", "签发方哈希", "Issuer Hash", "text", "values", true, true, false, false, false, true, 260, nil),
+			adminField("providerSubjectHash", "标识哈希", "Subject Hash", "text", "values", true, true, false, false, false, true, 260, nil),
+			adminField("platformUsername", "平台管理员", "Platform Administrator", "text", "values", true, true, true, true, false, true, 180, nil),
+			adminField("createdAt", "创建时间", "Created At", "datetime", "values", false, true, true, true, false, true, 180, nil),
+			adminField("lastLoginAt", "最近登录", "Last Login", "datetime", "values", false, true, true, true, false, true, 180, nil),
+		},
+		SearchFields:   []string{"provider", "providerKind", "platformUsername", "createdAt", "lastLoginAt"},
 		DefaultSortKey: "lastLoginAt",
 	}
 }

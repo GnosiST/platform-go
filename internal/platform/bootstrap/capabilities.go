@@ -34,6 +34,9 @@ func configureAuthProvidersFromConfig(manifest capability.Manifest, cfg config.C
 		if provider.ID == "wechat" && wechatMiniAppConfigured(cfg) {
 			provider.Configured = true
 		}
+		if provider.ID == "oidc" && cfg.AdminOIDCConfigured() {
+			provider.Configured = true
+		}
 	}
 	return manifest
 }

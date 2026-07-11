@@ -66,6 +66,30 @@ func TestCapabilitiesFromConfigMarksWechatProviderConfiguredWhenMiniAppCredentia
 	}
 }
 
+func TestCapabilitiesFromConfigMarksAdminOIDCProviderConfigured(t *testing.T) {
+	manifests, err := CapabilitiesFromConfig(config.Config{
+		Capabilities:          []string{"dictionary", "tenant", "identity", "session", "rbac", "audit", "admin-oidc"},
+		AdminOIDCIssuerURL:    "https://id.example/realms/platform",
+		AdminOIDCClientID:     "platform-admin",
+		AdminOIDCClientSecret: "client-secret",
+		AdminOIDCRedirectURL:  "https://admin.example/login",
+		AdminOIDCScopes:       []string{"openid", "profile", "email"},
+	})
+	if err != nil {
+		t.Fatalf("CapabilitiesFromConfig() error = %v", err)
+	}
+	provider, ok := authProviderByID(manifests, "oidc")
+	if !ok {
+		t.Fatalf("oidc provider not found in manifests: %+v", manifests)
+	}
+	if !provider.Configured {
+		t.Fatalf("oidc provider Configured = false, want true when admin OIDC config is complete")
+	}
+	if !provider.SupportsAudience(capability.AuthProviderAudienceAdmin) || provider.SupportsAudience(capability.AuthProviderAudienceApp) {
+		t.Fatalf("oidc provider audiences = %+v, want admin only", provider.Audiences)
+	}
+}
+
 func TestCapabilitiesFromConfigRejectsUnregisteredBusinessCapability(t *testing.T) {
 	_, err := CapabilitiesFromConfig(config.Config{
 		Capabilities: []string{

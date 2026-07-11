@@ -41,6 +41,11 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_WECHAT_MINIAPP_APP_ID", "")
 	t.Setenv("PLATFORM_WECHAT_MINIAPP_SECRET", "")
 	t.Setenv("PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT", "")
+	t.Setenv("PLATFORM_ADMIN_OIDC_ISSUER_URL", "")
+	t.Setenv("PLATFORM_ADMIN_OIDC_CLIENT_ID", "")
+	t.Setenv("PLATFORM_ADMIN_OIDC_CLIENT_SECRET", "")
+	t.Setenv("PLATFORM_ADMIN_OIDC_REDIRECT_URL", "")
+	t.Setenv("PLATFORM_ADMIN_OIDC_SCOPES", "")
 
 	cfg := Load()
 
@@ -118,6 +123,12 @@ func TestLoadUsesDefaults(t *testing.T) {
 	}
 	if cfg.WechatMiniAppID != "" || cfg.WechatMiniAppSecret != "" || cfg.WechatMiniAppCode2SessionEndpoint != "" {
 		t.Fatalf("WeChat miniapp config = %q/%q/%q, want empty by default", cfg.WechatMiniAppID, cfg.WechatMiniAppSecret, cfg.WechatMiniAppCode2SessionEndpoint)
+	}
+	if cfg.AdminOIDCIssuerURL != "" || cfg.AdminOIDCClientID != "" || cfg.AdminOIDCClientSecret != "" || cfg.AdminOIDCRedirectURL != "" {
+		t.Fatalf("Admin OIDC config = %+v, want empty by default", cfg)
+	}
+	if !reflect.DeepEqual(cfg.AdminOIDCScopes, []string{"openid", "profile", "email"}) {
+		t.Fatalf("AdminOIDCScopes = %#v, want default OpenID scopes", cfg.AdminOIDCScopes)
 	}
 	if cfg.DisableDemoAuthProvider {
 		t.Fatalf("DisableDemoAuthProvider = true, want false by default")
@@ -334,6 +345,19 @@ func TestLoadParsesWechatMiniAppConfig(t *testing.T) {
 	}
 }
 
+func TestLoadParsesAdminOIDCConfiguration(t *testing.T) {
+	t.Setenv("PLATFORM_ADMIN_OIDC_ISSUER_URL", "https://id.example/realms/platform")
+	t.Setenv("PLATFORM_ADMIN_OIDC_CLIENT_ID", "platform-admin")
+	t.Setenv("PLATFORM_ADMIN_OIDC_CLIENT_SECRET", "client-secret")
+	t.Setenv("PLATFORM_ADMIN_OIDC_REDIRECT_URL", "https://admin.example/login")
+	t.Setenv("PLATFORM_ADMIN_OIDC_SCOPES", "openid,profile,email")
+
+	cfg := Load()
+	if !cfg.AdminOIDCConfigured() || len(cfg.AdminOIDCScopes) != 3 {
+		t.Fatalf("OIDC config = %+v", cfg)
+	}
+}
+
 func TestValidateRuntimeAcceptsDevelopmentDefaults(t *testing.T) {
 	cfg := Load()
 
@@ -527,6 +551,78 @@ func TestValidateRuntimeRejectsProductionDemoAuthProvider(t *testing.T) {
 	}
 }
 
+func TestValidateRuntimeRejectsPartialAdminOIDCCredentials(t *testing.T) {
+	tests := []struct {
+		name  string
+		clear func(*Config)
+	}{
+		{name: "issuer", clear: func(cfg *Config) { cfg.AdminOIDCIssuerURL = "" }},
+		{name: "client id", clear: func(cfg *Config) { cfg.AdminOIDCClientID = "" }},
+		{name: "client secret", clear: func(cfg *Config) { cfg.AdminOIDCClientSecret = "" }},
+		{name: "redirect", clear: func(cfg *Config) { cfg.AdminOIDCRedirectURL = "" }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := validDevelopmentOIDCConfig("https://admin.example/login")
+			tt.clear(&cfg)
+
+			err := cfg.ValidateRuntime()
+			if err == nil || !strings.Contains(err.Error(), "admin oidc issuer, client id, client secret, and redirect url must be configured together") {
+				t.Fatalf("ValidateRuntime() error = %v, want partial OIDC configuration error", err)
+			}
+		})
+	}
+}
+
+func TestValidateRuntimeRejectsAdminOIDCScopesWithoutOpenID(t *testing.T) {
+	cfg := validDevelopmentOIDCConfig("https://admin.example/login")
+	cfg.AdminOIDCScopes = []string{"profile", "email"}
+
+	err := cfg.ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "admin oidc scopes must include openid") {
+		t.Fatalf("ValidateRuntime() error = %v, want missing openid error", err)
+	}
+}
+
+func TestValidateRuntimeRejectsProductionAdminOIDCNonHTTPSRedirect(t *testing.T) {
+	cfg := validProductionRuntimeConfig()
+	cfg.AdminOIDCRedirectURL = "http://admin.example/login"
+
+	err := cfg.ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "production admin oidc redirect url must use https") {
+		t.Fatalf("ValidateRuntime() error = %v, want HTTPS redirect error", err)
+	}
+}
+
+func TestValidateRuntimeAcceptsDevelopmentAndTestLoopbackAdminOIDCRedirects(t *testing.T) {
+	for _, tt := range []struct {
+		environment string
+		redirectURL string
+	}{
+		{environment: RuntimeEnvironmentDevelopment, redirectURL: "http://localhost:5173/login"},
+		{environment: RuntimeEnvironmentTest, redirectURL: "http://127.0.0.1:5173/login"},
+	} {
+		t.Run(tt.environment, func(t *testing.T) {
+			cfg := validDevelopmentOIDCConfig(tt.redirectURL)
+			cfg.RuntimeEnvironment = tt.environment
+			if err := cfg.ValidateRuntime(); err != nil {
+				t.Fatalf("ValidateRuntime() error = %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateRuntimeRejectsProductionWithoutConfiguredAdminProvider(t *testing.T) {
+	cfg := validProductionRuntimeConfig()
+	cfg.AdminOIDCClientSecret = ""
+
+	err := cfg.ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "production runtime requires a configured admin auth provider") {
+		t.Fatalf("ValidateRuntime() error = %v, want configured admin provider error", err)
+	}
+}
+
 func TestValidateRuntimeAcceptsProductionBaseline(t *testing.T) {
 	cfg := validProductionRuntimeConfig()
 
@@ -555,6 +651,11 @@ func validProductionRuntimeConfig() Config {
 		FileStorageS3AccessKey:  "access",
 		FileStorageS3SecretKey:  "secret",
 		DisableDemoAuthProvider: true,
+		AdminOIDCIssuerURL:      "https://id.example/realms/platform",
+		AdminOIDCClientID:       "platform-admin",
+		AdminOIDCClientSecret:   "client-secret",
+		AdminOIDCRedirectURL:    "https://admin.example/login",
+		AdminOIDCScopes:         []string{"openid", "profile", "email"},
 		Capabilities: []string{
 			"dictionary",
 			"tenant",
@@ -563,6 +664,24 @@ func validProductionRuntimeConfig() Config {
 			"rbac",
 			"menu",
 			"admin-shell",
+			"admin-oidc",
 		},
+	}
+}
+
+func validDevelopmentOIDCConfig(redirectURL string) Config {
+	return Config{
+		RuntimeEnvironment:    RuntimeEnvironmentDevelopment,
+		HTTPAddr:              "127.0.0.1:9200",
+		Capabilities:          []string{"tenant"},
+		JWTSecret:             "development-secret",
+		CacheDefaultTTL:       1,
+		FileStorageDriver:     "local",
+		FileStorageLocalDir:   ".platform/uploads",
+		AdminOIDCIssuerURL:    "https://id.example/realms/platform",
+		AdminOIDCClientID:     "platform-admin",
+		AdminOIDCClientSecret: "client-secret",
+		AdminOIDCRedirectURL:  redirectURL,
+		AdminOIDCScopes:       []string{"openid", "profile", "email"},
 	}
 }

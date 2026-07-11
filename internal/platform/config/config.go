@@ -3,6 +3,8 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -44,6 +46,11 @@ type Config struct {
 	WechatMiniAppID                   string
 	WechatMiniAppSecret               string
 	WechatMiniAppCode2SessionEndpoint string
+	AdminOIDCIssuerURL                string
+	AdminOIDCClientID                 string
+	AdminOIDCClientSecret             string
+	AdminOIDCRedirectURL              string
+	AdminOIDCScopes                   []string
 	DisableDemoAuthProvider           bool
 }
 
@@ -109,8 +116,20 @@ func Load() Config {
 		WechatMiniAppID:                   env("PLATFORM_WECHAT_MINIAPP_APP_ID", ""),
 		WechatMiniAppSecret:               env("PLATFORM_WECHAT_MINIAPP_SECRET", ""),
 		WechatMiniAppCode2SessionEndpoint: env("PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT", ""),
+		AdminOIDCIssuerURL:                env("PLATFORM_ADMIN_OIDC_ISSUER_URL", ""),
+		AdminOIDCClientID:                 env("PLATFORM_ADMIN_OIDC_CLIENT_ID", ""),
+		AdminOIDCClientSecret:             env("PLATFORM_ADMIN_OIDC_CLIENT_SECRET", ""),
+		AdminOIDCRedirectURL:              env("PLATFORM_ADMIN_OIDC_REDIRECT_URL", ""),
+		AdminOIDCScopes:                   csvEnv("PLATFORM_ADMIN_OIDC_SCOPES", []string{"openid", "profile", "email"}),
 		DisableDemoAuthProvider:           boolEnv("PLATFORM_DISABLE_DEMO_AUTH_PROVIDER", false),
 	}
+}
+
+func (c Config) AdminOIDCConfigured() bool {
+	return strings.TrimSpace(c.AdminOIDCIssuerURL) != "" &&
+		strings.TrimSpace(c.AdminOIDCClientID) != "" &&
+		strings.TrimSpace(c.AdminOIDCClientSecret) != "" &&
+		strings.TrimSpace(c.AdminOIDCRedirectURL) != ""
 }
 
 func (c Config) ValidateRuntime() error {
@@ -164,6 +183,7 @@ func (c Config) ValidateRuntime() error {
 	if (strings.TrimSpace(c.WechatMiniAppID) == "") != (strings.TrimSpace(c.WechatMiniAppSecret) == "") {
 		errs = append(errs, errors.New("wechat miniapp app id and secret must be configured together"))
 	}
+	errs = append(errs, c.validateAdminOIDC(environment)...)
 
 	if environment == RuntimeEnvironmentProduction {
 		errs = append(errs, c.validateProductionRuntime()...)
@@ -198,7 +218,62 @@ func (c Config) validateProductionRuntime() []error {
 	if !c.DisableDemoAuthProvider {
 		errs = append(errs, errors.New("production runtime requires PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true"))
 	}
+	if c.DisableDemoAuthProvider && (!hasCapability(c.Capabilities, "admin-oidc") || !c.AdminOIDCConfigured()) {
+		errs = append(errs, errors.New("production runtime requires a configured admin auth provider"))
+	}
 	return errs
+}
+
+func (c Config) validateAdminOIDC(environment string) []error {
+	values := []string{c.AdminOIDCIssuerURL, c.AdminOIDCClientID, c.AdminOIDCClientSecret, c.AdminOIDCRedirectURL}
+	configured := 0
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			configured++
+		}
+	}
+	if configured == 0 {
+		return nil
+	}
+	if configured != len(values) {
+		return []error{errors.New("admin oidc issuer, client id, client secret, and redirect url must be configured together")}
+	}
+
+	var errs []error
+	if !containsString(c.AdminOIDCScopes, "openid") {
+		errs = append(errs, errors.New("admin oidc scopes must include openid"))
+	}
+	redirectURL, err := url.Parse(strings.TrimSpace(c.AdminOIDCRedirectURL))
+	if err != nil || redirectURL.Hostname() == "" {
+		return append(errs, errors.New("admin oidc redirect url must be an absolute URL"))
+	}
+	if redirectURL.Scheme == "https" {
+		return errs
+	}
+	if redirectURL.Scheme == "http" && (environment == RuntimeEnvironmentDevelopment || environment == RuntimeEnvironmentTest) && isLoopbackHost(redirectURL.Hostname()) {
+		return errs
+	}
+	if environment == RuntimeEnvironmentProduction {
+		return append(errs, errors.New("production admin oidc redirect url must use https"))
+	}
+	return append(errs, errors.New("admin oidc redirect url must use https except for loopback development or test redirects"))
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if strings.TrimSpace(value) == target {
+			return true
+		}
+	}
+	return false
+}
+
+func isLoopbackHost(host string) bool {
+	if strings.EqualFold(strings.TrimSpace(host), "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func hasCapability(capabilities []string, target string) bool {

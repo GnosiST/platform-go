@@ -1,6 +1,9 @@
 package capability
 
-import "context"
+import (
+	"context"
+	"slices"
+)
 
 type ID string
 
@@ -182,14 +185,26 @@ type AppRoute struct {
 	Description LocalizedText
 }
 
+type AuthProviderAudience string
+
+const (
+	AuthProviderAudienceAdmin AuthProviderAudience = "admin"
+	AuthProviderAudienceApp   AuthProviderAudience = "app"
+)
+
 type AuthProvider struct {
-	ID          string        `json:"id"`
-	Kind        string        `json:"kind"`
-	Title       LocalizedText `json:"title"`
-	Description LocalizedText `json:"description"`
-	Enabled     bool          `json:"enabled"`
-	Configured  bool          `json:"configured"`
-	ConfigKeys  []string      `json:"configKeys,omitempty"`
+	ID          string                 `json:"id"`
+	Kind        string                 `json:"kind"`
+	Title       LocalizedText          `json:"title"`
+	Description LocalizedText          `json:"description"`
+	Enabled     bool                   `json:"enabled"`
+	Configured  bool                   `json:"configured"`
+	ConfigKeys  []string               `json:"configKeys,omitempty"`
+	Audiences   []AuthProviderAudience `json:"audiences"`
+}
+
+func (p AuthProvider) SupportsAudience(audience AuthProviderAudience) bool {
+	return slices.Contains(p.Audiences, audience)
 }
 
 type Migration struct {
