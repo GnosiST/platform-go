@@ -186,7 +186,7 @@ function validateExperienceContract(contract, errors) {
   requireIncludes(experience.previewTypes, ["image", "text", "pdf", "unsupported-fallback"], "experienceContract.previewTypes", errors);
   requireIncludes(
     experience.metadataFields,
-    ["name", "mimeType", "size", "storageDriver", "storageKey", "publicUrl", "createdAt", "updatedAt"],
+    ["name", "mimeType", "size", "storageDriver", "storageKey", "createdAt", "updatedAt"],
     "experienceContract.metadataFields",
     errors,
   );

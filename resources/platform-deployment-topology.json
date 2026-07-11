@@ -150,7 +150,10 @@
       "PLATFORM_LIFECYCLE_HISTORY_DSN",
       "PLATFORM_CACHE_DRIVER",
       "PLATFORM_REDIS_ADDR",
-      "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER"
+      "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER",
+      "PLATFORM_FILE_MAX_UPLOAD_BYTES",
+      "PLATFORM_FILE_ALLOWED_MIME_TYPES",
+      "PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION"
     ],
     "forbiddenProductionCapabilities": ["demo-data"],
     "recommendedFileStorage": "s3-for-multi-instance"
@@ -170,7 +173,7 @@
     "sameOrigin": {
       "adminPort": "8080",
       "apiProxy": "/api/",
-      "uploadAlias": "/uploads/"
+      "fileDelivery": "authenticated-api-only"
     },
     "requiredSourceSnippets": [
       {

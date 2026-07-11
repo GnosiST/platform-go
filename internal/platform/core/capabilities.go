@@ -663,6 +663,7 @@ func fileStorageAdminResource() capability.AdminResource {
 			adminField("storageDriver", "存储驱动", "Storage Driver", "text", "values", false, true, true, false, false, true, 140, nil),
 			secureAdminField(adminField("storageKey", "对象键", "Object Key", "text", "values", false, true, false, false, false, false, 260, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 			secureAdminField(adminField("tenantId", "租户 ID", "Tenant ID", "text", "values", false, true, false, false, false, false, 180, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
+			secureAdminField(adminField("ownerId", "所有者 ID", "Owner ID", "text", "values", false, true, false, false, false, false, 180, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 			secureAdminField(adminField("uploadedBy", "上传人", "Uploaded By", "text", "values", false, true, false, false, false, true, 180, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionFull, capability.FieldProjectionFull),
 			adminField("createdAt", "上传时间", "Created At", "datetime", "values", false, true, true, true, false, true, 180, nil),
 			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),

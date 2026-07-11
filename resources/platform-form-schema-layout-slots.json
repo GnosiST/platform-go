@@ -160,7 +160,7 @@
     },
     {
       "path": "internal/platform/adminresource/schema.go",
-      "contains": "Group       string"
+      "contains": "Group        string"
     },
     {
       "path": "admin/src/platform/api/client.ts",

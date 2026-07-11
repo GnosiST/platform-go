@@ -14,6 +14,9 @@ function argValue(name, fallback) {
 const contractPath = path.resolve(repoRoot, argValue("--contract", "resources/platform-deployment-topology.json"));
 const readinessPath = path.resolve(repoRoot, argValue("--readiness", "resources/platform-production-readiness.json"));
 const matrixPath = path.resolve(repoRoot, argValue("--matrix", "resources/platform-engineering-capabilities.json"));
+const adminProxyOverride = argValue("--admin-proxy", "");
+const composeOverride = argValue("--compose", "");
+const envTemplateOverride = argValue("--env-template", "");
 
 function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -247,6 +250,9 @@ function validateProductionRequirements(contract, errors) {
       "PLATFORM_CACHE_DRIVER",
       "PLATFORM_REDIS_ADDR",
       "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER",
+      "PLATFORM_FILE_MAX_UPLOAD_BYTES",
+      "PLATFORM_FILE_ALLOWED_MIME_TYPES",
+      "PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION",
     ],
     "productionApiRequirements.requiredEnv",
     errors,
@@ -308,8 +314,11 @@ function validateDeploymentPackage(contract, errors) {
   if (deploymentPackage.sameOrigin?.apiProxy !== "/api/") {
     errors.push("deploymentPackage.sameOrigin.apiProxy must stay /api/");
   }
-  if (deploymentPackage.sameOrigin?.uploadAlias !== "/uploads/") {
-    errors.push("deploymentPackage.sameOrigin.uploadAlias must stay /uploads/");
+  if (Object.hasOwn(deploymentPackage.sameOrigin ?? {}, "uploadAlias")) {
+    errors.push("deploymentPackage.sameOrigin must not declare uploadAlias");
+  }
+  if (deploymentPackage.sameOrigin?.fileDelivery !== "authenticated-api-only") {
+    errors.push("deploymentPackage.sameOrigin.fileDelivery must stay authenticated-api-only");
   }
   for (const snippet of values(deploymentPackage.requiredSourceSnippets)) {
     const snippetPath = snippet.path ?? "";
@@ -326,8 +335,19 @@ function validateDeploymentPackage(contract, errors) {
       errors.push(`${snippetPath} must include ${contains}`);
     }
   }
-  if (relativeExistingPath(deploymentPackage.envTemplate)) {
-    const envTemplate = readRelativeFile(deploymentPackage.envTemplate);
+  const adminProxyPath = path.resolve(repoRoot, adminProxyOverride || deploymentPackage.adminProxy || "");
+  if (!fs.existsSync(adminProxyPath)) {
+    errors.push(`admin proxy source is missing: ${adminProxyPath}`);
+  } else {
+    const adminProxy = fs.readFileSync(adminProxyPath, "utf8");
+    if (/location\s+\/uploads\//.test(adminProxy) || /alias\s+[^;]*uploads\//.test(adminProxy)) {
+      errors.push("admin proxy must not expose /uploads/");
+    }
+  }
+
+  const envTemplatePath = path.resolve(repoRoot, envTemplateOverride || deploymentPackage.envTemplate || "");
+  if (fs.existsSync(envTemplatePath)) {
+    const envTemplate = fs.readFileSync(envTemplatePath, "utf8");
     const capabilitiesLine = envTemplate.split(/\r?\n/).find((line) => line.startsWith("PLATFORM_CAPABILITIES=")) ?? "";
     if (!capabilitiesLine) {
       errors.push("deploymentPackage.envTemplate must declare PLATFORM_CAPABILITIES");
@@ -344,11 +364,38 @@ function validateDeploymentPackage(contract, errors) {
         errors.push(`deploymentPackage.envTemplate must include ${requiredEnv}`);
       }
     }
+    if (!/^PLATFORM_FILE_MAX_UPLOAD_BYTES=[1-9][0-9]*$/m.test(envTemplate)) {
+      errors.push("production env must configure PLATFORM_FILE_MAX_UPLOAD_BYTES");
+    }
+    const maxUploadMatch = envTemplate.match(/^PLATFORM_FILE_MAX_UPLOAD_BYTES=([0-9]+)$/m);
+    if (maxUploadMatch && Number(maxUploadMatch[1]) > 100 * 1024 * 1024) {
+      errors.push("production env PLATFORM_FILE_MAX_UPLOAD_BYTES must not exceed 104857600");
+    }
+    if (!/^PLATFORM_FILE_ALLOWED_MIME_TYPES=.+$/m.test(envTemplate)) {
+      errors.push("production env must configure PLATFORM_FILE_ALLOWED_MIME_TYPES");
+    }
+    if (!/^PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION=(AES256|aws:kms)$/m.test(envTemplate)) {
+      errors.push("production env must configure PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION");
+    }
+    if (/^PLATFORM_FILE_STORAGE_PUBLIC_URL=/m.test(envTemplate)) {
+      errors.push("production env must not configure PLATFORM_FILE_STORAGE_PUBLIC_URL");
+    }
+    const endpoint = envTemplate.match(/^PLATFORM_FILE_STORAGE_S3_ENDPOINT=(.+)$/m)?.[1]?.trim() ?? "";
+    if (endpoint.startsWith("http://") && !/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::|\/|$)/.test(endpoint)) {
+      errors.push("production env S3 endpoint must use https");
+    }
   }
-  if (relativeExistingPath(deploymentPackage.composeFile)) {
-    const composeSource = readRelativeFile(deploymentPackage.composeFile);
+  const composePath = path.resolve(repoRoot, composeOverride || deploymentPackage.composeFile || "");
+  if (fs.existsSync(composePath)) {
+    const composeSource = fs.readFileSync(composePath, "utf8");
     if (composeSource.includes("env_file:")) {
       errors.push("deploymentPackage.composeFile must use explicit environment mappings instead of env_file");
+    }
+    if (composeSource.includes("PLATFORM_FILE_STORAGE_PUBLIC_URL")) {
+      errors.push("compose file must not configure PLATFORM_FILE_STORAGE_PUBLIC_URL");
+    }
+    if (composeSource.includes("/var/lib/platform-go/uploads")) {
+      errors.push("Admin service must not mount file storage");
     }
   }
 }

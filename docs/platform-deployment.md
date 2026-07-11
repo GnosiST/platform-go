@@ -40,8 +40,8 @@ The repository includes a standard adapter package for this topology:
 
 - `Dockerfile`: multi-stage build with `api` and `admin-static` targets;
 - `deploy/compose/docker-compose.prod.yml`: single-node production-like composition with API, admin static proxy, MySQL and Redis;
-- `deploy/nginx/platform.conf`: serves `admin/dist`, proxies `/api/` to the Go service and exposes local `/uploads/` for single-node file storage;
-- `deploy/env/production.example.env`: production environment template with `demo-data` removed, demo auth disabled and the optional `admin-oidc` provider configuration declared.
+- `deploy/nginx/platform.conf`: serves `admin/dist` and proxies `/api/` to the Go service; file bytes are never exposed through a static alias;
+- `deploy/env/production.example.env`: production environment template with `demo-data` removed, demo auth disabled, bounded upload policy, private S3 encryption policy and the optional `admin-oidc` provider configuration declared.
 
 Use the package as a reviewable starting point:
 
@@ -54,6 +54,8 @@ rtk docker compose -f deploy/compose/docker-compose.prod.yml --env-file <private
 ```
 
 Copy `deploy/env/production.example.env` to a private environment file before deployment. Replace every secret, keep `PLATFORM_CAPABILITIES` business-neutral, and do not re-add `demo-data` in production. When `admin-oidc` is enabled, run the stdin-only `platform-admin bind-admin-oidc` procedure in `docs/platform-auth.md` against the same Admin store before starting the demo-disabled API.
+
+File content is delivered only through the authenticated Admin or App content endpoints. Do not add an Nginx `/uploads/` alias, mount the API upload volume into the Admin proxy, or configure a public file URL. Production uploads must set `PLATFORM_FILE_MAX_UPLOAD_BYTES` and a non-empty `PLATFORM_FILE_ALLOWED_MIME_TYPES` allowlist. S3 deployments must use HTTPS and explicitly select `AES256` or `aws:kms`; `aws:kms` also requires `PLATFORM_FILE_STORAGE_S3_KMS_KEY_ID`. Before promotion, operators must independently verify bucket-level Block Public Access and private bucket policy. The application configures `PutObject` encryption and no public ACL, but it does not claim to inspect external bucket policy.
 
 ### Split Admin And API
 

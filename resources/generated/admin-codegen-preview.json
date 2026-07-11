@@ -1385,7 +1385,7 @@
         "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
       },
       "schema": {
-        "fieldCount": 12,
+        "fieldCount": 13,
         "search": [
           "code",
           "createdAt",

@@ -54,6 +54,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("build file storage: %v", err)
 	}
+	uploadPolicy, err := httpapi.NewUploadPolicy(cfg.FileMaxUploadBytes, cfg.FileAllowedMIMETypes)
+	if err != nil {
+		log.Fatalf("build upload policy: %v", err)
+	}
 	appIdentityResolver, err := authprovider.AppIdentityResolverFromConfig(cfg)
 	if err != nil {
 		log.Fatalf("build app identity resolver: %v", err)
@@ -78,6 +82,7 @@ func main() {
 		InvalidationBus:         invalidationBus,
 		CacheTTL:                cfg.CacheDefaultTTL,
 		FileStorage:             fileStorage,
+		UploadPolicy:            uploadPolicy,
 		AdminRoutes:             apps.DefaultAdminRoutes(resources),
 		AppRoutes:               apps.DefaultAppRoutes(resources),
 		AdminIdentityResolver:   adminIdentityResolver,

@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"mime"
 	"net"
 	"net/url"
 	"os"
@@ -35,7 +36,8 @@ type Config struct {
 	RedisDB                           int
 	FileStorageDriver                 string
 	FileStorageLocalDir               string
-	FileStoragePublicURL              string
+	FileMaxUploadBytes                int64
+	FileAllowedMIMETypes              []string
 	FileStorageS3Endpoint             string
 	FileStorageS3Region               string
 	FileStorageS3Bucket               string
@@ -43,6 +45,8 @@ type Config struct {
 	FileStorageS3SecretKey            string
 	FileStorageS3Prefix               string
 	FileStorageS3PathStyle            bool
+	FileStorageS3ServerSideEncryption string
+	FileStorageS3KMSKeyID             string
 	WechatMiniAppID                   string
 	WechatMiniAppSecret               string
 	WechatMiniAppCode2SessionEndpoint string
@@ -80,8 +84,11 @@ const (
 	RuntimeEnvironmentStaging     = "staging"
 	RuntimeEnvironmentProduction  = "production"
 
-	defaultJWTSecret = "dev-platform-go-secret"
+	defaultJWTSecret   = "dev-platform-go-secret"
+	maxFileUploadBytes = int64(100 << 20)
 )
+
+var defaultFileAllowedMIMETypes = []string{"application/pdf", "image/jpeg", "image/png", "text/plain"}
 
 func Load() Config {
 	return Config{
@@ -108,7 +115,8 @@ func Load() Config {
 		RedisDB:                           intEnv("PLATFORM_REDIS_DB", 0),
 		FileStorageDriver:                 env("PLATFORM_FILE_STORAGE_DRIVER", "local"),
 		FileStorageLocalDir:               env("PLATFORM_FILE_STORAGE_LOCAL_DIR", ".platform/uploads"),
-		FileStoragePublicURL:              env("PLATFORM_FILE_STORAGE_PUBLIC_URL", "/uploads"),
+		FileMaxUploadBytes:                int64Env("PLATFORM_FILE_MAX_UPLOAD_BYTES", 10<<20),
+		FileAllowedMIMETypes:              csvEnv("PLATFORM_FILE_ALLOWED_MIME_TYPES", defaultFileAllowedMIMETypes),
 		FileStorageS3Endpoint:             env("PLATFORM_FILE_STORAGE_S3_ENDPOINT", ""),
 		FileStorageS3Region:               env("PLATFORM_FILE_STORAGE_S3_REGION", ""),
 		FileStorageS3Bucket:               env("PLATFORM_FILE_STORAGE_S3_BUCKET", ""),
@@ -116,6 +124,8 @@ func Load() Config {
 		FileStorageS3SecretKey:            env("PLATFORM_FILE_STORAGE_S3_SECRET_KEY", ""),
 		FileStorageS3Prefix:               env("PLATFORM_FILE_STORAGE_S3_PREFIX", ""),
 		FileStorageS3PathStyle:            boolEnv("PLATFORM_FILE_STORAGE_S3_FORCE_PATH_STYLE", false),
+		FileStorageS3ServerSideEncryption: env("PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION", "AES256"),
+		FileStorageS3KMSKeyID:             env("PLATFORM_FILE_STORAGE_S3_KMS_KEY_ID", ""),
 		WechatMiniAppID:                   env("PLATFORM_WECHAT_MINIAPP_APP_ID", ""),
 		WechatMiniAppSecret:               env("PLATFORM_WECHAT_MINIAPP_SECRET", ""),
 		WechatMiniAppCode2SessionEndpoint: env("PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT", ""),
@@ -185,7 +195,24 @@ func (c Config) ValidateRuntime() error {
 		if strings.TrimSpace(c.FileStorageS3Bucket) == "" {
 			errs = append(errs, errors.New("file storage s3 bucket is required when file storage driver is s3"))
 		}
+		if (strings.TrimSpace(c.FileStorageS3AccessKey) == "") != (strings.TrimSpace(c.FileStorageS3SecretKey) == "") {
+			errs = append(errs, errors.New("file storage s3 access key and secret key must be configured together"))
+		}
+		switch strings.TrimSpace(c.FileStorageS3ServerSideEncryption) {
+		case "AES256":
+			if strings.TrimSpace(c.FileStorageS3KMSKeyID) != "" {
+				errs = append(errs, errors.New("file storage s3 KMS key ID requires aws:kms server-side encryption"))
+			}
+		case "aws:kms":
+			if strings.TrimSpace(c.FileStorageS3KMSKeyID) == "" {
+				errs = append(errs, errors.New("file storage s3 KMS key ID is required for aws:kms server-side encryption"))
+			}
+		default:
+			errs = append(errs, errors.New("file storage s3 server-side encryption must be AES256 or aws:kms"))
+		}
+		errs = append(errs, validateObjectStorageEndpoint(environment, c.FileStorageS3Endpoint)...)
 	}
+	errs = append(errs, validateFileUploadPolicy(c.FileMaxUploadBytes, c.FileAllowedMIMETypes, environment == RuntimeEnvironmentProduction)...)
 	if (strings.TrimSpace(c.WechatMiniAppID) == "") != (strings.TrimSpace(c.WechatMiniAppSecret) == "") {
 		errs = append(errs, errors.New("wechat miniapp app id and secret must be configured together"))
 	}
@@ -260,10 +287,59 @@ func (c Config) validateProductionRuntime() []error {
 	if !c.DisableDemoAuthProvider {
 		errs = append(errs, errors.New("production runtime requires PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true"))
 	}
+	if c.FileStorageDriver == "s3" && strings.TrimSpace(c.FileStorageS3ServerSideEncryption) == "" {
+		errs = append(errs, errors.New("production s3 file storage requires server-side encryption"))
+	}
 	if c.DisableDemoAuthProvider && (!hasCapability(c.Capabilities, "admin-oidc") || !c.AdminOIDCConfigured()) {
 		errs = append(errs, errors.New("production runtime requires a configured admin auth provider"))
 	}
 	return errs
+}
+
+func validateFileUploadPolicy(maxBytes int64, allowedMIMETypes []string, production bool) []error {
+	var errs []error
+	if maxBytes < 0 || maxBytes > maxFileUploadBytes || (production && maxBytes <= 0) {
+		label := "file upload limit must be between 1 and 104857600 bytes when configured"
+		if production {
+			label = "production runtime requires a positive bounded file upload limit"
+		}
+		errs = append(errs, errors.New(label))
+	}
+	if production && len(allowedMIMETypes) == 0 {
+		errs = append(errs, errors.New("production runtime requires a non-empty file MIME allowlist"))
+	}
+	seen := map[string]struct{}{}
+	for _, raw := range allowedMIMETypes {
+		value := strings.TrimSpace(raw)
+		mediaType, params, err := mime.ParseMediaType(value)
+		if err != nil || mediaType == "" || len(params) != 0 || value != strings.ToLower(mediaType) {
+			errs = append(errs, fmt.Errorf("file MIME allowlist entry %q must be a canonical media type without parameters", raw))
+			continue
+		}
+		if _, exists := seen[mediaType]; exists {
+			errs = append(errs, fmt.Errorf("file MIME allowlist contains duplicate %q", mediaType))
+		}
+		seen[mediaType] = struct{}{}
+	}
+	return errs
+}
+
+func validateObjectStorageEndpoint(environment string, raw string) []error {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil
+	}
+	endpoint, err := url.Parse(value)
+	if err != nil || endpoint.Hostname() == "" {
+		return []error{errors.New("file storage s3 endpoint must be an absolute URL")}
+	}
+	if endpoint.Scheme == "https" {
+		return nil
+	}
+	if endpoint.Scheme == "http" && (environment == RuntimeEnvironmentDevelopment || environment == RuntimeEnvironmentTest) && isLoopbackHost(endpoint.Hostname()) {
+		return nil
+	}
+	return []error{errors.New("file storage s3 endpoint must use https outside loopback development and test")}
 }
 
 func (c Config) validateAdminOIDC(environment string) []error {
@@ -436,6 +512,18 @@ func intEnv(key string, fallback int) int {
 		return fallback
 	}
 	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func int64Env(key string, fallback int64) int64 {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
 		return fallback
 	}

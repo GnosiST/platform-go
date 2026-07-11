@@ -5,9 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"mime"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -4158,8 +4161,7 @@ func TestAdminAPITokenUpdateCannotReplaceTokenMaterial(t *testing.T) {
 
 func TestAdminFileUploadContentAndDelete(t *testing.T) {
 	fileStore := storage.NewLocalObjectStore(storage.LocalObjectStoreOptions{
-		BaseDir:       t.TempDir(),
-		PublicBaseURL: "/uploads",
+		BaseDir: t.TempDir(),
 		Now: func() time.Time {
 			return time.Date(2026, 7, 5, 9, 30, 0, 0, time.UTC)
 		},
@@ -4242,6 +4244,159 @@ func TestAdminFileUploadContentAndDelete(t *testing.T) {
 	}
 }
 
+type recordingObjectStore struct {
+	saveCalls   int
+	deleteCalls int
+}
+
+func (store *recordingObjectStore) Save(_ context.Context, input storage.ObjectSaveInput) (storage.ObjectMetadata, error) {
+	store.saveCalls++
+	content, err := io.ReadAll(input.Reader)
+	if err != nil {
+		return storage.ObjectMetadata{}, err
+	}
+	return storage.ObjectMetadata{Driver: "recording", Key: "private/object", SizeBytes: int64(len(content))}, nil
+}
+
+func (*recordingObjectStore) Open(context.Context, string) (io.ReadCloser, error) {
+	return nil, storage.ErrObjectNotFound
+}
+
+func (store *recordingObjectStore) Delete(context.Context, string) error {
+	store.deleteCalls++
+	return nil
+}
+
+func TestAdminFileUploadRejectsOversizeBeforeObjectCreation(t *testing.T) {
+	fileStore := &recordingObjectStore{}
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{"tenant", "identity", "session", "rbac", "menu", "audit", "dictionary", "parameter", "file-storage", "admin-shell"}),
+		FileStorage:  fileStore,
+		UploadPolicy: UploadPolicy{
+			MaxBytes:          128,
+			AllowedMediaTypes: map[string]struct{}{"text/plain": {}},
+		},
+	})
+	body, contentType := multipartUploadBodyWithMediaType(t, "report.txt", "text/plain", strings.Repeat("x", 512))
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/files/upload", body)
+	request.Header.Set("Content-Type", contentType)
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("POST oversized file status = %d body = %s, want 413", recorder.Code, recorder.Body.String())
+	}
+	if fileStore.saveCalls != 0 {
+		t.Fatalf("object store Save calls = %d, want 0", fileStore.saveCalls)
+	}
+}
+
+func TestAdminFileUploadHonorsFileSizeBoundary(t *testing.T) {
+	const maxBytes = int64(64)
+	for _, tt := range []struct {
+		name       string
+		size       int
+		wantStatus int
+		wantSaves  int
+	}{
+		{name: "exact limit", size: int(maxBytes), wantStatus: http.StatusCreated, wantSaves: 1},
+		{name: "one byte over", size: int(maxBytes) + 1, wantStatus: http.StatusRequestEntityTooLarge, wantSaves: 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			fileStore := &recordingObjectStore{}
+			server := newTestServer(ServerOptions{
+				Capabilities: capabilitiesFromConfigForTest(t, []string{"tenant", "identity", "session", "rbac", "menu", "audit", "dictionary", "parameter", "file-storage", "admin-shell"}),
+				FileStorage:  fileStore,
+				UploadPolicy: UploadPolicy{MaxBytes: maxBytes, AllowedMediaTypes: map[string]struct{}{"text/plain": {}}},
+			})
+			body, contentType := multipartUploadBodyWithMediaType(t, "report.txt", "text/plain", strings.Repeat("x", tt.size))
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/api/admin/files/upload", body)
+			request.Header.Set("Content-Type", contentType)
+
+			server.Router().ServeHTTP(recorder, request)
+
+			if recorder.Code != tt.wantStatus {
+				t.Fatalf("POST boundary file status = %d body = %s, want %d", recorder.Code, recorder.Body.String(), tt.wantStatus)
+			}
+			if fileStore.saveCalls != tt.wantSaves {
+				t.Fatalf("object store Save calls = %d, want %d", fileStore.saveCalls, tt.wantSaves)
+			}
+		})
+	}
+}
+
+func TestAdminFileUploadDeletesObjectWhenMetadataCreateFails(t *testing.T) {
+	capabilities := capabilitiesFromConfigForTest(t, []string{"tenant", "identity", "session", "rbac", "menu", "audit", "dictionary", "parameter", "file-storage", "admin-shell"})
+	repository := &controllableAdminResourceRepository{}
+	resources, err := adminresource.NewRepositoryBackedStoreFromCapabilities(repository, capabilities)
+	if err != nil {
+		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+	}
+	repository.saveErr = errors.New("metadata persistence failed")
+	fileStore := &recordingObjectStore{}
+	server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources, FileStorage: fileStore})
+	body, contentType := multipartUploadBodyWithMediaType(t, "report.txt", "text/plain", "private")
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/files/upload", body)
+	request.Header.Set("Content-Type", contentType)
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("POST file with metadata failure status = %d body = %s, want 500", recorder.Code, recorder.Body.String())
+	}
+	if fileStore.saveCalls != 1 || fileStore.deleteCalls != 1 {
+		t.Fatalf("object store calls save/delete = %d/%d, want 1/1", fileStore.saveCalls, fileStore.deleteCalls)
+	}
+}
+
+func TestAdminFileUploadRejectsSpoofedOrDisallowedMIME(t *testing.T) {
+	tests := []struct {
+		name     string
+		declared string
+		content  string
+		allowed  map[string]struct{}
+	}{
+		{
+			name:     "spoofed declaration",
+			declared: "image/png",
+			content:  "plain text payload",
+			allowed:  map[string]struct{}{"image/png": {}, "text/plain": {}},
+		},
+		{
+			name:     "disallowed detected type",
+			declared: "application/pdf",
+			content:  "%PDF-1.7\n",
+			allowed:  map[string]struct{}{"text/plain": {}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fileStore := &recordingObjectStore{}
+			server := newTestServer(ServerOptions{
+				Capabilities: capabilitiesFromConfigForTest(t, []string{"tenant", "identity", "session", "rbac", "menu", "audit", "dictionary", "parameter", "file-storage", "admin-shell"}),
+				FileStorage:  fileStore,
+				UploadPolicy: UploadPolicy{MaxBytes: 1 << 20, AllowedMediaTypes: tt.allowed},
+			})
+			body, contentType := multipartUploadBodyWithMediaType(t, "upload.bin", tt.declared, tt.content)
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/api/admin/files/upload", body)
+			request.Header.Set("Content-Type", contentType)
+
+			server.Router().ServeHTTP(recorder, request)
+
+			if recorder.Code != http.StatusUnsupportedMediaType {
+				t.Fatalf("POST invalid MIME status = %d body = %s, want 415", recorder.Code, recorder.Body.String())
+			}
+			if fileStore.saveCalls != 0 {
+				t.Fatalf("object store Save calls = %d, want 0", fileStore.saveCalls)
+			}
+		})
+	}
+}
+
 func TestAdminFileDeleteDoesNotAuditFailedObjectDeletion(t *testing.T) {
 	fileStore := storage.NewLocalObjectStore(storage.LocalObjectStoreOptions{
 		BaseDir: t.TempDir(),
@@ -4309,8 +4464,7 @@ func TestAdminFileUploadRequiresEnabledFileStorageCapability(t *testing.T) {
 
 func TestAppFileUploadAndContentUseAppSession(t *testing.T) {
 	fileStore := storage.NewLocalObjectStore(storage.LocalObjectStoreOptions{
-		BaseDir:       t.TempDir(),
-		PublicBaseURL: "/uploads",
+		BaseDir: t.TempDir(),
 		Now: func() time.Time {
 			return time.Date(2026, 7, 8, 9, 30, 0, 0, time.UTC)
 		},
@@ -4371,6 +4525,91 @@ func TestAppFileUploadAndContentUseAppSession(t *testing.T) {
 	}
 }
 
+func TestAppFileMetadataOmitsSessionPathAndPublicURL(t *testing.T) {
+	fileStore := storage.NewLocalObjectStore(storage.LocalObjectStoreOptions{BaseDir: t.TempDir()})
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"}),
+		FileStorage:  fileStore,
+	})
+	login := appLoginForTest(t, server, "buyer")
+	body, contentType := multipartUploadBodyWithMediaType(t, "../../unsafe report.txt", "text/plain", "private")
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/app/files", body)
+	request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	request.Header.Set("Content-Type", contentType)
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("POST app file status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	var uploaded adminResourceRecordTestPayload
+	if err := json.Unmarshal(recorder.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decode app upload response: %v", err)
+	}
+	if uploaded.Data.Record.Name != "unsafe_report.txt" {
+		t.Fatalf("uploaded filename = %q, want sanitized filename", uploaded.Data.Record.Name)
+	}
+	for _, prohibited := range []string{"sessionId", "storagePath", "publicUrl", "storageKey", "tenantId"} {
+		if strings.Contains(recorder.Body.String(), prohibited) {
+			t.Fatalf("app file response contains prohibited field %q: %s", prohibited, recorder.Body.String())
+		}
+	}
+	stored, err := server.adminResourceRecordByID("files", uploaded.Data.Record.ID)
+	if err != nil {
+		t.Fatalf("read stored app file: %v", err)
+	}
+	for _, prohibited := range []string{"sessionId", "storagePath", "publicUrl"} {
+		if stored.Values[prohibited] != "" {
+			t.Fatalf("stored app file contains %s: %+v", prohibited, stored.Values)
+		}
+	}
+	if stored.Values["ownerId"] != appUserID("buyer") {
+		t.Fatalf("stored app file ownerId = %q, want stable app user ID", stored.Values["ownerId"])
+	}
+}
+
+func TestAppFileContentReturnsNotFoundForCrossUser(t *testing.T) {
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"}),
+		FileStorage:  storage.NewLocalObjectStore(storage.LocalObjectStoreOptions{BaseDir: t.TempDir()}),
+	})
+	owner := appLoginForTest(t, server, "owner")
+	body, contentType := multipartUploadBodyWithMediaType(t, "private.txt", "text/plain", "private")
+	uploadRecorder := httptest.NewRecorder()
+	uploadRequest := httptest.NewRequest(http.MethodPost, "/api/app/files", body)
+	uploadRequest.Header.Set("Authorization", "Bearer "+owner.Data.Token)
+	uploadRequest.Header.Set("Content-Type", contentType)
+	server.Router().ServeHTTP(uploadRecorder, uploadRequest)
+	if uploadRecorder.Code != http.StatusCreated {
+		t.Fatalf("POST owner file status = %d body = %s", uploadRecorder.Code, uploadRecorder.Body.String())
+	}
+	var uploaded adminResourceRecordTestPayload
+	if err := json.Unmarshal(uploadRecorder.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decode owner upload response: %v", err)
+	}
+	stored, err := server.adminResourceRecordByID("files", uploaded.Data.Record.ID)
+	if err != nil {
+		t.Fatalf("read stored owner file: %v", err)
+	}
+	stored.Values["uploadedBy"] = "other"
+	if _, err := server.resources.UpdateInternal("files", stored.ID, adminresource.WriteInput{
+		Code: stored.Code, Name: stored.Name, Status: stored.Status, Description: stored.Description, Values: stored.Values,
+	}); err != nil {
+		t.Fatalf("update display uploader: %v", err)
+	}
+
+	other := appLoginForTest(t, server, "other")
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/app/files/"+uploaded.Data.Record.ID+"/content", nil)
+	request.Header.Set("Authorization", "Bearer "+other.Data.Token)
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("GET cross-user file status = %d body = %s, want 404", recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestAppFileUploadRequiresEnabledFileStorageCapability(t *testing.T) {
 	server := newTestServer(ServerOptions{Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "admin-shell"})})
 	login := appLoginForTest(t, server, "buyer")
@@ -4397,10 +4636,17 @@ func containsString(values []string, target string) bool {
 }
 
 func multipartUploadBody(t *testing.T, filename string, content string) (*bytes.Buffer, string) {
+	return multipartUploadBodyWithMediaType(t, filename, http.DetectContentType([]byte(content)), content)
+}
+
+func multipartUploadBodyWithMediaType(t *testing.T, filename string, mediaType string, content string) (*bytes.Buffer, string) {
 	t.Helper()
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile("file", filename)
+	header := make(textproto.MIMEHeader)
+	header.Set("Content-Disposition", mime.FormatMediaType("form-data", map[string]string{"name": "file", "filename": filename}))
+	header.Set("Content-Type", mediaType)
+	part, err := writer.CreatePart(header)
 	if err != nil {
 		t.Fatalf("CreateFormFile() error = %v", err)
 	}

@@ -645,7 +645,7 @@ Audit candidates: `file.create`, `file.delete`, `file.upload`
 
 ### Schema
 
-- Field count: 12
+- Field count: 13
 - Search: `code`, `createdAt`, `mimeType`, `name`, `storageDriver`
 - Filter: `code`, `createdAt`, `mimeType`, `name`, `size`, `status`, `storageDriver`, `storageKey`, `updatedAt`
 - Sort: `code`, `createdAt`, `mimeType`, `name`, `size`, `status`, `storageDriver`, `updatedAt`

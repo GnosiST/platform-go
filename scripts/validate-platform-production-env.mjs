@@ -144,6 +144,45 @@ function validatePlatformEnv(env, errors) {
     errors.push("PLATFORM_DISABLE_DEMO_AUTH_PROVIDER must be true");
   }
 
+  const maxUploadBytes = Number(requireKey(env, "PLATFORM_FILE_MAX_UPLOAD_BYTES", errors));
+  if (!Number.isSafeInteger(maxUploadBytes) || maxUploadBytes < 1 || maxUploadBytes > 100 * 1024 * 1024) {
+    errors.push("PLATFORM_FILE_MAX_UPLOAD_BYTES must be between 1 and 104857600");
+  }
+  const allowedMIMETypes = requireKey(env, "PLATFORM_FILE_ALLOWED_MIME_TYPES", errors)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (allowedMIMETypes.length === 0) {
+    errors.push("PLATFORM_FILE_ALLOWED_MIME_TYPES must not be empty");
+  }
+  for (const mediaType of allowedMIMETypes) {
+    if (!/^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/.test(mediaType)) {
+      errors.push(`PLATFORM_FILE_ALLOWED_MIME_TYPES contains invalid canonical media type ${mediaType}`);
+    }
+  }
+  if (env.has("PLATFORM_FILE_STORAGE_PUBLIC_URL")) {
+    errors.push("PLATFORM_FILE_STORAGE_PUBLIC_URL must not be configured");
+  }
+  const fileStorageDriver = requireKey(env, "PLATFORM_FILE_STORAGE_DRIVER", errors);
+  if (!["local", "s3"].includes(fileStorageDriver)) {
+    errors.push("PLATFORM_FILE_STORAGE_DRIVER must be local or s3");
+  }
+  if (fileStorageDriver === "s3") {
+    requireKey(env, "PLATFORM_FILE_STORAGE_S3_REGION", errors);
+    requireKey(env, "PLATFORM_FILE_STORAGE_S3_BUCKET", errors);
+    const endpoint = env.get("PLATFORM_FILE_STORAGE_S3_ENDPOINT")?.trim() ?? "";
+    if (endpoint !== "" && !endpoint.startsWith("https://")) {
+      errors.push("PLATFORM_FILE_STORAGE_S3_ENDPOINT must use https in production");
+    }
+    const encryption = requireKey(env, "PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION", errors);
+    if (!["AES256", "aws:kms"].includes(encryption)) {
+      errors.push("PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION must be AES256 or aws:kms");
+    }
+    if (encryption === "aws:kms" && requireKey(env, "PLATFORM_FILE_STORAGE_S3_KMS_KEY_ID", errors).trim() === "") {
+      errors.push("PLATFORM_FILE_STORAGE_S3_KMS_KEY_ID must not be empty for aws:kms");
+    }
+  }
+
   const capabilities = splitCapabilities(requireKey(env, "PLATFORM_CAPABILITIES", errors));
   if (capabilities.length === 0) {
     errors.push("PLATFORM_CAPABILITIES must not be empty");

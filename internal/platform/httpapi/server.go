@@ -37,6 +37,7 @@ type ServerOptions struct {
 	InvalidationBus         cache.InvalidationBus
 	CacheTTL                time.Duration
 	FileStorage             storage.ObjectStore
+	UploadPolicy            UploadPolicy
 	AdminRoutes             []AdminRouteRegistration
 	AppRoutes               []AppRouteRegistration
 	AdminIdentityResolver   AdminIdentityResolver
@@ -70,6 +71,7 @@ type Server struct {
 	cacheStats              cache.StatsProvider
 	cacheTTL                time.Duration
 	fileStorage             storage.ObjectStore
+	uploadPolicy            UploadPolicy
 	appRoutes               map[appRouteKey]gin.HandlerFunc
 	adminIdentityResolver   AdminIdentityResolver
 	adminIdentityBindings   AdminIdentityBindingStore
@@ -164,6 +166,7 @@ func New(options ServerOptions) *Server {
 		cacheStats:              cacheStats,
 		cacheTTL:                cacheTTL,
 		fileStorage:             fileStorage,
+		uploadPolicy:            normalizeUploadPolicy(options.UploadPolicy),
 		adminIdentityResolver:   options.AdminIdentityResolver,
 		adminIdentityBindings:   adminIdentityBindings,
 		appIdentityResolver:     options.AppIdentityResolver,
@@ -1146,23 +1149,17 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 	if !s.authorizeAdminResource(ctx, "files", "create") {
 		return
 	}
-	file, err := ctx.FormFile("file")
+	upload, err := readValidatedUpload(ctx, s.uploadPolicy, "ADMIN_FILE")
 	if err != nil {
-		writeFileError(ctx, http.StatusBadRequest, "ADMIN_FILE_REQUIRED", "file is required")
+		writeUploadPolicyError(ctx, err)
 		return
 	}
-	opened, err := file.Open()
-	if err != nil {
-		writeFileError(ctx, http.StatusBadRequest, "ADMIN_FILE_OPEN_FAILED", "open uploaded file failed")
-		return
-	}
-	defer opened.Close()
+	defer upload.Close()
 
-	contentType := file.Header.Get("Content-Type")
 	metadata, err := s.fileStorage.Save(ctx.Request.Context(), storage.ObjectSaveInput{
-		FileName:    file.Filename,
-		ContentType: contentType,
-		Reader:      opened,
+		FileName:    upload.FileName,
+		ContentType: upload.ContentType,
+		Reader:      upload.Reader,
 	})
 	if err != nil {
 		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_SAVE_FAILED", err.Error())
@@ -1170,11 +1167,11 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 	}
 	record, err := s.resources.CreateInternal("files", adminresource.WriteInput{
 		Code:        fmt.Sprintf("file-%d", s.now().UTC().UnixNano()),
-		Name:        file.Filename,
+		Name:        upload.FileName,
 		Status:      "enabled",
 		Description: "Uploaded file object.",
 		Values: map[string]string{
-			"mimeType":      contentType,
+			"mimeType":      upload.ContentType,
 			"size":          strconv.FormatInt(metadata.SizeBytes, 10),
 			"storageDriver": metadata.Driver,
 			"storageKey":    metadata.Key,
@@ -1232,6 +1229,7 @@ func (s *Server) adminFileContent(ctx *gin.Context) {
 
 	fileName := fileRecordFileName(record)
 	contentType := fileRecordContentType(record)
+	ctx.Header("X-Content-Type-Options", "nosniff")
 	ctx.Header("Content-Disposition", mime.FormatMediaType("inline", map[string]string{"filename": fileName}))
 	ctx.Header("Content-Type", contentType)
 	ctx.Status(http.StatusOK)
@@ -1244,23 +1242,17 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 		writeUnauthorized(ctx)
 		return
 	}
-	file, err := ctx.FormFile("file")
+	upload, err := readValidatedUpload(ctx, s.uploadPolicy, "APP_FILE")
 	if err != nil {
-		writeFileError(ctx, http.StatusBadRequest, "APP_FILE_REQUIRED", "file is required")
+		writeUploadPolicyError(ctx, err)
 		return
 	}
-	opened, err := file.Open()
-	if err != nil {
-		writeFileError(ctx, http.StatusBadRequest, "APP_FILE_OPEN_FAILED", "open uploaded file failed")
-		return
-	}
-	defer opened.Close()
+	defer upload.Close()
 
-	contentType := file.Header.Get("Content-Type")
 	metadata, err := s.fileStorage.Save(ctx.Request.Context(), storage.ObjectSaveInput{
-		FileName:    file.Filename,
-		ContentType: contentType,
-		Reader:      opened,
+		FileName:    upload.FileName,
+		ContentType: upload.ContentType,
+		Reader:      upload.Reader,
 	})
 	if err != nil {
 		writeFileError(ctx, http.StatusInternalServerError, "APP_FILE_SAVE_FAILED", err.Error())
@@ -1269,15 +1261,16 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 	username := appUsername(appSession.Username)
 	record, err := s.resources.CreateInternal("files", adminresource.WriteInput{
 		Code:        fmt.Sprintf("file-%d", s.now().UTC().UnixNano()),
-		Name:        file.Filename,
+		Name:        upload.FileName,
 		Status:      "enabled",
 		Description: "Uploaded app file object.",
 		Values: map[string]string{
-			"mimeType":      contentType,
+			"mimeType":      upload.ContentType,
 			"size":          strconv.FormatInt(metadata.SizeBytes, 10),
 			"storageDriver": metadata.Driver,
 			"storageKey":    metadata.Key,
 			"tenantId":      appTenant,
+			"ownerId":       appUserID(username),
 			"uploadedBy":    username,
 			"createdAt":     s.now().UTC().Format(time.RFC3339),
 		},
@@ -1340,6 +1333,7 @@ func (s *Server) appFileContent(ctx *gin.Context) {
 
 	fileName := fileRecordFileName(record)
 	contentType := fileRecordContentType(record)
+	ctx.Header("X-Content-Type-Options", "nosniff")
 	ctx.Header("Content-Disposition", mime.FormatMediaType("inline", map[string]string{"filename": fileName}))
 	ctx.Header("Content-Type", contentType)
 	ctx.Status(http.StatusOK)
@@ -1347,7 +1341,14 @@ func (s *Server) appFileContent(ctx *gin.Context) {
 }
 
 func appFileVisibleToSession(record adminresource.Record, username string) bool {
-	return strings.TrimSpace(record.Values["tenantId"]) == appTenant && strings.TrimSpace(record.Values["uploadedBy"]) == username
+	if strings.TrimSpace(record.Values["tenantId"]) != appTenant {
+		return false
+	}
+	ownerID := strings.TrimSpace(record.Values["ownerId"])
+	if ownerID != "" {
+		return ownerID == appUserID(username)
+	}
+	return strings.TrimSpace(record.Values["uploadedBy"]) == username
 }
 
 func (s *Server) deleteAdminFileObject(ctx *gin.Context, id string) bool {
@@ -1360,16 +1361,6 @@ func (s *Server) deleteAdminFileObject(ctx *gin.Context, id string) bool {
 	if key == "" {
 		return true
 	}
-	body, err := s.fileStorage.Open(ctx.Request.Context(), key)
-	if errors.Is(err, storage.ErrObjectNotFound) {
-		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_DELETE_FAILED", err.Error())
-		return false
-	}
-	if err != nil {
-		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_DELETE_FAILED", err.Error())
-		return false
-	}
-	_ = body.Close()
 	if err := s.fileStorage.Delete(ctx.Request.Context(), key); err != nil {
 		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_DELETE_FAILED", err.Error())
 		return false
@@ -2266,6 +2257,15 @@ func writeFileError(ctx *gin.Context, status int, code string, message string) {
 	ctx.JSON(status, Response[gin.H]{
 		Error: &ErrorBody{Code: code, Message: message},
 	})
+}
+
+func writeUploadPolicyError(ctx *gin.Context, err error) {
+	var policyErr *uploadPolicyError
+	if errors.As(err, &policyErr) {
+		writeFileError(ctx, policyErr.Status, policyErr.Code, policyErr.Message)
+		return
+	}
+	writeFileError(ctx, http.StatusBadRequest, "FILE_UPLOAD_INVALID", "invalid file upload")
 }
 
 func writeAdminResourceError(ctx *gin.Context, err error) {

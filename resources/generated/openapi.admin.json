@@ -10356,6 +10356,24 @@
             "x-platform-export-mode": "full",
             "type": "string"
           },
+          "ownerId": {
+            "description": "en: Owner ID; zh: 所有者 ID",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "所有者 ID",
+              "en": "Owner ID"
+            },
+            "x-platform-searchable": false,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "internal",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "omitted",
+            "x-platform-export-mode": "omitted",
+            "type": "string"
+          },
           "size": {
             "description": "en: Size; zh: 大小",
             "x-platform-field-type": "number",

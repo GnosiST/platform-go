@@ -30,7 +30,8 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_REDIS_DB", "")
 	t.Setenv("PLATFORM_FILE_STORAGE_DRIVER", "")
 	t.Setenv("PLATFORM_FILE_STORAGE_LOCAL_DIR", "")
-	t.Setenv("PLATFORM_FILE_STORAGE_PUBLIC_URL", "")
+	t.Setenv("PLATFORM_FILE_MAX_UPLOAD_BYTES", "")
+	t.Setenv("PLATFORM_FILE_ALLOWED_MIME_TYPES", "")
 	t.Setenv("PLATFORM_FILE_STORAGE_S3_ENDPOINT", "")
 	t.Setenv("PLATFORM_FILE_STORAGE_S3_REGION", "")
 	t.Setenv("PLATFORM_FILE_STORAGE_S3_BUCKET", "")
@@ -38,6 +39,8 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_FILE_STORAGE_S3_SECRET_KEY", "")
 	t.Setenv("PLATFORM_FILE_STORAGE_S3_PREFIX", "")
 	t.Setenv("PLATFORM_FILE_STORAGE_S3_FORCE_PATH_STYLE", "")
+	t.Setenv("PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION", "")
+	t.Setenv("PLATFORM_FILE_STORAGE_S3_KMS_KEY_ID", "")
 	t.Setenv("PLATFORM_WECHAT_MINIAPP_APP_ID", "")
 	t.Setenv("PLATFORM_WECHAT_MINIAPP_SECRET", "")
 	t.Setenv("PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT", "")
@@ -118,8 +121,14 @@ func TestLoadUsesDefaults(t *testing.T) {
 	if cfg.FileStorageLocalDir != ".platform/uploads" {
 		t.Fatalf("FileStorageLocalDir = %q", cfg.FileStorageLocalDir)
 	}
-	if cfg.FileStoragePublicURL != "/uploads" {
-		t.Fatalf("FileStoragePublicURL = %q", cfg.FileStoragePublicURL)
+	if cfg.FileMaxUploadBytes != 10<<20 {
+		t.Fatalf("FileMaxUploadBytes = %d, want 10 MiB", cfg.FileMaxUploadBytes)
+	}
+	if !reflect.DeepEqual(cfg.FileAllowedMIMETypes, []string{"application/pdf", "image/jpeg", "image/png", "text/plain"}) {
+		t.Fatalf("FileAllowedMIMETypes = %#v", cfg.FileAllowedMIMETypes)
+	}
+	if cfg.FileStorageS3ServerSideEncryption != "AES256" || cfg.FileStorageS3KMSKeyID != "" {
+		t.Fatalf("S3 encryption defaults = %q/%q", cfg.FileStorageS3ServerSideEncryption, cfg.FileStorageS3KMSKeyID)
 	}
 	if cfg.WechatMiniAppID != "" || cfg.WechatMiniAppSecret != "" || cfg.WechatMiniAppCode2SessionEndpoint != "" {
 		t.Fatalf("WeChat miniapp config = %q/%q/%q, want empty by default", cfg.WechatMiniAppID, cfg.WechatMiniAppSecret, cfg.WechatMiniAppCode2SessionEndpoint)
@@ -298,7 +307,8 @@ func TestLoadParsesCacheConfig(t *testing.T) {
 func TestLoadParsesFileStorageConfig(t *testing.T) {
 	t.Setenv("PLATFORM_FILE_STORAGE_DRIVER", "s3")
 	t.Setenv("PLATFORM_FILE_STORAGE_LOCAL_DIR", "/tmp/platform-files")
-	t.Setenv("PLATFORM_FILE_STORAGE_PUBLIC_URL", "https://cdn.example.test/files")
+	t.Setenv("PLATFORM_FILE_MAX_UPLOAD_BYTES", "2097152")
+	t.Setenv("PLATFORM_FILE_ALLOWED_MIME_TYPES", "image/png,application/pdf")
 	t.Setenv("PLATFORM_FILE_STORAGE_S3_ENDPOINT", "https://s3.example.test")
 	t.Setenv("PLATFORM_FILE_STORAGE_S3_REGION", "ap-southeast-1")
 	t.Setenv("PLATFORM_FILE_STORAGE_S3_BUCKET", "platform")
@@ -306,6 +316,8 @@ func TestLoadParsesFileStorageConfig(t *testing.T) {
 	t.Setenv("PLATFORM_FILE_STORAGE_S3_SECRET_KEY", "secret")
 	t.Setenv("PLATFORM_FILE_STORAGE_S3_PREFIX", "tenant/platform")
 	t.Setenv("PLATFORM_FILE_STORAGE_S3_FORCE_PATH_STYLE", "true")
+	t.Setenv("PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION", "aws:kms")
+	t.Setenv("PLATFORM_FILE_STORAGE_S3_KMS_KEY_ID", "kms-key")
 
 	cfg := Load()
 	if cfg.FileStorageDriver != "s3" {
@@ -314,8 +326,8 @@ func TestLoadParsesFileStorageConfig(t *testing.T) {
 	if cfg.FileStorageLocalDir != "/tmp/platform-files" {
 		t.Fatalf("FileStorageLocalDir = %q", cfg.FileStorageLocalDir)
 	}
-	if cfg.FileStoragePublicURL != "https://cdn.example.test/files" {
-		t.Fatalf("FileStoragePublicURL = %q", cfg.FileStoragePublicURL)
+	if cfg.FileMaxUploadBytes != 2097152 || !reflect.DeepEqual(cfg.FileAllowedMIMETypes, []string{"image/png", "application/pdf"}) {
+		t.Fatalf("upload policy mismatch: %+v", cfg)
 	}
 	if cfg.FileStorageS3Endpoint != "https://s3.example.test" || cfg.FileStorageS3Region != "ap-southeast-1" || cfg.FileStorageS3Bucket != "platform" {
 		t.Fatalf("S3 config mismatch: %+v", cfg)
@@ -325,6 +337,72 @@ func TestLoadParsesFileStorageConfig(t *testing.T) {
 	}
 	if !cfg.FileStorageS3PathStyle {
 		t.Fatalf("FileStorageS3PathStyle = false, want true")
+	}
+	if cfg.FileStorageS3ServerSideEncryption != "aws:kms" || cfg.FileStorageS3KMSKeyID != "kms-key" {
+		t.Fatalf("S3 encryption config mismatch: %+v", cfg)
+	}
+}
+
+func TestValidateRuntimeRejectsProductionS3WithoutPrivateEncryptionPolicy(t *testing.T) {
+	cfg := validProductionRuntimeConfig()
+	cfg.FileStorageS3ServerSideEncryption = ""
+
+	err := cfg.ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "production s3 file storage requires server-side encryption") {
+		t.Fatalf("ValidateRuntime() error = %v, want S3 encryption policy error", err)
+	}
+}
+
+func TestValidateRuntimeRejectsKMSWithoutKeyAndNonHTTPSEndpoint(t *testing.T) {
+	cfg := validProductionRuntimeConfig()
+	cfg.FileStorageS3ServerSideEncryption = "aws:kms"
+	cfg.FileStorageS3KMSKeyID = ""
+	cfg.FileStorageS3Endpoint = "http://s3.example.test"
+
+	err := cfg.ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "KMS key ID") || !strings.Contains(err.Error(), "must use https") {
+		t.Fatalf("ValidateRuntime() error = %v, want KMS key and HTTPS errors", err)
+	}
+}
+
+func TestValidateRuntimeAllowsLoopbackHTTPObjectStorageOnlyInDevelopmentOrTest(t *testing.T) {
+	cfg := Config{
+		RuntimeEnvironment:                RuntimeEnvironmentDevelopment,
+		HTTPAddr:                          "127.0.0.1:9200",
+		Capabilities:                      []string{"tenant"},
+		JWTSecret:                         "development-secret",
+		CacheDefaultTTL:                   1,
+		FileStorageDriver:                 "s3",
+		FileStorageS3Endpoint:             "http://127.0.0.1:9000",
+		FileStorageS3Region:               "us-east-1",
+		FileStorageS3Bucket:               "platform",
+		FileStorageS3ServerSideEncryption: "AES256",
+	}
+
+	if err := cfg.ValidateRuntime(); err != nil {
+		t.Fatalf("ValidateRuntime() error = %v", err)
+	}
+	cfg.RuntimeEnvironment = RuntimeEnvironmentStaging
+	if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "must use https") {
+		t.Fatalf("staging ValidateRuntime() error = %v, want HTTPS error", err)
+	}
+}
+
+func TestValidateRuntimeRejectsEmptyOrUnboundedProductionUploadPolicy(t *testing.T) {
+	cfg := validProductionRuntimeConfig()
+	cfg.FileMaxUploadBytes = 0
+	cfg.FileAllowedMIMETypes = nil
+
+	err := cfg.ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "positive bounded file upload limit") || !strings.Contains(err.Error(), "non-empty file MIME allowlist") {
+		t.Fatalf("ValidateRuntime() error = %v, want production upload policy errors", err)
+	}
+
+	cfg = validProductionRuntimeConfig()
+	cfg.FileMaxUploadBytes = 1 << 31
+	err = cfg.ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "positive bounded file upload limit") {
+		t.Fatalf("ValidateRuntime() error = %v, want bounded upload limit error", err)
 	}
 }
 
@@ -722,29 +800,32 @@ func TestValidateRuntimeAcceptsProductionBaseline(t *testing.T) {
 
 func validProductionRuntimeConfig() Config {
 	return Config{
-		RuntimeEnvironment:      "production",
-		HTTPAddr:                "0.0.0.0:9200",
-		AdminResourceDriver:     "postgres",
-		AdminResourceDSN:        "postgres://platform:secret@localhost:5432/platform",
-		SessionDriver:           "postgres",
-		SessionDSN:              "postgres://platform:secret@localhost:5432/platform",
-		LifecycleHistoryDriver:  "postgres",
-		LifecycleHistoryDSN:     "postgres://platform:secret@localhost:5432/platform",
-		JWTSecret:               "0123456789abcdef0123456789abcdef",
-		CacheDriver:             "redis",
-		CacheDefaultTTL:         1,
-		RedisAddr:               "127.0.0.1:6379",
-		FileStorageDriver:       "s3",
-		FileStorageS3Region:     "us-east-1",
-		FileStorageS3Bucket:     "platform",
-		FileStorageS3AccessKey:  "access",
-		FileStorageS3SecretKey:  "secret",
-		DisableDemoAuthProvider: true,
-		AdminOIDCIssuerURL:      "https://id.example/realms/platform",
-		AdminOIDCClientID:       "platform-admin",
-		AdminOIDCClientSecret:   "client-secret",
-		AdminOIDCRedirectURL:    "https://admin.example/login",
-		AdminOIDCScopes:         []string{"openid", "profile", "email"},
+		RuntimeEnvironment:                "production",
+		HTTPAddr:                          "0.0.0.0:9200",
+		AdminResourceDriver:               "postgres",
+		AdminResourceDSN:                  "postgres://platform:secret@localhost:5432/platform",
+		SessionDriver:                     "postgres",
+		SessionDSN:                        "postgres://platform:secret@localhost:5432/platform",
+		LifecycleHistoryDriver:            "postgres",
+		LifecycleHistoryDSN:               "postgres://platform:secret@localhost:5432/platform",
+		JWTSecret:                         "0123456789abcdef0123456789abcdef",
+		CacheDriver:                       "redis",
+		CacheDefaultTTL:                   1,
+		RedisAddr:                         "127.0.0.1:6379",
+		FileStorageDriver:                 "s3",
+		FileMaxUploadBytes:                10 << 20,
+		FileAllowedMIMETypes:              []string{"application/pdf", "image/jpeg", "image/png", "text/plain"},
+		FileStorageS3Region:               "us-east-1",
+		FileStorageS3Bucket:               "platform",
+		FileStorageS3AccessKey:            "access",
+		FileStorageS3SecretKey:            "secret",
+		FileStorageS3ServerSideEncryption: "AES256",
+		DisableDemoAuthProvider:           true,
+		AdminOIDCIssuerURL:                "https://id.example/realms/platform",
+		AdminOIDCClientID:                 "platform-admin",
+		AdminOIDCClientSecret:             "client-secret",
+		AdminOIDCRedirectURL:              "https://admin.example/login",
+		AdminOIDCScopes:                   []string{"openid", "profile", "email"},
 		Capabilities: []string{
 			"dictionary",
 			"tenant",

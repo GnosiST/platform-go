@@ -3232,6 +3232,19 @@
           "exportMode": "full"
         },
         {
+          "key": "ownerId",
+          "label": {
+            "zh": "所有者 ID",
+            "en": "Owner ID"
+          },
+          "type": "text",
+          "readOnly": true,
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
+        },
+        {
           "key": "size",
           "label": {
             "zh": "大小",
@@ -8280,6 +8293,19 @@
             "storageMode": "plain",
             "responseMode": "full",
             "exportMode": "full"
+          },
+          {
+            "key": "ownerId",
+            "label": {
+              "zh": "所有者 ID",
+              "en": "Owner ID"
+            },
+            "type": "text",
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "omitted",
+            "exportMode": "omitted"
           },
           {
             "key": "size",

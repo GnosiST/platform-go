@@ -105,6 +105,80 @@ describe("validate-platform-deployment-topology", () => {
     assert.match(result.stderr, /deploymentPackage\.dockerTargets\.api must stay api/);
   });
 
+  it("rejects reintroducing a public uploads alias", () => {
+	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-private-files-"));
+	try {
+	  const nginxPath = path.join(tempDir, "platform.conf");
+	  const current = fs.readFileSync(path.join(repoRoot, "deploy/nginx/platform.conf"), "utf8");
+	  fs.writeFileSync(nginxPath, `${current}\nlocation /uploads/ { alias /var/lib/platform-go/uploads/; }\n`);
+
+	  const result = runValidator(["--admin-proxy", nginxPath]);
+
+	  assert.notEqual(result.status, 0, result.stdout);
+	  assert.match(result.stderr, /admin proxy must not expose \/uploads\//);
+	} finally {
+	  fs.rmSync(tempDir, { recursive: true, force: true });
+	}
+  });
+
+  it("rejects public upload environment and Admin volume wiring", () => {
+	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-private-files-"));
+	try {
+	  const composePath = path.join(tempDir, "docker-compose.prod.yml");
+	  const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
+	  fs.writeFileSync(
+		composePath,
+		`${current}\n# PLATFORM_FILE_STORAGE_PUBLIC_URL=/uploads\n# platform_uploads:/var/lib/platform-go/uploads:ro\n`,
+	  );
+
+	  const result = runValidator(["--compose", composePath]);
+
+	  assert.notEqual(result.status, 0, result.stdout);
+	  assert.match(result.stderr, /compose file must not configure PLATFORM_FILE_STORAGE_PUBLIC_URL/);
+	  assert.match(result.stderr, /Admin service must not mount file storage/);
+	} finally {
+	  fs.rmSync(tempDir, { recursive: true, force: true });
+	}
+  });
+
+  it("rejects topology contracts that declare a public upload alias", () => {
+	const contract = readJSON("resources/platform-deployment-topology.json");
+	contract.deploymentPackage.sameOrigin.uploadAlias = "/uploads/";
+	const contractPath = tempJSON("platform-deployment-topology.json", contract);
+
+	const result = runValidator(["--contract", contractPath]);
+
+	assert.notEqual(result.status, 0, result.stdout);
+	assert.match(result.stderr, /deploymentPackage\.sameOrigin must not declare uploadAlias/);
+  });
+
+  it("rejects production env templates without bounded private upload policy", () => {
+	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-private-files-"));
+	try {
+	  const envPath = path.join(tempDir, "production.example.env");
+	  fs.writeFileSync(
+		envPath,
+		[
+		  "PLATFORM_RUNTIME_ENV=production",
+		  "PLATFORM_CACHE_DRIVER=redis",
+		  "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+		  "PLATFORM_CAPABILITIES=tenant,identity,file-storage",
+		  "PLATFORM_FILE_STORAGE_DRIVER=s3",
+		  "",
+		].join("\n"),
+	  );
+
+	  const result = runValidator(["--env-template", envPath]);
+
+	  assert.notEqual(result.status, 0, result.stdout);
+	  assert.match(result.stderr, /production env must configure PLATFORM_FILE_MAX_UPLOAD_BYTES/);
+	  assert.match(result.stderr, /production env must configure PLATFORM_FILE_ALLOWED_MIME_TYPES/);
+	  assert.match(result.stderr, /production env must configure PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION/);
+	} finally {
+	  fs.rmSync(tempDir, { recursive: true, force: true });
+	}
+  });
+
   it("rejects deployment contracts that do not require the Admin operator CLI in the API image", () => {
     const contract = readJSON("resources/platform-deployment-topology.json");
     contract.deploymentPackage.requiredSourceSnippets = contract.deploymentPackage.requiredSourceSnippets.filter(

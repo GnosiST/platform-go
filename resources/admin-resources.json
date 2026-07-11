@@ -3047,6 +3047,19 @@
             "exportMode": "full"
           },
           {
+            "key": "ownerId",
+            "label": {
+              "zh": "所有者 ID",
+              "en": "Owner ID"
+            },
+            "type": "text",
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "omitted",
+            "exportMode": "omitted"
+          },
+          {
             "key": "createdAt",
             "label": {
               "zh": "上传时间",

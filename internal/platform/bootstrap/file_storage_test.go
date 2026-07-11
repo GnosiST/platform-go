@@ -34,13 +34,14 @@ func TestFileStorageFromConfigRejectsS3WithoutBucket(t *testing.T) {
 
 func TestFileStorageFromConfigBuildsS3Store(t *testing.T) {
 	store, err := FileStorageFromConfig(config.Config{
-		FileStorageDriver:      "s3",
-		FileStorageS3Region:    "us-east-1",
-		FileStorageS3Bucket:    "platform",
-		FileStorageS3AccessKey: "access",
-		FileStorageS3SecretKey: "secret",
-		FileStorageS3Prefix:    "tenant/platform",
-		FileStorageS3PathStyle: true,
+		FileStorageDriver:                 "s3",
+		FileStorageS3Region:               "us-east-1",
+		FileStorageS3Bucket:               "platform",
+		FileStorageS3AccessKey:            "access",
+		FileStorageS3SecretKey:            "secret",
+		FileStorageS3Prefix:               "tenant/platform",
+		FileStorageS3PathStyle:            true,
+		FileStorageS3ServerSideEncryption: "AES256",
 	})
 	if err != nil {
 		t.Fatalf("FileStorageFromConfig(s3) error = %v", err)

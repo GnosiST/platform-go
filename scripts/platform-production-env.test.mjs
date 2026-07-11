@@ -35,6 +35,14 @@ const validStrictEnv = [
   "PLATFORM_LIFECYCLE_HISTORY_DSN=platform:strong-db-pass@tcp(platform-mysql:3306)/platform?charset=utf8mb4&parseTime=True&loc=Local",
   "PLATFORM_CACHE_DRIVER=redis",
   "PLATFORM_REDIS_ADDR=platform-redis:6379",
+  "PLATFORM_FILE_STORAGE_DRIVER=s3",
+  "PLATFORM_FILE_MAX_UPLOAD_BYTES=10485760",
+  "PLATFORM_FILE_ALLOWED_MIME_TYPES=application/pdf,image/jpeg,image/png,text/plain",
+  "PLATFORM_FILE_STORAGE_S3_ENDPOINT=https://s3.example.test",
+  "PLATFORM_FILE_STORAGE_S3_REGION=us-east-1",
+  "PLATFORM_FILE_STORAGE_S3_BUCKET=platform",
+  "PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION=AES256",
+  "PLATFORM_FILE_STORAGE_S3_KMS_KEY_ID=",
   "MYSQL_ROOT_PASSWORD=strong-root-password-value",
   "MYSQL_DATABASE=platform",
   "MYSQL_USER=platform",
@@ -100,6 +108,26 @@ describe("validate-platform-production-env", () => {
       assert.match(result.stderr, /PLATFORM_ADMIN_RESOURCE_DSN is required/);
       assert.match(result.stderr, /PLATFORM_SESSION_DRIVER must be mysql, postgres, or sqlite/);
       assert.match(result.stderr, /PLATFORM_CACHE_DRIVER must be redis/);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects unsafe production file upload and S3 settings", () => {
+    const source = validStrictEnv
+      .replace("PLATFORM_FILE_MAX_UPLOAD_BYTES=10485760", "PLATFORM_FILE_MAX_UPLOAD_BYTES=1073741824")
+      .replace("PLATFORM_FILE_ALLOWED_MIME_TYPES=application/pdf,image/jpeg,image/png,text/plain\n", "")
+      .replace("PLATFORM_FILE_STORAGE_S3_ENDPOINT=https://s3.example.test", "PLATFORM_FILE_STORAGE_S3_ENDPOINT=http://s3.example.test")
+      .replace("PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION=AES256\n", "");
+    const { tempDir, filePath } = tempEnv(source);
+    try {
+      const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /PLATFORM_FILE_MAX_UPLOAD_BYTES must be between 1 and 104857600/);
+      assert.match(result.stderr, /PLATFORM_FILE_ALLOWED_MIME_TYPES is required/);
+      assert.match(result.stderr, /PLATFORM_FILE_STORAGE_S3_ENDPOINT must use https/);
+      assert.match(result.stderr, /PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION is required/);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }

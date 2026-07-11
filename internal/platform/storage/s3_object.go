@@ -24,15 +24,17 @@ type s3ObjectAPI interface {
 }
 
 type S3ObjectStore struct {
-	client s3ObjectAPI
-	bucket string
-	prefix string
-	now    func() time.Time
+	client               s3ObjectAPI
+	bucket               string
+	prefix               string
+	serverSideEncryption types.ServerSideEncryption
+	kmsKeyID             string
+	now                  func() time.Time
 }
 
 func NewS3ObjectStore(ctx context.Context, config S3ObjectStoreConfig) (S3ObjectStore, error) {
-	if strings.TrimSpace(config.Bucket) == "" {
-		return S3ObjectStore{}, fmt.Errorf("%w: s3 bucket is required", ErrInvalidObjectStoreConfig)
+	if err := validateS3ObjectStoreConfig(config); err != nil {
+		return S3ObjectStore{}, err
 	}
 	region := strings.TrimSpace(config.Region)
 	if region == "" {
@@ -57,25 +59,47 @@ func NewS3ObjectStore(ctx context.Context, config S3ObjectStoreConfig) (S3Object
 		}
 		options.UsePathStyle = config.ForcePathStyle
 	})
-	return newS3ObjectStoreWithClient(client, config.Bucket, config.Prefix, nil)
+	return newS3ObjectStoreWithClient(client, config, nil)
 }
 
-func newS3ObjectStoreWithClient(client s3ObjectAPI, bucket string, prefix string, now func() time.Time) (S3ObjectStore, error) {
+func newS3ObjectStoreWithClient(client s3ObjectAPI, config S3ObjectStoreConfig, now func() time.Time) (S3ObjectStore, error) {
 	if client == nil {
 		return S3ObjectStore{}, fmt.Errorf("%w: s3 client is required", ErrInvalidObjectStoreConfig)
 	}
-	if strings.TrimSpace(bucket) == "" {
-		return S3ObjectStore{}, fmt.Errorf("%w: s3 bucket is required", ErrInvalidObjectStoreConfig)
+	if err := validateS3ObjectStoreConfig(config); err != nil {
+		return S3ObjectStore{}, err
 	}
 	if now == nil {
 		now = time.Now
 	}
 	return S3ObjectStore{
-		client: client,
-		bucket: strings.TrimSpace(bucket),
-		prefix: strings.Trim(strings.TrimSpace(prefix), "/"),
-		now:    now,
+		client:               client,
+		bucket:               strings.TrimSpace(config.Bucket),
+		prefix:               strings.Trim(strings.TrimSpace(config.Prefix), "/"),
+		serverSideEncryption: types.ServerSideEncryption(strings.TrimSpace(config.ServerSideEncryption)),
+		kmsKeyID:             strings.TrimSpace(config.KMSKeyID),
+		now:                  now,
 	}, nil
+}
+
+func validateS3ObjectStoreConfig(config S3ObjectStoreConfig) error {
+	if strings.TrimSpace(config.Bucket) == "" {
+		return fmt.Errorf("%w: s3 bucket is required", ErrInvalidObjectStoreConfig)
+	}
+	encryption := strings.TrimSpace(config.ServerSideEncryption)
+	switch encryption {
+	case "AES256":
+		if strings.TrimSpace(config.KMSKeyID) != "" {
+			return fmt.Errorf("%w: s3 KMS key ID requires aws:kms encryption", ErrInvalidObjectStoreConfig)
+		}
+	case "aws:kms":
+		if strings.TrimSpace(config.KMSKeyID) == "" {
+			return fmt.Errorf("%w: s3 KMS key ID is required for aws:kms encryption", ErrInvalidObjectStoreConfig)
+		}
+	default:
+		return fmt.Errorf("%w: s3 server-side encryption must be AES256 or aws:kms", ErrInvalidObjectStoreConfig)
+	}
+	return nil
 }
 
 func (store S3ObjectStore) Save(ctx context.Context, input ObjectSaveInput) (ObjectMetadata, error) {
@@ -85,9 +109,13 @@ func (store S3ObjectStore) Save(ctx context.Context, input ObjectSaveInput) (Obj
 	key := path.Join(store.prefix, store.timestampPrefix(), sanitizedObjectFileName(input.FileName))
 	reader := &countingReader{reader: input.Reader}
 	putInput := &s3.PutObjectInput{
-		Bucket: aws.String(store.bucket),
-		Key:    aws.String(key),
-		Body:   reader,
+		Bucket:               aws.String(store.bucket),
+		Key:                  aws.String(key),
+		Body:                 reader,
+		ServerSideEncryption: store.serverSideEncryption,
+	}
+	if store.serverSideEncryption == types.ServerSideEncryptionAwsKms {
+		putInput.SSEKMSKeyId = aws.String(store.kmsKeyID)
 	}
 	if strings.TrimSpace(input.ContentType) != "" {
 		putInput.ContentType = aws.String(strings.TrimSpace(input.ContentType))
@@ -98,8 +126,6 @@ func (store S3ObjectStore) Save(ctx context.Context, input ObjectSaveInput) (Obj
 	return ObjectMetadata{
 		Driver:    "s3",
 		Key:       key,
-		Path:      fmt.Sprintf("s3://%s/%s", store.bucket, key),
-		URL:       "",
 		SizeBytes: reader.bytesRead,
 	}, nil
 }

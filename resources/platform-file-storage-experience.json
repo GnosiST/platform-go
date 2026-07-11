@@ -152,7 +152,6 @@
       "size",
       "storageDriver",
       "storageKey",
-      "publicUrl",
       "createdAt",
       "updatedAt"
     ],

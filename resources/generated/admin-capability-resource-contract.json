@@ -2229,6 +2229,26 @@
           "exportMode": "omitted"
         },
         {
+          "key": "ownerId",
+          "label": {
+            "zh": "所有者 ID",
+            "en": "Owner ID"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
+        },
+        {
           "key": "uploadedBy",
           "label": {
             "zh": "上传人",
