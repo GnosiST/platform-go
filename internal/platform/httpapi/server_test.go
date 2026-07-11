@@ -148,6 +148,14 @@ type authLoginTestPayload struct {
 	} `json:"data"`
 }
 
+type adminIdentityStartTestPayload struct {
+	Data struct {
+		AuthorizationURL string    `json:"authorizationUrl"`
+		State            string    `json:"state"`
+		ExpiresAt        time.Time `json:"expiresAt"`
+	} `json:"data"`
+}
+
 type appLoginTestPayload struct {
 	Data struct {
 		Token     string             `json:"token"`
@@ -192,6 +200,35 @@ type appIdentityResolverFunc func(context.Context, AppIdentityResolveInput) (App
 
 func (f appIdentityResolverFunc) ResolveAppIdentity(ctx context.Context, input AppIdentityResolveInput) (AppIdentity, error) {
 	return f(ctx, input)
+}
+
+type adminIdentityResolverFunc struct {
+	start   func(context.Context, AdminIdentityStartInput) (AdminIdentityStart, error)
+	resolve func(context.Context, AdminIdentityResolveInput) (AdminIdentity, error)
+}
+
+func (f adminIdentityResolverFunc) StartAdminIdentity(ctx context.Context, input AdminIdentityStartInput) (AdminIdentityStart, error) {
+	return f.start(ctx, input)
+}
+
+func (f adminIdentityResolverFunc) ResolveAdminIdentity(ctx context.Context, input AdminIdentityResolveInput) (AdminIdentity, error) {
+	return f.resolve(ctx, input)
+}
+
+type adminIdentityBindingStoreFunc struct {
+	resolve func(context.Context, AdminIdentityBindingInput) (AdminIdentityBinding, error)
+}
+
+func (f adminIdentityBindingStoreFunc) ResolveAdminIdentityBinding(ctx context.Context, input AdminIdentityBindingInput) (AdminIdentityBinding, error) {
+	return f.resolve(ctx, input)
+}
+
+func (adminIdentityBindingStoreFunc) ProvisionAdminIdentityBinding(context.Context, AdminIdentityProvisionInput) (AdminIdentityBinding, error) {
+	return AdminIdentityBinding{}, ErrAdminIdentityBindingInvalid
+}
+
+func (adminIdentityBindingStoreFunc) ValidateAdminIdentityBindingReadiness(context.Context, capability.AuthProvider) error {
+	return nil
 }
 
 func newTestServer(options ServerOptions) *Server {
@@ -539,7 +576,7 @@ func TestAdminDemoDataApplyRequiresPermission(t *testing.T) {
 }
 
 func TestAuthProvidersEndpointReturnsCapabilityDeclaredProviders(t *testing.T) {
-	server := newTestServer(ServerOptions{Capabilities: []capability.Manifest{authProviderTestManifest()}})
+	server := newTestServer(ServerOptions{Capabilities: []capability.Manifest{adminAudienceAuthProviderTestManifest()}})
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/auth/providers", nil)
 
@@ -553,7 +590,7 @@ func TestAuthProvidersEndpointReturnsCapabilityDeclaredProviders(t *testing.T) {
 		t.Fatalf("decode auth providers: %v body = %s", err, recorder.Body.String())
 	}
 	if len(payload.Data.Items) != 2 {
-		t.Fatalf("auth providers = %+v, want demo and wechat", payload.Data.Items)
+		t.Fatalf("auth providers = %+v, want demo and oidc", payload.Data.Items)
 	}
 	if payload.Data.Items[0].ID != "demo" || !payload.Data.Items[0].Configured || !payload.Data.Items[0].Enabled {
 		t.Fatalf("first auth provider = %+v, want configured demo provider", payload.Data.Items[0])
@@ -564,8 +601,11 @@ func TestAuthProvidersEndpointReturnsCapabilityDeclaredProviders(t *testing.T) {
 	if payload.Data.Items[0].Title.ZH != "演示登录" || payload.Data.Items[0].Title.EN != "Demo Login" {
 		t.Fatalf("first auth provider localized title = %+v, want zh/en title", payload.Data.Items[0].Title)
 	}
-	if payload.Data.Items[1].ID != "wechat" || payload.Data.Items[1].Configured {
-		t.Fatalf("second auth provider = %+v, want unconfigured wechat provider", payload.Data.Items[1])
+	if payload.Data.Items[1].ID != "oidc" || !payload.Data.Items[1].Configured {
+		t.Fatalf("second auth provider = %+v, want configured oidc provider", payload.Data.Items[1])
+	}
+	if strings.Contains(recorder.Body.String(), `"id":"wechat"`) {
+		t.Fatalf("auth providers leaked app-only wechat provider: %s", recorder.Body.String())
 	}
 }
 
@@ -613,8 +653,8 @@ func TestDisabledDemoAuthProviderDoesNotLeakDiscoveryOrLogin(t *testing.T) {
 	if containsString(ids, "demo") {
 		t.Fatalf("auth provider ids = %+v, want no demo provider", ids)
 	}
-	if !containsString(ids, "wechat") {
-		t.Fatalf("auth provider ids = %+v, want wechat provider to remain discoverable", ids)
+	if containsString(ids, "wechat") {
+		t.Fatalf("auth provider ids = %+v, want app-only wechat provider hidden", ids)
 	}
 
 	loginBody := bytes.NewBufferString(`{"provider":"demo","username":"ops"}`)
@@ -712,6 +752,336 @@ func TestAuthLoginWithDemoProviderReturnsRoleBackedSessionToken(t *testing.T) {
 	if session.Data.User.Username != "ops" {
 		t.Fatalf("token session username = %q, want ops", session.Data.User.Username)
 	}
+}
+
+func TestAdminOIDCStartRejectsUnavailableProviderResolverAndMalformedChallenge(t *testing.T) {
+	validChallenge := strings.Repeat("a", 43)
+	tests := []struct {
+		name       string
+		provider   string
+		challenge  string
+		manifest   capability.Manifest
+		resolver   AdminIdentityResolver
+		wantStatus int
+		wantCode   string
+	}{
+		{
+			name: "app-only provider", provider: "wechat", challenge: validChallenge,
+			manifest: adminAudienceAuthProviderTestManifest(), resolver: successfulAdminIdentityResolver(),
+			wantStatus: http.StatusBadRequest, wantCode: "AUTH_PROVIDER_NOT_FOUND",
+		},
+		{
+			name: "disabled provider", provider: "oidc", challenge: validChallenge,
+			manifest: adminOIDCProviderManifest(false, true), resolver: successfulAdminIdentityResolver(),
+			wantStatus: http.StatusBadRequest, wantCode: "AUTH_PROVIDER_NOT_FOUND",
+		},
+		{
+			name: "unconfigured provider", provider: "oidc", challenge: validChallenge,
+			manifest: adminOIDCProviderManifest(true, false), resolver: successfulAdminIdentityResolver(),
+			wantStatus: http.StatusBadRequest, wantCode: "AUTH_PROVIDER_NOT_CONFIGURED",
+		},
+		{
+			name: "missing resolver", provider: "oidc", challenge: validChallenge,
+			manifest: adminOIDCProviderManifest(true, true), resolver: nil,
+			wantStatus: http.StatusNotImplemented, wantCode: "AUTH_PROVIDER_RESOLVER_NOT_CONFIGURED",
+		},
+		{
+			name: "malformed challenge", provider: "oidc", challenge: "not-s256",
+			manifest: adminOIDCProviderManifest(true, true),
+			resolver: adminIdentityResolverFunc{
+				start: func(context.Context, AdminIdentityStartInput) (AdminIdentityStart, error) {
+					return AdminIdentityStart{}, ErrAdminIdentityInvalid
+				},
+				resolve: func(context.Context, AdminIdentityResolveInput) (AdminIdentity, error) {
+					return AdminIdentity{}, nil
+				},
+			},
+			wantStatus: http.StatusBadRequest, wantCode: "AUTH_PROVIDER_START_INVALID",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			server := newTestServer(ServerOptions{
+				Capabilities:          []capability.Manifest{test.manifest},
+				AdminIdentityResolver: test.resolver,
+			})
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/api/auth/providers/"+test.provider+"/start", bytes.NewBufferString(`{"codeChallenge":"`+test.challenge+`"}`))
+			request.Header.Set("Content-Type", "application/json")
+
+			server.Router().ServeHTTP(recorder, request)
+
+			assertAuthErrorResponse(t, recorder, test.wantStatus, test.wantCode)
+			if strings.Contains(recorder.Body.String(), test.challenge) || strings.Contains(recorder.Body.String(), "client-secret") {
+				t.Fatalf("admin oidc start error leaked sensitive input: %s", recorder.Body.String())
+			}
+		})
+	}
+}
+
+func TestAdminOIDCStartReturnsResolverTransactionWithoutCredentials(t *testing.T) {
+	expiresAt := time.Date(2026, time.July, 11, 10, 5, 0, 0, time.UTC)
+	challenge := strings.Repeat("b", 43)
+	var captured AdminIdentityStartInput
+	server := newTestServer(ServerOptions{
+		Capabilities: []capability.Manifest{adminOIDCProviderManifest(true, true)},
+		AdminIdentityResolver: adminIdentityResolverFunc{
+			start: func(_ context.Context, input AdminIdentityStartInput) (AdminIdentityStart, error) {
+				captured = input
+				return AdminIdentityStart{
+					AuthorizationURL: "https://id.example/authorize?state=state-exact",
+					State:            "state-exact",
+					ExpiresAt:        expiresAt,
+				}, nil
+			},
+			resolve: func(context.Context, AdminIdentityResolveInput) (AdminIdentity, error) {
+				return AdminIdentity{}, nil
+			},
+		},
+	})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/providers/oidc/start", bytes.NewBufferString(`{"codeChallenge":"`+challenge+`"}`))
+	request.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("POST admin oidc start status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	if captured.Provider.ID != "oidc" || captured.Provider.Kind != "oidc" || captured.CodeChallenge != challenge {
+		t.Fatalf("captured admin oidc start = %+v, want oidc provider and exact challenge", captured)
+	}
+	var payload adminIdentityStartTestPayload
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode admin oidc start: %v body = %s", err, recorder.Body.String())
+	}
+	if payload.Data.AuthorizationURL != "https://id.example/authorize?state=state-exact" || payload.Data.State != "state-exact" || !payload.Data.ExpiresAt.Equal(expiresAt) {
+		t.Fatalf("admin oidc start payload = %+v, want exact resolver transaction", payload.Data)
+	}
+	for _, sensitive := range []string{"client-secret", "codeVerifier", "password", "accessToken", "refreshToken"} {
+		if strings.Contains(recorder.Body.String(), sensitive) {
+			t.Fatalf("admin oidc start response leaked credential field %q: %s", sensitive, recorder.Body.String())
+		}
+	}
+}
+
+func TestAppAuthLoginRejectsAdminOnlyOIDCProvider(t *testing.T) {
+	server := newTestServer(ServerOptions{
+		Capabilities: []capability.Manifest{adminAudienceAuthProviderTestManifest()},
+		AppIdentityResolver: appIdentityResolverFunc(func(context.Context, AppIdentityResolveInput) (AppIdentity, error) {
+			t.Fatalf("app resolver must not receive admin-only oidc provider")
+			return AppIdentity{}, nil
+		}),
+	})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/app/auth/login", bytes.NewBufferString(`{"provider":"oidc","code":"admin-code"}`))
+	request.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(recorder, request)
+
+	assertAuthErrorResponse(t, recorder, http.StatusBadRequest, "APP_AUTH_PROVIDER_NOT_FOUND")
+	if strings.Contains(recorder.Body.String(), "admin-code") {
+		t.Fatalf("app oidc rejection leaked code: %s", recorder.Body.String())
+	}
+}
+
+func TestAdminOIDCAuthLoginRejectsMissingTransactionResolverBindingAndDisabledPrincipal(t *testing.T) {
+	sensitiveCode := "oidc-code-sensitive"
+	sensitiveState := "oidc-state-sensitive"
+	sensitiveVerifier := "oidc-verifier-sensitive"
+	sensitiveIssuer := "https://issuer-sensitive.example"
+	sensitiveSubject := "subject-sensitive"
+
+	t.Run("missing state", func(t *testing.T) {
+		server := newTestServer(ServerOptions{
+			Capabilities:          []capability.Manifest{adminOIDCProviderManifest(true, true)},
+			AdminIdentityResolver: successfulAdminIdentityResolver(),
+		})
+		recorder := postAdminOIDCLoginForTest(server, `{"provider":"oidc","code":"`+sensitiveCode+`","codeVerifier":"`+sensitiveVerifier+`"}`)
+		assertAuthErrorResponse(t, recorder, http.StatusBadRequest, "AUTH_IDENTITY_TRANSACTION_REQUIRED")
+		assertResponseRedactsValues(t, recorder.Body.String(), sensitiveCode, sensitiveVerifier)
+	})
+
+	t.Run("missing verifier", func(t *testing.T) {
+		server := newTestServer(ServerOptions{
+			Capabilities:          []capability.Manifest{adminOIDCProviderManifest(true, true)},
+			AdminIdentityResolver: successfulAdminIdentityResolver(),
+		})
+		recorder := postAdminOIDCLoginForTest(server, `{"provider":"oidc","code":"`+sensitiveCode+`","state":"`+sensitiveState+`"}`)
+		assertAuthErrorResponse(t, recorder, http.StatusBadRequest, "AUTH_IDENTITY_TRANSACTION_REQUIRED")
+		assertResponseRedactsValues(t, recorder.Body.String(), sensitiveCode, sensitiveState)
+	})
+
+	t.Run("resolver error", func(t *testing.T) {
+		bindingCalled := false
+		server := newTestServer(ServerOptions{
+			Capabilities: []capability.Manifest{adminOIDCProviderManifest(true, true)},
+			AdminIdentityResolver: adminIdentityResolverFunc{
+				start: func(context.Context, AdminIdentityStartInput) (AdminIdentityStart, error) {
+					return AdminIdentityStart{}, nil
+				},
+				resolve: func(context.Context, AdminIdentityResolveInput) (AdminIdentity, error) {
+					return AdminIdentity{}, errors.New("provider exchange exposed client-secret-sensitive")
+				},
+			},
+			AdminIdentityBindings: adminIdentityBindingStoreFunc{resolve: func(context.Context, AdminIdentityBindingInput) (AdminIdentityBinding, error) {
+				bindingCalled = true
+				return AdminIdentityBinding{}, nil
+			}},
+		})
+		recorder := postAdminOIDCLoginForTest(server, adminOIDCLoginBody(sensitiveCode, sensitiveState, sensitiveVerifier))
+		assertAuthErrorResponse(t, recorder, http.StatusBadGateway, "AUTH_PROVIDER_RESOLVE_FAILED")
+		if bindingCalled {
+			t.Fatalf("binding store called after resolver failure")
+		}
+		assertResponseRedactsValues(t, recorder.Body.String(), sensitiveCode, sensitiveState, sensitiveVerifier, "client-secret-sensitive")
+	})
+
+	t.Run("missing binding", func(t *testing.T) {
+		var captured AdminIdentityBindingInput
+		server := newTestServer(ServerOptions{
+			Capabilities: []capability.Manifest{adminOIDCProviderManifest(true, true)},
+			AdminIdentityResolver: adminIdentityResolverFunc{
+				start: func(context.Context, AdminIdentityStartInput) (AdminIdentityStart, error) {
+					return AdminIdentityStart{}, nil
+				},
+				resolve: func(context.Context, AdminIdentityResolveInput) (AdminIdentity, error) {
+					return AdminIdentity{Issuer: sensitiveIssuer, ProviderSubject: sensitiveSubject}, nil
+				},
+			},
+			AdminIdentityBindings: adminIdentityBindingStoreFunc{resolve: func(_ context.Context, input AdminIdentityBindingInput) (AdminIdentityBinding, error) {
+				captured = input
+				return AdminIdentityBinding{}, ErrAdminIdentityBindingInvalid
+			}},
+		})
+		recorder := postAdminOIDCLoginForTest(server, adminOIDCLoginBody(sensitiveCode, sensitiveState, sensitiveVerifier))
+		assertAuthErrorResponse(t, recorder, http.StatusUnauthorized, "AUTH_IDENTITY_NOT_BOUND")
+		if captured.Provider.ID != "oidc" || captured.Issuer != sensitiveIssuer || captured.ProviderSubject != sensitiveSubject {
+			t.Fatalf("captured binding input = %+v, want resolved oidc tuple", captured)
+		}
+		assertResponseRedactsValues(t, recorder.Body.String(), sensitiveCode, sensitiveState, sensitiveVerifier, sensitiveIssuer, sensitiveSubject)
+	})
+
+	t.Run("disabled principal", func(t *testing.T) {
+		server := newTestServer(ServerOptions{
+			Capabilities:          []capability.Manifest{adminOIDCProviderManifest(true, true)},
+			AdminIdentityResolver: successfulAdminIdentityResolver(),
+			AdminIdentityBindings: adminIdentityBindingStoreFunc{resolve: func(context.Context, AdminIdentityBindingInput) (AdminIdentityBinding, error) {
+				return AdminIdentityBinding{Username: "ops"}, nil
+			}},
+		})
+		disableAdminUserForTest(t, server.resources, "ops")
+		recorder := postAdminOIDCLoginForTest(server, adminOIDCLoginBody(sensitiveCode, sensitiveState, sensitiveVerifier))
+		assertAuthErrorResponse(t, recorder, http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS")
+		assertResponseRedactsValues(t, recorder.Body.String(), sensitiveCode, sensitiveState, sensitiveVerifier)
+	})
+}
+
+func TestAdminOIDCAuthLoginUsesAtomicBindingAndExistingAdminSessionAuditPath(t *testing.T) {
+	manifests := configuredAdminOIDCPlatformManifests(t)
+	resources := adminresource.NewStoreFromCapabilities(manifests)
+	provider := authProviderByIDForTest(t, manifests, "oidc")
+	loginAt := time.Date(2026, time.July, 11, 11, 0, 0, 0, time.UTC)
+	issuer := "https://issuer-sensitive.example"
+	subject := "subject-sensitive"
+	bindings := NewResourceAdminIdentityBindingStore(resources, func() time.Time { return loginAt })
+	if _, err := bindings.ProvisionAdminIdentityBinding(context.Background(), AdminIdentityProvisionInput{
+		Provider: provider, Issuer: issuer, ProviderSubject: subject, Username: "ops", Now: loginAt.Add(-time.Hour),
+	}); err != nil {
+		t.Fatalf("ProvisionAdminIdentityBinding() error = %v", err)
+	}
+
+	code := "oidc-code-sensitive"
+	state := "oidc-state-sensitive"
+	verifier := "oidc-verifier-sensitive"
+	var captured AdminIdentityResolveInput
+	bus := cache.NewMemoryInvalidationBus()
+	invalidated := false
+	server := newTestServer(ServerOptions{
+		Capabilities:          manifests,
+		Resources:             resources,
+		InvalidationBus:       bus,
+		AdminIdentityBindings: bindings,
+		Now:                   func() time.Time { return loginAt },
+		AdminIdentityResolver: adminIdentityResolverFunc{
+			start: func(context.Context, AdminIdentityStartInput) (AdminIdentityStart, error) {
+				return AdminIdentityStart{}, nil
+			},
+			resolve: func(_ context.Context, input AdminIdentityResolveInput) (AdminIdentity, error) {
+				captured = input
+				return AdminIdentity{Issuer: issuer, ProviderSubject: subject}, nil
+			},
+		},
+	})
+	if err := bus.SubscribeInvalidations(context.Background(), func(_ context.Context, event cache.InvalidationEvent) {
+		if event.Resource == sessionInvalidationResource {
+			invalidated = true
+		}
+	}); err != nil {
+		t.Fatalf("SubscribeInvalidations() error = %v", err)
+	}
+
+	recorder := postAdminOIDCLoginForTest(server, adminOIDCLoginBody(code, state, verifier))
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("POST admin oidc login status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	if captured.Provider.ID != "oidc" || captured.Code != code || captured.State != state || captured.CodeVerifier != verifier {
+		t.Fatalf("captured oidc resolve input = %+v, want exact exchange transaction", captured)
+	}
+	var login authLoginTestPayload
+	if err := json.Unmarshal(recorder.Body.Bytes(), &login); err != nil {
+		t.Fatalf("decode admin oidc login: %v body = %s", err, recorder.Body.String())
+	}
+	claims, err := server.tokens.Parse(login.Data.Token)
+	if err != nil {
+		t.Fatalf("parse admin oidc jwt: %v", err)
+	}
+	if claims.TokenType != authjwt.TokenTypeAdmin || claims.TenantID != platformTenant || claims.Username != "ops" || claims.SessionID == "" {
+		t.Fatalf("admin oidc jwt claims = %+v, want existing admin session shape", claims)
+	}
+	if login.Data.Principal.User.Username != "ops" || !containsString(login.Data.Principal.Permissions, "admin:tenant:read") {
+		t.Fatalf("admin oidc principal = %+v, want validated ops principal", login.Data.Principal)
+	}
+	if !invalidated {
+		t.Fatalf("admin oidc login did not publish session invalidation")
+	}
+
+	bindingRecords, err := resources.List(adminIdentitiesResource)
+	if err != nil || len(bindingRecords) != 1 || bindingRecords[0].Values["lastLoginAt"] != loginAt.Format(time.RFC3339) {
+		t.Fatalf("atomic binding resolve records = %+v, %v, want updated lastLoginAt", bindingRecords, err)
+	}
+	auditRecords, err := resources.List("audit-logs")
+	if err != nil {
+		t.Fatalf("List(audit-logs) error = %v", err)
+	}
+	var loginAudit *adminresource.Record
+	for index := range auditRecords {
+		if auditRecords[index].Code == "auth.login" {
+			loginAudit = &auditRecords[index]
+		}
+	}
+	if loginAudit == nil || loginAudit.Values["actor"] != "ops" || loginAudit.Values["provider"] != "oidc" || loginAudit.Values["sessionId"] == "" {
+		t.Fatalf("admin oidc audit = %+v, want existing redacted auth.login shape", loginAudit)
+	}
+	serializedAudit, err := json.Marshal(loginAudit)
+	if err != nil {
+		t.Fatalf("marshal auth.login audit: %v", err)
+	}
+	assertResponseRedactsValues(t, string(serializedAudit), code, state, verifier, issuer, subject, login.Data.Token)
+}
+
+func TestAuthLoginWithDemoProviderRejectsDisabledPrincipal(t *testing.T) {
+	server := newTestServer(ServerOptions{Capabilities: []capability.Manifest{authProviderTestManifest()}})
+	disableAdminUserForTest(t, server.resources, "ops")
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"provider":"demo","username":"ops"}`))
+	request.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(recorder, request)
+
+	assertAuthErrorResponse(t, recorder, http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS")
 }
 
 func TestAuthLogoutRevokesSessionToken(t *testing.T) {
@@ -3811,6 +4181,7 @@ func authProviderTestManifest() capability.Manifest {
 				Description: capability.Text("本地开发演示账号登录。", "Local demo account login."),
 				Enabled:     true,
 				Configured:  true,
+				Audiences:   []capability.AuthProviderAudience{capability.AuthProviderAudienceAdmin, capability.AuthProviderAudienceApp},
 			},
 			{
 				ID:          "wechat",
@@ -3819,6 +4190,7 @@ func authProviderTestManifest() capability.Manifest {
 				Description: capability.Text("微信 code 换取登录态。", "WeChat code exchange login."),
 				Enabled:     true,
 				Configured:  false,
+				Audiences:   []capability.AuthProviderAudience{capability.AuthProviderAudienceApp},
 			},
 		},
 	}
@@ -3996,4 +4368,108 @@ func configuredWechatAuthProviderManifest() capability.Manifest {
 		}
 	}
 	return manifest
+}
+
+func adminAudienceAuthProviderTestManifest() capability.Manifest {
+	manifest := authProviderTestManifest()
+	manifest.AuthProviders = append(manifest.AuthProviders, capability.AuthProvider{
+		ID:          "oidc",
+		Kind:        "oidc",
+		Title:       capability.Text("企业单点登录", "Enterprise SSO"),
+		Description: capability.Text("通过 OpenID Connect 登录管理台。", "Sign in to Admin through OpenID Connect."),
+		Enabled:     true,
+		Configured:  true,
+		Audiences:   []capability.AuthProviderAudience{capability.AuthProviderAudienceAdmin},
+	})
+	return manifest
+}
+
+func adminOIDCProviderManifest(enabled bool, configured bool) capability.Manifest {
+	manifest := adminAudienceAuthProviderTestManifest()
+	manifest.AuthProviders = manifest.AuthProviders[len(manifest.AuthProviders)-1:]
+	manifest.AuthProviders[0].Enabled = enabled
+	manifest.AuthProviders[0].Configured = configured
+	return manifest
+}
+
+func configuredAdminOIDCPlatformManifests(t *testing.T) []capability.Manifest {
+	t.Helper()
+	manifests := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit", "admin-oidc"})
+	for manifestIndex := range manifests {
+		for providerIndex := range manifests[manifestIndex].AuthProviders {
+			if manifests[manifestIndex].AuthProviders[providerIndex].ID == "oidc" {
+				manifests[manifestIndex].AuthProviders[providerIndex].Configured = true
+			}
+		}
+	}
+	return manifests
+}
+
+func authProviderByIDForTest(t *testing.T, manifests []capability.Manifest, providerID string) capability.AuthProvider {
+	t.Helper()
+	for _, manifest := range manifests {
+		for _, provider := range manifest.AuthProviders {
+			if provider.ID == providerID {
+				return provider
+			}
+		}
+	}
+	t.Fatalf("auth provider %q not found", providerID)
+	return capability.AuthProvider{}
+}
+
+func successfulAdminIdentityResolver() AdminIdentityResolver {
+	return adminIdentityResolverFunc{
+		start: func(context.Context, AdminIdentityStartInput) (AdminIdentityStart, error) {
+			return AdminIdentityStart{
+				AuthorizationURL: "https://id.example/authorize?state=state-exact",
+				State:            "state-exact",
+				ExpiresAt:        time.Date(2026, time.July, 11, 12, 0, 0, 0, time.UTC),
+			}, nil
+		},
+		resolve: func(context.Context, AdminIdentityResolveInput) (AdminIdentity, error) {
+			return AdminIdentity{Issuer: "https://id.example", ProviderSubject: "subject-123"}, nil
+		},
+	}
+}
+
+func postAdminOIDCLoginForTest(server *Server, body string) *httptest.ResponseRecorder {
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(body))
+	request.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(recorder, request)
+	return recorder
+}
+
+func adminOIDCLoginBody(code string, state string, verifier string) string {
+	return `{"provider":"oidc","code":"` + code + `","state":"` + state + `","codeVerifier":"` + verifier + `"}`
+}
+
+func disableAdminUserForTest(t *testing.T, store *adminresource.Store, username string) {
+	t.Helper()
+	users, err := store.List("users")
+	if err != nil {
+		t.Fatalf("List(users) error = %v", err)
+	}
+	for _, user := range users {
+		if user.Code != username {
+			continue
+		}
+		if _, err := store.Update("users", user.ID, adminresource.WriteInput{
+			Code: user.Code, Name: user.Name, Status: "disabled", Description: user.Description, Values: user.Values,
+		}); err != nil {
+			t.Fatalf("Update(disable user %s) error = %v", username, err)
+		}
+		return
+	}
+	t.Fatalf("user %q not found", username)
+}
+
+func assertResponseRedactsValues(t *testing.T, value string, sensitive ...string) {
+	t.Helper()
+	for _, item := range sensitive {
+		if item != "" && strings.Contains(value, item) {
+			t.Fatalf("response exposed sensitive admin oidc value")
+		}
+	}
 }

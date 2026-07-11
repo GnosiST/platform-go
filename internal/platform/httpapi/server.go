@@ -38,6 +38,8 @@ type ServerOptions struct {
 	FileStorage             storage.ObjectStore
 	AdminRoutes             []AdminRouteRegistration
 	AppRoutes               []AppRouteRegistration
+	AdminIdentityResolver   AdminIdentityResolver
+	AdminIdentityBindings   AdminIdentityBindingStore
 	AppIdentityResolver     AppIdentityResolver
 	AppIdentityBindings     AppIdentityBindingStore
 	SessionTTL              time.Duration
@@ -65,6 +67,8 @@ type Server struct {
 	cacheTTL                time.Duration
 	fileStorage             storage.ObjectStore
 	appRoutes               map[appRouteKey]gin.HandlerFunc
+	adminIdentityResolver   AdminIdentityResolver
+	adminIdentityBindings   AdminIdentityBindingStore
 	appIdentityResolver     AppIdentityResolver
 	appIdentityBindings     AppIdentityBindingStore
 	tokens                  *authjwt.Service
@@ -135,6 +139,10 @@ func New(options ServerOptions) *Server {
 	if now == nil {
 		now = time.Now
 	}
+	adminIdentityBindings := options.AdminIdentityBindings
+	if adminIdentityBindings == nil {
+		adminIdentityBindings = NewResourceAdminIdentityBindingStore(resources, now)
+	}
 	appIdentityBindings := options.AppIdentityBindings
 	if appIdentityBindings == nil {
 		appIdentityBindings = newResourceAppIdentityBindingStore(resources, now)
@@ -149,6 +157,8 @@ func New(options ServerOptions) *Server {
 		cacheStats:              cacheStats,
 		cacheTTL:                cacheTTL,
 		fileStorage:             fileStorage,
+		adminIdentityResolver:   options.AdminIdentityResolver,
+		adminIdentityBindings:   adminIdentityBindings,
 		appIdentityResolver:     options.AppIdentityResolver,
 		appIdentityBindings:     appIdentityBindings,
 		tokens:                  tokens,
@@ -180,6 +190,7 @@ func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 	api.GET("/platform/branding", s.platformBranding)
 	api.GET("/platform/cache/stats", s.platformCacheStats)
 	api.GET("/auth/providers", s.authProviders)
+	api.POST("/auth/providers/:provider/start", s.authProviderStart)
 	api.POST("/auth/login", s.authLogin)
 	api.POST("/auth/refresh", s.authRefresh)
 	api.POST("/auth/logout", s.authLogout)
@@ -319,15 +330,27 @@ type authProviderListResponse struct {
 }
 
 type authLoginRequest struct {
-	Provider string `json:"provider"`
-	Username string `json:"username"`
-	Code     string `json:"code"`
+	Provider     string `json:"provider"`
+	Username     string `json:"username"`
+	Code         string `json:"code"`
+	State        string `json:"state"`
+	CodeVerifier string `json:"codeVerifier"`
 }
 
 type authLoginResponse struct {
 	Token     string         `json:"token"`
 	ExpiresAt time.Time      `json:"expiresAt"`
 	Principal rbac.Principal `json:"principal"`
+}
+
+type authProviderStartRequest struct {
+	CodeChallenge string `json:"codeChallenge"`
+}
+
+type authProviderStartResponse struct {
+	AuthorizationURL string    `json:"authorizationUrl"`
+	State            string    `json:"state"`
+	ExpiresAt        time.Time `json:"expiresAt"`
 }
 
 type appLoginRequest struct {
@@ -354,7 +377,7 @@ func (s *Server) authProviders(ctx *gin.Context) {
 		providers := make([]capability.AuthProvider, 0)
 		for _, manifest := range s.capabilities {
 			for _, provider := range manifest.AuthProviders {
-				if !s.authProviderAvailable(provider) {
+				if !s.authProviderAvailable(provider) || !provider.SupportsAudience(capability.AuthProviderAudienceAdmin) {
 					continue
 				}
 				providers = append(providers, provider)
@@ -365,14 +388,56 @@ func (s *Server) authProviders(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, Response[authProviderListResponse]{Data: authProviderListResponse{Items: providers}})
 }
 
+func (s *Server) authProviderStart(ctx *gin.Context) {
+	var input authProviderStartRequest
+	if err := ctx.ShouldBindJSON(&input); err != nil {
+		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_START_INVALID", "invalid auth provider start request")
+		return
+	}
+	provider, ok := s.findAuthProvider(ctx.Param("provider"), capability.AuthProviderAudienceAdmin)
+	if !ok {
+		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_NOT_FOUND", "auth provider not found")
+		return
+	}
+	if !provider.Configured {
+		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_NOT_CONFIGURED", "auth provider is not configured")
+		return
+	}
+	if provider.Kind != "oidc" {
+		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_UNSUPPORTED", "auth provider is not supported")
+		return
+	}
+	if s.adminIdentityResolver == nil {
+		writeAuthError(ctx, http.StatusNotImplemented, "AUTH_PROVIDER_RESOLVER_NOT_CONFIGURED", "auth provider resolver is not configured")
+		return
+	}
+	started, err := s.adminIdentityResolver.StartAdminIdentity(ctx.Request.Context(), AdminIdentityStartInput{
+		Provider:      provider,
+		CodeChallenge: strings.TrimSpace(input.CodeChallenge),
+	})
+	if errors.Is(err, ErrAdminIdentityInvalid) || errors.Is(err, ErrAdminIdentityTransaction) {
+		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_START_INVALID", "invalid auth provider start request")
+		return
+	}
+	if err != nil {
+		writeAuthError(ctx, http.StatusBadGateway, "AUTH_PROVIDER_START_FAILED", "auth provider start failed")
+		return
+	}
+	ctx.JSON(http.StatusOK, Response[authProviderStartResponse]{Data: authProviderStartResponse{
+		AuthorizationURL: started.AuthorizationURL,
+		State:            started.State,
+		ExpiresAt:        started.ExpiresAt,
+	}})
+}
+
 func (s *Server) authLogin(ctx *gin.Context) {
 	var input authLoginRequest
 	if err := ctx.ShouldBindJSON(&input); err != nil {
 		writeAuthError(ctx, http.StatusBadRequest, "AUTH_INVALID_REQUEST", "invalid auth login request")
 		return
 	}
-	provider, ok := s.findAuthProvider(input.Provider)
-	if !ok || !provider.Enabled {
+	provider, ok := s.findAuthProvider(input.Provider, capability.AuthProviderAudienceAdmin)
+	if !ok {
 		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_NOT_FOUND", "auth provider not found")
 		return
 	}
@@ -386,38 +451,89 @@ func (s *Server) authLogin(ctx *gin.Context) {
 		if username == "" {
 			username = "admin"
 		}
-		principal := s.resources.CurrentPrincipal(username)
-		if principal.User.Username == "" || len(principal.Permissions) == 0 {
+		principal, err := adminresource.ValidateAdminPrincipal(s.resources, username)
+		if err != nil {
 			writeAuthError(ctx, http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "invalid demo account")
 			return
 		}
-		issued, err := s.sessions.Issue(username)
-		if err != nil {
-			writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_ISSUE_FAILED", "session issue failed")
+		s.issueAdminLogin(ctx, principal, provider)
+	case "oidc":
+		if strings.TrimSpace(input.Code) == "" || strings.TrimSpace(input.State) == "" || strings.TrimSpace(input.CodeVerifier) == "" {
+			writeAuthError(ctx, http.StatusBadRequest, "AUTH_IDENTITY_TRANSACTION_REQUIRED", "auth identity transaction is required")
 			return
 		}
-		s.publishSessionInvalidation(ctx.Request.Context())
-		token, _, err := s.tokens.Sign(authjwt.Subject{
-			UserID:    principal.User.ID,
-			TenantID:  platformTenant,
-			Username:  principal.User.Username,
-			SessionID: issued.Token,
-			TokenType: authjwt.TokenTypeAdmin,
-		}, issued.ExpiresAt.Sub(issued.IssuedAt))
-		if err != nil {
-			writeAuthError(ctx, http.StatusInternalServerError, "AUTH_TOKEN_SIGN_FAILED", "auth token sign failed")
+		if s.adminIdentityResolver == nil {
+			writeAuthError(ctx, http.StatusNotImplemented, "AUTH_PROVIDER_RESOLVER_NOT_CONFIGURED", "auth provider resolver is not configured")
 			return
 		}
-		if err := s.recordAudit("auth.login", "Auth Login", principal.User.Username, provider.ID, issued.Token); err != nil {
-			writeAuthError(ctx, http.StatusInternalServerError, "AUTH_AUDIT_FAILED", "auth audit failed")
-			return
-		}
-		ctx.JSON(http.StatusOK, Response[authLoginResponse]{
-			Data: authLoginResponse{Token: token, ExpiresAt: issued.ExpiresAt, Principal: principal},
+		identity, err := s.adminIdentityResolver.ResolveAdminIdentity(ctx.Request.Context(), AdminIdentityResolveInput{
+			Provider:     provider,
+			Code:         strings.TrimSpace(input.Code),
+			State:        strings.TrimSpace(input.State),
+			CodeVerifier: strings.TrimSpace(input.CodeVerifier),
 		})
+		if errors.Is(err, ErrAdminIdentityInvalid) {
+			writeAuthError(ctx, http.StatusBadRequest, "AUTH_IDENTITY_INVALID", "invalid admin identity")
+			return
+		}
+		if errors.Is(err, ErrAdminIdentityTransaction) {
+			writeAuthError(ctx, http.StatusUnauthorized, "AUTH_IDENTITY_TRANSACTION_INVALID", "invalid admin identity transaction")
+			return
+		}
+		if err != nil {
+			writeAuthError(ctx, http.StatusBadGateway, "AUTH_PROVIDER_RESOLVE_FAILED", "auth provider resolve failed")
+			return
+		}
+		binding, err := s.adminIdentityBindings.ResolveAdminIdentityBinding(ctx.Request.Context(), AdminIdentityBindingInput{
+			Provider:        provider,
+			Issuer:          identity.Issuer,
+			ProviderSubject: identity.ProviderSubject,
+			Now:             s.now().UTC(),
+		})
+		if errors.Is(err, ErrAdminIdentityBindingInvalid) {
+			writeAuthError(ctx, http.StatusUnauthorized, "AUTH_IDENTITY_NOT_BOUND", "admin identity is not bound")
+			return
+		}
+		if err != nil {
+			writeAuthError(ctx, http.StatusInternalServerError, "AUTH_IDENTITY_BINDING_FAILED", "admin identity binding failed")
+			return
+		}
+		principal, err := adminresource.ValidateAdminPrincipal(s.resources, binding.Username)
+		if err != nil {
+			writeAuthError(ctx, http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "invalid admin account")
+			return
+		}
+		s.issueAdminLogin(ctx, principal, provider)
 	default:
 		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_UNSUPPORTED", "auth provider is not supported")
 	}
+}
+
+func (s *Server) issueAdminLogin(ctx *gin.Context, principal rbac.Principal, provider capability.AuthProvider) {
+	issued, err := s.sessions.Issue(principal.User.Username)
+	if err != nil {
+		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_ISSUE_FAILED", "session issue failed")
+		return
+	}
+	s.publishSessionInvalidation(ctx.Request.Context())
+	token, _, err := s.tokens.Sign(authjwt.Subject{
+		UserID:    principal.User.ID,
+		TenantID:  platformTenant,
+		Username:  principal.User.Username,
+		SessionID: issued.Token,
+		TokenType: authjwt.TokenTypeAdmin,
+	}, issued.ExpiresAt.Sub(issued.IssuedAt))
+	if err != nil {
+		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_TOKEN_SIGN_FAILED", "auth token sign failed")
+		return
+	}
+	if err := s.recordAudit("auth.login", "Auth Login", principal.User.Username, provider.ID, issued.Token); err != nil {
+		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_AUDIT_FAILED", "auth audit failed")
+		return
+	}
+	ctx.JSON(http.StatusOK, Response[authLoginResponse]{
+		Data: authLoginResponse{Token: token, ExpiresAt: issued.ExpiresAt, Principal: principal},
+	})
 }
 
 func (s *Server) authRefresh(ctx *gin.Context) {
@@ -538,7 +654,7 @@ func (s *Server) resolveAppLoginIdentity(ctx *gin.Context, input appLoginRequest
 	if providerID == "" {
 		return appUsername(input.Username), "", true
 	}
-	provider, ok := s.findAuthProvider(providerID)
+	provider, ok := s.findAuthProvider(providerID, capability.AuthProviderAudienceApp)
 	if !ok || !provider.Enabled {
 		writeAuthError(ctx, http.StatusBadRequest, "APP_AUTH_PROVIDER_NOT_FOUND", "app auth provider not found")
 		return "", "", false
@@ -1542,11 +1658,11 @@ func (s *Server) findDemoDataSet(capabilityID capability.ID, datasetID string) (
 	return capability.DemoDataSet{}, false
 }
 
-func (s *Server) findAuthProvider(providerID string) (capability.AuthProvider, bool) {
+func (s *Server) findAuthProvider(providerID string, audience capability.AuthProviderAudience) (capability.AuthProvider, bool) {
 	providerID = strings.TrimSpace(providerID)
 	for _, manifest := range s.capabilities {
 		for _, provider := range manifest.AuthProviders {
-			if provider.ID == providerID && s.authProviderAvailable(provider) {
+			if provider.ID == providerID && s.authProviderAvailable(provider) && provider.SupportsAudience(audience) {
 				return provider, true
 			}
 		}

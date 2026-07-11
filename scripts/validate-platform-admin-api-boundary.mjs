@@ -161,6 +161,61 @@ function validateOpenAPIQueryContract(errors) {
   }
 }
 
+function validateAdminOIDCOpenAPIContract(errors) {
+  if (!fs.existsSync(openAPIPath)) {
+    return;
+  }
+  const openAPI = readJSON(openAPIPath);
+  const start = openAPI.paths?.["/api/auth/providers/{provider}/start"]?.post;
+  const login = openAPI.paths?.["/api/auth/login"]?.post;
+  if (start?.operationId !== "startAdminAuthProvider" || !Array.isArray(start?.security) || start.security.length !== 0) {
+    errors.push("admin OpenAPI must expose the public Admin OIDC start operation");
+  }
+  if (login?.operationId !== "adminAuthLogin" || !Array.isArray(login?.security) || login.security.length !== 0) {
+    errors.push("admin OpenAPI must expose the public Admin login exchange operation");
+  }
+  if (!start?.responses?.["501"] || !login?.responses?.["501"]) {
+    errors.push("admin OpenAPI auth operations must declare the missing resolver 501 response");
+  }
+  const startRequest = openAPI.components?.schemas?.AdminAuthProviderStartRequest;
+  const challenge = startRequest?.properties?.codeChallenge;
+  if (
+    startRequest?.additionalProperties !== false ||
+    !Array.isArray(startRequest?.required) ||
+    !startRequest.required.includes("codeChallenge") ||
+    challenge?.minLength !== 43 ||
+    challenge?.maxLength !== 43 ||
+    challenge?.pattern !== "^[A-Za-z0-9_-]{43}$"
+  ) {
+    errors.push("AdminAuthProviderStartRequest must require an exact S256 codeChallenge");
+  }
+  const loginRequest = openAPI.components?.schemas?.AdminAuthLoginRequest;
+  if (
+    loginRequest?.additionalProperties !== false ||
+    !loginRequest?.properties?.state ||
+    !loginRequest?.properties?.codeVerifier ||
+    loginRequest.properties.state.writeOnly !== true ||
+    loginRequest.properties.codeVerifier.writeOnly !== true
+  ) {
+    errors.push("AdminAuthLoginRequest must declare write-only state and codeVerifier exchange fields");
+  }
+  const startData = openAPI.components?.schemas?.AdminAuthProviderStartData;
+  const responseFields = Object.keys(startData?.properties ?? {});
+  const allowedResponseFields = new Set(["authorizationUrl", "state", "expiresAt"]);
+  for (const field of responseFields) {
+    if (!allowedResponseFields.has(field)) {
+      errors.push(`AdminAuthProviderStartData must not expose sensitive response field ${field}`);
+    }
+  }
+  if (
+    startData?.additionalProperties !== false ||
+    responseFields.length !== allowedResponseFields.size ||
+    !responseFields.every((field) => allowedResponseFields.has(field))
+  ) {
+    errors.push("AdminAuthProviderStartData must expose only authorizationUrl, state and expiresAt");
+  }
+}
+
 function validateBoundaryPolicy(boundary, errors) {
   if (boundary.reference?.promotionDecision !== "foundation-gate") {
     errors.push("admin API boundary promotionDecision must stay foundation-gate");
@@ -208,6 +263,7 @@ function validate() {
   validateRequiredSnippets(boundary, errors);
   validateAdminSourceBoundary(boundary, errors);
   validateOpenAPIQueryContract(errors);
+  validateAdminOIDCOpenAPIContract(errors);
   return { boundary, errors };
 }
 

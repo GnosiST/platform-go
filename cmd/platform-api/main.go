@@ -33,7 +33,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("build admin resources: %v", err)
 	}
-	if _, err := authprovider.AdminIdentityResolverFromConfig(cfg); err != nil {
+	adminIdentityResolver, err := authprovider.AdminIdentityResolverFromConfig(cfg)
+	if err != nil {
 		log.Fatalf("build admin identity resolver: %v", err)
 	}
 	adminIdentityBindings := httpapi.NewResourceAdminIdentityBindingStore(resources, time.Now)
@@ -71,6 +72,8 @@ func main() {
 		FileStorage:             fileStorage,
 		AdminRoutes:             apps.DefaultAdminRoutes(resources),
 		AppRoutes:               apps.DefaultAppRoutes(resources),
+		AdminIdentityResolver:   adminIdentityResolver,
+		AdminIdentityBindings:   adminIdentityBindings,
 		AppIdentityResolver:     appIdentityResolver,
 		JWTSecret:               cfg.JWTSecret,
 		OpenAPIDocument:         openAPIDocument,

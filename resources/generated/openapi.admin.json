@@ -12,6 +12,10 @@
   ],
   "tags": [
     {
+      "name": "auth",
+      "description": "Public Admin authentication endpoints."
+    },
+    {
       "name": "apiDocs",
       "description": "API Docs / API 文档",
       "x-platform-group": "system"
@@ -7245,6 +7249,133 @@
           }
         }
       }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "adminAuthLogin",
+        "summary": "Exchange Admin credentials or an identity provider transaction",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminAuthLoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Admin login",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminAuthLoginData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "501": {
+            "$ref": "#/components/responses/NotImplemented"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          }
+        }
+      }
+    },
+    "/api/auth/providers/{provider}/start": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "startAdminAuthProvider",
+        "summary": "Start an Admin identity provider transaction",
+        "security": [],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminAuthProviderStartRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Admin identity provider transaction",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminAuthProviderStartData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "501": {
+            "$ref": "#/components/responses/NotImplemented"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7330,6 +7461,42 @@
       },
       "InternalError": {
         "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "nullable": true
+                },
+                "error": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "NotImplemented": {
+        "description": "Identity provider resolver not configured",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "nullable": true
+                },
+                "error": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "BadGateway": {
+        "description": "Identity provider unavailable",
         "content": {
           "application/json": {
             "schema": {
@@ -7487,6 +7654,95 @@
               "asc",
               "desc"
             ]
+          }
+        }
+      },
+      "AdminAuthProviderStartRequest": {
+        "type": "object",
+        "required": [
+          "codeChallenge"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "codeChallenge": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "description": "PKCE S256 code challenge generated by the Admin client."
+          }
+        }
+      },
+      "AdminAuthProviderStartData": {
+        "type": "object",
+        "required": [
+          "authorizationUrl",
+          "state",
+          "expiresAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "authorizationUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "state": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AdminAuthLoginRequest": {
+        "type": "object",
+        "required": [
+          "provider"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "username": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "state": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "codeVerifier": {
+            "type": "string",
+            "writeOnly": true
+          }
+        }
+      },
+      "AdminAuthLoginData": {
+        "type": "object",
+        "required": [
+          "token",
+          "expiresAt",
+          "principal"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "principal": {
+            "type": "object",
+            "additionalProperties": true
           }
         }
       },

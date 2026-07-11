@@ -159,6 +159,7 @@ func wechatProviderForTest() capability.AuthProvider {
 		Kind:       "wechat",
 		Enabled:    true,
 		Configured: true,
+		Audiences:  []capability.AuthProviderAudience{capability.AuthProviderAudienceApp},
 	}
 }
 
