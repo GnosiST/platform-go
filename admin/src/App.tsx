@@ -192,7 +192,7 @@ function PlatformApp() {
   }, []);
 
   useEffect(() => {
-    if (loading) {
+    if (!getAuthToken() || !session || loading) {
       return;
     }
     const locationRoute = routeFromPathname(location.pathname);
@@ -203,7 +203,7 @@ function PlatformApp() {
       return;
     }
     navigateToRoute(resources[0]?.route ?? "/capabilities", "replace");
-  }, [activeRoute, loading, location.pathname, navigateToRoute, resources]);
+  }, [activeRoute, loading, location.pathname, navigateToRoute, resources, session]);
 
   if (!getAuthToken() || !session) {
     return (
@@ -215,6 +215,7 @@ function PlatformApp() {
             providers={authProviders}
             loading={authLoading}
             error={sessionExpired ? dictionary.sessionExpired : authError || error}
+            search={location.search}
             themeName={themeName}
             onLanguageChange={changeLanguage}
             onThemeChange={applyThemeName}

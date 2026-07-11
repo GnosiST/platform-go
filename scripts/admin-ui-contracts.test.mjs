@@ -35,6 +35,13 @@ function replaceRegexInTemp(tempRoot, relativePath, pattern, to) {
   fs.writeFileSync(filePath, source.replace(pattern, to));
 }
 
+function replaceInTempIfPresent(tempRoot, relativePath, from, to) {
+  const filePath = path.join(tempRoot, relativePath);
+  const source = fs.readFileSync(filePath, "utf8");
+  if (!source.includes(from)) return;
+  fs.writeFileSync(filePath, source.split(from).join(to));
+}
+
 describe("validate-admin-ui-contracts", () => {
   it("accepts the current componentized admin UI contract", () => {
     const result = runValidator();
@@ -259,6 +266,79 @@ describe("validate-admin-ui-contracts", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /Auth provider discovery must explicitly avoid stored-token authentication/);
     assert.match(result.stderr, /Auth login must explicitly avoid stored-token authentication/);
+  });
+
+  for (const [name, relativePath, from, to, message] of [
+    ["provider audiences", "admin/src/platform/api/client.ts", "audiences: string[];", "audienceList: string[];", "AuthProvider must expose its declared audiences"],
+    ["Web Crypto verifier", "admin/src/platform/refine/authProvider.ts", "crypto.getRandomValues(new Uint8Array(32))", "new Uint8Array(32)", "generate a 32-byte verifier with Web Crypto"],
+    ["S256 challenge", "admin/src/platform/refine/authProvider.ts", 'crypto.subtle.digest("SHA-256"', 'legacyDigest("SHA-256"', "derive an S256 challenge with Web Crypto"],
+    ["tab-scoped transaction", "admin/src/platform/refine/authProvider.ts", "window.sessionStorage.setItem", "window.localStorage.setItem", "tab-scoped sessionStorage"],
+    ["exact callback state", "admin/src/platform/refine/authProvider.ts", "callbackState !== pending.state", "!callbackState", "exact comparison"],
+    ["callback URL cleanup", "admin/src/platform/refine/authProvider.ts", "window.history.replaceState", "window.history.pushState", "remove callback values from browser history before exchange"],
+    ["demo-only form", "admin/src/platform/auth/AdminLoginView.tsx", 'selectedProvider.kind === "demo"', 'selectedProvider.kind !== "unknown"', "username form must render only for the demo provider"],
+    ["OIDC-only action", "admin/src/platform/auth/AdminLoginView.tsx", 'selectedProvider.kind === "oidc"', 'selectedProvider.kind !== "unknown"', "OIDC action must render only for an OIDC provider"],
+    ["OIDC action width hook", "admin/src/platform/auth/AdminLoginView.tsx", 'className="login-oidc-action"', 'className="login-provider-action"', "one full-width login action"],
+    ["callback live region", "admin/src/platform/auth/AdminLoginView.tsx", 'aria-live="polite"', 'aria-live="off"', "polite live region"],
+    ["error focus", "admin/src/platform/auth/AdminLoginView.tsx", "focus({ preventScroll: true })", "focus()", "focus its heading without a scroll jump"],
+    ["recovery action", "admin/src/platform/auth/AdminLoginView.tsx", 'className="login-recovery-action"', 'className="login-reset-action"', "explicit recovery action"],
+    ["duplicate-submit prevention", "admin/src/platform/auth/AdminLoginView.tsx", "if (submitting)", "if (false)", "prevent duplicate submissions"],
+    ["login reduced motion", "admin/src/styles.css", ".login-page *", ".login-motion-uncovered *", "suppress non-essential login transitions"],
+    ["mobile login target", "admin/src/styles.css", ".login-submit,\n  .login-oidc-action,\n  .login-recovery-action", ".login-actions-missing", "Mobile login submit, OIDC, and recovery actions must expose 44px touch targets"],
+  ]) {
+    it(`rejects Task 6 without ${name}`, () => {
+      const tempRoot = tempAdminRoot();
+      replaceInTempIfPresent(tempRoot, relativePath, from, to);
+
+      const result = runValidator(["--root", tempRoot]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, new RegExp(message));
+    });
+  }
+
+  it("rejects OIDC rendering that restores the disabled password field", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTempIfPresent(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      "</Form>",
+      "<Input.Password disabled /></Form>",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must not retain the disabled password field/);
+  });
+
+  it("rejects unauthenticated route normalization during OIDC callback cleanup", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTempIfPresent(
+      tempRoot,
+      "admin/src/App.tsx",
+      "if (!getAuthToken() || !session || loading)",
+      "if (loading)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Unauthenticated callback routes must not be normalized before OIDC URL cleanup/);
+  });
+
+  it("rejects unmatched Admin OIDC translations", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTempIfPresent(
+      tempRoot,
+      "admin/src/platform/i18n.ts",
+      'loginOIDCRecovery: "Return to login providers",',
+      "",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Admin login i18n key loginOIDCRecovery must exist in matching Chinese and English dictionaries/);
   });
 
   it("rejects localized session expiry state", () => {

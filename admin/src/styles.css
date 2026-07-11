@@ -1028,6 +1028,9 @@ select {
   .platform-shell *,
   .platform-shell *::before,
   .platform-shell *::after,
+  .login-page *,
+  .login-page *::before,
+  .login-page *::after,
   :where(.ant-modal-root, .ant-drawer-root, .ant-dropdown, .ant-popover, .ant-tooltip, .ant-select-dropdown),
   :where(.ant-modal-root, .ant-drawer-root, .ant-dropdown, .ant-popover, .ant-tooltip, .ant-select-dropdown) *,
   :where(.ant-modal-root, .ant-drawer-root, .ant-dropdown, .ant-popover, .ant-tooltip, .ant-select-dropdown) *::before,
@@ -1211,10 +1214,11 @@ select {
 }
 
 .login-panel {
+  position: relative;
   align-self: center;
   width: min(100% - 48px, 430px);
   margin: 0 auto;
-  padding: 24px;
+  padding: 78px 24px 24px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-elevated);
@@ -1222,10 +1226,13 @@ select {
 }
 
 .login-panel-toolbar {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  left: 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 22px;
 }
 
 .login-panel h2.ant-typography {
@@ -1292,6 +1299,34 @@ select {
 
 .login-submit {
   margin-top: 2px;
+}
+
+.login-oidc-action,
+.login-recovery-action {
+  width: 100%;
+}
+
+.login-callback-status {
+  display: grid;
+  min-height: 172px;
+  align-content: center;
+  justify-items: start;
+  gap: 12px;
+}
+
+.login-callback-status h3.ant-typography,
+.login-callback-status .ant-typography {
+  margin: 0;
+}
+
+.login-callback-icon {
+  color: var(--primary);
+  font-size: 24px;
+}
+
+.login-error-heading:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
 }
 
 .login-theme-swatch {
@@ -4339,7 +4374,26 @@ select {
     align-self: start;
     width: calc(100% - 24px);
     margin: 12px auto 18px;
-    padding: 18px;
+    padding: 72px 18px 18px;
+  }
+
+  .login-panel-toolbar {
+    top: 18px;
+    right: 18px;
+    left: 18px;
+  }
+
+  .login-submit,
+  .login-oidc-action,
+  .login-recovery-action {
+    min-height: 44px;
+  }
+
+  .login-panel .ant-input-affix-wrapper,
+  .login-panel-toolbar .topbar-icon-button,
+  .login-theme-swatch {
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .platform-content {

@@ -47,6 +47,7 @@ export type AuthProvider = {
   description: LocalizedText;
   enabled: boolean;
   configured: boolean;
+  audiences: string[];
   configKeys?: string[];
 };
 
@@ -58,6 +59,14 @@ export type AuthLoginInput = {
   provider: string;
   username?: string;
   code?: string;
+  state?: string;
+  codeVerifier?: string;
+};
+
+export type AuthProviderStartResult = {
+  authorizationUrl: string;
+  state: string;
+  expiresAt: string;
 };
 
 export type AuthLoginResult = {
@@ -451,6 +460,14 @@ export function getBrandingConfig() {
 
 export function listAuthProviders() {
   return request<AuthProviderList>("/auth/providers", { auth: "none" });
+}
+
+export function startAdminAuthProvider(provider: string, codeChallenge: string) {
+  return request<AuthProviderStartResult>(`/auth/providers/${encodeURIComponent(provider)}/start`, {
+    auth: "none",
+    method: "POST",
+    body: JSON.stringify({ codeChallenge }),
+  });
 }
 
 export async function loginWithAuthProvider(input: AuthLoginInput) {

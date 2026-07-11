@@ -14,8 +14,10 @@ const root = resolve(defaultRoot, argValue("--root", defaultRoot));
 const files = {
   app: readSource("admin/src/App.tsx"),
   authProvider: readSource("admin/src/platform/refine/authProvider.ts"),
+  login: readSource("admin/src/platform/auth/AdminLoginView.tsx"),
   capabilityMetadata: readSource("admin/src/platform/capabilities/metadata.ts"),
   client: readSource("admin/src/platform/api/client.ts"),
+  i18n: readSource("admin/src/platform/i18n.ts"),
   primitives: readSource("admin/src/platform/ui/AdminPrimitives.tsx"),
   resourceConsole: readSource("admin/src/platform/resources/GenericResourceConsole.tsx"),
   shell: readSource("admin/src/platform/shell/AdminShell.tsx"),
@@ -58,6 +60,53 @@ requireRegex(
   /request<AuthLoginResult>\("\/auth\/login",\s*\{[\s\S]*?auth:\s*"none"/,
   "Auth login must explicitly avoid stored-token authentication.",
 );
+requireIncludes(files.client, "audiences: string[];", "AuthProvider must expose its declared audiences to the Admin client.");
+requireIncludes(files.client, "export function startAdminAuthProvider", "The Admin client must expose provider-start support.");
+requireRegex(
+  files.client,
+  /request<AuthProviderStartResult>\(`\/auth\/providers\/\$\{encodeURIComponent\(provider\)\}\/start`,\s*\{[\s\S]*?auth:\s*"none"[\s\S]*?JSON\.stringify\(\{ codeChallenge \}\)/,
+  "Admin provider start must post the PKCE challenge without stored-token authentication.",
+);
+requireIncludes(files.authProvider, "crypto.getRandomValues(new Uint8Array(32))", "OIDC login must generate a 32-byte verifier with Web Crypto.");
+requireIncludes(files.authProvider, 'crypto.subtle.digest("SHA-256"', "OIDC login must derive an S256 challenge with Web Crypto.");
+requireIncludes(files.authProvider, "window.sessionStorage.setItem", "OIDC pending transactions must use tab-scoped sessionStorage.");
+requireRegex(
+  files.authProvider,
+  /JSON\.stringify\(\{\s*provider,\s*state:\s*started\.state,\s*codeVerifier,\s*expiresAt:\s*started\.expiresAt,?\s*\}\)/,
+  "OIDC pending transactions must store only provider, state, codeVerifier, and expiresAt.",
+);
+requireIncludes(files.authProvider, "callbackState !== pending.state", "OIDC callback state must use an exact comparison.");
+requireIncludes(files.authProvider, "window.sessionStorage.removeItem", "OIDC terminal and recovery paths must clear the pending transaction.");
+requireOrder(
+  files.authProvider,
+  "window.history.replaceState",
+  "loginWithAuthProvider({",
+  "OIDC callbacks must remove callback values from browser history before exchange.",
+);
+requireIncludes(files.authProvider, "state?: string; codeVerifier?: string", "Refine login input must forward OIDC state and verifier values.");
+requireIncludes(files.app, "search={location.search}", "App must pass the current callback search string to the login view.");
+requireIncludes(files.app, "if (!getAuthToken() || !session || loading)", "Unauthenticated callback routes must not be normalized before OIDC URL cleanup.");
+requireIncludes(files.login, 'selectedProvider.kind === "demo"', "The username form must render only for the demo provider.");
+requireIncludes(files.login, 'selectedProvider.kind === "oidc"', "The OIDC action must render only for an OIDC provider.");
+requireIncludes(files.login, 'className="login-oidc-action"', "OIDC providers must expose one full-width login action.");
+requireNotIncludes(files.login, "Input.Password", "OIDC login must not retain the disabled password field.");
+requireIncludes(files.login, 'aria-live="polite"', "OIDC callback progress and failure must use a polite live region.");
+requireIncludes(files.login, 'className="login-error-heading"', "OIDC callback failures must expose a stable error heading.");
+requireIncludes(files.login, "tabIndex={-1}", "The OIDC callback error heading must be programmatically focusable.");
+requireIncludes(files.login, "focus({ preventScroll: true })", "OIDC callback failure must focus its heading without a scroll jump.");
+requireIncludes(files.login, 'className="login-recovery-action"', "OIDC callback failures must provide an explicit recovery action.");
+requireIncludes(files.login, "if (submitting)", "Login actions must prevent duplicate submissions while pending.");
+for (const key of [
+  "loginOIDCContinue",
+  "loginOIDCStarting",
+  "loginOIDCCallbackProgress",
+  "loginOIDCCallbackFailed",
+  "loginOIDCTransactionInvalid",
+  "loginOIDCTransactionExpired",
+  "loginOIDCRecovery",
+]) {
+  requireCountExactly(files.i18n, `${key}:`, 2, `Admin login i18n key ${key} must exist in matching Chinese and English dictionaries.`);
+}
 requireIncludes(files.app, "const [sessionExpired, setSessionExpired] = useState(false);", "App must keep session expiry in stable non-localized state.");
 requireIncludes(files.app, "setSessionExpired(true);", "Session expiry recovery must set the stable expiry state.");
 requireCountExactly(files.app, "setSessionExpired(true);", 1, "Only the exact-token session-expired event may set App expiry state.");
@@ -330,6 +379,11 @@ requireRegex(files.styles, /:focus-visible[\s\S]*outline:\s*2px solid var\(--pri
 requireRegex(files.styles, /@media\s*\(prefers-reduced-motion:\s*reduce\)/, "styles.css must respect reduced motion.");
 requireRegex(
   files.styles,
+  /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*\.login-page \*[\s\S]*transition-duration:\s*0\.01ms !important;/,
+  "Reduced motion must suppress non-essential login transitions.",
+);
+requireRegex(
+  files.styles,
   /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*:where\(\.ant-modal-root, \.ant-drawer-root, \.ant-dropdown, \.ant-popover, \.ant-tooltip, \.ant-select-dropdown\),[\s\S]*:where\(\.ant-modal-root, \.ant-drawer-root, \.ant-dropdown, \.ant-popover, \.ant-tooltip, \.ant-select-dropdown\) \*,[\s\S]*:where\(\.ant-modal-root, \.ant-drawer-root, \.ant-dropdown, \.ant-popover, \.ant-tooltip, \.ant-select-dropdown\) \*::before,[\s\S]*:where\(\.ant-modal-root, \.ant-drawer-root, \.ant-dropdown, \.ant-popover, \.ant-tooltip, \.ant-select-dropdown\) \*::after[\s\S]*transition-duration:\s*0\.01ms !important;/,
   "Reduced motion must cover used body-portaled AntD motion roots.",
 );
@@ -340,6 +394,12 @@ requireRegex(
   "Mobile Drawer search must use a 44px minimum target below the desktop breakpoint.",
 );
 requireCssRule(mobileStyles, ".platform-data-table-panel .platform-table-search", ["min-height: 44px;"], "Mobile resource search must expose a 44px touch target.");
+requireCssRule(
+  mobileStyles,
+  ".login-submit,\n  .login-oidc-action,\n  .login-recovery-action",
+  ["min-height: 44px;"],
+  "Mobile login submit, OIDC, and recovery actions must expose 44px touch targets.",
+);
 requireCssRule(mobileStyles, ".platform-data-table-panel .table-actions .ant-btn", ["min-width: 44px;", "min-height: 44px;"], "Mobile resource table actions must expose 44px touch targets.");
 requireCssRule(
   mobileStyles,

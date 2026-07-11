@@ -218,3 +218,50 @@ Automated evidence remains `scripts/validate-admin-i18n.mjs`, `scripts/validate-
 Evidence limit: this QA package is implementation evidence, not WCAG certification. It does not establish screen-reader behavior, high-zoom reflow or platform-specific assistive-technology conformance.
 
 final result: passed
+
+## 2026-07-11 Task 6 Admin OIDC Login QA
+
+Status: implemented and accepted for the accessible provider-specific Admin login slice.
+
+Baseline evidence:
+
+- `.superpowers/design-audit/task6/01-login-current-390x844.jpg`
+- `.superpowers/design-audit/task6/02-login-current-1280x720.jpg`
+
+Baseline findings:
+
+- The desktop hierarchy, spacing, colors, typography, provider selector and operational tone were stable and should be preserved.
+- Every provider shared the demo username and disabled-password form.
+- The `390x844` first viewport ended before the submit action.
+- Callback progress, callback failure focus and recovery states were absent.
+
+Required state definitions:
+
+1. Provider list: keep every Admin-capable provider visible; show localized configured status, disable unavailable providers, and expose a native-button accessible name containing provider title and status.
+2. Demo form: render only the username form and submit action when the selected provider kind is `demo`; do not render an irrelevant disabled password field.
+3. OIDC action: render exactly one full-width localized action when the selected provider kind is `oidc`; disable repeated provider selection and redirect actions while the start request is pending.
+4. Callback progress: replace provider and credential controls with stable `aria-live="polite"` and `aria-busy="true"` status content while the code exchange is pending.
+5. Callback failure: keep the callback values removed from browser history, show a localized sanitized message, and focus a `tabIndex=-1` error heading without scrolling.
+6. Recovery: expose one full-width localized recovery action that clears stale transaction state and restores the provider list.
+
+Fresh implementation evidence:
+
+- `.superpowers/design-audit/task6/03-login-demo-after-1280x720.png`
+- `.superpowers/design-audit/task6/04-login-oidc-after-1280x720.png`
+- `.superpowers/design-audit/task6/05-login-oidc-after-390x844.png`
+- `.superpowers/design-audit/task6/06-login-demo-after-390x844.png`
+- `.superpowers/design-audit/task6/07-login-callback-progress-390x844.png`
+- `.superpowers/design-audit/task6/08-login-callback-failure-390x844.png`
+
+Browser and accessibility evidence:
+
+- At `1280x720`, demo and OIDC states had no horizontal overflow; OIDC rendered one `380px`-wide action and no username or password inputs.
+- At `390x844`, demo and OIDC primary actions were `44px` high and remained within the first viewport; the demo username control was `44px` high, provider controls were `52px` high, and toolbar controls were `44px` high.
+- Callback progress removed provider/form actions, used `aria-live="polite"` plus `aria-busy="true"`, and normalized the URL to `/login` before exchange.
+- Callback failure retained `/login`, used `aria-live="polite"`, focused the error heading with `tabIndex=-1`, kept the `44px` recovery action in the first viewport, and restored both providers after recovery.
+- Keyboard order followed provider selection, provider action, language and theme controls. Focus-visible styling remained present for the callback error heading.
+- Focused Chrome console review found no warning or error entries. Static contracts cover reduced-motion suppression for login transitions.
+
+Evidence limit: this focused QA is not a WCAG certification and does not include a live external identity provider. Production-like OIDC acceptance remains a separate plan task.
+
+final result: passed

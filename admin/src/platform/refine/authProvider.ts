@@ -6,12 +6,115 @@ import {
   getCurrentAdminSession,
   loginWithAuthProvider,
   logoutCurrentSession,
+  startAdminAuthProvider,
+  type AuthLoginResult,
 } from "../api/client";
 
+const OIDC_TRANSACTION_KEY = "platform.auth.oidc.pending";
+
+type PendingOIDCLogin = {
+  provider: string;
+  state: string;
+  codeVerifier: string;
+  expiresAt: string;
+};
+
+export type OIDCCallbackFailure = "callback" | "state" | "expired";
+
+export class OIDCCallbackError extends Error {
+  constructor(readonly reason: OIDCCallbackFailure) {
+    super(reason);
+    this.name = "OIDCCallbackError";
+  }
+}
+
+export async function beginOIDCLogin(provider: string) {
+  const verifierBytes = crypto.getRandomValues(new Uint8Array(32));
+  const codeVerifier = base64URL(verifierBytes);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(codeVerifier));
+  const codeChallenge = base64URL(new Uint8Array(digest));
+  const started = await startAdminAuthProvider(provider, codeChallenge);
+  window.sessionStorage.setItem(
+    OIDC_TRANSACTION_KEY,
+    JSON.stringify({
+      provider,
+      state: started.state,
+      codeVerifier,
+      expiresAt: started.expiresAt,
+    }),
+  );
+  window.location.assign(started.authorizationUrl);
+}
+
+export async function consumePendingOIDCLogin(search: string): Promise<AuthLoginResult | null> {
+  const params = new URLSearchParams(search);
+  const code = params.get("code");
+  const callbackState = params.get("state");
+  const providerError = params.get("error");
+  if (!code && !callbackState && !providerError) {
+    return null;
+  }
+
+  window.history.replaceState(window.history.state, "", "/login");
+  window.dispatchEvent(new PopStateEvent("popstate"));
+
+  const rawPending = window.sessionStorage.getItem(OIDC_TRANSACTION_KEY);
+  window.sessionStorage.removeItem(OIDC_TRANSACTION_KEY);
+  if (providerError || !code || !callbackState) {
+    throw new OIDCCallbackError("callback");
+  }
+
+  const pending = parsePendingOIDCLogin(rawPending);
+  if (!pending || callbackState !== pending.state) {
+    throw new OIDCCallbackError("state");
+  }
+  if (!Number.isFinite(Date.parse(pending.expiresAt)) || Date.parse(pending.expiresAt) <= Date.now()) {
+    throw new OIDCCallbackError("expired");
+  }
+
+  return loginWithAuthProvider({
+    provider: pending.provider,
+    code,
+    state: callbackState,
+    codeVerifier: pending.codeVerifier,
+  });
+}
+
+export function clearPendingOIDCLogin() {
+  window.sessionStorage.removeItem(OIDC_TRANSACTION_KEY);
+}
+
+function parsePendingOIDCLogin(rawPending: string | null): PendingOIDCLogin | null {
+  if (!rawPending) return null;
+  try {
+    const value = JSON.parse(rawPending) as Partial<PendingOIDCLogin>;
+    const keys = Object.keys(value);
+    if (
+      keys.length !== 4 ||
+      !keys.every((key) => ["provider", "state", "codeVerifier", "expiresAt"].includes(key)) ||
+      typeof value.provider !== "string" ||
+      typeof value.state !== "string" ||
+      typeof value.codeVerifier !== "string" ||
+      typeof value.expiresAt !== "string"
+    ) {
+      return null;
+    }
+    return value as PendingOIDCLogin;
+  } catch {
+    return null;
+  }
+}
+
+function base64URL(bytes: Uint8Array) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return window.btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+}
+
 export const authProvider: AuthProvider = {
-  login: async ({ provider = "demo", username = "admin", code }: { provider?: string; username?: string; code?: string }) => {
+  login: async ({ provider = "demo", username = "admin", code, state, codeVerifier }: { provider?: string; username?: string; code?: string; state?: string; codeVerifier?: string }) => {
     try {
-      await loginWithAuthProvider({ provider, username, code });
+      await loginWithAuthProvider({ provider, username, code, state, codeVerifier });
       window.dispatchEvent(new Event("platform:auth:login"));
       return { success: true, redirectTo: "/" };
     } catch (error) {
