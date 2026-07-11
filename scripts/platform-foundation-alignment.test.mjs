@@ -7,6 +7,17 @@ import { describe, it } from "node:test";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
+const completionProgramTaskIDs = [
+  "runtime-security-containment",
+  "admin-watermark-export-governance",
+  "sensitive-data-protection-runtime",
+  "sensitive-data-historical-migration",
+  "open-source-portability",
+  "public-docs-community",
+  "public-docs-site",
+  "github-release-publication",
+];
+
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-foundation-alignment.mjs", ...args], {
     cwd: repoRoot,
@@ -26,11 +37,14 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
-  it("tracks production Admin OIDC as required and no longer future work", () => {
+  it("tracks the completion program as non-droppable future work", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
 
     assert.ok(audit.requiredTaskNodes.includes("production-admin-oidc-auth"));
-    assert.deepEqual(audit.requiredFutureTaskNodes, []);
+    assert.deepEqual(audit.requiredFutureTaskNodes, completionProgramTaskIDs);
+    for (const taskID of completionProgramTaskIDs) {
+      assert.ok(audit.nonDroppableGoalNodes.includes(taskID), `${taskID} must be non-droppable`);
+    }
   });
 
   it("rejects regressing production Admin OIDC to pending after Task 8 closeout", () => {
@@ -414,7 +428,7 @@ describe("validate-platform-foundation-alignment", () => {
     const result = runValidator(["--audit", auditPath, "--task-execution-audit", taskExecutionPath, "--engineering-capabilities", engineeringPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /task execution audit requiredUnfinishedNodes must be empty after Task 8 closeout/);
+    assert.match(result.stderr, /task execution audit requiredUnfinishedNodes/);
     assert.match(result.stderr, /alignment requiredValidators must include task execution validator scripts\/validate-platform-task-execution-audit\.mjs/);
     assert.match(result.stderr, /engineering capability task-dependency-governance must cite validate-platform-task-execution-audit\.mjs/);
   });

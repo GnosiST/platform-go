@@ -7,6 +7,57 @@ import { describe, it } from "node:test";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
+const foundationBaselineTaskIDs = [
+  "stack-alignment-and-architecture",
+  "capability-manifest-contract",
+  "resource-schema-contract",
+  "capability-profile-composition-gate",
+  "capability-contract-governance",
+  "rbac-menu-data-scope",
+  "governance-org-area-role-groups",
+  "auth-session-provider-jwt-wechat",
+  "gorm-storage-runtime",
+  "cache-redis-invalidation",
+  "production-persistence-correctness",
+  "production-runtime-gate",
+  "production-readiness-preflight",
+  "openapi-app-contracts",
+  "admin-api-boundary-query-security",
+  "codegen-preview-scaffold",
+  "codegen-source-writing-readiness",
+  "admin-ui-shell-and-list-components",
+  "branding-demo-data-dashboard",
+  "personnel-extension-boundary",
+  "notification-extension-boundary",
+  "job-extension-boundary",
+  "visual-product-design-qa",
+  "policy-review-and-audit-workflow",
+  "production-auth-provider-hardening",
+  "form-schema-layout-and-slots",
+  "refine-custom-panels-and-actions",
+  "file-storage-preview-and-audit-workflow",
+  "policy-review-custom-ui",
+  "source-writing-codegen-promotion",
+  "task-dependency-governance",
+  "reference-discovery-classification-gate",
+  "reference-coverage-boundary-gate",
+  "node-closeout-audit",
+  "foundation-alignment-audit",
+  "admin-ui-system-quality-hardening",
+  "production-admin-oidc-auth",
+];
+
+const completionProgramTaskIDs = [
+  "runtime-security-containment",
+  "admin-watermark-export-governance",
+  "sensitive-data-protection-runtime",
+  "sensitive-data-historical-migration",
+  "open-source-portability",
+  "public-docs-community",
+  "public-docs-site",
+  "github-release-publication",
+];
+
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-foundation-task-graph.mjs", ...args], {
     cwd: repoRoot,
@@ -248,7 +299,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /task production-auth-provider-hardening must declare at least one evidence\.docs path/);
   });
 
-  it("tracks production Admin OIDC as the final implemented foundation node", () => {
+  it("preserves the closed 37-node baseline and tracks the completion program as pending", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
@@ -278,10 +329,29 @@ describe("validate-platform-foundation-task-graph", () => {
       "1440x1024",
     ]);
     assert.ok(task.completionEvidence.every((item) => item.status === "verified"));
-    assert.equal(graph.tasks.length, 37);
+    assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
+    assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
+    assert.equal(graph.tasks.length, 45);
     assert.equal(implemented.length, 37);
-    assert.deepEqual(pending, []);
+    assert.deepEqual(pending.map((item) => item.id), completionProgramTaskIDs);
     assert.equal(blocked.length, 0);
+  });
+
+  it("rejects missing or reordered completion program task IDs", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const programTasks = graph.tasks.filter((task) => completionProgramTaskIDs.includes(task.id));
+    assert.equal(programTasks.length, completionProgramTaskIDs.length, "completion program nodes must exist before mutation validation");
+
+    const missingGraph = structuredClone(graph);
+    missingGraph.tasks = missingGraph.tasks.filter((task) => task.id !== completionProgramTaskIDs[0]);
+    const missingResult = runValidator(["--graph", tempJSON("missing-completion-task.json", missingGraph)]);
+    assert.notEqual(missingResult.status, 0, missingResult.stdout);
+
+    const reorderedGraph = structuredClone(graph);
+    const indexes = completionProgramTaskIDs.slice(0, 2).map((id) => reorderedGraph.tasks.findIndex((task) => task.id === id));
+    [reorderedGraph.tasks[indexes[0]], reorderedGraph.tasks[indexes[1]]] = [reorderedGraph.tasks[indexes[1]], reorderedGraph.tasks[indexes[0]]];
+    const reorderedResult = runValidator(["--graph", tempJSON("reordered-completion-task.json", reorderedGraph)]);
+    assert.notEqual(reorderedResult.status, 0, reorderedResult.stdout);
   });
 
   it("rejects production Admin OIDC evidence manifests without a completed redaction scan", () => {

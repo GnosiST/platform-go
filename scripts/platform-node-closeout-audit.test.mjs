@@ -7,6 +7,17 @@ import { describe, it } from "node:test";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
+const completionProgramTaskIDs = [
+  "runtime-security-containment",
+  "admin-watermark-export-governance",
+  "sensitive-data-protection-runtime",
+  "sensitive-data-historical-migration",
+  "open-source-portability",
+  "public-docs-community",
+  "public-docs-site",
+  "github-release-publication",
+];
+
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-node-closeout-audit.mjs", ...args], {
     cwd: repoRoot,
@@ -33,7 +44,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("closes the production Admin OIDC node with Task 8 evidence", () => {
+  it("preserves 37 baseline closeouts and tracks eight pending nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -42,7 +53,25 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
     assert.equal(audit.nodeCloseouts.length, 37);
-    assert.deepEqual(audit.pendingNodeEvidence, []);
+    assert.deepEqual(audit.pendingNodeEvidence, completionProgramTaskIDs);
+  });
+
+  it("rejects premature closeout evidence for a pending completion node", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const audit = readJSON("resources/platform-node-closeout-audit.json");
+    const task = graph.tasks.find((item) => item.id === completionProgramTaskIDs[0]);
+    assert.ok(task, "runtime security completion node must exist before closeout mutation validation");
+    assert.equal(task.status, "pending");
+    audit.nodeCloseouts.push({
+      taskId: task.id,
+      status: "closed",
+      neatFreak: true,
+      cleanupEvidence: ["docs/platform-auth.md"],
+      dimensions: ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"],
+    });
+
+    const result = runValidator(["--audit", tempJSON("premature-node-closeout-audit.json", audit)]);
+    assert.notEqual(result.status, 0, result.stdout);
   });
 
   it("rejects implemented task nodes without closeout evidence", () => {

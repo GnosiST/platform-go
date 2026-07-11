@@ -7,6 +7,17 @@ import { describe, it } from "node:test";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
+const completionProgramTaskIDs = [
+  "runtime-security-containment",
+  "admin-watermark-export-governance",
+  "sensitive-data-protection-runtime",
+  "sensitive-data-historical-migration",
+  "open-source-portability",
+  "public-docs-community",
+  "public-docs-site",
+  "github-release-publication",
+];
+
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-goal-completion-audit.mjs", ...args], {
     cwd: repoRoot,
@@ -40,38 +51,40 @@ describe("validate-platform-goal-completion-audit", () => {
     assert.match(result.stdout, /Validated platform goal completion audit/);
   });
 
-  it("marks the foundation goal complete after Task 8 evidence closes the final node", () => {
+  it("marks the completion program as controlled incomplete at 45/37/8", () => {
     const audit = readJSON("resources/platform-goal-completion-audit.json");
 
-    assert.equal(audit.completionStatus, "complete");
-    assert.deepEqual(audit.completionPolicy.requiredControlledUnfinishedNodes, []);
+    assert.equal(audit.completionStatus, "not-complete-controlled");
+    assert.deepEqual(audit.completionPolicy.requiredControlledUnfinishedNodes, completionProgramTaskIDs);
     assert.deepEqual(audit.taskSummary, {
-      expectedTotal: 37,
+      expectedTotal: 45,
       expectedImplemented: 37,
-      expectedControlledUnfinished: 0,
+      expectedControlledUnfinished: 8,
     });
   });
 
-  it("rejects regressing the completed foundation goal to controlled incomplete", () => {
+  it("rejects marking the completion program complete while nodes remain unfinished", () => {
     const audit = readJSON("resources/platform-goal-completion-audit.json");
-    audit.completionStatus = "not-complete-controlled";
+    audit.completionStatus = "complete";
     const auditPath = tempJSON("platform-goal-completion-audit.json", audit);
 
     const result = runValidator(["--audit", auditPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /completionStatus must be complete when all foundation task nodes are implemented/);
+    assert.match(result.stderr, /completionStatus must stay not-complete-controlled/);
   });
 
-  it("rejects reintroducing a controlled unfinished node after foundation completion", () => {
+  it("rejects missing or reordered controlled unfinished projections", () => {
     const audit = readJSON("resources/platform-goal-completion-audit.json");
-    audit.completionPolicy.requiredControlledUnfinishedNodes = ["production-admin-oidc-auth"];
-    const auditPath = tempJSON("platform-goal-completion-audit.json", audit);
+    assert.deepEqual(audit.completionPolicy.requiredControlledUnfinishedNodes, completionProgramTaskIDs);
 
-    const result = runValidator(["--audit", auditPath]);
+    audit.completionPolicy.requiredControlledUnfinishedNodes = completionProgramTaskIDs.slice(1);
+    const missingResult = runValidator(["--audit", tempJSON("missing-goal-completion-audit.json", audit)]);
+    assert.notEqual(missingResult.status, 0, missingResult.stdout);
 
-    assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /completionPolicy\.requiredControlledUnfinishedNodes must be empty after foundation completion/);
+    audit.completionPolicy.requiredControlledUnfinishedNodes = [completionProgramTaskIDs[1], completionProgramTaskIDs[0], ...completionProgramTaskIDs.slice(2)];
+    const reorderedResult = runValidator(["--audit", tempJSON("reordered-goal-completion-audit.json", audit)]);
+    assert.notEqual(reorderedResult.status, 0, reorderedResult.stdout);
   });
 
   it("rejects business reference wording that turns zshenmez into a migration source", () => {

@@ -7,6 +7,14 @@ import { describe, it } from "node:test";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
+const completionProgramCapabilityIDs = [
+  "runtime-security-containment",
+  "admin-watermark-export-governance",
+  "sensitive-data-protection",
+  "open-source-portability",
+  "public-documentation-and-release",
+];
+
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-engineering-capabilities.mjs", ...args], {
     cwd: repoRoot,
@@ -55,6 +63,23 @@ function tempStackSourceRoot(mutator) {
 }
 
 describe("validate-platform-engineering-capabilities", () => {
+  it("tracks approved completion program capabilities as partial", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    const capabilities = matrix.capabilities.filter((item) => completionProgramCapabilityIDs.includes(item.id));
+
+    assert.deepEqual(capabilities.map((item) => item.id), completionProgramCapabilityIDs);
+    assert.ok(capabilities.every((item) => item.status === "partial"));
+  });
+
+  it("rejects dropping an approved completion program capability", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities = matrix.capabilities.filter((item) => item.id !== completionProgramCapabilityIDs[0]);
+
+    const result = runValidator(["--matrix", tempJSON("missing-completion-capability.json", matrix)]);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /missing required capability runtime-security-containment/);
+  });
+
   it("accepts current engineering capability coverage", () => {
     const result = runValidator();
 

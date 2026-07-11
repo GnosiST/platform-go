@@ -7,6 +7,17 @@ import { describe, it } from "node:test";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
+const completionProgramTaskIDs = [
+  "runtime-security-containment",
+  "admin-watermark-export-governance",
+  "sensitive-data-protection-runtime",
+  "sensitive-data-historical-migration",
+  "open-source-portability",
+  "public-docs-community",
+  "public-docs-site",
+  "github-release-publication",
+];
+
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-task-execution-audit.mjs", ...args], {
     cwd: repoRoot,
@@ -33,10 +44,10 @@ describe("validate-platform-task-execution-audit", () => {
     assert.match(result.stdout, /Validated platform task execution audit/);
   });
 
-  it("tracks no unfinished foundation nodes after Task 8 closeout", () => {
+  it("tracks the ordered completion program as controlled unfinished work", () => {
     const audit = readJSON("resources/platform-task-execution-audit.json");
 
-    assert.deepEqual(audit.requiredUnfinishedNodes, []);
+    assert.deepEqual(audit.requiredUnfinishedNodes, completionProgramTaskIDs);
   });
 
   it("rejects an unfinished task graph node that is missing from the execution audit", () => {
@@ -64,15 +75,17 @@ describe("validate-platform-task-execution-audit", () => {
     assert.match(result.stderr, /requiredValidators must include scripts\/validate-platform-admin-api-boundary\.mjs/);
   });
 
-  it("rejects tracking a completed foundation node as unfinished", () => {
+  it("rejects missing or reordered completion program execution projections", () => {
     const audit = readJSON("resources/platform-task-execution-audit.json");
-    audit.requiredUnfinishedNodes = ["production-admin-oidc-auth"];
-    const auditPath = tempJSON("platform-task-execution-audit.json", audit);
+    assert.deepEqual(audit.requiredUnfinishedNodes, completionProgramTaskIDs);
 
-    const result = runValidator(["--audit", auditPath]);
+    audit.requiredUnfinishedNodes = completionProgramTaskIDs.slice(1);
+    const missingResult = runValidator(["--audit", tempJSON("missing-platform-task-execution-audit.json", audit)]);
+    assert.notEqual(missingResult.status, 0, missingResult.stdout);
 
-    assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /requiredUnfinishedNodes must be empty after Task 8 closeout/);
+    audit.requiredUnfinishedNodes = [completionProgramTaskIDs[1], completionProgramTaskIDs[0], ...completionProgramTaskIDs.slice(2)];
+    const reorderedResult = runValidator(["--audit", tempJSON("reordered-platform-task-execution-audit.json", audit)]);
+    assert.notEqual(reorderedResult.status, 0, reorderedResult.stdout);
   });
 
   it("rejects future promotion gates without status reason or completion gate", () => {

@@ -7,6 +7,17 @@ import { describe, it } from "node:test";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
+const completionProgramTaskIDs = [
+  "runtime-security-containment",
+  "admin-watermark-export-governance",
+  "sensitive-data-protection-runtime",
+  "sensitive-data-historical-migration",
+  "open-source-portability",
+  "public-docs-community",
+  "public-docs-site",
+  "github-release-publication",
+];
+
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-objective-conformance.mjs", ...args], {
     cwd: repoRoot,
@@ -26,12 +37,12 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-objective-conformance", () => {
-  it("tracks the completed foundation objective with no controlled unfinished nodes", () => {
+  it("tracks the ordered completion program as controlled objective blockers", () => {
     const audit = readJSON("resources/platform-objective-conformance.json");
 
-    assert.deepEqual(audit.taskControlPolicy.requiredUnfinishedNodes, []);
-    assert.equal(audit.completionPolicy.goalCompletionStatus, "complete");
-    assert.deepEqual(audit.completionPolicy.controlledBlockers, []);
+    assert.deepEqual(audit.taskControlPolicy.requiredUnfinishedNodes, completionProgramTaskIDs);
+    assert.equal(audit.completionPolicy.goalCompletionStatus, "not-complete-controlled");
+    assert.deepEqual(audit.completionPolicy.controlledBlockers, completionProgramTaskIDs);
   });
 
   it("accepts the current objective conformance contract", () => {
@@ -214,26 +225,26 @@ describe("validate-platform-objective-conformance", () => {
     assert.match(result.stderr, /objective conformance evidence must include scripts\/validate-platform-node-closeout-audit\.mjs/);
   });
 
-  it("rejects controlled blockers after the foundation objective is complete", () => {
+  it("rejects missing controlled blockers while completion nodes remain unfinished", () => {
     const audit = readJSON("resources/platform-objective-conformance.json");
-    audit.completionPolicy.controlledBlockers = ["source-writing-codegen-promotion"];
+    audit.completionPolicy.controlledBlockers = completionProgramTaskIDs.slice(1);
     const auditPath = tempJSON("platform-objective-conformance.json", audit);
 
     const result = runValidator(["--audit", auditPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /completionPolicy\.controlledBlockers must be empty after Task 8 closeout/);
+    assert.match(result.stderr, /completionPolicy\.controlledBlockers/);
   });
 
-  it("rejects regressing the completed objective to controlled incomplete", () => {
+  it("rejects reordering controlled objective blockers", () => {
     const audit = readJSON("resources/platform-objective-conformance.json");
-    audit.completionPolicy.goalCompletionStatus = "not-complete-controlled";
+    audit.completionPolicy.controlledBlockers = [completionProgramTaskIDs[1], completionProgramTaskIDs[0], ...completionProgramTaskIDs.slice(2)];
     const auditPath = tempJSON("platform-objective-conformance.json", audit);
 
     const result = runValidator(["--audit", auditPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /completionPolicy\.goalCompletionStatus must be complete after Task 8 closeout/);
+    assert.match(result.stderr, /completionPolicy\.controlledBlockers/);
   });
 
   it("rejects making Vercel the required default API runtime", () => {
