@@ -154,7 +154,8 @@ function validatePlatformEnv(env, errors) {
   if (capabilities.includes("app-phone")) {
     const phoneKey = requireKey(env, "PLATFORM_PHONE_HMAC_KEY", errors);
     const codeKey = requireKey(env, "PLATFORM_PHONE_CODE_HMAC_KEY", errors);
-    const provider = requireKey(env, "PLATFORM_PHONE_VERIFICATION_PROVIDER", errors).trim().toLowerCase();
+    const rawProvider = requireKey(env, "PLATFORM_PHONE_VERIFICATION_PROVIDER", errors);
+    const provider = rawProvider.trim().toLowerCase();
     if (Buffer.byteLength(phoneKey, "utf8") < 32) {
       errors.push("PLATFORM_PHONE_HMAC_KEY must be at least 32 bytes");
     }
@@ -163,6 +164,15 @@ function validatePlatformEnv(env, errors) {
     }
     if (phoneKey === codeKey) {
       errors.push("phone and code HMAC keys must be distinct");
+    }
+    if (rawProvider.trim() === "") {
+      errors.push("PLATFORM_PHONE_VERIFICATION_PROVIDER must not be empty");
+    }
+    if (rawProvider !== provider) {
+      errors.push("PLATFORM_PHONE_VERIFICATION_PROVIDER must be canonical trimmed lowercase");
+    }
+    if (provider === "unknown") {
+      errors.push("PLATFORM_PHONE_VERIFICATION_PROVIDER must identify a configured provider");
     }
     if (provider === "debug") {
       errors.push("PLATFORM_PHONE_VERIFICATION_PROVIDER must not be debug in production");

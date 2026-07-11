@@ -45,6 +45,7 @@ type ServerOptions struct {
 	AppIdentityBindings     AppIdentityBindingStore
 	PhoneProtector          PhoneProtector
 	PhoneVerificationSender PhoneVerificationSender
+	DebugCodeEnabled        bool
 	SessionTTL              time.Duration
 	JWTSecret               string
 	OpenAPIDocument         []byte
@@ -76,6 +77,7 @@ type Server struct {
 	appIdentityBindings     AppIdentityBindingStore
 	phoneProtector          PhoneProtector
 	phoneVerificationSender PhoneVerificationSender
+	debugCodeEnabled        bool
 	tokens                  *authjwt.Service
 	now                     func() time.Time
 	openAPIDocument         []byte
@@ -168,6 +170,7 @@ func New(options ServerOptions) *Server {
 		appIdentityBindings:     appIdentityBindings,
 		phoneProtector:          options.PhoneProtector,
 		phoneVerificationSender: options.PhoneVerificationSender,
+		debugCodeEnabled:        options.DebugCodeEnabled,
 		tokens:                  tokens,
 		now:                     now,
 		openAPIDocument:         append([]byte(nil), options.OpenAPIDocument...),

@@ -62,9 +62,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("load openapi document: %v", err)
 	}
-	phoneVerification, err := bootstrap.PhoneVerificationRuntimeFromConfig(cfg, nil)
+	phoneVerificationSender := phoneVerificationSenderFromConfig(cfg)
+	phoneVerification, err := bootstrap.PhoneVerificationRuntimeFromConfig(cfg, phoneVerificationSender)
 	if err != nil {
 		log.Fatalf("build phone verification runtime: %v", err)
+	}
+	if err := httpapi.ValidatePhoneProtectionHistory(resources, phoneVerification.Protector); err != nil {
+		log.Fatalf("validate phone protection history: %v", err)
 	}
 	server := httpapi.New(httpapi.ServerOptions{
 		Capabilities:            ordered,
@@ -81,6 +85,7 @@ func main() {
 		AppIdentityResolver:     appIdentityResolver,
 		PhoneProtector:          phoneVerification.Protector,
 		PhoneVerificationSender: phoneVerification.Sender,
+		DebugCodeEnabled:        phoneVerification.DebugCodeEnabled,
 		JWTSecret:               cfg.JWTSecret,
 		OpenAPIDocument:         openAPIDocument,
 		DisableDemoAuthProvider: cfg.DisableDemoAuthProvider,
@@ -88,4 +93,11 @@ func main() {
 	if err := server.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("run platform api: %v", err)
 	}
+}
+
+func phoneVerificationSenderFromConfig(cfg config.Config) httpapi.PhoneVerificationSender {
+	if cfg.PhoneVerificationProvider == httpapi.PhoneVerificationProviderDebug {
+		return httpapi.NewDebugPhoneVerificationSender()
+	}
+	return nil
 }

@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"platform-go/internal/platform/capability"
@@ -11,8 +12,9 @@ import (
 )
 
 type PhoneVerificationRuntime struct {
-	Protector httpapi.PhoneProtector
-	Sender    httpapi.PhoneVerificationSender
+	Protector        httpapi.PhoneProtector
+	Sender           httpapi.PhoneVerificationSender
+	DebugCodeEnabled bool
 }
 
 func CapabilitiesFromConfig(cfg config.Config, additionalManifests ...capability.Manifest) ([]capability.Manifest, error) {
@@ -64,29 +66,53 @@ func PhoneVerificationRuntimeFromConfig(cfg config.Config, sender httpapi.PhoneV
 	if _, err := protector.CodeDigest(phoneDigest, "bootstrap", "000000"); err != nil {
 		return PhoneVerificationRuntime{}, fmt.Errorf("build phone protector: %w", err)
 	}
-	provider := strings.ToLower(strings.TrimSpace(cfg.PhoneVerificationProvider))
-	environment := strings.ToLower(strings.TrimSpace(cfg.RuntimeEnvironment))
-	if environment == "" {
-		environment = config.RuntimeEnvironmentDevelopment
-	}
-	if provider == httpapi.PhoneVerificationProviderDebug {
-		if environment != config.RuntimeEnvironmentDevelopment && environment != config.RuntimeEnvironmentTest {
-			return PhoneVerificationRuntime{}, fmt.Errorf("phone verification debug provider is not allowed in %s", environment)
-		}
-		if sender == nil {
-			sender = httpapi.NewDebugPhoneVerificationSender()
-		}
-	} else if sender == nil {
-		return PhoneVerificationRuntime{}, fmt.Errorf("unsupported phone verification provider %q: no sender is registered", provider)
+	rawProvider := cfg.PhoneVerificationProvider
+	provider := strings.ToLower(strings.TrimSpace(rawProvider))
+	if rawProvider != provider {
+		return PhoneVerificationRuntime{}, fmt.Errorf("phone verification provider must be canonical trimmed lowercase")
 	}
 	if provider == "" {
 		return PhoneVerificationRuntime{}, fmt.Errorf("phone verification provider is required")
 	}
-	actualProvider := strings.ToLower(strings.TrimSpace(sender.Kind()))
+	if provider == "unknown" {
+		return PhoneVerificationRuntime{}, fmt.Errorf("unsupported phone verification provider %q", provider)
+	}
+	environment := strings.ToLower(strings.TrimSpace(cfg.RuntimeEnvironment))
+	if environment == "" {
+		environment = config.RuntimeEnvironmentDevelopment
+	}
+	if phoneVerificationSenderNil(sender) {
+		return PhoneVerificationRuntime{}, fmt.Errorf("unsupported phone verification provider %q: no sender is registered", provider)
+	}
+	debugCodeEnabled := false
+	if provider == httpapi.PhoneVerificationProviderDebug {
+		if environment != config.RuntimeEnvironmentDevelopment && environment != config.RuntimeEnvironmentTest {
+			return PhoneVerificationRuntime{}, fmt.Errorf("phone verification debug provider is not allowed in %s", environment)
+		}
+		debugSender, ok := sender.(*httpapi.DebugPhoneVerificationSender)
+		if !ok || debugSender == nil {
+			return PhoneVerificationRuntime{}, fmt.Errorf("phone verification debug provider requires the built-in debug sender")
+		}
+		debugCodeEnabled = true
+	}
+	actualProvider := sender.Kind()
 	if actualProvider != provider {
 		return PhoneVerificationRuntime{}, fmt.Errorf("phone verification sender %q does not match configured provider %q", actualProvider, provider)
 	}
-	return PhoneVerificationRuntime{Protector: protector, Sender: sender}, nil
+	return PhoneVerificationRuntime{Protector: protector, Sender: sender, DebugCodeEnabled: debugCodeEnabled}, nil
+}
+
+func phoneVerificationSenderNil(sender httpapi.PhoneVerificationSender) bool {
+	if sender == nil {
+		return true
+	}
+	value := reflect.ValueOf(sender)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
 }
 
 func configuredCapability(capabilities []string, target string) bool {

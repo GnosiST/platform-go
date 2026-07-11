@@ -361,10 +361,10 @@ func TestLoadParsesAdminOIDCConfiguration(t *testing.T) {
 func TestLoadParsesPhoneVerificationConfiguration(t *testing.T) {
 	t.Setenv("PLATFORM_PHONE_HMAC_KEY", "phone-key")
 	t.Setenv("PLATFORM_PHONE_CODE_HMAC_KEY", "code-key")
-	t.Setenv("PLATFORM_PHONE_VERIFICATION_PROVIDER", "debug")
+	t.Setenv("PLATFORM_PHONE_VERIFICATION_PROVIDER", "SMS-VENDOR")
 
 	cfg := Load()
-	if cfg.PhoneHMACKey != "phone-key" || cfg.PhoneCodeHMACKey != "code-key" || cfg.PhoneVerificationProvider != "debug" {
+	if cfg.PhoneHMACKey != "phone-key" || cfg.PhoneCodeHMACKey != "code-key" || cfg.PhoneVerificationProvider != "SMS-VENDOR" {
 		t.Fatalf("phone verification config = %+v", cfg)
 	}
 }
@@ -599,6 +599,32 @@ func TestValidateRuntimeRejectsDebugPhoneProviderOutsideDevelopmentAndTest(t *te
 				t.Fatalf("ValidateRuntime() error = %v, want debug provider environment error", err)
 			}
 		})
+	}
+}
+
+func TestValidateRuntimeRejectsNonCanonicalPhoneProvider(t *testing.T) {
+	cfg := validProductionRuntimeConfig()
+	cfg.Capabilities = append(cfg.Capabilities, "app-phone")
+	cfg.PhoneHMACKey = strings.Repeat("p", 32)
+	cfg.PhoneCodeHMACKey = strings.Repeat("c", 32)
+	cfg.PhoneVerificationProvider = " SMS-VENDOR "
+
+	err := cfg.ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "PLATFORM_PHONE_VERIFICATION_PROVIDER to be canonical trimmed lowercase") {
+		t.Fatalf("ValidateRuntime() error = %v, want canonical provider error", err)
+	}
+}
+
+func TestValidateRuntimeRejectsUnknownPhoneProvider(t *testing.T) {
+	cfg := validProductionRuntimeConfig()
+	cfg.Capabilities = append(cfg.Capabilities, "app-phone")
+	cfg.PhoneHMACKey = strings.Repeat("p", 32)
+	cfg.PhoneCodeHMACKey = strings.Repeat("c", 32)
+	cfg.PhoneVerificationProvider = "unknown"
+
+	err := cfg.ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "PLATFORM_PHONE_VERIFICATION_PROVIDER must identify a configured provider") {
+		t.Fatalf("ValidateRuntime() error = %v, want unknown provider error", err)
 	}
 }
 

@@ -127,7 +127,7 @@ func Load() Config {
 		DisableDemoAuthProvider:           boolEnv("PLATFORM_DISABLE_DEMO_AUTH_PROVIDER", false),
 		PhoneHMACKey:                      env("PLATFORM_PHONE_HMAC_KEY", ""),
 		PhoneCodeHMACKey:                  env("PLATFORM_PHONE_CODE_HMAC_KEY", ""),
-		PhoneVerificationProvider:         strings.ToLower(env("PLATFORM_PHONE_VERIFICATION_PROVIDER", "")),
+		PhoneVerificationProvider:         env("PLATFORM_PHONE_VERIFICATION_PROVIDER", ""),
 	}
 }
 
@@ -217,9 +217,16 @@ func (c Config) validateAppPhone(environment string) []error {
 	if c.PhoneHMACKey == c.PhoneCodeHMACKey {
 		errs = append(errs, fmt.Errorf("%s requires distinct phone and code HMAC keys", prefix))
 	}
-	provider := strings.ToLower(strings.TrimSpace(c.PhoneVerificationProvider))
+	rawProvider := c.PhoneVerificationProvider
+	provider := strings.ToLower(strings.TrimSpace(rawProvider))
+	if rawProvider != provider {
+		errs = append(errs, fmt.Errorf("%s requires PLATFORM_PHONE_VERIFICATION_PROVIDER to be canonical trimmed lowercase", prefix))
+	}
 	if provider == "" {
 		errs = append(errs, fmt.Errorf("%s requires PLATFORM_PHONE_VERIFICATION_PROVIDER", prefix))
+	}
+	if provider == "unknown" {
+		errs = append(errs, errors.New("PLATFORM_PHONE_VERIFICATION_PROVIDER must identify a configured provider"))
 	}
 	if provider == "debug" && environment != RuntimeEnvironmentDevelopment && environment != RuntimeEnvironmentTest {
 		errs = append(errs, errors.New("app-phone debug provider is allowed only in development or test"))

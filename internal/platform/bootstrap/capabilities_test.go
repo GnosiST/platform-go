@@ -25,6 +25,21 @@ func (s phoneVerificationSenderStub) Kind() string {
 	return s.kind
 }
 
+type pointerPhoneVerificationSenderStub struct {
+	kind string
+}
+
+func (*pointerPhoneVerificationSenderStub) Send(context.Context, string, string, string) error {
+	return nil
+}
+
+func (s *pointerPhoneVerificationSenderStub) Kind() string {
+	if s == nil {
+		return "sms-vendor"
+	}
+	return s.kind
+}
+
 func TestCapabilitiesFromConfigResolvesOnlyConfiguredCapabilities(t *testing.T) {
 	manifests, err := CapabilitiesFromConfig(config.Config{
 		Capabilities: []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "admin-shell"},
@@ -133,12 +148,25 @@ func TestPhoneVerificationRuntimeFromConfigComposesExplicitDevelopmentDebugSende
 		PhoneHMACKey:              strings.Repeat("p", 32),
 		PhoneCodeHMACKey:          strings.Repeat("c", 32),
 		PhoneVerificationProvider: "debug",
-	}, nil)
+	}, httpapi.NewDebugPhoneVerificationSender())
 	if err != nil {
 		t.Fatalf("PhoneVerificationRuntimeFromConfig() error = %v", err)
 	}
-	if runtime.Protector == nil || runtime.Sender == nil || runtime.Sender.Kind() != httpapi.PhoneVerificationProviderDebug {
-		t.Fatalf("phone verification runtime = %+v, want protector and debug sender", runtime)
+	if runtime.Protector == nil || runtime.Sender == nil || runtime.Sender.Kind() != httpapi.PhoneVerificationProviderDebug || !runtime.DebugCodeEnabled {
+		t.Fatalf("phone verification runtime = %+v, want protector, debug sender, and immutable debug disclosure", runtime)
+	}
+}
+
+func TestPhoneVerificationRuntimeFromConfigDoesNotImplicitlyCreateDebugSender(t *testing.T) {
+	_, err := PhoneVerificationRuntimeFromConfig(config.Config{
+		RuntimeEnvironment:        config.RuntimeEnvironmentDevelopment,
+		Capabilities:              []string{"app-phone"},
+		PhoneHMACKey:              strings.Repeat("p", 32),
+		PhoneCodeHMACKey:          strings.Repeat("c", 32),
+		PhoneVerificationProvider: "debug",
+	}, nil)
+	if err == nil || !strings.Contains(err.Error(), "no sender is registered") {
+		t.Fatalf("PhoneVerificationRuntimeFromConfig() error = %v, want explicit debug sender requirement", err)
 	}
 }
 
@@ -170,12 +198,34 @@ func TestPhoneVerificationRuntimeFromConfigRequiresMatchingInjectedSender(t *tes
 	if _, err := PhoneVerificationRuntimeFromConfig(cfg, phoneVerificationSenderStub{kind: "other-vendor"}); err == nil || !strings.Contains(err.Error(), "does not match configured provider") {
 		t.Fatalf("PhoneVerificationRuntimeFromConfig(mismatch) error = %v", err)
 	}
-	runtime, err := PhoneVerificationRuntimeFromConfig(cfg, phoneVerificationSenderStub{kind: " SMS-VENDOR "})
-	if err != nil {
-		t.Fatalf("PhoneVerificationRuntimeFromConfig(match) error = %v", err)
+	if _, err := PhoneVerificationRuntimeFromConfig(cfg, phoneVerificationSenderStub{kind: " SMS-VENDOR "}); err == nil || !strings.Contains(err.Error(), "does not match configured provider") {
+		t.Fatalf("PhoneVerificationRuntimeFromConfig(non-canonical sender) error = %v, want exact provider match", err)
 	}
-	if runtime.Protector == nil || runtime.Sender == nil {
-		t.Fatalf("phone verification runtime = %+v, want injected runtime", runtime)
+	runtime, err := PhoneVerificationRuntimeFromConfig(cfg, phoneVerificationSenderStub{kind: "sms-vendor"})
+	if err != nil || runtime.DebugCodeEnabled {
+		t.Fatalf("PhoneVerificationRuntimeFromConfig(match) runtime=%+v error=%v, want non-debug injected runtime", runtime, err)
+	}
+}
+
+func TestPhoneVerificationRuntimeFromConfigRejectsNonCanonicalProviderAndTypedNilSender(t *testing.T) {
+	base := config.Config{
+		RuntimeEnvironment:        config.RuntimeEnvironmentProduction,
+		Capabilities:              []string{"app-phone"},
+		PhoneHMACKey:              strings.Repeat("p", 32),
+		PhoneCodeHMACKey:          strings.Repeat("c", 32),
+		PhoneVerificationProvider: " SMS-VENDOR ",
+	}
+	if _, err := PhoneVerificationRuntimeFromConfig(base, phoneVerificationSenderStub{kind: "sms-vendor"}); err == nil || !strings.Contains(err.Error(), "canonical trimmed lowercase") {
+		t.Fatalf("PhoneVerificationRuntimeFromConfig(non-canonical provider) error = %v", err)
+	}
+	base.PhoneVerificationProvider = "sms-vendor"
+	var sender *pointerPhoneVerificationSenderStub
+	if _, err := PhoneVerificationRuntimeFromConfig(base, sender); err == nil || !strings.Contains(err.Error(), "no sender is registered") {
+		t.Fatalf("PhoneVerificationRuntimeFromConfig(typed nil) error = %v", err)
+	}
+	base.PhoneVerificationProvider = "unknown"
+	if _, err := PhoneVerificationRuntimeFromConfig(base, phoneVerificationSenderStub{kind: "unknown"}); err == nil || !strings.Contains(err.Error(), "unsupported") {
+		t.Fatalf("PhoneVerificationRuntimeFromConfig(unknown provider) error = %v", err)
 	}
 }
 

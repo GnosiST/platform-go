@@ -129,7 +129,7 @@ func (s *Server) appPhoneCreateVerification(ctx *gin.Context) {
 		Purpose:     purpose,
 		ExpiresAt:   expiresAt,
 	}
-	if normalizedPhoneVerificationProvider(s.phoneVerificationSender.Kind()) == PhoneVerificationProviderDebug {
+	if s.debugCodeEnabled {
 		response.DebugCode = verificationCode
 	}
 	ctx.JSON(http.StatusCreated, Response[appPhoneVerificationResponse]{
@@ -333,10 +333,6 @@ func maskAppPhone(phone string) string {
 		return string(value[:1]) + "***" + string(value[len(value)-1:])
 	}
 	return string(value[:3]) + "****" + string(value[len(value)-4:])
-}
-
-func normalizedPhoneVerificationProvider(provider string) string {
-	return strings.ToLower(strings.TrimSpace(provider))
 }
 
 func phoneDigestTag(digest string) string {

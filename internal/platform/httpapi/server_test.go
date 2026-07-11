@@ -211,6 +211,10 @@ type phoneVerificationSenderTestStub struct {
 	send func(context.Context, string, string, string) error
 }
 
+type mutablePhoneVerificationSenderTestStub struct {
+	kind string
+}
+
 type phoneProtectorTestStub struct {
 	phoneDigest func(string) (string, error)
 	codeDigest  func(string, string, string) (string, error)
@@ -224,6 +228,10 @@ func (p phoneProtectorTestStub) CodeDigest(phoneDigest string, purpose string, c
 	return p.codeDigest(phoneDigest, purpose, code)
 }
 
+func (p phoneProtectorTestStub) KeyIDs() (PhoneProtectionKeyIDs, error) {
+	return PhoneProtectionKeyIDs{Phone: strings.Repeat("a", 64), Code: strings.Repeat("b", 64)}, nil
+}
+
 func (s phoneVerificationSenderTestStub) Send(ctx context.Context, phone string, purpose string, code string) error {
 	if s.send == nil {
 		return nil
@@ -232,6 +240,15 @@ func (s phoneVerificationSenderTestStub) Send(ctx context.Context, phone string,
 }
 
 func (s phoneVerificationSenderTestStub) Kind() string {
+	return s.kind
+}
+
+func (s *mutablePhoneVerificationSenderTestStub) Send(context.Context, string, string, string) error {
+	s.kind = PhoneVerificationProviderDebug
+	return nil
+}
+
+func (s *mutablePhoneVerificationSenderTestStub) Kind() string {
 	return s.kind
 }
 
@@ -266,6 +283,7 @@ func newTestServer(options ServerOptions) *Server {
 	}
 	if options.PhoneVerificationSender == nil {
 		options.PhoneVerificationSender = NewDebugPhoneVerificationSender()
+		options.DebugCodeEnabled = true
 	}
 	return New(options)
 }
@@ -2205,6 +2223,75 @@ func TestAppPhoneVerificationWithProviderStoresOnlyVersionedDigestsAndOmitsDebug
 		if strings.Contains(string(encoded), forbidden) {
 			t.Fatalf("stored verification leaked %q: %s", forbidden, encoded)
 		}
+	}
+}
+
+func TestAppPhoneVerificationDoesNotTrustMutableSenderKindForDebugDisclosure(t *testing.T) {
+	sender := &mutablePhoneVerificationSenderTestStub{kind: "sms-vendor"}
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{
+			"dictionary", "tenant", "identity", "session", "rbac", "audit", "app-phone",
+		}),
+		PhoneVerificationSender: sender,
+		DebugCodeEnabled:        false,
+	})
+	login := appLoginForTest(t, server, "guest-alpha")
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/app/identity/phone-verifications", bytes.NewBufferString(`{"phone":"13800138000","purpose":"bind"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("POST mutable provider verification status=%d body=%s, want 201", recorder.Code, recorder.Body.String())
+	}
+	if sender.Kind() != PhoneVerificationProviderDebug {
+		t.Fatalf("mutable sender kind=%q, want debug after Send", sender.Kind())
+	}
+	if strings.Contains(recorder.Body.String(), "debugCode") {
+		t.Fatalf("mutable production sender exposed debugCode: %s", recorder.Body.String())
+	}
+}
+
+func TestAppPhoneVerificationFailsClosedWhenProtectionDependencyIsMissing(t *testing.T) {
+	capabilities := capabilitiesFromConfigForTest(t, []string{
+		"dictionary", "tenant", "identity", "session", "rbac", "audit", "app-phone",
+	})
+	tests := []struct {
+		name    string
+		options ServerOptions
+	}{
+		{
+			name: "protector",
+			options: ServerOptions{
+				Capabilities:            capabilities,
+				PhoneVerificationSender: NewDebugPhoneVerificationSender(),
+				DebugCodeEnabled:        true,
+			},
+		},
+		{
+			name: "sender",
+			options: ServerOptions{
+				Capabilities:   capabilities,
+				PhoneProtector: NewHMACPhoneProtector([]byte(strings.Repeat("p", 32)), []byte(strings.Repeat("c", 32))),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.options.AllowInsecureHeaderAuth = true
+			server := New(tt.options)
+			login := appLoginForTest(t, server, "guest-alpha")
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/api/app/identity/phone-verifications", bytes.NewBufferString(`{"phone":"13800138000","purpose":"bind"}`))
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+			server.Router().ServeHTTP(recorder, request)
+
+			if recorder.Code != http.StatusServiceUnavailable || !strings.Contains(recorder.Body.String(), "APP_PHONE_VERIFICATION_UNAVAILABLE") {
+				t.Fatalf("POST missing %s status=%d body=%s, want fail-closed 503", tt.name, recorder.Code, recorder.Body.String())
+			}
+		})
 	}
 }
 
