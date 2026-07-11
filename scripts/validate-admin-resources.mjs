@@ -74,6 +74,50 @@ function hasLocalizedText(value) {
   return typeof value?.zh === "string" && value.zh.trim() !== "" && typeof value?.en === "string" && value.en.trim() !== "";
 }
 
+function isMaskedProjection(mode) {
+  return mode === "masked" || mode === "omitted";
+}
+
+function validSecurityFieldPolicy(sensitivity, storageMode, responseMode, exportMode) {
+  if (sensitivity === "personal" && storageMode === "masked") {
+    return isMaskedProjection(responseMode) && isMaskedProjection(exportMode);
+  }
+  if (sensitivity === "public" || !["hashed", "encrypted"].includes(storageMode)) {
+    return false;
+  }
+  return responseMode === "omitted" && exportMode === "omitted";
+}
+
+function isSecurityFieldName(key) {
+  const normalized = String(key ?? "").trim().toLowerCase().replaceAll(/[_\-.]/g, "");
+  let base = normalized;
+  for (const suffix of ["hash", "digest"]) {
+    if (base.endsWith(suffix)) {
+      base = base.slice(0, -suffix.length);
+    }
+  }
+  if (["code", "session"].includes(base) && base !== normalized) {
+    return true;
+  }
+  if (["verificationcode", "debugcode", "providersubject", "phone", "phonenumber", "identitynumber", "idnumber", "email", "address", "detailedaddress", "sessionid", "sessionhandle", "sessiontoken"].includes(base)) {
+    return true;
+  }
+  if (["password", "passwd", "token", "secret", "credential", "credentials", "sessionid", "sessionhandle", "sessiontoken", "session"].some((marker) => protectedNameMatch(base, marker))) {
+    return true;
+  }
+  return ["email", "phone", "phonenumber", "address", "identitynumber", "idnumber", "providersubject"].some((suffix) => base.endsWith(suffix));
+}
+
+function protectedNameMatch(normalized, marker) {
+  if (normalized === marker || normalized.endsWith(marker)) {
+    return true;
+  }
+  if (!normalized.startsWith(marker)) {
+    return false;
+  }
+  return !["prefix", "type", "count", "status", "expiresat", "issuedat", "createdat", "updatedat", "revokedat", "lastusedat"].some((suffix) => normalized.endsWith(suffix));
+}
+
 function runCommand(label, command, args = []) {
   const result = spawnSync(command, args, {
     cwd: repoRoot,
@@ -299,11 +343,23 @@ function validateManifest() {
       if (["sensitive", "secret"].includes(sensitivity) && source === "record") {
         errors.push(`${prefix} field ${field.key} sensitive or secret values cannot use record storage`);
       }
+      if (sensitivity === "personal" && storageMode === "plain") {
+        errors.push(`${prefix} field ${field.key} personal values require masked or protected storage`);
+      }
       if (["sensitive", "secret"].includes(sensitivity) && storageMode === "plain") {
         errors.push(`${prefix} field ${field.key} sensitive or secret values require protected storage`);
       }
+      if (storageMode === "masked" && sensitivity !== "personal") {
+        errors.push(`${prefix} field ${field.key} masked storage requires personal sensitivity`);
+      }
+      if (storageMode === "masked" && (!isMaskedProjection(responseMode) || !isMaskedProjection(exportMode))) {
+        errors.push(`${prefix} field ${field.key} masked storage must use masked or omitted response and export`);
+      }
       if (["hashed", "encrypted"].includes(storageMode) && (responseMode !== "omitted" || exportMode !== "omitted")) {
         errors.push(`${prefix} field ${field.key} protected storage must be omitted from response and export`);
+      }
+      if (isSecurityFieldName(field.key) && !validSecurityFieldPolicy(sensitivity, storageMode, responseMode, exportMode)) {
+        errors.push(`${prefix} field ${field.key} security field names require masked personal or protected non-public storage`);
       }
       if (field.relation) {
         const relation = field.relation;

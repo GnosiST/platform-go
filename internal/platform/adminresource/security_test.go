@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/core"
@@ -95,6 +97,84 @@ func TestStoreRejectsHashNamedFieldWithoutProtectedPolicy(t *testing.T) {
 	}
 }
 
+func TestStoreRejectsPlainPersonalAndMalformedMaskedValues(t *testing.T) {
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	schema := store.schemas["tenants"]
+	for index := range schema.Fields {
+		if schema.Fields[index].Key == "isolation" {
+			schema.Fields[index].Sensitivity = capability.FieldSensitivityPersonal
+			schema.Fields[index].StorageMode = capability.FieldStoragePlain
+			schema.Fields[index].ResponseMode = capability.FieldProjectionOmitted
+			schema.Fields[index].ExportMode = capability.FieldProjectionOmitted
+		}
+	}
+	store.schemas["tenants"] = schema
+	if err := store.validateWriteValues("tenants", map[string]string{"isolation": "private-value"}, WriteOriginInternal); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("validateWriteValues(personal plain) error = %v, want ErrInvalidRecord", err)
+	}
+
+	store = NewStoreFromCapabilities(core.DefaultManifests())
+	if err := store.validateWriteValues("app-phone-bindings", map[string]string{
+		"maskedPhone": "13800138000",
+	}, WriteOriginInternal); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("validateWriteValues(unmasked maskedPhone) error = %v, want ErrInvalidRecord", err)
+	}
+
+	for _, tt := range []struct {
+		name   string
+		mutate func(*FieldDefinition)
+	}{
+		{name: "public sensitivity", mutate: func(field *FieldDefinition) { field.Sensitivity = capability.FieldSensitivityPublic }},
+		{name: "full response", mutate: func(field *FieldDefinition) { field.ResponseMode = capability.FieldProjectionFull }},
+		{name: "full export", mutate: func(field *FieldDefinition) { field.ExportMode = capability.FieldProjectionFull }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			store := NewStoreFromCapabilities(core.DefaultManifests())
+			schema := store.schemas["app-phone-bindings"]
+			for index := range schema.Fields {
+				if schema.Fields[index].Key == "maskedPhone" {
+					tt.mutate(&schema.Fields[index])
+				}
+			}
+			store.schemas["app-phone-bindings"] = schema
+			if err := store.validateWriteValues("app-phone-bindings", map[string]string{"maskedPhone": "138****8000"}, WriteOriginInternal); !errors.Is(err, ErrInvalidRecord) {
+				t.Fatalf("validateWriteValues(maskedPhone) error = %v, want ErrInvalidRecord", err)
+			}
+		})
+	}
+}
+
+func TestStoreRejectsCredentialLikeCompoundNamesWithoutProtectedPolicy(t *testing.T) {
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	schema := store.schemas["tenants"]
+	schema.Fields = append(schema.Fields,
+		FieldDefinition{Key: "apiToken", Source: "values", Sensitivity: capability.FieldSensitivityPublic, StorageMode: capability.FieldStoragePlain, ResponseMode: capability.FieldProjectionFull, ExportMode: capability.FieldProjectionFull},
+		FieldDefinition{Key: "authSecret", Source: "values", Sensitivity: capability.FieldSensitivityPublic, StorageMode: capability.FieldStoragePlain, ResponseMode: capability.FieldProjectionFull, ExportMode: capability.FieldProjectionFull},
+		FieldDefinition{Key: "adminSessionId", Source: "values", Sensitivity: capability.FieldSensitivityPublic, StorageMode: capability.FieldStoragePlain, ResponseMode: capability.FieldProjectionFull, ExportMode: capability.FieldProjectionFull},
+		FieldDefinition{Key: "maskedPassword", Source: "values", Sensitivity: capability.FieldSensitivityPublic, StorageMode: capability.FieldStoragePlain, ResponseMode: capability.FieldProjectionFull, ExportMode: capability.FieldProjectionFull},
+	)
+	store.schemas["tenants"] = schema
+	for key, value := range map[string]string{
+		"apiToken": "raw-token-marker", "authSecret": "raw-secret-marker",
+		"adminSessionId": "raw-session-marker", "maskedPassword": "not-actually-masked",
+	} {
+		if err := store.validateWriteValues("tenants", map[string]string{key: value}, WriteOriginInternal); !errors.Is(err, ErrInvalidRecord) {
+			t.Fatalf("validateWriteValues(%s) error = %v, want ErrInvalidRecord", key, err)
+		}
+	}
+	for index := range schema.Fields {
+		if schema.Fields[index].Key == "apiToken" {
+			schema.Fields[index].StorageMode = capability.FieldStorageHashed
+			schema.Fields[index].ResponseMode = capability.FieldProjectionOmitted
+			schema.Fields[index].ExportMode = capability.FieldProjectionOmitted
+		}
+	}
+	store.schemas["tenants"] = schema
+	if err := store.validateWriteValues("tenants", map[string]string{"apiToken": "derived-token-hash"}, WriteOriginInternal); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("validateWriteValues(public hashed apiToken) error = %v, want ErrInvalidRecord", err)
+	}
+}
+
 func TestProjectRecordDropsLegacyUnknownAndResponseOmittedValues(t *testing.T) {
 	store := NewStoreFromCapabilities(core.DefaultManifests())
 	legacyRecord := Record{
@@ -180,6 +260,89 @@ func TestPersistBoundaryRejectsInvalidDirectSnapshotWrites(t *testing.T) {
 	}
 }
 
+func TestPersistBoundaryRejectsPolicyReviewDirectSnapshotMutation(t *testing.T) {
+	repository := &securityRecordingRepository{snapshot: ResourceSnapshot{Resources: map[string][]Record{}}}
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	store.repository = repository
+
+	review, err := store.Create("policy-reviews", WriteInput{
+		Code: "PR-SECURITY-1001", Name: "Security boundary review", Status: "enabled",
+		Values: map[string]string{
+			"policyType": "role_permission", "requestedAction": "update", "reviewStatus": "pending",
+			"roleCode": "operator", "permissionCodes": "admin:user:read", "requestedBy": "admin",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Create(policy-reviews) error = %v", err)
+	}
+	for index := range repository.snapshot.Resources["audit-logs"] {
+		delete(repository.snapshot.Resources["audit-logs"][index].Values, "traceId")
+	}
+	removeSecuritySchemaField(store, "audit-logs", "traceId")
+	repository.saveCount = 0
+	wantSnapshot := cloneSecuritySnapshot(repository.snapshot)
+
+	_, err = store.ApprovePolicyReview(review.ID, "admin")
+	if !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("ApprovePolicyReview() error = %v, want ErrInvalidRecord", err)
+	}
+	if !strings.Contains(err.Error(), "traceId") {
+		t.Fatalf("ApprovePolicyReview() error = %v, want final snapshot rejection for traceId", err)
+	}
+	if repository.saveCount != 0 {
+		t.Fatalf("repository saveCount = %d, want 0", repository.saveCount)
+	}
+	if got := store.snapshotLocked(); !reflect.DeepEqual(got, wantSnapshot) {
+		t.Fatalf("store snapshot changed after rejected policy-review mutation\ngot:  %+v\nwant: %+v", got, wantSnapshot)
+	}
+	if hasSecurityRecordCode(store.resources["audit-logs"], "policy-review:PR-SECURITY-1001:approved") {
+		t.Fatal("rejected policy-review audit remained in memory")
+	}
+}
+
+func TestPersistBoundaryRejectsAdminIdentityDirectSnapshotMutation(t *testing.T) {
+	repository := &securityRecordingRepository{snapshot: ResourceSnapshot{Resources: map[string][]Record{}}}
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	store.repository = repository
+	input := AdminIdentityBindingProvisionInput{
+		Key: AdminIdentityBindingKey{
+			Provider: "oidc", ProviderKind: "oidc",
+			IssuerHash: strings.Repeat("a", 64), ProviderSubjectHash: strings.Repeat("b", 64),
+		},
+		PlatformUsername: "admin",
+		Now:              time.Date(2026, time.July, 12, 8, 0, 0, 0, time.UTC),
+	}
+	created, err := store.ProvisionAdminIdentityBinding(context.Background(), input)
+	if err != nil {
+		t.Fatalf("ProvisionAdminIdentityBinding() error = %v", err)
+	}
+	for index := range repository.snapshot.Resources[adminIdentitiesResource] {
+		if repository.snapshot.Resources[adminIdentitiesResource][index].ID == created.RecordID {
+			delete(repository.snapshot.Resources[adminIdentitiesResource][index].Values, adminIdentityBindingLastLoginAtField)
+		}
+	}
+	removeSecuritySchemaField(store, adminIdentitiesResource, adminIdentityBindingLastLoginAtField)
+	repository.saveCount = 0
+	wantSnapshot := cloneSecuritySnapshot(repository.snapshot)
+
+	_, err = store.ResolveAdminIdentityBinding(context.Background(), AdminIdentityBindingResolveInput{
+		Key: input.Key,
+		Now: time.Date(2026, time.July, 12, 9, 0, 0, 0, time.UTC),
+	})
+	if !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("ResolveAdminIdentityBinding() error = %v, want ErrInvalidRecord", err)
+	}
+	if !strings.Contains(err.Error(), adminIdentityBindingLastLoginAtField) {
+		t.Fatalf("ResolveAdminIdentityBinding() error = %v, want final snapshot rejection for %s", err, adminIdentityBindingLastLoginAtField)
+	}
+	if repository.saveCount != 0 {
+		t.Fatalf("repository saveCount = %d, want 0", repository.saveCount)
+	}
+	if got := store.snapshotLocked(); !reflect.DeepEqual(got, wantSnapshot) {
+		t.Fatalf("store snapshot changed after rejected identity mutation\ngot:  %+v\nwant: %+v", got, wantSnapshot)
+	}
+}
+
 func TestRepositoryLoadScrubsLegacyUnknownAndProhibitedValues(t *testing.T) {
 	repository := &securityRecordingRepository{snapshot: ResourceSnapshot{
 		Revision: 3,
@@ -241,9 +404,67 @@ func TestRepositoryLoadScrubsLegacyUnknownAndProhibitedValues(t *testing.T) {
 	}
 }
 
+func TestScrubSnapshotRemovesMalformedMaskedAndPlainPersonalValues(t *testing.T) {
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	tenantSchema := store.schemas["tenants"]
+	for index := range tenantSchema.Fields {
+		if tenantSchema.Fields[index].Key == "isolation" {
+			tenantSchema.Fields[index].Sensitivity = capability.FieldSensitivityPersonal
+			tenantSchema.Fields[index].StorageMode = capability.FieldStoragePlain
+			tenantSchema.Fields[index].ResponseMode = capability.FieldProjectionOmitted
+			tenantSchema.Fields[index].ExportMode = capability.FieldProjectionOmitted
+		}
+	}
+	store.schemas["tenants"] = tenantSchema
+
+	clean, changed, err := store.scrubSnapshot(ResourceSnapshot{Resources: map[string][]Record{
+		"tenants":            {{ID: "tenant-legacy", Values: map[string]string{"isolation": "private-value"}}},
+		"app-phone-bindings": {{ID: "binding-legacy", Values: map[string]string{"maskedPhone": "13800138000"}}},
+	}})
+	if err != nil {
+		t.Fatalf("scrubSnapshot() error = %v", err)
+	}
+	if !changed {
+		t.Fatal("scrubSnapshot() changed = false, want true")
+	}
+	if values := clean.Resources["tenants"][0].Values; len(values) != 0 {
+		t.Fatalf("tenant values = %+v, want scrubbed personal plaintext", values)
+	}
+	if values := clean.Resources["app-phone-bindings"][0].Values; len(values) != 0 {
+		t.Fatalf("phone binding values = %+v, want scrubbed malformed masked value", values)
+	}
+}
+
 type securityRecordingRepository struct {
 	snapshot  ResourceSnapshot
 	saveCount int
+}
+
+func removeSecuritySchemaField(store *Store, resource string, key string) {
+	schema := store.schemas[resource]
+	fields := make([]FieldDefinition, 0, len(schema.Fields))
+	for _, field := range schema.Fields {
+		if field.Key != key {
+			fields = append(fields, field)
+		}
+	}
+	schema.Fields = fields
+	store.schemas[resource] = schema
+}
+
+func cloneSecuritySnapshot(snapshot ResourceSnapshot) ResourceSnapshot {
+	return ResourceSnapshot{
+		Revision: snapshot.Revision, NextID: snapshot.NextID, Resources: cloneResourceMap(snapshot.Resources),
+	}
+}
+
+func hasSecurityRecordCode(records []Record, code string) bool {
+	for _, record := range records {
+		if record.Code == code {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *securityRecordingRepository) Load(context.Context) (ResourceSnapshot, error) {

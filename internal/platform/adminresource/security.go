@@ -48,12 +48,12 @@ func (s *Store) validateWriteValues(resource string, values map[string]string, o
 			fields[field.Key] = defaultFieldPolicy(field)
 		}
 	}
-	for key := range values {
+	for key, value := range values {
 		field, declared := fields[key]
 		if !declared {
 			return invalidSecurityField(key, "is not declared by the active schema")
 		}
-		if err := validateFieldWrite(key, field, origin); err != nil {
+		if err := validateFieldWrite(key, value, field, origin); err != nil {
 			return err
 		}
 	}
@@ -84,25 +84,43 @@ func (s *Store) validateWriteInput(resource string, input WriteInput, origin Wri
 		if !declared {
 			return invalidSecurityField(key, "is not declared by the active schema")
 		}
-		if err := validateFieldWrite(key, field, origin); err != nil {
+		if err := validateFieldWrite(key, value, field, origin); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func validateFieldWrite(key string, field FieldDefinition, origin WriteOrigin) error {
+func validateFieldWrite(key string, value string, field FieldDefinition, origin WriteOrigin) error {
 	if origin == WriteOriginExternal && field.ReadOnly {
 		return invalidSecurityField(key, "is read-only")
 	}
 	if origin == WriteOriginExternal && field.Sensitivity != capability.FieldSensitivityPublic {
 		return invalidSecurityField(key, "is not externally writable")
 	}
-	if prohibitedRawField(key) && !allowsDerivedProtectedValue(field) {
-		return invalidSecurityField(key, "is a prohibited raw credential or personal field")
-	}
-	if (field.Sensitivity == capability.FieldSensitivitySensitive || field.Sensitivity == capability.FieldSensitivitySecret) && field.StorageMode == capability.FieldStoragePlain {
+	protectedSensitivity := field.Sensitivity == capability.FieldSensitivityPersonal ||
+		field.Sensitivity == capability.FieldSensitivitySensitive ||
+		field.Sensitivity == capability.FieldSensitivitySecret
+	if protectedSensitivity && field.StorageMode == capability.FieldStoragePlain {
 		return invalidSecurityField(key, "requires protected storage")
+	}
+	if field.StorageMode == capability.FieldStorageMasked {
+		if field.Sensitivity != capability.FieldSensitivityPersonal {
+			return invalidSecurityField(key, "masked storage requires personal sensitivity")
+		}
+		if !allowsMaskedProjection(field.ResponseMode) || !allowsMaskedProjection(field.ExportMode) {
+			return invalidSecurityField(key, "masked storage requires masked or omitted response and export")
+		}
+		if strings.TrimSpace(value) != "" && !strings.Contains(value, "*") {
+			return invalidSecurityField(key, "masked storage requires an actually masked value")
+		}
+	}
+	if (field.StorageMode == capability.FieldStorageHashed || field.StorageMode == capability.FieldStorageEncrypted) &&
+		(field.ResponseMode != capability.FieldProjectionOmitted || field.ExportMode != capability.FieldProjectionOmitted) {
+		return invalidSecurityField(key, "protected storage must be omitted from response and export")
+	}
+	if prohibitedRawField(key) && !allowsProtectedField(field) {
+		return invalidSecurityField(key, "is a prohibited raw credential or personal field")
 	}
 	return nil
 }
@@ -113,9 +131,6 @@ func invalidSecurityField(field string, reason string) error {
 
 func prohibitedRawField(key string) bool {
 	normalized := strings.ToLower(strings.NewReplacer("_", "", "-", "", ".", "").Replace(strings.TrimSpace(key)))
-	if strings.HasPrefix(normalized, "masked") {
-		return false
-	}
 	base := normalized
 	for _, suffix := range []string{"hash", "digest"} {
 		base = strings.TrimSuffix(base, suffix)
@@ -124,24 +139,54 @@ func prohibitedRawField(key string) bool {
 		return true
 	}
 	normalized = base
-	switch normalized {
-	case "password", "passwd", "token", "accesstoken", "refreshtoken", "secret", "clientsecret", "credential", "credentials", "verificationcode", "debugcode", "providersubject", "phone", "phonenumber", "identitynumber", "idnumber", "email", "address", "detailedaddress", "sessionid", "sessionhandle", "sessiontoken":
+	switch base {
+	case "verificationcode", "debugcode", "providersubject", "phone", "phonenumber", "identitynumber", "idnumber", "email", "address", "detailedaddress", "sessionid", "sessionhandle", "sessiontoken":
 		return true
-	default:
-		return strings.HasSuffix(normalized, "email") ||
-			strings.HasSuffix(normalized, "phone") ||
-			strings.HasSuffix(normalized, "phonenumber") ||
-			strings.HasSuffix(normalized, "address") ||
-			strings.HasSuffix(normalized, "identitynumber") ||
-			strings.HasSuffix(normalized, "idnumber")
 	}
+	for _, marker := range []string{"password", "passwd", "token", "secret", "credential", "credentials", "sessionid", "sessionhandle", "sessiontoken", "session"} {
+		if protectedNameMatch(base, marker) {
+			return true
+		}
+	}
+	return strings.HasSuffix(base, "email") ||
+		strings.HasSuffix(base, "phone") ||
+		strings.HasSuffix(base, "phonenumber") ||
+		strings.HasSuffix(base, "address") ||
+		strings.HasSuffix(base, "identitynumber") ||
+		strings.HasSuffix(base, "idnumber") ||
+		strings.HasSuffix(base, "providersubject")
 }
 
-func allowsDerivedProtectedValue(field FieldDefinition) bool {
-	if field.StorageMode != capability.FieldStorageHashed && field.StorageMode != capability.FieldStorageEncrypted {
+func protectedNameMatch(normalized string, marker string) bool {
+	if normalized == marker || strings.HasSuffix(normalized, marker) {
+		return true
+	}
+	if !strings.HasPrefix(normalized, marker) {
 		return false
 	}
-	return field.ResponseMode == capability.FieldProjectionOmitted && field.ExportMode == capability.FieldProjectionOmitted
+	for _, suffix := range []string{"prefix", "type", "count", "status", "expiresat", "issuedat", "createdat", "updatedat", "revokedat", "lastusedat"} {
+		if strings.HasSuffix(normalized, suffix) {
+			return false
+		}
+	}
+	return true
+}
+
+func allowsMaskedProjection(mode string) bool {
+	return mode == capability.FieldProjectionMasked || mode == capability.FieldProjectionOmitted
+}
+
+func allowsProtectedField(field FieldDefinition) bool {
+	switch field.StorageMode {
+	case capability.FieldStorageMasked:
+		return field.Sensitivity == capability.FieldSensitivityPersonal &&
+			allowsMaskedProjection(field.ResponseMode) && allowsMaskedProjection(field.ExportMode)
+	case capability.FieldStorageHashed, capability.FieldStorageEncrypted:
+		return field.Sensitivity != capability.FieldSensitivityPublic &&
+			field.ResponseMode == capability.FieldProjectionOmitted && field.ExportMode == capability.FieldProjectionOmitted
+	default:
+		return false
+	}
 }
 
 func (s *Store) validateSnapshot(snapshot ResourceSnapshot) error {
@@ -179,7 +224,7 @@ func (s *Store) validateStoredRecordFields(resource string, record Record) error
 		if !declared {
 			return invalidSecurityField(key, "is not declared by the active schema")
 		}
-		if err := validateFieldWrite(key, field, WriteOriginInternal); err != nil {
+		if err := validateFieldWrite(key, value, field, WriteOriginInternal); err != nil {
 			return err
 		}
 	}
@@ -207,7 +252,7 @@ func (s *Store) scrubSnapshot(snapshot ResourceSnapshot) (ResourceSnapshot, bool
 			cleanRecord.Values = map[string]string{}
 			for key, value := range record.Values {
 				field, declared := fields[key]
-				if !declared || (prohibitedRawField(key) && !allowsDerivedProtectedValue(field)) || ((field.Sensitivity == capability.FieldSensitivitySensitive || field.Sensitivity == capability.FieldSensitivitySecret) && field.StorageMode == capability.FieldStoragePlain) {
+				if !declared || validateFieldWrite(key, value, field, WriteOriginInternal) != nil {
 					changed = true
 					continue
 				}

@@ -242,6 +242,7 @@ func TestValidateAdminSurfaceAcceptsSchemaFieldsFormGroupsSearchAndSort(t *testi
 func TestValidateAdminSurfaceValidatesFieldSecurityPolicies(t *testing.T) {
 	tests := []struct {
 		name    string
+		key     string
 		field   AdminField
 		wantErr string
 	}{
@@ -250,15 +251,33 @@ func TestValidateAdminSurfaceValidatesFieldSecurityPolicies(t *testing.T) {
 		{name: "unsupported response", field: AdminField{ResponseMode: "redacted"}, wantErr: "responseMode is unsupported"},
 		{name: "unsupported export", field: AdminField{ExportMode: "redacted"}, wantErr: "exportMode is unsupported"},
 		{name: "sensitive record field", field: AdminField{Source: "record", Sensitivity: FieldSensitivitySensitive, StorageMode: FieldStorageHashed, ResponseMode: FieldProjectionOmitted, ExportMode: FieldProjectionOmitted}, wantErr: "cannot use record storage"},
+		{name: "plain personal", field: AdminField{Sensitivity: FieldSensitivityPersonal, StorageMode: FieldStoragePlain}, wantErr: "personal values require masked or protected storage"},
 		{name: "plain secret", field: AdminField{Sensitivity: FieldSensitivitySecret, StorageMode: FieldStoragePlain}, wantErr: "require protected storage"},
+		{name: "masked public", field: AdminField{Sensitivity: FieldSensitivityPublic, StorageMode: FieldStorageMasked, ResponseMode: FieldProjectionMasked, ExportMode: FieldProjectionMasked}, wantErr: "masked storage requires personal sensitivity"},
+		{name: "masked full response", field: AdminField{Sensitivity: FieldSensitivityPersonal, StorageMode: FieldStorageMasked, ResponseMode: FieldProjectionFull, ExportMode: FieldProjectionMasked}, wantErr: "masked storage must use masked or omitted response and export"},
+		{name: "masked privileged export", field: AdminField{Sensitivity: FieldSensitivityPersonal, StorageMode: FieldStorageMasked, ResponseMode: FieldProjectionMasked, ExportMode: FieldProjectionPrivileged}, wantErr: "masked storage must use masked or omitted response and export"},
 		{name: "hashed response", field: AdminField{Sensitivity: FieldSensitivitySecret, StorageMode: FieldStorageHashed, ResponseMode: FieldProjectionFull, ExportMode: FieldProjectionOmitted}, wantErr: "must be omitted from response and export"},
 		{name: "encrypted export", field: AdminField{Sensitivity: FieldSensitivitySensitive, StorageMode: FieldStorageEncrypted, ResponseMode: FieldProjectionOmitted, ExportMode: FieldProjectionPrivileged}, wantErr: "must be omitted from response and export"},
+		{name: "masked credential disguise", key: "maskedToken", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
+		{name: "masked personal disguise", key: "maskedPhone", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
+		{name: "compound token", key: "apiToken", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
+		{name: "token value", key: "tokenValue", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
+		{name: "compound secret", key: "authSecret", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
+		{name: "masked password", key: "maskedPassword", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
+		{name: "compound credential", key: "serviceCredential", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
+		{name: "compound session id", key: "adminSessionId", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
+		{name: "compound session handle", key: "authSessionHandle", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
+		{name: "compound session token", key: "serviceSessionToken", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
+		{name: "masked provider subject", key: "maskedProviderSubject", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resource := validAdminResource("demo-resources", "/demo-resources", "admin:demo")
 			field := tt.field
-			field.Key = "protectedValue"
+			field.Key = tt.key
+			if field.Key == "" {
+				field.Key = "protectedValue"
+			}
 			field.Label = Text("保护值", "Protected Value")
 			field.Type = "text"
 			if field.Source == "" {
@@ -279,7 +298,12 @@ func TestValidateAdminSurfaceAcceptsDefaultAndProtectedFieldSecurityPolicies(t *
 	resource.Fields = []AdminField{
 		{Key: "title", Label: Text("标题", "Title"), Type: "text", Source: "values"},
 		{Key: "maskedPhone", Label: Text("脱敏手机号", "Masked Phone"), Type: "text", Source: "values", Sensitivity: FieldSensitivityPersonal, StorageMode: FieldStorageMasked, ResponseMode: FieldProjectionMasked, ExportMode: FieldProjectionMasked},
+		{Key: "maskedToken", Label: Text("脱敏令牌", "Masked Token"), Type: "text", Source: "values", Sensitivity: FieldSensitivityPersonal, StorageMode: FieldStorageMasked, ResponseMode: FieldProjectionMasked, ExportMode: FieldProjectionOmitted},
 		{Key: "tokenHash", Label: Text("令牌哈希", "Token Hash"), Type: "text", Source: "values", Sensitivity: FieldSensitivitySecret, StorageMode: FieldStorageHashed, ResponseMode: FieldProjectionOmitted, ExportMode: FieldProjectionOmitted},
+		{Key: "tokenPrefix", Label: Text("令牌前缀", "Token Prefix"), Type: "text", Source: "values"},
+		{Key: "tokenType", Label: Text("令牌类型", "Token Type"), Type: "text", Source: "values"},
+		{Key: "sessionType", Label: Text("会话类型", "Session Type"), Type: "text", Source: "values"},
+		{Key: "sessionStatus", Label: Text("会话状态", "Session Status"), Type: "text", Source: "values"},
 	}
 
 	if err := ValidateAdminSurface([]Manifest{{ID: "demo", Admin: AdminSurface{Resources: []AdminResource{resource}}}}); err != nil {

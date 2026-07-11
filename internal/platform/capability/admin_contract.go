@@ -584,13 +584,80 @@ func validateAdminFieldPolicy(owner ID, resource string, field AdminField) error
 	if (sensitivity == FieldSensitivitySensitive || sensitivity == FieldSensitivitySecret) && field.Source == "record" {
 		return fmt.Errorf("capability %q admin resource %q field %q sensitive or secret values cannot use record storage", owner, resource, field.Key)
 	}
+	if sensitivity == FieldSensitivityPersonal && storageMode == FieldStoragePlain {
+		return fmt.Errorf("capability %q admin resource %q field %q personal values require masked or protected storage", owner, resource, field.Key)
+	}
 	if (sensitivity == FieldSensitivitySensitive || sensitivity == FieldSensitivitySecret) && storageMode == FieldStoragePlain {
 		return fmt.Errorf("capability %q admin resource %q field %q sensitive or secret values require protected storage", owner, resource, field.Key)
+	}
+	if storageMode == FieldStorageMasked && sensitivity != FieldSensitivityPersonal {
+		return fmt.Errorf("capability %q admin resource %q field %q masked storage requires personal sensitivity", owner, resource, field.Key)
+	}
+	if storageMode == FieldStorageMasked && (!isAdminMaskedProjection(responseMode) || !isAdminMaskedProjection(exportMode)) {
+		return fmt.Errorf("capability %q admin resource %q field %q masked storage must use masked or omitted response and export", owner, resource, field.Key)
 	}
 	if (storageMode == FieldStorageHashed || storageMode == FieldStorageEncrypted) && (responseMode != FieldProjectionOmitted || exportMode != FieldProjectionOmitted) {
 		return fmt.Errorf("capability %q admin resource %q field %q protected storage must be omitted from response and export", owner, resource, field.Key)
 	}
+	if adminSecurityFieldName(field.Key) && !validAdminSecurityFieldPolicy(sensitivity, storageMode, responseMode, exportMode) {
+		return fmt.Errorf("capability %q admin resource %q field %q security field names require masked personal or protected non-public storage", owner, resource, field.Key)
+	}
 	return nil
+}
+
+func isAdminMaskedProjection(mode string) bool {
+	return mode == FieldProjectionMasked || mode == FieldProjectionOmitted
+}
+
+func validAdminSecurityFieldPolicy(sensitivity string, storageMode string, responseMode string, exportMode string) bool {
+	if sensitivity == FieldSensitivityPersonal && storageMode == FieldStorageMasked {
+		return isAdminMaskedProjection(responseMode) && isAdminMaskedProjection(exportMode)
+	}
+	if sensitivity == FieldSensitivityPublic || (storageMode != FieldStorageHashed && storageMode != FieldStorageEncrypted) {
+		return false
+	}
+	return responseMode == FieldProjectionOmitted && exportMode == FieldProjectionOmitted
+}
+
+func adminSecurityFieldName(key string) bool {
+	normalized := strings.ToLower(strings.NewReplacer("_", "", "-", "", ".", "").Replace(strings.TrimSpace(key)))
+	base := normalized
+	for _, suffix := range []string{"hash", "digest"} {
+		base = strings.TrimSuffix(base, suffix)
+	}
+	if (base == "code" || base == "session") && base != normalized {
+		return true
+	}
+	switch base {
+	case "verificationcode", "debugcode", "providersubject", "phone", "phonenumber", "identitynumber", "idnumber", "email", "address", "detailedaddress", "sessionid", "sessionhandle", "sessiontoken":
+		return true
+	}
+	for _, marker := range []string{"password", "passwd", "token", "secret", "credential", "credentials", "sessionid", "sessionhandle", "sessiontoken", "session"} {
+		if adminProtectedNameMatch(base, marker) {
+			return true
+		}
+	}
+	for _, suffix := range []string{"email", "phone", "phonenumber", "address", "identitynumber", "idnumber", "providersubject"} {
+		if strings.HasSuffix(base, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+func adminProtectedNameMatch(normalized string, marker string) bool {
+	if normalized == marker || strings.HasSuffix(normalized, marker) {
+		return true
+	}
+	if !strings.HasPrefix(normalized, marker) {
+		return false
+	}
+	for _, suffix := range []string{"prefix", "type", "count", "status", "expiresat", "issuedat", "createdat", "updatedat", "revokedat", "lastusedat"} {
+		if strings.HasSuffix(normalized, suffix) {
+			return false
+		}
+	}
+	return true
 }
 
 func defaultAdminFieldPolicy(value string, fallback string) string {

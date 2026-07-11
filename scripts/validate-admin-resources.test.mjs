@@ -90,6 +90,114 @@ describe("validate-admin-resources field security policies", () => {
       assert.match(result.stderr, pattern);
     });
   }
+
+  for (const [name, field, pattern] of [
+    [
+      "plain personal storage",
+      { key: "contactPhone", sensitivity: "personal", storageMode: "plain", responseMode: "masked", exportMode: "masked" },
+      /personal values require masked or protected storage/,
+    ],
+    [
+      "masked storage without personal sensitivity",
+      { key: "maskedPhone", sensitivity: "public", storageMode: "masked", responseMode: "masked", exportMode: "masked" },
+      /masked storage requires personal sensitivity/,
+    ],
+    [
+      "masked storage with full response",
+      { key: "maskedPhone", sensitivity: "personal", storageMode: "masked", responseMode: "full", exportMode: "masked" },
+      /masked storage must use masked or omitted response and export/,
+    ],
+    [
+      "masked credential disguise",
+      { key: "maskedToken", sensitivity: "public", storageMode: "plain", responseMode: "full", exportMode: "full" },
+      /security field names require masked personal or protected non-public storage/,
+    ],
+    [
+      "masked personal disguise",
+      { key: "maskedPhone", sensitivity: "public", storageMode: "plain", responseMode: "full", exportMode: "full" },
+      /security field names require masked personal or protected non-public storage/,
+    ],
+    [
+      "compound credential name",
+      { key: "apiToken", sensitivity: "public", storageMode: "plain", responseMode: "full", exportMode: "full" },
+      /security field names require masked personal or protected non-public storage/,
+    ],
+    [
+      "token value",
+      { key: "tokenValue", sensitivity: "public", storageMode: "plain", responseMode: "full", exportMode: "full" },
+      /security field names require masked personal or protected non-public storage/,
+    ],
+    [
+      "masked password name",
+      { key: "maskedPassword", sensitivity: "public", storageMode: "plain", responseMode: "full", exportMode: "full" },
+      /security field names require masked personal or protected non-public storage/,
+    ],
+    [
+      "compound credential suffix",
+      { key: "serviceCredential", sensitivity: "public", storageMode: "plain", responseMode: "full", exportMode: "full" },
+      /security field names require masked personal or protected non-public storage/,
+    ],
+    [
+      "compound session id",
+      { key: "adminSessionId", sensitivity: "public", storageMode: "plain", responseMode: "full", exportMode: "full" },
+      /security field names require masked personal or protected non-public storage/,
+    ],
+    [
+      "compound session handle",
+      { key: "authSessionHandle", sensitivity: "public", storageMode: "plain", responseMode: "full", exportMode: "full" },
+      /security field names require masked personal or protected non-public storage/,
+    ],
+    [
+      "compound session token",
+      { key: "serviceSessionToken", sensitivity: "public", storageMode: "plain", responseMode: "full", exportMode: "full" },
+      /security field names require masked personal or protected non-public storage/,
+    ],
+    [
+      "masked provider subject",
+      { key: "maskedProviderSubject", sensitivity: "public", storageMode: "plain", responseMode: "full", exportMode: "full" },
+      /security field names require masked personal or protected non-public storage/,
+    ],
+  ]) {
+    it(`rejects ${name}`, () => {
+      const manifestPath = writeBrokenManifest((manifest) => {
+        const identities = manifest.resources.find((resource) => resource.code === "app-identities");
+        identities.schema.fields.push({
+          label: { zh: "安全字段", en: "Security Field" },
+          type: "text",
+          source: "values",
+          ...field,
+        });
+      });
+
+      const result = runValidator(["--manifest", manifestPath]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, pattern);
+    });
+  }
+
+  it("accepts valid masked security fields and credential metadata names", () => {
+    const manifestPath = writeBrokenManifest((manifest) => {
+      const identities = manifest.resources.find((resource) => resource.code === "app-identities");
+      for (const field of [
+        { key: "maskedToken", sensitivity: "personal", storageMode: "masked", responseMode: "masked", exportMode: "omitted" },
+        { key: "tokenPrefix" },
+        { key: "sessionType" },
+        { key: "sessionStatus" },
+      ]) {
+        identities.schema.fields.push({
+          label: { zh: "安全字段", en: "Security Field" },
+          type: "text",
+          source: "values",
+          ...field,
+        });
+      }
+    });
+
+    const result = runValidator(["--manifest", manifestPath]);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
 });
 
 describe("validate-admin-resources relation contracts", () => {
