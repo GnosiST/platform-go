@@ -114,7 +114,6 @@ func (s *Store) ApprovePolicyReview(reviewID string, reviewerCode string) (Polic
 			"resource":   "roles",
 			"targetId":   role.ID,
 			"targetCode": role.Code,
-			"targetName": role.Name,
 			"provider":   "policy-review",
 			"traceId":    review.Code,
 		},
@@ -170,7 +169,6 @@ func (s *Store) ExportPolicyReviews(actorCode string) (PolicyReviewExport, error
 	now := s.now().UTC().Format("2006-01-02T15:04:05Z07:00")
 	audit := policyReviewAuditRecord(s.nextID+1, "export", "Policy review export", "policy-review.export", "policy-review:export", "Policy review ledger exported.", strings.TrimSpace(actorCode), Record{}, now)
 	audit.Values["targetCode"] = "policy-reviews"
-	audit.Values["targetName"] = "Policy Reviews"
 	s.nextID++
 	audits = append(audits, audit)
 	s.resources["audit-logs"] = audits
@@ -271,7 +269,6 @@ func applyPolicyReviewToRole(review Record, role *Record) error {
 
 func policyReviewAuditRecord(nextID int, suffix string, name string, action string, code string, description string, actorCode string, review Record, now string) Record {
 	targetCode := review.Code
-	targetName := review.Name
 	targetID := review.ID
 	if suffix == "" {
 		suffix = "recorded"
@@ -289,7 +286,6 @@ func policyReviewAuditRecord(nextID int, suffix string, name string, action stri
 			"resource":   "policy-reviews",
 			"targetId":   targetID,
 			"targetCode": targetCode,
-			"targetName": targetName,
 			"provider":   "policy-review",
 			"traceId":    targetCode,
 		},

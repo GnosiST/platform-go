@@ -1169,8 +1169,6 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 			"size":          strconv.FormatInt(metadata.SizeBytes, 10),
 			"storageDriver": metadata.Driver,
 			"storageKey":    metadata.Key,
-			"storagePath":   metadata.Path,
-			"publicUrl":     metadata.URL,
 			"createdAt":     time.Now().UTC().Format(time.RFC3339),
 		},
 	})
@@ -1270,8 +1268,6 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 			"size":          strconv.FormatInt(metadata.SizeBytes, 10),
 			"storageDriver": metadata.Driver,
 			"storageKey":    metadata.Key,
-			"storagePath":   metadata.Path,
-			"publicUrl":     metadata.URL,
 			"tenantId":      appTenant,
 			"uploadedBy":    username,
 			"createdAt":     s.now().UTC().Format(time.RFC3339),
@@ -1826,7 +1822,6 @@ func (s *Server) recordAdminResourceAudit(ctx *gin.Context, action string, resou
 			"resource":   resource,
 			"targetId":   record.ID,
 			"targetCode": record.Code,
-			"targetName": record.Name,
 			"createdAt":  s.now().UTC().Format(time.RFC3339),
 		},
 	})
@@ -1858,7 +1853,6 @@ func (s *Server) recordFileAuditForActor(action string, actor string, record adm
 			"resource":   "files",
 			"targetId":   record.ID,
 			"targetCode": record.Code,
-			"targetName": record.Name,
 			"createdAt":  s.now().UTC().Format(time.RFC3339),
 		},
 	})
@@ -2244,9 +2238,6 @@ func shortSessionID(token string) string {
 
 func fileStorageKey(record adminresource.Record) string {
 	if key := strings.TrimSpace(record.Values["storageKey"]); key != "" {
-		return key
-	}
-	if key := strings.TrimSpace(record.Values["storagePath"]); key != "" {
 		return key
 	}
 	return strings.TrimSpace(record.Code)

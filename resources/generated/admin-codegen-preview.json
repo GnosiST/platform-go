@@ -738,14 +738,13 @@
         "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
       },
       "schema": {
-        "fieldCount": 11,
+        "fieldCount": 9,
         "search": [
           "action",
           "actor",
           "provider",
           "resource",
           "targetCode",
-          "targetName",
           "traceId"
         ],
         "filter": [
@@ -757,7 +756,6 @@
           "resource",
           "targetCode",
           "targetId",
-          "targetName",
           "traceId"
         ],
         "sort": [
@@ -767,15 +765,13 @@
           "outcome",
           "provider",
           "resource",
-          "targetCode",
-          "targetName"
+          "targetCode"
         ],
         "table": [
           "actor",
           "action",
           "resource",
           "targetCode",
-          "targetName",
           "provider",
           "createdAt"
         ],
@@ -835,7 +831,7 @@
         "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
       },
       "schema": {
-        "fieldCount": 5,
+        "fieldCount": 4,
         "search": [
           "productName",
           "shortName"
@@ -1389,7 +1385,7 @@
         "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
       },
       "schema": {
-        "fieldCount": 14,
+        "fieldCount": 12,
         "search": [
           "code",
           "createdAt",

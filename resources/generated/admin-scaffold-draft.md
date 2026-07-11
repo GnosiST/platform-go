@@ -313,11 +313,11 @@ Audit candidates: -
 
 ### Schema
 
-- Field count: 11
-- Search: `action`, `actor`, `provider`, `resource`, `targetCode`, `targetName`, `traceId`
-- Filter: `action`, `actor`, `createdAt`, `outcome`, `provider`, `resource`, `targetCode`, `targetId`, `targetName`, `traceId`
-- Sort: `action`, `actor`, `createdAt`, `outcome`, `provider`, `resource`, `targetCode`, `targetName`
-- Table: `actor`, `action`, `resource`, `targetCode`, `targetName`, `provider`, `createdAt`
+- Field count: 9
+- Search: `action`, `actor`, `provider`, `resource`, `targetCode`, `traceId`
+- Filter: `action`, `actor`, `createdAt`, `outcome`, `provider`, `resource`, `targetCode`, `targetId`, `traceId`
+- Sort: `action`, `actor`, `createdAt`, `outcome`, `provider`, `resource`, `targetCode`
+- Table: `actor`, `action`, `resource`, `targetCode`, `provider`, `createdAt`
 - Form: -
 - Localized fields: -
 
@@ -362,7 +362,7 @@ Audit candidates: `branding.update`
 
 ### Schema
 
-- Field count: 5
+- Field count: 4
 - Search: `productName`, `shortName`
 - Filter: `defaultTheme`
 - Sort: `defaultTheme`, `primaryColor`, `productName`
@@ -645,7 +645,7 @@ Audit candidates: `file.create`, `file.delete`, `file.upload`
 
 ### Schema
 
-- Field count: 14
+- Field count: 12
 - Search: `code`, `createdAt`, `mimeType`, `name`, `storageDriver`
 - Filter: `code`, `createdAt`, `mimeType`, `name`, `size`, `status`, `storageDriver`, `storageKey`, `updatedAt`
 - Sort: `code`, `createdAt`, `mimeType`, `name`, `size`, `status`, `storageDriver`, `updatedAt`

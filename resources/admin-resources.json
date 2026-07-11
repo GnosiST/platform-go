@@ -2599,18 +2599,6 @@
             "readOnly": true
           },
           {
-            "key": "targetName",
-            "label": {
-              "zh": "目标名称",
-              "en": "Target Name"
-            },
-            "type": "text",
-            "search": true,
-            "table": true,
-            "detail": true,
-            "readOnly": true
-          },
-          {
             "key": "provider",
             "label": {
               "zh": "提供方",
@@ -2633,20 +2621,6 @@
             "table": true,
             "detail": true,
             "readOnly": true
-          },
-          {
-            "key": "sessionId",
-            "label": {
-              "zh": "会话 ID",
-              "en": "Session ID"
-            },
-            "type": "text",
-            "detail": true,
-            "readOnly": true,
-            "sensitivity": "internal",
-            "storageMode": "plain",
-            "responseMode": "omitted",
-            "exportMode": "omitted"
           },
           {
             "key": "createdAt",
@@ -2677,7 +2651,6 @@
           "action",
           "resource",
           "targetCode",
-          "targetName",
           "provider",
           "traceId"
         ],
@@ -2686,7 +2659,6 @@
           "action",
           "resource",
           "targetCode",
-          "targetName",
           "provider",
           "createdAt"
         ],
@@ -2968,8 +2940,8 @@
           {
             "key": "code",
             "label": {
-              "zh": "存储键",
-              "en": "Storage Key"
+              "zh": "文件编码",
+              "en": "File Code"
             },
             "type": "text",
             "search": true,
@@ -3040,34 +3012,6 @@
             },
             "type": "text",
             "search": true,
-            "detail": true,
-            "readOnly": true,
-            "sensitivity": "internal",
-            "storageMode": "plain",
-            "responseMode": "omitted",
-            "exportMode": "omitted"
-          },
-          {
-            "key": "storagePath",
-            "label": {
-              "zh": "存储路径",
-              "en": "Storage Path"
-            },
-            "type": "text",
-            "detail": true,
-            "readOnly": true,
-            "sensitivity": "internal",
-            "storageMode": "plain",
-            "responseMode": "omitted",
-            "exportMode": "omitted"
-          },
-          {
-            "key": "publicUrl",
-            "label": {
-              "zh": "公开地址",
-              "en": "Public URL"
-            },
-            "type": "text",
             "detail": true,
             "readOnly": true,
             "sensitivity": "internal",
@@ -3761,19 +3705,6 @@
               "black",
               "warm"
             ]
-          },
-          {
-            "key": "supportEmail",
-            "label": {
-              "zh": "支持邮箱",
-              "en": "Support Email"
-            },
-            "type": "text",
-            "readOnly": true,
-            "sensitivity": "personal",
-            "storageMode": "encrypted",
-            "responseMode": "omitted",
-            "exportMode": "omitted"
           }
         ],
         "search": [

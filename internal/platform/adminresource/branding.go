@@ -63,7 +63,4 @@ func applyBrandingValues(config *BrandingConfig, values map[string]string) {
 	if values["loginSubtitle"] != "" {
 		config.LoginSubtitle = values["loginSubtitle"]
 	}
-	if values["supportEmail"] != "" {
-		config.SupportEmail = values["supportEmail"]
-	}
 }

@@ -518,19 +518,17 @@ func areaCodeResourceSchema() Schema {
 }
 
 func auditLogResourceSchema() Schema {
-	fields := []FieldDefinition{
+	fields := withStandardRecordFields([]FieldDefinition{
 		auditLogField("actor", text("操作人", "Actor"), "text", true, true, 140),
 		auditLogField("action", text("动作", "Action"), "text", true, true, 180),
 		auditLogField("resource", text("资源", "Resource"), "text", true, true, 160),
 		auditLogField("targetId", text("目标 ID", "Target ID"), "text", true, false, 180),
 		auditLogField("targetCode", text("目标编码", "Target Code"), "text", true, true, 180),
-		auditLogField("targetName", text("目标名称", "Target Name"), "text", true, true, 180),
 		auditLogField("provider", text("提供方", "Provider"), "text", true, true, 130),
 		auditLogField("outcome", text("结果", "Outcome"), "text", true, true, 130),
-		secureFieldDefinition(auditLogField("sessionId", text("会话 ID", "Session ID"), "text", false, false, 180), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 		auditLogField("createdAt", text("发生时间", "Created At"), "datetime", true, true, 180),
 		auditLogField("traceId", text("链路 ID", "Trace ID"), "text", true, false, 180),
-	}
+	})
 	return Schema{
 		Resource:    "audit-logs",
 		Title:       text("审计日志", "Audit Logs"),
@@ -544,7 +542,6 @@ func auditLogResourceSchema() Schema {
 			"action",
 			"resource",
 			"targetCode",
-			"targetName",
 			"provider",
 			"outcome",
 			"traceId",
@@ -635,7 +632,6 @@ func brandingResourceSchema() Schema {
 		}),
 		valueField("loginTitle", text("登录标题", "Login Title"), "text", false, true, false, true, true, 220, nil),
 		valueField("loginSubtitle", text("登录副标题", "Login Subtitle"), "textarea", false, true, false, true, true, 260, nil),
-		secureFieldDefinition(valueField("supportEmail", text("支持邮箱", "Support Email"), "text", false, false, false, false, false, 180, nil), capability.FieldSensitivityPersonal, capability.FieldStorageEncrypted, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 	)
 	schema.SearchFields = []string{"name", "code", "productName", "shortName", "defaultTheme", "loginTitle"}
 	return schema
@@ -665,7 +661,6 @@ func settingsResourceSchema() Schema {
 		}),
 		valueField("loginTitle", text("登录标题", "Login Title"), "text", false, true, false, true, true, 220, nil),
 		valueField("loginSubtitle", text("登录副标题", "Login Subtitle"), "textarea", false, true, false, true, true, 260, nil),
-		secureFieldDefinition(valueField("supportEmail", text("支持邮箱", "Support Email"), "text", false, false, false, false, false, 180, nil), capability.FieldSensitivityPersonal, capability.FieldStorageEncrypted, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 	)
 	schema.SearchFields = []string{"name", "code", "status", "description", "capability", "productName", "shortName", "defaultTheme", "loginTitle"}
 	return schema
@@ -985,7 +980,29 @@ func fieldsFromCapability(fields []capability.AdminField) []FieldDefinition {
 			ExportMode:   defaultString(field.ExportMode, capability.FieldProjectionFull),
 		})
 	}
-	return withLocalizedValueFields(definitions)
+	return withLocalizedValueFields(withStandardRecordFields(definitions))
+}
+
+func withStandardRecordFields(fields []FieldDefinition) []FieldDefinition {
+	declared := make(map[string]struct{}, len(fields))
+	for _, field := range fields {
+		declared[field.Key] = struct{}{}
+	}
+	standard := []FieldDefinition{
+		recordField("name", text("名称", "Name"), "text", false, true, false, false, false, 180, nil),
+		recordField("code", text("编码", "Code"), "text", false, true, false, false, false, 180, nil),
+		recordField("status", text("状态", "Status"), "select", false, true, false, false, false, 120, statusOptions()),
+		recordField("description", text("描述", "Description"), "textarea", false, false, false, false, false, 280, nil),
+		recordField("updatedAt", text("更新时间", "Updated At"), "datetime", false, false, false, false, false, 180, nil),
+	}
+	for _, field := range standard {
+		if _, exists := declared[field.Key]; exists {
+			continue
+		}
+		field.ReadOnly = true
+		fields = append(fields, field)
+	}
+	return fields
 }
 
 func withLocalizedValueFields(fields []FieldDefinition) []FieldDefinition {

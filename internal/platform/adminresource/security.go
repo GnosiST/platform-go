@@ -53,18 +53,56 @@ func (s *Store) validateWriteValues(resource string, values map[string]string, o
 		if !declared {
 			return invalidSecurityField(key, "is not declared by the active schema")
 		}
-		if origin == WriteOriginExternal && field.ReadOnly {
-			return invalidSecurityField(key, "is read-only")
+		if err := validateFieldWrite(key, field, origin); err != nil {
+			return err
 		}
-		if origin == WriteOriginExternal && field.Sensitivity != capability.FieldSensitivityPublic {
-			return invalidSecurityField(key, "is not externally writable")
+	}
+	return nil
+}
+
+func (s *Store) validateWriteInput(resource string, input WriteInput, origin WriteOrigin) error {
+	if err := s.validateWriteValues(resource, input.Values, origin); err != nil {
+		return err
+	}
+	schema, ok := s.schemas[resource]
+	if !ok {
+		return ErrUnknownResource
+	}
+	fields := make(map[string]FieldDefinition, len(schema.Fields))
+	for _, field := range schema.Fields {
+		if field.Source == "record" {
+			fields[field.Key] = defaultFieldPolicy(field)
 		}
-		if prohibitedRawField(key) && !allowsDerivedProtectedValue(field) {
-			return invalidSecurityField(key, "is a prohibited raw credential or personal field")
+	}
+	for key, value := range map[string]string{
+		"code": input.Code, "name": input.Name, "status": input.Status, "description": input.Description,
+	} {
+		if strings.TrimSpace(value) == "" {
+			continue
 		}
-		if (field.Sensitivity == capability.FieldSensitivitySensitive || field.Sensitivity == capability.FieldSensitivitySecret) && field.StorageMode == capability.FieldStoragePlain {
-			return invalidSecurityField(key, "requires protected storage")
+		field, declared := fields[key]
+		if !declared {
+			return invalidSecurityField(key, "is not declared by the active schema")
 		}
+		if err := validateFieldWrite(key, field, origin); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateFieldWrite(key string, field FieldDefinition, origin WriteOrigin) error {
+	if origin == WriteOriginExternal && field.ReadOnly {
+		return invalidSecurityField(key, "is read-only")
+	}
+	if origin == WriteOriginExternal && field.Sensitivity != capability.FieldSensitivityPublic {
+		return invalidSecurityField(key, "is not externally writable")
+	}
+	if prohibitedRawField(key) && !allowsDerivedProtectedValue(field) {
+		return invalidSecurityField(key, "is a prohibited raw credential or personal field")
+	}
+	if (field.Sensitivity == capability.FieldSensitivitySensitive || field.Sensitivity == capability.FieldSensitivitySecret) && field.StorageMode == capability.FieldStoragePlain {
+		return invalidSecurityField(key, "requires protected storage")
 	}
 	return nil
 }
@@ -75,11 +113,19 @@ func invalidSecurityField(field string, reason string) error {
 
 func prohibitedRawField(key string) bool {
 	normalized := strings.ToLower(strings.NewReplacer("_", "", "-", "", ".", "").Replace(strings.TrimSpace(key)))
-	if strings.HasPrefix(normalized, "masked") || strings.HasSuffix(normalized, "hash") || strings.HasSuffix(normalized, "digest") {
+	if strings.HasPrefix(normalized, "masked") {
 		return false
 	}
+	base := normalized
+	for _, suffix := range []string{"hash", "digest"} {
+		base = strings.TrimSuffix(base, suffix)
+	}
+	if (base == "code" || base == "session") && base != normalized {
+		return true
+	}
+	normalized = base
 	switch normalized {
-	case "password", "passwd", "token", "accesstoken", "refreshtoken", "secret", "clientsecret", "credential", "credentials", "verificationcode", "debugcode", "providersubject", "phone", "phonenumber", "identitynumber", "idnumber", "email", "address", "detailedaddress":
+	case "password", "passwd", "token", "accesstoken", "refreshtoken", "secret", "clientsecret", "credential", "credentials", "verificationcode", "debugcode", "providersubject", "phone", "phonenumber", "identitynumber", "idnumber", "email", "address", "detailedaddress", "sessionid", "sessionhandle", "sessiontoken":
 		return true
 	default:
 		return strings.HasSuffix(normalized, "email") ||
@@ -107,6 +153,34 @@ func (s *Store) validateSnapshot(snapshot ResourceSnapshot) error {
 			if err := s.validateWriteValues(resource, record.Values, WriteOriginInternal); err != nil {
 				return fmt.Errorf("%w: resource %s record %s", err, resource, record.ID)
 			}
+			if err := s.validateStoredRecordFields(resource, record); err != nil {
+				return fmt.Errorf("%w: resource %s record %s", err, resource, record.ID)
+			}
+		}
+	}
+	return nil
+}
+
+func (s *Store) validateStoredRecordFields(resource string, record Record) error {
+	schema := s.schemas[resource]
+	fields := make(map[string]FieldDefinition, len(schema.Fields))
+	for _, field := range schema.Fields {
+		if field.Source == "record" {
+			fields[field.Key] = defaultFieldPolicy(field)
+		}
+	}
+	for key, value := range map[string]string{
+		"code": record.Code, "name": record.Name, "status": record.Status, "description": record.Description, "updatedAt": record.UpdatedAt,
+	} {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		field, declared := fields[key]
+		if !declared {
+			return invalidSecurityField(key, "is not declared by the active schema")
+		}
+		if err := validateFieldWrite(key, field, WriteOriginInternal); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -159,15 +233,13 @@ func (s *Store) ProjectRecord(resource string, record Record, purpose Projection
 	if !ok {
 		return Record{}, ErrUnknownResource
 	}
-	projected := cloneRecord(record)
+	projected := Record{ID: record.ID}
 	projected.Values = map[string]string{}
 	for _, rawField := range schema.Fields {
 		field := defaultFieldPolicy(rawField)
-		mode := field.ResponseMode
-		if purpose == ProjectionExport {
-			mode = field.ExportMode
-		} else if purpose != ProjectionResponse {
-			return Record{}, fmt.Errorf("%w: unsupported projection purpose %s", ErrInvalidRecord, purpose)
+		mode, err := projectionMode(field, purpose)
+		if err != nil {
+			return Record{}, err
 		}
 		if mode == capability.FieldProjectionOmitted || mode == capability.FieldProjectionPrivileged {
 			continue
@@ -176,10 +248,44 @@ func (s *Store) ProjectRecord(resource string, record Record, purpose Projection
 			if value, exists := record.Values[field.Key]; exists {
 				projected.Values[field.Key] = value
 			}
+			continue
+		}
+		if field.Source == "record" {
+			applyProjectedRecordField(&projected, record, field.Key)
 		}
 	}
 	if len(projected.Values) == 0 {
 		projected.Values = nil
 	}
 	return projected, nil
+}
+
+func projectionMode(field FieldDefinition, purpose ProjectionPurpose) (string, error) {
+	mode := field.ResponseMode
+	if purpose == ProjectionExport {
+		mode = field.ExportMode
+	} else if purpose != ProjectionResponse {
+		return "", fmt.Errorf("%w: unsupported projection purpose %s", ErrInvalidRecord, purpose)
+	}
+	switch mode {
+	case capability.FieldProjectionFull, capability.FieldProjectionMasked, capability.FieldProjectionPrivileged, capability.FieldProjectionOmitted:
+		return mode, nil
+	default:
+		return "", fmt.Errorf("%w: field %s has unsupported projection mode", ErrInvalidRecord, field.Key)
+	}
+}
+
+func applyProjectedRecordField(projected *Record, record Record, key string) {
+	switch key {
+	case "code":
+		projected.Code = record.Code
+	case "name":
+		projected.Name = record.Name
+	case "status":
+		projected.Status = record.Status
+	case "description":
+		projected.Description = record.Description
+	case "updatedAt":
+		projected.UpdatedAt = record.UpdatedAt
+	}
 }

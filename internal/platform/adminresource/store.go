@@ -260,7 +260,7 @@ func (s *Store) recordFromInputWithOrigin(resource string, id string, input Writ
 	if err := s.validateRequiredFields(resource, input); err != nil {
 		return Record{}, err
 	}
-	if err := s.validateWriteValues(resource, input.Values, origin); err != nil {
+	if err := s.validateWriteInput(resource, input, origin); err != nil {
 		return Record{}, err
 	}
 	status := strings.TrimSpace(input.Status)

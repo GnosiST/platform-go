@@ -3900,6 +3900,9 @@ func TestAdminFileUploadContentAndDelete(t *testing.T) {
 	if storageKey == "" {
 		t.Fatal("stored file record missing internal storage key")
 	}
+	if storedRecord.Values["storagePath"] != "" || storedRecord.Values["publicUrl"] != "" {
+		t.Fatalf("stored file record contains physical/public location: %+v", storedRecord.Values)
+	}
 
 	contentRecorder := httptest.NewRecorder()
 	contentRequest := httptest.NewRequest(http.MethodGet, "/api/admin/files/"+record.ID+"/content", nil)
@@ -3936,6 +3939,11 @@ func TestAdminFileUploadContentAndDelete(t *testing.T) {
 	for _, action := range []string{"file.upload", "file.content", "file.delete"} {
 		if !hasAdminResourceAuditRecord(audits.Data.Items, action, "files", record.ID, record.Code, "admin") {
 			t.Fatalf("audit logs missing %s for uploaded file: %+v", action, audits.Data.Items)
+		}
+	}
+	for _, audit := range audits.Data.Items {
+		if audit.Values["resource"] == "files" && audit.Values["targetName"] != "" {
+			t.Fatalf("file audit retained targetName: %+v", audit)
 		}
 	}
 }
@@ -4037,6 +4045,13 @@ func TestAppFileUploadAndContentUseAppSession(t *testing.T) {
 	record := uploaded.Data.Record
 	if record.ID == "" || record.Name != "avatar.png" || record.Values["storageKey"] != "" || record.Values["tenantId"] != "" || record.Values["sessionId"] != "" || record.Values["uploadedBy"] != "buyer" {
 		t.Fatalf("app uploaded record mismatch: %+v", record)
+	}
+	storedRecord, err := server.adminResourceRecordByID("files", record.ID)
+	if err != nil {
+		t.Fatalf("read stored app file record: %v", err)
+	}
+	if storedRecord.Values["storagePath"] != "" || storedRecord.Values["publicUrl"] != "" || storedRecord.Values["sessionId"] != "" {
+		t.Fatalf("stored app file record contains prohibited location/session data: %+v", storedRecord.Values)
 	}
 
 	contentRecorder := httptest.NewRecorder()

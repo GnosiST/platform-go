@@ -1385,26 +1385,6 @@
           "exportMode": "full"
         },
         {
-          "key": "supportEmail",
-          "label": {
-            "zh": "支持邮箱",
-            "en": "Support Email"
-          },
-          "type": "text",
-          "source": "values",
-          "help": {
-            "zh": "",
-            "en": ""
-          },
-          "readOnly": true,
-          "width": 180,
-          "validation": {},
-          "sensitivity": "personal",
-          "storageMode": "encrypted",
-          "responseMode": "omitted",
-          "exportMode": "omitted"
-        },
-        {
           "key": "updatedAt",
           "label": {
             "zh": "更新时间",
@@ -2060,8 +2040,8 @@
         {
           "key": "code",
           "label": {
-            "zh": "存储键",
-            "en": "Storage Key"
+            "zh": "文件编码",
+            "en": "File Code"
           },
           "type": "text",
           "source": "record",
@@ -2221,48 +2201,6 @@
             "en": ""
           },
           "readOnly": true,
-          "width": 260,
-          "validation": {},
-          "sensitivity": "internal",
-          "storageMode": "plain",
-          "responseMode": "omitted",
-          "exportMode": "omitted"
-        },
-        {
-          "key": "storagePath",
-          "label": {
-            "zh": "存储路径",
-            "en": "Storage Path"
-          },
-          "type": "text",
-          "source": "values",
-          "help": {
-            "zh": "",
-            "en": ""
-          },
-          "readOnly": true,
-          "inDetail": true,
-          "width": 260,
-          "validation": {},
-          "sensitivity": "internal",
-          "storageMode": "plain",
-          "responseMode": "omitted",
-          "exportMode": "omitted"
-        },
-        {
-          "key": "publicUrl",
-          "label": {
-            "zh": "公开地址",
-            "en": "Public URL"
-          },
-          "type": "text",
-          "source": "values",
-          "help": {
-            "zh": "",
-            "en": ""
-          },
-          "readOnly": true,
-          "inDetail": true,
           "width": 260,
           "validation": {},
           "sensitivity": "internal",

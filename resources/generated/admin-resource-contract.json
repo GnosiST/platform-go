@@ -2282,20 +2282,6 @@
           "exportMode": "full"
         },
         {
-          "key": "sessionId",
-          "label": {
-            "zh": "会话 ID",
-            "en": "Session ID"
-          },
-          "type": "text",
-          "detail": true,
-          "readOnly": true,
-          "sensitivity": "internal",
-          "storageMode": "plain",
-          "responseMode": "omitted",
-          "exportMode": "omitted"
-        },
-        {
           "key": "targetCode",
           "label": {
             "zh": "目标编码",
@@ -2327,22 +2313,6 @@
           "exportMode": "full"
         },
         {
-          "key": "targetName",
-          "label": {
-            "zh": "目标名称",
-            "en": "Target Name"
-          },
-          "type": "text",
-          "search": true,
-          "table": true,
-          "detail": true,
-          "readOnly": true,
-          "sensitivity": "public",
-          "storageMode": "plain",
-          "responseMode": "full",
-          "exportMode": "full"
-        },
-        {
           "key": "traceId",
           "label": {
             "zh": "链路 ID",
@@ -2364,7 +2334,6 @@
         "provider",
         "resource",
         "targetCode",
-        "targetName",
         "traceId"
       ],
       "filter": [
@@ -2376,7 +2345,6 @@
         "resource",
         "targetCode",
         "targetId",
-        "targetName",
         "traceId"
       ],
       "sort": [
@@ -2386,15 +2354,13 @@
         "outcome",
         "provider",
         "resource",
-        "targetCode",
-        "targetName"
+        "targetCode"
       ],
       "table": [
         "actor",
         "action",
         "resource",
         "targetCode",
-        "targetName",
         "provider",
         "createdAt"
       ],
@@ -2467,19 +2433,6 @@
           "storageMode": "plain",
           "responseMode": "full",
           "exportMode": "full"
-        },
-        {
-          "key": "supportEmail",
-          "label": {
-            "zh": "支持邮箱",
-            "en": "Support Email"
-          },
-          "type": "text",
-          "readOnly": true,
-          "sensitivity": "personal",
-          "storageMode": "encrypted",
-          "responseMode": "omitted",
-          "exportMode": "omitted"
         }
       ],
       "search": [
@@ -3205,8 +3158,8 @@
         {
           "key": "code",
           "label": {
-            "zh": "存储键",
-            "en": "Storage Key"
+            "zh": "文件编码",
+            "en": "File Code"
           },
           "type": "text",
           "search": true,
@@ -3279,20 +3232,6 @@
           "exportMode": "full"
         },
         {
-          "key": "publicUrl",
-          "label": {
-            "zh": "公开地址",
-            "en": "Public URL"
-          },
-          "type": "text",
-          "detail": true,
-          "readOnly": true,
-          "sensitivity": "internal",
-          "storageMode": "plain",
-          "responseMode": "omitted",
-          "exportMode": "omitted"
-        },
-        {
           "key": "size",
           "label": {
             "zh": "大小",
@@ -3347,20 +3286,6 @@
           },
           "type": "text",
           "search": true,
-          "detail": true,
-          "readOnly": true,
-          "sensitivity": "internal",
-          "storageMode": "plain",
-          "responseMode": "omitted",
-          "exportMode": "omitted"
-        },
-        {
-          "key": "storagePath",
-          "label": {
-            "zh": "存储路径",
-            "en": "Storage Path"
-          },
-          "type": "text",
           "detail": true,
           "readOnly": true,
           "sensitivity": "internal",
@@ -7011,20 +6936,6 @@
             "exportMode": "full"
           },
           {
-            "key": "sessionId",
-            "label": {
-              "zh": "会话 ID",
-              "en": "Session ID"
-            },
-            "type": "text",
-            "detail": true,
-            "readOnly": true,
-            "sensitivity": "internal",
-            "storageMode": "plain",
-            "responseMode": "omitted",
-            "exportMode": "omitted"
-          },
-          {
             "key": "targetCode",
             "label": {
               "zh": "目标编码",
@@ -7056,22 +6967,6 @@
             "exportMode": "full"
           },
           {
-            "key": "targetName",
-            "label": {
-              "zh": "目标名称",
-              "en": "Target Name"
-            },
-            "type": "text",
-            "search": true,
-            "table": true,
-            "detail": true,
-            "readOnly": true,
-            "sensitivity": "public",
-            "storageMode": "plain",
-            "responseMode": "full",
-            "exportMode": "full"
-          },
-          {
             "key": "traceId",
             "label": {
               "zh": "链路 ID",
@@ -7093,7 +6988,6 @@
           "provider",
           "resource",
           "targetCode",
-          "targetName",
           "traceId"
         ],
         "filter": [
@@ -7105,7 +6999,6 @@
           "resource",
           "targetCode",
           "targetId",
-          "targetName",
           "traceId"
         ],
         "sort": [
@@ -7115,15 +7008,13 @@
           "outcome",
           "provider",
           "resource",
-          "targetCode",
-          "targetName"
+          "targetCode"
         ],
         "table": [
           "actor",
           "action",
           "resource",
           "targetCode",
-          "targetName",
           "provider",
           "createdAt"
         ],
@@ -7248,19 +7139,6 @@
             "storageMode": "plain",
             "responseMode": "full",
             "exportMode": "full"
-          },
-          {
-            "key": "supportEmail",
-            "label": {
-              "zh": "支持邮箱",
-              "en": "Support Email"
-            },
-            "type": "text",
-            "readOnly": true,
-            "sensitivity": "personal",
-            "storageMode": "encrypted",
-            "responseMode": "omitted",
-            "exportMode": "omitted"
           }
         ],
         "search": [
@@ -8330,8 +8208,8 @@
           {
             "key": "code",
             "label": {
-              "zh": "存储键",
-              "en": "Storage Key"
+              "zh": "文件编码",
+              "en": "File Code"
             },
             "type": "text",
             "search": true,
@@ -8404,20 +8282,6 @@
             "exportMode": "full"
           },
           {
-            "key": "publicUrl",
-            "label": {
-              "zh": "公开地址",
-              "en": "Public URL"
-            },
-            "type": "text",
-            "detail": true,
-            "readOnly": true,
-            "sensitivity": "internal",
-            "storageMode": "plain",
-            "responseMode": "omitted",
-            "exportMode": "omitted"
-          },
-          {
             "key": "size",
             "label": {
               "zh": "大小",
@@ -8472,20 +8336,6 @@
             },
             "type": "text",
             "search": true,
-            "detail": true,
-            "readOnly": true,
-            "sensitivity": "internal",
-            "storageMode": "plain",
-            "responseMode": "omitted",
-            "exportMode": "omitted"
-          },
-          {
-            "key": "storagePath",
-            "label": {
-              "zh": "存储路径",
-              "en": "Storage Path"
-            },
-            "type": "text",
             "detail": true,
             "readOnly": true,
             "sensitivity": "internal",

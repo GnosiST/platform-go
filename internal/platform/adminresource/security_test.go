@@ -68,6 +68,33 @@ func TestStoreInternalWriteAllowsDeclaredDerivedValuesAndRejectsRawSecrets(t *te
 	}
 }
 
+func TestStoreExternalWriteRejectsProtectedRecordFields(t *testing.T) {
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	if _, err := store.Create("files", WriteInput{Code: "physical-object-key", Name: "report.txt"}); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("Create(files with code) error = %v, want ErrInvalidRecord", err)
+	}
+}
+
+func TestStoreRejectsHashNamedFieldWithoutProtectedPolicy(t *testing.T) {
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	schema := store.schemas["api-tokens"]
+	for index := range schema.Fields {
+		if schema.Fields[index].Key == "tokenHash" {
+			schema.Fields[index].Sensitivity = capability.FieldSensitivityPublic
+			schema.Fields[index].StorageMode = capability.FieldStoragePlain
+			schema.Fields[index].ResponseMode = capability.FieldProjectionFull
+			schema.Fields[index].ExportMode = capability.FieldProjectionFull
+		}
+	}
+	store.schemas["api-tokens"] = schema
+	_, err := store.CreateInternal("api-tokens", WriteInput{
+		Name: "Invalid Token", Values: map[string]string{"scope": "admin:tenant:read", "tokenHash": "marker-token-hash"},
+	})
+	if !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("CreateInternal(api-tokens) error = %v, want ErrInvalidRecord", err)
+	}
+}
+
 func TestProjectRecordDropsLegacyUnknownAndResponseOmittedValues(t *testing.T) {
 	store := NewStoreFromCapabilities(core.DefaultManifests())
 	legacyRecord := Record{
@@ -97,6 +124,35 @@ func TestProjectRecordDropsLegacyUnknownAndResponseOmittedValues(t *testing.T) {
 		if _, ok := exported.Values[key]; ok {
 			t.Fatalf("%s exposed in export projection", key)
 		}
+	}
+}
+
+func TestProjectRecordAppliesRecordFieldPolicyAndRejectsUnknownMode(t *testing.T) {
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	schema := store.schemas["tenants"]
+	for index := range schema.Fields {
+		if schema.Fields[index].Key == "code" {
+			schema.Fields[index].ResponseMode = capability.FieldProjectionOmitted
+		}
+	}
+	store.schemas["tenants"] = schema
+	projected, err := store.ProjectRecord("tenants", Record{ID: "tenant-1", Code: "secret-code", Name: "Tenant"}, ProjectionResponse)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projected.Code != "" || projected.Name != "Tenant" || projected.ID != "tenant-1" {
+		t.Fatalf("projected record = %+v, want omitted code and preserved identity/name", projected)
+	}
+
+	schema = store.schemas["tenants"]
+	for index := range schema.Fields {
+		if schema.Fields[index].Key == "name" {
+			schema.Fields[index].ResponseMode = "unknown-mode"
+		}
+	}
+	store.schemas["tenants"] = schema
+	if _, err := store.ProjectRecord("tenants", Record{ID: "tenant-1", Name: "Tenant"}, ProjectionResponse); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("ProjectRecord(unknown mode) error = %v, want ErrInvalidRecord", err)
 	}
 }
 
@@ -135,6 +191,18 @@ func TestRepositoryLoadScrubsLegacyUnknownAndProhibitedValues(t *testing.T) {
 					"phone": "13800000000", "password": "marker-secret", "legacyUnknown": "marker-unknown",
 				},
 			}},
+			"audit-logs": {{
+				ID: "audit-legacy", Code: "legacy", Name: "Legacy Audit", Status: "recorded",
+				Values: map[string]string{"actor": "admin", "action": "auth.login", "resource": "auth", "sessionId": "raw-session-marker", "targetName": "personal-name-marker"},
+			}},
+			"settings": {{
+				ID: "setting-branding", Code: "branding", Name: "Branding Settings", Status: "enabled",
+				Values: map[string]string{"productName": "Platform Go", "supportEmail": "legacy-email@example.test"},
+			}},
+			"files": {{
+				ID: "file-legacy", Code: "file-legacy", Name: "Legacy File", Status: "enabled",
+				Values: map[string]string{"storageKey": "safe-object-key", "storagePath": "/private/raw-path-marker", "publicUrl": "https://public.example.test/raw-url-marker"},
+			}},
 		},
 	}}
 	store := NewStoreFromCapabilities(core.DefaultManifests())
@@ -163,10 +231,13 @@ func TestRepositoryLoadScrubsLegacyUnknownAndProhibitedValues(t *testing.T) {
 		t.Fatalf("repository saveCount = %d, want one containment rewrite", repository.saveCount)
 	}
 	serialized := fmt.Sprint(repository.snapshot.Resources)
-	for _, marker := range []string{"13800000000", "marker-secret", "marker-unknown"} {
+	for _, marker := range []string{"13800000000", "marker-secret", "marker-unknown", "raw-session-marker", "personal-name-marker", "legacy-email@example.test", "raw-path-marker", "raw-url-marker"} {
 		if strings.Contains(serialized, marker) {
 			t.Fatalf("rewritten snapshot contains prohibited marker %q", marker)
 		}
+	}
+	if !strings.Contains(serialized, "safe-object-key") {
+		t.Fatal("rewritten snapshot removed internal object key")
 	}
 }
 

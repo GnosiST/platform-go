@@ -246,6 +246,7 @@ func policyReviewAdminResource() capability.AdminResource {
 		Fields: []capability.AdminField{
 			adminField("code", "评审单号", "Review Code", "text", "record", true, false, true, true, true, true, 170, nil),
 			adminField("name", "标题", "Title", "text", "record", true, false, true, true, true, true, 180, nil),
+			adminField("status", "状态", "Status", "select", "record", false, false, true, true, true, true, 120, enabledDisabledOptions()),
 			adminField("policyType", "策略类型", "Policy Type", "select", "values", true, false, true, true, true, true, 140, []capability.AdminFieldOption{
 				adminFieldOption("role_permission", "角色权限", "Role Permission"),
 				adminFieldOption("deny_permission", "拒绝权限", "Deny Permission"),
@@ -628,7 +629,6 @@ func brandingAdminResource() capability.AdminResource {
 			}),
 			adminField("loginTitle", "登录标题", "Login Title", "text", "values", false, false, true, false, true, true, 220, nil),
 			adminField("loginSubtitle", "登录副标题", "Login Subtitle", "textarea", "values", false, false, true, false, true, true, 260, nil),
-			secureAdminField(adminField("supportEmail", "支持邮箱", "Support Email", "text", "values", false, true, false, false, false, false, 180, nil), capability.FieldSensitivityPersonal, capability.FieldStorageEncrypted, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
 		},
 		SearchFields:   []string{"name", "code", "productName", "shortName", "defaultTheme", "loginTitle"},
@@ -652,7 +652,7 @@ func fileStorageAdminResource() capability.AdminResource {
 		},
 		Fields: []capability.AdminField{
 			adminField("name", "文件名", "Filename", "text", "record", true, false, true, true, true, true, 220, nil),
-			adminField("code", "存储键", "Storage Key", "text", "record", false, true, true, false, false, true, 240, nil),
+			adminField("code", "文件编码", "File Code", "text", "record", false, true, true, false, false, true, 240, nil),
 			adminField("status", "状态", "Status", "select", "record", false, false, true, true, true, true, 120, []capability.AdminFieldOption{
 				adminFieldOption("enabled", "已启用", "Enabled"),
 				adminFieldOption("disabled", "已停用", "Disabled"),
@@ -662,8 +662,6 @@ func fileStorageAdminResource() capability.AdminResource {
 			adminField("size", "大小", "Size", "number", "values", false, true, true, true, false, true, 120, nil),
 			adminField("storageDriver", "存储驱动", "Storage Driver", "text", "values", false, true, true, false, false, true, 140, nil),
 			secureAdminField(adminField("storageKey", "对象键", "Object Key", "text", "values", false, true, false, false, false, false, 260, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
-			secureAdminField(adminField("storagePath", "存储路径", "Storage Path", "text", "values", false, true, false, false, false, true, 260, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
-			secureAdminField(adminField("publicUrl", "公开地址", "Public URL", "text", "values", false, true, false, false, false, true, 260, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 			secureAdminField(adminField("tenantId", "租户 ID", "Tenant ID", "text", "values", false, true, false, false, false, false, 180, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 			secureAdminField(adminField("uploadedBy", "上传人", "Uploaded By", "text", "values", false, true, false, false, false, true, 180, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionFull, capability.FieldProjectionFull),
 			adminField("createdAt", "上传时间", "Created At", "datetime", "values", false, true, true, true, false, true, 180, nil),

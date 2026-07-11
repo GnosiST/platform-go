@@ -1932,7 +1932,6 @@
                   "resource",
                   "targetCode",
                   "targetId",
-                  "targetName",
                   "traceId"
                 ],
                 "x-platform-search-fields": [
@@ -1941,7 +1940,6 @@
                   "provider",
                   "resource",
                   "targetCode",
-                  "targetName",
                   "traceId"
                 ],
                 "x-platform-filter-fields": [
@@ -1953,7 +1951,6 @@
                   "resource",
                   "targetCode",
                   "targetId",
-                  "targetName",
                   "traceId"
                 ],
                 "x-platform-sort-fields": [
@@ -1963,8 +1960,7 @@
                   "outcome",
                   "provider",
                   "resource",
-                  "targetCode",
-                  "targetName"
+                  "targetCode"
                 ],
                 "x-platform-localized-fields": []
               }
@@ -9055,24 +9051,6 @@
             "x-platform-export-mode": "full",
             "type": "string"
           },
-          "sessionId": {
-            "description": "en: Session ID; zh: 会话 ID",
-            "x-platform-field-type": "text",
-            "x-platform-field-source": "values",
-            "x-platform-label": {
-              "zh": "会话 ID",
-              "en": "Session ID"
-            },
-            "x-platform-searchable": false,
-            "x-platform-filterable": false,
-            "x-platform-sortable": false,
-            "x-platform-localizable": false,
-            "x-platform-sensitivity": "internal",
-            "x-platform-storage-mode": "plain",
-            "x-platform-response-mode": "omitted",
-            "x-platform-export-mode": "omitted",
-            "type": "string"
-          },
           "targetCode": {
             "description": "en: Target Code; zh: 目标编码",
             "x-platform-field-type": "text",
@@ -9098,24 +9076,6 @@
             "x-platform-label": {
               "zh": "目标 ID",
               "en": "Target ID"
-            },
-            "x-platform-searchable": true,
-            "x-platform-filterable": false,
-            "x-platform-sortable": false,
-            "x-platform-localizable": false,
-            "x-platform-sensitivity": "public",
-            "x-platform-storage-mode": "plain",
-            "x-platform-response-mode": "full",
-            "x-platform-export-mode": "full",
-            "type": "string"
-          },
-          "targetName": {
-            "description": "en: Target Name; zh: 目标名称",
-            "x-platform-field-type": "text",
-            "x-platform-field-source": "values",
-            "x-platform-label": {
-              "zh": "目标名称",
-              "en": "Target Name"
             },
             "x-platform-searchable": true,
             "x-platform-filterable": false,
@@ -9268,24 +9228,6 @@
             "x-platform-storage-mode": "plain",
             "x-platform-response-mode": "full",
             "x-platform-export-mode": "full",
-            "type": "string"
-          },
-          "supportEmail": {
-            "description": "en: Support Email; zh: 支持邮箱",
-            "x-platform-field-type": "text",
-            "x-platform-field-source": "values",
-            "x-platform-label": {
-              "zh": "支持邮箱",
-              "en": "Support Email"
-            },
-            "x-platform-searchable": false,
-            "x-platform-filterable": false,
-            "x-platform-sortable": false,
-            "x-platform-localizable": false,
-            "x-platform-sensitivity": "personal",
-            "x-platform-storage-mode": "encrypted",
-            "x-platform-response-mode": "omitted",
-            "x-platform-export-mode": "omitted",
             "type": "string"
           }
         },
@@ -10276,12 +10218,12 @@
             "type": "string"
           },
           "code": {
-            "description": "en: Storage Key; zh: 存储键",
+            "description": "en: File Code; zh: 文件编码",
             "x-platform-field-type": "text",
             "x-platform-field-source": "values",
             "x-platform-label": {
-              "zh": "存储键",
-              "en": "Storage Key"
+              "zh": "文件编码",
+              "en": "File Code"
             },
             "x-platform-searchable": true,
             "x-platform-filterable": false,
@@ -10414,24 +10356,6 @@
             "x-platform-export-mode": "full",
             "type": "string"
           },
-          "publicUrl": {
-            "description": "en: Public URL; zh: 公开地址",
-            "x-platform-field-type": "text",
-            "x-platform-field-source": "values",
-            "x-platform-label": {
-              "zh": "公开地址",
-              "en": "Public URL"
-            },
-            "x-platform-searchable": false,
-            "x-platform-filterable": false,
-            "x-platform-sortable": false,
-            "x-platform-localizable": false,
-            "x-platform-sensitivity": "internal",
-            "x-platform-storage-mode": "plain",
-            "x-platform-response-mode": "omitted",
-            "x-platform-export-mode": "omitted",
-            "type": "string"
-          },
           "size": {
             "description": "en: Size; zh: 大小",
             "x-platform-field-type": "number",
@@ -10477,24 +10401,6 @@
               "en": "Object Key"
             },
             "x-platform-searchable": true,
-            "x-platform-filterable": false,
-            "x-platform-sortable": false,
-            "x-platform-localizable": false,
-            "x-platform-sensitivity": "internal",
-            "x-platform-storage-mode": "plain",
-            "x-platform-response-mode": "omitted",
-            "x-platform-export-mode": "omitted",
-            "type": "string"
-          },
-          "storagePath": {
-            "description": "en: Storage Path; zh: 存储路径",
-            "x-platform-field-type": "text",
-            "x-platform-field-source": "values",
-            "x-platform-label": {
-              "zh": "存储路径",
-              "en": "Storage Path"
-            },
-            "x-platform-searchable": false,
             "x-platform-filterable": false,
             "x-platform-sortable": false,
             "x-platform-localizable": false,
