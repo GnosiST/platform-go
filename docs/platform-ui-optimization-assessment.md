@@ -12,6 +12,8 @@ This assessment records how two design aids are routed without disrupting the pl
 
 Candidate A has completed that activation path as `admin-ui-system-quality-hardening`. Candidate B's broader brand-entry redesign remains deferred until a real public or brand brief is approved. The active completion graph now includes bounded visual nodes for admin watermark/export governance and the public documentation site; those nodes require `superpowers:brainstorming` and Product Design and remain pending until implementation and fresh browser evidence exist.
 
+The original 37-node foundation baseline remains closed. The active completion program adds eight controlled pending nodes, so current governance is `45 total / 37 implemented / 8 controlled unfinished` with `completionStatus=not-complete-controlled`. Approved specifications: [completion program](superpowers/specs/2026-07-12-platform-go-completion-program-design.md), [runtime security](superpowers/specs/2026-07-12-runtime-security-hardening-design.md), [watermark/export governance](superpowers/specs/2026-07-12-admin-watermark-export-design.md), [sensitive data encryption](superpowers/specs/2026-07-12-sensitive-data-encryption-design.md) and [open-source docs/site](superpowers/specs/2026-07-12-open-source-docs-site-design.md).
+
 ## Current Evidence
 
 The 2026-07-10 audit inspected the local admin at `1280x720` and `390x844` with fresh browser captures:
