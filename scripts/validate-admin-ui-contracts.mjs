@@ -87,6 +87,16 @@ requireIncludes(files.shell, "afterOpenChange={handleMobileDrawerOpenChange}", "
 requireIncludes(files.shell, "dictionary.openMobileNavigation", "Mobile navigation must use an explicit localized accessible name.");
 requireIncludes(files.shell, "dictionary.alerts", "The alert icon control must use an explicit localized accessible name.");
 requireIncludes(files.shell, "platform-mobile-contextbar", "AdminShell must provide the approved compact mobile context bar.");
+requireRegex(
+  files.shell,
+  /const handleMobileWorkTabClose = \(route: string\) => \{\s*setOpenContext\(null\);\s*closeWorkTab\(route\);\s*\};/,
+  "Mobile work-tab close must dismiss its context panel before closing the tab.",
+);
+requireIncludes(
+  files.shell,
+  "onClick={() => handleMobileWorkTabClose(resource.route)}",
+  "Mobile work-tab close controls must use the context-closing handler.",
+);
 
 for (const key of [
   "appearance",
@@ -290,8 +300,8 @@ requireRegex(files.styles, /:focus-visible[\s\S]*outline:\s*2px solid var\(--pri
 requireRegex(files.styles, /@media\s*\(prefers-reduced-motion:\s*reduce\)/, "styles.css must respect reduced motion.");
 requireRegex(
   files.styles,
-  /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*:where\(\.ant-modal-root, \.ant-drawer-root, \.ant-dropdown, \.ant-popover\),[\s\S]*:where\(\.ant-modal-root, \.ant-drawer-root, \.ant-dropdown, \.ant-popover\) \*,[\s\S]*transition-duration:\s*0\.01ms !important;/,
-  "Reduced motion must cover body-portaled AntD modal, drawer, dropdown, and popover roots.",
+  /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*:where\(\.ant-modal-root, \.ant-drawer-root, \.ant-dropdown, \.ant-popover, \.ant-tooltip, \.ant-select-dropdown\),[\s\S]*:where\(\.ant-modal-root, \.ant-drawer-root, \.ant-dropdown, \.ant-popover, \.ant-tooltip, \.ant-select-dropdown\) \*,[\s\S]*:where\(\.ant-modal-root, \.ant-drawer-root, \.ant-dropdown, \.ant-popover, \.ant-tooltip, \.ant-select-dropdown\) \*::before,[\s\S]*:where\(\.ant-modal-root, \.ant-drawer-root, \.ant-dropdown, \.ant-popover, \.ant-tooltip, \.ant-select-dropdown\) \*::after[\s\S]*transition-duration:\s*0\.01ms !important;/,
+  "Reduced motion must cover used body-portaled AntD motion roots.",
 );
 requireRegex(files.styles, /@media\s*\(max-width:\s*1023px\)[\s\S]*min-height:\s*44px/, "Responsive shell controls must use 44px minimum targets.");
 requireRegex(

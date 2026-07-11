@@ -194,6 +194,11 @@ export function AdminShell({
     }
   };
 
+  const handleMobileWorkTabClose = (route: string) => {
+    setOpenContext(null);
+    closeWorkTab(route);
+  };
+
   const closeWorkTabs = (mode: "current" | "others" | "all" | "left" | "right", route: string) => {
     const index = openTabRoutes.indexOf(route);
     const nextRoutes = (() => {
@@ -377,7 +382,7 @@ export function AdminShell({
                             aria-label={`${dictionary.closeTab}: ${resource.title[language]}`}
                             className="mobile-work-context-close"
                             type="button"
-                            onClick={() => closeWorkTab(resource.route)}
+                            onClick={() => handleMobileWorkTabClose(resource.route)}
                           >
                             <CloseOutlined />
                           </button>

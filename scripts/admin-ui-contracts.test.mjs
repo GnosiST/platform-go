@@ -88,6 +88,36 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /AdminShell must expose a skip-to-content link/);
   });
 
+  it("rejects mobile work-tab close handling that leaves the context panel open", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/shell/AdminShell.tsx",
+      "const handleMobileWorkTabClose = (route: string) => {\n    setOpenContext(null);\n    closeWorkTab(route);\n  };",
+      "const handleMobileWorkTabClose = (route: string) => {\n    closeWorkTab(route);\n  };",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Mobile work-tab close must dismiss its context panel before closing the tab/);
+  });
+
+  it("rejects mobile work-tab close controls that bypass the context-closing handler", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/shell/AdminShell.tsx",
+      "onClick={() => handleMobileWorkTabClose(resource.route)}",
+      "onClick={() => closeWorkTab(resource.route)}",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Mobile work-tab close controls must use the context-closing handler/);
+  });
+
   it("rejects a client that renames the session-expired event contract", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
@@ -191,8 +221,28 @@ describe("validate-admin-ui-contracts", () => {
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /Reduced motion must cover body-portaled AntD modal, drawer, dropdown, and popover roots/);
+    assert.match(result.stderr, /Reduced motion must cover used body-portaled AntD motion roots/);
   });
+
+  for (const [name, selector] of [
+    ["tooltips", ".ant-tooltip"],
+    ["select dropdowns", ".ant-select-dropdown"],
+  ]) {
+    it(`rejects reduced-motion styles that omit body-portaled AntD ${name}`, () => {
+      const tempRoot = tempAdminRoot();
+      replaceInTemp(
+        tempRoot,
+        "admin/src/styles.css",
+        selector,
+        `${selector}-motion-uncovered`,
+      );
+
+      const result = runValidator(["--root", tempRoot]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /Reduced motion must cover used body-portaled AntD motion roots/);
+    });
+  }
 
   it("rejects resource modal focus handling outside the AntD open lifecycle", () => {
     const tempRoot = tempAdminRoot();
