@@ -4333,11 +4333,21 @@ select {
 
   .table-actions {
     display: grid;
+    grid-auto-rows: minmax(44px, auto);
     grid-template-columns: minmax(0, 1fr) auto auto auto;
   }
 
   .capability-search {
     min-width: 0;
+  }
+
+  .platform-data-table-panel .platform-table-search {
+    min-height: 44px;
+  }
+
+  .platform-data-table-panel .table-actions .ant-btn {
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .user-menu-name {
@@ -4346,6 +4356,19 @@ select {
 
   .system-settings-drawer .ant-drawer-content-wrapper {
     width: calc(100vw - 12px) !important;
+  }
+
+  .system-settings-drawer .ant-drawer-close,
+  .settings-tabs .ant-tabs-tab,
+  .settings-tabs .ant-tabs-tab-btn,
+  .settings-tabs .ant-tabs-nav-more {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .settings-tabs .ant-tabs-tab-btn {
+    display: inline-flex;
+    align-items: center;
   }
 
   .resource-form-side-preview {
@@ -4437,6 +4460,8 @@ select {
 
   .platform-pagination-bar {
     --pagination-side-width: 100%;
+    --pagination-item-size: 44px;
+    --pagination-item-inner: 44px;
     grid-template-columns: minmax(0, 1fr);
     justify-items: center;
     row-gap: 4px;

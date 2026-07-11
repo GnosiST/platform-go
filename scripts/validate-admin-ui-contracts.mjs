@@ -129,6 +129,7 @@ requireIncludes(files.table, "responsiveBreakpointsForPriority", "PlatformDataTa
 requireIncludes(files.table, "column.responsive ?? responsiveBreakpointsForPriority(column.priority)", "PlatformDataTable must preserve caller-provided responsive breakpoints.");
 requireIncludes(files.resourceConsole, "tableColumnPriority(index)", "Generic resource tables must derive priority from schema order.");
 requireIncludes(files.resourceConsole, "form.getFieldInstance", "Resource modals must focus the first editable schema field.");
+requireIncludes(files.resourceConsole, "document.getElementById(firstField.key)", "Resource modals must fall back to the rendered field control when Form cannot expose an instance.");
 
 requireIncludes(files.client, "export type AdminResourceFieldRelation", "Admin API client must expose resource field relation metadata.");
 requireIncludes(files.client, "relation?: AdminResourceFieldRelation", "AdminResourceField must carry optional relation metadata.");
@@ -287,6 +288,21 @@ requireRegex(
   files.styles,
   /@media\s*\(max-width:\s*1023px\)[\s\S]*\.mobile-global-search\s*\{[^}]*min-height:\s*44px;/,
   "Mobile Drawer search must use a 44px minimum target below the desktop breakpoint.",
+);
+requireRegex(
+  files.styles,
+  /@media\s*\(max-width:\s*767px\)[\s\S]*\.platform-data-table-panel \.table-actions \.ant-btn\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/,
+  "Mobile resource table actions must expose 44px touch targets.",
+);
+requireRegex(
+  files.styles,
+  /@media\s*\(max-width:\s*767px\)[\s\S]*\.platform-pagination-bar\s*\{[^}]*--pagination-item-size:\s*44px;[^}]*--pagination-item-inner:\s*44px;/,
+  "Mobile resource pagination controls must expose 44px touch targets.",
+);
+requireRegex(
+  files.styles,
+  /@media\s*\(max-width:\s*767px\)[\s\S]*\.system-settings-drawer \.ant-drawer-close,[\s\S]*\.settings-tabs \.ant-tabs-nav-more\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/,
+  "Mobile settings Drawer controls must expose 44px touch targets.",
 );
 requireOrder(
   files.styles,

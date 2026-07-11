@@ -193,4 +193,48 @@ describe("validate-admin-ui-contracts", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /Reduced motion must cover body-portaled AntD modal, drawer, dropdown, and popover roots/);
   });
+
+  it("rejects resource modal focus handling without a rendered-control fallback", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "document.getElementById(firstField.key)",
+      'document.getElementById("missing-field")',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Resource modals must fall back to the rendered field control/);
+  });
+
+  it("rejects mobile styles that shrink resource and settings interactions", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/styles.css",
+      ".platform-data-table-panel .table-actions .ant-btn",
+      ".platform-data-table-panel .table-actions .missing-button",
+    );
+    replaceInTemp(
+      tempRoot,
+      "admin/src/styles.css",
+      ".settings-tabs .ant-tabs-nav-more",
+      ".settings-tabs .missing-nav-more",
+    );
+    replaceInTemp(
+      tempRoot,
+      "admin/src/styles.css",
+      "--pagination-item-size: 44px",
+      "--pagination-item-size: 32px",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Mobile resource table actions must expose 44px touch targets/);
+    assert.match(result.stderr, /Mobile resource pagination controls must expose 44px touch targets/);
+    assert.match(result.stderr, /Mobile settings Drawer controls must expose 44px touch targets/);
+  });
 });

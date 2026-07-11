@@ -12,7 +12,7 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 import { useCreate, useDataProvider, useDelete, useList, useUpdate, type CrudSort, type DataProvider, type HttpError } from "@refinedev/core";
-import { Button, Drawer, Dropdown, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Tabs, Tag, Typography, type MenuProps, type TableProps } from "antd";
+import { Button, Drawer, Dropdown, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Tabs, Tag, Typography, type FormInstance, type MenuProps, type TableProps } from "antd";
 import type { Rule } from "antd/es/form";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type Key, type ReactNode } from "react";
 import {
@@ -815,12 +815,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
             return;
           }
           requestAnimationFrame(() => {
-            const firstField = formFields[0];
-            if (!firstField) {
-              return;
-            }
-            const fieldInstance = form.getFieldInstance(firstField.key) as { focus?: () => void } | undefined;
-            fieldInstance?.focus?.();
+            focusFirstEditableFormField(form, formFields);
           });
         }}
         onCancel={() => setModalOpen(false)}
@@ -2361,6 +2356,22 @@ function tableColumnPriority(index: number): PlatformDataTableColumnPriority {
   if (index < 4) return "essential";
   if (index < 7) return "standard";
   return "extended";
+}
+
+function focusFirstEditableFormField(form: FormInstance<ResourceFormValues>, fields: AdminResourceField[]) {
+  const firstField = fields[0];
+  if (!firstField) {
+    return;
+  }
+  const fieldInstance = form.getFieldInstance(firstField.key) as { focus?: (options?: FocusOptions) => void } | undefined;
+  if (fieldInstance?.focus) {
+    fieldInstance.focus({ preventScroll: true });
+    return;
+  }
+  const fieldControl = document.getElementById(firstField.key);
+  if (fieldControl?.closest(".admin-form-modal")) {
+    fieldControl.focus({ preventScroll: true });
+  }
 }
 
 function formModalWidth(layout: PlatformResourceFormLayoutPreset) {
