@@ -156,17 +156,26 @@ func (r *GORMRepository) Load(ctx context.Context) (Snapshot, error) {
 	snapshot := Snapshot{Sessions: map[string]StoredSession{}}
 	for _, record := range records {
 		session := sessionFromGORMRecord(record)
+		if err := validateStoredSessionForKey(record.TokenDigest, session); err != nil {
+			return Snapshot{}, err
+		}
 		snapshot.Sessions[record.TokenDigest] = session
 	}
 	return snapshot, nil
 }
 
 func (r *GORMRepository) Create(ctx context.Context, session StoredSession) error {
+	if err := validateStoredSessionForKey(session.TokenDigest, session); err != nil {
+		return err
+	}
 	record := gormSessionRecordFromSession(session)
 	return r.db.WithContext(ctx).Create(&record).Error
 }
 
 func (r *GORMRepository) Resolve(ctx context.Context, tokenDigest string, now time.Time) (StoredSession, bool, error) {
+	if err := validateTokenDigest(tokenDigest); err != nil {
+		return StoredSession{}, false, err
+	}
 	var record gormSessionRecord
 	err := r.activeQuery(r.db.WithContext(ctx), tokenDigest, now).Take(&record).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -175,14 +184,24 @@ func (r *GORMRepository) Resolve(ctx context.Context, tokenDigest string, now ti
 	if err != nil {
 		return StoredSession{}, false, err
 	}
-	return sessionFromGORMRecord(record), true, nil
+	session := sessionFromGORMRecord(record)
+	if err := validateStoredSessionForKey(tokenDigest, session); err != nil {
+		return StoredSession{}, false, err
+	}
+	return session, true, nil
 }
 
 func (r *GORMRepository) Renew(ctx context.Context, tokenDigest string, now time.Time, expiresAt time.Time) (StoredSession, bool, error) {
+	if err := validateTokenDigest(tokenDigest); err != nil {
+		return StoredSession{}, false, err
+	}
 	return r.updateActive(ctx, tokenDigest, now, map[string]any{"expires_at": expiresAt.UTC()}, true)
 }
 
 func (r *GORMRepository) Revoke(ctx context.Context, tokenDigest string, now time.Time) (StoredSession, bool, error) {
+	if err := validateTokenDigest(tokenDigest); err != nil {
+		return StoredSession{}, false, err
+	}
 	return r.updateActive(ctx, tokenDigest, now, map[string]any{"revoked_at": now.UTC()}, false)
 }
 
@@ -217,7 +236,11 @@ func (r *GORMRepository) updateActive(ctx context.Context, tokenDigest string, n
 	if !updated {
 		return StoredSession{}, false, nil
 	}
-	return sessionFromGORMRecord(record), true, nil
+	session := sessionFromGORMRecord(record)
+	if err := validateStoredSessionForKey(tokenDigest, session); err != nil {
+		return StoredSession{}, false, err
+	}
+	return session, true, nil
 }
 
 func (r *GORMRepository) activeQuery(db *gorm.DB, tokenDigest string, now time.Time) *gorm.DB {

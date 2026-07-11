@@ -48,6 +48,9 @@ func (r *SQLRepository) Load(ctx context.Context) (Snapshot, error) {
 }
 
 func (r *SQLRepository) Create(ctx context.Context, session StoredSession) error {
+	if err := validateStoredSessionForKey(session.TokenDigest, session); err != nil {
+		return err
+	}
 	_, err := r.db.ExecContext(ctx, `INSERT INTO `+sessionsTable+` (token_digest, username, issued_at, expires_at, revoked_at) VALUES (?, ?, ?, ?, ?)`,
 		session.TokenDigest,
 		session.Username,
@@ -59,10 +62,16 @@ func (r *SQLRepository) Create(ctx context.Context, session StoredSession) error
 }
 
 func (r *SQLRepository) Resolve(ctx context.Context, tokenDigest string, now time.Time) (StoredSession, bool, error) {
+	if err := validateTokenDigest(tokenDigest); err != nil {
+		return StoredSession{}, false, err
+	}
 	return querySQLSession(ctx, r.db, `SELECT token_digest, username, issued_at, expires_at, revoked_at FROM `+sessionsTable+` WHERE token_digest = ? AND (revoked_at IS NULL OR revoked_at = '') AND expires_at > ?`, tokenDigest, formatSessionTime(now))
 }
 
 func (r *SQLRepository) Renew(ctx context.Context, tokenDigest string, now time.Time, expiresAt time.Time) (StoredSession, bool, error) {
+	if err := validateTokenDigest(tokenDigest); err != nil {
+		return StoredSession{}, false, err
+	}
 	return r.updateActive(ctx,
 		`UPDATE `+sessionsTable+` SET expires_at = ? WHERE token_digest = ? AND (revoked_at IS NULL OR revoked_at = '') AND expires_at > ?`,
 		[]any{formatSessionTime(expiresAt), tokenDigest, formatSessionTime(now)},
@@ -71,6 +80,9 @@ func (r *SQLRepository) Renew(ctx context.Context, tokenDigest string, now time.
 }
 
 func (r *SQLRepository) Revoke(ctx context.Context, tokenDigest string, now time.Time) (StoredSession, bool, error) {
+	if err := validateTokenDigest(tokenDigest); err != nil {
+		return StoredSession{}, false, err
+	}
 	return r.updateActive(ctx,
 		`UPDATE `+sessionsTable+` SET revoked_at = ? WHERE token_digest = ? AND (revoked_at IS NULL OR revoked_at = '') AND expires_at > ?`,
 		[]any{formatSessionTime(now), tokenDigest, formatSessionTime(now)},
@@ -190,6 +202,9 @@ func (r *SQLRepository) normalizeSessionTimes(ctx context.Context) error {
 		return err
 	}
 	for _, record := range records {
+		if err := validateTokenDigest(record.tokenDigest); err != nil {
+			return err
+		}
 		normalizedIssuedAt, err := normalizeSessionTime(record.issuedAt)
 		if err != nil {
 			return err
@@ -258,6 +273,9 @@ func scanSQLSession(scanner sqlSessionScanner) (StoredSession, error) {
 		if session.RevokedAt, err = parseSessionTime(value); err != nil {
 			return StoredSession{}, err
 		}
+	}
+	if err := validateStoredSessionForKey(session.TokenDigest, session); err != nil {
+		return StoredSession{}, err
 	}
 	return session, nil
 }

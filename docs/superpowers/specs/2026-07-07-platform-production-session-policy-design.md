@@ -8,6 +8,8 @@ Define the production session policy enforced by the implemented `production-aut
 
 Admin and app HTTP credentials are JWT bearer tokens. The JWT carries `tokenType`, user, tenant and server-side `sessionId`; the server-side session store is authoritative for TTL, renewal and revocation. `POST /api/auth/refresh` renews the same server-side session and signs a new admin JWT. It is not a refresh-token-family model, and it must not issue long-lived offline credentials.
 
+Raw server-side session handles exist only at the immediate HTTP/JWT and Store boundaries. Persisted session identifiers use the canonical `sha256:v1:` prefix followed by exactly 64 lowercase hexadecimal characters. File, SQL and GORM repositories must reject raw handles, non-canonical digests and mismatched snapshot keys before loading or returning records.
+
 ## Refresh Token Family Model
 
 The refresh-token-family runtime is allowed to become part of the default auth path only when offline renewal is explicitly required and approved. It must use separate storage from the session table:
@@ -47,7 +49,7 @@ Production enablement must declare and test these revocation scopes:
 
 ## Audit And Redaction
 
-Required audit actions are `auth.refresh`, `auth.refresh.rotate`, `auth.refresh.reuse_detected`, `auth.logout` and provider-specific login/logout actions. Audit values may include actor, action, resource, provider, family id, token id, shortened session id and timestamps. They must not include JWTs, bearer tokens, refresh token values, provider raw subjects, OpenID, UnionID, phone numbers or provider secrets.
+Required audit actions are `auth.refresh`, `auth.refresh.rotate`, `auth.refresh.reuse_detected`, `auth.logout` and provider-specific login/logout actions. Audit values may include actor, action, resource, provider, family id, token id and timestamps. Audit records must not store the raw session handle, its digest, or any shortened derivative. They must not include JWTs, bearer tokens, refresh token values, provider raw subjects, OpenID, UnionID, phone numbers or provider secrets. The generic audit schema has no `sessionId` field; session correlation belongs in protected runtime telemetry rather than the persisted Admin audit resource.
 
 ## Promotion Gate
 

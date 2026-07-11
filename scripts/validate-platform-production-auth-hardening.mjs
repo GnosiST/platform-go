@@ -17,6 +17,9 @@ const readinessPath = path.resolve(repoRoot, argValue("--production-readiness", 
 const capabilityAuditPath = path.resolve(repoRoot, argValue("--capability-audit", "resources/generated/platform-capability-audit.json"));
 const refreshTokenFamilyPromotionPath = path.resolve(repoRoot, argValue("--refresh-token-family-promotion", "resources/platform-refresh-token-family-promotion.json"));
 const promotionReviewPath = path.resolve(repoRoot, argValue("--promotion-review", "resources/generated/production-auth-promotion-review.json"));
+const sessionPolicyDocPath = path.resolve(repoRoot, argValue("--session-policy-doc", "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md"));
+const oidcDesignDocPath = path.resolve(repoRoot, argValue("--oidc-design-doc", "docs/superpowers/specs/2026-07-11-production-admin-oidc-auth-design.md"));
+const adminResourceSchemaDocPath = path.resolve(repoRoot, argValue("--admin-resource-schema-doc", "docs/admin-resource-schema.md"));
 
 function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -987,6 +990,46 @@ function validateAuditPolicy(contract, errors) {
   }
 }
 
+function validateAuditDocumentation(errors) {
+  const documents = [
+    {
+      path: sessionPolicyDocPath,
+      requirements: [
+        ["Persisted session identifiers use the canonical `sha256:v1:` prefix followed by exactly 64 lowercase hexadecimal characters.", "session policy must define canonical sha256:v1 digests with 64 lowercase hexadecimal characters"],
+        ["Audit records must not store the raw session handle, its digest, or any shortened derivative.", "session policy must forbid raw session handles, digests and shortened derivatives in audits"],
+        ["The generic audit schema has no `sessionId` field", "session policy must state that generic audit schema has no sessionId field"],
+      ],
+    },
+    {
+      path: oidcDesignDocPath,
+      requirements: [
+        ["OIDC audit records must not store the raw session handle, its digest, or any shortened derivative.", "OIDC design must forbid raw session handles, digests and shortened derivatives in audits"],
+        ["The persisted OIDC audit schema does not expose a `sessionId` field.", "OIDC design must state that persisted audit schema has no sessionId field"],
+      ],
+    },
+    {
+      path: adminResourceSchemaDocPath,
+      requirements: [
+        ["The audit schema does not expose `sessionId`", "admin resource schema must state that audit schema has no sessionId field"],
+        ["raw session handles, session digests or shortened derivatives", "admin resource schema must forbid session credentials and derivatives in audit schema"],
+      ],
+    },
+  ];
+
+  for (const document of documents) {
+    if (!fs.existsSync(document.path)) {
+      errors.push(`audit documentation path is missing: ${document.path}`);
+      continue;
+    }
+    const content = fs.readFileSync(document.path, "utf8");
+    for (const [phrase, error] of document.requirements) {
+      if (!content.includes(phrase)) {
+        errors.push(error);
+      }
+    }
+  }
+}
+
 function validate() {
   const contract = readJSON(contractPath);
   const graph = readJSON(taskGraphPath);
@@ -1009,6 +1052,7 @@ function validate() {
   validateRotationPolicy(contract, readiness, errors);
   validateTaskGraph(contract, graph, errors);
   validateAuditPolicy(contract, errors);
+  validateAuditDocumentation(errors);
   validateDocuments(contract, errors);
 
   return { contract, errors };

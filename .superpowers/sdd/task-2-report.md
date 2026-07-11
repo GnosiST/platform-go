@@ -63,3 +63,42 @@ Implemented. Public Store and HTTP/JWT call sites still use the opaque raw sessi
 
 - `docs/platform-auth.md` changed only to synchronize the implemented digest-only persistence and removal of `shortSessionID` from auth audits.
 - No refresh-token-family enablement and no source-writing capability were introduced.
+
+## Review Remediation: Persisted Digest Validation
+
+The follow-up review identified that `StoredSession.TokenDigest` was trusted by name rather than validated at runtime. A repository implementation, malformed database row or damaged file snapshot could therefore return a raw handle or malformed digest and have the Store cache it.
+
+The remediation adds one fail-closed digest boundary shared by the Store and all session repositories:
+
+- canonical persisted identifiers are exactly `sha256:v1:` followed by 64 lowercase hexadecimal characters;
+- File, SQL and GORM repositories reject malformed Create and lookup inputs before persistence access;
+- File v2 snapshots reject malformed values and map keys that differ from `StoredSession.TokenDigest`;
+- SQL and GORM scans reject malformed persisted rows before returning them;
+- Store construction and Reload validate the complete snapshot before replacing the last valid cache;
+- repository Resolve, Renew and Revoke results are validated against the requested digest before caching;
+- validation errors use a fixed message and do not interpolate the rejected raw or malformed value.
+
+The session-policy, OIDC and Admin resource-schema documents now agree that auth audits do not persist raw session handles, digests or shortened derivatives, and that the generic audit schema has no `sessionId` field. The production-auth validator has mutation coverage for these statements and for the exact canonical digest format.
+
+### Follow-up RED Evidence
+
+- `rtk go test ./internal/platform/session -run 'Test(RepositoriesRejectNonCanonicalSessionDigests|FileRepositoryRejectsMalformedV2Snapshots|SQLRepositoryRejectsMalformedPersistedDigest|GORMRepositoryRejectsMalformedPersistedDigest|RepositoryBackedStoreRejectsInvalid)' -count=1`
+  - 1 existing unknown-version assertion passed and 35 new digest-boundary assertions failed before implementation.
+- `rtk node --test --test-name-pattern 'rejects session and OIDC documentation' scripts/platform-production-auth-hardening.test.mjs`
+  - Failed because the validator ignored the mutated session-policy, OIDC and Admin resource-schema documents.
+
+### Follow-up GREEN Evidence
+
+- Focused digest-boundary tests: 36 passed.
+- Full `internal/platform/session`: 71 passed.
+- Session and HTTP API packages: 221 passed.
+- Full Go repository: 653 passed in 23 packages.
+- Production-auth validator mutation suite: 34 passed.
+- `rtk node scripts/validate-platform-production-auth-hardening.mjs`: passed.
+- `rtk git diff --check`: passed.
+
+### Follow-up Scope
+
+- This remediation does not change or enable `internal/platform/refreshtoken`.
+- It does not enable source writing.
+- Live MySQL/PostgreSQL integration execution remains separate from this digest/docs patch and its commit scope.

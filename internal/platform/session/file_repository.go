@@ -34,6 +34,9 @@ func (r *FileRepository) Load(context.Context) (Snapshot, error) {
 }
 
 func (r *FileRepository) Create(_ context.Context, session StoredSession) error {
+	if err := validateStoredSessionForKey(session.TokenDigest, session); err != nil {
+		return err
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	snapshot, err := r.loadLocked()
@@ -48,24 +51,32 @@ func (r *FileRepository) Create(_ context.Context, session StoredSession) error 
 }
 
 func (r *FileRepository) Resolve(_ context.Context, tokenDigest string, now time.Time) (StoredSession, bool, error) {
+	if err := validateTokenDigest(tokenDigest); err != nil {
+		return StoredSession{}, false, err
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	snapshot, err := r.loadLocked()
 	if err != nil {
 		return StoredSession{}, false, err
 	}
-	session, ok := activeSession(snapshot, tokenDigest, now)
-	return session, ok, nil
+	return activeSession(snapshot, tokenDigest, now)
 }
 
 func (r *FileRepository) Renew(_ context.Context, tokenDigest string, now time.Time, expiresAt time.Time) (StoredSession, bool, error) {
+	if err := validateTokenDigest(tokenDigest); err != nil {
+		return StoredSession{}, false, err
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	snapshot, err := r.loadLocked()
 	if err != nil {
 		return StoredSession{}, false, err
 	}
-	session, ok := activeSession(snapshot, tokenDigest, now)
+	session, ok, err := activeSession(snapshot, tokenDigest, now)
+	if err != nil {
+		return StoredSession{}, false, err
+	}
 	if !ok {
 		return StoredSession{}, false, nil
 	}
@@ -78,13 +89,19 @@ func (r *FileRepository) Renew(_ context.Context, tokenDigest string, now time.T
 }
 
 func (r *FileRepository) Revoke(_ context.Context, tokenDigest string, now time.Time) (StoredSession, bool, error) {
+	if err := validateTokenDigest(tokenDigest); err != nil {
+		return StoredSession{}, false, err
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	snapshot, err := r.loadLocked()
 	if err != nil {
 		return StoredSession{}, false, err
 	}
-	session, ok := activeSession(snapshot, tokenDigest, now)
+	session, ok, err := activeSession(snapshot, tokenDigest, now)
+	if err != nil {
+		return StoredSession{}, false, err
+	}
 	if !ok {
 		return StoredSession{}, false, nil
 	}
@@ -98,7 +115,11 @@ func (r *FileRepository) Revoke(_ context.Context, tokenDigest string, now time.
 
 func (r *FileRepository) loadLocked() (Snapshot, error) {
 	if r.path == "" {
-		return Snapshot{Sessions: cloneStoredSessions(r.sessions)}, nil
+		snapshot := Snapshot{Sessions: cloneStoredSessions(r.sessions)}
+		if err := validateSnapshot(snapshot); err != nil {
+			return Snapshot{}, err
+		}
+		return snapshot, nil
 	}
 	content, err := os.ReadFile(r.path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -124,10 +145,17 @@ func (r *FileRepository) loadLocked() (Snapshot, error) {
 	if snapshot.Sessions == nil {
 		snapshot.Sessions = map[string]StoredSession{}
 	}
-	return Snapshot{Sessions: cloneStoredSessions(snapshot.Sessions)}, nil
+	loaded := Snapshot{Sessions: cloneStoredSessions(snapshot.Sessions)}
+	if err := validateSnapshot(loaded); err != nil {
+		return Snapshot{}, err
+	}
+	return loaded, nil
 }
 
 func (r *FileRepository) writeLocked(snapshot Snapshot) error {
+	if err := validateSnapshot(snapshot); err != nil {
+		return err
+	}
 	if r.path == "" {
 		r.sessions = cloneStoredSessions(snapshot.Sessions)
 		return nil
@@ -160,10 +188,13 @@ func (r *FileRepository) writeLocked(snapshot Snapshot) error {
 	return os.Rename(tempPath, r.path)
 }
 
-func activeSession(snapshot Snapshot, tokenDigest string, now time.Time) (StoredSession, bool) {
+func activeSession(snapshot Snapshot, tokenDigest string, now time.Time) (StoredSession, bool, error) {
 	session, ok := snapshot.Sessions[tokenDigest]
 	if !ok || !session.RevokedAt.IsZero() || !now.UTC().Before(session.ExpiresAt) {
-		return StoredSession{}, false
+		return StoredSession{}, false, nil
 	}
-	return session, true
+	if err := validateStoredSessionForKey(tokenDigest, session); err != nil {
+		return StoredSession{}, false, err
+	}
+	return session, true, nil
 }

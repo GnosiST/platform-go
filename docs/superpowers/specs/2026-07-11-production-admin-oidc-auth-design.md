@@ -206,7 +206,7 @@ After successful OIDC resolution and binding, login uses the same Admin credenti
 2. Issue the existing server-side session.
 3. Publish the existing session invalidation event.
 4. Sign the existing `tokenType=admin` JWT with tenant `platform`.
-5. Record `auth.login` with provider ID and shortened session ID.
+5. Record `auth.login` with the provider ID and credential-free audit metadata.
 6. Return the existing token, expiry, and principal response.
 
 The shared Admin principal validation requires the platform user to be enabled and to have effective permissions for both demo and OIDC login. This closes the current demo-path gap where `CurrentPrincipal` alone does not reject a disabled user, without changing how roles, deny rules, or Casbin policies are calculated.
@@ -221,7 +221,7 @@ Add redacted audit coverage for:
 - binding conflict;
 - provider configuration or exchange failure categories.
 
-Audit fields may include provider ID, normalized outcome, platform username only after successful binding, transaction trace ID, and shortened platform session ID. They must not include provider subjects, raw issuer values, claims, authorization codes, PKCE material, state, nonce, provider tokens, or credentials.
+Audit fields may include provider ID, normalized outcome, platform username only after successful binding, and transaction trace ID. OIDC audit records must not store the raw session handle, its digest, or any shortened derivative. They must not include provider subjects, raw issuer values, claims, authorization codes, PKCE material, state, nonce, provider tokens, or credentials. The persisted OIDC audit schema does not expose a `sessionId` field.
 
 ### 7. Production Runtime Gate
 

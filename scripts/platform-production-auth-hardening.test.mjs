@@ -32,6 +32,13 @@ function tempJSON(name, value) {
   return filePath;
 }
 
+function tempText(name, value) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-production-auth-hardening-doc-"));
+  const filePath = path.join(tempDir, name);
+  fs.writeFileSync(filePath, value);
+  return filePath;
+}
+
 describe("validate-platform-production-auth-hardening", () => {
   it("accepts the current production auth hardening contract", () => {
     const result = runValidator();
@@ -618,6 +625,29 @@ describe("validate-platform-production-auth-hardening", () => {
     const result = runValidator(["--contract", contractPath, "--promotion-review", reviewPath]);
 
     assert.equal(result.status, 0, result.stderr);
+  });
+
+  it("rejects session and OIDC documentation that restores audit session identifiers", () => {
+    const sessionPolicy = fs.readFileSync(path.join(repoRoot, "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md"), "utf8");
+    const oidcDesign = fs.readFileSync(path.join(repoRoot, "docs/superpowers/specs/2026-07-11-production-admin-oidc-auth-design.md"), "utf8");
+    const adminResourceSchema = fs.readFileSync(path.join(repoRoot, "docs/admin-resource-schema.md"), "utf8");
+    const sessionPolicyPath = tempText("session-policy.md", sessionPolicy
+      .replace("Persisted session identifiers use the canonical `sha256:v1:` prefix followed by exactly 64 lowercase hexadecimal characters.", "Persisted session identifiers use a digest.")
+      .replace("Audit records must not store the raw session handle, its digest, or any shortened derivative.", "Audit records may store a shortened session id."));
+    const oidcDesignPath = tempText("oidc-design.md", oidcDesign.replace("OIDC audit records must not store the raw session handle, its digest, or any shortened derivative.", "OIDC audit records may store a shortened session id."));
+    const adminResourceSchemaPath = tempText("admin-resource-schema.md", adminResourceSchema.replace("The audit schema does not expose `sessionId`", "The audit schema exposes `sessionId`"));
+
+    const result = runValidator([
+      "--session-policy-doc", sessionPolicyPath,
+      "--oidc-design-doc", oidcDesignPath,
+      "--admin-resource-schema-doc", adminResourceSchemaPath,
+    ]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /session policy must define canonical sha256:v1 digests with 64 lowercase hexadecimal characters/);
+    assert.match(result.stderr, /session policy must forbid raw session handles, digests and shortened derivatives in audits/);
+    assert.match(result.stderr, /OIDC design must forbid raw session handles, digests and shortened derivatives in audits/);
+    assert.match(result.stderr, /admin resource schema must state that audit schema has no sessionId field/);
   });
 
   it("accepts task graph closeout while refresh-token-family runtime remains disabled by default", () => {

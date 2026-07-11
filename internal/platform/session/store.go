@@ -14,7 +14,12 @@ import (
 
 const DefaultTTL = 8 * time.Hour
 
-var ErrInvalidSession = errors.New("invalid session")
+const sessionDigestPrefix = "sha256:v1:"
+
+var (
+	ErrInvalidSession       = errors.New("invalid session")
+	ErrInvalidSessionDigest = errors.New("invalid session digest")
+)
 
 type Options struct {
 	TTL time.Duration
@@ -82,6 +87,9 @@ func NewRepositoryBackedStore(options Options, repository Repository) (*Store, e
 	if err != nil {
 		return nil, err
 	}
+	if err := validateSnapshot(snapshot); err != nil {
+		return nil, err
+	}
 	store.sessions = cloneStoredSessions(snapshot.Sessions)
 	store.repository = repository
 	return store, nil
@@ -95,6 +103,9 @@ func (s *Store) Reload() error {
 	}
 	snapshot, err := s.repository.Load(context.Background())
 	if err != nil {
+		return err
+	}
+	if err := validateSnapshot(snapshot); err != nil {
 		return err
 	}
 	s.sessions = cloneStoredSessions(snapshot.Sessions)
@@ -144,6 +155,9 @@ func (s *Store) ResolveContext(ctx context.Context, token string) (Session, bool
 		if err != nil || !ok {
 			return Session{}, false, err
 		}
+		if err := validateStoredSessionForKey(tokenDigest, stored); err != nil {
+			return Session{}, false, err
+		}
 		s.sessions[tokenDigest] = stored
 		return publicSession(token, stored), true, nil
 	}
@@ -175,6 +189,9 @@ func (s *Store) RenewContext(ctx context.Context, token string) (Session, bool, 
 	if s.repository != nil {
 		stored, ok, err := s.repository.Renew(ctx, tokenDigest, now, expiresAt)
 		if err != nil || !ok {
+			return Session{}, false, err
+		}
+		if err := validateStoredSessionForKey(tokenDigest, stored); err != nil {
 			return Session{}, false, err
 		}
 		s.sessions[tokenDigest] = stored
@@ -211,6 +228,9 @@ func (s *Store) RevokeContext(ctx context.Context, token string) (bool, error) {
 		if err != nil || !ok {
 			return false, err
 		}
+		if err := validateStoredSessionForKey(tokenDigest, stored); err != nil {
+			return false, err
+		}
 		s.sessions[tokenDigest] = stored
 		return true, nil
 	}
@@ -233,7 +253,42 @@ func (s *Store) Revoke(token string) bool {
 
 func DigestToken(raw string) string {
 	sum := sha256.Sum256(append([]byte("platform-session\x00"), []byte(raw)...))
-	return "sha256:v1:" + hex.EncodeToString(sum[:])
+	return sessionDigestPrefix + hex.EncodeToString(sum[:])
+}
+
+func validateTokenDigest(tokenDigest string) error {
+	if len(tokenDigest) != len(sessionDigestPrefix)+sha256.Size*2 || !strings.HasPrefix(tokenDigest, sessionDigestPrefix) {
+		return ErrInvalidSessionDigest
+	}
+	for index := len(sessionDigestPrefix); index < len(tokenDigest); index++ {
+		character := tokenDigest[index]
+		if (character < '0' || character > '9') && (character < 'a' || character > 'f') {
+			return ErrInvalidSessionDigest
+		}
+	}
+	return nil
+}
+
+func validateStoredSessionForKey(tokenDigest string, session StoredSession) error {
+	if err := validateTokenDigest(tokenDigest); err != nil {
+		return err
+	}
+	if err := validateTokenDigest(session.TokenDigest); err != nil {
+		return err
+	}
+	if session.TokenDigest != tokenDigest {
+		return ErrInvalidSessionDigest
+	}
+	return nil
+}
+
+func validateSnapshot(snapshot Snapshot) error {
+	for tokenDigest, session := range snapshot.Sessions {
+		if err := validateStoredSessionForKey(tokenDigest, session); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func storedSession(tokenDigest string, session Session) StoredSession {
