@@ -469,9 +469,10 @@ function validateOperationPolicies(readiness, errors) {
 }
 
 function sameSet(actual, expected) {
-  if (actual.length !== expected.length) return false;
-  const expectedSet = new Set(expected);
-  return actual.every((value) => expectedSet.has(value));
+  if (new Set(actual).size !== actual.length || new Set(expected).size !== expected.length) {
+    return false;
+  }
+  return JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort());
 }
 
 function sameJSON(actual, expected) {
@@ -526,8 +527,17 @@ function validateProviderPromotionPlan(plan, productionAuth, errors) {
     if (!sameSet(values(actual.requiredControls).sort(), values(expected.requiredControls).sort())) {
       errors.push(`platform operations plan provider ${expected.id} requiredControls must match production auth hardening contract`);
     }
-    for (const field of ["requiresSecretOwner", "rotationRunbookRequired", "subjectRedactionRequired", "unconfiguredProviderRejectionRequired", "errorNormalizationRequired", "productionLikeRehearsalRequired"]) {
-      if ((actual[field] === true) !== (expected[field] === true)) {
+    for (const field of [
+      "requiresSecretOwner",
+      "rotationRunbookRequired",
+      "subjectRedactionRequired",
+      "unconfiguredProviderRejectionRequired",
+      "errorNormalizationRequired",
+      "productionLikeRehearsalRequired",
+      "rawCredentialExposureAllowed",
+      "rawSubjectExposureAllowed",
+    ]) {
+      if (actual[field] !== expected[field]) {
         errors.push(`platform operations plan provider ${expected.id} ${field} must match production auth hardening contract`);
       }
     }

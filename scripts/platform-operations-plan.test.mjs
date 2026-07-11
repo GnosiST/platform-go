@@ -152,6 +152,14 @@ describe("platform operations dry-run plan", () => {
     const plan = readJSON("resources/generated/platform-operations-plan.json");
     const oidc = plan.providerPromotionMatrix.providers.find((provider) => provider.id === "oidc");
     oidc.audiences = ["app"];
+    oidc.configKeys = [
+      "PLATFORM_ADMIN_OIDC_ISSUER_URL",
+      "PLATFORM_ADMIN_OIDC_CLIENT_ID",
+      "PLATFORM_ADMIN_OIDC_CLIENT_SECRET",
+      "PLATFORM_ADMIN_OIDC_REDIRECT_URL",
+      "PLATFORM_ADMIN_OIDC_REDIRECT_URL",
+    ];
+    oidc.requiredControls = oidc.requiredControls.map((control, index) => (index === oidc.requiredControls.length - 1 ? oidc.requiredControls[0] : control));
     oidc.productionLikeRehearsalRequired = false;
     const planPath = tempJSON("platform-operations-plan.json", plan);
 
@@ -159,6 +167,8 @@ describe("platform operations dry-run plan", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /platform operations plan provider oidc audiences must match production auth hardening contract/);
+    assert.match(result.stderr, /platform operations plan provider oidc configKeys must match production auth hardening contract/);
+    assert.match(result.stderr, /platform operations plan provider oidc requiredControls must match production auth hardening contract/);
     assert.match(result.stderr, /platform operations plan provider oidc productionLikeRehearsalRequired must match production auth hardening contract/);
   });
 });

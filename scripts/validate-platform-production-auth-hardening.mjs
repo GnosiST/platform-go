@@ -45,9 +45,10 @@ function requireIncludes(items, required, label, errors) {
 }
 
 function sameSet(actual, expected) {
-  if (actual.length !== expected.length) return false;
-  const expectedSet = new Set(expected);
-  return actual.every((value) => expectedSet.has(value));
+  if (new Set(actual).size !== actual.length || new Set(expected).size !== expected.length) {
+    return false;
+  }
+  return JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort());
 }
 
 function validateArtifactHashPolicy(schema, label, errors) {
@@ -459,11 +460,32 @@ function validateProductionPromotionReview(contract, refreshTokenFamilyPromotion
     if (!actual) {
       continue;
     }
+    for (const field of ["capability", "kind", "productionUsage", "adapterBoundary"]) {
+      if (actual[field] !== expected[field]) {
+        errors.push(`production auth promotion review provider ${expected.id} ${field} must match production auth hardening contract`);
+      }
+    }
     if (!sameSet(values(actual.audiences).sort(), values(expected.audiences).sort())) {
       errors.push(`production auth promotion review provider ${expected.id} audiences must match production auth hardening contract`);
     }
-    if ((actual.productionLikeRehearsalRequired === true) !== (expected.productionLikeRehearsalRequired === true)) {
-      errors.push(`production auth promotion review provider ${expected.id} productionLikeRehearsalRequired must match production auth hardening contract`);
+    for (const field of ["configKeys", "requiredControls"]) {
+      if (!sameSet(values(actual[field]).sort(), values(expected[field]).sort())) {
+        errors.push(`production auth promotion review provider ${expected.id} ${field} must match production auth hardening contract`);
+      }
+    }
+    for (const field of [
+      "requiresSecretOwner",
+      "rotationRunbookRequired",
+      "subjectRedactionRequired",
+      "unconfiguredProviderRejectionRequired",
+      "errorNormalizationRequired",
+      "productionLikeRehearsalRequired",
+      "rawCredentialExposureAllowed",
+      "rawSubjectExposureAllowed",
+    ]) {
+      if (actual[field] !== expected[field]) {
+        errors.push(`production auth promotion review provider ${expected.id} ${field} must match production auth hardening contract`);
+      }
     }
   }
   requireIncludes(

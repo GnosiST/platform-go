@@ -66,14 +66,41 @@ describe("validate-platform-production-auth-hardening", () => {
   it("rejects production auth promotion reviews that weaken typed OIDC projection invariants", () => {
     const review = readJSON("resources/generated/production-auth-promotion-review.json");
     const oidc = review.providerPromotionMatrix.providers.find((provider) => provider.id === "oidc");
+    oidc.capability = "session";
+    oidc.kind = "saml";
+    oidc.productionUsage = "local-harness-only";
+    oidc.adapterBoundary = "httpapi.AppIdentityResolver";
     oidc.audiences = ["app"];
+    oidc.configKeys = [
+      "PLATFORM_ADMIN_OIDC_ISSUER_URL",
+      "PLATFORM_ADMIN_OIDC_CLIENT_ID",
+      "PLATFORM_ADMIN_OIDC_CLIENT_SECRET",
+      "PLATFORM_ADMIN_OIDC_REDIRECT_URL",
+      "PLATFORM_ADMIN_OIDC_REDIRECT_URL",
+    ];
+    oidc.requiredControls = oidc.requiredControls.map((control, index) => (index === oidc.requiredControls.length - 1 ? oidc.requiredControls[0] : control));
+    oidc.requiresSecretOwner = false;
+    oidc.rotationRunbookRequired = false;
+    oidc.subjectRedactionRequired = false;
+    oidc.unconfiguredProviderRejectionRequired = false;
+    oidc.errorNormalizationRequired = false;
     oidc.productionLikeRehearsalRequired = false;
+    oidc.rawCredentialExposureAllowed = true;
+    oidc.rawSubjectExposureAllowed = true;
     const reviewPath = tempJSON("production-auth-promotion-review.json", review);
 
     const result = runValidator(["--promotion-review", reviewPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /production auth promotion review provider oidc capability must match production auth hardening contract/);
+    assert.match(result.stderr, /production auth promotion review provider oidc kind must match production auth hardening contract/);
+    assert.match(result.stderr, /production auth promotion review provider oidc productionUsage must match production auth hardening contract/);
+    assert.match(result.stderr, /production auth promotion review provider oidc adapterBoundary must match production auth hardening contract/);
     assert.match(result.stderr, /production auth promotion review provider oidc audiences must match production auth hardening contract/);
+    assert.match(result.stderr, /production auth promotion review provider oidc configKeys must match production auth hardening contract/);
+    assert.match(result.stderr, /production auth promotion review provider oidc requiredControls must match production auth hardening contract/);
+    assert.match(result.stderr, /production auth promotion review provider oidc requiresSecretOwner must match production auth hardening contract/);
+    assert.match(result.stderr, /production auth promotion review provider oidc rawCredentialExposureAllowed must match production auth hardening contract/);
     assert.match(result.stderr, /production auth promotion review provider oidc productionLikeRehearsalRequired must match production auth hardening contract/);
   });
 
@@ -471,6 +498,24 @@ describe("validate-platform-production-auth-hardening", () => {
     assert.match(result.stderr, /providerPromotionMatrix provider oidc requiresSecretOwner must stay true/);
     assert.match(result.stderr, /providerPromotionMatrix provider oidc rotationRunbookRequired must stay true/);
     assert.match(result.stderr, /providerPromotionMatrix provider oidc productionLikeRehearsalRequired must stay true/);
+  });
+
+  it("rejects duplicate OIDC config keys that replace an approved key", () => {
+    const contract = readJSON("resources/platform-production-auth-hardening.json");
+    const oidc = contract.providerPromotionMatrix.providers.find((provider) => provider.id === "oidc");
+    oidc.configKeys = [
+      "PLATFORM_ADMIN_OIDC_ISSUER_URL",
+      "PLATFORM_ADMIN_OIDC_CLIENT_ID",
+      "PLATFORM_ADMIN_OIDC_CLIENT_SECRET",
+      "PLATFORM_ADMIN_OIDC_REDIRECT_URL",
+      "PLATFORM_ADMIN_OIDC_REDIRECT_URL",
+    ];
+    const contractPath = tempJSON("platform-production-auth-hardening.json", contract);
+
+    const result = runValidator(["--contract", contractPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /providerPromotionMatrix provider oidc configKeys must exactly match the approved Admin OIDC keys/);
   });
 
   it("rejects provider promotion matrices without source-backed evidence", () => {
