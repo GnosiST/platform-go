@@ -44,6 +44,7 @@ import {
   platformPopupContainer,
   type AdminFormRuntimeSlotRegistry,
   type PlatformDataTableColumn,
+  type PlatformDataTableColumnPriority,
   type PlatformDataTableFilterField,
   type PlatformDataTableFilterValue,
   type PlatformResourceFormLayoutPreset,
@@ -595,9 +596,10 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
   );
 
   const columns: PlatformDataTableColumn<AdminResourceRecord>[] = [
-    ...tableFields.map((field) => ({
+    ...tableFields.map((field, index) => ({
       title: localizedText(field.label, language),
       key: field.key,
+      priority: tableColumnPriority(index),
       width: field.width,
       ellipsis: field.type === "textarea",
       dataIndex: field.key,
@@ -808,6 +810,19 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
         okText={dictionary.save}
         cancelText={dictionary.cancel}
         confirmLoading={saving}
+        afterOpenChange={(open) => {
+          if (!open) {
+            return;
+          }
+          requestAnimationFrame(() => {
+            const firstField = formFields[0];
+            if (!firstField) {
+              return;
+            }
+            const fieldInstance = form.getFieldInstance(firstField.key) as { focus?: () => void } | undefined;
+            fieldInstance?.focus?.();
+          });
+        }}
         onCancel={() => setModalOpen(false)}
         onOk={() => form.submit()}
       >
@@ -2340,6 +2355,12 @@ function normalizeFormLayoutPreset(layout: AdminResourceSchema["formLayout"], fo
     return "two-column-density";
   }
   return "grouped-sections";
+}
+
+function tableColumnPriority(index: number): PlatformDataTableColumnPriority {
+  if (index < 4) return "essential";
+  if (index < 7) return "standard";
+  return "extended";
 }
 
 function formModalWidth(layout: PlatformResourceFormLayoutPreset) {

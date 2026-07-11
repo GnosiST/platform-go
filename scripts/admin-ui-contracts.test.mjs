@@ -163,4 +163,19 @@ describe("validate-admin-ui-contracts", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /App must not identify session expiry by comparing localized strings/);
   });
+
+  it("rejects styles that remove reduced-motion support", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/styles.css",
+      "@media (prefers-reduced-motion: reduce)",
+      "@media (prefers-reduced-motion: no-preference)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /styles\.css must respect reduced motion/);
+  });
 });

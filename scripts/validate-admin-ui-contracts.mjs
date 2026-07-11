@@ -124,6 +124,11 @@ requireIncludes(files.table, "detailDrawer", "PlatformDataTable must expose a de
 requireIncludes(files.table, "emptyState", "PlatformDataTable must expose an emptyState slot while keeping the default empty state.");
 requireIncludes(files.table, "mobileCards", "PlatformDataTable must keep mobile card rendering.");
 requireOrder(files.table, "mobileCards(dataSource)", "<PlatformPaginationBar", "PlatformDataTable must render mobile cards before pagination.");
+requireIncludes(files.table, 'export type PlatformDataTableColumnPriority = "essential" | "standard" | "extended"', "PlatformDataTable must expose responsive priority tiers.");
+requireIncludes(files.table, "responsiveBreakpointsForPriority", "PlatformDataTable must map priority to AntD breakpoints.");
+requireIncludes(files.table, "column.responsive ?? responsiveBreakpointsForPriority(column.priority)", "PlatformDataTable must preserve caller-provided responsive breakpoints.");
+requireIncludes(files.resourceConsole, "tableColumnPriority(index)", "Generic resource tables must derive priority from schema order.");
+requireIncludes(files.resourceConsole, "form.getFieldInstance", "Resource modals must focus the first editable schema field.");
 
 requireIncludes(files.client, "export type AdminResourceFieldRelation", "Admin API client must expose resource field relation metadata.");
 requireIncludes(files.client, "relation?: AdminResourceFieldRelation", "AdminResourceField must carry optional relation metadata.");
@@ -271,6 +276,7 @@ requireIncludes(files.styles, ".dashboard-chart {\n    height: 150px;", "Mobile 
 requireIncludes(files.styles, ".health-panel .ant-progress", "Mobile health panel must keep compact progress styling.");
 requireIncludes(files.styles, ".platform-skip-link", "styles.css must expose skip-link focus behavior.");
 requireRegex(files.styles, /:focus-visible[\s\S]*outline:\s*2px solid var\(--primary\)/, "Visible focus must be a default platform behavior.");
+requireRegex(files.styles, /@media\s*\(prefers-reduced-motion:\s*reduce\)/, "styles.css must respect reduced motion.");
 requireRegex(files.styles, /@media\s*\(max-width:\s*1023px\)[\s\S]*min-height:\s*44px/, "Responsive shell controls must use 44px minimum targets.");
 requireRegex(
   files.styles,

@@ -1019,6 +1019,22 @@ select {
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .transition-enabled .admin-page,
+  .transition-enabled .dashboard-home {
+    animation: none;
+  }
+
+  .platform-shell *,
+  .platform-shell *::before,
+  .platform-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 .page-heading {
   display: flex;
   align-items: center;

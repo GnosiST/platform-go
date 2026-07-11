@@ -32,10 +32,13 @@ import { PlatformDropdownPlugin, platformPopupContainer } from "./PlatformDropdo
 import { PlatformPaginationBar } from "./PlatformPaginationBar";
 import { PlatformTreeSelect, type PlatformTreeSelectOption } from "./PlatformTreeSelect";
 
+export type PlatformDataTableColumnPriority = "essential" | "standard" | "extended";
+
 export type PlatformDataTableColumn<T extends object> = TableColumnsType<T>[number] & {
   key: Key;
   defaultHidden?: boolean;
   lockVisible?: boolean;
+  priority?: PlatformDataTableColumnPriority;
 };
 
 export type PlatformDataTableFilterValue = string | { from?: string; to?: string };
@@ -167,7 +170,10 @@ export function PlatformDataTable<T extends object>({
     () => columns.filter((column) => column.lockVisible || visibleColumnKeys.includes(column.key)),
     [columns, visibleColumnKeys],
   );
-  const displayColumns = useMemo(() => visibleColumns.map((column) => withDefaultOverflowRenderer(column, inlineEditor)), [inlineEditor, visibleColumns]);
+  const displayColumns = useMemo(
+    () => visibleColumns.map((column) => withResponsivePriority(withDefaultOverflowRenderer(column, inlineEditor))),
+    [inlineEditor, visibleColumns],
+  );
   const tableColumns = useMemo(() => {
     if (!rowActions) {
       return displayColumns;
@@ -469,6 +475,19 @@ export function PlatformDataTable<T extends object>({
       )}
     </AdminListPanel>
   );
+}
+
+function responsiveBreakpointsForPriority(priority: PlatformDataTableColumnPriority | undefined) {
+  if (priority === "standard") return ["xl", "xxl"] as const;
+  if (priority === "extended") return ["xxl"] as const;
+  return ["md", "lg", "xl", "xxl"] as const;
+}
+
+function withResponsivePriority<T extends object>(column: PlatformDataTableColumn<T>): PlatformDataTableColumn<T> {
+  return {
+    ...column,
+    responsive: [...(column.responsive ?? responsiveBreakpointsForPriority(column.priority))],
+  };
 }
 
 function FilterControl({
