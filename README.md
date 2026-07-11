@@ -19,6 +19,18 @@ Optional profiles keep heavier reusable capabilities detachable: `platform-perso
 
 The `zshenmez` project is only external reference evidence for reusable capability coverage. `platform-go` is not a business migration target: it does not ship concrete `zshenmez` business resources, routes, stores, state machines, menus, fixtures or write-cutover plans. External business packages must live outside this foundation and attach through the public capability contracts.
 
+## Active Completion Program
+
+The original 37-node foundation baseline remains implemented and closed. The active completion program adds eight controlled pending nodes, so the current governance state is `45 total / 37 implemented / 8 controlled unfinished` with `completionStatus=not-complete-controlled`. This does not reopen the baseline and does not approve production auth promotion, refresh-token-family default runtime, source writing or external publication.
+
+Approved 2026-07-12 specifications:
+
+- [completion program](docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md);
+- [runtime security hardening](docs/superpowers/specs/2026-07-12-runtime-security-hardening-design.md);
+- [admin watermark and export governance](docs/superpowers/specs/2026-07-12-admin-watermark-export-design.md);
+- [sensitive data encryption](docs/superpowers/specs/2026-07-12-sensitive-data-encryption-design.md);
+- [open-source documentation and site](docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md).
+
 ## Run
 
 Start the API health smoke:

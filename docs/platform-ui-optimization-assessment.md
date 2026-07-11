@@ -1,7 +1,7 @@
 # Platform UI Optimization Assessment
 
-Date: 2026-07-11
-Status: Candidate A implemented; Candidate B deferred
+Date: 2026-07-12
+Status: Candidate A implemented; Candidate B deferred; completion program active
 
 ## Purpose
 
@@ -10,7 +10,7 @@ This assessment records how two design aids are routed without disrupting the pl
 - `ui-ux-pro-max` for implementation-level admin UI quality, accessibility, responsive behavior and shared-component hardening;
 - `design-taste-frontend` for the visual direction of login, brand-entry, landing, portfolio, marketing or deliberate redesign surfaces.
 
-Candidate A has completed that activation path as `admin-ui-system-quality-hardening`. Candidate B remains outside `resources/platform-foundation-task-graph.json` until a real public or brand brief is approved.
+Candidate A has completed that activation path as `admin-ui-system-quality-hardening`. Candidate B's broader brand-entry redesign remains deferred until a real public or brand brief is approved. The active completion graph now includes bounded visual nodes for admin watermark/export governance and the public documentation site; those nodes require `superpowers:brainstorming` and Product Design and remain pending until implementation and fresh browser evidence exist.
 
 ## Current Evidence
 
@@ -122,6 +122,6 @@ Completion gate:
 
 1. Production persistence correctness and Candidate A are implemented.
 2. Keep Candidate B deferred until there is a real brand/public-surface brief. If only the admin console changes, use the existing quiet operational design language and the implemented Candidate A contracts.
-3. Any future visual candidate requires an explicit task-graph node, design gates, resource locks and fresh screenshot evidence. Candidate A closed its 36-node graph slice; the full foundation graph now closes at 37/37/0 after the production Admin OIDC Task 8 evidence.
+3. Any future visual candidate requires an explicit task-graph node, design gates, resource locks and fresh screenshot evidence. Candidate A and production Admin OIDC remain closed in the original 37-node baseline; `admin-watermark-export-governance` and `public-docs-site` are controlled pending nodes in the active 45/37/8 completion program and do not yet claim screenshot evidence.
 
 Evidence remains scoped: screenshots, DOM measurements and keyboard checks support this implementation but do not certify WCAG conformance. Screen-reader announcements, high zoom/reflow and platform-specific assistive technology require separate evidence.
