@@ -15,11 +15,13 @@ import {
   type BrandingConfig,
 } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
+import { filterAdminAuthProviders } from "./oidcPolicy";
 import {
   beginOIDCLogin,
   clearPendingOIDCLogin,
   consumePendingOIDCLogin,
   OIDCCallbackError,
+  type OIDCCallbackFailure,
 } from "../refine/authProvider";
 import { themeNames, type ThemeName } from "../theme";
 import { AdminFeedback } from "../ui";
@@ -61,11 +63,15 @@ export function AdminLoginView({
   const [submitting, setSubmitting] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [callbackPhase, setCallbackPhase] = useState<CallbackPhase>("idle");
+  const [callbackFailure, setCallbackFailure] = useState<OIDCCallbackFailure | "generic" | null>(null);
   const callbackStartedRef = useRef(false);
+  const submissionLockRef = useRef(false);
+  const loginHeadingRef = useRef<HTMLElement>(null);
   const errorHeadingRef = useRef<HTMLElement>(null);
+  const adminProviders = useMemo(() => filterAdminAuthProviders(providers), [providers]);
   const selectedProvider = useMemo(
-    () => providers.find((provider) => provider.id === selectedProviderID) ?? providers.find((provider) => provider.configured),
-    [providers, selectedProviderID],
+    () => adminProviders.find((provider) => provider.id === selectedProviderID) ?? adminProviders.find((provider) => provider.configured),
+    [adminProviders, selectedProviderID],
   );
   const productName = branding?.productName || "Platform Go";
   const shortName = branding?.shortName || productName;
@@ -80,16 +86,17 @@ export function AdminLoginView({
     setCallbackPhase("processing");
     setSubmitting(true);
     setLoginError("");
+    setCallbackFailure(null);
     void consumePendingOIDCLogin(search)
       .then((result) => {
         if (result) onLoginSuccess(result.principal);
       })
       .catch((nextError: unknown) => {
-        setLoginError(callbackErrorMessage(dictionary, nextError));
+        setCallbackFailure(callbackFailureReason(nextError));
         setCallbackPhase("failed");
       })
       .finally(() => setSubmitting(false));
-  }, [callbackPhase, dictionary, onLoginSuccess, search]);
+  }, [callbackPhase, onLoginSuccess, search]);
 
   useEffect(() => {
     if (callbackPhase === "failed") {
@@ -98,8 +105,10 @@ export function AdminLoginView({
   }, [callbackPhase]);
 
   const submit = async (values: LoginFormValues) => {
-    if (submitting) return;
+    if (submissionLockRef.current) return;
+    submissionLockRef.current = true;
     if (!selectedProvider?.configured || selectedProvider.kind !== "demo") {
+      submissionLockRef.current = false;
       setLoginError(dictionary.loginProviderUnavailable);
       return;
     }
@@ -114,22 +123,26 @@ export function AdminLoginView({
     } catch (nextError) {
       setLoginError(nextError instanceof Error ? nextError.message : dictionary.loginFailed);
     } finally {
+      submissionLockRef.current = false;
       setSubmitting(false);
     }
   };
 
   const startOIDC = async () => {
-    if (submitting) return;
+    if (submissionLockRef.current) return;
+    submissionLockRef.current = true;
     if (!selectedProvider?.configured || selectedProvider.kind !== "oidc") {
+      submissionLockRef.current = false;
       setLoginError(dictionary.loginProviderUnavailable);
       return;
     }
     setSubmitting(true);
     setLoginError("");
     try {
-      await beginOIDCLogin(selectedProvider.id);
+      await beginOIDCLogin(selectedProvider);
     } catch {
       clearPendingOIDCLogin();
+      submissionLockRef.current = false;
       setLoginError(dictionary.loginOIDCStartFailed);
       setSubmitting(false);
     }
@@ -138,8 +151,10 @@ export function AdminLoginView({
   const recoverFromCallback = () => {
     clearPendingOIDCLogin();
     setCallbackPhase("idle");
+    setCallbackFailure(null);
     setLoginError("");
     setSubmitting(false);
+    loginHeadingRef.current?.focus({ preventScroll: true });
   };
 
   return (
@@ -174,7 +189,9 @@ export function AdminLoginView({
       </section>
 
       <section className="login-panel" aria-label={dictionary.loginTitle}>
-        <Typography.Title level={2}>{dictionary.loginTitle}</Typography.Title>
+        <Typography.Title className="login-heading" level={2} ref={loginHeadingRef} tabIndex={-1}>
+          {dictionary.loginTitle}
+        </Typography.Title>
         <Typography.Paragraph className="login-panel-subtitle">{dictionary.loginPanelSubtitle}</Typography.Paragraph>
 
         {error ? <AdminFeedback className="login-feedback" type="error" message={error} /> : null}
@@ -182,7 +199,7 @@ export function AdminLoginView({
           <>
             {loginError ? <AdminFeedback className="login-feedback" type="error" message={loginError} /> : null}
             <div className="login-provider-list" aria-label={dictionary.loginProvider}>
-              {providers.map((provider) => {
+              {adminProviders.map((provider) => {
                 const providerTitle = provider.title[language] || provider.id;
                 const providerStatus = provider.configured ? dictionary.configured : dictionary.notConfigured;
                 return (
@@ -265,7 +282,7 @@ export function AdminLoginView({
                 <Typography.Title className="login-error-heading" level={3} ref={errorHeadingRef} tabIndex={-1}>
                   {dictionary.loginFailed}
                 </Typography.Title>
-                <Typography.Paragraph>{loginError}</Typography.Paragraph>
+                <Typography.Paragraph>{callbackErrorMessage(dictionary, callbackFailure)}</Typography.Paragraph>
                 <Button block className="login-recovery-action" onClick={recoverFromCallback}>
                   {dictionary.loginOIDCRecovery}
                 </Button>
@@ -301,10 +318,13 @@ export function AdminLoginView({
   );
 }
 
-function callbackErrorMessage(dictionary: Dictionary, error: unknown) {
-  if (!(error instanceof OIDCCallbackError)) return dictionary.loginOIDCCallbackFailed;
-  if (error.reason === "expired") return dictionary.loginOIDCTransactionExpired;
-  if (error.reason === "state") return dictionary.loginOIDCTransactionInvalid;
+function callbackFailureReason(error: unknown): OIDCCallbackFailure | "generic" {
+  return error instanceof OIDCCallbackError ? error.reason : "generic";
+}
+
+function callbackErrorMessage(dictionary: Dictionary, failure: OIDCCallbackFailure | "generic" | null) {
+  if (failure === "expired") return dictionary.loginOIDCTransactionExpired;
+  if (failure === "state") return dictionary.loginOIDCTransactionInvalid;
   return dictionary.loginOIDCCallbackFailed;
 }
 

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { describe, it } from "node:test";
+import { pathToFileURL } from "node:url";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
@@ -40,6 +41,15 @@ function replaceInTempIfPresent(tempRoot, relativePath, from, to) {
   const source = fs.readFileSync(filePath, "utf8");
   if (!source.includes(from)) return;
   fs.writeFileSync(filePath, source.split(from).join(to));
+}
+
+function runTypeScriptProbe(relativePath, body) {
+  const moduleURL = pathToFileURL(path.join(repoRoot, relativePath)).href;
+  return spawnSync(
+    process.execPath,
+    ["--experimental-strip-types", "--input-type=module", "--eval", body(moduleURL)],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
 }
 
 describe("validate-admin-ui-contracts", () => {
@@ -281,7 +291,6 @@ describe("validate-admin-ui-contracts", () => {
     ["callback live region", "admin/src/platform/auth/AdminLoginView.tsx", 'aria-live="polite"', 'aria-live="off"', "polite live region"],
     ["error focus", "admin/src/platform/auth/AdminLoginView.tsx", "focus({ preventScroll: true })", "focus()", "focus its heading without a scroll jump"],
     ["recovery action", "admin/src/platform/auth/AdminLoginView.tsx", 'className="login-recovery-action"', 'className="login-reset-action"', "explicit recovery action"],
-    ["duplicate-submit prevention", "admin/src/platform/auth/AdminLoginView.tsx", "if (submitting)", "if (false)", "prevent duplicate submissions"],
     ["login reduced motion", "admin/src/styles.css", ".login-page *", ".login-motion-uncovered *", "suppress non-essential login transitions"],
     ["mobile login target", "admin/src/styles.css", ".login-submit,\n  .login-oidc-action,\n  .login-recovery-action", ".login-actions-missing", "Mobile login submit, OIDC, and recovery actions must expose 44px touch targets"],
   ]) {
@@ -295,6 +304,83 @@ describe("validate-admin-ui-contracts", () => {
       assert.match(result.stderr, new RegExp(message));
     });
   }
+
+  it("executes the Admin audience and authorization URL policy", () => {
+    const result = runTypeScriptProbe(
+      "admin/src/platform/auth/oidcPolicy.ts",
+      (moduleURL) => `
+        import assert from "node:assert/strict";
+        import { assertAdminAuthProvider, filterAdminAuthProviders, validateOIDCAuthorizationURL } from ${JSON.stringify(moduleURL)};
+
+        const adminProvider = { id: "oidc", audiences: ["admin"] };
+        const appProvider = { id: "wechat", audiences: ["app"] };
+        assert.deepEqual(filterAdminAuthProviders([appProvider, adminProvider]), [adminProvider]);
+        assert.doesNotThrow(() => assertAdminAuthProvider(adminProvider));
+        assert.throws(() => assertAdminAuthProvider(appProvider), /not available for Admin login/);
+
+        for (const url of [
+          "https://id.example/authorize",
+          "http://localhost:8080/authorize",
+          "http://auth.localhost:8080/authorize",
+          "http://127.0.0.1:8080/authorize",
+          "http://127.25.3.9:8080/authorize",
+          "http://[::1]:8080/authorize",
+        ]) {
+          assert.equal(validateOIDCAuthorizationURL(url), new URL(url).toString());
+        }
+
+        for (const url of [
+          "not a URL",
+          "javascript:alert(1)",
+          "data:text/html,unsafe",
+          "http://id.example/authorize",
+          "ftp://127.0.0.1/authorize",
+        ]) {
+          assert.throws(
+            () => validateOIDCAuthorizationURL(url),
+            (error) => error instanceof Error && error.message === "OIDC authorization URL is not trusted" && !error.message.includes(url),
+          );
+        }
+      `,
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  });
+
+  for (const [name, relativePath, from, to, message] of [
+    ["Admin audience filtering", "admin/src/platform/auth/AdminLoginView.tsx", "filterAdminAuthProviders(providers)", "providers", "Admin login must consume provider audiences before selection and rendering"],
+    ["Admin audience start guard", "admin/src/platform/refine/authProvider.ts", "assertAdminAuthProvider(provider);", "void provider;", "OIDC start must reject providers without the Admin audience"],
+    ["demo synchronous lock", "admin/src/platform/auth/AdminLoginView.tsx", "const submit = async (values: LoginFormValues) => {\n    if (submissionLockRef.current) return;\n    submissionLockRef.current = true;", "const submit = async (values: LoginFormValues) => {", "Demo login must acquire the synchronous submission lock"],
+    ["OIDC synchronous lock", "admin/src/platform/auth/AdminLoginView.tsx", "const startOIDC = async () => {\n    if (submissionLockRef.current) return;\n    submissionLockRef.current = true;", "const startOIDC = async () => {", "OIDC start must acquire the synchronous submission lock"],
+    ["authorization URL validation", "admin/src/platform/refine/authProvider.ts", "validateOIDCAuthorizationURL(started.authorizationUrl)", "started.authorizationUrl", "OIDC start must validate the authorization URL before browser navigation"],
+    ["recovery focus", "admin/src/platform/auth/AdminLoginView.tsx", "loginHeadingRef.current?.focus({ preventScroll: true })", "void loginHeadingRef.current", "Explicit OIDC recovery must restore focus predictably without scrolling"],
+    ["localized callback category", "admin/src/platform/auth/AdminLoginView.tsx", "setCallbackFailure(callbackFailureReason(nextError))", "setLoginError(callbackErrorMessage(dictionary, nextError))", "OIDC callback failures must store a stable error category"],
+  ]) {
+    it(`rejects Task 6 without ${name}`, () => {
+      const tempRoot = tempAdminRoot();
+      replaceInTempIfPresent(tempRoot, relativePath, from, to);
+
+      const result = runValidator(["--root", tempRoot]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, new RegExp(message));
+    });
+  }
+
+  it("rejects callback cleanup after pending transaction access", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTempIfPresent(
+      tempRoot,
+      "admin/src/platform/refine/authProvider.ts",
+      'window.history.replaceState(window.history.state, "", "/login");\n  window.dispatchEvent(new PopStateEvent("popstate"));\n\n  const rawPending = window.sessionStorage.getItem(OIDC_TRANSACTION_KEY);',
+      'const rawPending = window.sessionStorage.getItem(OIDC_TRANSACTION_KEY);\n  window.history.replaceState(window.history.state, "", "/login");\n  window.dispatchEvent(new PopStateEvent("popstate"));',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /OIDC callbacks must remove callback values before reading pending transaction state/);
+  });
 
   it("rejects OIDC rendering that restores the disabled password field", () => {
     const tempRoot = tempAdminRoot();

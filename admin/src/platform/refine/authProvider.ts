@@ -1,4 +1,4 @@
-import type { AuthProvider } from "@refinedev/core";
+import type { AuthProvider as RefineAuthProvider } from "@refinedev/core";
 import {
   AdminAPIError,
   clearAuthToken,
@@ -7,8 +7,10 @@ import {
   loginWithAuthProvider,
   logoutCurrentSession,
   startAdminAuthProvider,
+  type AuthProvider,
   type AuthLoginResult,
 } from "../api/client";
+import { assertAdminAuthProvider, validateOIDCAuthorizationURL } from "../auth/oidcPolicy";
 
 const OIDC_TRANSACTION_KEY = "platform.auth.oidc.pending";
 
@@ -28,22 +30,24 @@ export class OIDCCallbackError extends Error {
   }
 }
 
-export async function beginOIDCLogin(provider: string) {
+export async function beginOIDCLogin(provider: AuthProvider) {
+  assertAdminAuthProvider(provider);
   const verifierBytes = crypto.getRandomValues(new Uint8Array(32));
   const codeVerifier = base64URL(verifierBytes);
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(codeVerifier));
   const codeChallenge = base64URL(new Uint8Array(digest));
-  const started = await startAdminAuthProvider(provider, codeChallenge);
+  const started = await startAdminAuthProvider(provider.id, codeChallenge);
+  const authorizationURL = validateOIDCAuthorizationURL(started.authorizationUrl);
   window.sessionStorage.setItem(
     OIDC_TRANSACTION_KEY,
     JSON.stringify({
-      provider,
+      provider: provider.id,
       state: started.state,
       codeVerifier,
       expiresAt: started.expiresAt,
     }),
   );
-  window.location.assign(started.authorizationUrl);
+  window.location.assign(authorizationURL);
 }
 
 export async function consumePendingOIDCLogin(search: string): Promise<AuthLoginResult | null> {
@@ -111,7 +115,7 @@ function base64URL(bytes: Uint8Array) {
   return window.btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
 }
 
-export const authProvider: AuthProvider = {
+export const authProvider: RefineAuthProvider = {
   login: async ({ provider = "demo", username = "admin", code, state, codeVerifier }: { provider?: string; username?: string; code?: string; state?: string; codeVerifier?: string }) => {
     try {
       await loginWithAuthProvider({ provider, username, code, state, codeVerifier });

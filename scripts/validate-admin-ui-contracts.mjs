@@ -61,6 +61,8 @@ requireRegex(
   "Auth login must explicitly avoid stored-token authentication.",
 );
 requireIncludes(files.client, "audiences: string[];", "AuthProvider must expose its declared audiences to the Admin client.");
+requireIncludes(files.login, "filterAdminAuthProviders(providers)", "Admin login must consume provider audiences before selection and rendering.");
+requireIncludes(files.authProvider, "assertAdminAuthProvider(provider);", "OIDC start must reject providers without the Admin audience.");
 requireIncludes(files.client, "export function startAdminAuthProvider", "The Admin client must expose provider-start support.");
 requireRegex(
   files.client,
@@ -72,11 +74,17 @@ requireIncludes(files.authProvider, 'crypto.subtle.digest("SHA-256"', "OIDC logi
 requireIncludes(files.authProvider, "window.sessionStorage.setItem", "OIDC pending transactions must use tab-scoped sessionStorage.");
 requireRegex(
   files.authProvider,
-  /JSON\.stringify\(\{\s*provider,\s*state:\s*started\.state,\s*codeVerifier,\s*expiresAt:\s*started\.expiresAt,?\s*\}\)/,
+  /JSON\.stringify\(\{\s*provider:\s*provider\.id,\s*state:\s*started\.state,\s*codeVerifier,\s*expiresAt:\s*started\.expiresAt,?\s*\}\)/,
   "OIDC pending transactions must store only provider, state, codeVerifier, and expiresAt.",
 );
 requireIncludes(files.authProvider, "callbackState !== pending.state", "OIDC callback state must use an exact comparison.");
 requireIncludes(files.authProvider, "window.sessionStorage.removeItem", "OIDC terminal and recovery paths must clear the pending transaction.");
+requireOrder(
+  files.authProvider,
+  "window.history.replaceState",
+  "window.sessionStorage.getItem",
+  "OIDC callbacks must remove callback values before reading pending transaction state.",
+);
 requireOrder(
   files.authProvider,
   "window.history.replaceState",
@@ -95,7 +103,32 @@ requireIncludes(files.login, 'className="login-error-heading"', "OIDC callback f
 requireIncludes(files.login, "tabIndex={-1}", "The OIDC callback error heading must be programmatically focusable.");
 requireIncludes(files.login, "focus({ preventScroll: true })", "OIDC callback failure must focus its heading without a scroll jump.");
 requireIncludes(files.login, 'className="login-recovery-action"', "OIDC callback failures must provide an explicit recovery action.");
-requireIncludes(files.login, "if (submitting)", "Login actions must prevent duplicate submissions while pending.");
+requireRegex(
+  files.login,
+  /const submit = async \(values: LoginFormValues\) => \{\s*if \(submissionLockRef\.current\) return;\s*submissionLockRef\.current = true;/,
+  "Demo login must acquire the synchronous submission lock before its first await.",
+);
+requireRegex(
+  files.login,
+  /const startOIDC = async \(\) => \{\s*if \(submissionLockRef\.current\) return;\s*submissionLockRef\.current = true;/,
+  "OIDC start must acquire the synchronous submission lock before its first await.",
+);
+requireIncludes(files.authProvider, "validateOIDCAuthorizationURL(started.authorizationUrl)", "OIDC start must validate the authorization URL before browser navigation.");
+requireOrder(
+  files.authProvider,
+  "validateOIDCAuthorizationURL(started.authorizationUrl)",
+  "window.sessionStorage.setItem",
+  "OIDC authorization URL validation must happen before pending transaction storage.",
+);
+requireOrder(
+  files.authProvider,
+  "validateOIDCAuthorizationURL(started.authorizationUrl)",
+  "window.location.assign",
+  "OIDC authorization URL validation must happen before browser navigation.",
+);
+requireIncludes(files.login, "loginHeadingRef.current?.focus({ preventScroll: true })", "Explicit OIDC recovery must restore focus predictably without scrolling.");
+requireIncludes(files.login, "setCallbackFailure(callbackFailureReason(nextError))", "OIDC callback failures must store a stable error category instead of localized copy.");
+requireIncludes(files.login, "callbackErrorMessage(dictionary, callbackFailure)", "OIDC callback failure copy must derive from the current dictionary.");
 for (const key of [
   "loginOIDCContinue",
   "loginOIDCStarting",
