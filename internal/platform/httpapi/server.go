@@ -524,16 +524,33 @@ func (s *Server) issueAdminLogin(ctx *gin.Context, principal rbac.Principal, pro
 		TokenType: authjwt.TokenTypeAdmin,
 	}, issued.ExpiresAt.Sub(issued.IssuedAt))
 	if err != nil {
+		if !s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token) {
+			writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_CLEANUP_FAILED", "session cleanup failed")
+			return
+		}
 		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_TOKEN_SIGN_FAILED", "auth token sign failed")
 		return
 	}
 	if err := s.recordAudit("auth.login", "Auth Login", principal.User.Username, provider.ID, issued.Token); err != nil {
+		if !s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token) {
+			writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_CLEANUP_FAILED", "session cleanup failed")
+			return
+		}
 		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_AUDIT_FAILED", "auth audit failed")
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[authLoginResponse]{
 		Data: authLoginResponse{Token: token, ExpiresAt: issued.ExpiresAt, Principal: principal},
 	})
+}
+
+func (s *Server) cleanupIssuedAdminSession(ctx context.Context, token string) bool {
+	revoked, err := s.sessions.RevokeContext(context.WithoutCancel(ctx), token)
+	if err != nil || !revoked {
+		return false
+	}
+	s.publishSessionInvalidation(context.WithoutCancel(ctx))
+	return true
 }
 
 func (s *Server) authRefresh(ctx *gin.Context) {

@@ -822,7 +822,7 @@ func TestAdminOIDCStartRejectsUnavailableProviderResolverAndMalformedChallenge(t
 
 func TestAdminOIDCStartReturnsResolverTransactionWithoutCredentials(t *testing.T) {
 	expiresAt := time.Date(2026, time.July, 11, 10, 5, 0, 0, time.UTC)
-	challenge := strings.Repeat("b", 43)
+	challenge := "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
 	var captured AdminIdentityStartInput
 	server := newTestServer(ServerOptions{
 		Capabilities: []capability.Manifest{adminOIDCProviderManifest(true, true)},
@@ -913,6 +913,49 @@ func TestAdminOIDCAuthLoginRejectsMissingTransactionResolverBindingAndDisabledPr
 		assertResponseRedactsValues(t, recorder.Body.String(), sensitiveCode, sensitiveState)
 	})
 
+	t.Run("missing resolver", func(t *testing.T) {
+		server := newTestServer(ServerOptions{
+			Capabilities: []capability.Manifest{adminOIDCProviderManifest(true, true)},
+		})
+		recorder := postAdminOIDCLoginForTest(server, adminOIDCLoginBody(sensitiveCode, sensitiveState, sensitiveVerifier))
+		assertAuthErrorResponse(t, recorder, http.StatusNotImplemented, "AUTH_PROVIDER_RESOLVER_NOT_CONFIGURED")
+		assertResponseRedactsValues(t, recorder.Body.String(), sensitiveCode, sensitiveState, sensitiveVerifier)
+	})
+
+	t.Run("invalid identity", func(t *testing.T) {
+		server := newTestServer(ServerOptions{
+			Capabilities: []capability.Manifest{adminOIDCProviderManifest(true, true)},
+			AdminIdentityResolver: adminIdentityResolverFunc{
+				start: func(context.Context, AdminIdentityStartInput) (AdminIdentityStart, error) {
+					return AdminIdentityStart{}, nil
+				},
+				resolve: func(context.Context, AdminIdentityResolveInput) (AdminIdentity, error) {
+					return AdminIdentity{}, errors.Join(ErrAdminIdentityInvalid, errors.New("identity-detail-sensitive"))
+				},
+			},
+		})
+		recorder := postAdminOIDCLoginForTest(server, adminOIDCLoginBody(sensitiveCode, sensitiveState, sensitiveVerifier))
+		assertAuthErrorResponse(t, recorder, http.StatusBadRequest, "AUTH_IDENTITY_INVALID")
+		assertResponseRedactsValues(t, recorder.Body.String(), sensitiveCode, sensitiveState, sensitiveVerifier, "identity-detail-sensitive")
+	})
+
+	t.Run("invalid transaction", func(t *testing.T) {
+		server := newTestServer(ServerOptions{
+			Capabilities: []capability.Manifest{adminOIDCProviderManifest(true, true)},
+			AdminIdentityResolver: adminIdentityResolverFunc{
+				start: func(context.Context, AdminIdentityStartInput) (AdminIdentityStart, error) {
+					return AdminIdentityStart{}, nil
+				},
+				resolve: func(context.Context, AdminIdentityResolveInput) (AdminIdentity, error) {
+					return AdminIdentity{}, errors.Join(ErrAdminIdentityTransaction, errors.New("transaction-detail-sensitive"))
+				},
+			},
+		})
+		recorder := postAdminOIDCLoginForTest(server, adminOIDCLoginBody(sensitiveCode, sensitiveState, sensitiveVerifier))
+		assertAuthErrorResponse(t, recorder, http.StatusUnauthorized, "AUTH_IDENTITY_TRANSACTION_INVALID")
+		assertResponseRedactsValues(t, recorder.Body.String(), sensitiveCode, sensitiveState, sensitiveVerifier, "transaction-detail-sensitive")
+	})
+
 	t.Run("resolver error", func(t *testing.T) {
 		bindingCalled := false
 		server := newTestServer(ServerOptions{
@@ -961,6 +1004,19 @@ func TestAdminOIDCAuthLoginRejectsMissingTransactionResolverBindingAndDisabledPr
 			t.Fatalf("captured binding input = %+v, want resolved oidc tuple", captured)
 		}
 		assertResponseRedactsValues(t, recorder.Body.String(), sensitiveCode, sensitiveState, sensitiveVerifier, sensitiveIssuer, sensitiveSubject)
+	})
+
+	t.Run("binding persistence failure", func(t *testing.T) {
+		server := newTestServer(ServerOptions{
+			Capabilities:          []capability.Manifest{adminOIDCProviderManifest(true, true)},
+			AdminIdentityResolver: successfulAdminIdentityResolver(),
+			AdminIdentityBindings: adminIdentityBindingStoreFunc{resolve: func(context.Context, AdminIdentityBindingInput) (AdminIdentityBinding, error) {
+				return AdminIdentityBinding{}, errors.New("binding-storage-detail-sensitive")
+			}},
+		})
+		recorder := postAdminOIDCLoginForTest(server, adminOIDCLoginBody(sensitiveCode, sensitiveState, sensitiveVerifier))
+		assertAuthErrorResponse(t, recorder, http.StatusInternalServerError, "AUTH_IDENTITY_BINDING_FAILED")
+		assertResponseRedactsValues(t, recorder.Body.String(), sensitiveCode, sensitiveState, sensitiveVerifier, "binding-storage-detail-sensitive")
 	})
 
 	t.Run("disabled principal", func(t *testing.T) {
@@ -1082,6 +1138,78 @@ func TestAuthLoginWithDemoProviderRejectsDisabledPrincipal(t *testing.T) {
 	server.Router().ServeHTTP(recorder, request)
 
 	assertAuthErrorResponse(t, recorder, http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS")
+}
+
+func TestAuthLoginCleansUpIssuedSessionWhenAuditFails(t *testing.T) {
+	for _, test := range []struct {
+		name              string
+		cleanupErr        error
+		wantCode          string
+		wantInvalidations int
+		wantResolvable    bool
+	}{
+		{name: "cleanup succeeds", wantCode: "AUTH_AUDIT_FAILED", wantInvalidations: 2},
+		{
+			name: "cleanup fails", cleanupErr: errors.New("revoke-detail-sensitive"),
+			wantCode: "AUTH_SESSION_CLEANUP_FAILED", wantInvalidations: 1, wantResolvable: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit"})
+			adminRepository := &controllableAdminResourceRepository{}
+			resources, err := adminresource.NewRepositoryBackedStoreFromCapabilities(adminRepository, capabilities)
+			if err != nil {
+				t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+			}
+			sessionRepository := newControllableSessionRepository()
+			sessionRepository.revokeErr = test.cleanupErr
+			sessions, err := session.NewRepositoryBackedStore(session.Options{TTL: time.Hour}, sessionRepository)
+			if err != nil {
+				t.Fatalf("NewRepositoryBackedStore() error = %v", err)
+			}
+			bus := cache.NewMemoryInvalidationBus()
+			invalidations := 0
+			server := newTestServer(ServerOptions{
+				Capabilities:    capabilities,
+				Resources:       resources,
+				Sessions:        sessions,
+				InvalidationBus: bus,
+			})
+			if err := bus.SubscribeInvalidations(context.Background(), func(_ context.Context, event cache.InvalidationEvent) {
+				if event.Resource == sessionInvalidationResource {
+					invalidations++
+				}
+			}); err != nil {
+				t.Fatalf("SubscribeInvalidations() error = %v", err)
+			}
+			adminRepository.saveErr = errors.New("audit-save-detail-sensitive")
+
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"provider":"demo","username":"ops"}`))
+			request.Header.Set("Content-Type", "application/json")
+			server.Router().ServeHTTP(recorder, request)
+
+			assertAuthErrorResponse(t, recorder, http.StatusInternalServerError, test.wantCode)
+			if len(sessionRepository.sessions) != 1 {
+				t.Fatalf("issued sessions = %d, want one attempted login session", len(sessionRepository.sessions))
+			}
+			var issuedToken string
+			for token := range sessionRepository.sessions {
+				issuedToken = token
+			}
+			_, resolvable, err := sessions.ResolveContext(context.Background(), issuedToken)
+			if err != nil {
+				t.Fatalf("ResolveContext(issued) error = %v", err)
+			}
+			if resolvable != test.wantResolvable {
+				t.Fatalf("issued session resolvable = %v, want %v", resolvable, test.wantResolvable)
+			}
+			if invalidations != test.wantInvalidations {
+				t.Fatalf("session invalidations = %d, want %d", invalidations, test.wantInvalidations)
+			}
+			assertResponseRedactsValues(t, recorder.Body.String(), issuedToken, "audit-save-detail-sensitive", "revoke-detail-sensitive")
+		})
+	}
 }
 
 func TestAuthLogoutRevokesSessionToken(t *testing.T) {
@@ -4206,6 +4334,7 @@ type controllableSessionRepository struct {
 type controllableAdminResourceRepository struct {
 	snapshot adminresource.ResourceSnapshot
 	loadErr  error
+	saveErr  error
 }
 
 func (r *controllableAdminResourceRepository) Load(context.Context) (adminresource.ResourceSnapshot, error) {
@@ -4216,6 +4345,9 @@ func (r *controllableAdminResourceRepository) Load(context.Context) (adminresour
 }
 
 func (r *controllableAdminResourceRepository) Save(_ context.Context, snapshot adminresource.ResourceSnapshot) (uint64, error) {
+	if r.saveErr != nil {
+		return 0, r.saveErr
+	}
 	r.snapshot = snapshot
 	r.snapshot.Revision++
 	return r.snapshot.Revision, nil

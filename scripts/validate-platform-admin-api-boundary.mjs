@@ -199,6 +199,9 @@ function validateAdminOIDCOpenAPIContract(errors) {
   ) {
     errors.push("AdminAuthLoginRequest must declare write-only state and codeVerifier exchange fields");
   }
+  if (loginRequest?.properties?.code?.writeOnly !== true) {
+    errors.push("AdminAuthLoginRequest code must stay writeOnly");
+  }
   const startData = openAPI.components?.schemas?.AdminAuthProviderStartData;
   const responseFields = Object.keys(startData?.properties ?? {});
   const allowedResponseFields = new Set(["authorizationUrl", "state", "expiresAt"]);

@@ -95,6 +95,17 @@ describe("validate-platform-admin-api-boundary", () => {
     assert.match(result.stderr, /admin OpenAPI auth operations must declare the missing resolver 501 response/);
   });
 
+  it("rejects a readable admin oidc authorization code field", () => {
+    const openAPI = readJSON("resources/generated/openapi.admin.json");
+    openAPI.components.schemas.AdminAuthLoginRequest.properties.code.writeOnly = false;
+    const openAPIPath = tempJSON("openapi.admin.json", openAPI);
+
+    const result = runValidator(["--admin-openapi", openAPIPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /AdminAuthLoginRequest code must stay writeOnly/);
+  });
+
   it("rejects direct fetch outside the platform API client allowlist", () => {
     const boundary = readJSON("resources/platform-admin-api-boundary.json");
     boundary.adminSourceBoundary.allowedDirectFetchFiles = [];
