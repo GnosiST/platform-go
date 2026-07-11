@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -791,6 +792,11 @@ func (s *Server) adminResourceList(ctx *gin.Context) {
 			writeAdminResourceError(ctx, err)
 			return
 		}
+		items, err = s.projectAdminResourceRecords(resource, items, adminresource.ProjectionResponse)
+		if err != nil {
+			writeAdminResourceError(ctx, err)
+			return
+		}
 		ctx.JSON(http.StatusOK, Response[adminResourceListResponse]{
 			Data: adminResourceListResponse{Resource: resource, Items: items},
 		})
@@ -809,8 +815,13 @@ func (s *Server) adminResourceList(ctx *gin.Context) {
 		writeAdminResourceError(ctx, err)
 		return
 	}
+	items, err = s.projectAdminResourceRecords(resource, items, adminresource.ProjectionResponse)
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
 	ctx.JSON(http.StatusOK, Response[adminResourceListResponse]{
-		Data: adminResourceListResponse{Resource: resource, Items: sanitizeAdminResourceRecords(resource, items)},
+		Data: adminResourceListResponse{Resource: resource, Items: items},
 	})
 }
 
@@ -838,10 +849,15 @@ func (s *Server) adminResourceQuery(ctx *gin.Context) {
 		writeAdminResourceError(ctx, err)
 		return
 	}
+	items, err := s.projectAdminResourceRecords(resource, result.Items, adminresource.ProjectionResponse)
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
 	ctx.JSON(http.StatusOK, Response[adminResourceQueryResponse]{
 		Data: adminResourceQueryResponse{
 			Resource: result.Resource,
-			Items:    sanitizeAdminResourceRecords(resource, result.Items),
+			Items:    items,
 			Total:    result.Total,
 			Page:     result.Page,
 			PageSize: result.PageSize,
@@ -866,8 +882,13 @@ func (s *Server) adminResourceCreate(ctx *gin.Context) {
 			return
 		}
 		s.invalidateCachesForResource(ctx.Request.Context(), resource)
+		projected, err := s.resources.ProjectRecord(resource, issued, adminresource.ProjectionResponse)
+		if err != nil {
+			writeAdminResourceError(ctx, err)
+			return
+		}
 		ctx.JSON(http.StatusCreated, Response[adminResourceRecordResponse]{
-			Data: adminResourceRecordResponse{Resource: resource, Record: sanitizeAdminResourceRecord(resource, issued), Token: token},
+			Data: adminResourceRecordResponse{Resource: resource, Record: projected, Token: token},
 		})
 		return
 	}
@@ -878,8 +899,13 @@ func (s *Server) adminResourceCreate(ctx *gin.Context) {
 	}
 	s.recordAdminResourceAudit(ctx, "create", resource, record)
 	s.invalidateCachesForResource(ctx.Request.Context(), resource)
+	projected, err := s.resources.ProjectRecord(resource, record, adminresource.ProjectionResponse)
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
 	ctx.JSON(http.StatusCreated, Response[adminResourceRecordResponse]{
-		Data: adminResourceRecordResponse{Resource: resource, Record: sanitizeAdminResourceRecord(resource, record)},
+		Data: adminResourceRecordResponse{Resource: resource, Record: projected},
 	})
 }
 
@@ -901,8 +927,13 @@ func (s *Server) adminResourceUpdate(ctx *gin.Context) {
 			return
 		}
 		s.invalidateCachesForResource(ctx.Request.Context(), resource)
+		projected, err := s.resources.ProjectRecord(resource, record, adminresource.ProjectionResponse)
+		if err != nil {
+			writeAdminResourceError(ctx, err)
+			return
+		}
 		ctx.JSON(http.StatusOK, Response[adminResourceRecordResponse]{
-			Data: adminResourceRecordResponse{Resource: resource, Record: sanitizeAdminResourceRecord(resource, record)},
+			Data: adminResourceRecordResponse{Resource: resource, Record: projected},
 		})
 		return
 	}
@@ -913,8 +944,13 @@ func (s *Server) adminResourceUpdate(ctx *gin.Context) {
 	}
 	s.recordAdminResourceAudit(ctx, "update", resource, record)
 	s.invalidateCachesForResource(ctx.Request.Context(), resource)
+	projected, err := s.resources.ProjectRecord(resource, record, adminresource.ProjectionResponse)
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
 	ctx.JSON(http.StatusOK, Response[adminResourceRecordResponse]{
-		Data: adminResourceRecordResponse{Resource: resource, Record: sanitizeAdminResourceRecord(resource, record)},
+		Data: adminResourceRecordResponse{Resource: resource, Record: projected},
 	})
 }
 
@@ -930,11 +966,26 @@ func (s *Server) adminPolicyReviewApprove(ctx *gin.Context) {
 	for _, resource := range []string{"policy-reviews", "roles", "audit-logs"} {
 		s.invalidateCachesForResource(ctx.Request.Context(), resource)
 	}
+	review, err := s.resources.ProjectRecord("policy-reviews", result.Review, adminresource.ProjectionResponse)
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
+	role, err := s.resources.ProjectRecord("roles", result.Role, adminresource.ProjectionResponse)
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
+	audit, err := s.resources.ProjectRecord("audit-logs", result.Audit, adminresource.ProjectionResponse)
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
 	ctx.JSON(http.StatusOK, Response[policyReviewApproveResponse]{
 		Data: policyReviewApproveResponse{
-			Review: sanitizeAdminResourceRecord("policy-reviews", result.Review),
-			Role:   sanitizeAdminResourceRecord("roles", result.Role),
-			Audit:  sanitizeAdminResourceRecord("audit-logs", result.Audit),
+			Review: review,
+			Role:   role,
+			Audit:  audit,
 		},
 	})
 }
@@ -951,10 +1002,20 @@ func (s *Server) adminPolicyReviewRequest(ctx *gin.Context) {
 	for _, resource := range []string{"policy-reviews", "audit-logs"} {
 		s.invalidateCachesForResource(ctx.Request.Context(), resource)
 	}
+	review, err := s.resources.ProjectRecord("policy-reviews", result.Review, adminresource.ProjectionResponse)
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
+	audit, err := s.resources.ProjectRecord("audit-logs", result.Audit, adminresource.ProjectionResponse)
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
 	ctx.JSON(http.StatusOK, Response[policyReviewActionResponse]{
 		Data: policyReviewActionResponse{
-			Review: sanitizeAdminResourceRecord("policy-reviews", result.Review),
-			Audit:  sanitizeAdminResourceRecord("audit-logs", result.Audit),
+			Review: review,
+			Audit:  audit,
 		},
 	})
 }
@@ -976,10 +1037,20 @@ func (s *Server) adminPolicyReviewReject(ctx *gin.Context) {
 	for _, resource := range []string{"policy-reviews", "audit-logs"} {
 		s.invalidateCachesForResource(ctx.Request.Context(), resource)
 	}
+	review, err := s.resources.ProjectRecord("policy-reviews", result.Review, adminresource.ProjectionResponse)
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
+	audit, err := s.resources.ProjectRecord("audit-logs", result.Audit, adminresource.ProjectionResponse)
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
 	ctx.JSON(http.StatusOK, Response[policyReviewActionResponse]{
 		Data: policyReviewActionResponse{
-			Review: sanitizeAdminResourceRecord("policy-reviews", result.Review),
-			Audit:  sanitizeAdminResourceRecord("audit-logs", result.Audit),
+			Review: review,
+			Audit:  audit,
 		},
 	})
 }
@@ -996,11 +1067,21 @@ func (s *Server) adminPolicyReviewExport(ctx *gin.Context) {
 	s.invalidateCachesForResource(ctx.Request.Context(), "audit-logs")
 	reviews := make([]adminresource.Record, 0, len(result.Reviews))
 	for _, review := range result.Reviews {
-		reviews = append(reviews, sanitizeAdminResourceRecord("policy-reviews", review))
+		projected, projectErr := s.resources.ProjectRecord("policy-reviews", review, adminresource.ProjectionExport)
+		if projectErr != nil {
+			writeAdminResourceError(ctx, projectErr)
+			return
+		}
+		reviews = append(reviews, projected)
 	}
 	audits := make([]adminresource.Record, 0, len(result.Audits))
 	for _, audit := range result.Audits {
-		audits = append(audits, sanitizeAdminResourceRecord("audit-logs", audit))
+		projected, projectErr := s.resources.ProjectRecord("audit-logs", audit, adminresource.ProjectionExport)
+		if projectErr != nil {
+			writeAdminResourceError(ctx, projectErr)
+			return
+		}
+		audits = append(audits, projected)
 	}
 	ctx.JSON(http.StatusOK, Response[policyReviewExportResponse]{
 		Data: policyReviewExportResponse{
@@ -1078,8 +1159,8 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_SAVE_FAILED", err.Error())
 		return
 	}
-	record, err := s.resources.Create("files", adminresource.WriteInput{
-		Code:        metadata.Key,
+	record, err := s.resources.CreateInternal("files", adminresource.WriteInput{
+		Code:        fmt.Sprintf("file-%d", s.now().UTC().UnixNano()),
 		Name:        file.Filename,
 		Status:      "enabled",
 		Description: "Uploaded file object.",
@@ -1103,8 +1184,13 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 		return
 	}
 	s.invalidateCachesForResource(ctx.Request.Context(), "files")
+	projected, err := s.resources.ProjectRecord("files", record, adminresource.ProjectionResponse)
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
 	ctx.JSON(http.StatusCreated, Response[adminResourceRecordResponse]{
-		Data: adminResourceRecordResponse{Resource: "files", Record: record},
+		Data: adminResourceRecordResponse{Resource: "files", Record: projected},
 	})
 }
 
@@ -1174,8 +1260,8 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 		return
 	}
 	username := appUsername(appSession.Username)
-	record, err := s.resources.Create("files", adminresource.WriteInput{
-		Code:        metadata.Key,
+	record, err := s.resources.CreateInternal("files", adminresource.WriteInput{
+		Code:        fmt.Sprintf("file-%d", s.now().UTC().UnixNano()),
 		Name:        file.Filename,
 		Status:      "enabled",
 		Description: "Uploaded app file object.",
@@ -1188,7 +1274,6 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 			"publicUrl":     metadata.URL,
 			"tenantId":      appTenant,
 			"uploadedBy":    username,
-			"sessionId":     appSession.Token,
 			"createdAt":     s.now().UTC().Format(time.RFC3339),
 		},
 	})
@@ -1202,8 +1287,13 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 		return
 	}
 	s.invalidateCachesForResource(ctx.Request.Context(), "files")
+	projected, err := s.resources.ProjectRecord("files", record, adminresource.ProjectionResponse)
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
 	ctx.JSON(http.StatusCreated, Response[adminResourceRecordResponse]{
-		Data: adminResourceRecordResponse{Resource: "files", Record: record},
+		Data: adminResourceRecordResponse{Resource: "files", Record: projected},
 	})
 }
 
@@ -1325,7 +1415,7 @@ func (s *Server) issueAdminAPIToken(ctx context.Context, actor string, input adm
 		input.Code = prefix
 	}
 	input.Values = values
-	record, err := s.resources.Create(apiTokensResource, input)
+	record, err := s.resources.CreateInternal(apiTokensResource, input)
 	if err != nil {
 		return adminresource.Record{}, "", err
 	}
@@ -1342,7 +1432,7 @@ func (s *Server) revokeAdminAPIToken(ctx context.Context, actor string, id strin
 	}
 	values := cloneStringMap(record.Values)
 	values["revokedAt"] = s.now().UTC().Format(time.RFC3339)
-	_, err = s.resources.Update(apiTokensResource, id, adminresource.WriteInput{
+	_, err = s.resources.UpdateInternal(apiTokensResource, id, adminresource.WriteInput{
 		Code:        record.Code,
 		Name:        record.Name,
 		Status:      "revoked",
@@ -1400,7 +1490,7 @@ func (s *Server) updateAdminAPIToken(ctx context.Context, actor string, id strin
 	}
 	input.Status = status
 	input.Values = values
-	record, err := s.resources.Update(apiTokensResource, id, input)
+	record, err := s.resources.UpdateInternal(apiTokensResource, id, input)
 	if err != nil {
 		return adminresource.Record{}, err
 	}
@@ -1488,24 +1578,16 @@ func apiTokenExpired(expiresAt string, now time.Time) bool {
 	return !now.UTC().Before(parsed.UTC())
 }
 
-func sanitizeAdminResourceRecords(resource string, records []adminresource.Record) []adminresource.Record {
+func (s *Server) projectAdminResourceRecords(resource string, records []adminresource.Record, purpose adminresource.ProjectionPurpose) ([]adminresource.Record, error) {
 	items := make([]adminresource.Record, 0, len(records))
 	for _, record := range records {
-		items = append(items, sanitizeAdminResourceRecord(resource, record))
+		projected, err := s.resources.ProjectRecord(resource, record, purpose)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, projected)
 	}
-	return items
-}
-
-func sanitizeAdminResourceRecord(resource string, record adminresource.Record) adminresource.Record {
-	record.Values = cloneStringMap(record.Values)
-	if resource == apiTokensResource {
-		delete(record.Values, "token")
-		delete(record.Values, "tokenHash")
-	}
-	if len(record.Values) == 0 {
-		record.Values = nil
-	}
-	return record
+	return items, nil
 }
 
 func splitAPITokenScopes(scopeValue string) []string {
@@ -1694,7 +1776,7 @@ func (s *Server) authProviderAvailable(provider capability.AuthProvider) bool {
 	return !(s.disableDemoAuthProvider && provider.Kind == "demo")
 }
 
-func (s *Server) recordAudit(code string, name string, username string, provider string, token string) error {
+func (s *Server) recordAudit(code string, name string, username string, provider string, _ string) error {
 	auditCode, err := newAuthAuditCode(code)
 	if err != nil {
 		return err
@@ -1703,13 +1785,12 @@ func (s *Server) recordAudit(code string, name string, username string, provider
 		"actor":     username,
 		"action":    code,
 		"resource":  "auth",
-		"sessionId": shortSessionID(token),
 		"createdAt": s.now().UTC().Format(time.RFC3339),
 	}
 	if provider != "" {
 		values["provider"] = provider
 	}
-	_, err = s.resources.Create("audit-logs", adminresource.WriteInput{
+	_, err = s.resources.CreateInternal("audit-logs", adminresource.WriteInput{
 		Code:        auditCode,
 		Name:        name,
 		Status:      "recorded",
@@ -1734,7 +1815,7 @@ func (s *Server) recordAdminResourceAudit(ctx *gin.Context, action string, resou
 	if resource == "audit" || resource == "audit-logs" || action == "" {
 		return
 	}
-	_, err := s.resources.Create("audit-logs", adminresource.WriteInput{
+	_, err := s.resources.CreateInternal("audit-logs", adminresource.WriteInput{
 		Code:        "admin_resource." + action + "." + resource + "." + record.ID,
 		Name:        "Admin Resource " + strings.ToUpper(action[:1]) + action[1:],
 		Status:      "recorded",
@@ -1766,7 +1847,7 @@ func (s *Server) recordFileAuditForActor(action string, actor string, record adm
 	if actor == "" {
 		actor = "system"
 	}
-	_, err := s.resources.Create("audit-logs", adminresource.WriteInput{
+	_, err := s.resources.CreateInternal("audit-logs", adminresource.WriteInput{
 		Code:        action + "." + record.ID,
 		Name:        "File Operation",
 		Status:      "recorded",

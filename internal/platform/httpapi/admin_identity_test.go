@@ -164,7 +164,7 @@ func TestAdminIdentityBindingResolveDoesNotRestoreBindingDisabledByConcurrentCRU
 	if err != nil || len(records) != 1 {
 		t.Fatalf("List(admin-identities) = %d, %v", len(records), err)
 	}
-	if _, err := crudStore.Update(adminIdentitiesResource, records[0].ID, adminresource.WriteInput{
+	if _, err := crudStore.UpdateInternal(adminIdentitiesResource, records[0].ID, adminresource.WriteInput{
 		Code: records[0].Code, Name: records[0].Name, Status: "disabled", Description: records[0].Description, Values: records[0].Values,
 	}); err != nil {
 		t.Fatalf("Update(disable admin identity) error = %v", err)
@@ -210,7 +210,7 @@ func TestAdminIdentityBindingResolveDoesNotOverwriteBindingReassignedByConcurren
 	}
 	values := cloneAdminIdentityValues(records[0].Values)
 	values["platformUsername"] = "ops"
-	if _, err := crudStore.Update(adminIdentitiesResource, records[0].ID, adminresource.WriteInput{
+	if _, err := crudStore.UpdateInternal(adminIdentitiesResource, records[0].ID, adminresource.WriteInput{
 		Code: records[0].Code, Name: records[0].Name, Status: records[0].Status, Description: records[0].Description, Values: values,
 	}); err != nil {
 		t.Fatalf("Update(reassign admin identity) error = %v", err)
@@ -248,7 +248,7 @@ func TestAdminIdentityBindingResolveRetriesRevisionConflictAndFailsClosed(t *tes
 	if err != nil || len(records) != 1 {
 		t.Fatalf("List(admin-identities) = %d, %v", len(records), err)
 	}
-	if _, err := crudStore.Update(adminIdentitiesResource, records[0].ID, adminresource.WriteInput{
+	if _, err := crudStore.UpdateInternal(adminIdentitiesResource, records[0].ID, adminresource.WriteInput{
 		Code: records[0].Code, Name: records[0].Name, Status: "disabled", Description: records[0].Description, Values: records[0].Values,
 	}); err != nil {
 		t.Fatalf("Update(disable admin identity) error = %v", err)
@@ -507,7 +507,7 @@ func TestAdminAuthReadinessRejectsUnusableOIDCBindings(t *testing.T) {
 		{
 			name: "malformed hashes",
 			setup: func(t *testing.T, store *adminresource.Store) {
-				if _, err := store.Create(adminIdentitiesResource, adminresource.WriteInput{
+				if _, err := store.CreateInternal(adminIdentitiesResource, adminresource.WriteInput{
 					Code: "oidc-invalid", Name: "Admin identity binding", Status: "enabled",
 					Values: map[string]string{
 						"provider": "oidc", "providerKind": "oidc", "issuerHash": "not-a-sha256", "providerSubjectHash": "also-not-a-sha256",
@@ -560,7 +560,7 @@ func createAdminBindingRecord(t *testing.T, store *adminresource.Store, provider
 	t.Helper()
 	issuerSum := sha256.Sum256([]byte(strings.TrimSpace(issuer)))
 	subjectHash := adminProviderSubjectHash(provider, issuer, subject)
-	_, err := store.Create(adminIdentitiesResource, adminresource.WriteInput{
+	_, err := store.CreateInternal(adminIdentitiesResource, adminresource.WriteInput{
 		Code:   strings.TrimSpace(provider.ID) + "-" + subjectHash[:12],
 		Name:   "Admin identity binding",
 		Status: status,

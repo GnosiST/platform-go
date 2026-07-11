@@ -67,6 +67,31 @@ describe("validate-admin-resources default gate wiring", () => {
   });
 });
 
+describe("validate-admin-resources field security policies", () => {
+  function mutateProtectedField(mutator) {
+    return writeBrokenManifest((manifest) => {
+      const identities = manifest.resources.find((resource) => resource.code === "app-identities");
+      const field = identities.schema.fields.find((candidate) => candidate.key === "providerSubjectHash");
+      mutator(field);
+    });
+  }
+
+  for (const [name, mutate, pattern] of [
+    ["sensitivity", (field) => (field.sensitivity = "classified"), /unsupported sensitivity classified/],
+    ["storage mode", (field) => (field.storageMode = "digest"), /unsupported storageMode digest/],
+    ["response mode", (field) => (field.responseMode = "redacted"), /unsupported responseMode redacted/],
+    ["export mode", (field) => (field.exportMode = "redacted"), /unsupported exportMode redacted/],
+    ["plain secret", (field) => (field.storageMode = "plain"), /require protected storage/],
+    ["hash response", (field) => (field.responseMode = "full"), /must be omitted from response and export/],
+  ]) {
+    it(`rejects invalid ${name}`, () => {
+      const result = runValidator(["--manifest", mutateProtectedField(mutate)]);
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, pattern);
+    });
+  }
+});
+
 describe("validate-admin-resources relation contracts", () => {
   it("accepts the side-detail-preview schema form layout preset", () => {
     const manifestPath = writeBrokenManifest((manifest) => {

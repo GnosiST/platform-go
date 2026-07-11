@@ -262,6 +262,10 @@ export type AdminResourceField = {
   options?: Array<AdminResourceFieldOption & { parentValue?: string; pathValue?: string }>;
   relation?: AdminResourceFieldRelation;
   validation?: AdminResourceFieldValidation;
+  sensitivity: "public" | "internal" | "personal" | "sensitive" | "secret";
+  storageMode: "plain" | "masked" | "hashed" | "encrypted";
+  responseMode: "full" | "masked" | "privileged" | "omitted";
+  exportMode: "full" | "masked" | "privileged" | "omitted";
 };
 
 export type AdminResourcePermissions = {

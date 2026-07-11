@@ -34,7 +34,6 @@ type appPhoneVerificationRequest struct {
 type appPhoneVerificationResponse struct {
 	ID          string    `json:"id"`
 	MaskedPhone string    `json:"maskedPhone"`
-	PhoneHash   string    `json:"phoneHash"`
 	Purpose     string    `json:"purpose"`
 	ExpiresAt   time.Time `json:"expiresAt"`
 	DebugCode   string    `json:"debugCode"`
@@ -49,7 +48,6 @@ type appPhoneBindingResponse struct {
 	ID          string    `json:"id"`
 	AppUsername string    `json:"appUsername"`
 	MaskedPhone string    `json:"maskedPhone"`
-	PhoneHash   string    `json:"phoneHash"`
 	BoundAt     time.Time `json:"boundAt"`
 }
 
@@ -92,7 +90,7 @@ func (s *Server) appPhoneCreateVerification(ctx *gin.Context) {
 		writeAuthError(ctx, http.StatusTooManyRequests, "APP_PHONE_VERIFICATION_RATE_LIMITED", "app phone verification rate limited")
 		return
 	}
-	record, err := s.resources.Create(appPhoneVerificationsResource, adminresource.WriteInput{
+	record, err := s.resources.CreateInternal(appPhoneVerificationsResource, adminresource.WriteInput{
 		Code:        "phone-verification-" + phoneHash[:12] + "-" + fmt.Sprintf("%d", now.UnixNano()),
 		Name:        "Phone verification / " + username,
 		Status:      "pending",
@@ -115,7 +113,6 @@ func (s *Server) appPhoneCreateVerification(ctx *gin.Context) {
 		Data: appPhoneVerificationResponse{
 			ID:          record.ID,
 			MaskedPhone: maskedPhone,
-			PhoneHash:   phoneHash,
 			Purpose:     purpose,
 			ExpiresAt:   expiresAt,
 			DebugCode:   debugCode,
@@ -159,7 +156,7 @@ func (s *Server) appPhoneCreateBinding(ctx *gin.Context) {
 		return
 	}
 
-	record, err := s.resources.Create(appPhoneBindingsResource, adminresource.WriteInput{
+	record, err := s.resources.CreateInternal(appPhoneBindingsResource, adminresource.WriteInput{
 		Code:        "phone-binding-" + phoneHash[:12],
 		Name:        "Phone binding / " + username,
 		Status:      "enabled",
@@ -189,7 +186,6 @@ func (s *Server) appPhoneCreateBinding(ctx *gin.Context) {
 			ID:          record.ID,
 			AppUsername: username,
 			MaskedPhone: maskedPhone,
-			PhoneHash:   phoneHash,
 			BoundAt:     now,
 		},
 	})
@@ -263,7 +259,7 @@ func (s *Server) validAppPhoneVerification(username string, phoneHash string, pu
 func (s *Server) markAppPhoneVerificationUsed(record adminresource.Record, now time.Time) error {
 	values := cloneStringMap(record.Values)
 	values["verifiedAt"] = now.UTC().Format(time.RFC3339)
-	_, err := s.resources.Update(appPhoneVerificationsResource, record.ID, adminresource.WriteInput{
+	_, err := s.resources.UpdateInternal(appPhoneVerificationsResource, record.ID, adminresource.WriteInput{
 		Code:        record.Code,
 		Name:        record.Name,
 		Status:      "verified",

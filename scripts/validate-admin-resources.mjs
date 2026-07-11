@@ -21,6 +21,10 @@ const allowedActionKinds = new Set(["row", "batch", "resource"]);
 const allowedActionTones = new Set(["default", "primary", "danger", "warning"]);
 const allowedActionMethods = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
 const allowedPanelKinds = new Set(["fields", "permissions", "audit", "approval", "files", "custom"]);
+const allowedFieldSensitivities = new Set(["public", "internal", "personal", "sensitive", "secret"]);
+const allowedFieldStorageModes = new Set(["plain", "masked", "hashed", "encrypted"]);
+const allowedFieldProjectionModes = new Set(["full", "masked", "privileged", "omitted"]);
+const recordFieldKeys = new Set(["id", "code", "name", "status", "description", "updatedAt"]);
 const permissionPattern = /^admin:[a-z0-9-]+:[a-z0-9-]+$/;
 const requiredOrgUnitTypeOptions = ["group", "company", "branch", "organization", "department", "team", "store", "custom"];
 const defaultStaticExcludedResources = new Map([
@@ -274,6 +278,32 @@ function validateManifest() {
       }
       if (!allowedFieldTypes.has(field.type)) {
         errors.push(`${prefix} field ${field.key} has unsupported type ${field.type}`);
+      }
+      const sensitivity = field.sensitivity ?? "public";
+      const storageMode = field.storageMode ?? "plain";
+      const responseMode = field.responseMode ?? "full";
+      const exportMode = field.exportMode ?? "full";
+      const source = field.source ?? (recordFieldKeys.has(field.key) ? "record" : "values");
+      if (!allowedFieldSensitivities.has(sensitivity)) {
+        errors.push(`${prefix} field ${field.key} has unsupported sensitivity ${sensitivity}`);
+      }
+      if (!allowedFieldStorageModes.has(storageMode)) {
+        errors.push(`${prefix} field ${field.key} has unsupported storageMode ${storageMode}`);
+      }
+      if (!allowedFieldProjectionModes.has(responseMode)) {
+        errors.push(`${prefix} field ${field.key} has unsupported responseMode ${responseMode}`);
+      }
+      if (!allowedFieldProjectionModes.has(exportMode)) {
+        errors.push(`${prefix} field ${field.key} has unsupported exportMode ${exportMode}`);
+      }
+      if (["sensitive", "secret"].includes(sensitivity) && source === "record") {
+        errors.push(`${prefix} field ${field.key} sensitive or secret values cannot use record storage`);
+      }
+      if (["sensitive", "secret"].includes(sensitivity) && storageMode === "plain") {
+        errors.push(`${prefix} field ${field.key} sensitive or secret values require protected storage`);
+      }
+      if (["hashed", "encrypted"].includes(storageMode) && (responseMode !== "omitted" || exportMode !== "omitted")) {
+        errors.push(`${prefix} field ${field.key} protected storage must be omitted from response and export`);
       }
       if (field.relation) {
         const relation = field.relation;

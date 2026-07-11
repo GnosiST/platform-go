@@ -37,13 +37,11 @@ type AdminResourceRepository interface {
 func NewRepositoryBackedStoreFromCapabilities(repository AdminResourceRepository, manifests []capability.Manifest) (*Store, error) {
 	baseResources := seedResourcesFromCapabilities(manifests)
 	schemas := seedResourceSchemasFromCapabilities(manifests)
-	snapshot, err := repository.Load(context.Background())
-	if err != nil {
-		return nil, err
-	}
 	store := newStore(baseResources, schemas)
 	store.repository = repository
-	store.installSnapshotLocked(snapshot)
+	if err := store.reloadContextLocked(context.Background()); err != nil {
+		return nil, err
+	}
 	return store, nil
 }
 

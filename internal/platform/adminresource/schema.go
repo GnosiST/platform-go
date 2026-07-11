@@ -1,6 +1,10 @@
 package adminresource
 
-import "platform-go/internal/platform/capability"
+import (
+	"strings"
+
+	"platform-go/internal/platform/capability"
+)
 
 type LocalizedText struct {
 	ZH string `json:"zh"`
@@ -47,25 +51,29 @@ type FieldRelation struct {
 }
 
 type FieldDefinition struct {
-	Key         string           `json:"key"`
-	Label       LocalizedText    `json:"label"`
-	Type        string           `json:"type"`
-	Source      string           `json:"source"`
-	Group       string           `json:"group,omitempty"`
-	Help        *LocalizedText   `json:"help,omitempty"`
-	Required    bool             `json:"required,omitempty"`
-	ReadOnly    bool             `json:"readOnly,omitempty"`
-	Searchable  bool             `json:"searchable,omitempty"`
-	Filterable  bool             `json:"filterable,omitempty"`
-	Sortable    bool             `json:"sortable,omitempty"`
-	Localizable bool             `json:"localizable,omitempty"`
-	InTable     bool             `json:"inTable,omitempty"`
-	InForm      bool             `json:"inForm,omitempty"`
-	InDetail    bool             `json:"inDetail,omitempty"`
-	Width       int              `json:"width,omitempty"`
-	Options     []FieldOption    `json:"options,omitempty"`
-	Relation    *FieldRelation   `json:"relation,omitempty"`
-	Validation  *FieldValidation `json:"validation,omitempty"`
+	Key          string           `json:"key"`
+	Label        LocalizedText    `json:"label"`
+	Type         string           `json:"type"`
+	Source       string           `json:"source"`
+	Group        string           `json:"group,omitempty"`
+	Help         *LocalizedText   `json:"help,omitempty"`
+	Required     bool             `json:"required,omitempty"`
+	ReadOnly     bool             `json:"readOnly,omitempty"`
+	Searchable   bool             `json:"searchable,omitempty"`
+	Filterable   bool             `json:"filterable,omitempty"`
+	Sortable     bool             `json:"sortable,omitempty"`
+	Localizable  bool             `json:"localizable,omitempty"`
+	InTable      bool             `json:"inTable,omitempty"`
+	InForm       bool             `json:"inForm,omitempty"`
+	InDetail     bool             `json:"inDetail,omitempty"`
+	Width        int              `json:"width,omitempty"`
+	Options      []FieldOption    `json:"options,omitempty"`
+	Relation     *FieldRelation   `json:"relation,omitempty"`
+	Validation   *FieldValidation `json:"validation,omitempty"`
+	Sensitivity  string           `json:"sensitivity"`
+	StorageMode  string           `json:"storageMode"`
+	ResponseMode string           `json:"responseMode"`
+	ExportMode   string           `json:"exportMode"`
 }
 
 type ActionPermissions struct {
@@ -190,7 +198,7 @@ func seedResourceSchemas() map[string]Schema {
 		option("admin:*", "后台全部权限", "All Admin Permissions"),
 	}
 	return map[string]Schema{
-		"overview":              defaultSchema("overview", text("概览", "Overview"), text("平台运行概览资源。", "Platform runtime overview resource."), "admin:overview"),
+		"overview":              overviewResourceSchema(),
 		"tenants":               tenantResourceSchema(),
 		"users":                 userResourceSchema(),
 		"org-units":             orgUnitResourceSchema(),
@@ -204,20 +212,27 @@ func seedResourceSchemas() map[string]Schema {
 		"dictionary-parameters": dictionaryParameterSchema(),
 		"area-codes":            areaCodeResourceSchema(),
 		"audit-logs":            auditLogResourceSchema(),
-		"monitoring":            defaultSchema("monitoring", text("监控", "Monitoring"), text("运行监控资源。", "Operations monitoring resource."), "admin:monitoring"),
+		"monitoring":            monitoringResourceSchema(),
 		"branding":              brandingResourceSchema(),
 		"settings":              settingsResourceSchema(),
 	}
 }
 
 func seedResourceSchemasFromCapabilities(manifests []capability.Manifest) map[string]Schema {
-	schemas := map[string]Schema{}
 	permissionOptions := permissionOptionsFromCapabilities(manifests)
+	schemas := map[string]Schema{
+		"users":       userResourceSchema(),
+		"roles":       roleResourceSchema(permissionOptions),
+		"menus":       menuResourceSchema(),
+		"permissions": permissionResourceSchema(),
+	}
+	registered := false
 	for _, manifest := range manifests {
 		for _, resource := range manifest.Admin.Resources {
 			if resource.Resource == "" {
 				continue
 			}
+			registered = true
 			if resource.Resource == "roles" {
 				schemas[resource.Resource] = roleResourceSchema(permissionOptions)
 				continue
@@ -225,7 +240,7 @@ func seedResourceSchemasFromCapabilities(manifests []capability.Manifest) map[st
 			schemas[resource.Resource] = schemaFromCapabilityResource(resource)
 		}
 	}
-	if len(schemas) == 0 {
+	if !registered {
 		return seedResourceSchemas()
 	}
 	return schemas
@@ -233,6 +248,16 @@ func seedResourceSchemasFromCapabilities(manifests []capability.Manifest) map[st
 
 func schemaFromCapabilityResource(resource capability.AdminResource) Schema {
 	switch resource.Resource {
+	case "tenants":
+		return tenantResourceSchema()
+	case "users":
+		return userResourceSchema()
+	case "org-units":
+		return orgUnitResourceSchema()
+	case "role-groups":
+		return roleGroupResourceSchema()
+	case "area-codes":
+		return areaCodeResourceSchema()
 	case "api-resources":
 		return apiResourceSchema()
 	case "dictionaries":
@@ -251,6 +276,10 @@ func schemaFromCapabilityResource(resource capability.AdminResource) Schema {
 		return auditLogResourceSchema()
 	case "branding":
 		return brandingResourceSchema()
+	case "monitoring":
+		return monitoringResourceSchema()
+	case "overview":
+		return overviewResourceSchema()
 	}
 	if len(resource.Fields) == 0 {
 		schema := defaultSchema(
@@ -396,9 +425,25 @@ func tenantResourceSchema() Schema {
 		"admin:tenant",
 	)
 	schema.Fields = append(schema.Fields,
+		valueField("isolation", text("隔离模式", "Isolation"), "select", false, true, true, true, true, 140, []FieldOption{
+			option("shared", "共享", "Shared"),
+			option("sandbox", "沙箱", "Sandbox"),
+		}),
 		withRelation(valueField("areaCode", text("地址码", "Area Code"), "select", false, true, true, true, true, 140, nil), areaCodeFieldRelation(enabledRelationFilter())),
 	)
-	schema.SearchFields = []string{"name", "code", "status", "description", "areaCode"}
+	schema.SearchFields = []string{"name", "code", "status", "description", "isolation", "areaCode"}
+	return schema
+}
+
+func overviewResourceSchema() Schema {
+	schema := defaultSchema(
+		"overview",
+		text("概览", "Overview"),
+		text("平台运行概览资源。", "Platform runtime overview resource."),
+		"admin:overview",
+	)
+	schema.Fields = append(schema.Fields, valueField("domain", text("领域", "Domain"), "text", false, true, true, false, true, 160, nil))
+	schema.SearchFields = append(schema.SearchFields, "domain")
 	return schema
 }
 
@@ -481,7 +526,8 @@ func auditLogResourceSchema() Schema {
 		auditLogField("targetCode", text("目标编码", "Target Code"), "text", true, true, 180),
 		auditLogField("targetName", text("目标名称", "Target Name"), "text", true, true, 180),
 		auditLogField("provider", text("提供方", "Provider"), "text", true, true, 130),
-		auditLogField("sessionId", text("会话 ID", "Session ID"), "text", false, false, 180),
+		auditLogField("outcome", text("结果", "Outcome"), "text", true, true, 130),
+		secureFieldDefinition(auditLogField("sessionId", text("会话 ID", "Session ID"), "text", false, false, 180), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 		auditLogField("createdAt", text("发生时间", "Created At"), "datetime", true, true, 180),
 		auditLogField("traceId", text("链路 ID", "Trace ID"), "text", true, false, 180),
 	}
@@ -500,6 +546,7 @@ func auditLogResourceSchema() Schema {
 			"targetCode",
 			"targetName",
 			"provider",
+			"outcome",
 			"traceId",
 		},
 		DefaultSortKey: "createdAt",
@@ -577,6 +624,8 @@ func brandingResourceSchema() Schema {
 	schema.Fields = append(schema.Fields,
 		valueField("productName", text("产品名称", "Product Name"), "text", true, true, true, true, true, 180, nil),
 		valueField("shortName", text("简称", "Short Name"), "text", false, true, true, true, true, 120, nil),
+		valueField("logoUrl", text("Logo URL", "Logo URL"), "text", false, false, false, true, true, 220, nil),
+		valueField("faviconUrl", text("Favicon URL", "Favicon URL"), "text", false, false, false, true, true, 220, nil),
 		valueField("primaryColor", text("主色", "Primary Color"), "color", false, true, true, true, true, 120, nil),
 		valueField("defaultTheme", text("默认主题", "Default Theme"), "select", true, true, true, true, true, 140, []FieldOption{
 			option("tech", "科技风", "Tech"),
@@ -584,8 +633,11 @@ func brandingResourceSchema() Schema {
 			option("black", "炫酷黑", "Cool Black"),
 			option("warm", "温暖黄", "Warm Yellow"),
 		}),
+		valueField("loginTitle", text("登录标题", "Login Title"), "text", false, true, false, true, true, 220, nil),
+		valueField("loginSubtitle", text("登录副标题", "Login Subtitle"), "textarea", false, true, false, true, true, 260, nil),
+		secureFieldDefinition(valueField("supportEmail", text("支持邮箱", "Support Email"), "text", false, false, false, false, false, 180, nil), capability.FieldSensitivityPersonal, capability.FieldStorageEncrypted, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 	)
-	schema.SearchFields = []string{"name", "code", "productName", "shortName", "defaultTheme"}
+	schema.SearchFields = []string{"name", "code", "productName", "shortName", "defaultTheme", "loginTitle"}
 	return schema
 }
 
@@ -613,9 +665,40 @@ func settingsResourceSchema() Schema {
 		}),
 		valueField("loginTitle", text("登录标题", "Login Title"), "text", false, true, false, true, true, 220, nil),
 		valueField("loginSubtitle", text("登录副标题", "Login Subtitle"), "textarea", false, true, false, true, true, 260, nil),
-		valueField("supportEmail", text("支持邮箱", "Support Email"), "text", false, true, false, true, true, 180, nil),
+		secureFieldDefinition(valueField("supportEmail", text("支持邮箱", "Support Email"), "text", false, false, false, false, false, 180, nil), capability.FieldSensitivityPersonal, capability.FieldStorageEncrypted, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 	)
-	schema.SearchFields = []string{"name", "code", "status", "description", "capability", "productName", "shortName", "defaultTheme", "loginTitle", "supportEmail"}
+	schema.SearchFields = []string{"name", "code", "status", "description", "capability", "productName", "shortName", "defaultTheme", "loginTitle"}
+	return schema
+}
+
+func monitoringResourceSchema() Schema {
+	schema := defaultSchema(
+		"monitoring",
+		text("监控", "Monitoring"),
+		text("实例、服务、健康状态和告警摘要。", "Instances, services, health state, and alert summaries."),
+		"admin:monitoring",
+	)
+	schema.Fields = append(schema.Fields,
+		valueField("targetType", text("目标类型", "Target Type"), "select", true, true, true, true, true, 130, []FieldOption{
+			option("instance", "实例", "Instance"),
+			option("service", "服务", "Service"),
+			option("endpoint", "端点", "Endpoint"),
+			option("job", "任务", "Job"),
+			option("queue", "队列", "Queue"),
+			option("custom", "自定义", "Custom"),
+		}),
+		valueField("health", text("健康状态", "Health"), "select", false, true, true, true, true, 120, []FieldOption{
+			option("healthy", "健康", "Healthy"),
+			option("warning", "预警", "Warning"),
+			option("error", "异常", "Error"),
+			option("unknown", "未知", "Unknown"),
+		}),
+		valueField("endpoint", text("端点", "Endpoint"), "text", false, true, true, true, true, 220, nil),
+		valueField("lastSeenAt", text("最近上报", "Last Seen"), "datetime", false, true, true, true, true, 180, nil),
+		valueField("alertCount", text("告警数", "Alerts"), "number", false, true, true, true, true, 110, nil),
+	)
+	schema.SearchFields = []string{"name", "code", "status", "description", "targetType", "health", "endpoint", "lastSeenAt"}
+	schema.DefaultSortKey = "lastSeenAt"
 	return schema
 }
 
@@ -805,22 +888,34 @@ func enabledRelationFilter() FieldRelationFilter {
 
 func field(key string, label LocalizedText, fieldType string, source string, required bool, searchable bool, inTable bool, inForm bool, inDetail bool, width int, options []FieldOption) FieldDefinition {
 	return FieldDefinition{
-		Key:         key,
-		Label:       label,
-		Type:        fieldType,
-		Source:      source,
-		Group:       defaultFormGroupForField(key),
-		Required:    required,
-		Searchable:  searchable,
-		Filterable:  defaultFilterableField(key, fieldType, searchable),
-		Sortable:    defaultSortableField(key, fieldType, inTable),
-		Localizable: defaultLocalizableField(key),
-		InTable:     inTable,
-		InForm:      inForm,
-		InDetail:    inDetail,
-		Width:       width,
-		Options:     options,
+		Key:          key,
+		Label:        label,
+		Type:         fieldType,
+		Source:       source,
+		Group:        defaultFormGroupForField(key),
+		Required:     required,
+		Searchable:   searchable,
+		Filterable:   defaultFilterableField(key, fieldType, searchable),
+		Sortable:     defaultSortableField(key, fieldType, inTable),
+		Localizable:  defaultLocalizableField(key),
+		InTable:      inTable,
+		InForm:       inForm,
+		InDetail:     inDetail,
+		Width:        width,
+		Options:      options,
+		Sensitivity:  capability.FieldSensitivityPublic,
+		StorageMode:  capability.FieldStoragePlain,
+		ResponseMode: capability.FieldProjectionFull,
+		ExportMode:   capability.FieldProjectionFull,
 	}
+}
+
+func secureFieldDefinition(field FieldDefinition, sensitivity string, storageMode string, responseMode string, exportMode string) FieldDefinition {
+	field.Sensitivity = sensitivity
+	field.StorageMode = storageMode
+	field.ResponseMode = responseMode
+	field.ExportMode = exportMode
+	return field
 }
 
 func defaultFilterableField(key string, fieldType string, searchable bool) bool {
@@ -865,28 +960,62 @@ func fieldsFromCapability(fields []capability.AdminField) []FieldDefinition {
 			})
 		}
 		definitions = append(definitions, FieldDefinition{
-			Key:         field.Key,
-			Label:       localizedTextFromCapability(field.Label),
-			Type:        field.Type,
-			Source:      field.Source,
-			Group:       field.Group,
-			Help:        localizedTextPointerFromCapability(field.Help),
-			Required:    field.Required,
-			ReadOnly:    field.ReadOnly,
-			Searchable:  field.Searchable,
-			Filterable:  field.Filterable || defaultFilterableField(field.Key, field.Type, field.Searchable),
-			Sortable:    field.Sortable || defaultSortableField(field.Key, field.Type, field.InTable),
-			Localizable: field.Localizable || defaultLocalizableField(field.Key),
-			InTable:     field.InTable,
-			InForm:      field.InForm,
-			InDetail:    field.InDetail,
-			Width:       field.Width,
-			Options:     options,
-			Relation:    relationFromCapability(field.Relation),
-			Validation:  validationFromCapability(field.Validation),
+			Key:          field.Key,
+			Label:        localizedTextFromCapability(field.Label),
+			Type:         field.Type,
+			Source:       field.Source,
+			Group:        field.Group,
+			Help:         localizedTextPointerFromCapability(field.Help),
+			Required:     field.Required,
+			ReadOnly:     field.ReadOnly,
+			Searchable:   field.Searchable,
+			Filterable:   field.Filterable || defaultFilterableField(field.Key, field.Type, field.Searchable),
+			Sortable:     field.Sortable || defaultSortableField(field.Key, field.Type, field.InTable),
+			Localizable:  field.Localizable || defaultLocalizableField(field.Key),
+			InTable:      field.InTable,
+			InForm:       field.InForm,
+			InDetail:     field.InDetail,
+			Width:        field.Width,
+			Options:      options,
+			Relation:     relationFromCapability(field.Relation),
+			Validation:   validationFromCapability(field.Validation),
+			Sensitivity:  defaultString(field.Sensitivity, capability.FieldSensitivityPublic),
+			StorageMode:  defaultString(field.StorageMode, capability.FieldStoragePlain),
+			ResponseMode: defaultString(field.ResponseMode, capability.FieldProjectionFull),
+			ExportMode:   defaultString(field.ExportMode, capability.FieldProjectionFull),
 		})
 	}
-	return definitions
+	return withLocalizedValueFields(definitions)
+}
+
+func withLocalizedValueFields(fields []FieldDefinition) []FieldDefinition {
+	declared := make(map[string]struct{}, len(fields))
+	for _, field := range fields {
+		declared[field.Key] = struct{}{}
+	}
+	localized := []FieldDefinition{
+		valueField("nameZh", text("中文名称", "Chinese Name"), "text", false, true, false, true, false, 180, nil),
+		valueField("nameEn", text("英文名称", "English Name"), "text", false, true, false, true, false, 180, nil),
+		valueField("descriptionZh", text("中文描述", "Chinese Description"), "textarea", false, true, false, true, false, 240, nil),
+		valueField("descriptionEn", text("英文描述", "English Description"), "textarea", false, true, false, true, false, 240, nil),
+	}
+	for _, field := range fields {
+		if field.Source != "record" || !field.Localizable {
+			continue
+		}
+		prefix := field.Key
+		for _, candidate := range localized {
+			if !strings.HasPrefix(candidate.Key, prefix) {
+				continue
+			}
+			if _, exists := declared[candidate.Key]; exists {
+				continue
+			}
+			fields = append(fields, candidate)
+			declared[candidate.Key] = struct{}{}
+		}
+	}
+	return fields
 }
 
 func relationFromCapability(value *capability.AdminFieldRelation) *FieldRelation {

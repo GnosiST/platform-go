@@ -1458,7 +1458,11 @@
           },
           "type": "number",
           "table": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "title",
@@ -1468,7 +1472,11 @@
           },
           "type": "text",
           "table": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "version",
@@ -1478,7 +1486,11 @@
           },
           "type": "text",
           "table": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -1523,7 +1535,11 @@
             "PUT",
             "PATCH",
             "DELETE"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "path",
@@ -1535,7 +1551,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "permission",
@@ -1547,7 +1567,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -1561,7 +1585,11 @@
           "options": [
             "enabled",
             "disabled"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -1608,7 +1636,11 @@
           },
           "type": "datetime",
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -1620,7 +1652,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "scope",
@@ -1631,7 +1667,11 @@
           "type": "text",
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -1644,7 +1684,11 @@
           "options": [
             "active",
             "revoked"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -1695,7 +1739,11 @@
           "search": true,
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "code",
@@ -1707,7 +1755,11 @@
           "required": true,
           "search": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "createdAt",
@@ -1718,7 +1770,11 @@
           "type": "datetime",
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -1727,7 +1783,11 @@
             "en": "Description"
           },
           "type": "textarea",
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "lastLoginAt",
@@ -1738,7 +1798,11 @@
           "type": "datetime",
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "maskedSubject",
@@ -1751,7 +1815,11 @@
           "search": true,
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "personal",
+          "storageMode": "masked",
+          "responseMode": "masked",
+          "exportMode": "masked"
         },
         {
           "key": "name",
@@ -1763,7 +1831,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "provider",
@@ -1776,7 +1848,11 @@
           "search": true,
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "providerKind",
@@ -1789,7 +1865,11 @@
           "search": true,
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "providerScope",
@@ -1802,7 +1882,11 @@
           "search": true,
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "providerSubjectHash",
@@ -1813,7 +1897,11 @@
           "type": "text",
           "required": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "secret",
+          "storageMode": "hashed",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
         },
         {
           "key": "status",
@@ -1829,7 +1917,11 @@
           "options": [
             "enabled",
             "disabled"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -1896,7 +1988,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -1906,7 +2002,11 @@
           },
           "type": "textarea",
           "form": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "level",
@@ -1925,7 +2025,11 @@
             "district",
             "street",
             "custom"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -1937,7 +2041,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "parentCode",
@@ -1966,7 +2074,11 @@
             "display": "tree",
             "parentField": "parentCode",
             "pathField": "path"
-          }
+          },
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "path",
@@ -1978,7 +2090,11 @@
           "search": true,
           "table": true,
           "form": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "sortOrder",
@@ -1989,7 +2105,11 @@
           "type": "number",
           "table": true,
           "form": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -2003,7 +2123,11 @@
           "options": [
             "enabled",
             "disabled"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -2071,7 +2195,11 @@
           "search": true,
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "actor",
@@ -2083,7 +2211,11 @@
           "search": true,
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "createdAt",
@@ -2095,7 +2227,27 @@
           "search": true,
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "outcome",
+          "label": {
+            "zh": "结果",
+            "en": "Outcome"
+          },
+          "type": "text",
+          "search": true,
+          "table": true,
+          "detail": true,
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "provider",
@@ -2107,7 +2259,11 @@
           "search": true,
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "resource",
@@ -2119,7 +2275,11 @@
           "search": true,
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "sessionId",
@@ -2129,7 +2289,11 @@
           },
           "type": "text",
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
         },
         {
           "key": "targetCode",
@@ -2141,7 +2305,11 @@
           "search": true,
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "targetId",
@@ -2152,7 +2320,11 @@
           "type": "text",
           "search": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "targetName",
@@ -2164,7 +2336,11 @@
           "search": true,
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "traceId",
@@ -2175,7 +2351,11 @@
           "type": "text",
           "search": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -2191,6 +2371,7 @@
         "action",
         "actor",
         "createdAt",
+        "outcome",
         "provider",
         "resource",
         "targetCode",
@@ -2202,6 +2383,7 @@
         "action",
         "actor",
         "createdAt",
+        "outcome",
         "provider",
         "resource",
         "targetCode",
@@ -2238,7 +2420,11 @@
             "white",
             "black",
             "warm"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "primaryColor",
@@ -2248,7 +2434,11 @@
           },
           "type": "color",
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "productName",
@@ -2259,7 +2449,11 @@
           "type": "text",
           "required": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "shortName",
@@ -2268,7 +2462,24 @@
             "en": "Short Name"
           },
           "type": "text",
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "supportEmail",
+          "label": {
+            "zh": "支持邮箱",
+            "en": "Support Email"
+          },
+          "type": "text",
+          "readOnly": true,
+          "sensitivity": "personal",
+          "storageMode": "encrypted",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
         }
       ],
       "search": [
@@ -2309,7 +2520,11 @@
           },
           "type": "text",
           "search": true,
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -2319,7 +2534,11 @@
           },
           "type": "text",
           "search": true,
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "version",
@@ -2328,7 +2547,11 @@
             "en": "Version"
           },
           "type": "text",
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -2367,7 +2590,11 @@
           },
           "type": "text",
           "search": true,
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "records",
@@ -2376,7 +2603,11 @@
             "en": "Records"
           },
           "type": "number",
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "title",
@@ -2386,7 +2617,11 @@
           },
           "type": "text",
           "search": true,
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -2426,7 +2661,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "itemCount",
@@ -2437,7 +2676,11 @@
           "type": "number",
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -2449,7 +2692,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -2463,7 +2710,11 @@
           "options": [
             "enabled",
             "disabled"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -2524,7 +2775,11 @@
           "table": true,
           "form": true,
           "detail": true,
-          "width": 170
+          "width": 170,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -2547,7 +2802,11 @@
           "table": false,
           "form": true,
           "detail": true,
-          "width": 220
+          "width": 220,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "dictionaryCode",
@@ -2571,6 +2830,10 @@
           "form": true,
           "detail": true,
           "width": 160,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full",
           "relation": {
             "resource": "dictionaries",
             "valueField": "code",
@@ -2607,7 +2870,11 @@
           "table": true,
           "form": true,
           "detail": true,
-          "width": 180
+          "width": 180,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "sortOrder",
@@ -2630,7 +2897,11 @@
           "table": true,
           "form": true,
           "detail": true,
-          "width": 110
+          "width": 110,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -2654,6 +2925,10 @@
           "form": true,
           "detail": true,
           "width": 120,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full",
           "options": [
             {
               "value": "enabled",
@@ -2692,7 +2967,11 @@
           "table": true,
           "form": false,
           "detail": true,
-          "width": 180
+          "width": 180,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "value",
@@ -2715,7 +2994,11 @@
           "table": true,
           "form": true,
           "detail": true,
-          "width": 180
+          "width": 180,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "valueType",
@@ -2739,6 +3022,10 @@
           "form": true,
           "detail": true,
           "width": 120,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full",
           "options": [
             {
               "value": "text",
@@ -2835,7 +3122,11 @@
           },
           "type": "datetime",
           "table": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "level",
@@ -2845,7 +3136,11 @@
           },
           "type": "text",
           "search": true,
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "message",
@@ -2856,7 +3151,11 @@
           "type": "textarea",
           "search": true,
           "table": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "traceId",
@@ -2866,7 +3165,11 @@
           },
           "type": "text",
           "search": true,
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -2909,7 +3212,11 @@
           "search": true,
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "createdAt",
@@ -2920,7 +3227,11 @@
           "type": "datetime",
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -2930,7 +3241,11 @@
           },
           "type": "textarea",
           "form": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "mimeType",
@@ -2940,7 +3255,11 @@
           },
           "type": "text",
           "search": true,
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -2953,7 +3272,11 @@
           "search": true,
           "table": true,
           "form": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "publicUrl",
@@ -2963,7 +3286,11 @@
           },
           "type": "text",
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
         },
         {
           "key": "size",
@@ -2972,7 +3299,11 @@
             "en": "Size"
           },
           "type": "number",
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -2986,7 +3317,11 @@
           "options": [
             "enabled",
             "disabled"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "storageDriver",
@@ -2998,7 +3333,11 @@
           "search": true,
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "storageKey",
@@ -3009,7 +3348,11 @@
           "type": "text",
           "search": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
         },
         {
           "key": "storagePath",
@@ -3019,7 +3362,24 @@
           },
           "type": "text",
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
+        },
+        {
+          "key": "tenantId",
+          "label": {
+            "zh": "租户 ID",
+            "en": "Tenant ID"
+          },
+          "type": "text",
+          "readOnly": true,
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
         },
         {
           "key": "updatedAt",
@@ -3030,7 +3390,25 @@
           "type": "datetime",
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "uploadedBy",
+          "label": {
+            "zh": "上传人",
+            "en": "Uploaded By"
+          },
+          "type": "text",
+          "detail": true,
+          "readOnly": true,
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -3092,7 +3470,11 @@
           },
           "type": "datetime",
           "table": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "ip",
@@ -3102,7 +3484,11 @@
           },
           "type": "text",
           "search": true,
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "provider",
@@ -3112,7 +3498,11 @@
           },
           "type": "text",
           "search": true,
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "username",
@@ -3122,7 +3512,11 @@
           },
           "type": "text",
           "search": true,
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -3166,7 +3560,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "external",
@@ -3176,7 +3574,11 @@
           },
           "type": "switch",
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "keepAlive",
@@ -3186,7 +3588,11 @@
           },
           "type": "switch",
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -3198,7 +3604,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "parentCode",
@@ -3208,7 +3618,11 @@
           },
           "type": "text",
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "path",
@@ -3219,7 +3633,11 @@
           "type": "text",
           "required": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "visible",
@@ -3229,7 +3647,11 @@
           },
           "type": "switch",
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -3330,7 +3752,11 @@
           "table": true,
           "form": false,
           "detail": true,
-          "width": 110
+          "width": 110,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "code",
@@ -3353,7 +3779,11 @@
           "table": true,
           "form": true,
           "detail": true,
-          "width": 170
+          "width": 170,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -3376,7 +3806,11 @@
           "table": false,
           "form": true,
           "detail": true,
-          "width": 220
+          "width": 220,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "endpoint",
@@ -3399,7 +3833,11 @@
           "table": true,
           "form": true,
           "detail": true,
-          "width": 220
+          "width": 220,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "health",
@@ -3423,6 +3861,10 @@
           "form": false,
           "detail": true,
           "width": 120,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full",
           "options": [
             {
               "value": "healthy",
@@ -3475,7 +3917,11 @@
           "table": true,
           "form": false,
           "detail": true,
-          "width": 180
+          "width": 180,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -3498,7 +3944,11 @@
           "table": true,
           "form": true,
           "detail": true,
-          "width": 180
+          "width": 180,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -3522,6 +3972,10 @@
           "form": true,
           "detail": true,
           "width": 120,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full",
           "options": [
             {
               "value": "enabled",
@@ -3561,6 +4015,10 @@
           "form": true,
           "detail": true,
           "width": 130,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full",
           "options": [
             {
               "value": "instance",
@@ -3627,7 +4085,11 @@
           "table": true,
           "form": false,
           "detail": true,
-          "width": 180
+          "width": 180,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -3715,7 +4177,11 @@
             "display": "tree",
             "parentField": "parentCode",
             "pathField": "path"
-          }
+          },
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "code",
@@ -3727,7 +4193,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -3737,7 +4207,11 @@
           },
           "type": "textarea",
           "form": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -3749,7 +4223,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "parentCode",
@@ -3776,7 +4254,11 @@
             "sortOrder": "asc",
             "display": "tree",
             "parentField": "parentCode"
-          }
+          },
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "sortOrder",
@@ -3787,7 +4269,11 @@
           "type": "number",
           "table": true,
           "form": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -3801,7 +4287,11 @@
           "options": [
             "enabled",
             "disabled"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "tenantCode",
@@ -3828,7 +4318,11 @@
             "sortField": "name",
             "sortOrder": "asc"
           },
-          "required": true
+          "required": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "type",
@@ -3850,7 +4344,11 @@
             "team",
             "store",
             "custom"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -3921,7 +4419,11 @@
           },
           "type": "text",
           "table": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "value",
@@ -3931,7 +4433,11 @@
           },
           "type": "text",
           "table": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [],
@@ -3961,7 +4467,11 @@
           "type": "text",
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "key",
@@ -3973,7 +4483,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -3987,7 +4501,11 @@
           "options": [
             "enabled",
             "disabled"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "value",
@@ -3998,7 +4516,11 @@
           "type": "text",
           "required": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -4046,7 +4568,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -4056,7 +4582,11 @@
           },
           "type": "textarea",
           "form": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "module",
@@ -4067,7 +4597,11 @@
           "type": "text",
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -4079,7 +4613,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -4128,7 +4666,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -4138,7 +4680,11 @@
           },
           "type": "textarea",
           "form": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -4150,7 +4696,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "parentCode",
@@ -4178,7 +4728,11 @@
             "sortOrder": "asc",
             "display": "tree",
             "parentField": "parentCode"
-          }
+          },
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "sortOrder",
@@ -4189,7 +4743,11 @@
           "type": "number",
           "table": true,
           "form": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -4203,7 +4761,11 @@
           "options": [
             "enabled",
             "disabled"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -4261,7 +4823,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "dataScope",
@@ -4284,7 +4850,11 @@
             "current_and_children_areas",
             "custom_areas",
             "self"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "dataScopeAreaCodes",
@@ -4313,7 +4883,11 @@
             "display": "tree",
             "parentField": "parentCode",
             "pathField": "path"
-          }
+          },
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "dataScopeOrgCodes",
@@ -4341,7 +4915,11 @@
             "sortOrder": "asc",
             "display": "tree",
             "parentField": "parentCode"
-          }
+          },
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "denyPermissions",
@@ -4367,7 +4945,11 @@
             ],
             "sortField": "name",
             "sortOrder": "asc"
-          }
+          },
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "groupCode",
@@ -4395,7 +4977,11 @@
             "sortOrder": "asc",
             "display": "tree",
             "parentField": "parentCode"
-          }
+          },
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -4407,7 +4993,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "permissions",
@@ -4432,7 +5022,11 @@
             ],
             "sortField": "name",
             "sortOrder": "asc"
-          }
+          },
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -4446,7 +5040,11 @@
           "options": [
             "enabled",
             "disabled"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -4511,7 +5109,11 @@
             "en": "Expires At"
           },
           "type": "datetime",
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -4524,7 +5126,11 @@
           "options": [
             "active",
             "revoked"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "tokenType",
@@ -4534,7 +5140,11 @@
           },
           "type": "text",
           "search": true,
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "username",
@@ -4544,7 +5154,11 @@
           },
           "type": "text",
           "search": true,
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -4586,7 +5200,11 @@
           },
           "type": "text",
           "search": true,
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "key",
@@ -4596,7 +5214,11 @@
           },
           "type": "text",
           "search": true,
-          "table": true
+          "table": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "updatedAt",
@@ -4606,7 +5228,11 @@
           },
           "type": "datetime",
           "table": true,
-          "detail": true
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "value",
@@ -4616,7 +5242,11 @@
           },
           "type": "text",
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -4677,7 +5307,11 @@
             "display": "tree",
             "parentField": "parentCode",
             "pathField": "path"
-          }
+          },
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "code",
@@ -4689,7 +5323,31 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "isolation",
+          "label": {
+            "zh": "隔离模式",
+            "en": "Isolation"
+          },
+          "type": "select",
+          "search": true,
+          "table": true,
+          "form": true,
+          "detail": true,
+          "options": [
+            "shared",
+            "sandbox"
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -4701,7 +5359,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -4715,7 +5377,11 @@
           "options": [
             "enabled",
             "disabled"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "updatedAt",
@@ -4726,7 +5392,11 @@
           "type": "datetime",
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -4738,6 +5408,7 @@
       "filter": [
         "areaCode",
         "code",
+        "isolation",
         "name",
         "status",
         "updatedAt"
@@ -4745,6 +5416,7 @@
       "sort": [
         "areaCode",
         "code",
+        "isolation",
         "name",
         "status",
         "updatedAt"
@@ -4798,7 +5470,11 @@
             "display": "tree",
             "parentField": "parentCode",
             "pathField": "path"
-          }
+          },
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "code",
@@ -4810,7 +5486,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -4822,7 +5502,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "orgUnitCode",
@@ -4850,7 +5534,11 @@
             "sortOrder": "asc",
             "display": "tree",
             "parentField": "parentCode"
-          }
+          },
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "roles",
@@ -4877,7 +5565,11 @@
             ],
             "sortField": "name",
             "sortOrder": "asc"
-          }
+          },
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -4891,7 +5583,11 @@
           "options": [
             "enabled",
             "disabled"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "tenantCode",
@@ -4918,7 +5614,11 @@
             "sortField": "name",
             "sortOrder": "asc"
           },
-          "required": true
+          "required": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "updatedAt",
@@ -4929,7 +5629,11 @@
           "type": "datetime",
           "table": true,
           "detail": true,
-          "readOnly": true
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -4996,7 +5700,11 @@
           "type": "text",
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "releasedAt",
@@ -5006,7 +5714,11 @@
           },
           "type": "datetime",
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -5021,7 +5733,11 @@
             "draft",
             "released",
             "disabled"
-          ]
+          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "version",
@@ -5033,7 +5749,11 @@
           "required": true,
           "search": true,
           "table": true,
-          "form": true
+          "form": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "search": [
@@ -5159,7 +5879,11 @@
             },
             "type": "number",
             "table": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "title",
@@ -5169,7 +5893,11 @@
             },
             "type": "text",
             "table": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "version",
@@ -5179,7 +5907,11 @@
             },
             "type": "text",
             "table": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -5291,7 +6023,11 @@
               "PUT",
               "PATCH",
               "DELETE"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "path",
@@ -5303,7 +6039,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "permission",
@@ -5315,7 +6055,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "status",
@@ -5329,7 +6073,11 @@
             "options": [
               "enabled",
               "disabled"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -5436,7 +6184,11 @@
             },
             "type": "datetime",
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "name",
@@ -5448,7 +6200,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "scope",
@@ -5459,7 +6215,11 @@
             "type": "text",
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "status",
@@ -5472,7 +6232,11 @@
             "options": [
               "active",
               "revoked"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -5592,7 +6356,11 @@
             "search": true,
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "code",
@@ -5604,7 +6372,11 @@
             "required": true,
             "search": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "createdAt",
@@ -5615,7 +6387,11 @@
             "type": "datetime",
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "description",
@@ -5624,7 +6400,11 @@
               "en": "Description"
             },
             "type": "textarea",
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "lastLoginAt",
@@ -5635,7 +6415,11 @@
             "type": "datetime",
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "maskedSubject",
@@ -5648,7 +6432,11 @@
             "search": true,
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "personal",
+            "storageMode": "masked",
+            "responseMode": "masked",
+            "exportMode": "masked"
           },
           {
             "key": "name",
@@ -5660,7 +6448,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "provider",
@@ -5673,7 +6465,11 @@
             "search": true,
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "providerKind",
@@ -5686,7 +6482,11 @@
             "search": true,
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "providerScope",
@@ -5699,7 +6499,11 @@
             "search": true,
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "providerSubjectHash",
@@ -5710,7 +6514,11 @@
             "type": "text",
             "required": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "secret",
+            "storageMode": "hashed",
+            "responseMode": "omitted",
+            "exportMode": "omitted"
           },
           {
             "key": "status",
@@ -5726,7 +6534,11 @@
             "options": [
               "enabled",
               "disabled"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -5861,7 +6673,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "description",
@@ -5871,7 +6687,11 @@
             },
             "type": "textarea",
             "form": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "level",
@@ -5890,7 +6710,11 @@
               "district",
               "street",
               "custom"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "name",
@@ -5902,7 +6726,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "parentCode",
@@ -5931,7 +6759,11 @@
               "display": "tree",
               "parentField": "parentCode",
               "pathField": "path"
-            }
+            },
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "path",
@@ -5943,7 +6775,11 @@
             "search": true,
             "table": true,
             "form": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "sortOrder",
@@ -5954,7 +6790,11 @@
             "type": "number",
             "table": true,
             "form": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "status",
@@ -5968,7 +6808,11 @@
             "options": [
               "enabled",
               "disabled"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -6080,7 +6924,11 @@
             "search": true,
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "actor",
@@ -6092,7 +6940,11 @@
             "search": true,
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "createdAt",
@@ -6104,7 +6956,27 @@
             "search": true,
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "outcome",
+            "label": {
+              "zh": "结果",
+              "en": "Outcome"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "provider",
@@ -6116,7 +6988,11 @@
             "search": true,
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "resource",
@@ -6128,7 +7004,11 @@
             "search": true,
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "sessionId",
@@ -6138,7 +7018,11 @@
             },
             "type": "text",
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "omitted",
+            "exportMode": "omitted"
           },
           {
             "key": "targetCode",
@@ -6150,7 +7034,11 @@
             "search": true,
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "targetId",
@@ -6161,7 +7049,11 @@
             "type": "text",
             "search": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "targetName",
@@ -6173,7 +7065,11 @@
             "search": true,
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "traceId",
@@ -6184,7 +7080,11 @@
             "type": "text",
             "search": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -6200,6 +7100,7 @@
           "action",
           "actor",
           "createdAt",
+          "outcome",
           "provider",
           "resource",
           "targetCode",
@@ -6211,6 +7112,7 @@
           "action",
           "actor",
           "createdAt",
+          "outcome",
           "provider",
           "resource",
           "targetCode",
@@ -6299,7 +7201,11 @@
               "white",
               "black",
               "warm"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "primaryColor",
@@ -6309,7 +7215,11 @@
             },
             "type": "color",
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "productName",
@@ -6320,7 +7230,11 @@
             "type": "text",
             "required": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "shortName",
@@ -6329,7 +7243,24 @@
               "en": "Short Name"
             },
             "type": "text",
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "supportEmail",
+            "label": {
+              "zh": "支持邮箱",
+              "en": "Support Email"
+            },
+            "type": "text",
+            "readOnly": true,
+            "sensitivity": "personal",
+            "storageMode": "encrypted",
+            "responseMode": "omitted",
+            "exportMode": "omitted"
           }
         ],
         "search": [
@@ -6413,7 +7344,11 @@
             },
             "type": "text",
             "search": true,
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "name",
@@ -6423,7 +7358,11 @@
             },
             "type": "text",
             "search": true,
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "version",
@@ -6432,7 +7371,11 @@
               "en": "Version"
             },
             "type": "text",
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -6522,7 +7465,11 @@
             },
             "type": "text",
             "search": true,
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "records",
@@ -6531,7 +7478,11 @@
               "en": "Records"
             },
             "type": "number",
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "title",
@@ -6541,7 +7492,11 @@
             },
             "type": "text",
             "search": true,
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -6648,7 +7603,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "itemCount",
@@ -6659,7 +7618,11 @@
             "type": "number",
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "name",
@@ -6671,7 +7634,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "status",
@@ -6685,7 +7652,11 @@
             "options": [
               "enabled",
               "disabled"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -6814,7 +7785,11 @@
             "table": true,
             "form": true,
             "detail": true,
-            "width": 170
+            "width": 170,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "description",
@@ -6837,7 +7812,11 @@
             "table": false,
             "form": true,
             "detail": true,
-            "width": 220
+            "width": 220,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "dictionaryCode",
@@ -6861,6 +7840,10 @@
             "form": true,
             "detail": true,
             "width": 160,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full",
             "relation": {
               "resource": "dictionaries",
               "valueField": "code",
@@ -6897,7 +7880,11 @@
             "table": true,
             "form": true,
             "detail": true,
-            "width": 180
+            "width": 180,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "sortOrder",
@@ -6920,7 +7907,11 @@
             "table": true,
             "form": true,
             "detail": true,
-            "width": 110
+            "width": 110,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "status",
@@ -6944,6 +7935,10 @@
             "form": true,
             "detail": true,
             "width": 120,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full",
             "options": [
               {
                 "value": "enabled",
@@ -6982,7 +7977,11 @@
             "table": true,
             "form": false,
             "detail": true,
-            "width": 180
+            "width": 180,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "value",
@@ -7005,7 +8004,11 @@
             "table": true,
             "form": true,
             "detail": true,
-            "width": 180
+            "width": 180,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "valueType",
@@ -7029,6 +8032,10 @@
             "form": true,
             "detail": true,
             "width": 120,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full",
             "options": [
               {
                 "value": "text",
@@ -7169,7 +8176,11 @@
             },
             "type": "datetime",
             "table": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "level",
@@ -7179,7 +8190,11 @@
             },
             "type": "text",
             "search": true,
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "message",
@@ -7190,7 +8205,11 @@
             "type": "textarea",
             "search": true,
             "table": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "traceId",
@@ -7200,7 +8219,11 @@
             },
             "type": "text",
             "search": true,
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -7314,7 +8337,11 @@
             "search": true,
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "createdAt",
@@ -7325,7 +8352,11 @@
             "type": "datetime",
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "description",
@@ -7335,7 +8366,11 @@
             },
             "type": "textarea",
             "form": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "mimeType",
@@ -7345,7 +8380,11 @@
             },
             "type": "text",
             "search": true,
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "name",
@@ -7358,7 +8397,11 @@
             "search": true,
             "table": true,
             "form": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "publicUrl",
@@ -7368,7 +8411,11 @@
             },
             "type": "text",
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "omitted",
+            "exportMode": "omitted"
           },
           {
             "key": "size",
@@ -7377,7 +8424,11 @@
               "en": "Size"
             },
             "type": "number",
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "status",
@@ -7391,7 +8442,11 @@
             "options": [
               "enabled",
               "disabled"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "storageDriver",
@@ -7403,7 +8458,11 @@
             "search": true,
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "storageKey",
@@ -7414,7 +8473,11 @@
             "type": "text",
             "search": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "omitted",
+            "exportMode": "omitted"
           },
           {
             "key": "storagePath",
@@ -7424,7 +8487,24 @@
             },
             "type": "text",
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "omitted",
+            "exportMode": "omitted"
+          },
+          {
+            "key": "tenantId",
+            "label": {
+              "zh": "租户 ID",
+              "en": "Tenant ID"
+            },
+            "type": "text",
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "omitted",
+            "exportMode": "omitted"
           },
           {
             "key": "updatedAt",
@@ -7435,7 +8515,25 @@
             "type": "datetime",
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "uploadedBy",
+            "label": {
+              "zh": "上传人",
+              "en": "Uploaded By"
+            },
+            "type": "text",
+            "detail": true,
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -7542,7 +8640,11 @@
             },
             "type": "datetime",
             "table": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "ip",
@@ -7552,7 +8654,11 @@
             },
             "type": "text",
             "search": true,
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "provider",
@@ -7562,7 +8668,11 @@
             },
             "type": "text",
             "search": true,
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "username",
@@ -7572,7 +8682,11 @@
             },
             "type": "text",
             "search": true,
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -7718,7 +8832,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "external",
@@ -7728,7 +8846,11 @@
             },
             "type": "switch",
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "keepAlive",
@@ -7738,7 +8860,11 @@
             },
             "type": "switch",
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "name",
@@ -7750,7 +8876,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "parentCode",
@@ -7760,7 +8890,11 @@
             },
             "type": "text",
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "path",
@@ -7771,7 +8905,11 @@
             "type": "text",
             "required": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "visible",
@@ -7781,7 +8919,11 @@
             },
             "type": "switch",
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -7921,7 +9063,11 @@
             "table": true,
             "form": false,
             "detail": true,
-            "width": 110
+            "width": 110,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "code",
@@ -7944,7 +9090,11 @@
             "table": true,
             "form": true,
             "detail": true,
-            "width": 170
+            "width": 170,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "description",
@@ -7967,7 +9117,11 @@
             "table": false,
             "form": true,
             "detail": true,
-            "width": 220
+            "width": 220,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "endpoint",
@@ -7990,7 +9144,11 @@
             "table": true,
             "form": true,
             "detail": true,
-            "width": 220
+            "width": 220,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "health",
@@ -8014,6 +9172,10 @@
             "form": false,
             "detail": true,
             "width": 120,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full",
             "options": [
               {
                 "value": "healthy",
@@ -8066,7 +9228,11 @@
             "table": true,
             "form": false,
             "detail": true,
-            "width": 180
+            "width": 180,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "name",
@@ -8089,7 +9255,11 @@
             "table": true,
             "form": true,
             "detail": true,
-            "width": 180
+            "width": 180,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "status",
@@ -8113,6 +9283,10 @@
             "form": true,
             "detail": true,
             "width": 120,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full",
             "options": [
               {
                 "value": "enabled",
@@ -8152,6 +9326,10 @@
             "form": true,
             "detail": true,
             "width": 130,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full",
             "options": [
               {
                 "value": "instance",
@@ -8218,7 +9396,11 @@
             "table": true,
             "form": false,
             "detail": true,
-            "width": 180
+            "width": 180,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -8374,7 +9556,11 @@
               "display": "tree",
               "parentField": "parentCode",
               "pathField": "path"
-            }
+            },
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "code",
@@ -8386,7 +9572,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "description",
@@ -8396,7 +9586,11 @@
             },
             "type": "textarea",
             "form": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "name",
@@ -8408,7 +9602,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "parentCode",
@@ -8435,7 +9633,11 @@
               "sortOrder": "asc",
               "display": "tree",
               "parentField": "parentCode"
-            }
+            },
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "sortOrder",
@@ -8446,7 +9648,11 @@
             "type": "number",
             "table": true,
             "form": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "status",
@@ -8460,7 +9666,11 @@
             "options": [
               "enabled",
               "disabled"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "tenantCode",
@@ -8487,7 +9697,11 @@
               "sortField": "name",
               "sortOrder": "asc"
             },
-            "required": true
+            "required": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "type",
@@ -8509,7 +9723,11 @@
               "team",
               "store",
               "custom"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -8624,7 +9842,11 @@
             },
             "type": "text",
             "table": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "value",
@@ -8634,7 +9856,11 @@
             },
             "type": "text",
             "table": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [],
@@ -8731,7 +9957,11 @@
             "type": "text",
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "key",
@@ -8743,7 +9973,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "status",
@@ -8757,7 +9991,11 @@
             "options": [
               "enabled",
               "disabled"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "value",
@@ -8768,7 +10006,11 @@
             "type": "text",
             "required": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -8884,7 +10126,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "description",
@@ -8894,7 +10140,11 @@
             },
             "type": "textarea",
             "form": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "module",
@@ -8905,7 +10155,11 @@
             "type": "text",
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "name",
@@ -8917,7 +10171,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -9034,7 +10292,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "description",
@@ -9044,7 +10306,11 @@
             },
             "type": "textarea",
             "form": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "name",
@@ -9056,7 +10322,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "parentCode",
@@ -9084,7 +10354,11 @@
               "sortOrder": "asc",
               "display": "tree",
               "parentField": "parentCode"
-            }
+            },
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "sortOrder",
@@ -9095,7 +10369,11 @@
             "type": "number",
             "table": true,
             "form": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "status",
@@ -9109,7 +10387,11 @@
             "options": [
               "enabled",
               "disabled"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -9235,7 +10517,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "dataScope",
@@ -9258,7 +10544,11 @@
               "current_and_children_areas",
               "custom_areas",
               "self"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "dataScopeAreaCodes",
@@ -9287,7 +10577,11 @@
               "display": "tree",
               "parentField": "parentCode",
               "pathField": "path"
-            }
+            },
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "dataScopeOrgCodes",
@@ -9315,7 +10609,11 @@
               "sortOrder": "asc",
               "display": "tree",
               "parentField": "parentCode"
-            }
+            },
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "denyPermissions",
@@ -9341,7 +10639,11 @@
               ],
               "sortField": "name",
               "sortOrder": "asc"
-            }
+            },
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "groupCode",
@@ -9369,7 +10671,11 @@
               "sortOrder": "asc",
               "display": "tree",
               "parentField": "parentCode"
-            }
+            },
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "name",
@@ -9381,7 +10687,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "permissions",
@@ -9406,7 +10716,11 @@
               ],
               "sortField": "name",
               "sortOrder": "asc"
-            }
+            },
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "status",
@@ -9420,7 +10734,11 @@
             "options": [
               "enabled",
               "disabled"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -9537,7 +10855,11 @@
               "en": "Expires At"
             },
             "type": "datetime",
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "status",
@@ -9550,7 +10872,11 @@
             "options": [
               "active",
               "revoked"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "tokenType",
@@ -9560,7 +10886,11 @@
             },
             "type": "text",
             "search": true,
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "username",
@@ -9570,7 +10900,11 @@
             },
             "type": "text",
             "search": true,
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -9664,7 +10998,11 @@
             },
             "type": "text",
             "search": true,
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "key",
@@ -9674,7 +11012,11 @@
             },
             "type": "text",
             "search": true,
-            "table": true
+            "table": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "updatedAt",
@@ -9684,7 +11026,11 @@
             },
             "type": "datetime",
             "table": true,
-            "detail": true
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "value",
@@ -9694,7 +11040,11 @@
             },
             "type": "text",
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -9822,7 +11172,11 @@
               "display": "tree",
               "parentField": "parentCode",
               "pathField": "path"
-            }
+            },
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "code",
@@ -9834,7 +11188,31 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "isolation",
+            "label": {
+              "zh": "隔离模式",
+              "en": "Isolation"
+            },
+            "type": "select",
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "options": [
+              "shared",
+              "sandbox"
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "name",
@@ -9846,7 +11224,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "status",
@@ -9860,7 +11242,11 @@
             "options": [
               "enabled",
               "disabled"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "updatedAt",
@@ -9871,7 +11257,11 @@
             "type": "datetime",
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -9883,6 +11273,7 @@
         "filter": [
           "areaCode",
           "code",
+          "isolation",
           "name",
           "status",
           "updatedAt"
@@ -9890,6 +11281,7 @@
         "sort": [
           "areaCode",
           "code",
+          "isolation",
           "name",
           "status",
           "updatedAt"
@@ -10011,7 +11403,11 @@
               "display": "tree",
               "parentField": "parentCode",
               "pathField": "path"
-            }
+            },
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "code",
@@ -10023,7 +11419,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "name",
@@ -10035,7 +11435,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "orgUnitCode",
@@ -10063,7 +11467,11 @@
               "sortOrder": "asc",
               "display": "tree",
               "parentField": "parentCode"
-            }
+            },
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "roles",
@@ -10090,7 +11498,11 @@
               ],
               "sortField": "name",
               "sortOrder": "asc"
-            }
+            },
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "status",
@@ -10104,7 +11516,11 @@
             "options": [
               "enabled",
               "disabled"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "tenantCode",
@@ -10131,7 +11547,11 @@
               "sortField": "name",
               "sortOrder": "asc"
             },
-            "required": true
+            "required": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "updatedAt",
@@ -10142,7 +11562,11 @@
             "type": "datetime",
             "table": true,
             "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [
@@ -10269,7 +11693,11 @@
             "type": "text",
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "releasedAt",
@@ -10279,7 +11707,11 @@
             },
             "type": "datetime",
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "status",
@@ -10294,7 +11726,11 @@
               "draft",
               "released",
               "disabled"
-            ]
+            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           },
           {
             "key": "version",
@@ -10306,7 +11742,11 @@
             "required": true,
             "search": true,
             "table": true,
-            "form": true
+            "form": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
           }
         ],
         "search": [

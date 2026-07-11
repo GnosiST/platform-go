@@ -56,7 +56,7 @@ func (s *Store) demoRecordFromDeclaration(resource string, record capability.Dem
 		Description: record.Description,
 		Values:      cloneValues(record.Values),
 	}
-	genericRecord, err := s.recordFromInput(resource, strings.TrimSpace(record.ID), input)
+	genericRecord, err := s.recordFromInputWithOrigin(resource, strings.TrimSpace(record.ID), input, WriteOriginInternal)
 	if err != nil {
 		return Record{}, err
 	}

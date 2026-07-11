@@ -33,7 +33,7 @@ func (s *Store) RequestPolicyReview(reviewID string, requesterCode string) (Poli
 		auditName:   "Policy review requested",
 		apply: func(review *Record, actorCode string, now string) {
 			review.Values["requestedBy"] = strings.TrimSpace(actorCode)
-			review.Values["requestedAt"] = now
+			review.Values["submittedAt"] = now
 		},
 	})
 }

@@ -88,7 +88,7 @@ func TestRequestRejectAndExportPolicyReviewWorkflow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RequestPolicyReview() error = %v", err)
 	}
-	if requested.Review.Values["reviewStatus"] != "pending" || requested.Review.Values["requestedBy"] != "ops" || requested.Review.Values["requestedAt"] == "" {
+	if requested.Review.Values["reviewStatus"] != "pending" || requested.Review.Values["requestedBy"] != "ops" || requested.Review.Values["submittedAt"] == "" {
 		t.Fatalf("requested review values = %+v, want pending request metadata", requested.Review.Values)
 	}
 	if requested.Audit.Values["action"] != "policy-review.request" || requested.Audit.Values["targetCode"] != "PR-1002" {

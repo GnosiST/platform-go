@@ -12,6 +12,9 @@ var adminRelationFilterOperators = []string{"contains", "=", "!=", ">", ">=", "<
 var adminRuntimeSlotRegions = []string{"form.header", "form.section.before", "form.section.after", "form.footer", "field.control", "side.preview"}
 var adminRuntimeSlotDataBindingModes = []string{"record", "formValues", "resource", "none"}
 var adminRuntimeSlotVariants = []string{"compact", "info", "warning", "preview", "inline"}
+var adminFieldSensitivities = []string{FieldSensitivityPublic, FieldSensitivityInternal, FieldSensitivityPersonal, FieldSensitivitySensitive, FieldSensitivitySecret}
+var adminFieldStorageModes = []string{FieldStoragePlain, FieldStorageMasked, FieldStorageHashed, FieldStorageEncrypted}
+var adminFieldProjectionModes = []string{FieldProjectionFull, FieldProjectionMasked, FieldProjectionPrivileged, FieldProjectionOmitted}
 
 func ValidateAdminSurface(manifests []Manifest) error {
 	resources := map[string]ID{}
@@ -543,6 +546,9 @@ func validateAdminField(owner ID, resource string, field AdminField) error {
 	if !hasOptionalLocalizedText(field.Help) {
 		return fmt.Errorf("capability %q admin resource %q field %s help must declare zh/en text", owner, resource, field.Key)
 	}
+	if err := validateAdminFieldPolicy(owner, resource, field); err != nil {
+		return err
+	}
 	for _, option := range field.Options {
 		value := strings.TrimSpace(option.Value)
 		switch {
@@ -556,6 +562,43 @@ func validateAdminField(owner ID, resource string, field AdminField) error {
 		return err
 	}
 	return nil
+}
+
+func validateAdminFieldPolicy(owner ID, resource string, field AdminField) error {
+	sensitivity := defaultAdminFieldPolicy(field.Sensitivity, FieldSensitivityPublic)
+	storageMode := defaultAdminFieldPolicy(field.StorageMode, FieldStoragePlain)
+	responseMode := defaultAdminFieldPolicy(field.ResponseMode, FieldProjectionFull)
+	exportMode := defaultAdminFieldPolicy(field.ExportMode, FieldProjectionFull)
+	if !slices.Contains(adminFieldSensitivities, sensitivity) {
+		return fmt.Errorf("capability %q admin resource %q field %q sensitivity is unsupported", owner, resource, field.Key)
+	}
+	if !slices.Contains(adminFieldStorageModes, storageMode) {
+		return fmt.Errorf("capability %q admin resource %q field %q storageMode is unsupported", owner, resource, field.Key)
+	}
+	if !slices.Contains(adminFieldProjectionModes, responseMode) {
+		return fmt.Errorf("capability %q admin resource %q field %q responseMode is unsupported", owner, resource, field.Key)
+	}
+	if !slices.Contains(adminFieldProjectionModes, exportMode) {
+		return fmt.Errorf("capability %q admin resource %q field %q exportMode is unsupported", owner, resource, field.Key)
+	}
+	if (sensitivity == FieldSensitivitySensitive || sensitivity == FieldSensitivitySecret) && field.Source == "record" {
+		return fmt.Errorf("capability %q admin resource %q field %q sensitive or secret values cannot use record storage", owner, resource, field.Key)
+	}
+	if (sensitivity == FieldSensitivitySensitive || sensitivity == FieldSensitivitySecret) && storageMode == FieldStoragePlain {
+		return fmt.Errorf("capability %q admin resource %q field %q sensitive or secret values require protected storage", owner, resource, field.Key)
+	}
+	if (storageMode == FieldStorageHashed || storageMode == FieldStorageEncrypted) && (responseMode != FieldProjectionOmitted || exportMode != FieldProjectionOmitted) {
+		return fmt.Errorf("capability %q admin resource %q field %q protected storage must be omitted from response and export", owner, resource, field.Key)
+	}
+	return nil
+}
+
+func defaultAdminFieldPolicy(value string, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 func hasLocalizedText(value LocalizedText) bool {

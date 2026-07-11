@@ -225,7 +225,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -266,7 +270,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "scope",
@@ -286,7 +294,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 260,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "tokenPrefix",
@@ -305,7 +317,31 @@
           "inTable": true,
           "inDetail": true,
           "width": 140,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "tokenHash",
+          "label": {
+            "zh": "令牌哈希",
+            "en": "Token Hash"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "width": 260,
+          "validation": {},
+          "sensitivity": "secret",
+          "storageMode": "hashed",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
         },
         {
           "key": "expiresAt",
@@ -324,7 +360,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "createdAt",
@@ -343,7 +383,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "revokedAt",
@@ -361,7 +405,11 @@
           "searchable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "searchFields": [
@@ -417,7 +465,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "code",
@@ -436,7 +488,11 @@
           "searchable": true,
           "inDetail": true,
           "width": 190,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -470,7 +526,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "provider",
@@ -490,7 +550,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 120,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "providerKind",
@@ -510,7 +574,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 120,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "providerScope",
@@ -530,7 +598,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 140,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "maskedSubject",
@@ -550,7 +622,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "personal",
+          "storageMode": "masked",
+          "responseMode": "masked",
+          "exportMode": "masked"
         },
         {
           "key": "providerSubjectHash",
@@ -568,7 +644,11 @@
           "readOnly": true,
           "inDetail": true,
           "width": 260,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "secret",
+          "storageMode": "hashed",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
         },
         {
           "key": "appUsername",
@@ -588,7 +668,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "createdAt",
@@ -607,7 +691,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "lastLoginAt",
@@ -626,7 +714,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -642,7 +734,11 @@
           },
           "inDetail": true,
           "width": 220,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "searchFields": [
@@ -704,7 +800,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 150,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -724,7 +824,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "parentCode",
@@ -760,7 +864,11 @@
             "parentField": "parentCode",
             "pathField": "path"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "level",
@@ -823,7 +931,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "path",
@@ -842,7 +954,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 220,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "sortOrder",
@@ -860,7 +976,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 110,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -895,7 +1015,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -912,7 +1036,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 220,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "updatedAt",
@@ -930,7 +1058,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "searchFields": [
@@ -1014,7 +1146,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "code",
@@ -1032,7 +1168,11 @@
           "searchable": true,
           "inDetail": true,
           "width": 160,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "productName",
@@ -1052,7 +1192,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "shortName",
@@ -1071,7 +1215,53 @@
           "inForm": true,
           "inDetail": true,
           "width": 120,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "logoUrl",
+          "label": {
+            "zh": "Logo URL",
+            "en": "Logo URL"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "faviconUrl",
+          "label": {
+            "zh": "Favicon URL",
+            "en": "Favicon URL"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "primaryColor",
@@ -1090,7 +1280,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 120,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "defaultTheme",
@@ -1140,7 +1334,75 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "loginTitle",
+          "label": {
+            "zh": "登录标题",
+            "en": "Login Title"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "loginSubtitle",
+          "label": {
+            "zh": "登录副标题",
+            "en": "Login Subtitle"
+          },
+          "type": "textarea",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 260,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "supportEmail",
+          "label": {
+            "zh": "支持邮箱",
+            "en": "Support Email"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "personal",
+          "storageMode": "encrypted",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
         },
         {
           "key": "updatedAt",
@@ -1158,7 +1420,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "searchFields": [
@@ -1166,7 +1432,8 @@
         "code",
         "productName",
         "shortName",
-        "defaultTheme"
+        "defaultTheme",
+        "loginTitle"
       ],
       "defaultSortKey": "updatedAt"
     },
@@ -1265,7 +1532,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 160,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -1285,7 +1556,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "itemCount",
@@ -1303,7 +1578,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 110,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -1338,7 +1617,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -1355,7 +1638,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 220,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "updatedAt",
@@ -1373,7 +1660,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "searchFields": [
@@ -1429,7 +1720,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 170,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -1449,7 +1744,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "dictionaryCode",
@@ -1483,7 +1782,11 @@
             "sortField": "name",
             "sortOrder": "asc"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "value",
@@ -1503,7 +1806,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "valueType",
@@ -1552,7 +1859,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "sortOrder",
@@ -1570,7 +1881,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 110,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -1605,7 +1920,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -1622,7 +1941,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 220,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "updatedAt",
@@ -1640,7 +1963,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "searchFields": [
@@ -1724,7 +2051,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 220,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "code",
@@ -1742,7 +2073,11 @@
           "searchable": true,
           "inDetail": true,
           "width": 240,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -1777,7 +2112,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -1795,7 +2134,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 220,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "mimeType",
@@ -1814,7 +2157,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 160,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "size",
@@ -1833,7 +2180,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 120,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "storageDriver",
@@ -1851,7 +2202,11 @@
           "searchable": true,
           "inDetail": true,
           "width": 140,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "storageKey",
@@ -1866,10 +2221,12 @@
             "en": ""
           },
           "readOnly": true,
-          "searchable": true,
-          "inDetail": true,
           "width": 260,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
         },
         {
           "key": "storagePath",
@@ -1886,7 +2243,11 @@
           "readOnly": true,
           "inDetail": true,
           "width": 260,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
         },
         {
           "key": "publicUrl",
@@ -1903,7 +2264,52 @@
           "readOnly": true,
           "inDetail": true,
           "width": 260,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
+        },
+        {
+          "key": "tenantId",
+          "label": {
+            "zh": "租户 ID",
+            "en": "Tenant ID"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
+        },
+        {
+          "key": "uploadedBy",
+          "label": {
+            "zh": "上传人",
+            "en": "Uploaded By"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "createdAt",
@@ -1922,7 +2328,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "updatedAt",
@@ -1940,7 +2350,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "searchFields": [
@@ -2048,7 +2462,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 170,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -2068,7 +2486,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "targetType",
@@ -2132,7 +2554,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "health",
@@ -2181,7 +2607,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "endpoint",
@@ -2200,7 +2630,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 220,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "lastSeenAt",
@@ -2219,7 +2653,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "alertCount",
@@ -2237,7 +2675,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 110,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -2272,7 +2714,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -2289,7 +2735,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 220,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "updatedAt",
@@ -2307,7 +2757,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "searchFields": [
@@ -2367,7 +2821,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 160,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -2387,7 +2845,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "type",
@@ -2465,7 +2927,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "tenantCode",
@@ -2499,7 +2965,11 @@
             "sortField": "name",
             "sortOrder": "asc"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "parentCode",
@@ -2534,7 +3004,11 @@
             "display": "tree",
             "parentField": "parentCode"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "areaCode",
@@ -2570,7 +3044,11 @@
             "parentField": "parentCode",
             "pathField": "path"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "sortOrder",
@@ -2588,7 +3066,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 110,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -2623,7 +3105,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -2640,7 +3126,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 220,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "updatedAt",
@@ -2658,7 +3148,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "searchFields": [
@@ -2743,7 +3237,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -2763,7 +3261,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "value",
@@ -2783,7 +3285,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 220,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "group",
@@ -2802,7 +3308,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 140,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -2837,7 +3347,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -2854,7 +3368,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 220,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "updatedAt",
@@ -2872,7 +3390,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "searchFields": [
@@ -2955,7 +3477,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 160,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -2975,7 +3501,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "parentCode",
@@ -3010,7 +3540,11 @@
             "display": "tree",
             "parentField": "parentCode"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "sortOrder",
@@ -3028,7 +3562,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 110,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -3063,7 +3601,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -3080,7 +3622,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 220,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "searchFields": [
@@ -3137,7 +3683,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 160,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -3157,7 +3707,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "groupCode",
@@ -3192,7 +3746,11 @@
             "display": "tree",
             "parentField": "parentCode"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "dataScope",
@@ -3270,7 +3828,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "dataScopeOrgCodes",
@@ -3305,7 +3867,11 @@
             "display": "tree",
             "parentField": "parentCode"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "dataScopeAreaCodes",
@@ -3341,7 +3907,11 @@
             "parentField": "parentCode",
             "pathField": "path"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "permissions",
@@ -3374,7 +3944,11 @@
             "sortField": "name",
             "sortOrder": "asc"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "denyPermissions",
@@ -3407,7 +3981,11 @@
             "sortField": "name",
             "sortOrder": "asc"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -3442,7 +4020,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "searchFields": [
@@ -3552,7 +4134,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 160,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -3572,7 +4158,50 @@
           "inForm": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "isolation",
+          "label": {
+            "zh": "隔离模式",
+            "en": "Isolation"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 140,
+          "options": [
+            {
+              "value": "shared",
+              "label": {
+                "zh": "共享",
+                "en": "Shared"
+              }
+            },
+            {
+              "value": "sandbox",
+              "label": {
+                "zh": "沙箱",
+                "en": "Sandbox"
+              }
+            }
+          ],
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "areaCode",
@@ -3608,7 +4237,11 @@
             "parentField": "parentCode",
             "pathField": "path"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -3643,7 +4276,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -3660,7 +4297,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 220,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "updatedAt",
@@ -3678,7 +4319,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "searchFields": [
@@ -3686,6 +4331,7 @@
         "code",
         "status",
         "description",
+        "isolation",
         "areaCode"
       ],
       "defaultSortKey": "updatedAt"
@@ -3735,7 +4381,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 160,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "name",
@@ -3755,7 +4405,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 160,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "tenantCode",
@@ -3789,7 +4443,11 @@
             "sortField": "name",
             "sortOrder": "asc"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "orgUnitCode",
@@ -3824,7 +4482,11 @@
             "display": "tree",
             "parentField": "parentCode"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "areaCode",
@@ -3860,7 +4522,11 @@
             "parentField": "parentCode",
             "pathField": "path"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "roles",
@@ -3894,7 +4560,11 @@
             "sortField": "name",
             "sortOrder": "asc"
           },
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "status",
@@ -3929,7 +4599,11 @@
               }
             }
           ],
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "description",
@@ -3946,7 +4620,11 @@
           "inForm": true,
           "inDetail": true,
           "width": 220,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         },
         {
           "key": "updatedAt",
@@ -3964,7 +4642,11 @@
           "inTable": true,
           "inDetail": true,
           "width": 180,
-          "validation": {}
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
         }
       ],
       "searchFields": [

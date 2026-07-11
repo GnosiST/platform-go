@@ -63,6 +63,19 @@ function defaultLocalizableField(field) {
   return Boolean(field.localize || field.localizable || field.key === "name" || field.key === "description");
 }
 
+function normalizedFieldPolicy(field) {
+  return {
+    sensitivity: field.sensitivity ?? "public",
+    storageMode: field.storageMode ?? "plain",
+    responseMode: field.responseMode ?? "full",
+    exportMode: field.exportMode ?? "full",
+  };
+}
+
+function normalizeField(field) {
+  return { ...field, ...normalizedFieldPolicy(field) };
+}
+
 function schemaKeys(resource, listName, predicate) {
   const fields = resource.schema?.fields ?? [];
   const declared = resource.schema?.[listName];
@@ -162,6 +175,7 @@ function capabilityField(field) {
     form: field.inForm === true,
     detail: field.inDetail === true,
     width: field.width,
+    ...normalizedFieldPolicy(field),
     ...(Array.isArray(field.options) && field.options.length > 0 ? { options: field.options } : {}),
     ...(field.relation ? { relation: field.relation } : {}),
     ...(field.validation && Object.keys(field.validation).length > 0 ? { validation: field.validation } : {}),
@@ -259,7 +273,7 @@ function normalizeResource(resource) {
     schema: {
       formGroups: resource.schema?.formGroups ?? [],
       formLayout: normalizeFormLayout(resource.schema?.formLayout, resource.schema?.fields ?? []),
-      fields: [...(resource.schema?.fields ?? [])].sort((a, b) => a.key.localeCompare(b.key)),
+      fields: [...(resource.schema?.fields ?? [])].map(normalizeField).sort((a, b) => a.key.localeCompare(b.key)),
       search: [...(resource.schema?.search ?? [])].sort(),
       filter: schemaKeys(resource, "filter", defaultFilterableField).sort(),
       sort: schemaKeys(resource, "sort", defaultSortableField).sort(),

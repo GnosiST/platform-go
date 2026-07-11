@@ -313,10 +313,10 @@ Audit candidates: -
 
 ### Schema
 
-- Field count: 10
+- Field count: 11
 - Search: `action`, `actor`, `provider`, `resource`, `targetCode`, `targetName`, `traceId`
-- Filter: `action`, `actor`, `createdAt`, `provider`, `resource`, `targetCode`, `targetId`, `targetName`, `traceId`
-- Sort: `action`, `actor`, `createdAt`, `provider`, `resource`, `targetCode`, `targetName`
+- Filter: `action`, `actor`, `createdAt`, `outcome`, `provider`, `resource`, `targetCode`, `targetId`, `targetName`, `traceId`
+- Sort: `action`, `actor`, `createdAt`, `outcome`, `provider`, `resource`, `targetCode`, `targetName`
 - Table: `actor`, `action`, `resource`, `targetCode`, `targetName`, `provider`, `createdAt`
 - Form: -
 - Localized fields: -
@@ -362,7 +362,7 @@ Audit candidates: `branding.update`
 
 ### Schema
 
-- Field count: 4
+- Field count: 5
 - Search: `productName`, `shortName`
 - Filter: `defaultTheme`
 - Sort: `defaultTheme`, `primaryColor`, `productName`
@@ -645,7 +645,7 @@ Audit candidates: `file.create`, `file.delete`, `file.upload`
 
 ### Schema
 
-- Field count: 12
+- Field count: 14
 - Search: `code`, `createdAt`, `mimeType`, `name`, `storageDriver`
 - Filter: `code`, `createdAt`, `mimeType`, `name`, `size`, `status`, `storageDriver`, `storageKey`, `updatedAt`
 - Sort: `code`, `createdAt`, `mimeType`, `name`, `size`, `status`, `storageDriver`, `updatedAt`
@@ -1232,10 +1232,10 @@ Audit candidates: `tenant.create`, `tenant.delete`, `tenant.update`
 
 ### Schema
 
-- Field count: 5
+- Field count: 6
 - Search: `areaCode`, `code`, `name`, `status`
-- Filter: `areaCode`, `code`, `name`, `status`, `updatedAt`
-- Sort: `areaCode`, `code`, `name`, `status`, `updatedAt`
+- Filter: `areaCode`, `code`, `isolation`, `name`, `status`, `updatedAt`
+- Sort: `areaCode`, `code`, `isolation`, `name`, `status`, `updatedAt`
 - Table: `code`, `name`, `areaCode`, `status`, `updatedAt`
 - Form: `code`, `name`, `areaCode`, `status`
 - Localized fields: `name`

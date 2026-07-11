@@ -97,7 +97,7 @@ func (s resourceAppIdentityBindingStore) ResolveAppIdentityBinding(ctx context.C
 		}
 		nextValues := cloneStringMap(values)
 		nextValues["lastLoginAt"] = now.UTC().Format(time.RFC3339)
-		_, err := s.resources.Update(appIdentitiesResource, record.ID, adminresource.WriteInput{
+		_, err := s.resources.UpdateInternal(appIdentitiesResource, record.ID, adminresource.WriteInput{
 			Code:        record.Code,
 			Name:        record.Name,
 			Status:      record.Status,
@@ -123,7 +123,7 @@ func (s resourceAppIdentityBindingStore) ResolveAppIdentityBinding(ctx context.C
 		"createdAt":           now.UTC().Format(time.RFC3339),
 		"lastLoginAt":         now.UTC().Format(time.RFC3339),
 	}
-	_, err = s.resources.Create(appIdentitiesResource, adminresource.WriteInput{
+	_, err = s.resources.CreateInternal(appIdentitiesResource, adminresource.WriteInput{
 		Code:        input.Provider.ID + "-" + subjectHash[:12],
 		Name:        input.Provider.ID + " / " + username,
 		Status:      "enabled",

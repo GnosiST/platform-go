@@ -68,10 +68,14 @@ func (s *Store) persistLocked() error {
 }
 
 func (s *Store) persistContextLocked(ctx context.Context) error {
+	snapshot := s.snapshotLocked()
+	if err := s.validateSnapshot(snapshot); err != nil {
+		return err
+	}
 	if s.repository == nil {
 		return nil
 	}
-	committed, err := s.repository.Save(ctx, s.snapshotLocked())
+	committed, err := s.repository.Save(ctx, snapshot)
 	if err != nil {
 		return err
 	}
@@ -112,6 +116,17 @@ func (s *Store) reloadContextLocked(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	snapshot, changed, err := s.scrubSnapshot(snapshot)
+	if err != nil {
+		return err
+	}
+	if changed {
+		committed, saveErr := s.repository.Save(ctx, snapshot)
+		if saveErr != nil {
+			return saveErr
+		}
+		snapshot.Revision = committed
+	}
 	s.installSnapshotLocked(snapshot)
 	return nil
 }
@@ -134,6 +149,14 @@ func (s *Store) List(resource string) ([]Record, error) {
 }
 
 func (s *Store) Create(resource string, input WriteInput) (Record, error) {
+	return s.create(resource, input, WriteOriginExternal)
+}
+
+func (s *Store) CreateInternal(resource string, input WriteInput) (Record, error) {
+	return s.create(resource, input, WriteOriginInternal)
+}
+
+func (s *Store) create(resource string, input WriteInput, origin WriteOrigin) (Record, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	previous, err := s.prepareMutationLocked()
@@ -144,7 +167,7 @@ func (s *Store) Create(resource string, input WriteInput) (Record, error) {
 	if !ok {
 		return Record{}, ErrUnknownResource
 	}
-	record, err := s.recordFromInput(resource, "", input)
+	record, err := s.recordFromInputWithOrigin(resource, "", input, origin)
 	if err != nil {
 		return Record{}, err
 	}
@@ -159,6 +182,14 @@ func (s *Store) Create(resource string, input WriteInput) (Record, error) {
 }
 
 func (s *Store) Update(resource string, id string, input WriteInput) (Record, error) {
+	return s.update(resource, id, input, WriteOriginExternal)
+}
+
+func (s *Store) UpdateInternal(resource string, id string, input WriteInput) (Record, error) {
+	return s.update(resource, id, input, WriteOriginInternal)
+}
+
+func (s *Store) update(resource string, id string, input WriteInput, origin WriteOrigin) (Record, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	previous, err := s.prepareMutationLocked()
@@ -178,7 +209,7 @@ func (s *Store) Update(resource string, id string, input WriteInput) (Record, er
 	if strings.TrimSpace(input.Code) == "" {
 		input.Code = items[index].Code
 	}
-	record, err := s.recordFromInput(resource, id, input)
+	record, err := s.recordFromInputWithOrigin(resource, id, input, origin)
 	if err != nil {
 		return Record{}, err
 	}
@@ -218,11 +249,18 @@ func (s *Store) Delete(resource string, id string) error {
 }
 
 func (s *Store) recordFromInput(resource string, id string, input WriteInput) (Record, error) {
+	return s.recordFromInputWithOrigin(resource, id, input, WriteOriginExternal)
+}
+
+func (s *Store) recordFromInputWithOrigin(resource string, id string, input WriteInput, origin WriteOrigin) (Record, error) {
 	name := strings.TrimSpace(input.Name)
 	if name == "" {
 		return Record{}, ValidationError{Field: "name"}
 	}
 	if err := s.validateRequiredFields(resource, input); err != nil {
+		return Record{}, err
+	}
+	if err := s.validateWriteValues(resource, input.Values, origin); err != nil {
 		return Record{}, err
 	}
 	status := strings.TrimSpace(input.Status)
@@ -314,8 +352,8 @@ func seedResources() map[string][]Record {
 			seedLocalized("tenant-demo", "demo", "演示租户", "Demo Tenant", "enabled", "用于演示和测试数据的可复用租户。", "Reusable tenant for demos and fixtures.", updatedAt, map[string]string{"isolation": "sandbox"}),
 		},
 		"users": {
-			seedLocalized("user-admin", "admin", "平台管理员", "Platform Admin", "enabled", "默认管理员账号。", "Default administrator account.", updatedAt, map[string]string{"role": "super-admin", "roles": "super-admin", "tenantCode": "platform", "orgUnitCode": "platform-hq", "areaCode": "110000"}),
-			seedLocalized("user-ops", "ops", "运维用户", "Operations User", "enabled", "用于监控任务的运维账号。", "Operations account for monitoring tasks.", updatedAt, map[string]string{"role": "operator", "roles": "operator", "tenantCode": "platform", "orgUnitCode": "platform-ops", "areaCode": "110000"}),
+			seedLocalized("user-admin", "admin", "平台管理员", "Platform Admin", "enabled", "默认管理员账号。", "Default administrator account.", updatedAt, map[string]string{"roles": "super-admin", "tenantCode": "platform", "orgUnitCode": "platform-hq", "areaCode": "110000"}),
+			seedLocalized("user-ops", "ops", "运维用户", "Operations User", "enabled", "用于监控任务的运维账号。", "Operations account for monitoring tasks.", updatedAt, map[string]string{"roles": "operator", "tenantCode": "platform", "orgUnitCode": "platform-ops", "areaCode": "110000"}),
 		},
 		"roles": {
 			seedLocalized("role-super-admin", "super-admin", "超级管理员", "Super Admin", "enabled", "拥有完整平台管理权限的角色。", "Full platform administration role.", updatedAt, map[string]string{"groupCode": "system-admin", "dataScope": "all", "permissions": "*"}),
@@ -363,13 +401,13 @@ func seedResources() map[string][]Record {
 			seedLocalized("parameter-brand-name", "brand.name", "品牌名称", "Brand Name", "enabled", "展示用产品名称。", "Displayed product name.", updatedAt, map[string]string{"value": "Platform Go", "group": "branding"}),
 		},
 		"branding": {
-			seedLocalized("branding-platform", "branding", "品牌配置", "Branding Settings", "enabled", "平台品牌、主题和登录展示配置。", "Platform branding, theme, and login presentation configuration.", updatedAt, brandingSeedValues()),
+			seedLocalized("branding-platform", "branding", "品牌配置", "Branding Settings", "enabled", "平台品牌、主题和登录展示配置。", "Platform branding, theme, and login presentation configuration.", updatedAt, brandingResourceSeedValues()),
 		},
 		"audit-logs": {
-			seedLocalized("audit-bootstrap", "platform.bootstrap", "平台启动", "Platform Bootstrap", "recorded", "初始平台启动事件。", "Initial platform bootstrap event.", updatedAt, map[string]string{"actor": "system"}),
+			seed("audit-bootstrap", "platform.bootstrap", "Platform Bootstrap", "recorded", "Initial platform bootstrap event.", updatedAt, map[string]string{"actor": "system", "action": "platform.bootstrap", "resource": "platform", "createdAt": updatedAt}),
 		},
 		"monitoring": {
-			seedLocalized("monitor-api", "platform-api", "平台 API", "Platform API", "healthy", "核心 API 进程健康状态。", "Core API process health.", updatedAt, map[string]string{"target": "http"}),
+			seedLocalized("monitor-api", "platform-api", "平台 API", "Platform API", "healthy", "核心 API 进程健康状态。", "Core API process health.", updatedAt, map[string]string{"targetType": "service"}),
 		},
 		"settings": {
 			seedLocalized("setting-branding", "branding", "品牌设置", "Branding Settings", "enabled", "产品名称、Logo 和主题设置。", "Product name, logo and theme settings.", updatedAt, brandingSeedValues()),
@@ -407,8 +445,8 @@ func seedPrincipalResources() map[string][]Record {
 	updatedAt := "2026-07-04T00:00:00Z"
 	return map[string][]Record{
 		"users": {
-			seedLocalized("user-admin", "admin", "平台管理员", "Platform Admin", "enabled", "默认管理员账号。", "Default administrator account.", updatedAt, map[string]string{"role": "super-admin", "roles": "super-admin", "tenantCode": "platform", "orgUnitCode": "platform-hq", "areaCode": "110000"}),
-			seedLocalized("user-ops", "ops", "运维用户", "Operations User", "enabled", "用于监控任务的运维账号。", "Operations account for monitoring tasks.", updatedAt, map[string]string{"role": "operator", "roles": "operator", "tenantCode": "platform", "orgUnitCode": "platform-ops", "areaCode": "110000"}),
+			seedLocalized("user-admin", "admin", "平台管理员", "Platform Admin", "enabled", "默认管理员账号。", "Default administrator account.", updatedAt, map[string]string{"roles": "super-admin", "tenantCode": "platform", "orgUnitCode": "platform-hq", "areaCode": "110000"}),
+			seedLocalized("user-ops", "ops", "运维用户", "Operations User", "enabled", "用于监控任务的运维账号。", "Operations account for monitoring tasks.", updatedAt, map[string]string{"roles": "operator", "tenantCode": "platform", "orgUnitCode": "platform-ops", "areaCode": "110000"}),
 		},
 		"roles": {
 			seedLocalized("role-super-admin", "super-admin", "超级管理员", "Super Admin", "enabled", "拥有完整平台管理权限的角色。", "Full platform administration role.", updatedAt, map[string]string{"groupCode": "system-admin", "dataScope": "all", "permissions": "*"}),
@@ -468,15 +506,15 @@ func seedRowsForResource(resource string, updatedAt string) []Record {
 		}
 	case "branding":
 		return []Record{
-			seedLocalized("branding-platform", "branding", "品牌配置", "Branding Settings", "enabled", "平台品牌、主题和登录展示配置。", "Platform branding, theme, and login presentation configuration.", updatedAt, brandingSeedValues()),
+			seedLocalized("branding-platform", "branding", "品牌配置", "Branding Settings", "enabled", "平台品牌、主题和登录展示配置。", "Platform branding, theme, and login presentation configuration.", updatedAt, brandingResourceSeedValues()),
 		}
 	case "audit-logs":
 		return []Record{
-			seedLocalized("audit-bootstrap", "platform.bootstrap", "平台启动", "Platform Bootstrap", "recorded", "初始平台启动事件。", "Initial platform bootstrap event.", updatedAt, map[string]string{"actor": "system"}),
+			seed("audit-bootstrap", "platform.bootstrap", "Platform Bootstrap", "recorded", "Initial platform bootstrap event.", updatedAt, map[string]string{"actor": "system", "action": "platform.bootstrap", "resource": "platform", "createdAt": updatedAt}),
 		}
 	case "monitoring":
 		return []Record{
-			seedLocalized("monitor-api", "platform-api", "平台 API", "Platform API", "healthy", "核心 API 进程健康状态。", "Core API process health.", updatedAt, map[string]string{"target": "http"}),
+			seedLocalized("monitor-api", "platform-api", "平台 API", "Platform API", "healthy", "核心 API 进程健康状态。", "Core API process health.", updatedAt, map[string]string{"targetType": "service"}),
 		}
 	case "settings":
 		return []Record{
@@ -500,8 +538,13 @@ func brandingSeedValues() map[string]string {
 		"defaultTheme":  "tech",
 		"loginTitle":    "Platform Go",
 		"loginSubtitle": "Reusable operations platform foundation.",
-		"supportEmail":  "",
 	}
+}
+
+func brandingResourceSeedValues() map[string]string {
+	values := brandingSeedValues()
+	delete(values, "capability")
+	return values
 }
 
 func seed(id string, code string, name string, status string, description string, updatedAt string, values map[string]string) Record {

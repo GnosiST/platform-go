@@ -2246,6 +2246,10 @@ function normalizeResourceSchema(schema: AdminResourceSchema): AdminResourceSche
   const fields = uniqueResourceFields(schema.fields).map((field) => ({
     ...field,
     group: field.group ?? defaultFormGroupForField(field.key),
+    sensitivity: field.sensitivity ?? "public",
+    storageMode: field.storageMode ?? "plain",
+    responseMode: field.responseMode ?? "full",
+    exportMode: field.exportMode ?? "full",
   }));
   return {
     ...schema,
@@ -2420,6 +2424,10 @@ function fallbackField(
     inDetail,
     width,
     options,
+    sensitivity: "public",
+    storageMode: "plain",
+    responseMode: "full",
+    exportMode: "full",
   };
 }
 

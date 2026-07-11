@@ -165,9 +165,9 @@ func (s *Store) ProvisionAdminIdentityBinding(ctx context.Context, input AdminId
 			adminIdentityBindingCreatedAtField:   now.Format(time.RFC3339),
 			adminIdentityBindingLastLoginAtField: now.Format(time.RFC3339),
 		}
-		record, err := s.recordFromInput(adminIdentitiesResource, "", WriteInput{
+		record, err := s.recordFromInputWithOrigin(adminIdentitiesResource, "", WriteInput{
 			Code: key.Provider + "-" + key.ProviderSubjectHash[:12], Name: adminIdentityBindingManagedName, Status: adminIdentityBindingEnabledStatus, Values: values,
-		})
+		}, WriteOriginInternal)
 		if err != nil {
 			return AdminIdentityBindingProvisionResult{}, err
 		}
@@ -247,9 +247,9 @@ func (s *Store) EnsureAdminIdentityBindingAudit(ctx context.Context, input Admin
 		} else if ok {
 			return cloneRecord(existing), nil
 		}
-		record, err := s.recordFromInput("audit-logs", "", WriteInput{
+		record, err := s.recordFromInputWithOrigin("audit-logs", "", WriteInput{
 			Code: code, Name: name, Status: "recorded", Description: "Admin OIDC identity binding provisioning event.", Values: values,
-		})
+		}, WriteOriginInternal)
 		if err != nil {
 			return Record{}, err
 		}

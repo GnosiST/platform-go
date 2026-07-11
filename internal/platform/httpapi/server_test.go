@@ -445,7 +445,7 @@ func TestBrandingEndpointReflectsAdminSettingsUpdate(t *testing.T) {
 		t.Fatalf("branding cache after prime ok = %v err = %v, want cached config", ok, err)
 	}
 
-	updateBody := bytes.NewBufferString(`{"name":"Branding Settings","status":"enabled","description":"Updated branding","values":{"capability":"branding","productName":"Acme Ops","shortName":"Acme","logoUrl":"https://cdn.example.test/logo.png","faviconUrl":"https://cdn.example.test/favicon.ico","primaryColor":"#1677ff","defaultTheme":"white","loginTitle":"Welcome to Acme","loginSubtitle":"Operate with confidence","supportEmail":"support@example.test"}}`)
+	updateBody := bytes.NewBufferString(`{"name":"Branding Settings","status":"enabled","description":"Updated branding","values":{"capability":"branding","productName":"Acme Ops","shortName":"Acme","logoUrl":"https://cdn.example.test/logo.png","faviconUrl":"https://cdn.example.test/favicon.ico","primaryColor":"#1677ff","defaultTheme":"white","loginTitle":"Welcome to Acme","loginSubtitle":"Operate with confidence"}}`)
 	updateRecorder := httptest.NewRecorder()
 	updateRequest := httptest.NewRequest(http.MethodPut, "/api/admin/resources/settings/setting-branding", updateBody)
 	updateRequest.Header.Set("Content-Type", "application/json")
@@ -476,8 +476,8 @@ func TestBrandingEndpointReflectsAdminSettingsUpdate(t *testing.T) {
 	if payload.Data.ProductName != "Acme Ops" || payload.Data.ShortName != "Acme" || payload.Data.DefaultTheme != "white" {
 		t.Fatalf("branding after update mismatch: %+v", payload.Data)
 	}
-	if payload.Data.SupportEmail != "support@example.test" {
-		t.Fatalf("SupportEmail = %q, want support@example.test", payload.Data.SupportEmail)
+	if payload.Data.SupportEmail != "" {
+		t.Fatalf("SupportEmail = %q, want disabled until encrypted storage is available", payload.Data.SupportEmail)
 	}
 }
 
@@ -1118,8 +1118,8 @@ func TestAdminOIDCAuthLoginUsesAtomicBindingAndExistingAdminSessionAuditPath(t *
 			loginAudit = &auditRecords[index]
 		}
 	}
-	if loginAudit == nil || loginAudit.Values["actor"] != "ops" || loginAudit.Values["provider"] != "oidc" || loginAudit.Values["sessionId"] == "" {
-		t.Fatalf("admin oidc audit = %+v, want existing redacted auth.login shape", loginAudit)
+	if loginAudit == nil || loginAudit.Values["actor"] != "ops" || loginAudit.Values["provider"] != "oidc" || loginAudit.Values["sessionId"] != "" {
+		t.Fatalf("admin oidc audit = %+v, want credential-free auth.login shape", loginAudit)
 	}
 	serializedAudit, err := json.Marshal(loginAudit)
 	if err != nil {
@@ -1917,8 +1917,8 @@ func TestAppPhoneVerificationAndBindingUseMaskedRecords(t *testing.T) {
 	if err := json.Unmarshal(verificationRecorder.Body.Bytes(), &verification); err != nil {
 		t.Fatalf("decode app phone verification: %v body = %s", err, verificationRecorder.Body.String())
 	}
-	if verification.Data.DebugCode == "" || verification.Data.PhoneHash == "" || verification.Data.MaskedPhone != "138****8000" || verification.Data.Purpose != "bind" || verification.Data.ExpiresAt.IsZero() {
-		t.Fatalf("phone verification payload = %+v, want masked phone, hash, bind purpose, debug code and expiry", verification.Data)
+	if verification.Data.DebugCode == "" || verification.Data.PhoneHash != "" || verification.Data.MaskedPhone != "138****8000" || verification.Data.Purpose != "bind" || verification.Data.ExpiresAt.IsZero() {
+		t.Fatalf("phone verification payload = %+v, want masked phone, bind purpose, debug code and expiry without hash", verification.Data)
 	}
 
 	bindingRecorder := httptest.NewRecorder()
@@ -1937,7 +1937,7 @@ func TestAppPhoneVerificationAndBindingUseMaskedRecords(t *testing.T) {
 	if err := json.Unmarshal(bindingRecorder.Body.Bytes(), &binding); err != nil {
 		t.Fatalf("decode app phone binding: %v body = %s", err, bindingRecorder.Body.String())
 	}
-	if binding.Data.AppUsername != "guest-alpha" || binding.Data.PhoneHash != verification.Data.PhoneHash || binding.Data.MaskedPhone != verification.Data.MaskedPhone || binding.Data.BoundAt.IsZero() {
+	if binding.Data.AppUsername != "guest-alpha" || binding.Data.PhoneHash != "" || binding.Data.MaskedPhone != verification.Data.MaskedPhone || binding.Data.BoundAt.IsZero() {
 		t.Fatalf("phone binding payload = %+v, want guest-alpha masked binding", binding.Data)
 	}
 
@@ -3889,8 +3889,16 @@ func TestAdminFileUploadContentAndDelete(t *testing.T) {
 		t.Fatalf("decode upload response: %v body = %s", err, uploadRecorder.Body.String())
 	}
 	record := uploaded.Data.Record
-	if record.ID == "" || record.Name != "report.txt" || record.Values["storageKey"] == "" || record.Values["size"] != "18" {
+	if record.ID == "" || record.Name != "report.txt" || record.Values["storageKey"] != "" || record.Values["storagePath"] != "" || record.Values["publicUrl"] != "" || record.Values["size"] != "18" {
 		t.Fatalf("uploaded record mismatch: %+v", record)
+	}
+	storedRecord, err := server.adminResourceRecordByID("files", record.ID)
+	if err != nil {
+		t.Fatalf("read stored file record: %v", err)
+	}
+	storageKey := storedRecord.Values["storageKey"]
+	if storageKey == "" {
+		t.Fatal("stored file record missing internal storage key")
 	}
 
 	contentRecorder := httptest.NewRecorder()
@@ -3911,7 +3919,7 @@ func TestAdminFileUploadContentAndDelete(t *testing.T) {
 	if deleteRecorder.Code != http.StatusOK {
 		t.Fatalf("DELETE file status = %d body = %s", deleteRecorder.Code, deleteRecorder.Body.String())
 	}
-	if _, err := fileStore.Open(deleteRequest.Context(), record.Values["storageKey"]); !errors.Is(err, storage.ErrObjectNotFound) {
+	if _, err := fileStore.Open(deleteRequest.Context(), storageKey); !errors.Is(err, storage.ErrObjectNotFound) {
 		t.Fatalf("Open(deleted file object) error = %v, want ErrObjectNotFound", err)
 	}
 
@@ -3953,7 +3961,11 @@ func TestAdminFileDeleteDoesNotAuditFailedObjectDeletion(t *testing.T) {
 		t.Fatalf("decode upload response: %v body = %s", err, uploadRecorder.Body.String())
 	}
 	record := uploaded.Data.Record
-	if err := fileStore.Delete(uploadRequest.Context(), record.Values["storageKey"]); err != nil {
+	storedRecord, err := server.adminResourceRecordByID("files", record.ID)
+	if err != nil {
+		t.Fatalf("read stored file record: %v", err)
+	}
+	if err := fileStore.Delete(uploadRequest.Context(), storedRecord.Values["storageKey"]); err != nil {
 		t.Fatalf("Delete(uploaded object before API delete) error = %v", err)
 	}
 
@@ -4023,7 +4035,7 @@ func TestAppFileUploadAndContentUseAppSession(t *testing.T) {
 		t.Fatalf("decode app upload response: %v body = %s", err, uploadRecorder.Body.String())
 	}
 	record := uploaded.Data.Record
-	if record.ID == "" || record.Name != "avatar.png" || record.Values["storageKey"] == "" || record.Values["uploadedBy"] != "buyer" || record.Values["sessionId"] != login.Data.Session.SessionID {
+	if record.ID == "" || record.Name != "avatar.png" || record.Values["storageKey"] != "" || record.Values["tenantId"] != "" || record.Values["sessionId"] != "" || record.Values["uploadedBy"] != "buyer" {
 		t.Fatalf("app uploaded record mismatch: %+v", record)
 	}
 

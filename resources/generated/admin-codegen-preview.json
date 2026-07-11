@@ -738,7 +738,7 @@
         "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
       },
       "schema": {
-        "fieldCount": 10,
+        "fieldCount": 11,
         "search": [
           "action",
           "actor",
@@ -752,6 +752,7 @@
           "action",
           "actor",
           "createdAt",
+          "outcome",
           "provider",
           "resource",
           "targetCode",
@@ -763,6 +764,7 @@
           "action",
           "actor",
           "createdAt",
+          "outcome",
           "provider",
           "resource",
           "targetCode",
@@ -833,7 +835,7 @@
         "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
       },
       "schema": {
-        "fieldCount": 4,
+        "fieldCount": 5,
         "search": [
           "productName",
           "shortName"
@@ -1387,7 +1389,7 @@
         "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
       },
       "schema": {
-        "fieldCount": 12,
+        "fieldCount": 14,
         "search": [
           "code",
           "createdAt",
@@ -2630,7 +2632,7 @@
         "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
       },
       "schema": {
-        "fieldCount": 5,
+        "fieldCount": 6,
         "search": [
           "areaCode",
           "code",
@@ -2640,6 +2642,7 @@
         "filter": [
           "areaCode",
           "code",
+          "isolation",
           "name",
           "status",
           "updatedAt"
@@ -2647,6 +2650,7 @@
         "sort": [
           "areaCode",
           "code",
+          "isolation",
           "name",
           "status",
           "updatedAt"

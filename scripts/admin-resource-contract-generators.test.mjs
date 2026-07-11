@@ -70,6 +70,46 @@ describe("admin resource contract generators", () => {
     assert.equal(bindings.permissions.read, "admin:app-phone-binding:read");
   });
 
+  it("preserves field security policy through contract and OpenAPI generation", () => {
+    const contract = runAdminResourceContract({
+      PLATFORM_CAPABILITIES:
+        "tenant,identity,session,rbac,menu,api-resource,audit,wechat-login,app-phone,dictionary,parameter,file-storage,admin-shell,demo-data,system-admin",
+    });
+    const verification = contract.schemas["app-phone-verifications"].fields.find((field) => field.key === "codeHash");
+    assert.deepEqual(
+      {
+        sensitivity: verification.sensitivity,
+        storageMode: verification.storageMode,
+        responseMode: verification.responseMode,
+        exportMode: verification.exportMode,
+      },
+      { sensitivity: "secret", storageMode: "hashed", responseMode: "omitted", exportMode: "omitted" },
+    );
+
+    const openapi = runAdminOpenAPIForContract(contract);
+    const property = openapi.components.schemas.AppPhoneVerificationsRecord.properties.codeHash;
+    assert.equal(property["x-platform-sensitivity"], "secret");
+    assert.equal(property["x-platform-storage-mode"], "hashed");
+    assert.equal(property["x-platform-response-mode"], "omitted");
+    assert.equal(property["x-platform-export-mode"], "omitted");
+
+    const staticIdentityHash = contract.schemas.appIdentities.fields.find((field) => field.key === "providerSubjectHash");
+    assert.deepEqual(
+      {
+        sensitivity: staticIdentityHash.sensitivity,
+        storageMode: staticIdentityHash.storageMode,
+        responseMode: staticIdentityHash.responseMode,
+        exportMode: staticIdentityHash.exportMode,
+      },
+      { sensitivity: "secret", storageMode: "hashed", responseMode: "omitted", exportMode: "omitted" },
+    );
+    const staticIdentityProperty = openapi.components.schemas.AppIdentitiesRecord.properties.providerSubjectHash;
+    assert.equal(staticIdentityProperty["x-platform-sensitivity"], "secret");
+    assert.equal(staticIdentityProperty["x-platform-storage-mode"], "hashed");
+    assert.equal(staticIdentityProperty["x-platform-response-mode"], "omitted");
+    assert.equal(staticIdentityProperty["x-platform-export-mode"], "omitted");
+  });
+
   it("keeps optional notification resources out of the default generated contract", () => {
     const contract = runAdminResourceContract();
 

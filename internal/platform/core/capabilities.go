@@ -132,12 +132,16 @@ func tenantAdminResource() capability.AdminResource {
 		Fields: []capability.AdminField{
 			adminField("code", "租户编码", "Tenant Code", "text", "record", true, false, true, true, true, true, 160, nil),
 			adminField("name", "租户名称", "Tenant Name", "text", "record", true, false, true, true, true, true, 180, nil),
+			adminField("isolation", "隔离模式", "Isolation", "select", "values", false, false, true, true, true, true, 140, []capability.AdminFieldOption{
+				adminFieldOption("shared", "共享", "Shared"),
+				adminFieldOption("sandbox", "沙箱", "Sandbox"),
+			}),
 			relationAdminField(adminField("areaCode", "地址码", "Area Code", "select", "values", false, false, true, true, true, true, 140, nil), areaCodeAdminFieldRelation(enabledAdminRelationFilter())),
 			adminField("status", "状态", "Status", "select", "record", false, false, true, true, true, true, 120, enabledDisabledOptions()),
 			adminField("description", "描述", "Description", "textarea", "record", false, false, false, false, true, true, 220, nil),
 			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
 		},
-		SearchFields:   []string{"name", "code", "status", "description", "areaCode"},
+		SearchFields:   []string{"name", "code", "status", "description", "isolation", "areaCode"},
 		DefaultSortKey: "updatedAt",
 	}
 }
@@ -268,6 +272,7 @@ func policyReviewAdminResource() capability.AdminResource {
 			relationAdminField(adminField("reviewedBy", "评审人", "Reviewed By", "select", "values", false, false, true, true, true, true, 150, nil), adminFieldRelation("users", "code", "name", false, enabledAdminRelationFilter())),
 			adminField("submittedAt", "提交时间", "Submitted At", "datetime", "values", false, false, true, true, true, true, 180, nil),
 			adminField("reviewedAt", "评审时间", "Reviewed At", "datetime", "values", false, false, true, true, true, true, 180, nil),
+			adminField("rejectionReason", "拒绝原因", "Rejection Reason", "textarea", "values", false, true, false, false, false, true, 260, nil),
 			adminField("description", "评审说明", "Review Notes", "textarea", "record", false, false, false, false, true, true, 260, nil),
 			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
 		},
@@ -612,6 +617,8 @@ func brandingAdminResource() capability.AdminResource {
 			adminField("code", "配置编码", "Config Code", "text", "record", true, false, true, false, false, true, 160, nil),
 			adminField("productName", "产品名称", "Product Name", "text", "values", true, false, true, true, true, true, 180, nil),
 			adminField("shortName", "简称", "Short Name", "text", "values", false, false, true, true, true, true, 120, nil),
+			adminField("logoUrl", "Logo URL", "Logo URL", "text", "values", false, false, false, false, true, true, 220, nil),
+			adminField("faviconUrl", "Favicon URL", "Favicon URL", "text", "values", false, false, false, false, true, true, 220, nil),
 			adminField("primaryColor", "主色", "Primary Color", "color", "values", false, false, true, true, true, true, 120, nil),
 			adminField("defaultTheme", "默认主题", "Default Theme", "select", "values", true, false, true, true, true, true, 140, []capability.AdminFieldOption{
 				adminFieldOption("tech", "科技风", "Tech"),
@@ -619,9 +626,12 @@ func brandingAdminResource() capability.AdminResource {
 				adminFieldOption("black", "炫酷黑", "Cool Black"),
 				adminFieldOption("warm", "温暖黄", "Warm Yellow"),
 			}),
+			adminField("loginTitle", "登录标题", "Login Title", "text", "values", false, false, true, false, true, true, 220, nil),
+			adminField("loginSubtitle", "登录副标题", "Login Subtitle", "textarea", "values", false, false, true, false, true, true, 260, nil),
+			secureAdminField(adminField("supportEmail", "支持邮箱", "Support Email", "text", "values", false, true, false, false, false, false, 180, nil), capability.FieldSensitivityPersonal, capability.FieldStorageEncrypted, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
 		},
-		SearchFields:   []string{"name", "code", "productName", "shortName", "defaultTheme"},
+		SearchFields:   []string{"name", "code", "productName", "shortName", "defaultTheme", "loginTitle"},
 		DefaultSortKey: "updatedAt",
 	}
 }
@@ -651,9 +661,11 @@ func fileStorageAdminResource() capability.AdminResource {
 			adminField("mimeType", "类型", "MIME Type", "text", "values", false, false, true, true, true, true, 160, nil),
 			adminField("size", "大小", "Size", "number", "values", false, true, true, true, false, true, 120, nil),
 			adminField("storageDriver", "存储驱动", "Storage Driver", "text", "values", false, true, true, false, false, true, 140, nil),
-			adminField("storageKey", "对象键", "Object Key", "text", "values", false, true, true, false, false, true, 260, nil),
-			adminField("storagePath", "存储路径", "Storage Path", "text", "values", false, true, false, false, false, true, 260, nil),
-			adminField("publicUrl", "公开地址", "Public URL", "text", "values", false, true, false, false, false, true, 260, nil),
+			secureAdminField(adminField("storageKey", "对象键", "Object Key", "text", "values", false, true, false, false, false, false, 260, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
+			secureAdminField(adminField("storagePath", "存储路径", "Storage Path", "text", "values", false, true, false, false, false, true, 260, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
+			secureAdminField(adminField("publicUrl", "公开地址", "Public URL", "text", "values", false, true, false, false, false, true, 260, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
+			secureAdminField(adminField("tenantId", "租户 ID", "Tenant ID", "text", "values", false, true, false, false, false, false, 180, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
+			secureAdminField(adminField("uploadedBy", "上传人", "Uploaded By", "text", "values", false, true, false, false, false, true, 180, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionFull, capability.FieldProjectionFull),
 			adminField("createdAt", "上传时间", "Created At", "datetime", "values", false, true, true, true, false, true, 180, nil),
 			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
 		},
@@ -686,8 +698,8 @@ func appIdentityAdminResource() capability.AdminResource {
 			adminField("provider", "登录方式", "Provider", "text", "values", true, true, true, true, false, true, 120, nil),
 			adminField("providerKind", "方式类型", "Provider Kind", "text", "values", true, true, true, true, false, true, 120, nil),
 			adminField("providerScope", "作用域", "Scope", "text", "values", true, true, true, true, false, true, 140, nil),
-			adminField("maskedSubject", "脱敏标识", "Masked Subject", "text", "values", true, true, true, true, false, true, 180, nil),
-			adminField("providerSubjectHash", "标识哈希", "Subject Hash", "text", "values", true, true, false, false, false, true, 260, nil),
+			secureAdminField(adminField("maskedSubject", "脱敏标识", "Masked Subject", "text", "values", true, true, true, true, false, true, 180, nil), capability.FieldSensitivityPersonal, capability.FieldStorageMasked, capability.FieldProjectionMasked, capability.FieldProjectionMasked),
+			secureAdminField(adminField("providerSubjectHash", "标识哈希", "Subject Hash", "text", "values", true, true, false, false, false, true, 260, nil), capability.FieldSensitivitySecret, capability.FieldStorageHashed, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 			adminField("appUsername", "App 用户", "App User", "text", "values", true, true, true, true, false, true, 180, nil),
 			adminField("createdAt", "创建时间", "Created At", "datetime", "values", false, true, true, true, false, true, 180, nil),
 			adminField("lastLoginAt", "最近登录", "Last Login", "datetime", "values", false, true, true, true, false, true, 180, nil),
@@ -715,8 +727,8 @@ func adminIdentityAdminResource() capability.AdminResource {
 		Fields: []capability.AdminField{
 			adminField("provider", "登录方式", "Provider", "text", "values", true, true, true, true, false, true, 120, nil),
 			adminField("providerKind", "方式类型", "Provider Kind", "text", "values", true, true, true, true, false, true, 120, nil),
-			adminField("issuerHash", "签发方哈希", "Issuer Hash", "text", "values", true, true, false, false, false, true, 260, nil),
-			adminField("providerSubjectHash", "标识哈希", "Subject Hash", "text", "values", true, true, false, false, false, true, 260, nil),
+			secureAdminField(adminField("issuerHash", "签发方哈希", "Issuer Hash", "text", "values", true, true, false, false, false, false, 260, nil), capability.FieldSensitivitySecret, capability.FieldStorageHashed, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
+			secureAdminField(adminField("providerSubjectHash", "标识哈希", "Subject Hash", "text", "values", true, true, false, false, false, true, 260, nil), capability.FieldSensitivitySecret, capability.FieldStorageHashed, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 			adminField("platformUsername", "平台管理员", "Platform Administrator", "text", "values", true, true, true, true, false, true, 180, nil),
 			adminField("createdAt", "创建时间", "Created At", "datetime", "values", false, true, true, true, false, true, 180, nil),
 			adminField("lastLoginAt", "最近登录", "Last Login", "datetime", "values", false, true, true, true, false, true, 180, nil),
@@ -749,17 +761,17 @@ func appPhoneVerificationAdminResource() capability.AdminResource {
 				adminFieldOption("expired", "已过期", "Expired"),
 			}),
 			adminField("appUsername", "App 用户", "App User", "text", "values", true, true, true, true, false, true, 180, nil),
-			adminField("maskedPhone", "脱敏手机号", "Masked Phone", "text", "values", true, true, true, true, false, true, 150, nil),
-			adminField("phoneHash", "手机号哈希", "Phone Hash", "text", "values", true, true, false, false, false, true, 260, nil),
+			secureAdminField(adminField("maskedPhone", "脱敏手机号", "Masked Phone", "text", "values", true, true, true, true, false, true, 150, nil), capability.FieldSensitivityPersonal, capability.FieldStorageMasked, capability.FieldProjectionMasked, capability.FieldProjectionMasked),
+			secureAdminField(adminField("phoneHash", "手机号哈希", "Phone Hash", "text", "values", true, true, false, false, false, true, 260, nil), capability.FieldSensitivitySensitive, capability.FieldStorageHashed, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 			adminField("purpose", "用途", "Purpose", "select", "values", true, true, true, true, false, true, 120, []capability.AdminFieldOption{
 				adminFieldOption("bind", "绑定", "Bind"),
 			}),
-			adminField("codeHash", "验证码哈希", "Code Hash", "text", "values", true, true, false, false, false, true, 260, nil),
+			secureAdminField(adminField("codeHash", "验证码哈希", "Code Hash", "text", "values", true, true, false, false, false, true, 260, nil), capability.FieldSensitivitySecret, capability.FieldStorageHashed, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 			adminField("requestedAt", "请求时间", "Requested At", "datetime", "values", false, true, true, true, false, true, 180, nil),
 			adminField("expiresAt", "过期时间", "Expires At", "datetime", "values", false, true, true, true, false, true, 180, nil),
 			adminField("verifiedAt", "验证时间", "Verified At", "datetime", "values", false, true, true, false, false, true, 180, nil),
 		},
-		SearchFields:   []string{"name", "code", "status", "appUsername", "maskedPhone", "phoneHash", "purpose", "requestedAt", "expiresAt", "verifiedAt"},
+		SearchFields:   []string{"name", "code", "status", "appUsername", "maskedPhone", "purpose", "requestedAt", "expiresAt", "verifiedAt"},
 		DefaultSortKey: "requestedAt",
 	}
 }
@@ -786,12 +798,12 @@ func appPhoneBindingAdminResource() capability.AdminResource {
 				adminFieldOption("disabled", "已停用", "Disabled"),
 			}),
 			adminField("appUsername", "App 用户", "App User", "text", "values", true, true, true, true, false, true, 180, nil),
-			adminField("maskedPhone", "脱敏手机号", "Masked Phone", "text", "values", true, true, true, true, false, true, 150, nil),
-			adminField("phoneHash", "手机号哈希", "Phone Hash", "text", "values", true, true, false, false, false, true, 260, nil),
+			secureAdminField(adminField("maskedPhone", "脱敏手机号", "Masked Phone", "text", "values", true, true, true, true, false, true, 150, nil), capability.FieldSensitivityPersonal, capability.FieldStorageMasked, capability.FieldProjectionMasked, capability.FieldProjectionMasked),
+			secureAdminField(adminField("phoneHash", "手机号哈希", "Phone Hash", "text", "values", true, true, false, false, false, true, 260, nil), capability.FieldSensitivitySensitive, capability.FieldStorageHashed, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 			adminField("boundAt", "绑定时间", "Bound At", "datetime", "values", false, true, true, true, false, true, 180, nil),
 			adminField("verificationId", "验证记录", "Verification", "text", "values", false, true, false, false, false, true, 180, nil),
 		},
-		SearchFields:   []string{"name", "code", "status", "appUsername", "maskedPhone", "phoneHash", "boundAt"},
+		SearchFields:   []string{"name", "code", "status", "appUsername", "maskedPhone", "boundAt"},
 		DefaultSortKey: "boundAt",
 	}
 }
@@ -843,6 +855,7 @@ func apiTokenAdminResource() capability.AdminResource {
 			}),
 			adminField("scope", "作用域", "Scope", "text", "values", true, false, true, true, true, true, 260, nil),
 			adminField("tokenPrefix", "令牌前缀", "Token Prefix", "text", "values", false, true, true, true, false, true, 140, nil),
+			secureAdminField(adminField("tokenHash", "令牌哈希", "Token Hash", "text", "values", false, true, false, false, false, false, 260, nil), capability.FieldSensitivitySecret, capability.FieldStorageHashed, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 			adminField("expiresAt", "过期时间", "Expires At", "datetime", "values", false, false, true, true, true, true, 180, nil),
 			adminField("createdAt", "签发时间", "Created At", "datetime", "values", false, true, true, true, false, true, 180, nil),
 			adminField("revokedAt", "撤销时间", "Revoked At", "datetime", "values", false, true, true, false, false, true, 180, nil),
@@ -854,19 +867,31 @@ func apiTokenAdminResource() capability.AdminResource {
 
 func adminField(key string, labelZH string, labelEN string, fieldType string, source string, required bool, readOnly bool, searchable bool, inTable bool, inForm bool, inDetail bool, width int, options []capability.AdminFieldOption) capability.AdminField {
 	return capability.AdminField{
-		Key:        key,
-		Label:      capability.Text(labelZH, labelEN),
-		Type:       fieldType,
-		Source:     source,
-		Required:   required,
-		ReadOnly:   readOnly,
-		Searchable: searchable,
-		InTable:    inTable,
-		InForm:     inForm,
-		InDetail:   inDetail,
-		Width:      width,
-		Options:    options,
+		Key:          key,
+		Label:        capability.Text(labelZH, labelEN),
+		Type:         fieldType,
+		Source:       source,
+		Required:     required,
+		ReadOnly:     readOnly,
+		Searchable:   searchable,
+		InTable:      inTable,
+		InForm:       inForm,
+		InDetail:     inDetail,
+		Width:        width,
+		Options:      options,
+		Sensitivity:  capability.FieldSensitivityPublic,
+		StorageMode:  capability.FieldStoragePlain,
+		ResponseMode: capability.FieldProjectionFull,
+		ExportMode:   capability.FieldProjectionFull,
 	}
+}
+
+func secureAdminField(field capability.AdminField, sensitivity string, storageMode string, responseMode string, exportMode string) capability.AdminField {
+	field.Sensitivity = sensitivity
+	field.StorageMode = storageMode
+	field.ResponseMode = responseMode
+	field.ExportMode = exportMode
+	return field
 }
 
 func relationAdminField(field capability.AdminField, relation capability.AdminFieldRelation) capability.AdminField {

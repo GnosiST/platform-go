@@ -99,7 +99,6 @@ func TestRunBindAdminOIDCRejectsInvalidAdminPrincipal(t *testing.T) {
 		}},
 		{name: "user without permissions", username: "admin", prepare: func(t *testing.T, cfg config.Config) {
 			updateUser(t, cfg, "admin", func(record *adminresource.Record) {
-				record.Values["role"] = "missing-role"
 				record.Values["roles"] = "missing-role"
 			})
 		}},

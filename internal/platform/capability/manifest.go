@@ -57,26 +57,48 @@ type AdminMenu struct {
 }
 
 type AdminField struct {
-	Key         string
-	Label       LocalizedText
-	Type        string
-	Source      string
-	Group       string
-	Help        LocalizedText
-	Required    bool
-	ReadOnly    bool
-	Searchable  bool
-	Filterable  bool
-	Sortable    bool
-	Localizable bool
-	InTable     bool
-	InForm      bool
-	InDetail    bool
-	Width       int
-	Options     []AdminFieldOption
-	Relation    *AdminFieldRelation
-	Validation  AdminFieldValidation
+	Key          string
+	Label        LocalizedText
+	Type         string
+	Source       string
+	Group        string
+	Help         LocalizedText
+	Required     bool
+	ReadOnly     bool
+	Searchable   bool
+	Filterable   bool
+	Sortable     bool
+	Localizable  bool
+	InTable      bool
+	InForm       bool
+	InDetail     bool
+	Width        int
+	Options      []AdminFieldOption
+	Relation     *AdminFieldRelation
+	Validation   AdminFieldValidation
+	Sensitivity  string
+	StorageMode  string
+	ResponseMode string
+	ExportMode   string
 }
+
+const (
+	FieldSensitivityPublic    = "public"
+	FieldSensitivityInternal  = "internal"
+	FieldSensitivityPersonal  = "personal"
+	FieldSensitivitySensitive = "sensitive"
+	FieldSensitivitySecret    = "secret"
+
+	FieldStoragePlain     = "plain"
+	FieldStorageMasked    = "masked"
+	FieldStorageHashed    = "hashed"
+	FieldStorageEncrypted = "encrypted"
+
+	FieldProjectionFull       = "full"
+	FieldProjectionMasked     = "masked"
+	FieldProjectionPrivileged = "privileged"
+	FieldProjectionOmitted    = "omitted"
+)
 
 type AdminFieldRelation struct {
 	Resource    string

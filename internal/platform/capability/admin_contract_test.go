@@ -239,6 +239,54 @@ func TestValidateAdminSurfaceAcceptsSchemaFieldsFormGroupsSearchAndSort(t *testi
 	}
 }
 
+func TestValidateAdminSurfaceValidatesFieldSecurityPolicies(t *testing.T) {
+	tests := []struct {
+		name    string
+		field   AdminField
+		wantErr string
+	}{
+		{name: "unsupported sensitivity", field: AdminField{Sensitivity: "classified"}, wantErr: "sensitivity is unsupported"},
+		{name: "unsupported storage", field: AdminField{StorageMode: "digest"}, wantErr: "storageMode is unsupported"},
+		{name: "unsupported response", field: AdminField{ResponseMode: "redacted"}, wantErr: "responseMode is unsupported"},
+		{name: "unsupported export", field: AdminField{ExportMode: "redacted"}, wantErr: "exportMode is unsupported"},
+		{name: "sensitive record field", field: AdminField{Source: "record", Sensitivity: FieldSensitivitySensitive, StorageMode: FieldStorageHashed, ResponseMode: FieldProjectionOmitted, ExportMode: FieldProjectionOmitted}, wantErr: "cannot use record storage"},
+		{name: "plain secret", field: AdminField{Sensitivity: FieldSensitivitySecret, StorageMode: FieldStoragePlain}, wantErr: "require protected storage"},
+		{name: "hashed response", field: AdminField{Sensitivity: FieldSensitivitySecret, StorageMode: FieldStorageHashed, ResponseMode: FieldProjectionFull, ExportMode: FieldProjectionOmitted}, wantErr: "must be omitted from response and export"},
+		{name: "encrypted export", field: AdminField{Sensitivity: FieldSensitivitySensitive, StorageMode: FieldStorageEncrypted, ResponseMode: FieldProjectionOmitted, ExportMode: FieldProjectionPrivileged}, wantErr: "must be omitted from response and export"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resource := validAdminResource("demo-resources", "/demo-resources", "admin:demo")
+			field := tt.field
+			field.Key = "protectedValue"
+			field.Label = Text("保护值", "Protected Value")
+			field.Type = "text"
+			if field.Source == "" {
+				field.Source = "values"
+			}
+			resource.Fields = []AdminField{field}
+
+			err := ValidateAdminSurface([]Manifest{{ID: "demo", Admin: AdminSurface{Resources: []AdminResource{resource}}}})
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("ValidateAdminSurface() error = %v, want %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateAdminSurfaceAcceptsDefaultAndProtectedFieldSecurityPolicies(t *testing.T) {
+	resource := validAdminResource("demo-resources", "/demo-resources", "admin:demo")
+	resource.Fields = []AdminField{
+		{Key: "title", Label: Text("标题", "Title"), Type: "text", Source: "values"},
+		{Key: "maskedPhone", Label: Text("脱敏手机号", "Masked Phone"), Type: "text", Source: "values", Sensitivity: FieldSensitivityPersonal, StorageMode: FieldStorageMasked, ResponseMode: FieldProjectionMasked, ExportMode: FieldProjectionMasked},
+		{Key: "tokenHash", Label: Text("令牌哈希", "Token Hash"), Type: "text", Source: "values", Sensitivity: FieldSensitivitySecret, StorageMode: FieldStorageHashed, ResponseMode: FieldProjectionOmitted, ExportMode: FieldProjectionOmitted},
+	}
+
+	if err := ValidateAdminSurface([]Manifest{{ID: "demo", Admin: AdminSurface{Resources: []AdminResource{resource}}}}); err != nil {
+		t.Fatalf("ValidateAdminSurface() error = %v", err)
+	}
+}
+
 func TestValidateAdminSurfaceRejectsDuplicateFieldKeys(t *testing.T) {
 	resource := validAdminResource("demo-resources", "/demo-resources", "admin:demo")
 	resource.Fields = []AdminField{

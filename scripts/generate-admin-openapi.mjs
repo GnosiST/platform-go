@@ -113,6 +113,10 @@ function fieldSchema(field) {
     "x-platform-filterable": field.filter === true || field.filterable === true,
     "x-platform-sortable": field.sort === true || field.sortable === true,
     "x-platform-localizable": field.localize === true || field.localizable === true,
+    "x-platform-sensitivity": field.sensitivity ?? "public",
+    "x-platform-storage-mode": field.storageMode ?? "plain",
+    "x-platform-response-mode": field.responseMode ?? "full",
+    "x-platform-export-mode": field.exportMode ?? "full",
     ...(field.relation ? { "x-platform-relation": field.relation } : {}),
   };
 
