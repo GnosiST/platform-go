@@ -39,6 +39,9 @@
       "productionDriver": "gorm",
       "invalidationResource": "sessions",
       "distributedInvalidationRequired": true,
+      "tokenPersistence": "sha256:v1-digest-only",
+      "rawTokenPersistenceAllowed": false,
+      "legacyRawSessionMigration": "replace-and-revoke",
       "evidence": ["docs/platform-auth.md", "docs/platform-cache.md", "internal/platform/session/store.go"]
     },
     "slidingRenewal": {
@@ -381,9 +384,9 @@
   },
   "auditPolicy": {
     "requiredActions": ["auth.login", "auth.refresh", "auth.logout", "app.auth.login", "app.auth.logout", "api_token.create", "api_token.update", "api_token.revoke"],
-    "forbiddenRawFields": ["jwt", "bearerToken", "refreshToken", "apiToken", "openid", "unionid", "phone", "secret"],
-    "allowedAuthAuditFields": ["actor", "action", "resource", "sessionId", "provider", "createdAt"],
-    "sessionIdentifier": "shortSessionID",
+    "forbiddenRawFields": ["jwt", "bearerToken", "refreshToken", "apiToken", "openid", "unionid", "phone", "secret", "sessionId", "sessionDigest", "tokenDigest"],
+    "allowedAuthAuditFields": ["actor", "action", "resource", "provider", "createdAt"],
+    "sessionIdentifier": "none",
     "runtimeEvidence": [
       "internal/platform/httpapi/server.go",
       "internal/platform/httpapi/server_test.go",

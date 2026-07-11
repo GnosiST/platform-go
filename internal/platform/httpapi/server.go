@@ -532,7 +532,7 @@ func (s *Server) issueAdminLogin(ctx *gin.Context, principal rbac.Principal, pro
 		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_TOKEN_SIGN_FAILED", "auth token sign failed")
 		return
 	}
-	if err := s.recordAudit("auth.login", "Auth Login", principal.User.Username, provider.ID, issued.Token); err != nil {
+	if err := s.recordAudit("auth.login", "Auth Login", principal.User.Username, provider.ID); err != nil {
 		if !s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token) {
 			writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_CLEANUP_FAILED", "session cleanup failed")
 			return
@@ -591,7 +591,7 @@ func (s *Server) authRefresh(ctx *gin.Context) {
 		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_TOKEN_SIGN_FAILED", "auth token sign failed")
 		return
 	}
-	if err := s.recordAudit("auth.refresh", "Auth Refresh", principal.User.Username, "", renewed.Token); err != nil {
+	if err := s.recordAudit("auth.refresh", "Auth Refresh", principal.User.Username, ""); err != nil {
 		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_AUDIT_FAILED", "auth audit failed")
 		return
 	}
@@ -620,7 +620,7 @@ func (s *Server) authLogout(ctx *gin.Context) {
 		return
 	}
 	s.publishSessionInvalidation(ctx.Request.Context())
-	if err := s.recordAudit("auth.logout", "Auth Logout", authSession.Username, "", authSession.Token); err != nil {
+	if err := s.recordAudit("auth.logout", "Auth Logout", authSession.Username, ""); err != nil {
 		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_AUDIT_FAILED", "auth audit failed")
 		return
 	}
@@ -654,7 +654,7 @@ func (s *Server) appAuthLogin(ctx *gin.Context) {
 		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_TOKEN_SIGN_FAILED", "app auth token sign failed")
 		return
 	}
-	if err := s.recordAudit("app.auth.login", "App Auth Login", username, providerID, issued.Token); err != nil {
+	if err := s.recordAudit("app.auth.login", "App Auth Login", username, providerID); err != nil {
 		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_AUDIT_FAILED", "app auth audit failed")
 		return
 	}
@@ -747,7 +747,7 @@ func (s *Server) appAuthLogout(ctx *gin.Context) {
 		return
 	}
 	s.publishSessionInvalidation(ctx.Request.Context())
-	if err := s.recordAudit("app.auth.logout", "App Auth Logout", appSession.Username, "", appSession.Token); err != nil {
+	if err := s.recordAudit("app.auth.logout", "App Auth Logout", appSession.Username, ""); err != nil {
 		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_AUDIT_FAILED", "app auth audit failed")
 		return
 	}
@@ -1415,7 +1415,7 @@ func (s *Server) issueAdminAPIToken(ctx context.Context, actor string, input adm
 	if err != nil {
 		return adminresource.Record{}, "", err
 	}
-	if err := s.recordAudit("api_token.create", "API Token Issued", actor, "", prefix); err != nil {
+	if err := s.recordAudit("api_token.create", "API Token Issued", actor, ""); err != nil {
 		return adminresource.Record{}, "", err
 	}
 	return record, token, nil
@@ -1438,7 +1438,7 @@ func (s *Server) revokeAdminAPIToken(ctx context.Context, actor string, id strin
 	if err != nil {
 		return err
 	}
-	return s.recordAudit("api_token.revoke", "API Token Revoked", actor, "", values["tokenPrefix"])
+	return s.recordAudit("api_token.revoke", "API Token Revoked", actor, "")
 }
 
 func (s *Server) updateAdminAPIToken(ctx context.Context, actor string, id string, input adminresource.WriteInput) (adminresource.Record, error) {
@@ -1490,7 +1490,7 @@ func (s *Server) updateAdminAPIToken(ctx context.Context, actor string, id strin
 	if err != nil {
 		return adminresource.Record{}, err
 	}
-	if err := s.recordAudit("api_token.update", "API Token Updated", actor, "", values["tokenPrefix"]); err != nil {
+	if err := s.recordAudit("api_token.update", "API Token Updated", actor, ""); err != nil {
 		return adminresource.Record{}, err
 	}
 	return record, nil
@@ -1772,7 +1772,7 @@ func (s *Server) authProviderAvailable(provider capability.AuthProvider) bool {
 	return !(s.disableDemoAuthProvider && provider.Kind == "demo")
 }
 
-func (s *Server) recordAudit(code string, name string, username string, provider string, _ string) error {
+func (s *Server) recordAudit(code string, name string, username string, provider string) error {
 	auditCode, err := newAuthAuditCode(code)
 	if err != nil {
 		return err
@@ -2226,14 +2226,6 @@ func bearerToken(header string) (string, bool) {
 	}
 	token := strings.TrimSpace(strings.TrimPrefix(header, prefix))
 	return token, token != ""
-}
-
-func shortSessionID(token string) string {
-	token = strings.TrimSpace(token)
-	if len(token) <= 12 {
-		return token
-	}
-	return token[:12]
 }
 
 func fileStorageKey(record adminresource.Record) string {

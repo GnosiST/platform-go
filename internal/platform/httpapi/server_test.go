@@ -1220,13 +1220,13 @@ func TestAuthLoginCleansUpIssuedSessionWhenAuditFails(t *testing.T) {
 			if len(sessionRepository.sessions) != 1 {
 				t.Fatalf("issued sessions = %d, want one attempted login session", len(sessionRepository.sessions))
 			}
-			var issuedToken string
-			for token := range sessionRepository.sessions {
-				issuedToken = token
+			var issuedDigest string
+			for tokenDigest := range sessionRepository.sessions {
+				issuedDigest = tokenDigest
 			}
-			_, resolvable, err := sessions.ResolveContext(context.Background(), issuedToken)
+			_, resolvable, err := sessionRepository.Resolve(context.Background(), issuedDigest, time.Now())
 			if err != nil {
-				t.Fatalf("ResolveContext(issued) error = %v", err)
+				t.Fatalf("repository Resolve(issued) error = %v", err)
 			}
 			if resolvable != test.wantResolvable {
 				t.Fatalf("issued session resolvable = %v, want %v", resolvable, test.wantResolvable)
@@ -1234,7 +1234,7 @@ func TestAuthLoginCleansUpIssuedSessionWhenAuditFails(t *testing.T) {
 			if invalidations != test.wantInvalidations {
 				t.Fatalf("session invalidations = %d, want %d", invalidations, test.wantInvalidations)
 			}
-			assertResponseRedactsValues(t, recorder.Body.String(), issuedToken, "audit-save-detail-sensitive", "revoke-detail-sensitive")
+			assertResponseRedactsValues(t, recorder.Body.String(), issuedDigest, "audit-save-detail-sensitive", "revoke-detail-sensitive")
 		})
 	}
 }
@@ -1422,7 +1422,7 @@ func TestAdminSessionWriteHandlersKeepNotFoundResolveUnauthorized(t *testing.T) 
 	for _, endpoint := range []string{"/api/auth/refresh", "/api/auth/logout"} {
 		t.Run(endpoint, func(t *testing.T) {
 			server, repository, token := newAdminSessionWriteTestServer(t)
-			delete(repository.sessions, loginSessionIDForTest(t, server, token))
+			delete(repository.sessions, session.DigestToken(loginSessionIDForTest(t, server, token)))
 
 			recorder := performBearerRequest(server, http.MethodPost, endpoint, token)
 
@@ -2159,7 +2159,7 @@ func TestAppAuthLogoutResolveRepositoryErrorDoesNotInvokeOverrideHandler(t *test
 
 func TestAppAuthLogoutKeepsNotFoundResolveUnauthorized(t *testing.T) {
 	server, repository, token := newAppSessionWriteTestServer(t)
-	delete(repository.sessions, loginSessionIDForTest(t, server, token))
+	delete(repository.sessions, session.DigestToken(loginSessionIDForTest(t, server, token)))
 
 	recorder := performBearerRequest(server, http.MethodPost, "/api/app/auth/logout", token)
 
@@ -4388,7 +4388,7 @@ func authProviderTestManifest() capability.Manifest {
 }
 
 type controllableSessionRepository struct {
-	sessions   map[string]session.Session
+	sessions   map[string]session.StoredSession
 	resolveErr error
 	renewErr   error
 	revokeErr  error
@@ -4417,25 +4417,25 @@ func (r *controllableAdminResourceRepository) Save(_ context.Context, snapshot a
 }
 
 func newControllableSessionRepository() *controllableSessionRepository {
-	return &controllableSessionRepository{sessions: map[string]session.Session{}}
+	return &controllableSessionRepository{sessions: map[string]session.StoredSession{}}
 }
 
 func (r *controllableSessionRepository) Load(context.Context) (session.Snapshot, error) {
 	return session.Snapshot{Sessions: cloneTestSessions(r.sessions)}, nil
 }
 
-func (r *controllableSessionRepository) Create(_ context.Context, created session.Session) error {
-	r.sessions[created.Token] = created
+func (r *controllableSessionRepository) Create(_ context.Context, created session.StoredSession) error {
+	r.sessions[created.TokenDigest] = created
 	return nil
 }
 
-func (r *controllableSessionRepository) Resolve(_ context.Context, token string, now time.Time) (session.Session, bool, error) {
+func (r *controllableSessionRepository) Resolve(_ context.Context, tokenDigest string, now time.Time) (session.StoredSession, bool, error) {
 	if r.resolveErr != nil {
-		return session.Session{}, false, r.resolveErr
+		return session.StoredSession{}, false, r.resolveErr
 	}
-	current, ok := r.sessions[token]
+	current, ok := r.sessions[tokenDigest]
 	if !ok || !current.RevokedAt.IsZero() || !now.Before(current.ExpiresAt) {
-		return session.Session{}, false, nil
+		return session.StoredSession{}, false, nil
 	}
 	return current, true, nil
 }
@@ -4490,36 +4490,36 @@ func assertAuthErrorResponse(t *testing.T, recorder *httptest.ResponseRecorder, 
 	}
 }
 
-func (r *controllableSessionRepository) Renew(_ context.Context, token string, now time.Time, expiresAt time.Time) (session.Session, bool, error) {
+func (r *controllableSessionRepository) Renew(_ context.Context, tokenDigest string, now time.Time, expiresAt time.Time) (session.StoredSession, bool, error) {
 	if r.renewErr != nil {
-		return session.Session{}, false, r.renewErr
+		return session.StoredSession{}, false, r.renewErr
 	}
-	current, ok, err := r.Resolve(context.Background(), token, now)
+	current, ok, err := r.Resolve(context.Background(), tokenDigest, now)
 	if err != nil || !ok {
-		return session.Session{}, ok, err
+		return session.StoredSession{}, ok, err
 	}
 	current.ExpiresAt = expiresAt
-	r.sessions[token] = current
+	r.sessions[tokenDigest] = current
 	return current, true, nil
 }
 
-func (r *controllableSessionRepository) Revoke(_ context.Context, token string, now time.Time) (session.Session, bool, error) {
+func (r *controllableSessionRepository) Revoke(_ context.Context, tokenDigest string, now time.Time) (session.StoredSession, bool, error) {
 	if r.revokeErr != nil {
-		return session.Session{}, false, r.revokeErr
+		return session.StoredSession{}, false, r.revokeErr
 	}
-	current, ok, err := r.Resolve(context.Background(), token, now)
+	current, ok, err := r.Resolve(context.Background(), tokenDigest, now)
 	if err != nil || !ok {
-		return session.Session{}, ok, err
+		return session.StoredSession{}, ok, err
 	}
 	current.RevokedAt = now
-	r.sessions[token] = current
+	r.sessions[tokenDigest] = current
 	return current, true, nil
 }
 
-func cloneTestSessions(source map[string]session.Session) map[string]session.Session {
-	cloned := make(map[string]session.Session, len(source))
-	for token, current := range source {
-		cloned[token] = current
+func cloneTestSessions(source map[string]session.StoredSession) map[string]session.StoredSession {
+	cloned := make(map[string]session.StoredSession, len(source))
+	for tokenDigest, current := range source {
+		cloned[tokenDigest] = current
 	}
 	return cloned
 }

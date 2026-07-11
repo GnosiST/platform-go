@@ -3,7 +3,9 @@ package session
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"strings"
 	"sync"
@@ -20,28 +22,36 @@ type Options struct {
 }
 
 type Snapshot struct {
-	Sessions map[string]Session `json:"sessions"`
+	Sessions map[string]StoredSession `json:"sessions"`
 }
 
 type Repository interface {
 	Load(context.Context) (Snapshot, error)
-	Create(context.Context, Session) error
-	Resolve(context.Context, string, time.Time) (Session, bool, error)
-	Renew(context.Context, string, time.Time, time.Time) (Session, bool, error)
-	Revoke(context.Context, string, time.Time) (Session, bool, error)
+	Create(context.Context, StoredSession) error
+	Resolve(context.Context, string, time.Time) (StoredSession, bool, error)
+	Renew(context.Context, string, time.Time, time.Time) (StoredSession, bool, error)
+	Revoke(context.Context, string, time.Time) (StoredSession, bool, error)
 }
 
 type Session struct {
-	Token     string    `json:"token"`
+	Token     string    `json:"-"`
 	Username  string    `json:"username"`
 	IssuedAt  time.Time `json:"issuedAt"`
 	ExpiresAt time.Time `json:"expiresAt"`
 	RevokedAt time.Time `json:"revokedAt,omitempty"`
 }
 
+type StoredSession struct {
+	TokenDigest string    `json:"tokenDigest"`
+	Username    string    `json:"username"`
+	IssuedAt    time.Time `json:"issuedAt"`
+	ExpiresAt   time.Time `json:"expiresAt"`
+	RevokedAt   time.Time `json:"revokedAt,omitempty"`
+}
+
 type Store struct {
 	mu         sync.Mutex
-	sessions   map[string]Session
+	sessions   map[string]StoredSession
 	ttl        time.Duration
 	now        func() time.Time
 	repository Repository
@@ -57,7 +67,7 @@ func NewStore(options Options) *Store {
 		now = time.Now
 	}
 	return &Store{
-		sessions: map[string]Session{},
+		sessions: map[string]StoredSession{},
 		ttl:      ttl,
 		now:      now,
 	}
@@ -72,7 +82,7 @@ func NewRepositoryBackedStore(options Options, repository Repository) (*Store, e
 	if err != nil {
 		return nil, err
 	}
-	store.sessions = cloneSessions(snapshot.Sessions)
+	store.sessions = cloneStoredSessions(snapshot.Sessions)
 	store.repository = repository
 	return store, nil
 }
@@ -87,7 +97,7 @@ func (s *Store) Reload() error {
 	if err != nil {
 		return err
 	}
-	s.sessions = cloneSessions(snapshot.Sessions)
+	s.sessions = cloneStoredSessions(snapshot.Sessions)
 	return nil
 }
 
@@ -107,14 +117,16 @@ func (s *Store) Issue(username string) (Session, error) {
 		IssuedAt:  issuedAt,
 		ExpiresAt: issuedAt.Add(s.ttl),
 	}
+	tokenDigest := DigestToken(token)
+	stored := storedSession(tokenDigest, session)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.repository != nil {
-		if err := s.repository.Create(context.Background(), session); err != nil {
+		if err := s.repository.Create(context.Background(), stored); err != nil {
 			return Session{}, err
 		}
 	}
-	s.sessions[token] = session
+	s.sessions[tokenDigest] = stored
 	return session, nil
 }
 
@@ -126,19 +138,20 @@ func (s *Store) ResolveContext(ctx context.Context, token string) (Session, bool
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := s.now().UTC()
+	tokenDigest := DigestToken(token)
 	if s.repository != nil {
-		session, ok, err := s.repository.Resolve(ctx, token, now)
+		stored, ok, err := s.repository.Resolve(ctx, tokenDigest, now)
 		if err != nil || !ok {
 			return Session{}, false, err
 		}
-		s.sessions[token] = session
-		return session, true, nil
+		s.sessions[tokenDigest] = stored
+		return publicSession(token, stored), true, nil
 	}
-	session, ok := s.sessions[token]
-	if !ok || !session.RevokedAt.IsZero() || !now.Before(session.ExpiresAt) {
+	stored, ok := s.sessions[tokenDigest]
+	if !ok || !stored.RevokedAt.IsZero() || !now.Before(stored.ExpiresAt) {
 		return Session{}, false, nil
 	}
-	return session, true, nil
+	return publicSession(token, stored), true, nil
 }
 
 func (s *Store) Resolve(token string) (Session, bool) {
@@ -158,21 +171,22 @@ func (s *Store) RenewContext(ctx context.Context, token string) (Session, bool, 
 	defer s.mu.Unlock()
 	now := s.now().UTC()
 	expiresAt := now.Add(s.ttl)
+	tokenDigest := DigestToken(token)
 	if s.repository != nil {
-		session, ok, err := s.repository.Renew(ctx, token, now, expiresAt)
+		stored, ok, err := s.repository.Renew(ctx, tokenDigest, now, expiresAt)
 		if err != nil || !ok {
 			return Session{}, false, err
 		}
-		s.sessions[token] = session
-		return session, true, nil
+		s.sessions[tokenDigest] = stored
+		return publicSession(token, stored), true, nil
 	}
-	session, ok := s.sessions[token]
-	if !ok || !session.RevokedAt.IsZero() || !now.Before(session.ExpiresAt) {
+	stored, ok := s.sessions[tokenDigest]
+	if !ok || !stored.RevokedAt.IsZero() || !now.Before(stored.ExpiresAt) {
 		return Session{}, false, nil
 	}
-	session.ExpiresAt = expiresAt
-	s.sessions[token] = session
-	return session, true, nil
+	stored.ExpiresAt = expiresAt
+	s.sessions[tokenDigest] = stored
+	return publicSession(token, stored), true, nil
 }
 
 func (s *Store) Renew(token string) (Session, bool) {
@@ -191,20 +205,21 @@ func (s *Store) RevokeContext(ctx context.Context, token string) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := s.now().UTC()
+	tokenDigest := DigestToken(token)
 	if s.repository != nil {
-		session, ok, err := s.repository.Revoke(ctx, token, now)
+		stored, ok, err := s.repository.Revoke(ctx, tokenDigest, now)
 		if err != nil || !ok {
 			return false, err
 		}
-		s.sessions[token] = session
+		s.sessions[tokenDigest] = stored
 		return true, nil
 	}
-	session, ok := s.sessions[token]
-	if !ok || !session.RevokedAt.IsZero() || !now.Before(session.ExpiresAt) {
+	stored, ok := s.sessions[tokenDigest]
+	if !ok || !stored.RevokedAt.IsZero() || !now.Before(stored.ExpiresAt) {
 		return false, nil
 	}
-	session.RevokedAt = now
-	s.sessions[token] = session
+	stored.RevokedAt = now
+	s.sessions[tokenDigest] = stored
 	return true, nil
 }
 
@@ -216,10 +231,35 @@ func (s *Store) Revoke(token string) bool {
 	return ok
 }
 
-func cloneSessions(sessions map[string]Session) map[string]Session {
-	cloned := make(map[string]Session, len(sessions))
-	for token, session := range sessions {
-		cloned[token] = session
+func DigestToken(raw string) string {
+	sum := sha256.Sum256(append([]byte("platform-session\x00"), []byte(raw)...))
+	return "sha256:v1:" + hex.EncodeToString(sum[:])
+}
+
+func storedSession(tokenDigest string, session Session) StoredSession {
+	return StoredSession{
+		TokenDigest: tokenDigest,
+		Username:    session.Username,
+		IssuedAt:    session.IssuedAt,
+		ExpiresAt:   session.ExpiresAt,
+		RevokedAt:   session.RevokedAt,
+	}
+}
+
+func publicSession(rawToken string, stored StoredSession) Session {
+	return Session{
+		Token:     rawToken,
+		Username:  stored.Username,
+		IssuedAt:  stored.IssuedAt,
+		ExpiresAt: stored.ExpiresAt,
+		RevokedAt: stored.RevokedAt,
+	}
+}
+
+func cloneStoredSessions(sessions map[string]StoredSession) map[string]StoredSession {
+	cloned := make(map[string]StoredSession, len(sessions))
+	for tokenDigest, session := range sessions {
+		cloned[tokenDigest] = session
 	}
 	return cloned
 }

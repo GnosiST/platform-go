@@ -116,6 +116,15 @@ function validateSessionPolicy(contract, errors) {
   if (policy.sessionStore?.distributedInvalidationRequired !== true) {
     errors.push("sessionCredentialPolicy.sessionStore.distributedInvalidationRequired must stay true");
   }
+  if (policy.sessionStore?.tokenPersistence !== "sha256:v1-digest-only") {
+    errors.push("sessionCredentialPolicy.sessionStore.tokenPersistence must stay sha256:v1-digest-only");
+  }
+  if (policy.sessionStore?.rawTokenPersistenceAllowed !== false) {
+    errors.push("sessionCredentialPolicy.sessionStore.rawTokenPersistenceAllowed must stay false");
+  }
+  if (policy.sessionStore?.legacyRawSessionMigration !== "replace-and-revoke") {
+    errors.push("sessionCredentialPolicy.sessionStore.legacyRawSessionMigration must stay replace-and-revoke");
+  }
   if (policy.slidingRenewal?.status !== "implemented") {
     errors.push("sessionCredentialPolicy.slidingRenewal.status must stay implemented");
   }
@@ -910,13 +919,13 @@ function validateAuditPolicy(contract, errors) {
   );
   requireIncludes(
     contract.auditPolicy?.forbiddenRawFields,
-    ["jwt", "bearerToken", "refreshToken", "apiToken", "openid", "unionid", "phone", "secret"],
+    ["jwt", "bearerToken", "refreshToken", "apiToken", "openid", "unionid", "phone", "secret", "sessionId", "sessionDigest", "tokenDigest"],
     "auditPolicy.forbiddenRawFields",
     errors,
   );
   requireIncludes(
     contract.auditPolicy?.allowedAuthAuditFields,
-    ["actor", "action", "resource", "sessionId", "provider", "createdAt"],
+    ["actor", "action", "resource", "provider", "createdAt"],
     "auditPolicy.allowedAuthAuditFields",
     errors,
   );
@@ -926,8 +935,8 @@ function validateAuditPolicy(contract, errors) {
       errors.push(`auditPolicy.allowedAuthAuditFields must not include forbidden raw field ${field}`);
     }
   }
-  if (contract.auditPolicy?.sessionIdentifier !== "shortSessionID") {
-    errors.push("auditPolicy.sessionIdentifier must stay shortSessionID");
+  if (contract.auditPolicy?.sessionIdentifier !== "none") {
+    errors.push("auditPolicy.sessionIdentifier must stay none");
   }
   for (const relativePath of values(contract.auditPolicy?.runtimeEvidence)) {
     if (!relativeExistingPath(relativePath)) {
@@ -938,16 +947,18 @@ function validateAuditPolicy(contract, errors) {
   if (relativeExistingPath(serverPath)) {
     const server = fs.readFileSync(path.resolve(repoRoot, serverPath), "utf8");
     const recordAuditStart = server.indexOf("func (s *Server) recordAudit(");
-    const shortSessionStart = server.indexOf("func shortSessionID(", recordAuditStart);
-    const recordAuditBody = recordAuditStart >= 0 && shortSessionStart > recordAuditStart ? server.slice(recordAuditStart, shortSessionStart) : "";
+    const nextFunctionStart = server.indexOf("func newAuthAuditCode(", recordAuditStart);
+    const recordAuditBody = recordAuditStart >= 0 && nextFunctionStart > recordAuditStart ? server.slice(recordAuditStart, nextFunctionStart) : "";
     if (!recordAuditBody) {
-      errors.push(`${serverPath} must expose recordAudit before shortSessionID`);
+      errors.push(`${serverPath} must expose recordAudit before newAuthAuditCode`);
+    }
+    if (!recordAuditBody.includes("func (s *Server) recordAudit(code string, name string, username string, provider string) error")) {
+      errors.push(`${serverPath} recordAudit must not accept a session credential parameter`);
     }
     for (const snippet of [
       '"actor":     username',
       '"action":    code',
       '"resource":  "auth"',
-      '"sessionId": shortSessionID(token)',
       '"createdAt": s.now().UTC().Format(time.RFC3339)',
       'values["provider"] = provider',
     ]) {
@@ -961,11 +972,14 @@ function validateAuditPolicy(contract, errors) {
         errors.push(`${serverPath} recordAudit must not store forbidden raw audit field ${field}`);
       }
     }
+    if (server.includes("func shortSessionID(")) {
+      errors.push(`${serverPath} must not expose shortSessionID`);
+    }
   }
   const authDocPath = "docs/platform-auth.md";
   if (relativeExistingPath(authDocPath)) {
     const authDoc = fs.readFileSync(path.resolve(repoRoot, authDocPath), "utf8");
-    for (const phrase of ["shortened session id", "does not store the raw bearer token", "omitting raw JWT secrets, raw bearer tokens, OpenID, UnionID, phone numbers and API token values"]) {
+    for (const phrase of ["does not store the raw session handle, its digest or a shortened derivative", "omitting raw JWT secrets, raw bearer tokens, OpenID, UnionID, phone numbers and API token values"]) {
       if (!authDoc.includes(phrase)) {
         errors.push(`${authDocPath} must document auth audit redaction phrase: ${phrase}`);
       }

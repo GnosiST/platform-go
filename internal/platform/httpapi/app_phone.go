@@ -177,7 +177,7 @@ func (s *Server) appPhoneCreateBinding(ctx *gin.Context) {
 		writeAuthError(ctx, http.StatusInternalServerError, "APP_PHONE_VERIFICATION_UPDATE_FAILED", "app phone verification update failed")
 		return
 	}
-	if err := s.recordAudit("app.phone.bind", "App Phone Bind", username, "phone", appSession.Token); err != nil {
+	if err := s.recordAudit("app.phone.bind", "App Phone Bind", username, "phone"); err != nil {
 		writeAuthError(ctx, http.StatusInternalServerError, "APP_PHONE_AUDIT_FAILED", "app phone audit failed")
 		return
 	}

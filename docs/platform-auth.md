@@ -86,6 +86,8 @@ Sessions are managed through a repository-backed session store.
 - File persistence is useful for local demos and early deployments.
 - GORM persistence is selected before file persistence when both are configured.
 - The platform repository defines the adapter boundary and creates `platform_sessions` through the shared GORM storage opener.
+- Repositories persist only `sha256:v1` session-token digests. Raw handles exist only at the Store and JWT call boundaries and are never written to file, SQL or GORM storage.
+- File v1 snapshots and SQL/GORM tables with the legacy raw `token` column are replaced with empty digest-only storage during initialization, intentionally revoking those historical sessions.
 - When an invalidation bus is configured, successful login, refresh and logout publish a `sessions` invalidation event. Peer API instances reload their repository-backed session store after that event, so issued, renewed and revoked sessions converge across instances that share the same session repository.
 
 ## Admin UI Flow
@@ -112,7 +114,7 @@ Successful login and logout write audit records when the `audit-logs` admin reso
 - `app.auth.login`
 - `app.auth.logout`
 
-The audit record stores actor, action, resource, provider when available, created time and a shortened session id. It does not store the raw bearer token.
+The audit record stores actor, action, resource, provider when available and created time. It does not store the raw session handle, its digest or a shortened derivative.
 
 Generic admin resource create, update and delete handlers also write `admin_resource.create`, `admin_resource.update` and `admin_resource.delete` records after successful writes. These records store the actor, resource code, target id, target code, target name and created time, and skip the audit resource itself to avoid recursive audit rows. The `audit-logs` resource is read-focused: its runtime schema exposes structured query fields but no create/edit form fields.
 

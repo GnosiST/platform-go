@@ -140,6 +140,40 @@ func TestRepositoryBackedStoreSeesExternalSessionChangesWithoutReload(t *testing
 	}
 }
 
+func TestRepositoryBackedStoreResolvesRenewsAndRevokesRawTokenThroughDigest(t *testing.T) {
+	now := time.Date(2026, 7, 12, 9, 0, 0, 0, time.UTC)
+	path := filepath.Join(t.TempDir(), "sessions.json")
+	store, err := NewRepositoryBackedStore(Options{TTL: time.Hour, Now: func() time.Time { return now }}, NewFileRepository(path))
+	if err != nil {
+		t.Fatalf("NewRepositoryBackedStore() error = %v", err)
+	}
+	issued, err := store.Issue("ops")
+	if err != nil {
+		t.Fatalf("Issue() error = %v", err)
+	}
+	if _, ok := store.sessions[DigestToken(issued.Token)]; !ok {
+		t.Fatalf("store sessions are not keyed by digest %q", DigestToken(issued.Token))
+	}
+	if _, ok := store.sessions[issued.Token]; ok {
+		t.Fatalf("store sessions contain raw token key %q", issued.Token)
+	}
+	resolved, ok := store.Resolve(issued.Token)
+	if !ok || resolved.Token != issued.Token {
+		t.Fatalf("Resolve(raw) = %+v, %v; want raw token restored only at Store boundary", resolved, ok)
+	}
+	now = now.Add(30 * time.Minute)
+	renewed, ok := store.Renew(issued.Token)
+	if !ok || renewed.Token != issued.Token || !renewed.ExpiresAt.Equal(now.Add(time.Hour)) {
+		t.Fatalf("Renew(raw) = %+v, %v; want renewed raw Store result", renewed, ok)
+	}
+	if !store.Revoke(issued.Token) {
+		t.Fatal("Revoke(raw) = false, want true")
+	}
+	if _, ok := store.Resolve(issued.Token); ok {
+		t.Fatal("Resolve(raw) after revoke = true, want false")
+	}
+}
+
 func TestFileRepositoryPersistsIssuedAndRevokedSessions(t *testing.T) {
 	now := time.Date(2026, 7, 4, 9, 0, 0, 0, time.UTC)
 	path := filepath.Join(t.TempDir(), "sessions.json")
@@ -192,9 +226,9 @@ func TestStoreDoesNotAddLocalSessionWhenRepositoryCreateFails(t *testing.T) {
 func TestStoreDoesNotReplaceLocalSessionWhenRepositoryRenewFails(t *testing.T) {
 	now := time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)
 	wantErr := errors.New("renew failed")
-	existing := testSession("active", "admin", now, now.Add(time.Hour), time.Time{})
+	existing := testStoredSession("active", "admin", now, now.Add(time.Hour), time.Time{})
 	repository := &failingSessionRepository{
-		snapshot: Snapshot{Sessions: map[string]Session{existing.Token: existing}},
+		snapshot: Snapshot{Sessions: map[string]StoredSession{existing.TokenDigest: existing}},
 		renewErr: wantErr,
 	}
 	store, err := NewRepositoryBackedStore(Options{TTL: time.Hour, Now: func() time.Time { return now }}, repository)
@@ -202,10 +236,10 @@ func TestStoreDoesNotReplaceLocalSessionWhenRepositoryRenewFails(t *testing.T) {
 		t.Fatalf("NewRepositoryBackedStore() error = %v", err)
 	}
 
-	if _, ok, err := store.RenewContext(context.Background(), existing.Token); ok || !errors.Is(err, wantErr) {
+	if _, ok, err := store.RenewContext(context.Background(), "active"); ok || !errors.Is(err, wantErr) {
 		t.Fatalf("RenewContext() = _, %v, %v; want false, %v", ok, err, wantErr)
 	}
-	if got := store.sessions[existing.Token]; !got.ExpiresAt.Equal(existing.ExpiresAt) {
+	if got := store.sessions[existing.TokenDigest]; !got.ExpiresAt.Equal(existing.ExpiresAt) {
 		t.Fatalf("local expiresAt = %s after Renew error, want %s", got.ExpiresAt, existing.ExpiresAt)
 	}
 }
@@ -213,9 +247,9 @@ func TestStoreDoesNotReplaceLocalSessionWhenRepositoryRenewFails(t *testing.T) {
 func TestStoreDoesNotReplaceLocalSessionWhenRepositoryRevokeFails(t *testing.T) {
 	now := time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)
 	wantErr := errors.New("revoke failed")
-	existing := testSession("active", "admin", now, now.Add(time.Hour), time.Time{})
+	existing := testStoredSession("active", "admin", now, now.Add(time.Hour), time.Time{})
 	repository := &failingSessionRepository{
-		snapshot:  Snapshot{Sessions: map[string]Session{existing.Token: existing}},
+		snapshot:  Snapshot{Sessions: map[string]StoredSession{existing.TokenDigest: existing}},
 		revokeErr: wantErr,
 	}
 	store, err := NewRepositoryBackedStore(Options{TTL: time.Hour, Now: func() time.Time { return now }}, repository)
@@ -223,10 +257,10 @@ func TestStoreDoesNotReplaceLocalSessionWhenRepositoryRevokeFails(t *testing.T) 
 		t.Fatalf("NewRepositoryBackedStore() error = %v", err)
 	}
 
-	if ok, err := store.RevokeContext(context.Background(), existing.Token); ok || !errors.Is(err, wantErr) {
+	if ok, err := store.RevokeContext(context.Background(), "active"); ok || !errors.Is(err, wantErr) {
 		t.Fatalf("RevokeContext() = %v, %v; want false, %v", ok, err, wantErr)
 	}
-	if got := store.sessions[existing.Token]; !got.RevokedAt.IsZero() {
+	if got := store.sessions[existing.TokenDigest]; !got.RevokedAt.IsZero() {
 		t.Fatalf("local revokedAt = %s after Revoke error, want zero", got.RevokedAt)
 	}
 }
@@ -288,7 +322,7 @@ func TestStoreReloadCannotOverwriteConcurrentSuccessfulIssue(t *testing.T) {
 		if err := <-reloadDone; err != nil {
 			t.Fatalf("Reload() error = %v", err)
 		}
-		if _, ok := store.sessions[result.session.Token]; !ok {
+		if _, ok := store.sessions[DigestToken(result.session.Token)]; !ok {
 			t.Fatalf("Reload() overwrote a successful concurrent Issue()")
 		}
 	case <-time.After(250 * time.Millisecond):
@@ -301,7 +335,7 @@ func TestStoreReloadCannotOverwriteConcurrentSuccessfulIssue(t *testing.T) {
 		if result.err != nil {
 			t.Fatalf("Issue() error = %v", result.err)
 		}
-		if _, ok := store.sessions[result.session.Token]; !ok {
+		if _, ok := store.sessions[DigestToken(result.session.Token)]; !ok {
 			t.Fatalf("local session missing after serialized Reload() and Issue()")
 		}
 	}
@@ -317,6 +351,16 @@ func testSession(token string, username string, issuedAt time.Time, expiresAt ti
 	}
 }
 
+func testStoredSession(rawToken string, username string, issuedAt time.Time, expiresAt time.Time, revokedAt time.Time) StoredSession {
+	return StoredSession{
+		TokenDigest: DigestToken(rawToken),
+		Username:    username,
+		IssuedAt:    issuedAt,
+		ExpiresAt:   expiresAt,
+		RevokedAt:   revokedAt,
+	}
+}
+
 type failingSessionRepository struct {
 	snapshot   Snapshot
 	createErr  error
@@ -326,28 +370,28 @@ type failingSessionRepository struct {
 }
 
 func (r *failingSessionRepository) Load(context.Context) (Snapshot, error) {
-	return Snapshot{Sessions: cloneSessions(r.snapshot.Sessions)}, nil
+	return Snapshot{Sessions: cloneStoredSessions(r.snapshot.Sessions)}, nil
 }
 
-func (r *failingSessionRepository) Create(context.Context, Session) error {
+func (r *failingSessionRepository) Create(context.Context, StoredSession) error {
 	return r.createErr
 }
 
-func (r *failingSessionRepository) Resolve(context.Context, string, time.Time) (Session, bool, error) {
-	return Session{}, false, r.resolveErr
+func (r *failingSessionRepository) Resolve(context.Context, string, time.Time) (StoredSession, bool, error) {
+	return StoredSession{}, false, r.resolveErr
 }
 
-func (r *failingSessionRepository) Renew(context.Context, string, time.Time, time.Time) (Session, bool, error) {
-	return Session{}, false, r.renewErr
+func (r *failingSessionRepository) Renew(context.Context, string, time.Time, time.Time) (StoredSession, bool, error) {
+	return StoredSession{}, false, r.renewErr
 }
 
-func (r *failingSessionRepository) Revoke(context.Context, string, time.Time) (Session, bool, error) {
-	return Session{}, false, r.revokeErr
+func (r *failingSessionRepository) Revoke(context.Context, string, time.Time) (StoredSession, bool, error) {
+	return StoredSession{}, false, r.revokeErr
 }
 
 type blockingReloadRepository struct {
 	mu           sync.Mutex
-	sessions     map[string]Session
+	sessions     map[string]StoredSession
 	blockLoad    bool
 	loadStarted  chan struct{}
 	loadRelease  chan struct{}
@@ -356,7 +400,7 @@ type blockingReloadRepository struct {
 }
 
 func newBlockingReloadRepository() *blockingReloadRepository {
-	return &blockingReloadRepository{sessions: map[string]Session{}}
+	return &blockingReloadRepository{sessions: map[string]StoredSession{}}
 }
 
 func (r *blockingReloadRepository) blockNextLoad() {
@@ -379,7 +423,7 @@ func (r *blockingReloadRepository) allowCreateReturn() {
 
 func (r *blockingReloadRepository) Load(context.Context) (Snapshot, error) {
 	r.mu.Lock()
-	snapshot := Snapshot{Sessions: cloneSessions(r.sessions)}
+	snapshot := Snapshot{Sessions: cloneStoredSessions(r.sessions)}
 	if !r.blockLoad {
 		r.mu.Unlock()
 		return snapshot, nil
@@ -393,45 +437,45 @@ func (r *blockingReloadRepository) Load(context.Context) (Snapshot, error) {
 	return snapshot, nil
 }
 
-func (r *blockingReloadRepository) Create(_ context.Context, session Session) error {
+func (r *blockingReloadRepository) Create(_ context.Context, session StoredSession) error {
 	close(r.createCalled)
 	<-r.createReturn
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.sessions[session.Token] = session
+	r.sessions[session.TokenDigest] = session
 	return nil
 }
 
-func (r *blockingReloadRepository) Resolve(_ context.Context, token string, now time.Time) (Session, bool, error) {
+func (r *blockingReloadRepository) Resolve(_ context.Context, tokenDigest string, now time.Time) (StoredSession, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	session, ok := r.sessions[token]
+	session, ok := r.sessions[tokenDigest]
 	if !ok || !session.RevokedAt.IsZero() || !now.Before(session.ExpiresAt) {
-		return Session{}, false, nil
+		return StoredSession{}, false, nil
 	}
 	return session, true, nil
 }
 
-func (r *blockingReloadRepository) Renew(_ context.Context, token string, now time.Time, expiresAt time.Time) (Session, bool, error) {
+func (r *blockingReloadRepository) Renew(_ context.Context, tokenDigest string, now time.Time, expiresAt time.Time) (StoredSession, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	session, ok := r.sessions[token]
+	session, ok := r.sessions[tokenDigest]
 	if !ok || !session.RevokedAt.IsZero() || !now.Before(session.ExpiresAt) {
-		return Session{}, false, nil
+		return StoredSession{}, false, nil
 	}
 	session.ExpiresAt = expiresAt
-	r.sessions[token] = session
+	r.sessions[tokenDigest] = session
 	return session, true, nil
 }
 
-func (r *blockingReloadRepository) Revoke(_ context.Context, token string, now time.Time) (Session, bool, error) {
+func (r *blockingReloadRepository) Revoke(_ context.Context, tokenDigest string, now time.Time) (StoredSession, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	session, ok := r.sessions[token]
+	session, ok := r.sessions[tokenDigest]
 	if !ok || !session.RevokedAt.IsZero() || !now.Before(session.ExpiresAt) {
-		return Session{}, false, nil
+		return StoredSession{}, false, nil
 	}
 	session.RevokedAt = now
-	r.sessions[token] = session
+	r.sessions[tokenDigest] = session
 	return session, true, nil
 }

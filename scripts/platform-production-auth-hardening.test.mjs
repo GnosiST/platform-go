@@ -150,6 +150,24 @@ describe("validate-platform-production-auth-hardening", () => {
     assert.match(result.stderr, /refreshTokenFamily defaultRuntime must stay disabled until production approval is attached/);
   });
 
+  it("rejects session stores that persist raw handles or preserve legacy sessions", () => {
+    const contract = readJSON("resources/platform-production-auth-hardening.json");
+    contract.sessionCredentialPolicy.sessionStore.tokenPersistence = "raw-token";
+    contract.sessionCredentialPolicy.sessionStore.rawTokenPersistenceAllowed = true;
+    contract.sessionCredentialPolicy.sessionStore.legacyRawSessionMigration = "preserve";
+    const contractPath = tempJSON("platform-production-auth-hardening.json", contract);
+    const review = readJSON("resources/generated/production-auth-promotion-review.json");
+    review.sources.productionAuthHardening = path.relative(repoRoot, contractPath).split(path.sep).join("/");
+    const reviewPath = tempJSON("production-auth-promotion-review.json", review);
+
+    const result = runValidator(["--contract", contractPath, "--promotion-review", reviewPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /sessionCredentialPolicy.sessionStore.tokenPersistence must stay sha256:v1-digest-only/);
+    assert.match(result.stderr, /sessionCredentialPolicy.sessionStore.rawTokenPersistenceAllowed must stay false/);
+    assert.match(result.stderr, /sessionCredentialPolicy.sessionStore.legacyRawSessionMigration must stay replace-and-revoke/);
+  });
+
   it("rejects refresh-token family policies without a production session specification", () => {
     const contract = readJSON("resources/platform-production-auth-hardening.json");
     delete contract.sessionCredentialPolicy.productionSessionPolicy;
@@ -574,7 +592,7 @@ describe("validate-platform-production-auth-hardening", () => {
 
   it("rejects auth audit policies that allow raw credential fields or drop runtime evidence", () => {
     const contract = readJSON("resources/platform-production-auth-hardening.json");
-    contract.auditPolicy.allowedAuthAuditFields = ["actor", "action", "resource", "jwt"];
+    contract.auditPolicy.allowedAuthAuditFields = ["actor", "action", "resource", "jwt", "sessionId"];
     contract.auditPolicy.sessionIdentifier = "rawSessionToken";
     contract.auditPolicy.runtimeEvidence = ["missing/server.go"];
     const contractPath = tempJSON("platform-production-auth-hardening.json", contract);
@@ -582,10 +600,24 @@ describe("validate-platform-production-auth-hardening", () => {
     const result = runValidator(["--contract", contractPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /auditPolicy.allowedAuthAuditFields must include sessionId/);
     assert.match(result.stderr, /auditPolicy.allowedAuthAuditFields must not include forbidden raw field jwt/);
-    assert.match(result.stderr, /auditPolicy.sessionIdentifier must stay shortSessionID/);
+    assert.match(result.stderr, /auditPolicy.allowedAuthAuditFields must not include forbidden raw field sessionId/);
+    assert.match(result.stderr, /auditPolicy.sessionIdentifier must stay none/);
     assert.match(result.stderr, /auditPolicy.runtimeEvidence path is missing or unsafe: missing\/server.go/);
+  });
+
+  it("accepts credential-free auth audits without a session identifier", () => {
+    const contract = readJSON("resources/platform-production-auth-hardening.json");
+    contract.auditPolicy.allowedAuthAuditFields = ["actor", "action", "resource", "provider", "createdAt"];
+    contract.auditPolicy.sessionIdentifier = "none";
+    const contractPath = tempJSON("platform-production-auth-hardening.json", contract);
+    const review = readJSON("resources/generated/production-auth-promotion-review.json");
+    review.sources.productionAuthHardening = path.relative(repoRoot, contractPath).split(path.sep).join("/");
+    const reviewPath = tempJSON("production-auth-promotion-review.json", review);
+
+    const result = runValidator(["--contract", contractPath, "--promotion-review", reviewPath]);
+
+    assert.equal(result.status, 0, result.stderr);
   });
 
   it("accepts task graph closeout while refresh-token-family runtime remains disabled by default", () => {

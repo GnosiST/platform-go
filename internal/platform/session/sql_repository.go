@@ -28,18 +28,18 @@ func NewSQLRepository(ctx context.Context, db *sql.DB) (*SQLRepository, error) {
 }
 
 func (r *SQLRepository) Load(ctx context.Context) (Snapshot, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT token, username, issued_at, expires_at, revoked_at FROM `+sessionsTable+` ORDER BY token`)
+	rows, err := r.db.QueryContext(ctx, `SELECT token_digest, username, issued_at, expires_at, revoked_at FROM `+sessionsTable+` ORDER BY token_digest`)
 	if err != nil {
 		return Snapshot{}, err
 	}
 	defer rows.Close()
-	snapshot := Snapshot{Sessions: map[string]Session{}}
+	snapshot := Snapshot{Sessions: map[string]StoredSession{}}
 	for rows.Next() {
 		session, err := scanSQLSession(rows)
 		if err != nil {
 			return Snapshot{}, err
 		}
-		snapshot.Sessions[session.Token] = session
+		snapshot.Sessions[session.TokenDigest] = session
 	}
 	if err := rows.Err(); err != nil {
 		return Snapshot{}, err
@@ -47,9 +47,9 @@ func (r *SQLRepository) Load(ctx context.Context) (Snapshot, error) {
 	return snapshot, nil
 }
 
-func (r *SQLRepository) Create(ctx context.Context, session Session) error {
-	_, err := r.db.ExecContext(ctx, `INSERT INTO `+sessionsTable+` (token, username, issued_at, expires_at, revoked_at) VALUES (?, ?, ?, ?, ?)`,
-		session.Token,
+func (r *SQLRepository) Create(ctx context.Context, session StoredSession) error {
+	_, err := r.db.ExecContext(ctx, `INSERT INTO `+sessionsTable+` (token_digest, username, issued_at, expires_at, revoked_at) VALUES (?, ?, ?, ?, ?)`,
+		session.TokenDigest,
 		session.Username,
 		formatSessionTime(session.IssuedAt),
 		formatSessionTime(session.ExpiresAt),
@@ -58,66 +58,104 @@ func (r *SQLRepository) Create(ctx context.Context, session Session) error {
 	return err
 }
 
-func (r *SQLRepository) Resolve(ctx context.Context, token string, now time.Time) (Session, bool, error) {
-	return querySQLSession(ctx, r.db, `SELECT token, username, issued_at, expires_at, revoked_at FROM `+sessionsTable+` WHERE token = ? AND (revoked_at IS NULL OR revoked_at = '') AND expires_at > ?`, token, formatSessionTime(now))
+func (r *SQLRepository) Resolve(ctx context.Context, tokenDigest string, now time.Time) (StoredSession, bool, error) {
+	return querySQLSession(ctx, r.db, `SELECT token_digest, username, issued_at, expires_at, revoked_at FROM `+sessionsTable+` WHERE token_digest = ? AND (revoked_at IS NULL OR revoked_at = '') AND expires_at > ?`, tokenDigest, formatSessionTime(now))
 }
 
-func (r *SQLRepository) Renew(ctx context.Context, token string, now time.Time, expiresAt time.Time) (Session, bool, error) {
+func (r *SQLRepository) Renew(ctx context.Context, tokenDigest string, now time.Time, expiresAt time.Time) (StoredSession, bool, error) {
 	return r.updateActive(ctx,
-		`UPDATE `+sessionsTable+` SET expires_at = ? WHERE token = ? AND (revoked_at IS NULL OR revoked_at = '') AND expires_at > ?`,
-		[]any{formatSessionTime(expiresAt), token, formatSessionTime(now)},
-		token,
+		`UPDATE `+sessionsTable+` SET expires_at = ? WHERE token_digest = ? AND (revoked_at IS NULL OR revoked_at = '') AND expires_at > ?`,
+		[]any{formatSessionTime(expiresAt), tokenDigest, formatSessionTime(now)},
+		tokenDigest,
 	)
 }
 
-func (r *SQLRepository) Revoke(ctx context.Context, token string, now time.Time) (Session, bool, error) {
+func (r *SQLRepository) Revoke(ctx context.Context, tokenDigest string, now time.Time) (StoredSession, bool, error) {
 	return r.updateActive(ctx,
-		`UPDATE `+sessionsTable+` SET revoked_at = ? WHERE token = ? AND (revoked_at IS NULL OR revoked_at = '') AND expires_at > ?`,
-		[]any{formatSessionTime(now), token, formatSessionTime(now)},
-		token,
+		`UPDATE `+sessionsTable+` SET revoked_at = ? WHERE token_digest = ? AND (revoked_at IS NULL OR revoked_at = '') AND expires_at > ?`,
+		[]any{formatSessionTime(now), tokenDigest, formatSessionTime(now)},
+		tokenDigest,
 	)
 }
 
-func (r *SQLRepository) updateActive(ctx context.Context, statement string, args []any, token string) (Session, bool, error) {
+func (r *SQLRepository) updateActive(ctx context.Context, statement string, args []any, tokenDigest string) (StoredSession, bool, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return Session{}, false, err
+		return StoredSession{}, false, err
 	}
 	defer func() { _ = tx.Rollback() }()
 	result, err := tx.ExecContext(ctx, statement, args...)
 	if err != nil {
-		return Session{}, false, err
+		return StoredSession{}, false, err
 	}
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return Session{}, false, err
+		return StoredSession{}, false, err
 	}
 	if rowsAffected == 0 {
-		return Session{}, false, nil
+		return StoredSession{}, false, nil
 	}
-	session, ok, err := querySQLSession(ctx, tx, `SELECT token, username, issued_at, expires_at, revoked_at FROM `+sessionsTable+` WHERE token = ?`, token)
+	session, ok, err := querySQLSession(ctx, tx, `SELECT token_digest, username, issued_at, expires_at, revoked_at FROM `+sessionsTable+` WHERE token_digest = ?`, tokenDigest)
 	if err != nil {
-		return Session{}, false, err
+		return StoredSession{}, false, err
 	}
 	if !ok {
-		return Session{}, false, nil
+		return StoredSession{}, false, nil
 	}
 	if err := tx.Commit(); err != nil {
-		return Session{}, false, err
+		return StoredSession{}, false, err
 	}
 	return session, true, nil
 }
 
 func (r *SQLRepository) ensureSchema(ctx context.Context) error {
-	_, err := r.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS `+sessionsTable+` (
-token TEXT NOT NULL PRIMARY KEY,
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, createSQLSessionsTable); err != nil {
+		return err
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT * FROM `+sessionsTable+` WHERE 1 = 0`)
+	if err != nil {
+		return err
+	}
+	columnTypes, err := rows.ColumnTypes()
+	if closeErr := rows.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return err
+	}
+	hasDigest := false
+	hasRawToken := false
+	for _, columnType := range columnTypes {
+		switch strings.ToLower(columnType.Name()) {
+		case "token_digest":
+			hasDigest = true
+		case "token":
+			hasRawToken = true
+		}
+	}
+	if hasRawToken || !hasDigest {
+		if _, err := tx.ExecContext(ctx, `DROP TABLE `+sessionsTable); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, createSQLSessionsTable); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+const createSQLSessionsTable = `CREATE TABLE IF NOT EXISTS ` + sessionsTable + ` (
+token_digest TEXT NOT NULL PRIMARY KEY,
 username TEXT NOT NULL,
 issued_at TEXT NOT NULL,
 expires_at TEXT NOT NULL,
 revoked_at TEXT NOT NULL
-)`)
-	return err
-}
+)`
 
 func (r *SQLRepository) normalizeSessionTimes(ctx context.Context) error {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -125,20 +163,20 @@ func (r *SQLRepository) normalizeSessionTimes(ctx context.Context) error {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	rows, err := tx.QueryContext(ctx, `SELECT token, issued_at, expires_at, revoked_at FROM `+sessionsTable+` ORDER BY token`)
+	rows, err := tx.QueryContext(ctx, `SELECT token_digest, issued_at, expires_at, revoked_at FROM `+sessionsTable+` ORDER BY token_digest`)
 	if err != nil {
 		return err
 	}
 	type timeRecord struct {
-		token     string
-		issuedAt  string
-		expiresAt string
-		revokedAt sql.NullString
+		tokenDigest string
+		issuedAt    string
+		expiresAt   string
+		revokedAt   sql.NullString
 	}
 	records := []timeRecord{}
 	for rows.Next() {
 		var record timeRecord
-		if err := rows.Scan(&record.token, &record.issuedAt, &record.expiresAt, &record.revokedAt); err != nil {
+		if err := rows.Scan(&record.tokenDigest, &record.issuedAt, &record.expiresAt, &record.revokedAt); err != nil {
 			_ = rows.Close()
 			return err
 		}
@@ -167,8 +205,8 @@ func (r *SQLRepository) normalizeSessionTimes(ctx context.Context) error {
 		if record.issuedAt == normalizedIssuedAt && record.expiresAt == normalizedExpiresAt && nullableSessionTimeEqual(record.revokedAt, normalizedRevokedAt) {
 			continue
 		}
-		statement := `UPDATE ` + sessionsTable + ` SET issued_at = ?, expires_at = ?, revoked_at = ? WHERE token = ? AND issued_at = ? AND expires_at = ?`
-		args := []any{normalizedIssuedAt, normalizedExpiresAt, normalizedRevokedAt, record.token, record.issuedAt, record.expiresAt}
+		statement := `UPDATE ` + sessionsTable + ` SET issued_at = ?, expires_at = ?, revoked_at = ? WHERE token_digest = ? AND issued_at = ? AND expires_at = ?`
+		args := []any{normalizedIssuedAt, normalizedExpiresAt, normalizedRevokedAt, record.tokenDigest, record.issuedAt, record.expiresAt}
 		if record.revokedAt.Valid {
 			statement += ` AND revoked_at = ?`
 			args = append(args, record.revokedAt.String)
@@ -190,35 +228,35 @@ type sqlSessionScanner interface {
 	Scan(...any) error
 }
 
-func querySQLSession(ctx context.Context, queryer sqlSessionQueryer, query string, args ...any) (Session, bool, error) {
+func querySQLSession(ctx context.Context, queryer sqlSessionQueryer, query string, args ...any) (StoredSession, bool, error) {
 	session, err := scanSQLSession(queryer.QueryRowContext(ctx, query, args...))
 	if errors.Is(err, sql.ErrNoRows) {
-		return Session{}, false, nil
+		return StoredSession{}, false, nil
 	}
 	if err != nil {
-		return Session{}, false, err
+		return StoredSession{}, false, err
 	}
 	return session, true, nil
 }
 
-func scanSQLSession(scanner sqlSessionScanner) (Session, error) {
-	var session Session
+func scanSQLSession(scanner sqlSessionScanner) (StoredSession, error) {
+	var session StoredSession
 	var issuedAt string
 	var expiresAt string
 	var revokedAt sql.NullString
-	if err := scanner.Scan(&session.Token, &session.Username, &issuedAt, &expiresAt, &revokedAt); err != nil {
-		return Session{}, err
+	if err := scanner.Scan(&session.TokenDigest, &session.Username, &issuedAt, &expiresAt, &revokedAt); err != nil {
+		return StoredSession{}, err
 	}
 	var err error
 	if session.IssuedAt, err = parseSessionTime(issuedAt); err != nil {
-		return Session{}, err
+		return StoredSession{}, err
 	}
 	if session.ExpiresAt, err = parseSessionTime(expiresAt); err != nil {
-		return Session{}, err
+		return StoredSession{}, err
 	}
 	if value := strings.TrimSpace(revokedAt.String); revokedAt.Valid && value != "" {
 		if session.RevokedAt, err = parseSessionTime(value); err != nil {
-			return Session{}, err
+			return StoredSession{}, err
 		}
 	}
 	return session, nil
