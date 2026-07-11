@@ -36,6 +36,21 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stdout, /Admin UI contract validation passed/);
   });
 
+  it("rejects optional personnel copy that is labeled as the organization capability", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/capabilities/metadata.ts",
+      "人员与岗位",
+      "人员组织",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Optional personnel capability must not be labeled as the organization capability/);
+  });
+
   it("rejects a table fork that drops the shared pagination bar", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(

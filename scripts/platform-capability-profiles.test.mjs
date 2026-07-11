@@ -153,6 +153,9 @@ describe("validate-platform-capability-profiles", () => {
     assert.ok(personnelProfile.mustIncludeResources.includes("positions"));
     assert.ok(personnelProfile.mustIncludeResources.includes("position-assignments"));
     assert.ok(!personnelProfile.business, "personnel is a reusable platform extension, not a business capability");
+    assert.equal(personnelProfile.label.zh, "人员与岗位增强");
+    assert.equal(personnelProfile.label.en, "Personnel & Positions Platform Foundation");
+    assert.match(personnelProfile.purpose, /organization units remain part of the default platform foundation/i);
   });
 
   it("rejects foundation profiles that stop declaring organization, role-group or area governance resources", () => {

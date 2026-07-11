@@ -14,6 +14,7 @@ const root = resolve(defaultRoot, argValue("--root", defaultRoot));
 const files = {
   app: readSource("admin/src/App.tsx"),
   authProvider: readSource("admin/src/platform/refine/authProvider.ts"),
+  capabilityMetadata: readSource("admin/src/platform/capabilities/metadata.ts"),
   client: readSource("admin/src/platform/api/client.ts"),
   primitives: readSource("admin/src/platform/ui/AdminPrimitives.tsx"),
   resourceConsole: readSource("admin/src/platform/resources/GenericResourceConsole.tsx"),
@@ -65,6 +66,9 @@ requireIncludes(files.app, "setSessionExpired(false);", "Successful login must c
 requireNotIncludes(files.app, "current === dictionary.sessionExpired", "App must not identify session expiry by comparing localized strings.");
 requireIncludes(files.client, "parsePlatformResponse", "Direct fetch helpers must share response normalization.");
 requireIncludes(files.authProvider, "error instanceof AdminAPIError", "Refine auth errors must use the typed admin API error contract.");
+requireIncludes(files.capabilityMetadata, 'label: { zh: "身份与组织", en: "Identity & Organization" }', "Core identity capability must make default organization ownership explicit.");
+requireIncludes(files.capabilityMetadata, 'makeOptional("personnel", { zh: "人员与岗位", en: "Personnel & Positions" }', "Optional personnel capability must not be labeled as the organization capability.");
+requireIncludes(files.capabilityMetadata, "默认平台底座已提供组织机构", "Optional personnel copy must state that organization units are part of the default foundation.");
 
 requireIncludes(files.shell, "SystemSettingsDrawer", "AdminShell must expose account/system settings through the shared drawer.");
 requireIncludes(files.shell, "user-menu-trigger", "AdminShell must keep the avatar/settings trigger in the topbar.");

@@ -147,10 +147,10 @@
     {
       "id": "platform-personnel-ready",
       "label": {
-        "zh": "人员组织增强",
-        "en": "Personnel-Ready Platform Foundation"
+        "zh": "人员与岗位增强",
+        "en": "Personnel & Positions Platform Foundation"
       },
-      "purpose": "Default platform foundation plus optional personnel profiles, positions and position assignments for enterprise organization management.",
+      "purpose": "Default platform foundation plus optional personnel profiles, positions and position assignments; organization units remain part of the default platform foundation.",
       "capabilities": [
         "tenant",
         "identity",
