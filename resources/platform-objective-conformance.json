@@ -27,7 +27,7 @@
     "requiresResourceLocks": true,
     "requiresDependencyConflictChecks": true,
     "requiresTaskGraphBeforeNewNode": true,
-    "requiredUnfinishedNodes": []
+    "requiredUnfinishedNodes": ["production-admin-oidc-auth"]
   },
   "capabilityPolicy": {
     "contract": "resources/platform-capability-contracts.json",
@@ -57,10 +57,10 @@
     "fullStackVercelGo": "requires-separate-adapter-spec"
   },
   "completionPolicy": {
-    "goalCompletionStatus": "complete",
+    "goalCompletionStatus": "not-complete-controlled",
     "mustNotMarkCompleteWhileBlockersActive": true,
     "mustNotSelfCertifyExternalApprovalEvidence": true,
-    "controlledBlockers": []
+    "controlledBlockers": ["production-admin-oidc-auth"]
   },
   "futurePromotionGates": [
     {

@@ -238,6 +238,23 @@ function validateRuntimeCacheInvalidation(capability, errors) {
   }
 }
 
+function validateProductionAuthHardening(capability, errors) {
+  if (!capability) {
+    return;
+  }
+  if (!values(capability.evidence?.sourcePaths).includes("resources/platform-foundation-task-graph.json")) {
+    errors.push("production-auth-hardening-gate must cite resources/platform-foundation-task-graph.json");
+  }
+  if (!values(capability.evidence?.tests).includes("internal/platform/authprovider/oidc/resolver_test.go")) {
+    errors.push("production-auth-hardening-gate must cite internal/platform/authprovider/oidc/resolver_test.go");
+  }
+  for (const requirement of ["production-like-oidc-rehearsal", "six-viewport-browser-acceptance", "neat-freak-cleanup-closeout"]) {
+    if (!values(capability.pendingEvidenceRequirements).includes(requirement)) {
+      errors.push(`production-auth-hardening-gate pendingEvidenceRequirements must include ${requirement}`);
+    }
+  }
+}
+
 function validateAdminAPIBoundaryQuerySecurity(capability, errors) {
   if (!capability) {
     return;
@@ -362,6 +379,7 @@ function validate() {
     }
   }
   validateSafeCodegenScaffold(capabilityByID.get("safe-codegen-scaffold"), errors);
+  validateProductionAuthHardening(capabilityByID.get("production-auth-hardening-gate"), errors);
   validateRuntimeCacheInvalidation(capabilityByID.get("runtime-cache-invalidation"), errors);
   validateAdminAPIBoundaryQuerySecurity(capabilityByID.get("admin-api-boundary-query-security"), errors);
   validateFileStorageAdminExperience(capabilityByID.get("file-storage-admin-experience"), errors);

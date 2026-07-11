@@ -1387,7 +1387,7 @@
         "en": "Production Auth Hardening Gate"
       },
       "status": "implemented",
-      "purpose": "Keep JWT session renewal, provider adapter controls, credential rotation and the implemented-disabled refresh-token-family runtime slice machine-checkable without enabling token-family behavior by default.",
+      "purpose": "Keep JWT session renewal, provider adapter controls, Admin-only OIDC governance, credential rotation and the implemented-disabled refresh-token-family runtime slice machine-checkable without enabling token-family behavior or approving OIDC production promotion by default.",
       "dependsOn": [
         "production-runtime-gate",
         "app-route-contracts",
@@ -1396,7 +1396,9 @@
       "evidence": {
         "sourcePaths": [
           "resources/platform-production-auth-hardening.json",
+          "resources/platform-foundation-task-graph.json",
           "scripts/generate-production-auth-promotion-review.mjs",
+          "docs/superpowers/specs/2026-07-11-production-admin-oidc-auth-design.md",
           "docs/platform-auth.md",
           "docs/platform-foundation-task-map.md",
           "docs/platform-roadmap.md",
@@ -1409,7 +1411,9 @@
           "scripts/validate-platform-production-auth-hardening.mjs"
         ],
         "tests": [
+          "internal/platform/authprovider/oidc/resolver_test.go",
           "scripts/platform-production-auth-hardening.test.mjs",
+          "scripts/platform-foundation-task-graph.test.mjs",
           "scripts/platform-production-readiness.test.mjs",
           "scripts/platform-operations-plan.test.mjs"
         ],
@@ -1441,6 +1445,14 @@
           {
             "path": "resources/platform-production-auth-hardening.json",
             "contains": "\"providerPromotionMatrix\""
+          },
+          {
+            "path": "resources/platform-production-auth-hardening.json",
+            "contains": "\"id\": \"oidc\""
+          },
+          {
+            "path": "resources/platform-foundation-task-graph.json",
+            "contains": "\"id\": \"production-admin-oidc-auth\""
           },
           {
             "path": "resources/platform-production-auth-hardening.json",
@@ -1651,7 +1663,12 @@
             "contains": "resources/platform-production-auth-hardening.json"
           }
         ]
-      }
+      },
+      "pendingEvidenceRequirements": [
+        "production-like-oidc-rehearsal",
+        "six-viewport-browser-acceptance",
+        "neat-freak-cleanup-closeout"
+      ]
     },
     {
       "id": "runtime-cache-invalidation",
@@ -2275,7 +2292,7 @@
         "requiredSourceSnippets": [
           {
             "path": "resources/platform-goal-completion-audit.json",
-            "contains": "\"completionStatus\": \"complete\""
+            "contains": "\"completionStatus\": \"not-complete-controlled\""
           },
           {
             "path": "resources/platform-goal-completion-audit.json",
@@ -2530,7 +2547,7 @@
           },
           {
             "path": "resources/platform-objective-conformance.json",
-            "contains": "\"goalCompletionStatus\": \"complete\""
+            "contains": "\"goalCompletionStatus\": \"not-complete-controlled\""
           },
           {
             "path": "resources/platform-objective-conformance.json",

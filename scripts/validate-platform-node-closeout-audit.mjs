@@ -93,6 +93,7 @@ function validate() {
   const tasks = values(taskGraph.tasks);
   const taskByID = new Map(tasks.map((task) => [task.id, task]));
   const implementedTasks = tasks.filter((task) => task.status === "implemented");
+  const unfinishedTasks = tasks.filter((task) => task.status !== "implemented");
   const closeouts = values(audit.nodeCloseouts);
   const closeoutByTaskID = new Map();
 
@@ -150,6 +151,25 @@ function validate() {
     if (!closeoutByTaskID.has(task.id)) {
       errors.push(`implemented task ${task.id} must declare node closeout evidence`);
     }
+  }
+
+  const pendingEvidence = values(audit.pendingNodeEvidence);
+  if (JSON.stringify(unfinishedTasks.map((task) => task.id)) !== JSON.stringify(["production-admin-oidc-auth"])) {
+    errors.push("node closeout audit must track only production-admin-oidc-auth as unfinished during Task 7 evidence collection");
+  }
+  if (pendingEvidence.length !== 1 || pendingEvidence[0]?.taskId !== "production-admin-oidc-auth") {
+    errors.push("pendingNodeEvidence must describe production-admin-oidc-auth");
+  } else {
+    const pending = pendingEvidence[0];
+    if (pending.status !== "pending" || pending.closeoutAllowed !== false) {
+      errors.push("pendingNodeEvidence.production-admin-oidc-auth must stay pending with closeoutAllowed false");
+    }
+    requireIncludes(
+      pending.missingEvidence,
+      ["production-like OIDC provider rehearsal", "six-viewport browser acceptance", "neat-freak cleanup evidence"],
+      "pendingNodeEvidence.production-admin-oidc-auth.missingEvidence",
+      errors,
+    );
   }
 
   return { audit, implementedCount: implementedTasks.length, errors };

@@ -114,6 +114,36 @@ describe("validate-platform-production-readiness", () => {
     assert.match(result.stderr, /missing required preflight command production-auth-hardening/);
   });
 
+  it("keeps Admin OIDC promotion evidence visible in production readiness", () => {
+    const readiness = readJSON("resources/platform-production-readiness.json");
+    const productionAuth = readiness.preflightCommands.find((command) => command.id === "production-auth-hardening");
+    const tokenRotation = readiness.operationPolicies.find((policy) => policy.id === "token-rotation");
+
+    assert.match(productionAuth.purpose, /Admin OIDC/);
+    assert.match(tokenRotation.purpose, /OIDC client credentials/);
+    assert.match(tokenRotation.rollbackRequirement, /OIDC provider rollback/);
+    assert.ok(tokenRotation.prohibitedActions.includes("promote Admin OIDC without production-like rehearsal, six-viewport browser acceptance and cleanup evidence"));
+  });
+
+  it("rejects production readiness that drops Admin OIDC promotion controls", () => {
+    const readiness = readJSON("resources/platform-production-readiness.json");
+    const productionAuth = readiness.preflightCommands.find((command) => command.id === "production-auth-hardening");
+    const tokenRotation = readiness.operationPolicies.find((policy) => policy.id === "token-rotation");
+    productionAuth.purpose = "Generic auth check.";
+    tokenRotation.purpose = "Generic token rotation.";
+    tokenRotation.rollbackRequirement = "Generic rollback.";
+    tokenRotation.prohibitedActions = tokenRotation.prohibitedActions.filter((item) => !item.startsWith("promote Admin OIDC"));
+    const readinessPath = tempJSON("platform-production-readiness.json", readiness);
+
+    const result = runValidator(["--readiness", readinessPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /production-auth-hardening purpose must mention Admin OIDC/);
+    assert.match(result.stderr, /token-rotation purpose must mention OIDC client credentials/);
+    assert.match(result.stderr, /token-rotation rollbackRequirement must mention OIDC provider rollback/);
+    assert.match(result.stderr, /token-rotation prohibitedActions must include production-like Admin OIDC evidence gate/);
+  });
+
   it("rejects missing refresh-token family promotion preflight", () => {
     const readiness = readJSON("resources/platform-production-readiness.json");
     readiness.preflightCommands = readiness.preflightCommands.filter((command) => command.id !== "refresh-token-family-promotion");

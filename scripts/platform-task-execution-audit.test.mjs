@@ -33,10 +33,10 @@ describe("validate-platform-task-execution-audit", () => {
     assert.match(result.stdout, /Validated platform task execution audit/);
   });
 
-  it("keeps zero unfinished nodes after production hardening and codegen skeleton closeout", () => {
+  it("tracks only the production Admin OIDC node as unfinished pending Task 8 evidence", () => {
     const audit = readJSON("resources/platform-task-execution-audit.json");
 
-    assert.deepEqual(audit.requiredUnfinishedNodes, []);
+    assert.deepEqual(audit.requiredUnfinishedNodes, ["production-admin-oidc-auth"]);
   });
 
   it("rejects execution audits that omit the admin API boundary validator", () => {
@@ -50,15 +50,15 @@ describe("validate-platform-task-execution-audit", () => {
     assert.match(result.stderr, /requiredValidators must include scripts\/validate-platform-admin-api-boundary\.mjs/);
   });
 
-  it("rejects reintroducing completed foundation nodes as unfinished", () => {
+  it("rejects tracking completed foundation nodes alongside the pending OIDC node", () => {
     const audit = readJSON("resources/platform-task-execution-audit.json");
-    audit.requiredUnfinishedNodes = ["source-writing-codegen-promotion"];
+    audit.requiredUnfinishedNodes = ["production-admin-oidc-auth", "source-writing-codegen-promotion"];
     const auditPath = tempJSON("platform-task-execution-audit.json", audit);
 
     const result = runValidator(["--audit", auditPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /requiredUnfinishedNodes must be empty after foundation completion/);
+    assert.match(result.stderr, /requiredUnfinishedNodes must contain only production-admin-oidc-auth during Task 7 evidence collection/);
   });
 
   it("rejects future promotion gates without status reason or completion gate", () => {

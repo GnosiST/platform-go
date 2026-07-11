@@ -334,6 +334,37 @@
           { "path": "internal/platform/authprovider/wechat/resolver_test.go", "contains": "TestResolverNormalizesProviderErrorForWechatErrorCode" },
           { "path": "internal/platform/authprovider/wechat/resolver_test.go", "contains": "TestResolverBacksConfiguredHTTPAppLoginWithoutLeakingProviderSubjects" }
         ]
+      },
+      {
+        "id": "oidc",
+        "capability": "admin-oidc",
+        "kind": "oidc",
+        "productionUsage": "optional-production-provider",
+        "adapterBoundary": "httpapi.AdminIdentityResolver",
+        "audiences": ["admin"],
+        "configKeys": ["PLATFORM_ADMIN_OIDC_ISSUER_URL", "PLATFORM_ADMIN_OIDC_CLIENT_ID", "PLATFORM_ADMIN_OIDC_CLIENT_SECRET", "PLATFORM_ADMIN_OIDC_REDIRECT_URL", "PLATFORM_ADMIN_OIDC_SCOPES"],
+        "requiredControls": ["admin-audience-only", "configured-provider-only-discovery-and-exchange", "issuer-validation", "signature-validation", "audience-validation", "nonce-validation", "state-validation", "pkce-s256-validation", "exact-redirect-url-validation", "explicit-identity-binding", "disabled-user-rejection", "provider-subject-redaction", "raw-provider-subject-never-in-response", "raw-provider-subject-never-in-audit", "provider-specific-error-normalization", "audit-redaction", "production-like-runtime-rehearsal"],
+        "requiresSecretOwner": true,
+        "rotationRunbookRequired": true,
+        "subjectRedactionRequired": true,
+        "unconfiguredProviderRejectionRequired": true,
+        "errorNormalizationRequired": true,
+        "productionLikeRehearsalRequired": true,
+        "rawCredentialExposureAllowed": false,
+        "rawSubjectExposureAllowed": false,
+        "manifestEvidence": [
+          { "path": "internal/platform/core/capabilities.go", "contains": "authProvider(\"oidc\", \"oidc\"" }
+        ],
+        "runtimeEvidence": [
+          { "path": "internal/platform/authprovider/resolver.go", "contains": "AdminIdentityResolverFromConfig" },
+          { "path": "internal/platform/authprovider/oidc/resolver.go", "contains": "ResolveAdminIdentity" },
+          { "path": "internal/platform/authprovider/oidc/resolver_test.go", "contains": "TestResolverStartsAndResolvesAdminIdentity" },
+          { "path": "internal/platform/authprovider/oidc/resolver_test.go", "contains": "TestResolverNormalizesAndRedactsUpstreamTokenError" },
+          { "path": "internal/platform/httpapi/admin_identity_test.go", "contains": "TestAdminIdentityBindingResolveDoesNotAutoCreate" },
+          { "path": "internal/platform/httpapi/server_test.go", "contains": "TestAppAuthLoginRejectsAdminOnlyOIDCProvider" },
+          { "path": "internal/platform/httpapi/server_test.go", "contains": "TestAdminOIDCAuthLoginRejectsMissingTransactionResolverBindingAndDisabledPrincipal" },
+          { "path": "cmd/platform-api/main.go", "contains": "ValidateAdminAuthReadiness" }
+        ]
       }
     ],
     "newProviderRequirements": ["manifest-declared-provider", "composition-root-injected-resolver", "config-key-contract", "secret-owner", "rotation-runbook", "hash-and-mask-subject-storage", "unconfigured-provider-rejection-test", "configured-provider-only-login-test", "provider-error-normalization-test", "audit-redaction-test"]

@@ -145,7 +145,8 @@
         "promotionDecision": "not-approved",
         "providerIds": [
           "demo",
-          "wechat"
+          "wechat",
+          "oidc"
         ],
         "requiredRuntimeTests": [
           "unconfigured-provider-rejection",
@@ -155,13 +156,25 @@
           "production-demo-capability-rejection"
         ],
         "requiredProviderControls": [
+          "admin-audience-only",
+          "audience-validation",
           "audit-redaction",
+          "configured-provider-only-discovery-and-exchange",
           "configured-provider-only-login",
+          "disabled-user-rejection",
+          "exact-redirect-url-validation",
+          "explicit-identity-binding",
+          "issuer-validation",
+          "nonce-validation",
+          "pkce-s256-validation",
+          "production-like-runtime-rehearsal",
           "provider-specific-error-normalization",
           "provider-subject-redaction",
           "raw-provider-subject-never-in-audit",
           "raw-provider-subject-never-in-response",
-          "secret-rotation-plan"
+          "secret-rotation-plan",
+          "signature-validation",
+          "state-validation"
         ]
       },
       "evidenceTemplates": [

@@ -40,34 +40,38 @@ describe("validate-platform-goal-completion-audit", () => {
     assert.match(result.stdout, /Validated platform goal completion audit/);
   });
 
-  it("requires the foundation goal to be complete after production hardening and codegen skeleton closeout", () => {
+  it("keeps the foundation goal controlled incomplete while production Admin OIDC evidence is pending", () => {
     const audit = readJSON("resources/platform-goal-completion-audit.json");
 
-    assert.equal(audit.completionStatus, "complete");
-    assert.equal(audit.taskSummary.expectedControlledUnfinished, 0);
-    assert.deepEqual(audit.completionPolicy.requiredControlledUnfinishedNodes, []);
+    assert.equal(audit.completionStatus, "not-complete-controlled");
+    assert.deepEqual(audit.completionPolicy.requiredControlledUnfinishedNodes, ["production-admin-oidc-auth"]);
+    assert.deepEqual(audit.taskSummary, {
+      expectedTotal: 37,
+      expectedImplemented: 36,
+      expectedControlledUnfinished: 1,
+    });
   });
 
-  it("rejects reverting the goal to controlled incomplete after all task nodes are implemented", () => {
+  it("rejects claiming the goal complete while production Admin OIDC evidence is pending", () => {
     const audit = readJSON("resources/platform-goal-completion-audit.json");
-    audit.completionStatus = "not-complete-controlled";
+    audit.completionStatus = "complete";
     const auditPath = tempJSON("platform-goal-completion-audit.json", audit);
 
     const result = runValidator(["--audit", auditPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /completionStatus must be complete when all foundation task nodes are implemented/);
+    assert.match(result.stderr, /completionStatus must stay not-complete-controlled while unfinished task nodes or promotion blockers are active/);
   });
 
-  it("rejects reintroducing controlled unfinished nodes into the completion policy", () => {
+  it("rejects dropping the production Admin OIDC controlled unfinished node", () => {
     const audit = readJSON("resources/platform-goal-completion-audit.json");
-    audit.completionPolicy.requiredControlledUnfinishedNodes = ["source-writing-codegen-promotion"];
+    audit.completionPolicy.requiredControlledUnfinishedNodes = [];
     const auditPath = tempJSON("platform-goal-completion-audit.json", audit);
 
     const result = runValidator(["--audit", auditPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /completionPolicy\.requiredControlledUnfinishedNodes must be empty after foundation completion/);
+    assert.match(result.stderr, /completionPolicy\.requiredControlledUnfinishedNodes must include production-admin-oidc-auth/);
   });
 
   it("rejects business reference wording that turns zshenmez into a migration source", () => {

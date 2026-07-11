@@ -263,7 +263,7 @@
     {
       "id": "production-auth-hardening",
       "command": "rtk node scripts/validate-platform-production-auth-hardening.mjs",
-      "purpose": "Verifies JWT/session/provider hardening policy, token-rotation boundaries and refresh-token family promotion gates."
+      "purpose": "Verifies JWT/session/provider hardening policy, Admin OIDC configuration and evidence boundaries, token-rotation controls and refresh-token family promotion gates."
     },
     {
       "id": "production-auth-promotion-review",
@@ -362,7 +362,7 @@
         "admin-ui-contract-tests",
         "production-env-audit"
       ],
-      "reason": "Credential rotation requires cache/session invalidation planning, production auth promotion review evidence, refresh-token family promotion checks and visible release task state."
+      "reason": "Credential rotation requires cache/session invalidation planning, production auth and Admin OIDC promotion evidence, refresh-token family promotion checks and visible release task state."
     }
   ],
   "operationPolicies": [
@@ -463,7 +463,7 @@
     },
     {
       "id": "token-rotation",
-      "purpose": "Require explicit session, JWT secret and API-token rotation planning before changing production credentials.",
+      "purpose": "Require explicit session, JWT secret, API-token and OIDC client credentials rotation planning before changing production credentials.",
       "docs": [
         "README.md",
         "docs/platform-capability-development.md",
@@ -488,11 +488,12 @@
         "platform-operations-plan"
       ],
       "requiresHumanReview": true,
-      "rollbackRequirement": "Rotation plans must identify overlap windows, invalidation behavior and rollback handling for admin JWTs, app JWTs and pgo_ API tokens.",
+      "rollbackRequirement": "Rotation plans must identify overlap windows, invalidation behavior, OIDC provider rollback and rollback handling for admin JWTs, app JWTs and pgo_ API tokens.",
       "auditRequirement": "Credential rotations must record actor, scope, affected token classes, invalidation decision and verification commands without logging secret values.",
       "prohibitedActions": [
         "log raw JWT secrets, OpenID, UnionID or API token values",
-        "rotate production secrets without session impact review"
+        "rotate production secrets without session impact review",
+        "promote Admin OIDC without production-like rehearsal, six-viewport browser acceptance and cleanup evidence"
       ]
     }
   ],

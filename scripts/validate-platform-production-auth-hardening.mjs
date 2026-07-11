@@ -644,7 +644,7 @@ function validateProviderPromotionMatrix(contract, audit, errors) {
   }
   const providers = values(matrix.providers);
   const byID = new Map(providers.map((provider) => [provider.id, provider]));
-  for (const providerID of ["demo", "wechat"]) {
+  for (const providerID of ["demo", "wechat", "oidc"]) {
     if (!byID.has(providerID)) {
       errors.push(`providerPromotionMatrix.providers must include ${providerID}`);
     }
@@ -722,6 +722,59 @@ function validateProviderPromotionMatrix(contract, audit, errors) {
     ]) {
       if (wechat[field] !== expected) {
         errors.push(`providerPromotionMatrix provider wechat ${field} must stay ${expected}`);
+      }
+    }
+  }
+
+  const oidc = byID.get("oidc");
+  if (oidc) {
+    if (oidc.productionUsage !== "optional-production-provider") {
+      errors.push("providerPromotionMatrix provider oidc productionUsage must stay optional-production-provider");
+    }
+    if (oidc.adapterBoundary !== "httpapi.AdminIdentityResolver") {
+      errors.push("providerPromotionMatrix provider oidc adapterBoundary must stay httpapi.AdminIdentityResolver");
+    }
+    if (JSON.stringify(values(oidc.audiences)) !== JSON.stringify(["admin"])) {
+      errors.push("providerPromotionMatrix provider oidc audiences must stay admin-only");
+    }
+    requireIncludes(
+      oidc.configKeys,
+      ["PLATFORM_ADMIN_OIDC_ISSUER_URL", "PLATFORM_ADMIN_OIDC_CLIENT_ID", "PLATFORM_ADMIN_OIDC_CLIENT_SECRET", "PLATFORM_ADMIN_OIDC_REDIRECT_URL", "PLATFORM_ADMIN_OIDC_SCOPES"],
+      "providerPromotionMatrix provider oidc configKeys",
+      errors,
+    );
+    requireIncludes(
+      oidc.requiredControls,
+      [
+        "admin-audience-only",
+        "configured-provider-only-discovery-and-exchange",
+        "issuer-validation",
+        "signature-validation",
+        "audience-validation",
+        "nonce-validation",
+        "state-validation",
+        "pkce-s256-validation",
+        "exact-redirect-url-validation",
+        "explicit-identity-binding",
+        "disabled-user-rejection",
+        "provider-subject-redaction",
+        "raw-provider-subject-never-in-response",
+        "raw-provider-subject-never-in-audit",
+        "provider-specific-error-normalization",
+        "audit-redaction",
+        "production-like-runtime-rehearsal",
+      ],
+      "providerPromotionMatrix provider oidc requiredControls",
+      errors,
+    );
+    for (const [field, expected] of [
+      ["requiresSecretOwner", true],
+      ["rotationRunbookRequired", true],
+      ["unconfiguredProviderRejectionRequired", true],
+      ["productionLikeRehearsalRequired", true],
+    ]) {
+      if (oidc[field] !== expected) {
+        errors.push(`providerPromotionMatrix provider oidc ${field} must stay ${expected}`);
       }
     }
   }

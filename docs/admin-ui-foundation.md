@@ -10,7 +10,7 @@ Ant Design provides mature primitives such as `Table`, `Modal`, `Alert`, `Button
 
 The platform layer provides reusable backoffice semantics, default density, theme tokens and extension slots. Business pages can customize by props, `children`, `actions`, `toolbar`, `summary`, `extra`, `footer` and class names. If a prop is not provided, the component keeps the platform default.
 
-The admin entry now starts with `AdminLoginView`. It consumes the same theme tokens, i18n dictionary and auth provider API as the rest of the shell. The login screen is intentionally provider-driven: adding WeChat, SSO or another login mode should add an auth provider capability and adapter, not hard-code business login logic into the shell.
+The admin entry now starts with `AdminLoginView`. It consumes the same theme tokens, i18n dictionary and auth provider API as the rest of the shell. The login screen is intentionally provider-driven: demo keeps the username flow, while the Admin-only `oidc` provider uses a configured provider action, tab-scoped state and PKCE transaction, sanitized callback recovery and the existing bound platform principal/session path. Adding another login mode must add an auth provider capability and adapter rather than hard-code business login logic into the shell.
 
 The design rule is unified defaults with flexible adaptation. Shared components own typography, spacing, color, responsive behavior, i18n, accessibility labels and common states. Business modules may override through documented props, slots and schema fields, but should not fork the base visual rules for tables, buttons, drawers, modals, dropdowns, pagination, prompts or alerts.
 
@@ -61,6 +61,7 @@ Do not wrap a component when:
 - i18n is a hard gate for every new shared component. When adding a component, add Chinese and English dictionary keys, localized sample data if needed, and run the i18n validator in the same change.
 - Admin preferences are platform concerns. Language, theme, layout mode and UI configuration are persisted in browser storage by the app shell; branding default theme is used only when the user has not chosen a theme.
 - Login screens must use provider declarations from `GET /api/auth/providers`; do not couple the shell to one concrete login provider.
+- Admin login must filter provider audiences to `admin`. OIDC must never render irrelevant username/password controls, auto-provision users or authorization relationships, expose callback material, or reuse the App identity resolver boundary.
 - Logout must clear the platform token and return to the login view.
 - Prefer `AdminPage` for page structure instead of hand-writing `page-heading`.
 - Prefer `AdminListPanel` for table or list containers instead of hand-writing toolbar panels.
@@ -287,6 +288,8 @@ Session and motion rules:
 - `prefers-reduced-motion: reduce` overrides non-essential page-entry, transform and opacity motion, including Ant Design modal/drawer/dropdown/popover portals, while preserving loading, focus, validation and status feedback. Browser-computed styles must resolve those transitions and animations to effectively immediate values.
 
 Browser evidence is stored under `tmp/product-design/p1-admin-ui-hardening-20260711/`. It covers login, compact dashboard, menu list breakpoints, settled create-modal focus plus Escape/trigger restoration, narrow settings drawer, computed reduced-motion styles and localized stale-session recovery at 375x812, 390x844, 768x1024, 1024x768, 1280x720 and 1440x1024. The accepted stable states have no page-level horizontal overflow and no new application console errors. The stale-session state is captured in `10-stale-session-390x844.png` and shows “会话已过期，请重新登录。” rather than raw backend error copy.
+
+The OIDC login implementation has automated UI and focused design evidence, but its task node remains `pending`. Task 8 must provide a redacted production-like Keycloak-compatible rehearsal, fresh browser acceptance at the same six viewports, and neat-freak cleanup evidence before `production-admin-oidc-auth` can become implemented and receive a node-closeout entry.
 
 This evidence validates the implemented contract but is not WCAG certification. Screen-reader announcements, high zoom/reflow and platform-specific assistive technology remain separate acceptance work when a deployment requires those claims.
 

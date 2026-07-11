@@ -7,7 +7,7 @@ const repoRoot = path.resolve(__dirname, "..");
 
 const approvedBackendStack = ["Gin", "GORM", "Casbin", "JWT"];
 const approvedFrontendStack = ["Refine", "React", "Ant Design"];
-const allowedStatuses = new Set(["implemented", "preview", "planned", "deferred"]);
+const allowedStatuses = new Set(["implemented", "pending", "preview", "planned", "deferred"]);
 const allowedScopes = new Set(["foundation", "governance", "admin-ui", "business-extension"]);
 const allowedLockModes = new Set(["exclusive", "shared"]);
 const requiredVisualDesignGate = ["superpowers:brainstorming", "product-design"];
@@ -266,7 +266,7 @@ function validateTask(task, context, errors) {
       }
     }
   }
-  if (task.status === "preview" || task.status === "planned" || task.status === "deferred") {
+  if (task.status === "pending" || task.status === "preview" || task.status === "planned" || task.status === "deferred") {
     if (!hasLocalizedText(task.statusReason)) {
       errors.push(`${prefix} with status ${task.status} must declare zh/en statusReason`);
     }
@@ -299,6 +299,38 @@ function validateTask(task, context, errors) {
         errors.push(`${prefix} evidence doc is missing or unsafe: ${relativePath}`);
       }
     }
+  }
+}
+
+function validateProductionAdminOIDCNode(tasks, errors) {
+  const task = tasks.find((item) => item.id === "production-admin-oidc-auth");
+  if (!task) {
+    errors.push("task graph must include production-admin-oidc-auth");
+    return;
+  }
+  if (task.status !== "pending") {
+    errors.push("production-admin-oidc-auth must stay pending until Task 8 evidence exists");
+  }
+  const implemented = tasks.filter((item) => item.status === "implemented");
+  const pending = tasks.filter((item) => item.status === "pending");
+  const blocked = tasks.filter((item) => item.status === "blocked");
+  if (tasks.length !== 37 || implemented.length !== 36 || pending.length !== 1 || blocked.length !== 0) {
+    errors.push("Task 7 task graph counts must stay 37 total, 36 implemented, 1 pending and 0 blocked");
+  }
+  if (!sameList(values(task.dependsOn), ["production-auth-provider-hardening", "production-persistence-correctness", "admin-ui-system-quality-hardening"])) {
+    errors.push("production-admin-oidc-auth dependencies must stay production auth, persistence correctness and Admin UI hardening");
+  }
+  const requirements = values(task.pendingEvidenceRequirements);
+  const requiredIDs = ["production-like-oidc-rehearsal", "six-viewport-browser-acceptance", "neat-freak-cleanup-closeout"];
+  if (!sameList(requirements.map((item) => item.id), requiredIDs)) {
+    errors.push("production-admin-oidc-auth pendingEvidenceRequirements must name production-like, six-viewport browser and neat-freak cleanup evidence");
+  }
+  if (requirements.some((item) => item.status !== "pending" || item.requiredIn !== "Task 8")) {
+    errors.push("production-admin-oidc-auth pending evidence must stay pending for Task 8");
+  }
+  const browser = requirements.find((item) => item.id === "six-viewport-browser-acceptance");
+  if (!sameList(values(browser?.viewports), ["375x812", "390x844", "768x1024", "1024x768", "1280x720", "1440x1024"])) {
+    errors.push("production-admin-oidc-auth browser evidence must require all six approved viewports");
   }
 }
 
@@ -408,6 +440,7 @@ function validate() {
   for (const task of tasks) {
     validateTask(task, context, errors);
   }
+  validateProductionAdminOIDCNode(tasks, errors);
 
   for (const cycle of detectCycles(tasksByID)) {
     errors.push(`dependency cycle detected: ${cycle}`);

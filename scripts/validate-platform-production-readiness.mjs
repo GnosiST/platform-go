@@ -346,6 +346,10 @@ function validatePreflightCommands(readiness, errors) {
       errors.push(`missing required preflight command ${requiredCommand}`);
     }
   }
+  const productionAuth = commands.find((command) => command.id === "production-auth-hardening");
+  if (productionAuth && !productionAuth.purpose.includes("Admin OIDC")) {
+    errors.push("production-auth-hardening purpose must mention Admin OIDC");
+  }
 }
 
 function validatePolicyPreflightRequirements(readiness, errors) {
@@ -444,6 +448,17 @@ function validateOperationPolicies(readiness, errors) {
     }
     if (!policy.auditRequirement) {
       errors.push(`${prefix} must declare auditRequirement`);
+    }
+    if (id === "token-rotation") {
+      if (!policy.purpose.includes("OIDC client credentials")) {
+        errors.push("token-rotation purpose must mention OIDC client credentials");
+      }
+      if (!policy.rollbackRequirement.includes("OIDC provider rollback")) {
+        errors.push("token-rotation rollbackRequirement must mention OIDC provider rollback");
+      }
+      if (!values(policy.prohibitedActions).includes("promote Admin OIDC without production-like rehearsal, six-viewport browser acceptance and cleanup evidence")) {
+        errors.push("token-rotation prohibitedActions must include production-like Admin OIDC evidence gate");
+      }
     }
   }
   for (const requiredPolicy of requiredOperationPolicies) {

@@ -26,6 +26,14 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-objective-conformance", () => {
+  it("tracks production Admin OIDC as the only controlled unfinished objective node", () => {
+    const audit = readJSON("resources/platform-objective-conformance.json");
+
+    assert.deepEqual(audit.taskControlPolicy.requiredUnfinishedNodes, ["production-admin-oidc-auth"]);
+    assert.equal(audit.completionPolicy.goalCompletionStatus, "not-complete-controlled");
+    assert.deepEqual(audit.completionPolicy.controlledBlockers, ["production-admin-oidc-auth"]);
+  });
+
   it("accepts the current objective conformance contract", () => {
     const result = runValidator();
 
@@ -206,26 +214,26 @@ describe("validate-platform-objective-conformance", () => {
     assert.match(result.stderr, /objective conformance evidence must include scripts\/validate-platform-node-closeout-audit\.mjs/);
   });
 
-  it("rejects reintroducing controlled blocker nodes into the completed objective contract", () => {
+  it("rejects controlled blockers beyond the pending production Admin OIDC node", () => {
     const audit = readJSON("resources/platform-objective-conformance.json");
-    audit.completionPolicy.controlledBlockers = ["source-writing-codegen-promotion"];
+    audit.completionPolicy.controlledBlockers = ["production-admin-oidc-auth", "source-writing-codegen-promotion"];
     const auditPath = tempJSON("platform-objective-conformance.json", audit);
 
     const result = runValidator(["--audit", auditPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /completionPolicy\.controlledBlockers must be empty after foundation completion/);
+    assert.match(result.stderr, /completionPolicy\.controlledBlockers must contain only production-admin-oidc-auth during Task 7 evidence collection/);
   });
 
-  it("rejects reverting the objective completion policy to controlled incomplete", () => {
+  it("rejects claiming objective completion while production Admin OIDC evidence is pending", () => {
     const audit = readJSON("resources/platform-objective-conformance.json");
-    audit.completionPolicy.goalCompletionStatus = "not-complete-controlled";
+    audit.completionPolicy.goalCompletionStatus = "complete";
     const auditPath = tempJSON("platform-objective-conformance.json", audit);
 
     const result = runValidator(["--audit", auditPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /completionPolicy\.goalCompletionStatus must be complete after foundation completion/);
+    assert.match(result.stderr, /completionPolicy\.goalCompletionStatus must stay not-complete-controlled during Task 7 evidence collection/);
   });
 
   it("rejects making Vercel the required default API runtime", () => {

@@ -248,6 +248,41 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /task production-auth-provider-hardening must declare at least one evidence\.docs path/);
   });
 
+  it("tracks production Admin OIDC as the only pending evidence node", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
+    const implemented = graph.tasks.filter((item) => item.status === "implemented");
+    const pending = graph.tasks.filter((item) => item.status === "pending");
+    const blocked = graph.tasks.filter((item) => item.status === "blocked");
+
+    assert.ok(task, "task graph must include production-admin-oidc-auth");
+    assert.equal(task.status, "pending");
+    assert.equal(task.visual, true);
+    assert.deepEqual(task.dependsOn, [
+      "production-auth-provider-hardening",
+      "production-persistence-correctness",
+      "admin-ui-system-quality-hardening",
+    ]);
+    assert.deepEqual(task.designGate, ["superpowers:brainstorming", "product-design"]);
+    assert.deepEqual(
+      task.pendingEvidenceRequirements.map((item) => item.id),
+      ["production-like-oidc-rehearsal", "six-viewport-browser-acceptance", "neat-freak-cleanup-closeout"],
+    );
+    assert.deepEqual(task.pendingEvidenceRequirements[1].viewports, [
+      "375x812",
+      "390x844",
+      "768x1024",
+      "1024x768",
+      "1280x720",
+      "1440x1024",
+    ]);
+    assert.ok(task.pendingEvidenceRequirements.every((item) => item.status === "pending"));
+    assert.equal(graph.tasks.length, 37);
+    assert.equal(implemented.length, 36);
+    assert.deepEqual(pending.map((item) => item.id), ["production-admin-oidc-auth"]);
+    assert.equal(blocked.length, 0);
+  });
+
   it("tracks completed platform foundation work and promoted visual task nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const closedTasks = [

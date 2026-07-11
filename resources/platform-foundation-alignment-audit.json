@@ -60,9 +60,10 @@
     "production-readiness-preflight",
     "production-auth-provider-hardening",
     "source-writing-codegen-promotion",
-    "admin-ui-system-quality-hardening"
+    "admin-ui-system-quality-hardening",
+    "production-admin-oidc-auth"
   ],
-  "requiredFutureTaskNodes": [],
+  "requiredFutureTaskNodes": ["production-admin-oidc-auth"],
   "nonDroppableGoalNodes": [
     "stack-alignment-and-architecture",
     "governance-org-area-role-groups",

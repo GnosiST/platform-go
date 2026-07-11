@@ -26,6 +26,13 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
+  it("tracks the pending production Admin OIDC node in required and future alignment sets", () => {
+    const audit = readJSON("resources/platform-foundation-alignment-audit.json");
+
+    assert.ok(audit.requiredTaskNodes.includes("production-admin-oidc-auth"));
+    assert.deepEqual(audit.requiredFutureTaskNodes, ["production-admin-oidc-auth"]);
+  });
+
   it("accepts the current platform foundation alignment audit", () => {
     const result = runValidator();
 
@@ -382,7 +389,7 @@ describe("validate-platform-foundation-alignment", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
     audit.requiredValidators = audit.requiredValidators.filter((validator) => validator !== "scripts/validate-platform-task-execution-audit.mjs");
     const taskExecution = readJSON("resources/platform-task-execution-audit.json");
-    taskExecution.requiredUnfinishedNodes = ["source-writing-codegen-promotion"];
+    taskExecution.requiredUnfinishedNodes = ["production-admin-oidc-auth", "source-writing-codegen-promotion"];
     const engineering = readJSON("resources/platform-engineering-capabilities.json");
     const capability = engineering.capabilities.find((item) => item.id === "task-dependency-governance");
     capability.evidence.validators = capability.evidence.validators.filter((validator) => validator !== "scripts/validate-platform-task-execution-audit.mjs");
@@ -393,7 +400,7 @@ describe("validate-platform-foundation-alignment", () => {
     const result = runValidator(["--audit", auditPath, "--task-execution-audit", taskExecutionPath, "--engineering-capabilities", engineeringPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /task execution audit requiredUnfinishedNodes must be empty after foundation completion/);
+    assert.match(result.stderr, /task execution audit requiredUnfinishedNodes must contain only production-admin-oidc-auth during Task 7 evidence collection/);
     assert.match(result.stderr, /alignment requiredValidators must include task execution validator scripts\/validate-platform-task-execution-audit\.mjs/);
     assert.match(result.stderr, /engineering capability task-dependency-governance must cite validate-platform-task-execution-audit\.mjs/);
   });

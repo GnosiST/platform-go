@@ -165,7 +165,7 @@ function validateTaskGraph(audit, taskGraph, errors) {
       errors.push(`alignment audit required task node is missing: ${taskID}`);
       continue;
     }
-    if (task.status !== "implemented" && task.status !== "preview") {
+    if (task.status !== "implemented" && task.status !== "preview" && !(taskID === "production-admin-oidc-auth" && task.status === "pending")) {
       errors.push(`alignment audit task ${taskID} has unsupported status ${task.status}`);
     }
     if (promotionGateTaskIDs.has(taskID)) {
@@ -183,10 +183,10 @@ function validateTaskGraph(audit, taskGraph, errors) {
       errors.push(`alignment audit future task node is missing: ${taskID}`);
       continue;
     }
-    if (!["planned", "deferred", "preview", "implemented"].includes(task.status)) {
+    if (!["pending", "planned", "deferred", "preview", "implemented"].includes(task.status)) {
       errors.push(`alignment audit future task ${taskID} has unsupported status ${task.status}`);
     }
-    if (task.status === "planned" || task.status === "deferred" || task.status === "preview") {
+    if (task.status === "pending" || task.status === "planned" || task.status === "deferred" || task.status === "preview") {
       if (!task.statusReason?.zh || !task.statusReason?.en) {
         errors.push(`alignment audit future task ${taskID} must declare zh/en statusReason`);
       }
@@ -754,13 +754,13 @@ function validateTaskExecutionAudit(audit, taskExecutionAudit, engineering, erro
   if (taskExecutionAudit.alignmentAudit !== "resources/platform-foundation-alignment-audit.json") {
     errors.push("task execution audit alignmentAudit must point to resources/platform-foundation-alignment-audit.json");
   }
-  if (values(audit.requiredFutureTaskNodes).length !== 0) {
-    errors.push("alignment requiredFutureTaskNodes must be empty after foundation completion");
+  if (JSON.stringify(values(audit.requiredFutureTaskNodes)) !== JSON.stringify(["production-admin-oidc-auth"])) {
+    errors.push("alignment requiredFutureTaskNodes must contain only production-admin-oidc-auth during Task 7 evidence collection");
   }
-  if (values(taskExecutionAudit.requiredUnfinishedNodes).length !== 0) {
-    errors.push("task execution audit requiredUnfinishedNodes must be empty after foundation completion");
+  if (JSON.stringify(values(taskExecutionAudit.requiredUnfinishedNodes)) !== JSON.stringify(["production-admin-oidc-auth"])) {
+    errors.push("task execution audit requiredUnfinishedNodes must contain only production-admin-oidc-auth during Task 7 evidence collection");
   }
-  for (const taskID of ["production-auth-provider-hardening", "source-writing-codegen-promotion"]) {
+  for (const taskID of ["production-auth-provider-hardening", "source-writing-codegen-promotion", "production-admin-oidc-auth"]) {
     if (!values(taskExecutionAudit.knownPromotionBlockers).some((blocker) => blocker.taskId === taskID)) {
       errors.push(`task execution audit knownPromotionBlockers must describe ${taskID}`);
     }

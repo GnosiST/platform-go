@@ -1625,6 +1625,101 @@
           "tmp/product-design/p1-admin-ui-hardening-20260711/10-stale-session-390x844.png"
         ]
       }
+    },
+    {
+      "id": "production-admin-oidc-auth",
+      "title": {
+        "zh": "生产级管理台 OIDC 认证",
+        "en": "Production Admin OIDC Authentication"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "OIDC 管理台运行时、持久化绑定、自动化测试、治理契约和登录体验已实现；Task 8 的生产类 Keycloak 演练、六视口浏览器验收与 neat-freak 清理证据尚未完成，因此节点保持待证据状态。",
+        "en": "The Admin OIDC runtime, persistent binding path, automated tests, governance contracts, and login experience are implemented. The node remains evidence-pending until Task 8 supplies the production-like Keycloak rehearsal, six-viewport browser acceptance, and neat-freak cleanup evidence."
+      },
+      "completionGate": {
+        "zh": "仅在 Task 8 产出脱敏的生产类 OIDC 演练证据、375x812 至 1440x1024 六视口浏览器证据，并完成 neat-freak 清理与节点关闭审计后，才能改为 implemented；不得据此宣称生产晋级已批准。",
+        "en": "Move this node to implemented only after Task 8 supplies redacted production-like OIDC rehearsal evidence, browser evidence at all six required viewports from 375x812 through 1440x1024, and neat-freak cleanup plus node-closeout audit evidence. This does not approve production promotion."
+      },
+      "visual": true,
+      "designGate": [
+        "superpowers:brainstorming",
+        "product-design"
+      ],
+      "resourceLocks": [
+        "capability-manifest",
+        "admin-resource-contract",
+        "admin-resource-api",
+        "jwt-session",
+        "production-config",
+        "admin-ui",
+        "i18n",
+        "audit-policy",
+        "browser-qa",
+        "docs"
+      ],
+      "dependsOn": [
+        "production-auth-provider-hardening",
+        "production-persistence-correctness",
+        "admin-ui-system-quality-hardening"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-11-production-admin-oidc-auth-design.md",
+          "docs/superpowers/plans/2026-07-11-production-admin-oidc-auth.md",
+          "docs/platform-auth.md",
+          "docs/admin-ui-foundation.md",
+          "docs/platform-foundation-task-map.md",
+          "docs/platform-roadmap.md",
+          "design-qa.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-production-auth-hardening.mjs",
+          "scripts/validate-platform-production-readiness.mjs",
+          "scripts/validate-platform-foundation-task-graph.mjs",
+          "scripts/validate-platform-task-execution-audit.mjs",
+          "scripts/validate-platform-foundation-alignment.mjs",
+          "scripts/validate-platform-goal-completion-audit.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs",
+          "scripts/validate-platform-objective-conformance.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs",
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs"
+        ],
+        "tests": [
+          "internal/platform/authprovider/oidc/resolver_test.go",
+          "internal/platform/authprovider/oidc/state_test.go",
+          "internal/platform/httpapi/admin_identity_test.go",
+          "internal/platform/httpapi/server_test.go",
+          "cmd/platform-admin/main_test.go",
+          "scripts/admin-ui-contracts.test.mjs",
+          "scripts/platform-production-auth-hardening.test.mjs",
+          "scripts/platform-foundation-task-graph.test.mjs"
+        ]
+      },
+      "pendingEvidenceRequirements": [
+        {
+          "id": "production-like-oidc-rehearsal",
+          "status": "pending",
+          "requiredIn": "Task 8",
+          "description": "Redacted production-like Keycloak or equivalent OIDC provider rehearsal covering configured Admin discovery, bound-user login, failure normalization, session refresh, logout, and protected navigation."
+        },
+        {
+          "id": "six-viewport-browser-acceptance",
+          "status": "pending",
+          "requiredIn": "Task 8",
+          "viewports": ["375x812", "390x844", "768x1024", "1024x768", "1280x720", "1440x1024"],
+          "description": "Redacted browser acceptance for success, cancellation, invalid or expired state, missing binding, disabled user, retry, keyboard operation, and callback recovery at all required viewports."
+        },
+        {
+          "id": "neat-freak-cleanup-closeout",
+          "status": "pending",
+          "requiredIn": "Task 8",
+          "description": "Neat-freak documentation and knowledge cleanup evidence followed by a closed node-closeout audit entry."
+        }
+      ]
     }
   ],
   "parallelBatches": [

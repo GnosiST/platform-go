@@ -10,7 +10,7 @@
     "productionAuthHardening": "2026-07-07",
     "refreshTokenFamilyPromotion": "2026-07-07",
     "productionReadiness": "2026-07-06",
-    "taskExecutionAudit": "2026-07-07"
+    "taskExecutionAudit": "2026-07-11"
   },
   "mode": {
     "dryRun": true,
@@ -24,8 +24,8 @@
     "completedEvidenceCount": 0,
     "missingEvidenceCount": 7,
     "blockerCount": 5,
-    "providerPromotionCount": 2,
-    "optionalProductionProviderCount": 1,
+    "providerPromotionCount": 3,
+    "optionalProductionProviderCount": 2,
     "tokenRotationPreflightCommandCount": 16
   },
   "currentRuntime": {
@@ -296,6 +296,46 @@
         "errorNormalizationRequired": true,
         "rawCredentialExposureAllowed": false,
         "rawSubjectExposureAllowed": false
+      },
+      {
+        "id": "oidc",
+        "capability": "admin-oidc",
+        "kind": "oidc",
+        "productionUsage": "optional-production-provider",
+        "adapterBoundary": "httpapi.AdminIdentityResolver",
+        "configKeys": [
+          "PLATFORM_ADMIN_OIDC_ISSUER_URL",
+          "PLATFORM_ADMIN_OIDC_CLIENT_ID",
+          "PLATFORM_ADMIN_OIDC_CLIENT_SECRET",
+          "PLATFORM_ADMIN_OIDC_REDIRECT_URL",
+          "PLATFORM_ADMIN_OIDC_SCOPES"
+        ],
+        "requiredControls": [
+          "admin-audience-only",
+          "configured-provider-only-discovery-and-exchange",
+          "issuer-validation",
+          "signature-validation",
+          "audience-validation",
+          "nonce-validation",
+          "state-validation",
+          "pkce-s256-validation",
+          "exact-redirect-url-validation",
+          "explicit-identity-binding",
+          "disabled-user-rejection",
+          "provider-subject-redaction",
+          "raw-provider-subject-never-in-response",
+          "raw-provider-subject-never-in-audit",
+          "provider-specific-error-normalization",
+          "audit-redaction",
+          "production-like-runtime-rehearsal"
+        ],
+        "requiresSecretOwner": true,
+        "rotationRunbookRequired": true,
+        "subjectRedactionRequired": true,
+        "unconfiguredProviderRejectionRequired": true,
+        "errorNormalizationRequired": true,
+        "rawCredentialExposureAllowed": false,
+        "rawSubjectExposureAllowed": false
       }
     ]
   },
@@ -355,7 +395,7 @@
       "platform-operations-plan"
     ],
     "tokenRotationPolicyRequiresHumanReview": true,
-    "tokenRotationRollbackRequirement": "Rotation plans must identify overlap windows, invalidation behavior and rollback handling for admin JWTs, app JWTs and pgo_ API tokens.",
+    "tokenRotationRollbackRequirement": "Rotation plans must identify overlap windows, invalidation behavior, OIDC provider rollback and rollback handling for admin JWTs, app JWTs and pgo_ API tokens.",
     "tokenRotationAuditRequirement": "Credential rotations must record actor, scope, affected token classes, invalidation decision and verification commands without logging secret values."
   },
   "manualReview": {

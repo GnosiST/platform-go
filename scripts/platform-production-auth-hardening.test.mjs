@@ -359,6 +359,77 @@ describe("validate-platform-production-auth-hardening", () => {
     assert.match(result.stderr, /providerPromotionMatrix provider wechat unconfiguredProviderRejectionRequired must stay true/);
   });
 
+  it("requires the Admin-only OIDC provider promotion contract", () => {
+    const contract = readJSON("resources/platform-production-auth-hardening.json");
+    const oidc = contract.providerPromotionMatrix.providers.find((provider) => provider.id === "oidc");
+
+    assert.ok(oidc, "providerPromotionMatrix must include oidc");
+    assert.equal(oidc.capability, "admin-oidc");
+    assert.equal(oidc.kind, "oidc");
+    assert.equal(oidc.productionUsage, "optional-production-provider");
+    assert.equal(oidc.adapterBoundary, "httpapi.AdminIdentityResolver");
+    assert.deepEqual(oidc.audiences, ["admin"]);
+    assert.deepEqual(oidc.configKeys, [
+      "PLATFORM_ADMIN_OIDC_ISSUER_URL",
+      "PLATFORM_ADMIN_OIDC_CLIENT_ID",
+      "PLATFORM_ADMIN_OIDC_CLIENT_SECRET",
+      "PLATFORM_ADMIN_OIDC_REDIRECT_URL",
+      "PLATFORM_ADMIN_OIDC_SCOPES",
+    ]);
+    for (const control of [
+      "admin-audience-only",
+      "configured-provider-only-discovery-and-exchange",
+      "issuer-validation",
+      "signature-validation",
+      "audience-validation",
+      "nonce-validation",
+      "state-validation",
+      "pkce-s256-validation",
+      "exact-redirect-url-validation",
+      "explicit-identity-binding",
+      "disabled-user-rejection",
+      "provider-subject-redaction",
+      "raw-provider-subject-never-in-response",
+      "raw-provider-subject-never-in-audit",
+      "provider-specific-error-normalization",
+      "audit-redaction",
+      "production-like-runtime-rehearsal",
+    ]) {
+      assert.ok(oidc.requiredControls.includes(control), `OIDC controls must include ${control}`);
+    }
+    assert.equal(oidc.requiresSecretOwner, true);
+    assert.equal(oidc.rotationRunbookRequired, true);
+    assert.equal(oidc.subjectRedactionRequired, true);
+    assert.equal(oidc.unconfiguredProviderRejectionRequired, true);
+    assert.equal(oidc.errorNormalizationRequired, true);
+    assert.equal(oidc.productionLikeRehearsalRequired, true);
+    assert.equal(oidc.rawCredentialExposureAllowed, false);
+    assert.equal(oidc.rawSubjectExposureAllowed, false);
+  });
+
+  it("rejects OIDC promotion matrices that weaken Admin isolation or production evidence", () => {
+    const contract = readJSON("resources/platform-production-auth-hardening.json");
+    const oidc = contract.providerPromotionMatrix.providers.find((provider) => provider.id === "oidc");
+    assert.ok(oidc, "providerPromotionMatrix must include oidc");
+    oidc.audiences = ["admin", "app"];
+    oidc.configKeys = ["PLATFORM_ADMIN_OIDC_ISSUER_URL"];
+    oidc.requiredControls = ["issuer-validation"];
+    oidc.requiresSecretOwner = false;
+    oidc.rotationRunbookRequired = false;
+    oidc.productionLikeRehearsalRequired = false;
+    const contractPath = tempJSON("platform-production-auth-hardening.json", contract);
+
+    const result = runValidator(["--contract", contractPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /providerPromotionMatrix provider oidc audiences must stay admin-only/);
+    assert.match(result.stderr, /providerPromotionMatrix provider oidc configKeys must include PLATFORM_ADMIN_OIDC_CLIENT_SECRET/);
+    assert.match(result.stderr, /providerPromotionMatrix provider oidc requiredControls must include pkce-s256-validation/);
+    assert.match(result.stderr, /providerPromotionMatrix provider oidc requiresSecretOwner must stay true/);
+    assert.match(result.stderr, /providerPromotionMatrix provider oidc rotationRunbookRequired must stay true/);
+    assert.match(result.stderr, /providerPromotionMatrix provider oidc productionLikeRehearsalRequired must stay true/);
+  });
+
   it("rejects provider promotion matrices without source-backed evidence", () => {
     const contract = readJSON("resources/platform-production-auth-hardening.json");
     const wechat = contract.providerPromotionMatrix.providers.find((provider) => provider.id === "wechat");
