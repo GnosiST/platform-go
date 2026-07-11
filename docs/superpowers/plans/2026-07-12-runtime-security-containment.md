@@ -34,6 +34,10 @@
 - Modify: `internal/platform/httpapi/server.go`
 - Modify: `internal/platform/httpapi/server_test.go`
 - Modify: `resources/admin-resources.json`
+- Modify: `scripts/generate-admin-resource-contract.mjs`
+- Modify: `scripts/generate-admin-openapi.mjs`
+- Modify: `scripts/admin-resource-contract-generators.test.mjs`
+- Modify: `admin/src/platform/api/client.ts`
 
 **Interfaces:**
 - Produces: `WriteOrigin`, `ProjectionPurpose`, `Store.CreateInternal`, `Store.UpdateInternal`, `Store.ProjectRecord`.
@@ -94,6 +98,8 @@ func (s *Store) ProjectRecord(resource string, record Record, purpose Projection
 
 Add the four field-policy dimensions already approved for the later data-protection phase: `sensitivity`, `storageMode`, `responseMode` and `exportMode`. This task uses them only for write allowlisting and projection; encryption, blind indexes and privileged decryption remain in the later sensitive-data runtime node. Defaults preserve current public/plain/full behavior for ordinary declared fields.
 
+Carry all four dimensions through the capability manifest, static resource JSON, generated Admin contract, generated OpenAPI schema and Admin TypeScript schema types. Generator drift tests must fail if any dimension is dropped or renamed.
+
 External writes reject unknown, read-only, internal, sensitive and secret fields unless their declared policy explicitly permits the operation. Internal writes accept declared internal/read-only fields but reject undeclared keys and raw-secret classes. Derived hashes or encrypted envelopes are accepted only when the declared field policy names the matching non-plain storage mode and omits them from response/export. Projection reconstructs the record from declared schema fields and emits only fields whose response/export policy allows the requested purpose.
 
 `persistContextLocked` is the final firewall: validate the complete snapshot against the active schemas immediately before every repository save. This catches policy-review, identity-binding, demo-data and any future direct in-memory mutation path even when it does not call `CreateInternal`/`UpdateInternal`. On validation failure, restore the previous snapshot and never call the repository.
@@ -123,8 +129,9 @@ rtk node scripts/validate-platform-admin-api-boundary.mjs
 rtk node scripts/validate-admin-i18n.mjs
 rtk node scripts/validate-admin-ui-contracts.mjs
 rtk node --test scripts/admin-ui-contracts.test.mjs
+rtk node --test scripts/admin-resource-contract-generators.test.mjs
 rtk npm --prefix admin run build
-rtk git add internal/platform/adminresource internal/platform/capability internal/platform/core internal/platform/httpapi resources scripts
+rtk git add admin internal/platform/adminresource internal/platform/capability internal/platform/core internal/platform/httpapi resources scripts
 rtk git commit -m "fix: enforce admin resource field boundaries"
 ```
 
@@ -422,6 +429,11 @@ rtk git commit -m "fix: enforce production transport security"
 - Modify: `cmd/platform-api/main.go`
 - Modify: `deploy/compose/docker-compose.prod.yml`
 - Modify: `deploy/env/production.example.env`
+- Modify: `resources/platform-production-readiness.json`
+- Modify: `scripts/validate-platform-production-env.mjs`
+- Modify: `scripts/platform-production-env.test.mjs`
+- Modify: `scripts/validate-platform-production-readiness.mjs`
+- Modify: `scripts/platform-production-readiness.test.mjs`
 
 **Interfaces:**
 - Produces: shared memory and Redis `ratelimit.Limiter`.
@@ -439,6 +451,8 @@ type Decision struct {
 ```
 
 Tests cover threshold, window reset, shared Redis state, fail-closed errors and key redaction. Add a dedicated `PLATFORM_RATE_LIMIT_HMAC_KEY`; production requires at least 32 bytes and it must be distinct from phone/code keys.
+
+Add the key to the standard production compose/env contract, production readiness required environment list and strict production-env validator. Mutation tests must prove a missing, short or duplicated key fails before runtime construction.
 
 - [ ] **Step 2: Verify RED**
 
@@ -464,7 +478,10 @@ A key builder HMACs normalized dimensions before they reach memory/Redis; Redis 
 
 ```bash
 rtk go test ./internal/platform/ratelimit ./internal/platform/httpapi ./internal/platform/bootstrap ./internal/platform/config -run 'Test.*RateLimit' -count=1
-rtk git add cmd/platform-api internal/platform/ratelimit internal/platform/httpapi internal/platform/bootstrap internal/platform/config deploy
+rtk node --test scripts/platform-production-env.test.mjs scripts/platform-production-readiness.test.mjs
+rtk node scripts/validate-platform-production-env.mjs --env-file deploy/env/production.example.env
+rtk node scripts/validate-platform-production-readiness.mjs
+rtk git add cmd/platform-api internal/platform/ratelimit internal/platform/httpapi internal/platform/bootstrap internal/platform/config deploy resources scripts
 rtk git commit -m "fix: rate limit credential endpoints"
 ```
 
@@ -504,12 +521,14 @@ func TestRuntimeLogsDoNotContainSecretMarkers(t *testing.T) {}
 func TestPlatformHasNoLocalPasswordProviderOrPasswordPersistencePath(t *testing.T) {}
 func TestAdminResourceMutationRollsBackWhenAuditPersistenceFails(t *testing.T) {}
 func TestFileUploadCleansObjectAndRecordWhenAuditPersistenceFails(t *testing.T) {}
+func TestFileDeleteTombstoneKeepsContentHiddenUntilObjectCleanupCompletes(t *testing.T) {}
+func TestFileDeleteRetriesObjectCleanupAfterObjectOrAuditFailure(t *testing.T) {}
 ```
 
 - [ ] **Step 2: Verify RED**
 
 ```bash
-rtk go test ./internal/platform/adminresource ./internal/platform/httpapi ./cmd/platform-api -run 'Test.*(Export|Redact|Leak|Audit|Password|RollsBack|CleansObject)' -count=1
+rtk go test ./internal/platform/adminresource ./internal/platform/httpapi ./cmd/platform-api -run 'Test.*(Export|Redact|Leak|Audit|Password|RollsBack|CleansObject|Tombstone|RetriesObjectCleanup)' -count=1
 ```
 
 - [ ] **Step 3: Implement export permission and fail-closed projection**
@@ -518,13 +537,15 @@ Add `admin:policy-review:export`. Export projects every review and audit record 
 
 Add transactional Store mutation APIs that persist the business record and audit record in one repository snapshot. Generic create/update/delete handlers use those APIs. Authentication/session flows revoke or discard newly issued credentials when audit persistence fails. File uploads delete the just-written object and roll back the resource record when the record+audit transaction fails; cleanup errors are logged only through the redacted error path. No handler may swallow audit errors after returning a successful protected operation.
 
+File deletion uses a durable tombstone/outbox state in the same record+audit snapshot: content access rejects tombstoned records immediately, object deletion is idempotently retried, and the internal record is purged only after object deletion succeeds. Object-delete or audit-persistence failures must never restore public access, lose the only recoverable object reference or leave a visible record pointing at missing content.
+
 Gate the Admin export button with `admin:policy-review:export` independently of read access, preserve keyboard/focus behavior, and add UI contract tests for the hidden/disabled state. Any new user-visible copy must be added to Chinese and English dictionaries in the same change.
 
 Document and test the current credential boundary: the platform has no local password provider or password repository, generic resources reject password fields, and browser-to-server credential-bearing requests require the production HTTPS contract. A future local-password capability must use the separately approved Argon2id boundary and cannot be added to generic `Record.Values`.
 
 - [ ] **Step 4: Regenerate contracts and close the node**
 
-Regenerate Admin contracts/OpenAPI. Update `runtime-security-containment` to implemented, remove it from all unfinished projections, add a node-closeout entry and set engineering security capability evidence to implemented. Keep the remaining seven program nodes pending.
+Regenerate Admin contracts/OpenAPI. Update `runtime-security-containment` to implemented, move it atomically from alignment `requiredFutureTaskNodes` to `requiredTaskNodes`, remove it from every unfinished/controlled-blocker projection, add a node-closeout entry and set engineering security capability evidence to implemented. Update the goal summary to `45 total / 38 implemented / 7 controlled unfinished`; keep the remaining seven program nodes pending in their original order. Add mutation tests for missing future-to-required migration, stale `45/37/8` counts and reordered seven-node projections.
 
 Run the complete Admin resource generation chain (`admin-resource-contract`, Admin OpenAPI, codegen preview, scaffold plan/files/draft/promotion review) before validation so no generated artifact is stale.
 
@@ -537,6 +558,7 @@ rtk node scripts/validate-admin-resources.mjs
 rtk node scripts/validate-platform-admin-api-boundary.mjs
 rtk node scripts/validate-platform-deployment-topology.mjs
 rtk node scripts/validate-platform-production-readiness.mjs
+rtk node scripts/validate-platform-production-env.mjs --env-file deploy/env/production.example.env
 rtk node scripts/validate-platform-foundation-alignment.mjs
 rtk node scripts/validate-platform-task-execution-audit.mjs
 rtk node scripts/validate-platform-goal-completion-audit.mjs
