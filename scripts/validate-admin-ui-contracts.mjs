@@ -277,6 +277,11 @@ requireIncludes(files.styles, ".health-panel .ant-progress", "Mobile health pane
 requireIncludes(files.styles, ".platform-skip-link", "styles.css must expose skip-link focus behavior.");
 requireRegex(files.styles, /:focus-visible[\s\S]*outline:\s*2px solid var\(--primary\)/, "Visible focus must be a default platform behavior.");
 requireRegex(files.styles, /@media\s*\(prefers-reduced-motion:\s*reduce\)/, "styles.css must respect reduced motion.");
+requireRegex(
+  files.styles,
+  /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*:where\(\.ant-modal-root, \.ant-drawer-root, \.ant-dropdown, \.ant-popover\),[\s\S]*:where\(\.ant-modal-root, \.ant-drawer-root, \.ant-dropdown, \.ant-popover\) \*,[\s\S]*transition-duration:\s*0\.01ms !important;/,
+  "Reduced motion must cover body-portaled AntD modal, drawer, dropdown, and popover roots.",
+);
 requireRegex(files.styles, /@media\s*\(max-width:\s*1023px\)[\s\S]*min-height:\s*44px/, "Responsive shell controls must use 44px minimum targets.");
 requireRegex(
   files.styles,

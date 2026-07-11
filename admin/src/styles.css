@@ -1027,7 +1027,11 @@ select {
 
   .platform-shell *,
   .platform-shell *::before,
-  .platform-shell *::after {
+  .platform-shell *::after,
+  :where(.ant-modal-root, .ant-drawer-root, .ant-dropdown, .ant-popover),
+  :where(.ant-modal-root, .ant-drawer-root, .ant-dropdown, .ant-popover) *,
+  :where(.ant-modal-root, .ant-drawer-root, .ant-dropdown, .ant-popover) *::before,
+  :where(.ant-modal-root, .ant-drawer-root, .ant-dropdown, .ant-popover) *::after {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;

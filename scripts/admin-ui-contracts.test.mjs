@@ -178,4 +178,19 @@ describe("validate-admin-ui-contracts", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /styles\.css must respect reduced motion/);
   });
+
+  it("rejects reduced-motion styles that omit body-portaled AntD modals", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/styles.css",
+      ".ant-modal-root",
+      ".ant-modal-portal-root",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Reduced motion must cover body-portaled AntD modal, drawer, dropdown, and popover roots/);
+  });
 });
