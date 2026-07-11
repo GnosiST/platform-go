@@ -82,10 +82,12 @@ describe("validate-platform-task-execution-audit", () => {
     audit.requiredUnfinishedNodes = completionProgramTaskIDs.slice(1);
     const missingResult = runValidator(["--audit", tempJSON("missing-platform-task-execution-audit.json", audit)]);
     assert.notEqual(missingResult.status, 0, missingResult.stdout);
+    assert.match(missingResult.stderr, /requiredUnfinishedNodes must exactly match unfinished task graph nodes in graph order/);
 
     audit.requiredUnfinishedNodes = [completionProgramTaskIDs[1], completionProgramTaskIDs[0], ...completionProgramTaskIDs.slice(2)];
     const reorderedResult = runValidator(["--audit", tempJSON("reordered-platform-task-execution-audit.json", audit)]);
     assert.notEqual(reorderedResult.status, 0, reorderedResult.stdout);
+    assert.match(reorderedResult.stderr, /requiredUnfinishedNodes must exactly match unfinished task graph nodes in graph order/);
   });
 
   it("rejects future promotion gates without status reason or completion gate", () => {

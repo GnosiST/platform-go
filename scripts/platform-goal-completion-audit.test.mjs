@@ -81,10 +81,12 @@ describe("validate-platform-goal-completion-audit", () => {
     audit.completionPolicy.requiredControlledUnfinishedNodes = completionProgramTaskIDs.slice(1);
     const missingResult = runValidator(["--audit", tempJSON("missing-goal-completion-audit.json", audit)]);
     assert.notEqual(missingResult.status, 0, missingResult.stdout);
+    assert.match(missingResult.stderr, /completionPolicy\.requiredControlledUnfinishedNodes must exactly match unfinished task graph nodes in graph order/);
 
     audit.completionPolicy.requiredControlledUnfinishedNodes = [completionProgramTaskIDs[1], completionProgramTaskIDs[0], ...completionProgramTaskIDs.slice(2)];
     const reorderedResult = runValidator(["--audit", tempJSON("reordered-goal-completion-audit.json", audit)]);
     assert.notEqual(reorderedResult.status, 0, reorderedResult.stdout);
+    assert.match(reorderedResult.stderr, /completionPolicy\.requiredControlledUnfinishedNodes must exactly match unfinished task graph nodes in graph order/);
   });
 
   it("rejects business reference wording that turns zshenmez into a migration source", () => {

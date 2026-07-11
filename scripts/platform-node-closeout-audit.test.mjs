@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { describe, it } from "node:test";
 
@@ -17,6 +18,48 @@ const completionProgramTaskIDs = [
   "public-docs-site",
   "github-release-publication",
 ];
+
+const foundationBaselineCloseoutTaskIDs = [
+  "stack-alignment-and-architecture",
+  "capability-manifest-contract",
+  "resource-schema-contract",
+  "capability-profile-composition-gate",
+  "capability-contract-governance",
+  "rbac-menu-data-scope",
+  "governance-org-area-role-groups",
+  "auth-session-provider-jwt-wechat",
+  "gorm-storage-runtime",
+  "cache-redis-invalidation",
+  "production-persistence-correctness",
+  "production-runtime-gate",
+  "production-readiness-preflight",
+  "openapi-app-contracts",
+  "admin-api-boundary-query-security",
+  "codegen-preview-scaffold",
+  "codegen-source-writing-readiness",
+  "admin-ui-shell-and-list-components",
+  "branding-demo-data-dashboard",
+  "personnel-extension-boundary",
+  "notification-extension-boundary",
+  "job-extension-boundary",
+  "visual-product-design-qa",
+  "policy-review-and-audit-workflow",
+  "form-schema-layout-and-slots",
+  "refine-custom-panels-and-actions",
+  "file-storage-preview-and-audit-workflow",
+  "policy-review-custom-ui",
+  "task-dependency-governance",
+  "reference-discovery-classification-gate",
+  "reference-coverage-boundary-gate",
+  "node-closeout-audit",
+  "foundation-alignment-audit",
+  "production-auth-provider-hardening",
+  "source-writing-codegen-promotion",
+  "admin-ui-system-quality-hardening",
+  "production-admin-oidc-auth",
+];
+
+const foundationBaselineCloseoutDigest = "3f40fe426cb54ca5b75221721158f3f37cac400baa7f32ab680ebe447a082c59";
 
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-node-closeout-audit.mjs", ...args], {
@@ -53,6 +96,8 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
     assert.equal(audit.nodeCloseouts.length, 37);
+    assert.deepEqual(audit.nodeCloseouts.map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
+    assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts)).digest("hex"), foundationBaselineCloseoutDigest);
     assert.deepEqual(audit.pendingNodeEvidence, completionProgramTaskIDs);
   });
 
@@ -72,6 +117,7 @@ describe("validate-platform-node-closeout-audit", () => {
 
     const result = runValidator(["--audit", tempJSON("premature-node-closeout-audit.json", audit)]);
     assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /pending task runtime-security-containment must not have closeout evidence/);
   });
 
   it("rejects implemented task nodes without closeout evidence", () => {

@@ -233,7 +233,7 @@ describe("validate-platform-objective-conformance", () => {
     const result = runValidator(["--audit", auditPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /completionPolicy\.controlledBlockers/);
+    assert.match(result.stderr, /completionPolicy\.controlledBlockers must exactly match unfinished task graph nodes in graph order/);
   });
 
   it("rejects reordering controlled objective blockers", () => {
@@ -244,7 +244,7 @@ describe("validate-platform-objective-conformance", () => {
     const result = runValidator(["--audit", auditPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /completionPolicy\.controlledBlockers/);
+    assert.match(result.stderr, /completionPolicy\.controlledBlockers must exactly match unfinished task graph nodes in graph order/);
   });
 
   it("rejects making Vercel the required default API runtime", () => {

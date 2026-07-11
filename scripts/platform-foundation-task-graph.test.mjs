@@ -346,12 +346,14 @@ describe("validate-platform-foundation-task-graph", () => {
     missingGraph.tasks = missingGraph.tasks.filter((task) => task.id !== completionProgramTaskIDs[0]);
     const missingResult = runValidator(["--graph", tempJSON("missing-completion-task.json", missingGraph)]);
     assert.notEqual(missingResult.status, 0, missingResult.stdout);
+    assert.match(missingResult.stderr, /approved completion program task is missing: runtime-security-containment/);
 
     const reorderedGraph = structuredClone(graph);
     const indexes = completionProgramTaskIDs.slice(0, 2).map((id) => reorderedGraph.tasks.findIndex((task) => task.id === id));
     [reorderedGraph.tasks[indexes[0]], reorderedGraph.tasks[indexes[1]]] = [reorderedGraph.tasks[indexes[1]], reorderedGraph.tasks[indexes[0]]];
     const reorderedResult = runValidator(["--graph", tempJSON("reordered-completion-task.json", reorderedGraph)]);
     assert.notEqual(reorderedResult.status, 0, reorderedResult.stdout);
+    assert.match(reorderedResult.stderr, /completion program task order must match approved order/);
   });
 
   it("rejects production Admin OIDC evidence manifests without a completed redaction scan", () => {
