@@ -430,7 +430,11 @@ function tableLabels(dictionary: Dictionary) {
     goToPage: dictionary.goToPage,
     page: dictionary.page,
     paginationRange: dictionary.paginationRange,
-    visibleColumns: (visible: number, total: number) => formatTemplate(dictionary.visibleColumns, { visible: String(visible), total: String(total) }),
+    selectedColumns: (selected: number, total: number) =>
+      formatTemplate(dictionary.selectedColumns, { selected: String(selected), total: String(total) }),
+    renderedColumns: (rendered: number, selected: number) =>
+      formatTemplate(dictionary.renderedColumns, { rendered: String(rendered), selected: String(selected) }),
+    hiddenAtCurrentWidth: dictionary.hiddenAtCurrentWidth,
     selectAllColumns: dictionary.selectAllColumns,
     resetColumns: dictionary.resetColumns,
   };

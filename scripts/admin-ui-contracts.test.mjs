@@ -66,6 +66,36 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /PlatformDataTable must use the shared pagination bar/);
   });
 
+  it("rejects table column settings without AntD breakpoint state", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/ui/PlatformDataTable.tsx",
+      "Grid.useBreakpoint()",
+      "{}",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /PlatformDataTable must use AntD breakpoint state for rendered-column clarity/);
+  });
+
+  it("rejects table column settings without the current-width hidden state", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/ui/PlatformDataTable.tsx",
+      "labels.hiddenAtCurrentWidth",
+      "labels.columnUnavailable",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Column settings must explain breakpoint-hidden selected columns/);
+  });
+
   it("rejects a settings drawer that drops import/export configuration support", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(

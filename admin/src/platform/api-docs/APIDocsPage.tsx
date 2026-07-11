@@ -234,7 +234,10 @@ export function APIDocsPage({ dictionary }: APIDocsPageProps) {
           goToPage: dictionary.goToPage,
           page: dictionary.page,
           paginationRange: dictionary.paginationRange,
-          visibleColumns: (visible, total) => formatTemplate(dictionary.visibleColumns, { visible: String(visible), total: String(total) }),
+          selectedColumns: (selected, total) => formatTemplate(dictionary.selectedColumns, { selected: String(selected), total: String(total) }),
+          renderedColumns: (rendered, selected) =>
+            formatTemplate(dictionary.renderedColumns, { rendered: String(rendered), selected: String(selected) }),
+          hiddenAtCurrentWidth: dictionary.hiddenAtCurrentWidth,
           selectAllColumns: dictionary.selectAllColumns,
           resetColumns: dictionary.resetColumns,
         }}

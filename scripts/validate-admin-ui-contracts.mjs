@@ -142,6 +142,12 @@ requireOrder(files.table, "mobileCards(dataSource)", "<PlatformPaginationBar", "
 requireIncludes(files.table, 'export type PlatformDataTableColumnPriority = "essential" | "standard" | "extended"', "PlatformDataTable must expose responsive priority tiers.");
 requireIncludes(files.table, "responsiveBreakpointsForPriority", "PlatformDataTable must map priority to AntD breakpoints.");
 requireIncludes(files.table, "column.responsive ?? responsiveBreakpointsForPriority(column.priority)", "PlatformDataTable must preserve caller-provided responsive breakpoints.");
+requireIncludes(files.table, "Grid.useBreakpoint()", "PlatformDataTable must use AntD breakpoint state for rendered-column clarity.");
+requireIncludes(files.table, "effectiveResponsiveBreakpoints", "PlatformDataTable must share one effective responsive rule for rendering and column settings.");
+requireIncludes(files.table, "columnRenderedAtCurrentWidth", "PlatformDataTable must compute columns rendered at the current width.");
+requireIncludes(files.table, "labels.selectedColumns", "Column settings must distinguish selected columns.");
+requireIncludes(files.table, "labels.renderedColumns", "Column settings must report currently rendered columns.");
+requireIncludes(files.table, "labels.hiddenAtCurrentWidth", "Column settings must explain breakpoint-hidden selected columns.");
 requireIncludes(files.resourceConsole, "tableColumnPriority(index)", "Generic resource tables must derive priority from schema order.");
 requireIncludes(files.resourceConsole, "form.getFieldInstance", "Resource modals must focus the first editable schema field.");
 requireIncludes(files.resourceConsole, "afterOpenChange={(open) => {", "Resource modals must focus through the AntD open lifecycle.");

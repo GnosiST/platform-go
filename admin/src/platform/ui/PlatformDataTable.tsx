@@ -11,6 +11,7 @@ import {
   Button,
   Checkbox,
   Empty,
+  Grid,
   Input,
   InputNumber,
   Select,
@@ -40,6 +41,9 @@ export type PlatformDataTableColumn<T extends object> = TableColumnsType<T>[numb
   lockVisible?: boolean;
   priority?: PlatformDataTableColumnPriority;
 };
+
+type PlatformBreakpoint = NonNullable<PlatformDataTableColumn<Record<string, unknown>>["responsive"]>[number];
+type PlatformBreakpointState = Partial<Record<PlatformBreakpoint, boolean>>;
 
 export type PlatformDataTableFilterValue = string | { from?: string; to?: string };
 
@@ -74,7 +78,9 @@ export type PlatformDataTableLabels = {
   goToPage: string;
   page: string;
   paginationRange: string;
-  visibleColumns: (visible: number, total: number) => string;
+  selectedColumns: (selected: number, total: number) => string;
+  renderedColumns: (rendered: number, selected: number) => string;
+  hiddenAtCurrentWidth: string;
   selectAllColumns: string;
   resetColumns: string;
 };
@@ -156,6 +162,7 @@ export function PlatformDataTable<T extends object>({
   onRowClick,
   onTableChange,
 }: PlatformDataTableProps<T>) {
+  const screens = Grid.useBreakpoint();
   const tableID = useId().replace(/:/g, "");
   const columnsSignature = columns.map((column) => String(column.key)).join("|");
   const defaultVisibleColumnKeys = useMemo(() => columns.filter((column) => !column.defaultHidden).map((column) => column.key), [columnsSignature]);
@@ -166,13 +173,17 @@ export function PlatformDataTable<T extends object>({
   const [internalPage, setInternalPage] = useState(initialPage);
   const [internalPageSize, setInternalPageSize] = useState(initialPageSize);
   const [openPlugin, setOpenPlugin] = useState<"filters" | "columns" | null>(null);
-  const visibleColumns = useMemo(
+  const selectedColumns = useMemo(
     () => columns.filter((column) => column.lockVisible || visibleColumnKeys.includes(column.key)),
     [columns, visibleColumnKeys],
   );
+  const renderedColumnKeys = useMemo(
+    () => new Set(selectedColumns.filter((column) => columnRenderedAtCurrentWidth(column, screens)).map((column) => column.key)),
+    [screens, selectedColumns],
+  );
   const displayColumns = useMemo(
-    () => visibleColumns.map((column) => withResponsivePriority(withDefaultOverflowRenderer(column, inlineEditor))),
-    [inlineEditor, visibleColumns],
+    () => selectedColumns.map((column) => withResponsivePriority(withDefaultOverflowRenderer(column, inlineEditor))),
+    [inlineEditor, selectedColumns],
   );
   const tableColumns = useMemo(() => {
     if (!rowActions) {
@@ -190,7 +201,6 @@ export function PlatformDataTable<T extends object>({
       },
     ] satisfies PlatformDataTableColumn<T>[];
   }, [displayColumns, labels.rowActions, rowActions, rowActionsColumnTitle, rowActionsColumnWidth]);
-  const visibleColumnCount = visibleColumns.length;
   const activeFilterCount = Object.values(filterValues).filter(filterValueActive).length;
   const clearSelection = () => setSelectedKeys([]);
 
@@ -281,7 +291,12 @@ export function PlatformDataTable<T extends object>({
     <PlatformDropdownPanel
       className="platform-column-menu"
       title={labels.columns}
-      headerExtra={<Typography.Text type="secondary">{labels.visibleColumns(visibleColumnCount, columns.length)}</Typography.Text>}
+      headerExtra={
+        <Space align="end" direction="vertical" size={0}>
+          <Typography.Text type="secondary">{labels.selectedColumns(selectedColumns.length, columns.length)}</Typography.Text>
+          <Typography.Text type="secondary">{labels.renderedColumns(renderedColumnKeys.size, selectedColumns.length)}</Typography.Text>
+        </Space>
+      }
       width={282}
       maxHeight="min(440px, calc(100vh - 140px))"
       bodyClassName="platform-column-menu-body"
@@ -298,11 +313,22 @@ export function PlatformDataTable<T extends object>({
     >
       <Checkbox.Group name={`${tableID}-column-visibility`} value={visibleColumnKeys} onChange={(values) => setVisibleColumnKeys(values)}>
         <Space className="platform-column-list" direction="vertical" size={4}>
-          {columns.map((column) => (
-            <Checkbox aria-label={String(column.title)} disabled={column.lockVisible} key={column.key} value={column.key}>
-              {column.title as ReactNode}
-            </Checkbox>
-          ))}
+          {columns.map((column) => {
+            const hiddenAtCurrentWidth =
+              (column.lockVisible || visibleColumnKeys.includes(column.key)) && !renderedColumnKeys.has(column.key);
+            return (
+              <Checkbox aria-label={String(column.title)} disabled={column.lockVisible} key={column.key} value={column.key}>
+                <span className="platform-column-option">
+                  <span className="platform-column-option-label">{column.title as ReactNode}</span>
+                  {hiddenAtCurrentWidth ? (
+                    <Typography.Text className="platform-column-option-state" type="secondary">
+                      {labels.hiddenAtCurrentWidth}
+                    </Typography.Text>
+                  ) : null}
+                </span>
+              </Checkbox>
+            );
+          })}
         </Space>
       </Checkbox.Group>
     </PlatformDropdownPanel>
@@ -483,11 +509,16 @@ function responsiveBreakpointsForPriority(priority: PlatformDataTableColumnPrior
   return ["md", "lg", "xl", "xxl"] as const;
 }
 
+function effectiveResponsiveBreakpoints<T extends object>(column: PlatformDataTableColumn<T>) {
+  return [...(column.responsive ?? responsiveBreakpointsForPriority(column.priority))];
+}
+
 function withResponsivePriority<T extends object>(column: PlatformDataTableColumn<T>): PlatformDataTableColumn<T> {
-  return {
-    ...column,
-    responsive: [...(column.responsive ?? responsiveBreakpointsForPriority(column.priority))],
-  };
+  return { ...column, responsive: effectiveResponsiveBreakpoints(column) };
+}
+
+function columnRenderedAtCurrentWidth<T extends object>(column: PlatformDataTableColumn<T>, screens: PlatformBreakpointState) {
+  return effectiveResponsiveBreakpoints(column).some((breakpoint) => screens[breakpoint]);
 }
 
 function FilterControl({
