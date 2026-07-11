@@ -50,6 +50,10 @@ requireNotIncludes(files.shell, "access: dictionary.navBusinessAccess", "AdminSh
 requireIncludes(files.shell, 'href="#platform-main-content"', "AdminShell must expose a skip-to-content link.");
 requireIncludes(files.shell, 'id="platform-main-content"', "AdminShell main region must expose a stable focus target.");
 requireIncludes(files.shell, "previousRouteRef", "AdminShell must move focus only after actual route changes.");
+requireIncludes(files.shell, "pendingDrawerRouteFocusRef", "Drawer route changes must defer main focus until the mobile navigation closes.");
+requireIncludes(files.shell, "if (pendingDrawerRouteFocusRef.current)", "Route focus must remain deferred while mobile navigation is closing.");
+requireIncludes(files.shell, "pendingDrawerRouteFocusRef.current = !resource.isExternal && resource.route !== activeRoute", "Mobile navigation must mark only actual internal route changes for deferred focus.");
+requireIncludes(files.shell, "afterOpenChange={handleMobileDrawerOpenChange}", "Mobile navigation must focus main through the Drawer close lifecycle.");
 requireIncludes(files.shell, "dictionary.openMobileNavigation", "Mobile navigation must use an explicit localized accessible name.");
 requireIncludes(files.shell, "dictionary.alerts", "The alert icon control must use an explicit localized accessible name.");
 requireIncludes(files.shell, "platform-mobile-contextbar", "AdminShell must provide the approved compact mobile context bar.");
@@ -239,6 +243,23 @@ requireIncludes(files.styles, ".health-panel .ant-progress", "Mobile health pane
 requireIncludes(files.styles, ".platform-skip-link", "styles.css must expose skip-link focus behavior.");
 requireRegex(files.styles, /:focus-visible[\s\S]*outline:\s*2px solid var\(--primary\)/, "Visible focus must be a default platform behavior.");
 requireRegex(files.styles, /@media\s*\(max-width:\s*1023px\)[\s\S]*min-height:\s*44px/, "Responsive shell controls must use 44px minimum targets.");
+requireRegex(
+  files.styles,
+  /@media\s*\(max-width:\s*1023px\)[\s\S]*\.mobile-global-search\s*\{[^}]*min-height:\s*44px;/,
+  "Mobile Drawer search must use a 44px minimum target below the desktop breakpoint.",
+);
+requireOrder(
+  files.styles,
+  "@media (max-width: 767px)",
+  ".dashboard-hero-panel .page-eyebrow",
+  "Dashboard eyebrow hiding must be scoped to the mobile breakpoint.",
+);
+requireCountExactly(
+  files.styles,
+  ".dashboard-hero-panel .page-eyebrow",
+  1,
+  "Dashboard eyebrow hiding must have exactly one mobile-only rule.",
+);
 
 if (failures.length > 0) {
   console.error("Admin UI contract validation failed:");
@@ -282,6 +303,12 @@ function requireOrder(source, first, second, message) {
 
 function requireCountAtLeast(source, needle, expectedCount, message) {
   if (source.split(needle).length - 1 < expectedCount) {
+    failures.push(message);
+  }
+}
+
+function requireCountExactly(source, needle, expectedCount, message) {
+  if (source.split(needle).length - 1 !== expectedCount) {
     failures.push(message);
   }
 }

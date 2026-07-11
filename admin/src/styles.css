@@ -4002,6 +4002,7 @@ select {
 
   .mobile-global-search {
     display: flex;
+    min-height: 44px;
     margin-bottom: 14px;
   }
 
@@ -4149,10 +4150,6 @@ select {
     flex-direction: column;
     min-height: 0;
     padding: 14px;
-  }
-
-  .dashboard-hero-panel .page-eyebrow {
-    display: none;
   }
 
   .dashboard-hero-panel h1.ant-typography {
@@ -4371,6 +4368,10 @@ select {
   .dashboard-hero-panel {
     gap: 10px;
     padding: 12px;
+  }
+
+  .dashboard-hero-panel .page-eyebrow {
+    display: none;
   }
 
   .dashboard-hero-panel h1.ant-typography {

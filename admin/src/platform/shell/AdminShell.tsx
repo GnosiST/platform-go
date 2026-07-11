@@ -115,6 +115,7 @@ export function AdminShell({
   const [openTabRoutes, setOpenTabRoutes] = useState<string[]>(() => uniqueRoutes([HOME_ROUTE, activeRoute]));
   const mainRef = useRef<HTMLElement | null>(null);
   const previousRouteRef = useRef(activeRoute);
+  const pendingDrawerRouteFocusRef = useRef(false);
   const activeResource = resources.find((resource) => resource.route === activeRoute) ?? resources[0];
   const resourcesByRoute = useMemo(() => new Map(resources.map((resource) => [resource.route, resource])), [resources]);
   const groupedResources = useMemo(
@@ -153,6 +154,9 @@ export function AdminShell({
       return;
     }
     previousRouteRef.current = activeRoute;
+    if (pendingDrawerRouteFocusRef.current) {
+      return;
+    }
     window.requestAnimationFrame(() => mainRef.current?.focus({ preventScroll: true }));
   }, [activeRoute]);
 
@@ -162,6 +166,20 @@ export function AdminShell({
       return;
     }
     onRouteChange(resource.route);
+  };
+
+  const openResourceFromMobileDrawer = (resource: AdminResourceDefinition) => {
+    pendingDrawerRouteFocusRef.current = !resource.isExternal && resource.route !== activeRoute;
+    openResource(resource);
+    setMobileNavOpen(false);
+  };
+
+  const handleMobileDrawerOpenChange = (open: boolean) => {
+    if (open || !pendingDrawerRouteFocusRef.current) {
+      return;
+    }
+    pendingDrawerRouteFocusRef.current = false;
+    window.requestAnimationFrame(() => mainRef.current?.focus({ preventScroll: true }));
   };
 
   const closeWorkTab = (route: string) => {
@@ -509,6 +527,7 @@ export function AdminShell({
         placement="left"
         rootStyle={{ position: "absolute" }}
         width={320}
+        afterOpenChange={handleMobileDrawerOpenChange}
         onClose={() => setMobileNavOpen(false)}
       >
         <Input
@@ -525,10 +544,7 @@ export function AdminShell({
           activeRoute={activeRoute}
           language={language}
           dictionary={dictionary}
-          onResourceOpen={(resource) => {
-            openResource(resource);
-            setMobileNavOpen(false);
-          }}
+          onResourceOpen={openResourceFromMobileDrawer}
         />
       </Drawer>
       <SystemSettingsDrawer
