@@ -364,16 +364,19 @@ export type AdminPolicyReviewExport = {
 };
 
 type PlatformResponseMode = "data" | "raw" | "blob";
+type PlatformRequestInit = RequestInit & {
+  auth?: "stored-token" | "none";
+};
 
-function handleUnauthorizedResponse(statusCode: number, hadToken: boolean) {
-  if (statusCode !== 401 || !hadToken || !getAuthToken()) {
+function handleUnauthorizedResponse(statusCode: number, requestToken: string) {
+  if (statusCode !== 401 || !requestToken || getAuthToken() !== requestToken) {
     return;
   }
   clearAuthToken();
   window.dispatchEvent(new Event(ADMIN_SESSION_EXPIRED_EVENT));
 }
 
-async function parsePlatformResponse<T>(response: Response, hadToken: boolean, mode: PlatformResponseMode = "data"): Promise<T> {
+async function parsePlatformResponse<T>(response: Response, requestToken: string, mode: PlatformResponseMode = "data"): Promise<T> {
   if (mode === "blob" && response.ok) {
     return (await response.blob()) as T;
   }
@@ -389,7 +392,7 @@ async function parsePlatformResponse<T>(response: Response, hadToken: boolean, m
     ? (payload as PlatformResponse<unknown>).error
     : undefined;
   if (!response.ok || error || payload === undefined) {
-    handleUnauthorizedResponse(response.status, hadToken);
+    handleUnauthorizedResponse(response.status, requestToken);
     throw new AdminAPIError(error?.message ?? `HTTP ${response.status}`, response.status, error?.code);
   }
 
@@ -399,17 +402,21 @@ async function parsePlatformResponse<T>(response: Response, hadToken: boolean, m
   return (payload as PlatformResponse<T>).data as T;
 }
 
-export async function request<T>(path: `/${string}`, init?: RequestInit): Promise<T> {
-  const token = getAuthToken();
+export async function request<T>(path: `/${string}`, init: PlatformRequestInit = {}): Promise<T> {
+  const { auth = "stored-token", ...fetchInit } = init;
+  const requestToken = auth === "stored-token" ? getAuthToken() : "";
+  const headers = new Headers(fetchInit.headers);
+  if (fetchInit.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (requestToken && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${requestToken}`);
+  }
   const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
+    ...fetchInit,
+    headers,
   });
-  return parsePlatformResponse<T>(response, Boolean(token));
+  return parsePlatformResponse<T>(response, requestToken);
 }
 
 export function getAuthToken() {
@@ -443,11 +450,12 @@ export function getBrandingConfig() {
 }
 
 export function listAuthProviders() {
-  return request<AuthProviderList>("/auth/providers");
+  return request<AuthProviderList>("/auth/providers", { auth: "none" });
 }
 
 export async function loginWithAuthProvider(input: AuthLoginInput) {
   const result = await request<AuthLoginResult>("/auth/login", {
+    auth: "none",
     method: "POST",
     body: JSON.stringify(input),
   });
@@ -486,11 +494,11 @@ export function listAdminDemoData() {
 }
 
 export async function getAdminOpenAPI() {
-  const token = getAuthToken();
+  const requestToken = getAuthToken();
   const response = await fetch(`${API_BASE}/openapi.json`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    headers: requestToken ? { Authorization: `Bearer ${requestToken}` } : undefined,
   });
-  return parsePlatformResponse<AdminOpenAPIDocument>(response, Boolean(token), "raw");
+  return parsePlatformResponse<AdminOpenAPIDocument>(response, requestToken, "raw");
 }
 
 export function applyAdminDemoData(capabilityId: string, datasetId: string) {
@@ -572,15 +580,15 @@ export function exportAdminPolicyReviews() {
 }
 
 export async function uploadAdminFile(file: File) {
-  const token = getAuthToken();
+  const requestToken = getAuthToken();
   const formData = new FormData();
   formData.append("file", file);
   const response = await fetch(`${API_BASE}/admin/files/upload`, {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    headers: requestToken ? { Authorization: `Bearer ${requestToken}` } : undefined,
     body: formData,
   });
-  return parsePlatformResponse<AdminResourceMutation>(response, Boolean(token));
+  return parsePlatformResponse<AdminResourceMutation>(response, requestToken);
 }
 
 export function adminFileContentUrl(id: string) {
@@ -588,9 +596,9 @@ export function adminFileContentUrl(id: string) {
 }
 
 export async function getAdminFileBlob(id: string) {
-  const token = getAuthToken();
+  const requestToken = getAuthToken();
   const response = await fetch(adminFileContentUrl(id), {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    headers: requestToken ? { Authorization: `Bearer ${requestToken}` } : undefined,
   });
-  return parsePlatformResponse<Blob>(response, Boolean(token), "blob");
+  return parsePlatformResponse<Blob>(response, requestToken, "blob");
 }

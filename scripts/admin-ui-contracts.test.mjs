@@ -102,4 +102,65 @@ describe("validate-admin-ui-contracts", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /The shared client must expose the session-expired event contract/);
   });
+
+  it("rejects session expiry handling that does not match the exact request token", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/api/client.ts",
+      "getAuthToken() !== requestToken",
+      "Boolean(getAuthToken())",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Session expiry must clear only the exact token used by the failed request/);
+  });
+
+  it("rejects auth bootstrap calls that use stored-token authentication", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/api/client.ts",
+      'auth: "none"',
+      'auth: "stored-token"',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Auth provider discovery must explicitly avoid stored-token authentication/);
+    assert.match(result.stderr, /Auth login must explicitly avoid stored-token authentication/);
+  });
+
+  it("rejects localized session expiry state", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/App.tsx",
+      "const [sessionExpired, setSessionExpired] = useState(false);",
+      "const [sessionExpired, setSessionExpired] = useState(dictionary.sessionExpired);",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /App must keep session expiry in stable non-localized state/);
+  });
+
+  it("rejects localized-string equality for session expiry", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/App.tsx",
+      'setAuthError("");',
+      'setAuthError((current) => current === dictionary.sessionExpired ? current : "");',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /App must not identify session expiry by comparing localized strings/);
+  });
 });

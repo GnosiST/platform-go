@@ -42,7 +42,26 @@ requireIncludes(files.client, "statusCode", "Admin API errors must carry HTTP st
 requireIncludes(files.client, "dispatchEvent", "Stored-token 401 responses must notify the app.");
 requireIncludes(files.app, "ADMIN_SESSION_EXPIRED_EVENT", "App must listen for shared session expiry.");
 requireIncludes(files.app, "dictionary.sessionExpired", "Session expiry feedback must be localized.");
-requireIncludes(files.app, "current === dictionary.sessionExpired", "Provider discovery must not overwrite localized session-expired feedback.");
+requireRegex(
+  files.client,
+  /statusCode !== 401\s*\|\|\s*!requestToken\s*\|\|\s*getAuthToken\(\) !== requestToken/,
+  "Session expiry must clear only the exact token used by the failed request.",
+);
+requireNotIncludes(files.client, "hadToken", "Session expiry handling must retain the exact request token instead of a boolean token flag.");
+requireIncludes(files.client, 'const { auth = "stored-token", ...fetchInit } = init;', "Request must separate the platform auth mode from native fetch options.");
+requireNotIncludes(files.client, "...init,", "Platform-only request options must not be forwarded to fetch.");
+requireIncludes(files.client, 'return request<AuthProviderList>("/auth/providers", { auth: "none" });', "Auth provider discovery must explicitly avoid stored-token authentication.");
+requireRegex(
+  files.client,
+  /request<AuthLoginResult>\("\/auth\/login",\s*\{[\s\S]*?auth:\s*"none"/,
+  "Auth login must explicitly avoid stored-token authentication.",
+);
+requireIncludes(files.app, "const [sessionExpired, setSessionExpired] = useState(false);", "App must keep session expiry in stable non-localized state.");
+requireIncludes(files.app, "setSessionExpired(true);", "Session expiry recovery must set the stable expiry state.");
+requireCountExactly(files.app, "setSessionExpired(true);", 1, "Only the exact-token session-expired event may set App expiry state.");
+requireIncludes(files.app, "sessionExpired ? dictionary.sessionExpired : authError || error", "Session expiry display must use the current localized dictionary and override provider errors.");
+requireIncludes(files.app, "setSessionExpired(false);", "Successful login must clear stable session expiry state.");
+requireNotIncludes(files.app, "current === dictionary.sessionExpired", "App must not identify session expiry by comparing localized strings.");
 requireIncludes(files.client, "parsePlatformResponse", "Direct fetch helpers must share response normalization.");
 requireIncludes(files.authProvider, "error instanceof AdminAPIError", "Refine auth errors must use the typed admin API error contract.");
 

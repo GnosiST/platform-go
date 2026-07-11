@@ -63,6 +63,7 @@ function PlatformApp() {
   const [authLoading, setAuthLoading] = useState(true);
   const [error, setError] = useState("");
   const [authError, setAuthError] = useState("");
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [language, setLanguageState] = useState<Language>(readStoredLanguage);
   const [themeName, setThemeNameState] = useState<ThemeName>(readStoredThemeName);
   const [layoutMode, setLayoutModeState] = useState<AdminLayoutMode>(readStoredLayoutMode);
@@ -120,13 +121,13 @@ function PlatformApp() {
       setDeniedPermissions([]);
       setCapabilityItems([]);
       setResources(coreResources);
-      setAuthError(dictionary.sessionExpired);
+      setSessionExpired(true);
       setError("");
       setLoading(false);
     };
     window.addEventListener(ADMIN_SESSION_EXPIRED_EVENT, handleSessionExpired);
     return () => window.removeEventListener(ADMIN_SESSION_EXPIRED_EVENT, handleSessionExpired);
-  }, [dictionary.sessionExpired]);
+  }, []);
 
   useEffect(() => {
     Promise.all([getBrandingConfig(), listAuthProviders()])
@@ -136,15 +137,13 @@ function PlatformApp() {
           applyThemeName(normalizeThemeName(nextBranding.defaultTheme));
         }
         setAuthProviders(providers.items);
-        setAuthError((current) => current === dictionary.sessionExpired ? current : "");
+        setAuthError("");
       })
       .catch((nextError: unknown) => {
-        setAuthError((current) => current === dictionary.sessionExpired
-          ? current
-          : nextError instanceof Error ? nextError.message : dictionary.authProvidersLoadFailed);
+        setAuthError(nextError instanceof Error ? nextError.message : dictionary.authProvidersLoadFailed);
       })
       .finally(() => setAuthLoading(false));
-  }, [applyThemeName, dictionary.authProvidersLoadFailed, dictionary.sessionExpired, hasStoredTheme]);
+  }, [applyThemeName, dictionary.authProvidersLoadFailed, hasStoredTheme]);
 
   const loadAdminWorkspace = () => {
     setLoading(true);
@@ -163,7 +162,6 @@ function PlatformApp() {
       })
       .catch((nextError: unknown) => {
         if (nextError instanceof AdminAPIError && nextError.statusCode === 401) {
-          setAuthError(dictionary.sessionExpired);
           setError("");
           return;
         }
@@ -216,11 +214,13 @@ function PlatformApp() {
             branding={branding}
             providers={authProviders}
             loading={authLoading}
-            error={authError || error}
+            error={sessionExpired ? dictionary.sessionExpired : authError || error}
             themeName={themeName}
             onLanguageChange={changeLanguage}
             onThemeChange={applyThemeName}
             onLoginSuccess={(nextSession) => {
+              setSessionExpired(false);
+              setAuthError("");
               setSession(nextSession);
               setPermissions(nextSession.permissions);
               setDeniedPermissions(nextSession.deniedPermissions ?? []);
