@@ -4358,17 +4358,26 @@ select {
     width: calc(100vw - 12px) !important;
   }
 
-  .system-settings-drawer .ant-drawer-close,
-  .settings-tabs .ant-tabs-tab,
-  .settings-tabs .ant-tabs-tab-btn,
-  .settings-tabs .ant-tabs-nav-more {
+  .system-settings-drawer .ant-drawer-close {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .settings-tabs .ant-tabs-tab {
     min-width: 44px;
     min-height: 44px;
   }
 
   .settings-tabs .ant-tabs-tab-btn {
     display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
     align-items: center;
+  }
+
+  .settings-tabs .ant-tabs-nav-more {
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .resource-form-side-preview {
@@ -4483,12 +4492,23 @@ select {
     justify-content: center;
   }
 
+  .platform-pagination-main :where(.ant-pagination-prev, .ant-pagination-item, .ant-pagination-jump-prev, .ant-pagination-jump-next, .ant-pagination-next, .ant-pagination-item-link, a) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   .platform-pagination-jumper {
     grid-column: 1;
     grid-row: 3;
     justify-content: center;
     justify-self: center;
     max-width: 100%;
+  }
+
+  .platform-pagination-jumper .ant-input-number {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .dashboard-table .ant-pagination-total-text,

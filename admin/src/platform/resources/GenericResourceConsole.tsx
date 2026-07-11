@@ -80,6 +80,15 @@ type FilePreviewState = {
   error?: string;
 };
 
+const FOCUSABLE_RESOURCE_FORM_CONTROL_SELECTOR = [
+  '.resource-form-fields input:not([type="hidden"]):not([disabled]):not([readonly])',
+  ".resource-form-fields textarea:not([disabled]):not([readonly])",
+  ".resource-form-fields select:not([disabled])",
+  '.resource-form-fields button:not([disabled]):not([aria-disabled="true"])',
+  '.resource-form-fields [role="combobox"]:not([disabled]):not([readonly]):not([aria-disabled="true"])',
+  '.resource-form-fields [tabindex]:not([tabindex="-1"]):not([disabled]):not([readonly]):not([aria-disabled="true"])',
+].join(", ");
+
 export function GenericResourceConsole({ resource, availableResourceRoutes = [], language, dictionary, permissions = ["*"], deniedPermissions = [] }: GenericResourceConsoleProps) {
   const resourceKey = resourceKeyFromRoute(resource.route);
   const isFileResource = resourceKey === "files";
@@ -2368,10 +2377,11 @@ function focusFirstEditableFormField(form: FormInstance<ResourceFormValues>, fie
     fieldInstance.focus({ preventScroll: true });
     return;
   }
-  const fieldControl = document.getElementById(firstField.key);
-  if (fieldControl?.closest(".admin-form-modal")) {
-    fieldControl.focus({ preventScroll: true });
-  }
+  const visibleModal = Array.from(document.querySelectorAll<HTMLElement>(".admin-form-modal")).find(
+    (modal) => modal.getClientRects().length > 0,
+  );
+  const fieldControl = visibleModal?.querySelector<HTMLElement>(FOCUSABLE_RESOURCE_FORM_CONTROL_SELECTOR);
+  fieldControl?.focus({ preventScroll: true });
 }
 
 function formModalWidth(layout: PlatformResourceFormLayoutPreset) {

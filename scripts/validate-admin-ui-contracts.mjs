@@ -30,6 +30,7 @@ const files = {
 };
 
 const failures = [];
+const mobileStyles = extractCssBlock(files.styles, "@media (max-width: 767px)");
 
 requireIncludes(files.app, "readStoredUIConfig", "App must keep persisted admin UI configuration.");
 requireIncludes(files.app, "writeStorageValue(adminPreferenceStorageKeys.ui", "App must persist admin UI configuration changes.");
@@ -129,7 +130,16 @@ requireIncludes(files.table, "responsiveBreakpointsForPriority", "PlatformDataTa
 requireIncludes(files.table, "column.responsive ?? responsiveBreakpointsForPriority(column.priority)", "PlatformDataTable must preserve caller-provided responsive breakpoints.");
 requireIncludes(files.resourceConsole, "tableColumnPriority(index)", "Generic resource tables must derive priority from schema order.");
 requireIncludes(files.resourceConsole, "form.getFieldInstance", "Resource modals must focus the first editable schema field.");
-requireIncludes(files.resourceConsole, "document.getElementById(firstField.key)", "Resource modals must fall back to the rendered field control when Form cannot expose an instance.");
+requireIncludes(files.resourceConsole, "afterOpenChange={(open) => {", "Resource modals must focus through the AntD open lifecycle.");
+requireIncludes(files.resourceConsole, "focusFirstEditableFormField(form, formFields);", "Resource modals must invoke the shared first-field focus helper after opening.");
+requireIncludes(files.resourceConsole, 'document.querySelectorAll<HTMLElement>(".admin-form-modal")', "Resource modal fallback focus must inspect only admin form modal roots.");
+requireIncludes(files.resourceConsole, "modal.getClientRects().length > 0", "Resource modal fallback focus must select the currently visible modal.");
+requireIncludes(files.resourceConsole, "visibleModal?.querySelector<HTMLElement>(FOCUSABLE_RESOURCE_FORM_CONTROL_SELECTOR)", "Resource modal fallback focus must stay scoped to the visible modal.");
+requireIncludes(files.resourceConsole, 'input:not([type="hidden"]):not([disabled]):not([readonly])', "Resource modal fallback focus must select the first enabled editable form control.");
+requireIncludes(files.resourceConsole, '[tabindex]:not([tabindex="-1"]):not([disabled]):not([readonly]):not([aria-disabled="true"])', "Resource modal fallback focus must exclude disabled generic focus targets.");
+requireIncludes(files.resourceConsole, "fieldInstance.focus({ preventScroll: true });", "Resource modal instance focus must prevent scroll jumps.");
+requireIncludes(files.resourceConsole, "fieldControl?.focus({ preventScroll: true });", "Resource modal fallback focus must prevent scroll jumps.");
+requireNotIncludes(files.resourceConsole, "document.getElementById(firstField.key)", "Resource modal fallback focus must not depend on a global field id.");
 
 requireIncludes(files.client, "export type AdminResourceFieldRelation", "Admin API client must expose resource field relation metadata.");
 requireIncludes(files.client, "relation?: AdminResourceFieldRelation", "AdminResourceField must carry optional relation metadata.");
@@ -289,21 +299,23 @@ requireRegex(
   /@media\s*\(max-width:\s*1023px\)[\s\S]*\.mobile-global-search\s*\{[^}]*min-height:\s*44px;/,
   "Mobile Drawer search must use a 44px minimum target below the desktop breakpoint.",
 );
-requireRegex(
-  files.styles,
-  /@media\s*\(max-width:\s*767px\)[\s\S]*\.platform-data-table-panel \.table-actions \.ant-btn\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/,
-  "Mobile resource table actions must expose 44px touch targets.",
+requireCssRule(mobileStyles, ".platform-data-table-panel .platform-table-search", ["min-height: 44px;"], "Mobile resource search must expose a 44px touch target.");
+requireCssRule(mobileStyles, ".platform-data-table-panel .table-actions .ant-btn", ["min-width: 44px;", "min-height: 44px;"], "Mobile resource table actions must expose 44px touch targets.");
+requireCssRule(
+  mobileStyles,
+  ".platform-pagination-main :where(.ant-pagination-prev, .ant-pagination-item, .ant-pagination-jump-prev, .ant-pagination-jump-next, .ant-pagination-next, .ant-pagination-item-link, a)",
+  ["min-width: 44px;", "min-height: 44px;"],
+  "Mobile pagination main controls must expose 44px touch targets.",
 );
-requireRegex(
-  files.styles,
-  /@media\s*\(max-width:\s*767px\)[\s\S]*\.platform-pagination-bar\s*\{[^}]*--pagination-item-size:\s*44px;[^}]*--pagination-item-inner:\s*44px;/,
-  "Mobile resource pagination controls must expose 44px touch targets.",
-);
-requireRegex(
-  files.styles,
-  /@media\s*\(max-width:\s*767px\)[\s\S]*\.system-settings-drawer \.ant-drawer-close,[\s\S]*\.settings-tabs \.ant-tabs-nav-more\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/,
-  "Mobile settings Drawer controls must expose 44px touch targets.",
-);
+requireCssRule(mobileStyles, ".platform-pagination-jumper .ant-input-number", ["width: 44px;", "min-width: 44px;", "min-height: 44px;"], "Mobile pagination quick jumper must expose a 44px touch target.");
+for (const [selector, label] of [
+  [".system-settings-drawer .ant-drawer-close", "close control"],
+  [".settings-tabs .ant-tabs-tab", "tab"],
+  [".settings-tabs .ant-tabs-tab-btn", "tab button"],
+  [".settings-tabs .ant-tabs-nav-more", "overflow control"],
+]) {
+  requireCssRule(mobileStyles, selector, ["min-width: 44px;", "min-height: 44px;"], `Mobile settings Drawer ${label} must expose a 44px touch target.`);
+}
 requireOrder(
   files.styles,
   "@media (max-width: 767px)",
@@ -347,6 +359,27 @@ function requireRegex(source, pattern, message) {
   if (!pattern.test(source)) {
     failures.push(message);
   }
+}
+
+function requireCssRule(source, selector, declarations, message) {
+  const match = source.match(new RegExp(`${escapeRegExp(selector)}\\s*\\{([^}]*)\\}`));
+  if (!match || declarations.some((declaration) => !match[1].includes(declaration))) {
+    failures.push(message);
+  }
+}
+
+function extractCssBlock(source, marker) {
+  const markerIndex = source.indexOf(marker);
+  if (markerIndex === -1) return "";
+  const openIndex = source.indexOf("{", markerIndex);
+  if (openIndex === -1) return "";
+  let depth = 1;
+  for (let index = openIndex + 1; index < source.length; index += 1) {
+    if (source[index] === "{") depth += 1;
+    if (source[index] === "}") depth -= 1;
+    if (depth === 0) return source.slice(openIndex + 1, index);
+  }
+  return "";
 }
 
 function requireOrder(source, first, second, message) {

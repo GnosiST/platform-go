@@ -194,47 +194,113 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /Reduced motion must cover body-portaled AntD modal, drawer, dropdown, and popover roots/);
   });
 
-  it("rejects resource modal focus handling without a rendered-control fallback", () => {
+  it("rejects resource modal focus handling outside the AntD open lifecycle", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
       tempRoot,
       "admin/src/platform/resources/GenericResourceConsole.tsx",
-      "document.getElementById(firstField.key)",
-      'document.getElementById("missing-field")',
+      "focusFirstEditableFormField(form, formFields);",
+      "void form;",
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /Resource modals must fall back to the rendered field control/);
+    assert.match(result.stderr, /Resource modals must invoke the shared first-field focus helper/);
   });
 
-  it("rejects mobile styles that shrink resource and settings interactions", () => {
+  it("rejects resource modal fallback focus without current-visible-modal scoping", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
       tempRoot,
-      "admin/src/styles.css",
-      ".platform-data-table-panel .table-actions .ant-btn",
-      ".platform-data-table-panel .table-actions .missing-button",
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "modal.getClientRects().length > 0",
+      "true",
     );
     replaceInTemp(
       tempRoot,
-      "admin/src/styles.css",
-      ".settings-tabs .ant-tabs-nav-more",
-      ".settings-tabs .missing-nav-more",
-    );
-    replaceInTemp(
-      tempRoot,
-      "admin/src/styles.css",
-      "--pagination-item-size: 44px",
-      "--pagination-item-size: 32px",
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "visibleModal?.querySelector<HTMLElement>(FOCUSABLE_RESOURCE_FORM_CONTROL_SELECTOR)",
+      "document.querySelector<HTMLElement>(FOCUSABLE_RESOURCE_FORM_CONTROL_SELECTOR)",
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /Mobile resource table actions must expose 44px touch targets/);
-    assert.match(result.stderr, /Mobile resource pagination controls must expose 44px touch targets/);
-    assert.match(result.stderr, /Mobile settings Drawer controls must expose 44px touch targets/);
+    assert.match(result.stderr, /currently visible modal/);
+    assert.match(result.stderr, /stay scoped to the visible modal/);
   });
+
+  it("rejects resource modal fallback focus that includes disabled or read-only fields", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      'input:not([type="hidden"]):not([disabled]):not([readonly])',
+      'input:not([type="hidden"])',
+    );
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      '[tabindex]:not([tabindex="-1"]):not([disabled]):not([readonly]):not([aria-disabled="true"])',
+      '[tabindex]:not([tabindex="-1"])',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /first enabled editable form control/);
+    assert.match(result.stderr, /exclude disabled generic focus targets/);
+  });
+
+  it("rejects resource modal fallback focus without preventScroll", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "fieldControl?.focus({ preventScroll: true });",
+      "fieldControl?.focus();",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /fallback focus must prevent scroll jumps/);
+  });
+
+  it("rejects resource modal fallback focus that restores a global field-id lookup", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "visibleModal?.querySelector<HTMLElement>(FOCUSABLE_RESOURCE_FORM_CONTROL_SELECTOR)",
+      "document.getElementById(firstField.key)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must not depend on a global field id/);
+  });
+
+  for (const [name, selector, message] of [
+    ["resource search", ".platform-data-table-panel .platform-table-search {", "Mobile resource search must expose a 44px touch target"],
+    ["resource toolbar", ".platform-data-table-panel .table-actions .ant-btn {", "Mobile resource table actions must expose 44px touch targets"],
+    ["pagination main controls", ".platform-pagination-main :where(.ant-pagination-prev, .ant-pagination-item, .ant-pagination-jump-prev, .ant-pagination-jump-next, .ant-pagination-next, .ant-pagination-item-link, a) {", "Mobile pagination main controls must expose 44px touch targets"],
+    ["pagination quick jumper", ".platform-pagination-jumper .ant-input-number {", "Mobile pagination quick jumper must expose a 44px touch target"],
+    ["settings close control", ".system-settings-drawer .ant-drawer-close {", "Mobile settings Drawer close control must expose a 44px touch target"],
+    ["settings tab", ".settings-tabs .ant-tabs-tab {", "Mobile settings Drawer tab must expose a 44px touch target"],
+    ["settings tab button", ".settings-tabs .ant-tabs-tab-btn {", "Mobile settings Drawer tab button must expose a 44px touch target"],
+    ["settings overflow control", ".settings-tabs .ant-tabs-nav-more {", "Mobile settings Drawer overflow control must expose a 44px touch target"],
+  ]) {
+    it(`rejects mobile styles that shrink the ${name}`, () => {
+      const tempRoot = tempAdminRoot();
+      replaceInTemp(tempRoot, "admin/src/styles.css", selector, `${selector.slice(0, -1)}.missing {`);
+
+      const result = runValidator(["--root", tempRoot]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, new RegExp(message));
+    });
+  }
 });
