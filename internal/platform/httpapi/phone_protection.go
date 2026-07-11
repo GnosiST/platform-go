@@ -126,7 +126,7 @@ func fullSHA256Hex(value string) bool {
 		return false
 	}
 	decoded, err := hex.DecodeString(value)
-	return err == nil && len(decoded) == sha256.Size
+	return err == nil && len(decoded) == sha256.Size && hex.EncodeToString(decoded) == value
 }
 
 func ValidatePhoneProtectionHistory(resources *adminresource.Store, protector PhoneProtector) error {

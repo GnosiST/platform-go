@@ -211,6 +211,86 @@ func TestValidatePhoneProtectionHistoryRejectsLegacyDigestFormat(t *testing.T) {
 	}
 }
 
+func TestValidatePhoneProtectionHistoryRejectsNonCanonicalHMACCase(t *testing.T) {
+	protector := NewHMACPhoneProtector([]byte(strings.Repeat("p", 32)), []byte(strings.Repeat("c", 32)))
+	phoneDigest, err := protector.PhoneDigest("13800138000")
+	if err != nil {
+		t.Fatalf("PhoneDigest() error = %v", err)
+	}
+	codeDigest, err := protector.CodeDigest(phoneDigest, appPhoneVerificationPurpose, "123456")
+	if err != nil {
+		t.Fatalf("CodeDigest() error = %v", err)
+	}
+	now := time.Date(2026, 7, 12, 10, 0, 0, 0, time.UTC)
+
+	t.Run("uppercase phone HMAC", func(t *testing.T) {
+		store := appPhoneHistoryStoreForTest(t)
+		_, err := store.CreateInternal(appPhoneBindingsResource, adminresource.WriteInput{
+			Code: "phone-binding-uppercase", Name: "Uppercase Phone Binding", Status: "enabled",
+			Values: map[string]string{
+				"appUsername": "guest-alpha",
+				"maskedPhone": "138****8000",
+				"phoneHash":   uppercaseDigestHMACForTest(t, phoneDigest),
+				"boundAt":     now.Format(time.RFC3339),
+			},
+		})
+		if err != nil {
+			t.Fatalf("seed uppercase phone digest: %v", err)
+		}
+		if err := ValidatePhoneProtectionHistory(store, protector); err == nil || !strings.Contains(err.Error(), "legacy or malformed") {
+			t.Fatalf("ValidatePhoneProtectionHistory(uppercase phone HMAC) error = %v, want format rejection", err)
+		}
+	})
+
+	t.Run("mixed-case code HMAC", func(t *testing.T) {
+		store := appPhoneHistoryStoreForTest(t)
+		_, err := store.CreateInternal(appPhoneVerificationsResource, adminresource.WriteInput{
+			Code: "phone-verification-mixed-case", Name: "Mixed Case Code Verification", Status: "verified",
+			Values: map[string]string{
+				"appUsername": "guest-alpha",
+				"maskedPhone": "138****8000",
+				"phoneHash":   phoneDigest,
+				"purpose":     appPhoneVerificationPurpose,
+				"codeHash":    mixedCaseDigestHMACForTest(t, codeDigest),
+				"requestedAt": now.Format(time.RFC3339),
+				"expiresAt":   now.Add(appPhoneVerificationTTL).Format(time.RFC3339),
+				"verifiedAt":  now.Add(time.Minute).Format(time.RFC3339),
+			},
+		})
+		if err != nil {
+			t.Fatalf("seed mixed-case code digest: %v", err)
+		}
+		if err := ValidatePhoneProtectionHistory(store, protector); err == nil || !strings.Contains(err.Error(), "legacy or malformed") {
+			t.Fatalf("ValidatePhoneProtectionHistory(mixed-case code HMAC) error = %v, want format rejection", err)
+		}
+	})
+}
+
+func uppercaseDigestHMACForTest(t *testing.T, digest string) string {
+	t.Helper()
+	separator := strings.LastIndex(digest, ":")
+	if separator < 0 {
+		t.Fatalf("digest %q has no HMAC separator", digest)
+	}
+	return digest[:separator+1] + strings.ToUpper(digest[separator+1:])
+}
+
+func mixedCaseDigestHMACForTest(t *testing.T, digest string) string {
+	t.Helper()
+	separator := strings.LastIndex(digest, ":")
+	if separator < 0 {
+		t.Fatalf("digest %q has no HMAC separator", digest)
+	}
+	hmacValue := digest[separator+1:]
+	for index := range hmacValue {
+		if hmacValue[index] >= 'a' && hmacValue[index] <= 'f' {
+			return digest[:separator+1] + hmacValue[:index] + strings.ToUpper(hmacValue[index:index+1]) + hmacValue[index+1:]
+		}
+	}
+	t.Fatalf("digest HMAC %q has no alphabetic hex character", hmacValue)
+	return ""
+}
+
 func appPhoneHistoryStoreForTest(t *testing.T) *adminresource.Store {
 	t.Helper()
 	return adminresource.NewStoreFromCapabilities(capabilitiesFromConfigForTest(t, []string{

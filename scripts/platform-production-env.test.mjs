@@ -214,4 +214,27 @@ describe("validate-platform-production-env", () => {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  it("rejects a placeholder code HMAC key independently", () => {
+    const source = validStrictEnv
+      .replace("system-admin", "system-admin,app-phone")
+      .replace(
+        "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+        [
+          "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+          "PLATFORM_PHONE_HMAC_KEY=phone-production-key-material-000001",
+          "PLATFORM_PHONE_CODE_HMAC_KEY=replace-with-code-key-material-000002",
+          "PLATFORM_PHONE_VERIFICATION_PROVIDER=sms-vendor",
+        ].join("\n"),
+      );
+    const { tempDir, filePath } = tempEnv(source);
+    try {
+      const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /PLATFORM_PHONE_CODE_HMAC_KEY must not be a placeholder/);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 });
