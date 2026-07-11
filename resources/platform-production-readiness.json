@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-production-readiness.json",
-  "capturedAt": "2026-07-06",
+  "capturedAt": "2026-07-11",
   "purpose": "Machine-checkable production readiness contract for platform runtime configuration and preflight gates.",
   "runtimeGate": {
     "source": "internal/platform/config/config.go",

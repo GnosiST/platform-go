@@ -56,6 +56,7 @@ const providerPromotionProviders = values(providerPromotionMatrix.providers).map
   kind: provider.kind,
   productionUsage: provider.productionUsage,
   adapterBoundary: provider.adapterBoundary,
+  audiences: values(provider.audiences),
   configKeys: values(provider.configKeys),
   requiredControls: values(provider.requiredControls),
   requiresSecretOwner: provider.requiresSecretOwner === true,
@@ -63,6 +64,7 @@ const providerPromotionProviders = values(providerPromotionMatrix.providers).map
   subjectRedactionRequired: provider.subjectRedactionRequired === true,
   unconfiguredProviderRejectionRequired: provider.unconfiguredProviderRejectionRequired === true,
   errorNormalizationRequired: provider.errorNormalizationRequired === true,
+  productionLikeRehearsalRequired: provider.productionLikeRehearsalRequired === true,
   rawCredentialExposureAllowed: provider.rawCredentialExposureAllowed === true,
   rawSubjectExposureAllowed: provider.rawSubjectExposureAllowed === true,
 }));

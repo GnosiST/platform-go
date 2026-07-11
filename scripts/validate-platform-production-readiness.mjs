@@ -517,13 +517,16 @@ function validateProviderPromotionPlan(plan, productionAuth, errors) {
         errors.push(`platform operations plan provider ${expected.id} ${field} must match production auth hardening contract`);
       }
     }
+    if (!sameSet(values(actual.audiences).sort(), values(expected.audiences).sort())) {
+      errors.push(`platform operations plan provider ${expected.id} audiences must match production auth hardening contract`);
+    }
     if (!sameSet(values(actual.configKeys).sort(), values(expected.configKeys).sort())) {
       errors.push(`platform operations plan provider ${expected.id} configKeys must match production auth hardening contract`);
     }
     if (!sameSet(values(actual.requiredControls).sort(), values(expected.requiredControls).sort())) {
       errors.push(`platform operations plan provider ${expected.id} requiredControls must match production auth hardening contract`);
     }
-    for (const field of ["requiresSecretOwner", "rotationRunbookRequired", "subjectRedactionRequired", "unconfiguredProviderRejectionRequired", "errorNormalizationRequired"]) {
+    for (const field of ["requiresSecretOwner", "rotationRunbookRequired", "subjectRedactionRequired", "unconfiguredProviderRejectionRequired", "errorNormalizationRequired", "productionLikeRehearsalRequired"]) {
       if ((actual[field] === true) !== (expected[field] === true)) {
         errors.push(`platform operations plan provider ${expected.id} ${field} must match production auth hardening contract`);
       }

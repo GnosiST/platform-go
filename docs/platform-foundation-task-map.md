@@ -242,7 +242,7 @@ Task 1-4 reports, focused Go tests and the cache invalidation validator.
 
 ## Current P1 Work
 
-The P1/P2 foundation items below are represented in `resources/platform-foundation-task-graph.json`. Production auth hardening and the source-writing generator skeleton are now implemented foundation gates; their `completionGate` text documents future runtime/source-writing promotion requirements rather than unfinished foundation work. `resources/platform-foundation-alignment-audit.json` keeps them in `requiredTaskNodes`, and `requiredFutureTaskNodes` is empty after foundation closeout.
+The P1/P2 foundation items below are represented in `resources/platform-foundation-task-graph.json`. Production auth hardening and the source-writing generator skeleton are implemented foundation gates; their `completionGate` text documents future runtime/source-writing promotion requirements. `resources/platform-foundation-alignment-audit.json` keeps them in `requiredTaskNodes`, while `requiredFutureTaskNodes` contains only `production-admin-oidc-auth` until Task 8 supplies the production-like provider, six-viewport browser, and neat-freak cleanup evidence required for closeout.
 
 1. Production auth hardening
    - Current state: the policy gate is implemented in `resources/platform-production-auth-hardening.json` and `scripts/validate-platform-production-auth-hardening.mjs`; it is also referenced by production readiness preflight and the engineering capability matrix.

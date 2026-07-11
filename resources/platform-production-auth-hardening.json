@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-production-auth-hardening.json",
-  "capturedAt": "2026-07-07",
+  "capturedAt": "2026-07-11",
   "purpose": "Machine-checkable production auth hardening policy for JWT sessions, provider adapters, credential rotation and future refresh-token family promotion.",
   "taskGraph": {
     "path": "resources/platform-foundation-task-graph.json",
@@ -289,6 +289,7 @@
         "kind": "demo",
         "productionUsage": "local-harness-only",
         "adapterBoundary": "built-in-demo-login",
+        "audiences": ["admin", "app"],
         "configKeys": [],
         "requiredControls": ["audit-redaction", "provider-specific-error-normalization"],
         "requiresSecretOwner": false,
@@ -296,6 +297,7 @@
         "subjectRedactionRequired": true,
         "unconfiguredProviderRejectionRequired": false,
         "errorNormalizationRequired": true,
+        "productionLikeRehearsalRequired": false,
         "rawCredentialExposureAllowed": false,
         "rawSubjectExposureAllowed": false,
         "manifestEvidence": [
@@ -314,6 +316,7 @@
         "kind": "wechat",
         "productionUsage": "optional-production-provider",
         "adapterBoundary": "httpapi.AppIdentityResolver",
+        "audiences": ["app"],
         "configKeys": ["PLATFORM_WECHAT_MINIAPP_APP_ID", "PLATFORM_WECHAT_MINIAPP_SECRET", "PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT"],
         "requiredControls": ["secret-rotation-plan", "provider-subject-redaction", "raw-provider-subject-never-in-response", "raw-provider-subject-never-in-audit", "configured-provider-only-login", "provider-specific-error-normalization"],
         "requiresSecretOwner": true,
@@ -321,6 +324,7 @@
         "subjectRedactionRequired": true,
         "unconfiguredProviderRejectionRequired": true,
         "errorNormalizationRequired": true,
+        "productionLikeRehearsalRequired": false,
         "rawCredentialExposureAllowed": false,
         "rawSubjectExposureAllowed": false,
         "manifestEvidence": [

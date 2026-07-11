@@ -448,6 +448,24 @@ function validateProductionPromotionReview(contract, refreshTokenFamilyPromotion
   if (review.summary?.optionalProductionProviderCount !== optionalProviderCount) {
     errors.push(`production auth promotion review summary.optionalProductionProviderCount must be ${optionalProviderCount}`);
   }
+  const expectedProviders = values(contract.providerPromotionMatrix?.providers);
+  const reviewProviders = values(review.providerPromotionMatrix?.providers);
+  if (!sameSet(reviewProviders.map((provider) => provider.id).sort(), expectedProviders.map((provider) => provider.id).sort())) {
+    errors.push("production auth promotion review providerPromotionMatrix.providers must match production auth hardening contract");
+  }
+  const reviewProviderByID = new Map(reviewProviders.map((provider) => [provider.id, provider]));
+  for (const expected of expectedProviders) {
+    const actual = reviewProviderByID.get(expected.id);
+    if (!actual) {
+      continue;
+    }
+    if (!sameSet(values(actual.audiences).sort(), values(expected.audiences).sort())) {
+      errors.push(`production auth promotion review provider ${expected.id} audiences must match production auth hardening contract`);
+    }
+    if ((actual.productionLikeRehearsalRequired === true) !== (expected.productionLikeRehearsalRequired === true)) {
+      errors.push(`production auth promotion review provider ${expected.id} productionLikeRehearsalRequired must match production auth hardening contract`);
+    }
+  }
   requireIncludes(
     review.preflight?.tokenRotationPolicyCommands,
     ["production-auth-hardening", "refresh-token-family-promotion", "production-auth-promotion-review", "cache-invalidation", "task-execution-audit"],
@@ -678,6 +696,12 @@ function validateProviderPromotionMatrix(contract, audit, errors) {
     if (provider.errorNormalizationRequired !== true) {
       errors.push(`${label} errorNormalizationRequired must stay true`);
     }
+    if (values(provider.audiences).length === 0 || values(provider.audiences).some((audience) => !["admin", "app"].includes(audience))) {
+      errors.push(`${label} audiences must declare at least one typed audience`);
+    }
+    if (typeof provider.productionLikeRehearsalRequired !== "boolean") {
+      errors.push(`${label} productionLikeRehearsalRequired must be boolean`);
+    }
     validateEvidenceSnippets(provider.manifestEvidence, `${label} manifest`, errors);
     validateEvidenceSnippets(provider.runtimeEvidence, `${label} runtime`, errors);
   }
@@ -693,6 +717,12 @@ function validateProviderPromotionMatrix(contract, audit, errors) {
     if (values(demo.configKeys).length !== 0) {
       errors.push("providerPromotionMatrix provider demo configKeys must stay empty");
     }
+    if (!sameSet(values(demo.audiences).sort(), ["admin", "app"])) {
+      errors.push("providerPromotionMatrix provider demo audiences must stay admin-and-app");
+    }
+    if (demo.productionLikeRehearsalRequired !== false) {
+      errors.push("providerPromotionMatrix provider demo productionLikeRehearsalRequired must stay false");
+    }
   }
 
   const wechat = byID.get("wechat");
@@ -702,6 +732,12 @@ function validateProviderPromotionMatrix(contract, audit, errors) {
     }
     if (wechat.adapterBoundary !== "httpapi.AppIdentityResolver") {
       errors.push("providerPromotionMatrix provider wechat adapterBoundary must stay httpapi.AppIdentityResolver");
+    }
+    if (!sameSet(values(wechat.audiences).sort(), ["app"])) {
+      errors.push("providerPromotionMatrix provider wechat audiences must stay app-only");
+    }
+    if (wechat.productionLikeRehearsalRequired !== false) {
+      errors.push("providerPromotionMatrix provider wechat productionLikeRehearsalRequired must stay false");
     }
     requireIncludes(
       wechat.configKeys,
@@ -728,6 +764,12 @@ function validateProviderPromotionMatrix(contract, audit, errors) {
 
   const oidc = byID.get("oidc");
   if (oidc) {
+    if (oidc.capability !== "admin-oidc") {
+      errors.push("providerPromotionMatrix provider oidc capability must stay admin-oidc");
+    }
+    if (oidc.kind !== "oidc") {
+      errors.push("providerPromotionMatrix provider oidc kind must stay oidc");
+    }
     if (oidc.productionUsage !== "optional-production-provider") {
       errors.push("providerPromotionMatrix provider oidc productionUsage must stay optional-production-provider");
     }
@@ -737,12 +779,10 @@ function validateProviderPromotionMatrix(contract, audit, errors) {
     if (JSON.stringify(values(oidc.audiences)) !== JSON.stringify(["admin"])) {
       errors.push("providerPromotionMatrix provider oidc audiences must stay admin-only");
     }
-    requireIncludes(
-      oidc.configKeys,
-      ["PLATFORM_ADMIN_OIDC_ISSUER_URL", "PLATFORM_ADMIN_OIDC_CLIENT_ID", "PLATFORM_ADMIN_OIDC_CLIENT_SECRET", "PLATFORM_ADMIN_OIDC_REDIRECT_URL", "PLATFORM_ADMIN_OIDC_SCOPES"],
-      "providerPromotionMatrix provider oidc configKeys",
-      errors,
-    );
+    const approvedOIDCConfigKeys = ["PLATFORM_ADMIN_OIDC_ISSUER_URL", "PLATFORM_ADMIN_OIDC_CLIENT_ID", "PLATFORM_ADMIN_OIDC_CLIENT_SECRET", "PLATFORM_ADMIN_OIDC_REDIRECT_URL", "PLATFORM_ADMIN_OIDC_SCOPES"];
+    if (!sameSet(values(oidc.configKeys).sort(), approvedOIDCConfigKeys.sort())) {
+      errors.push("providerPromotionMatrix provider oidc configKeys must exactly match the approved Admin OIDC keys");
+    }
     requireIncludes(
       oidc.requiredControls,
       [

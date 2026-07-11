@@ -58,6 +58,23 @@ describe("validate-platform-production-auth-hardening", () => {
     assert.ok(review.approvalPackage.missingEvidence.includes("runtime-test-output"));
     assert.ok(review.blockers.includes("production approval package is blocked"));
     assert.ok(review.preflight.tokenRotationPolicyCommands.includes("production-auth-promotion-review"));
+    const oidc = review.providerPromotionMatrix.providers.find((provider) => provider.id === "oidc");
+    assert.deepEqual(oidc.audiences, ["admin"]);
+    assert.equal(oidc.productionLikeRehearsalRequired, true);
+  });
+
+  it("rejects production auth promotion reviews that weaken typed OIDC projection invariants", () => {
+    const review = readJSON("resources/generated/production-auth-promotion-review.json");
+    const oidc = review.providerPromotionMatrix.providers.find((provider) => provider.id === "oidc");
+    oidc.audiences = ["app"];
+    oidc.productionLikeRehearsalRequired = false;
+    const reviewPath = tempJSON("production-auth-promotion-review.json", review);
+
+    const result = runValidator(["--promotion-review", reviewPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /production auth promotion review provider oidc audiences must match production auth hardening contract/);
+    assert.match(result.stderr, /production auth promotion review provider oidc productionLikeRehearsalRequired must match production auth hardening contract/);
   });
 
   it("rejects production auth contracts without a non-mutating promotion review declaration", () => {
@@ -339,6 +356,21 @@ describe("validate-platform-production-auth-hardening", () => {
     assert.match(result.stderr, /providerPromotionMatrix provider demo rawSubjectExposureAllowed must stay false/);
   });
 
+  it("rejects provider promotion matrices without typed audience and rehearsal fields", () => {
+    const contract = readJSON("resources/platform-production-auth-hardening.json");
+    const demo = contract.providerPromotionMatrix.providers.find((provider) => provider.id === "demo");
+    const wechat = contract.providerPromotionMatrix.providers.find((provider) => provider.id === "wechat");
+    delete demo.audiences;
+    delete wechat.productionLikeRehearsalRequired;
+    const contractPath = tempJSON("platform-production-auth-hardening.json", contract);
+
+    const result = runValidator(["--contract", contractPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /providerPromotionMatrix provider demo audiences must declare at least one typed audience/);
+    assert.match(result.stderr, /providerPromotionMatrix provider wechat productionLikeRehearsalRequired must be boolean/);
+  });
+
   it("rejects provider promotion matrices that drop wechat production controls", () => {
     const contract = readJSON("resources/platform-production-auth-hardening.json");
     const wechat = contract.providerPromotionMatrix.providers.find((provider) => provider.id === "wechat");
@@ -411,8 +443,17 @@ describe("validate-platform-production-auth-hardening", () => {
     const contract = readJSON("resources/platform-production-auth-hardening.json");
     const oidc = contract.providerPromotionMatrix.providers.find((provider) => provider.id === "oidc");
     assert.ok(oidc, "providerPromotionMatrix must include oidc");
+    oidc.capability = "session";
+    oidc.kind = "saml";
     oidc.audiences = ["admin", "app"];
-    oidc.configKeys = ["PLATFORM_ADMIN_OIDC_ISSUER_URL"];
+    oidc.configKeys = [
+      "PLATFORM_ADMIN_OIDC_ISSUER_URL",
+      "PLATFORM_ADMIN_OIDC_CLIENT_ID",
+      "PLATFORM_ADMIN_OIDC_CLIENT_SECRET",
+      "PLATFORM_ADMIN_OIDC_REDIRECT_URL",
+      "PLATFORM_ADMIN_OIDC_SCOPES",
+      "PLATFORM_ADMIN_OIDC_UNREVIEWED_EXTRA",
+    ];
     oidc.requiredControls = ["issuer-validation"];
     oidc.requiresSecretOwner = false;
     oidc.rotationRunbookRequired = false;
@@ -422,8 +463,10 @@ describe("validate-platform-production-auth-hardening", () => {
     const result = runValidator(["--contract", contractPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /providerPromotionMatrix provider oidc capability must stay admin-oidc/);
+    assert.match(result.stderr, /providerPromotionMatrix provider oidc kind must stay oidc/);
     assert.match(result.stderr, /providerPromotionMatrix provider oidc audiences must stay admin-only/);
-    assert.match(result.stderr, /providerPromotionMatrix provider oidc configKeys must include PLATFORM_ADMIN_OIDC_CLIENT_SECRET/);
+    assert.match(result.stderr, /providerPromotionMatrix provider oidc configKeys must exactly match the approved Admin OIDC keys/);
     assert.match(result.stderr, /providerPromotionMatrix provider oidc requiredControls must include pkce-s256-validation/);
     assert.match(result.stderr, /providerPromotionMatrix provider oidc requiresSecretOwner must stay true/);
     assert.match(result.stderr, /providerPromotionMatrix provider oidc rotationRunbookRequired must stay true/);

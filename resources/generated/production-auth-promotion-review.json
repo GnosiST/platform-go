@@ -7,9 +7,9 @@
     "taskExecutionAudit": "resources/platform-task-execution-audit.json"
   },
   "sourceCapturedAt": {
-    "productionAuthHardening": "2026-07-07",
+    "productionAuthHardening": "2026-07-11",
     "refreshTokenFamilyPromotion": "2026-07-07",
-    "productionReadiness": "2026-07-06",
+    "productionReadiness": "2026-07-11",
     "taskExecutionAudit": "2026-07-11"
   },
   "mode": {
@@ -257,6 +257,10 @@
         "kind": "demo",
         "productionUsage": "local-harness-only",
         "adapterBoundary": "built-in-demo-login",
+        "audiences": [
+          "admin",
+          "app"
+        ],
         "configKeys": [],
         "requiredControls": [
           "audit-redaction",
@@ -267,6 +271,7 @@
         "subjectRedactionRequired": true,
         "unconfiguredProviderRejectionRequired": false,
         "errorNormalizationRequired": true,
+        "productionLikeRehearsalRequired": false,
         "rawCredentialExposureAllowed": false,
         "rawSubjectExposureAllowed": false
       },
@@ -276,6 +281,9 @@
         "kind": "wechat",
         "productionUsage": "optional-production-provider",
         "adapterBoundary": "httpapi.AppIdentityResolver",
+        "audiences": [
+          "app"
+        ],
         "configKeys": [
           "PLATFORM_WECHAT_MINIAPP_APP_ID",
           "PLATFORM_WECHAT_MINIAPP_SECRET",
@@ -294,6 +302,7 @@
         "subjectRedactionRequired": true,
         "unconfiguredProviderRejectionRequired": true,
         "errorNormalizationRequired": true,
+        "productionLikeRehearsalRequired": false,
         "rawCredentialExposureAllowed": false,
         "rawSubjectExposureAllowed": false
       },
@@ -303,6 +312,9 @@
         "kind": "oidc",
         "productionUsage": "optional-production-provider",
         "adapterBoundary": "httpapi.AdminIdentityResolver",
+        "audiences": [
+          "admin"
+        ],
         "configKeys": [
           "PLATFORM_ADMIN_OIDC_ISSUER_URL",
           "PLATFORM_ADMIN_OIDC_CLIENT_ID",
@@ -334,6 +346,7 @@
         "subjectRedactionRequired": true,
         "unconfiguredProviderRejectionRequired": true,
         "errorNormalizationRequired": true,
+        "productionLikeRehearsalRequired": true,
         "rawCredentialExposureAllowed": false,
         "rawSubjectExposureAllowed": false
       }

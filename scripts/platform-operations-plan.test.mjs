@@ -36,8 +36,8 @@ describe("platform operations dry-run plan", () => {
     assert.equal(plan.mode.runtimeMutation, "disabled");
     assert.equal(plan.mode.sourceWriting, "disabled");
     assert.equal(plan.summary.policyCount, 4);
-    assert.equal(plan.summary.providerPromotionCount, 2);
-    assert.equal(plan.summary.optionalProductionProviderCount, 1);
+    assert.equal(plan.summary.providerPromotionCount, 3);
+    assert.equal(plan.summary.optionalProductionProviderCount, 2);
     assert.equal(plan.preflightRunner.script, "scripts/run-platform-production-preflight.mjs");
     assert.equal(plan.preflightRunner.dryRunCommand, "rtk node scripts/run-platform-production-preflight.mjs");
     assert.match(plan.preflightRunner.policyCommand, /--policy <policy-id>/);
@@ -56,11 +56,16 @@ describe("platform operations dry-run plan", () => {
     assert.ok(plan.providerPromotionMatrix.newProviderRequirements.includes("audit-redaction-test"));
     const demoProvider = plan.providerPromotionMatrix.providers.find((provider) => provider.id === "demo");
     const wechatProvider = plan.providerPromotionMatrix.providers.find((provider) => provider.id === "wechat");
+    const oidcProvider = plan.providerPromotionMatrix.providers.find((provider) => provider.id === "oidc");
     assert.equal(demoProvider.productionUsage, "local-harness-only");
     assert.equal(wechatProvider.productionUsage, "optional-production-provider");
     assert.equal(wechatProvider.rawCredentialExposureAllowed, false);
     assert.equal(wechatProvider.rawSubjectExposureAllowed, false);
     assert.ok(wechatProvider.configKeys.includes("PLATFORM_WECHAT_MINIAPP_SECRET"));
+    assert.equal(oidcProvider.capability, "admin-oidc");
+    assert.equal(oidcProvider.kind, "oidc");
+    assert.deepEqual(oidcProvider.audiences, ["admin"]);
+    assert.equal(oidcProvider.productionLikeRehearsalRequired, true);
     for (const policy of ["config-backup-export", "config-import-restore", "database-migration", "token-rotation"]) {
       const item = plan.policies.find((candidate) => candidate.id === policy);
       assert.ok(item, `missing ${policy}`);
@@ -90,7 +95,7 @@ describe("platform operations dry-run plan", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /platform operations plan providerPromotionMatrix.source must point to resources\/platform-production-auth-hardening\.json/);
-    assert.match(result.stderr, /platform operations plan summary.providerPromotionCount must be 2/);
+    assert.match(result.stderr, /platform operations plan summary.providerPromotionCount must be 3/);
   });
 
   it("rejects operations plans that drop production auth approval package evidence", () => {
@@ -141,5 +146,19 @@ describe("platform operations dry-run plan", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /platform operations plan provider wechat configKeys must match production auth hardening contract/);
     assert.match(result.stderr, /platform operations plan provider wechat rawSubjectExposureAllowed must stay false/);
+  });
+
+  it("rejects operations plans that weaken typed OIDC projection invariants", () => {
+    const plan = readJSON("resources/generated/platform-operations-plan.json");
+    const oidc = plan.providerPromotionMatrix.providers.find((provider) => provider.id === "oidc");
+    oidc.audiences = ["app"];
+    oidc.productionLikeRehearsalRequired = false;
+    const planPath = tempJSON("platform-operations-plan.json", plan);
+
+    const result = runScript("scripts/validate-platform-production-readiness.mjs", ["--operations-plan", planPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /platform operations plan provider oidc audiences must match production auth hardening contract/);
+    assert.match(result.stderr, /platform operations plan provider oidc productionLikeRehearsalRequired must match production auth hardening contract/);
   });
 });
