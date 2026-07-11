@@ -55,9 +55,16 @@ Implemented. Public Store and HTTP/JWT call sites still use the opaque raw sessi
 
 ## Residual Risks
 
-- The MySQL migration path was source-reviewed but not exercised against a live MySQL server in this environment. SQLite integration tests prove the replacement semantics and raw-column removal, but they are not MySQL production proof.
+- Live MySQL/PostgreSQL migration tests are opt-in through `PLATFORM_TEST_MYSQL_DSN` and `PLATFORM_TEST_POSTGRES_DSN`; default CI still needs database services and these environment variables before the production-driver evidence runs automatically.
 - `internal/platform/refreshtoken` still persists its `SessionID`. The refresh-token-family runtime remains implemented-disabled and was intentionally not enabled or expanded in this task. It must be digest-hardened before any production promotion.
 - The App current-session response continues returning the immediate raw server-side handle as explicitly retained by the task decision; persistence, logs and audits do not receive it.
+
+## Live Database Verification
+
+- Added opt-in GORM integration tests that create real legacy raw-token tables and verify migration removes the raw marker, removes the `token` column, installs `token_digest`, empties legacy sessions and leaves no replacement/legacy tables.
+- MySQL 8.4.10 passed five recovery states: legacy current table, replacement-only, legacy-only, digest current with both leftovers, and legacy current with replacement.
+- PostgreSQL 17.10 passed the transactional legacy-table replacement path.
+- Both database suites were rerun after persisted-digest validation was added and passed against isolated temporary containers.
 
 ## Scope Notes
 
@@ -101,4 +108,4 @@ The session-policy, OIDC and Admin resource-schema documents now agree that auth
 
 - This remediation does not change or enable `internal/platform/refreshtoken`.
 - It does not enable source writing.
-- Live MySQL/PostgreSQL integration execution remains separate from this digest/docs patch and its commit scope.
+- Live MySQL/PostgreSQL integration coverage is committed separately so the digest/docs fix remains reviewable.
