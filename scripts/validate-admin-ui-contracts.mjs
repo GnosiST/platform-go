@@ -15,6 +15,7 @@ const files = {
   app: readSource("admin/src/App.tsx"),
   authProvider: readSource("admin/src/platform/refine/authProvider.ts"),
   login: readSource("admin/src/platform/auth/AdminLoginView.tsx"),
+  oidcPolicy: readSource("admin/src/platform/auth/oidcPolicy.ts"),
   capabilityMetadata: readSource("admin/src/platform/capabilities/metadata.ts"),
   client: readSource("admin/src/platform/api/client.ts"),
   i18n: readSource("admin/src/platform/i18n.ts"),
@@ -62,35 +63,39 @@ requireRegex(
 );
 requireIncludes(files.client, "audiences: string[];", "AuthProvider must expose its declared audiences to the Admin client.");
 requireIncludes(files.login, "filterAdminAuthProviders(providers)", "Admin login must consume provider audiences before selection and rendering.");
-requireIncludes(files.authProvider, "assertAdminAuthProvider(provider);", "OIDC start must reject providers without the Admin audience.");
+requireIncludes(files.oidcPolicy, "assertAdminAuthProvider(provider);", "OIDC start must reject providers without the Admin audience.");
 requireIncludes(files.client, "export function startAdminAuthProvider", "The Admin client must expose provider-start support.");
 requireRegex(
   files.client,
   /request<AuthProviderStartResult>\(`\/auth\/providers\/\$\{encodeURIComponent\(provider\)\}\/start`,\s*\{[\s\S]*?auth:\s*"none"[\s\S]*?JSON\.stringify\(\{ codeChallenge \}\)/,
   "Admin provider start must post the PKCE challenge without stored-token authentication.",
 );
-requireIncludes(files.authProvider, "crypto.getRandomValues(new Uint8Array(32))", "OIDC login must generate a 32-byte verifier with Web Crypto.");
+requireIncludes(files.authProvider, "crypto.getRandomValues(new Uint8Array(size))", "OIDC login must generate verifier bytes with Web Crypto.");
 requireIncludes(files.authProvider, 'crypto.subtle.digest("SHA-256"', "OIDC login must derive an S256 challenge with Web Crypto.");
 requireIncludes(files.authProvider, "window.sessionStorage.setItem", "OIDC pending transactions must use tab-scoped sessionStorage.");
 requireRegex(
-  files.authProvider,
+  files.oidcPolicy,
   /JSON\.stringify\(\{\s*provider:\s*provider\.id,\s*state:\s*started\.state,\s*codeVerifier,\s*expiresAt:\s*started\.expiresAt,?\s*\}\)/,
   "OIDC pending transactions must store only provider, state, codeVerifier, and expiresAt.",
 );
-requireIncludes(files.authProvider, "callbackState !== pending.state", "OIDC callback state must use an exact comparison.");
+requireIncludes(files.oidcPolicy, "callbackState !== pending.state", "OIDC callback state must use an exact comparison.");
 requireIncludes(files.authProvider, "window.sessionStorage.removeItem", "OIDC terminal and recovery paths must clear the pending transaction.");
+requireIncludes(files.authProvider, "window.history.replaceState", "OIDC callbacks must remove callback values from browser history before exchange.");
 requireOrder(
-  files.authProvider,
-  "window.history.replaceState",
-  "window.sessionStorage.getItem",
+  files.oidcPolicy,
+  "dependencies.cleanupURL()",
+  "dependencies.readPending()",
   "OIDC callbacks must remove callback values before reading pending transaction state.",
 );
 requireOrder(
-  files.authProvider,
-  "window.history.replaceState",
-  "loginWithAuthProvider({",
+  files.oidcPolicy,
+  "dependencies.cleanupURL()",
+  "dependencies.exchange({",
   "OIDC callbacks must remove callback values from browser history before exchange.",
 );
+requireIncludes(files.authProvider, "beginOIDCLoginTransaction(provider,", "The production OIDC start wrapper must use the injected transaction implementation.");
+requireIncludes(files.authProvider, "consumePendingOIDCLoginTransaction(search,", "The production OIDC callback wrapper must use the injected transaction implementation.");
+requireIncludes(files.authProvider, "allowLoopbackHTTP: import.meta.env.DEV", "Loopback HTTP authorization URLs must be enabled only in verified development mode.");
 requireIncludes(files.authProvider, "state?: string; codeVerifier?: string", "Refine login input must forward OIDC state and verifier values.");
 requireIncludes(files.app, "search={location.search}", "App must pass the current callback search string to the login view.");
 requireIncludes(files.app, "if (!getAuthToken() || !session || loading)", "Unauthenticated callback routes must not be normalized before OIDC URL cleanup.");
@@ -105,25 +110,28 @@ requireIncludes(files.login, "focus({ preventScroll: true })", "OIDC callback fa
 requireIncludes(files.login, 'className="login-recovery-action"', "OIDC callback failures must provide an explicit recovery action.");
 requireRegex(
   files.login,
-  /const submit = async \(values: LoginFormValues\) => \{\s*if \(submissionLockRef\.current\) return;\s*submissionLockRef\.current = true;/,
+  /const submit = async \(values: LoginFormValues\) => \{\s*if \(!submissionLockRef\.current\.acquire\(\)\) return;/,
   "Demo login must acquire the synchronous submission lock before its first await.",
 );
 requireRegex(
   files.login,
-  /const startOIDC = async \(\) => \{\s*if \(submissionLockRef\.current\) return;\s*submissionLockRef\.current = true;/,
+  /const startOIDC = async \(\) => \{\s*if \(!submissionLockRef\.current\.acquire\(\)\) return;/,
   "OIDC start must acquire the synchronous submission lock before its first await.",
 );
-requireIncludes(files.authProvider, "validateOIDCAuthorizationURL(started.authorizationUrl)", "OIDC start must validate the authorization URL before browser navigation.");
+requireIncludes(files.login, "useRef(createSubmissionLock())", "Admin login must use the executable synchronous submission lock helper.");
+requireIncludes(files.login, "useRef(createSingleUseGuard())", "Admin callback processing must use the executable single-use guard for StrictMode replay.");
+requireIncludes(files.login, "callbackGuardRef.current.acquire()", "Admin callback processing must acquire its single-use guard before exchange.");
+requireIncludes(files.oidcPolicy, "validateOIDCAuthorizationURL(started.authorizationUrl,", "OIDC start must validate the authorization URL before browser navigation.");
 requireOrder(
-  files.authProvider,
-  "validateOIDCAuthorizationURL(started.authorizationUrl)",
-  "window.sessionStorage.setItem",
+  files.oidcPolicy,
+  "validateOIDCAuthorizationURL(started.authorizationUrl,",
+  "dependencies.storePending",
   "OIDC authorization URL validation must happen before pending transaction storage.",
 );
 requireOrder(
-  files.authProvider,
-  "validateOIDCAuthorizationURL(started.authorizationUrl)",
-  "window.location.assign",
+  files.oidcPolicy,
+  "validateOIDCAuthorizationURL(started.authorizationUrl,",
+  "dependencies.navigate",
   "OIDC authorization URL validation must happen before browser navigation.",
 );
 requireIncludes(files.login, "loginHeadingRef.current?.focus({ preventScroll: true })", "Explicit OIDC recovery must restore focus predictably without scrolling.");

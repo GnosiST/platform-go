@@ -280,10 +280,10 @@ describe("validate-admin-ui-contracts", () => {
 
   for (const [name, relativePath, from, to, message] of [
     ["provider audiences", "admin/src/platform/api/client.ts", "audiences: string[];", "audienceList: string[];", "AuthProvider must expose its declared audiences"],
-    ["Web Crypto verifier", "admin/src/platform/refine/authProvider.ts", "crypto.getRandomValues(new Uint8Array(32))", "new Uint8Array(32)", "generate a 32-byte verifier with Web Crypto"],
+    ["Web Crypto verifier", "admin/src/platform/refine/authProvider.ts", "crypto.getRandomValues(new Uint8Array(size))", "new Uint8Array(size)", "generate verifier bytes with Web Crypto"],
     ["S256 challenge", "admin/src/platform/refine/authProvider.ts", 'crypto.subtle.digest("SHA-256"', 'legacyDigest("SHA-256"', "derive an S256 challenge with Web Crypto"],
     ["tab-scoped transaction", "admin/src/platform/refine/authProvider.ts", "window.sessionStorage.setItem", "window.localStorage.setItem", "tab-scoped sessionStorage"],
-    ["exact callback state", "admin/src/platform/refine/authProvider.ts", "callbackState !== pending.state", "!callbackState", "exact comparison"],
+    ["exact callback state", "admin/src/platform/auth/oidcPolicy.ts", "callbackState !== pending.state", "!callbackState", "exact comparison"],
     ["callback URL cleanup", "admin/src/platform/refine/authProvider.ts", "window.history.replaceState", "window.history.pushState", "remove callback values from browser history before exchange"],
     ["demo-only form", "admin/src/platform/auth/AdminLoginView.tsx", 'selectedProvider.kind === "demo"', 'selectedProvider.kind !== "unknown"', "username form must render only for the demo provider"],
     ["OIDC-only action", "admin/src/platform/auth/AdminLoginView.tsx", 'selectedProvider.kind === "oidc"', 'selectedProvider.kind !== "unknown"', "OIDC action must render only for an OIDC provider"],
@@ -310,7 +310,15 @@ describe("validate-admin-ui-contracts", () => {
       "admin/src/platform/auth/oidcPolicy.ts",
       (moduleURL) => `
         import assert from "node:assert/strict";
-        import { assertAdminAuthProvider, filterAdminAuthProviders, validateOIDCAuthorizationURL } from ${JSON.stringify(moduleURL)};
+        import {
+          assertAdminAuthProvider,
+          beginOIDCLoginTransaction,
+          consumePendingOIDCLoginTransaction,
+          createSingleUseGuard,
+          createSubmissionLock,
+          filterAdminAuthProviders,
+          validateOIDCAuthorizationURL,
+        } from ${JSON.stringify(moduleURL)};
 
         const adminProvider = { id: "oidc", audiences: ["admin"] };
         const appProvider = { id: "wechat", audiences: ["app"] };
@@ -318,15 +326,19 @@ describe("validate-admin-ui-contracts", () => {
         assert.doesNotThrow(() => assertAdminAuthProvider(adminProvider));
         assert.throws(() => assertAdminAuthProvider(appProvider), /not available for Admin login/);
 
+        for (const url of ["https://id.example/authorize"]) {
+          assert.equal(validateOIDCAuthorizationURL(url), new URL(url).toString());
+        }
+
         for (const url of [
-          "https://id.example/authorize",
           "http://localhost:8080/authorize",
           "http://auth.localhost:8080/authorize",
           "http://127.0.0.1:8080/authorize",
           "http://127.25.3.9:8080/authorize",
           "http://[::1]:8080/authorize",
         ]) {
-          assert.equal(validateOIDCAuthorizationURL(url), new URL(url).toString());
+          assert.throws(() => validateOIDCAuthorizationURL(url), /OIDC authorization URL is not trusted/);
+          assert.equal(validateOIDCAuthorizationURL(url, { allowLoopbackHTTP: true }), new URL(url).toString());
         }
 
         for (const url of [
@@ -341,6 +353,99 @@ describe("validate-admin-ui-contracts", () => {
             (error) => error instanceof Error && error.message === "OIDC authorization URL is not trusted" && !error.message.includes(url),
           );
         }
+
+        const submissionLock = createSubmissionLock();
+        assert.equal(submissionLock.acquire(), true);
+        assert.equal(submissionLock.acquire(), false);
+        submissionLock.release();
+        assert.equal(submissionLock.acquire(), true);
+
+        const onceGuard = createSingleUseGuard();
+        assert.equal(onceGuard.acquire(), true);
+        assert.equal(onceGuard.acquire(), false);
+
+        const beginEvents = [];
+        let storedTransaction = "";
+        await beginOIDCLoginTransaction(adminProvider, {
+          allowLoopbackHTTP: false,
+          randomBytes: (size) => { beginEvents.push("random"); return new Uint8Array(size).fill(1); },
+          digestSHA256: async (input) => { beginEvents.push("digest"); assert.equal(input.length, 43); return new Uint8Array(32).fill(2); },
+          startProvider: async (provider, challenge) => {
+            beginEvents.push("start");
+            assert.equal(provider, "oidc");
+            assert.match(challenge, /^[A-Za-z0-9_-]{43}$/);
+            return { authorizationUrl: "https://id.example/authorize", state: "state-exact", expiresAt: "2030-01-01T00:00:00.000Z" };
+          },
+          storePending: (value) => { beginEvents.push("store"); storedTransaction = value; },
+          navigate: (url) => { beginEvents.push("navigate"); assert.equal(url, "https://id.example/authorize"); },
+        });
+        assert.deepEqual(beginEvents, ["random", "digest", "start", "store", "navigate"]);
+        const stored = JSON.parse(storedTransaction);
+        assert.deepEqual(Object.keys(stored).sort(), ["codeVerifier", "expiresAt", "provider", "state"]);
+        assert.equal(stored.provider, "oidc");
+        assert.equal(stored.state, "state-exact");
+
+        const rejectedBeginEvents = [];
+        await assert.rejects(
+          beginOIDCLoginTransaction(adminProvider, {
+            allowLoopbackHTTP: false,
+            randomBytes: (size) => new Uint8Array(size),
+            digestSHA256: async () => new Uint8Array(32),
+            startProvider: async () => ({ authorizationUrl: "http://127.0.0.1:8080/authorize", state: "state", expiresAt: "2030-01-01T00:00:00.000Z" }),
+            storePending: () => rejectedBeginEvents.push("store"),
+            navigate: () => rejectedBeginEvents.push("navigate"),
+          }),
+          /OIDC authorization URL is not trusted/,
+        );
+        assert.deepEqual(rejectedBeginEvents, []);
+
+        const pending = JSON.stringify({ provider: "oidc", state: "state-exact", codeVerifier: "verifier", expiresAt: "2030-01-01T00:00:00.000Z" });
+        const makeConsumeDependencies = ({ raw = pending, now = Date.parse("2029-01-01T00:00:00.000Z"), exchangeError = null } = {}) => {
+          const events = [];
+          const exchanges = [];
+          return {
+            events,
+            exchanges,
+            dependencies: {
+              cleanupURL: () => events.push("cleanup"),
+              readPending: () => { events.push("read"); return raw; },
+              removePending: () => events.push("remove"),
+              now: () => now,
+              exchange: async (input) => {
+                events.push("exchange");
+                exchanges.push(input);
+                if (exchangeError) throw exchangeError;
+                return { principal: { user: { id: "admin" } } };
+              },
+            },
+          };
+        };
+
+        const noCallback = makeConsumeDependencies();
+        assert.equal(await consumePendingOIDCLoginTransaction("", noCallback.dependencies), null);
+        assert.deepEqual(noCallback.events, []);
+
+        for (const scenario of [
+          { name: "missing code", search: "?state=state-exact" },
+          { name: "malformed transaction", search: "?code=code&state=state-exact", raw: "not-json" },
+          { name: "state mismatch", search: "?code=code&state=wrong" },
+          { name: "expired", search: "?code=code&state=state-exact", now: Date.parse("2031-01-01T00:00:00.000Z") },
+        ]) {
+          const current = makeConsumeDependencies(scenario);
+          await assert.rejects(consumePendingOIDCLoginTransaction(scenario.search, current.dependencies));
+          assert.deepEqual(current.events.slice(0, 3), ["cleanup", "read", "remove"], scenario.name);
+          assert.equal(current.events.includes("exchange"), false, scenario.name);
+        }
+
+        const success = makeConsumeDependencies();
+        const successResult = await consumePendingOIDCLoginTransaction("?code=code-exact&state=state-exact", success.dependencies);
+        assert.deepEqual(success.events, ["cleanup", "read", "remove", "exchange"]);
+        assert.deepEqual(success.exchanges, [{ provider: "oidc", code: "code-exact", state: "state-exact", codeVerifier: "verifier" }]);
+        assert.equal(successResult.principal.user.id, "admin");
+
+        const exchangeFailure = makeConsumeDependencies({ exchangeError: new Error("normalized exchange failure") });
+        await assert.rejects(consumePendingOIDCLoginTransaction("?code=code&state=state-exact", exchangeFailure.dependencies), /normalized exchange failure/);
+        assert.deepEqual(exchangeFailure.events, ["cleanup", "read", "remove", "exchange"]);
       `,
     );
 
@@ -349,10 +454,10 @@ describe("validate-admin-ui-contracts", () => {
 
   for (const [name, relativePath, from, to, message] of [
     ["Admin audience filtering", "admin/src/platform/auth/AdminLoginView.tsx", "filterAdminAuthProviders(providers)", "providers", "Admin login must consume provider audiences before selection and rendering"],
-    ["Admin audience start guard", "admin/src/platform/refine/authProvider.ts", "assertAdminAuthProvider(provider);", "void provider;", "OIDC start must reject providers without the Admin audience"],
-    ["demo synchronous lock", "admin/src/platform/auth/AdminLoginView.tsx", "const submit = async (values: LoginFormValues) => {\n    if (submissionLockRef.current) return;\n    submissionLockRef.current = true;", "const submit = async (values: LoginFormValues) => {", "Demo login must acquire the synchronous submission lock"],
-    ["OIDC synchronous lock", "admin/src/platform/auth/AdminLoginView.tsx", "const startOIDC = async () => {\n    if (submissionLockRef.current) return;\n    submissionLockRef.current = true;", "const startOIDC = async () => {", "OIDC start must acquire the synchronous submission lock"],
-    ["authorization URL validation", "admin/src/platform/refine/authProvider.ts", "validateOIDCAuthorizationURL(started.authorizationUrl)", "started.authorizationUrl", "OIDC start must validate the authorization URL before browser navigation"],
+    ["Admin audience start guard", "admin/src/platform/auth/oidcPolicy.ts", "assertAdminAuthProvider(provider);", "void provider;", "OIDC start must reject providers without the Admin audience"],
+    ["demo synchronous lock", "admin/src/platform/auth/AdminLoginView.tsx", "if (!submissionLockRef.current.acquire()) return;", "if (submitting) return;", "Demo login must acquire the synchronous submission lock"],
+    ["OIDC synchronous lock", "admin/src/platform/auth/AdminLoginView.tsx", "if (!submissionLockRef.current.acquire()) return;", "if (submitting) return;", "OIDC start must acquire the synchronous submission lock"],
+    ["authorization URL validation", "admin/src/platform/auth/oidcPolicy.ts", "validateOIDCAuthorizationURL(started.authorizationUrl,", "String(started.authorizationUrl,", "OIDC start must validate the authorization URL before browser navigation"],
     ["recovery focus", "admin/src/platform/auth/AdminLoginView.tsx", "loginHeadingRef.current?.focus({ preventScroll: true })", "void loginHeadingRef.current", "Explicit OIDC recovery must restore focus predictably without scrolling"],
     ["localized callback category", "admin/src/platform/auth/AdminLoginView.tsx", "setCallbackFailure(callbackFailureReason(nextError))", "setLoginError(callbackErrorMessage(dictionary, nextError))", "OIDC callback failures must store a stable error category"],
   ]) {
@@ -367,13 +472,28 @@ describe("validate-admin-ui-contracts", () => {
     });
   }
 
-  it("rejects callback cleanup after pending transaction access", () => {
+  it("rejects production wrappers that enable loopback HTTP outside verified development", () => {
     const tempRoot = tempAdminRoot();
     replaceInTempIfPresent(
       tempRoot,
       "admin/src/platform/refine/authProvider.ts",
-      'window.history.replaceState(window.history.state, "", "/login");\n  window.dispatchEvent(new PopStateEvent("popstate"));\n\n  const rawPending = window.sessionStorage.getItem(OIDC_TRANSACTION_KEY);',
-      'const rawPending = window.sessionStorage.getItem(OIDC_TRANSACTION_KEY);\n  window.history.replaceState(window.history.state, "", "/login");\n  window.dispatchEvent(new PopStateEvent("popstate"));',
+      "allowLoopbackHTTP: import.meta.env.DEV",
+      "allowLoopbackHTTP: true",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Loopback HTTP authorization URLs must be enabled only in verified development mode/);
+  });
+
+  it("rejects callback cleanup after pending transaction access", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTempIfPresent(
+      tempRoot,
+      "admin/src/platform/auth/oidcPolicy.ts",
+      "dependencies.cleanupURL();\n  const rawPending = dependencies.readPending();",
+      "const rawPending = dependencies.readPending();\n  dependencies.cleanupURL();",
     );
 
     const result = runValidator(["--root", tempRoot]);

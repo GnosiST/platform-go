@@ -15,13 +15,18 @@ import {
   type BrandingConfig,
 } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
-import { filterAdminAuthProviders } from "./oidcPolicy";
+import {
+  createSingleUseGuard,
+  createSubmissionLock,
+  filterAdminAuthProviders,
+  hasOIDCCallbackParams,
+  OIDCCallbackError,
+  type OIDCCallbackFailure,
+} from "./oidcPolicy";
 import {
   beginOIDCLogin,
   clearPendingOIDCLogin,
   consumePendingOIDCLogin,
-  OIDCCallbackError,
-  type OIDCCallbackFailure,
 } from "../refine/authProvider";
 import { themeNames, type ThemeName } from "../theme";
 import { AdminFeedback } from "../ui";
@@ -64,8 +69,8 @@ export function AdminLoginView({
   const [loginError, setLoginError] = useState("");
   const [callbackPhase, setCallbackPhase] = useState<CallbackPhase>("idle");
   const [callbackFailure, setCallbackFailure] = useState<OIDCCallbackFailure | "generic" | null>(null);
-  const callbackStartedRef = useRef(false);
-  const submissionLockRef = useRef(false);
+  const callbackGuardRef = useRef(createSingleUseGuard());
+  const submissionLockRef = useRef(createSubmissionLock());
   const loginHeadingRef = useRef<HTMLElement>(null);
   const errorHeadingRef = useRef<HTMLElement>(null);
   const adminProviders = useMemo(() => filterAdminAuthProviders(providers), [providers]);
@@ -78,11 +83,9 @@ export function AdminLoginView({
   const targetLanguage = language === "zh" ? "en" : "zh";
 
   useEffect(() => {
-    if (callbackStartedRef.current || callbackPhase !== "idle") return;
-    const params = new URLSearchParams(search);
-    if (!["code", "state", "error"].some((key) => params.has(key))) return;
+    if (callbackPhase !== "idle" || !hasOIDCCallbackParams(search)) return;
+    if (!callbackGuardRef.current.acquire()) return;
 
-    callbackStartedRef.current = true;
     setCallbackPhase("processing");
     setSubmitting(true);
     setLoginError("");
@@ -105,10 +108,9 @@ export function AdminLoginView({
   }, [callbackPhase]);
 
   const submit = async (values: LoginFormValues) => {
-    if (submissionLockRef.current) return;
-    submissionLockRef.current = true;
+    if (!submissionLockRef.current.acquire()) return;
     if (!selectedProvider?.configured || selectedProvider.kind !== "demo") {
-      submissionLockRef.current = false;
+      submissionLockRef.current.release();
       setLoginError(dictionary.loginProviderUnavailable);
       return;
     }
@@ -123,16 +125,15 @@ export function AdminLoginView({
     } catch (nextError) {
       setLoginError(nextError instanceof Error ? nextError.message : dictionary.loginFailed);
     } finally {
-      submissionLockRef.current = false;
+      submissionLockRef.current.release();
       setSubmitting(false);
     }
   };
 
   const startOIDC = async () => {
-    if (submissionLockRef.current) return;
-    submissionLockRef.current = true;
+    if (!submissionLockRef.current.acquire()) return;
     if (!selectedProvider?.configured || selectedProvider.kind !== "oidc") {
-      submissionLockRef.current = false;
+      submissionLockRef.current.release();
       setLoginError(dictionary.loginProviderUnavailable);
       return;
     }
@@ -142,7 +143,7 @@ export function AdminLoginView({
       await beginOIDCLogin(selectedProvider);
     } catch {
       clearPendingOIDCLogin();
-      submissionLockRef.current = false;
+      submissionLockRef.current.release();
       setLoginError(dictionary.loginOIDCStartFailed);
       setSubmitting(false);
     }
