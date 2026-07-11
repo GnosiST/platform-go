@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-objective-conformance.json",
-  "capturedAt": "2026-07-08",
+  "capturedAt": "2026-07-11",
   "purpose": "Machine-checkable conformance contract for the persistent reusable platform foundation objective. It keeps stack choices, business-neutral reference use, future promotion gates, visual gates, deployment boundaries and closeout discipline aligned before further implementation continues.",
   "objectiveMode": "persistent-full-scope",
   "approvedStack": {
@@ -135,7 +135,10 @@
       "AGENTS.md",
       "docs/platform-foundation-task-map.md",
       "docs/platform-roadmap.md",
-      "docs/platform-deployment.md"
+      "docs/platform-deployment.md",
+      "docs/platform-ui-optimization-assessment.md",
+      "docs/admin-ui-foundation.md",
+      "design-qa.md"
     ]
   }
 }

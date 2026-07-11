@@ -314,16 +314,16 @@ The P1/P2 foundation items below are represented in `resources/platform-foundati
    - Implemented proof: the shared frontend executor calls schema-declared routed actions through the admin API, honors confirmation metadata and preserves localized failure states. Concrete business actions must be provided by downstream capability routes; the platform UI does not ship product-specific action handlers.
    - Task graph node: `refine-custom-panels-and-actions` is `implemented`; richer approval/file/business panels remain follow-on capability-owned UI work and must still go through product design, i18n, browser evidence and capability-local tests.
 
-## Post-Foundation UI Optimization Activation Queue
+## Post-Foundation UI Optimization State
 
-The closed foundation task graph remains at 35 implemented nodes. The candidates below are reviewed but are not execution nodes until their activation gates are met. This preserves the completed foundation audit while keeping follow-on UI debt visible.
+The closed foundation task graph now contains 36 implemented nodes and zero preview, planned or deferred nodes. Admin UI system-quality hardening is implemented; the brand/public-surface direction remains an external follow-on candidate rather than a graph node.
 
 1. Admin UI system-quality hardening
    - Requested aid: `ui-ux-pro-max`.
-   - Proposed priority: P1 after `docs/superpowers/specs/2026-07-10-platform-production-persistence-correctness-design.md` is implemented and before the next large admin capability or downstream business console.
-   - Current evidence: the 2026-07-10 audit found 30-32px mobile controls, roughly 300px of persistent mobile shell chrome before page content, conditional rather than default shared focus-ring styling, icon controls without explicit localized labels, raw stale-session `unauthorized` feedback and reduced table scan quality at 1280px.
-   - Activation gate: approved `superpowers:brainstorming` design for mobile navigation density, focus behavior and table prioritization; then add a visual task node with `admin-ui`, `i18n`, `browser-qa` and `docs` locks.
-   - Completion evidence: 375/390/768/1024/1280/1440 browser captures, keyboard walkthrough, target-size and focus checks, reduced-motion checks, admin UI contract tests, i18n and build.
+   - Current state: `admin-ui-system-quality-hardening` is `implemented` after `production-persistence-correctness`, `admin-ui-shell-and-list-components` and `visual-product-design-qa`.
+   - Behavior: widths below 1024px use the compact command/context shell; widths at or above 1024px preserve the desktop shell. Compact-shell controls use 44px minimum targets; at mobile resource widths the toolbar, search, pagination quick-jumper and settings Drawer controls also measure at least 44x44px. Route changes move focus to the stable main region; the create modal settles focus on its first enabled editable field, closes through Escape and restores the create trigger.
+   - Data and recovery: mobile cards remain authoritative through 767px; 768/1024/1280/1440 tables expose schema-order priority tiers while keeping actions discoverable. Stored-session 401 responses clear the token once and return localized sign-in recovery instead of raw `unauthorized` copy.
+   - Completion evidence: fresh 375/390/768/1024/1280/1440 captures, create-modal and settings-drawer states, keyboard/focus checks, target-size and stable-state overflow measurements, computed reduced-motion checks, clean browser console, admin UI contract tests, i18n and build. `tmp/product-design/p1-admin-ui-hardening-20260711/10-stale-session-390x844.png` records “会话已过期，请重新登录。” without raw backend copy.
 
 2. Brand entry and public-surface visual redesign
    - Requested aid: `design-taste-frontend`.

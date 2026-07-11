@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-foundation-alignment-audit.json",
-  "capturedAt": "2026-07-07",
+  "capturedAt": "2026-07-11",
   "purpose": "Machine-checkable alignment audit for the active platform foundation goal: approved stack, task dependencies, reference coverage, capability boundaries, governance topology, visual design gates and source-writing safety must not conflict.",
   "approvedStack": {
     "backend": [
@@ -59,7 +59,8 @@
     "foundation-alignment-audit",
     "production-readiness-preflight",
     "production-auth-provider-hardening",
-    "source-writing-codegen-promotion"
+    "source-writing-codegen-promotion",
+    "admin-ui-system-quality-hardening"
   ],
   "requiredFutureTaskNodes": [],
   "nonDroppableGoalNodes": [
@@ -69,7 +70,8 @@
     "admin-api-boundary-query-security",
     "visual-product-design-qa",
     "production-readiness-preflight",
-    "production-persistence-correctness"
+    "production-persistence-correctness",
+    "admin-ui-system-quality-hardening"
   ],
   "nonDroppableEngineeringCapabilities": [
     "governance-org-area-role-groups",
@@ -328,6 +330,9 @@
     "AGENTS.md",
     "docs/platform-foundation-task-map.md",
     "docs/platform-capability-development.md",
-    "docs/platform-roadmap.md"
+    "docs/platform-roadmap.md",
+    "docs/platform-ui-optimization-assessment.md",
+    "docs/admin-ui-foundation.md",
+    "design-qa.md"
   ]
 }

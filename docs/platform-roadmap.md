@@ -1,7 +1,7 @@
 # Platform Foundation Roadmap
 
 Date: 2026-07-04
-Last updated: 2026-07-10
+Last updated: 2026-07-11
 
 ## Goal
 
@@ -57,6 +57,7 @@ Implemented foundation slices:
 - optional `notification` capability with `notification-templates`, `notifications`, `notification-deliveries` and shared tenant/user/audit relations through the `platform-notification-ready` profile;
 - optional `job` capability with `job-definitions`, `job-runs`, `job-run-attempts` and shared tenant/user/audit relations through the `platform-job-ready` profile;
 - Ant Design based admin shell with themes, layouts, tabs, i18n and reusable platform UI primitives;
+- implemented Admin UI system-quality hardening with a compact two-tier shell below 1024px, 44px compact-shell/resource-toolbar/search/pagination/settings targets at mobile widths, skip/route focus, settled modal first-field focus with Escape/trigger restoration, localized icon labels, schema-order table priority, localized stale-session recovery and computed reduced-motion handling;
 - reusable dashboard home, data table filters, date/numeric range filters, active filter state, column settings, compact centered integrated pagination, settings drawer, watermark, visual-aid switch, sidebar collapse and top-layout navigation.
 - isolated app security-domain runtime with guest-first `POST /api/app/auth/login`, optional configured provider resolution through `httpapi.AppIdentityResolver`, generic `app-identities` provider-subject-hash binding, optional `app-phone` verification/binding routes, `GET /api/app/session/current`, `POST /api/app/auth/logout`, `tokenType=app` JWT enforcement and route-level `app:` permission checks for registered business handlers.
 
@@ -172,13 +173,13 @@ Acceptance:
 - complex resources can still mount custom actions or custom panels through extension points;
 - one style/token change applies consistently across platform pages.
 
-### Post-Foundation UI Optimization Queue
+### Post-Foundation UI Optimization State
 
-Status: reviewed, pending activation. Full assessment: `docs/platform-ui-optimization-assessment.md`.
+Status: P1 implemented; public/brand redesign remains deferred. Full assessment: `docs/platform-ui-optimization-assessment.md`.
 
-- P1, `ui-ux-pro-max`: activate admin UI system-quality hardening after `docs/superpowers/specs/2026-07-10-platform-production-persistence-correctness-design.md` is implemented and before the next large admin capability or downstream business console. The task covers default focus visibility, skip/route focus, explicit icon labels, 44px mobile hit areas, reduced mobile shell chrome, 1024/1280px table prioritization, localized stale-session recovery, reduced motion and browser/contract coverage.
+- Done, P1: `admin-ui-system-quality-hardening` implements default focus visibility, skip/route focus, explicit localized icon labels, 44px mobile shell/resource controls, a two-tier shell below 1024px, settled modal focus lifecycle, schema-order table prioritization, localized stale-session recovery, computed reduced-motion behavior and browser/contract coverage across 375, 390, 768, 1024, 1280 and 1440 widths with no stable-state page overflow or new application console errors.
 - P2, `design-taste-frontend`: keep brand-entry and public-surface visual redesign deferred until a real landing, portfolio, marketing or approved login-brand brief exists. Apply it to public or brand surfaces only; do not turn repeated CRUD and governance workflows into marketing-style card pages.
-- Governance: these candidates do not reopen the closed 35/35 foundation task graph. When approved for implementation, add explicit task nodes with `superpowers:brainstorming` and Product Design gates, resource locks, localized completion criteria and fresh browser evidence.
+- Governance: the implemented visual node closes the task graph at 36/36/0 with `superpowers:brainstorming`, Product Design, `admin-ui`, `i18n`, `browser-qa` and `docs` evidence. Any later public/brand redesign still requires a separate visual node and fresh evidence.
 
 ### Phase 3: Production Auth And Identity
 

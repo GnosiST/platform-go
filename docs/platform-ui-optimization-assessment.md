@@ -1,16 +1,16 @@
 # Platform UI Optimization Assessment
 
-Date: 2026-07-10
-Status: reviewed, pending activation
+Date: 2026-07-11
+Status: Candidate A implemented; Candidate B deferred
 
 ## Purpose
 
-This assessment records when and how to use two design aids without disrupting the closed platform-foundation goal:
+This assessment records how two design aids are routed without disrupting the platform-foundation goal:
 
 - `ui-ux-pro-max` for implementation-level admin UI quality, accessibility, responsive behavior and shared-component hardening;
 - `design-taste-frontend` for the visual direction of login, brand-entry, landing, portfolio, marketing or deliberate redesign surfaces.
 
-These are follow-on optimization candidates. They do not reopen `resources/platform-foundation-task-graph.json` until a design is approved and an implementation node is intentionally activated.
+Candidate A has completed that activation path as `admin-ui-system-quality-hardening`. Candidate B remains outside `resources/platform-foundation-task-graph.json` until a real public or brand brief is approved.
 
 ## Current Evidence
 
@@ -47,15 +47,17 @@ Evidence limits:
 
 ## Candidate A: Admin UI System Quality Hardening
 
+Status: implemented on 2026-07-11.
+
 Requested aid: `ui-ux-pro-max`
 
 Priority: P1 after the production persistence correctness work described in `docs/superpowers/specs/2026-07-10-platform-production-persistence-correctness-design.md`, before the next large admin capability or downstream business UI is added.
 
-Activation gate:
+Completed activation gate:
 
-- the current P0 production persistence correctness slice is implemented and its shared repository contracts are stable;
-- a short `superpowers:brainstorming` design is approved for mobile navigation density, focus behavior and table prioritization;
-- the task is added to the execution graph with `admin-ui`, `i18n`, `browser-qa` and `docs` resource locks.
+- the P0 production persistence correctness slice is implemented and its shared repository contracts are stable;
+- `superpowers:brainstorming` and Product Design approved the compact two-tier direction, focus behavior and table prioritization;
+- `admin-ui-system-quality-hardening` is implemented with `admin-ui`, `i18n`, `browser-qa` and `docs` resource locks.
 
 Implementation scope:
 
@@ -76,6 +78,19 @@ Acceptance evidence:
 - keyboard walkthrough covering login, global navigation, one resource list, create/edit modal and settings drawer;
 - automated checks for no horizontal page overflow, visible focus styles, explicit icon labels and mobile hit-area geometry;
 - admin i18n, UI contract tests, React build and focused browser console review remain green.
+
+Implemented result:
+
+- `0-767px` uses the compact two-tier shell with mobile resource cards; `768-1023px` keeps the compact shell with priority-reduced tables; `1024px+` preserves the existing desktop shell;
+- compact-shell controls use a 44px minimum target; at mobile resource widths the toolbar buttons, search, pagination controls, quick-jumper, settings Drawer close control, tabs and overflow actions also measure at least 44x44px;
+- accepted stable states reject page-level horizontal overflow, keep the page heading within the approved compact-shell geometry and report no new application console errors;
+- a localized skip link targets the stable main region, actual route changes move focus there, and shared focus-visible styling no longer depends on the visual-aid preference;
+- after the generic resource modal settles, it focuses the first enabled editable field inside the currently visible form; Escape closes it and focus returns to the create/edit trigger through Ant Design;
+- schema field order drives essential, standard and extended table tiers without adding business field names to the shared shell;
+- stored-token 401 responses clear the stale token once, emit the shared session-expired event and present localized sign-in recovery;
+- operating-system reduced-motion preference produces effectively immediate computed animation/transition styles for platform and portaled Ant Design motion without hiding focus, validation, loading or status feedback.
+
+Fresh implementation evidence is under `tmp/product-design/p1-admin-ui-hardening-20260711/` and covers login, dashboard, menu list, create modal, settings drawer and localized stale-session recovery across the required 375, 390, 768, 1024, 1280 and 1440 widths. `09-settings-drawer-390x844.png` records the accepted narrow Drawer state. `10-stale-session-390x844.png` records “会话已过期，请重新登录。” without raw `unauthorized` copy.
 
 ## Candidate B: Brand Entry And Public-Surface Visual Redesign
 
@@ -105,7 +120,8 @@ Completion gate:
 
 ## Scheduling Decision
 
-1. Finish production persistence correctness and contract stabilization first.
-2. Activate Candidate A before the next large admin feature or downstream business-console adoption so later UI does not multiply current shell and accessibility debt.
-3. Keep Candidate B deferred until there is a real brand/public-surface brief. If only the admin console changes, use Candidate A and the existing quiet operational design language.
-4. When either candidate activates, add an explicit task-graph node, localized status reason, completion gate, design gates, resource locks and fresh screenshot evidence. The closed 34/34 foundation goal remains unchanged until that activation decision.
+1. Production persistence correctness and Candidate A are implemented.
+2. Keep Candidate B deferred until there is a real brand/public-surface brief. If only the admin console changes, use the existing quiet operational design language and the implemented Candidate A contracts.
+3. Any future visual candidate requires an explicit task-graph node, design gates, resource locks and fresh screenshot evidence. The current graph is closed at 36/36/0.
+
+Evidence remains scoped: screenshots, DOM measurements and keyboard checks support this implementation but do not certify WCAG conformance. Screen-reader announcements, high zoom/reflow and platform-specific assistive technology require separate evidence.

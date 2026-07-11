@@ -257,6 +257,39 @@ The shell supports:
 - multi-level navigation through slash-separated menu `parent` paths.
 - top and mixed layout modes render a horizontal resource navigation row; work tabs remain browser-like task history instead of replacing primary navigation.
 
+### System Quality Hardening Contract
+
+`admin-ui-system-quality-hardening` defines the shared responsive, keyboard, session-recovery and motion behavior. These are platform contracts, not page-local exceptions.
+
+Responsive shell and data rules:
+
+- `0-767px`: use the compact two-tier command/context shell and the existing mobile resource cards;
+- `768-1023px`: keep the compact shell and render the priority-reduced table;
+- `1024px+`: preserve the desktop shell, side/top navigation, work tabs and separate environment/tenant controls;
+- compact-shell interactive controls must remain at least 44x44px and must not create page-level horizontal overflow;
+- at `0-767px`, resource toolbar buttons, search input, pagination controls, the quick-jumper input, settings Drawer close control, tabs, tab buttons and overflow actions must also remain at least 44x44px;
+- generic table priority follows visible schema field order: the first four fields are `essential`, the next three are `standard`, and remaining fields are `extended`; selection and row actions remain available at every table breakpoint;
+- full values remain discoverable through row detail and column settings rather than hard-coded business column exceptions.
+
+Keyboard and focus rules:
+
+- render the localized skip link before navigation and keep `#platform-main-content` as the stable native `main` focus target;
+- move focus to the main region after an actual route change, not on the first authenticated render or when the route is unchanged;
+- provide a default 2px `:focus-visible` platform outline independently of the visual-aid preference;
+- icon-only shell controls require explicit localized names;
+- after the generic resource create/edit modal settles, focus the first enabled editable field inside the currently visible resource form; Ant Design continues to own focus trapping, Escape handling and restoration to the create/edit trigger.
+
+Session and motion rules:
+
+- shared API paths normalize failures as typed `AdminAPIError` values with HTTP status information;
+- a 401 with a stored admin token clears that token once, emits the platform session-expired event, clears authenticated workspace state and shows localized sign-in recovery instead of raw backend `unauthorized` copy;
+- provider discovery and unauthenticated login failures do not emit session-expired recovery when no stored token exists;
+- `prefers-reduced-motion: reduce` overrides non-essential page-entry, transform and opacity motion, including Ant Design modal/drawer/dropdown/popover portals, while preserving loading, focus, validation and status feedback. Browser-computed styles must resolve those transitions and animations to effectively immediate values.
+
+Browser evidence is stored under `tmp/product-design/p1-admin-ui-hardening-20260711/`. It covers login, compact dashboard, menu list breakpoints, settled create-modal focus plus Escape/trigger restoration, narrow settings drawer, computed reduced-motion styles and localized stale-session recovery at 375x812, 390x844, 768x1024, 1024x768, 1280x720 and 1440x1024. The accepted stable states have no page-level horizontal overflow and no new application console errors. The stale-session state is captured in `10-stale-session-390x844.png` and shows “会话已过期，请重新登录。” rather than raw backend error copy.
+
+This evidence validates the implemented contract but is not WCAG certification. Screen-reader announcements, high zoom/reflow and platform-specific assistive technology remain separate acceptance work when a deployment requires those claims.
+
 Page rendering under the shell is routed through `PlatformRoutePages` in `admin/src/App.tsx`. Custom platform pages such as overview, capabilities, demo data and API docs are explicit route elements. Backend-declared internal menu resources become route elements that render `ResourceRoutePage` in `admin/src/platform/refine/ResourceRoutePage.tsx`. That route page reads Refine resource metadata with `useResourceParams`, guards read access with `useCan`, and then delegates the schema-driven CRUD surface to `GenericResourceConsole`. `GenericResourceConsole` owns the platform schema UI, but list/create/update/delete now flow through Refine `useList`, `useCreate`, `useUpdate` and `useDelete` instead of direct API calls. This keeps the visible shell stable while moving route ownership, access control and CRUD flow toward React Router and Refine resource semantics.
 
 `rtk npm --prefix admin run build` runs `scripts/validate-admin-refine-runtime.mjs`, `scripts/validate-admin-refine-crud.mjs` and `scripts/validate-admin-ui-contracts.mjs` after i18n validation. Those gates prevent schema-driven resource routes from drifting back into local `App.tsx` adapters, direct resource API calls, relation-field option shortcuts, form-control passthrough regressions, or shell/list regressions that remove required platform UI primitives. `scripts/admin-ui-contracts.test.mjs` exercises the validator against temporary UI source copies, so dropping shared pagination or settings-drawer configuration support is caught as a validator regression instead of relying only on the live source tree.

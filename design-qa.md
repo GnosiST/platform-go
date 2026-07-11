@@ -181,6 +181,40 @@ Findings:
 Evidence limits:
 
 - This pass does not claim WCAG conformance. Contrast, screen-reader announcements, zoom/reflow, reduced motion, keyboard route focus and modal focus return still need focused tests.
-- The task candidates remain outside the closed 34/34 foundation graph until design approval and explicit activation.
+- At the time of this audit, the task candidates remained outside the then-closed foundation graph; the 2026-07-11 section below records Candidate A activation and closeout.
 
 Detailed assessment: `docs/platform-ui-optimization-assessment.md`.
+
+## 2026-07-11 Admin UI System Quality Hardening QA
+
+Status: implemented and accepted for the `admin-ui-system-quality-hardening` node.
+
+Fresh evidence:
+
+- `tmp/product-design/p1-admin-ui-hardening-20260711/01-login-1280x720.png`
+- `tmp/product-design/p1-admin-ui-hardening-20260711/02-dashboard-375x812.png`
+- `tmp/product-design/p1-admin-ui-hardening-20260711/03-menus-390x844.png`
+- `tmp/product-design/p1-admin-ui-hardening-20260711/04-menus-768x1024.png`
+- `tmp/product-design/p1-admin-ui-hardening-20260711/05-menus-1024x768.png`
+- `tmp/product-design/p1-admin-ui-hardening-20260711/06-menus-1280x720.png`
+- `tmp/product-design/p1-admin-ui-hardening-20260711/07-menus-1440x1024.png`
+- `tmp/product-design/p1-admin-ui-hardening-20260711/08-create-modal-1280x720.png`
+- `tmp/product-design/p1-admin-ui-hardening-20260711/09-settings-drawer-390x844.png`
+- `tmp/product-design/p1-admin-ui-hardening-20260711/10-stale-session-390x844.png`
+
+Accepted behavior:
+
+- the 375/390/768 compact shell uses two persistent tiers and keeps page headings within the approved geometry; at mobile resource widths the shell, toolbar actions, search, pagination buttons, quick-jumper and settings Drawer close/tabs/overflow controls measure at least 44x44px;
+- the 1024/1280/1440 states preserve desktop shell placement while schema-order responsive tiers keep high-priority menu fields and row actions operable;
+- the localized skip link targets the stable main region, route changes move focus to that region, and icon-only navigation/alert controls have explicit localized names;
+- after the create modal settles, focus is on the first enabled editable field inside the visible form; Escape closes the modal and returns focus to the “新增记录” trigger;
+- `09-settings-drawer-390x844.png` records the accepted narrow settings Drawer state with 44px controls;
+- stale stored sessions recover to localized sign-in guidance instead of raw `unauthorized` feedback; `10-stale-session-390x844.png` shows “会话已过期，请重新登录。” as the visible state;
+- reduced-motion emulation produces effectively immediate computed transition/animation styles for the platform shell and portaled modal/drawer/dropdown/popover surfaces while retaining focus, loading, validation and status feedback;
+- accepted stable states have no page-level horizontal overflow, and focused browser console review found no new application errors.
+
+Automated evidence remains `scripts/validate-admin-i18n.mjs`, `scripts/validate-admin-ui-contracts.mjs`, `scripts/admin-ui-contracts.test.mjs` and the Admin production build.
+
+Evidence limit: this QA package is implementation evidence, not WCAG certification. It does not establish screen-reader behavior, high-zoom reflow or platform-specific assistive-technology conformance.
+
+final result: passed
