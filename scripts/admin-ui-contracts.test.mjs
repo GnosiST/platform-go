@@ -72,4 +72,19 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /SystemSettingsDrawer must keep exportConfig support/);
     assert.match(result.stderr, /SystemSettingsDrawer must keep importConfig support/);
   });
+
+  it("rejects a shell whose skip link does not target main content", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/shell/AdminShell.tsx",
+      'href="#platform-main-content"',
+      'href="#missing-content"',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /AdminShell must expose a skip-to-content link/);
+  });
 });

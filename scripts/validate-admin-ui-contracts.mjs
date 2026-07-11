@@ -47,6 +47,12 @@ requireIncludes(files.shell, "buildNavigationTree", "AdminShell must build multi
 requireIncludes(files.shell, '"business/access"', "AdminShell must label business/access through a full parent path.");
 requireIncludes(files.shell, '"business/dispatch"', "AdminShell must label business/dispatch through a full parent path.");
 requireNotIncludes(files.shell, "access: dictionary.navBusinessAccess", "AdminShell must not reuse plain access for business navigation labels.");
+requireIncludes(files.shell, 'href="#platform-main-content"', "AdminShell must expose a skip-to-content link.");
+requireIncludes(files.shell, 'id="platform-main-content"', "AdminShell main region must expose a stable focus target.");
+requireIncludes(files.shell, "previousRouteRef", "AdminShell must move focus only after actual route changes.");
+requireIncludes(files.shell, "dictionary.openMobileNavigation", "Mobile navigation must use an explicit localized accessible name.");
+requireIncludes(files.shell, "dictionary.alerts", "The alert icon control must use an explicit localized accessible name.");
+requireIncludes(files.shell, "platform-mobile-contextbar", "AdminShell must provide the approved compact mobile context bar.");
 
 for (const key of [
   "appearance",
@@ -230,6 +236,9 @@ requireRegex(
 );
 requireIncludes(files.styles, ".dashboard-chart {\n    height: 150px;", "Mobile dashboard chart must keep a compact height.");
 requireIncludes(files.styles, ".health-panel .ant-progress", "Mobile health panel must keep compact progress styling.");
+requireIncludes(files.styles, ".platform-skip-link", "styles.css must expose skip-link focus behavior.");
+requireRegex(files.styles, /:focus-visible[\s\S]*outline:\s*2px solid var\(--primary\)/, "Visible focus must be a default platform behavior.");
+requireRegex(files.styles, /@media\s*\(max-width:\s*1023px\)[\s\S]*min-height:\s*44px/, "Responsive shell controls must use 44px minimum targets.");
 
 if (failures.length > 0) {
   console.error("Admin UI contract validation failed:");

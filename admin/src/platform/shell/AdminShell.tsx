@@ -26,7 +26,7 @@ import {
   UserOutlined,
 } from "@ant-design/icons";
 import { Avatar, Badge, Button, Drawer, Dropdown, Input, Space, Tag, Tooltip, Typography, type MenuProps } from "antd";
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { AdminCurrentSession, BrandingConfig } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
 import { themeTokens, type AdminLayoutMode, type ThemeName } from "../theme";
@@ -111,8 +111,10 @@ export function AdminShell({
 }: AdminShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [openContext, setOpenContext] = useState<"environment" | "tenant" | null>(null);
+  const [openContext, setOpenContext] = useState<"environment" | "tenant" | "mobile-work" | "mobile-runtime" | null>(null);
   const [openTabRoutes, setOpenTabRoutes] = useState<string[]>(() => uniqueRoutes([HOME_ROUTE, activeRoute]));
+  const mainRef = useRef<HTMLElement | null>(null);
+  const previousRouteRef = useRef(activeRoute);
   const activeResource = resources.find((resource) => resource.route === activeRoute) ?? resources[0];
   const resourcesByRoute = useMemo(() => new Map(resources.map((resource) => [resource.route, resource])), [resources]);
   const groupedResources = useMemo(
@@ -145,6 +147,14 @@ export function AdminShell({
     }
     setOpenTabRoutes((current) => uniqueRoutes([HOME_ROUTE, ...current.filter((route) => resourcesByRoute.has(route)), activeRoute]));
   }, [activeRoute, resourcesByRoute]);
+
+  useEffect(() => {
+    if (previousRouteRef.current === activeRoute) {
+      return;
+    }
+    previousRouteRef.current = activeRoute;
+    window.requestAnimationFrame(() => mainRef.current?.focus({ preventScroll: true }));
+  }, [activeRoute]);
 
   const openResource = (resource: AdminResourceDefinition) => {
     if (resource.isExternal) {
@@ -209,6 +219,9 @@ export function AdminShell({
 
   return (
     <div className={shellClass} data-theme={themeName} data-layout={layoutMode} data-density={uiConfig.density} style={shellStyle}>
+      <a className="platform-skip-link" href="#platform-main-content">
+        {dictionary.skipToContent}
+      </a>
       <aside className="platform-sider" aria-label={dictionary.primaryNavigation}>
         <Brand
           dictionary={dictionary}
@@ -247,10 +260,15 @@ export function AdminShell({
         </aside>
       ) : null}
 
-      <main className="platform-main">
+      <main ref={mainRef} className="platform-main" id="platform-main-content" tabIndex={-1}>
         <header className="platform-topbar">
           <div className="topbar-left">
-            <Button className="mobile-nav-button" icon={<MenuOutlined />} onClick={() => setMobileNavOpen(true)} />
+            <Button
+              aria-label={dictionary.openMobileNavigation}
+              className="mobile-nav-button"
+              icon={<MenuOutlined />}
+              onClick={() => setMobileNavOpen(true)}
+            />
             {layoutMode !== "top" ? (
               <Tooltip title={uiConfig.sidebarCollapsed ? dictionary.expandSidebar : dictionary.collapseSidebar}>
                 <Button
@@ -266,7 +284,7 @@ export function AdminShell({
           <Input
             aria-label={dictionary.topSearch}
             autoComplete="off"
-            className="global-search"
+            className="global-search desktop-global-search"
             id="platform-global-search"
             name="globalSearch"
             prefix={<SearchOutlined />}
@@ -284,7 +302,7 @@ export function AdminShell({
             </Tooltip>
             <Tooltip title={dictionary.alerts}>
               <Badge count={3} size="small">
-                <Button className="topbar-icon-button" icon={<BellOutlined />} />
+                <Button aria-label={dictionary.alerts} className="topbar-icon-button" icon={<BellOutlined />} />
               </Badge>
             </Tooltip>
             <Button className="user-menu-trigger" aria-label={dictionary.userSettings} onClick={() => setSettingsOpen(true)}>
@@ -308,6 +326,91 @@ export function AdminShell({
             />
           </section>
         ) : null}
+
+        <section className="platform-mobile-contextbar">
+          <PlatformDropdownPlugin
+            open={openContext === "mobile-work"}
+            content={(
+              <PlatformDropdownPanel
+                className="mobile-context-panel"
+                title={dictionary.mobileWorkContext}
+                description={`${activeGroup?.label ?? dictionary.foundation} · ${activeResource?.title[language] ?? ""}`}
+                width={320}
+              >
+                <div className="mobile-work-context-list">
+                  {openTabs.map((resource) => {
+                    const Icon = iconMap[resource.icon as keyof typeof iconMap] ?? BookOutlined;
+                    const isPinned = resource.route === HOME_ROUTE;
+                    return (
+                      <div className={resource.route === activeRoute ? "mobile-work-context-item active" : "mobile-work-context-item"} key={resource.route}>
+                        <button
+                          className="mobile-work-context-route"
+                          type="button"
+                          onClick={() => {
+                            openResource(resource);
+                            setOpenContext(null);
+                          }}
+                        >
+                          <Icon />
+                          <span>{resource.title[language]}</span>
+                        </button>
+                        {isPinned ? null : (
+                          <button
+                            aria-label={`${dictionary.closeTab}: ${resource.title[language]}`}
+                            className="mobile-work-context-close"
+                            type="button"
+                            onClick={() => closeWorkTab(resource.route)}
+                          >
+                            <CloseOutlined />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </PlatformDropdownPanel>
+            )}
+            placement="bottomLeft"
+            onOpenChange={(open) => setOpenContext(open ? "mobile-work" : null)}
+          >
+            <Button className="platform-mobile-context-button" aria-label={dictionary.mobileWorkContext}>
+              <span>{activeGroup?.label ?? dictionary.foundation}</span>
+              <strong>{activeResource?.title[language] ?? ""}</strong>
+              <DownOutlined />
+            </Button>
+          </PlatformDropdownPlugin>
+          <PlatformDropdownPlugin
+            open={openContext === "mobile-runtime"}
+            content={(
+              <PlatformDropdownPanel
+                className="mobile-context-panel"
+                title={dictionary.mobileRuntimeContext}
+                description={`${dictionary.environment}: ${dictionary.production} · ${dictionary.tenant}: ${dictionary.platformTenant}`}
+                width={320}
+                footer={<Tag>{dictionary.readOnlyContext}</Tag>}
+              >
+                <div className="mobile-runtime-context-list">
+                  <div>
+                    <Typography.Text type="secondary">{dictionary.environment}</Typography.Text>
+                    <strong>{dictionary.production}</strong>
+                  </div>
+                  <div>
+                    <Typography.Text type="secondary">{dictionary.tenant}</Typography.Text>
+                    <strong>{`${dictionary.platformTenant} (platform)`}</strong>
+                  </div>
+                </div>
+              </PlatformDropdownPanel>
+            )}
+            placement="bottomRight"
+            onOpenChange={(open) => setOpenContext(open ? "mobile-runtime" : null)}
+          >
+            <Button className="platform-mobile-context-button" aria-label={dictionary.mobileRuntimeContext}>
+              <span>{dictionary.environment}</span>
+              <strong>{`${dictionary.production} · ${dictionary.platformTenant}`}</strong>
+              <DownOutlined />
+            </Button>
+          </PlatformDropdownPlugin>
+        </section>
 
         <section className={uiConfig.showWorkTabs ? "platform-workbar" : "platform-workbar without-tabs"}>
           {uiConfig.showWorkTabs ? (
@@ -408,6 +511,15 @@ export function AdminShell({
         width={320}
         onClose={() => setMobileNavOpen(false)}
       >
+        <Input
+          aria-label={dictionary.topSearch}
+          autoComplete="off"
+          className="global-search mobile-global-search"
+          id="platform-mobile-global-search"
+          name="mobileGlobalSearch"
+          prefix={<SearchOutlined />}
+          placeholder={dictionary.topSearch}
+        />
         <SideNavigation
           groupedResources={groupedResources}
           activeRoute={activeRoute}
