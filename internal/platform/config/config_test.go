@@ -358,6 +358,17 @@ func TestLoadParsesAdminOIDCConfiguration(t *testing.T) {
 	}
 }
 
+func TestLoadParsesPhoneVerificationConfiguration(t *testing.T) {
+	t.Setenv("PLATFORM_PHONE_HMAC_KEY", "phone-key")
+	t.Setenv("PLATFORM_PHONE_CODE_HMAC_KEY", "code-key")
+	t.Setenv("PLATFORM_PHONE_VERIFICATION_PROVIDER", "debug")
+
+	cfg := Load()
+	if cfg.PhoneHMACKey != "phone-key" || cfg.PhoneCodeHMACKey != "code-key" || cfg.PhoneVerificationProvider != "debug" {
+		t.Fatalf("phone verification config = %+v", cfg)
+	}
+}
+
 func TestValidateRuntimeAcceptsDevelopmentDefaults(t *testing.T) {
 	cfg := Load()
 
@@ -548,6 +559,58 @@ func TestValidateRuntimeRejectsProductionDemoAuthProvider(t *testing.T) {
 	}
 	if got := err.Error(); !strings.Contains(got, "production runtime requires PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true") {
 		t.Fatalf("ValidateRuntime() error = %q", got)
+	}
+}
+
+func TestValidateRuntimeRejectsProductionAppPhoneWithoutProviderAndDistinctKeys(t *testing.T) {
+	cfg := validProductionRuntimeConfig()
+	cfg.Capabilities = append(cfg.Capabilities, "app-phone")
+	cfg.PhoneHMACKey = "short"
+	cfg.PhoneCodeHMACKey = "short"
+
+	err := cfg.ValidateRuntime()
+	if err == nil {
+		t.Fatal("ValidateRuntime() error = nil, want app-phone protection errors")
+	}
+	for _, want := range []string{
+		"production app-phone requires PLATFORM_PHONE_HMAC_KEY to be at least 32 bytes",
+		"production app-phone requires PLATFORM_PHONE_CODE_HMAC_KEY to be at least 32 bytes",
+		"production app-phone requires distinct phone and code HMAC keys",
+		"production app-phone requires PLATFORM_PHONE_VERIFICATION_PROVIDER",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("ValidateRuntime() error = %q, missing %q", err, want)
+		}
+	}
+}
+
+func TestValidateRuntimeRejectsDebugPhoneProviderOutsideDevelopmentAndTest(t *testing.T) {
+	for _, environment := range []string{RuntimeEnvironmentStaging, RuntimeEnvironmentProduction} {
+		t.Run(environment, func(t *testing.T) {
+			cfg := validProductionRuntimeConfig()
+			cfg.RuntimeEnvironment = environment
+			cfg.Capabilities = append(cfg.Capabilities, "app-phone")
+			cfg.PhoneHMACKey = strings.Repeat("p", 32)
+			cfg.PhoneCodeHMACKey = strings.Repeat("c", 32)
+			cfg.PhoneVerificationProvider = "debug"
+
+			err := cfg.ValidateRuntime()
+			if err == nil || !strings.Contains(err.Error(), "app-phone debug provider is allowed only in development or test") {
+				t.Fatalf("ValidateRuntime() error = %v, want debug provider environment error", err)
+			}
+		})
+	}
+}
+
+func TestValidateRuntimeAcceptsProductionAppPhoneProtectionConfig(t *testing.T) {
+	cfg := validProductionRuntimeConfig()
+	cfg.Capabilities = append(cfg.Capabilities, "app-phone")
+	cfg.PhoneHMACKey = strings.Repeat("p", 32)
+	cfg.PhoneCodeHMACKey = strings.Repeat("c", 32)
+	cfg.PhoneVerificationProvider = "sms-vendor"
+
+	if err := cfg.ValidateRuntime(); err != nil {
+		t.Fatalf("ValidateRuntime() error = %v", err)
 	}
 }
 

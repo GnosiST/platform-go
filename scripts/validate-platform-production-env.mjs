@@ -151,6 +151,29 @@ function validatePlatformEnv(env, errors) {
   if (capabilities.includes("demo-data")) {
     errors.push("PLATFORM_CAPABILITIES must not include demo-data in production");
   }
+  if (capabilities.includes("app-phone")) {
+    const phoneKey = requireKey(env, "PLATFORM_PHONE_HMAC_KEY", errors);
+    const codeKey = requireKey(env, "PLATFORM_PHONE_CODE_HMAC_KEY", errors);
+    const provider = requireKey(env, "PLATFORM_PHONE_VERIFICATION_PROVIDER", errors).trim().toLowerCase();
+    if (Buffer.byteLength(phoneKey, "utf8") < 32) {
+      errors.push("PLATFORM_PHONE_HMAC_KEY must be at least 32 bytes");
+    }
+    if (Buffer.byteLength(codeKey, "utf8") < 32) {
+      errors.push("PLATFORM_PHONE_CODE_HMAC_KEY must be at least 32 bytes");
+    }
+    if (phoneKey === codeKey) {
+      errors.push("phone and code HMAC keys must be distinct");
+    }
+    if (provider === "debug") {
+      errors.push("PLATFORM_PHONE_VERIFICATION_PROVIDER must not be debug in production");
+    }
+    if (strictSecrets && isPlaceholderSecret(phoneKey)) {
+      errors.push("PLATFORM_PHONE_HMAC_KEY must not be a placeholder when --strict-secrets is used");
+    }
+    if (strictSecrets && isPlaceholderSecret(codeKey)) {
+      errors.push("PLATFORM_PHONE_CODE_HMAC_KEY must not be a placeholder when --strict-secrets is used");
+    }
+  }
 }
 
 function validateComposeEnv(env, errors) {

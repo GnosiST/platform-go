@@ -18,10 +18,9 @@ import (
 	"platform-go/internal/apps"
 	"platform-go/internal/platform/adminresource"
 	"platform-go/internal/platform/authjwt"
-	"platform-go/internal/platform/bootstrap"
 	"platform-go/internal/platform/cache"
 	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/config"
+	"platform-go/internal/platform/core"
 	"platform-go/internal/platform/session"
 	"platform-go/internal/platform/storage"
 )
@@ -207,6 +206,35 @@ type adminIdentityResolverFunc struct {
 	resolve func(context.Context, AdminIdentityResolveInput) (AdminIdentity, error)
 }
 
+type phoneVerificationSenderTestStub struct {
+	kind string
+	send func(context.Context, string, string, string) error
+}
+
+type phoneProtectorTestStub struct {
+	phoneDigest func(string) (string, error)
+	codeDigest  func(string, string, string) (string, error)
+}
+
+func (p phoneProtectorTestStub) PhoneDigest(phone string) (string, error) {
+	return p.phoneDigest(phone)
+}
+
+func (p phoneProtectorTestStub) CodeDigest(phoneDigest string, purpose string, code string) (string, error) {
+	return p.codeDigest(phoneDigest, purpose, code)
+}
+
+func (s phoneVerificationSenderTestStub) Send(ctx context.Context, phone string, purpose string, code string) error {
+	if s.send == nil {
+		return nil
+	}
+	return s.send(ctx, phone, purpose, code)
+}
+
+func (s phoneVerificationSenderTestStub) Kind() string {
+	return s.kind
+}
+
 func (f adminIdentityResolverFunc) StartAdminIdentity(ctx context.Context, input AdminIdentityStartInput) (AdminIdentityStart, error) {
 	return f.start(ctx, input)
 }
@@ -233,6 +261,12 @@ func (adminIdentityBindingStoreFunc) ValidateAdminIdentityBindingReadiness(conte
 
 func newTestServer(options ServerOptions) *Server {
 	options.AllowInsecureHeaderAuth = true
+	if options.PhoneProtector == nil {
+		options.PhoneProtector = NewHMACPhoneProtector([]byte(strings.Repeat("p", 32)), []byte(strings.Repeat("c", 32)))
+	}
+	if options.PhoneVerificationSender == nil {
+		options.PhoneVerificationSender = NewDebugPhoneVerificationSender()
+	}
 	return New(options)
 }
 
@@ -1986,12 +2020,20 @@ func TestAppPhoneBindingRejectsDuplicatePhoneHash(t *testing.T) {
 
 func TestAppPhoneVerificationRateLimitUsesUserAndPhoneWindow(t *testing.T) {
 	now := time.Date(2026, 7, 6, 9, 0, 0, 0, time.UTC)
+	senderCalls := 0
 	server := newTestServer(ServerOptions{
 		Capabilities: capabilitiesFromConfigForTest(t, []string{
 			"dictionary", "tenant", "identity", "session", "rbac", "audit", "app-phone",
 		}),
 		Now: func() time.Time {
 			return now
+		},
+		PhoneVerificationSender: phoneVerificationSenderTestStub{
+			kind: "sms-vendor",
+			send: func(context.Context, string, string, string) error {
+				senderCalls++
+				return nil
+			},
 		},
 	})
 	login := appLoginForTest(t, server, "guest-alpha")
@@ -2023,6 +2065,9 @@ func TestAppPhoneVerificationRateLimitUsesUserAndPhoneWindow(t *testing.T) {
 	if strings.Contains(limitedRecorder.Body.String(), rawPhone) {
 		t.Fatalf("rate limit response leaked raw phone: %s", limitedRecorder.Body.String())
 	}
+	if senderCalls != appPhoneVerificationRateLimit {
+		t.Fatalf("sender calls after rate limit = %d, want %d", senderCalls, appPhoneVerificationRateLimit)
+	}
 
 	now = now.Add(11 * time.Minute)
 	nextRecorder := httptest.NewRecorder()
@@ -2033,6 +2078,168 @@ func TestAppPhoneVerificationRateLimitUsesUserAndPhoneWindow(t *testing.T) {
 
 	if nextRecorder.Code != http.StatusCreated {
 		t.Fatalf("POST app phone verification after window status = %d body = %s, want 201", nextRecorder.Code, nextRecorder.Body.String())
+	}
+	if senderCalls != appPhoneVerificationRateLimit+1 {
+		t.Fatalf("sender calls after next window = %d, want %d", senderCalls, appPhoneVerificationRateLimit+1)
+	}
+}
+
+func TestAppPhoneVerificationDoesNotCallSenderForRejectedInput(t *testing.T) {
+	senderCalls := 0
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{
+			"dictionary", "tenant", "identity", "session", "rbac", "audit", "app-phone",
+		}),
+		PhoneVerificationSender: phoneVerificationSenderTestStub{
+			kind: "sms-vendor",
+			send: func(context.Context, string, string, string) error {
+				senderCalls++
+				return nil
+			},
+		},
+	})
+	login := appLoginForTest(t, server, "guest-alpha")
+	for _, body := range []string{
+		`{"phone":"invalid","purpose":"bind"}`,
+		`{"phone":"13800138000","purpose":"login"}`,
+	} {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/api/app/identity/phone-verifications", bytes.NewBufferString(body))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+		server.Router().ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusBadRequest {
+			t.Fatalf("POST rejected app phone verification status = %d body = %s, want 400", recorder.Code, recorder.Body.String())
+		}
+	}
+	if senderCalls != 0 {
+		t.Fatalf("sender calls for rejected input = %d, want 0", senderCalls)
+	}
+}
+
+func TestAppPhoneVerificationSenderFailureDoesNotPersistRecord(t *testing.T) {
+	var deliveredPhone string
+	var deliveredCode string
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{
+			"dictionary", "tenant", "identity", "session", "rbac", "audit", "app-phone",
+		}),
+		PhoneVerificationSender: phoneVerificationSenderTestStub{
+			kind: "sms-vendor",
+			send: func(_ context.Context, phone string, _ string, code string) error {
+				deliveredPhone = phone
+				deliveredCode = code
+				return errors.New("delivery unavailable")
+			},
+		},
+	})
+	login := appLoginForTest(t, server, "guest-alpha")
+	rawPhone := "13800138000"
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/app/identity/phone-verifications", bytes.NewBufferString(`{"phone":"`+rawPhone+`","purpose":"bind"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusBadGateway {
+		t.Fatalf("POST failed app phone delivery status = %d body = %s, want 502", recorder.Code, recorder.Body.String())
+	}
+	if deliveredPhone != rawPhone || deliveredCode == "" {
+		t.Fatalf("sender received phone=%q code=%q, want normalized phone and generated code", deliveredPhone, deliveredCode)
+	}
+	if strings.Contains(recorder.Body.String(), rawPhone) || strings.Contains(recorder.Body.String(), deliveredCode) {
+		t.Fatalf("delivery failure response leaked phone or code: %s", recorder.Body.String())
+	}
+	records, err := server.resources.List(appPhoneVerificationsResource)
+	if err != nil {
+		t.Fatalf("List(app-phone-verifications) error = %v", err)
+	}
+	if len(records) != 0 {
+		t.Fatalf("app phone verification records = %+v, want none after delivery failure", records)
+	}
+}
+
+func TestAppPhoneVerificationWithProviderStoresOnlyVersionedDigestsAndOmitsDebugCode(t *testing.T) {
+	var deliveredCode string
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{
+			"dictionary", "tenant", "identity", "session", "rbac", "audit", "app-phone",
+		}),
+		PhoneVerificationSender: phoneVerificationSenderTestStub{
+			kind: "sms-vendor",
+			send: func(_ context.Context, _ string, _ string, code string) error {
+				deliveredCode = code
+				return nil
+			},
+		},
+	})
+	login := appLoginForTest(t, server, "guest-alpha")
+	rawPhone := "138 0013-8000"
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/app/identity/phone-verifications", bytes.NewBufferString(`{"phone":"`+rawPhone+`","purpose":"bind"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("POST provider app phone verification status = %d body = %s, want 201", recorder.Code, recorder.Body.String())
+	}
+	if deliveredCode == "" || strings.Contains(recorder.Body.String(), deliveredCode) || strings.Contains(recorder.Body.String(), "debugCode") {
+		t.Fatalf("provider response leaked debug code field/value: %s", recorder.Body.String())
+	}
+	records, err := server.resources.List(appPhoneVerificationsResource)
+	if err != nil || len(records) != 1 {
+		t.Fatalf("List(app-phone-verifications) records=%+v error=%v, want one", records, err)
+	}
+	values := records[0].Values
+	if values["maskedPhone"] != "138****8000" || !strings.HasPrefix(values["phoneHash"], "v1:hmac-sha256:phone:") || !strings.HasPrefix(values["codeHash"], "v1:hmac-sha256:code:") {
+		t.Fatalf("stored phone verification values = %+v, want masked phone and versioned HMACs", values)
+	}
+	encoded, err := json.Marshal(records)
+	if err != nil {
+		t.Fatalf("marshal verification records: %v", err)
+	}
+	for _, forbidden := range []string{rawPhone, "13800138000", deliveredCode} {
+		if strings.Contains(string(encoded), forbidden) {
+			t.Fatalf("stored verification leaked %q: %s", forbidden, encoded)
+		}
+	}
+}
+
+func TestAppPhoneVerificationProtectionFailureDoesNotCallSenderOrPersist(t *testing.T) {
+	senderCalls := 0
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{
+			"dictionary", "tenant", "identity", "session", "rbac", "audit", "app-phone",
+		}),
+		PhoneProtector: phoneProtectorTestStub{
+			phoneDigest: func(string) (string, error) { return "", errors.New("protection unavailable") },
+			codeDigest:  func(string, string, string) (string, error) { return "", errors.New("unexpected") },
+		},
+		PhoneVerificationSender: phoneVerificationSenderTestStub{
+			kind: "sms-vendor",
+			send: func(context.Context, string, string, string) error {
+				senderCalls++
+				return nil
+			},
+		},
+	})
+	login := appLoginForTest(t, server, "guest-alpha")
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/app/identity/phone-verifications", bytes.NewBufferString(`{"phone":"13800138000","purpose":"bind"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusServiceUnavailable || senderCalls != 0 {
+		t.Fatalf("protection failure status=%d senderCalls=%d body=%s, want 503 and zero calls", recorder.Code, senderCalls, recorder.Body.String())
+	}
+	records, err := server.resources.List(appPhoneVerificationsResource)
+	if err != nil || len(records) != 0 {
+		t.Fatalf("records=%+v error=%v, want none after protection failure", records, err)
 	}
 }
 
@@ -4180,24 +4387,31 @@ func hasAdminResourceAuditRecord(records []adminResourceRecordTest, action strin
 
 func capabilitiesFromConfigForTest(t *testing.T, enabled []string) []capability.Manifest {
 	t.Helper()
-	manifests, err := bootstrap.CapabilitiesFromConfig(configForCapabilities(enabled))
-	if err != nil {
-		t.Fatalf("CapabilitiesFromConfig() error = %v", err)
-	}
-	return manifests
+	return resolvedCapabilitiesForTest(t, enabled, nil)
 }
 
 func capabilitiesFromConfigWithAppsForTest(t *testing.T, enabled []string) []capability.Manifest {
 	t.Helper()
-	manifests, err := bootstrap.CapabilitiesFromConfig(configForCapabilities(enabled), apps.DefaultManifests()...)
-	if err != nil {
-		t.Fatalf("CapabilitiesFromConfig() with apps error = %v", err)
-	}
-	return manifests
+	return resolvedCapabilitiesForTest(t, enabled, apps.DefaultManifests())
 }
 
-func configForCapabilities(enabled []string) config.Config {
-	return config.Config{Capabilities: enabled}
+func resolvedCapabilitiesForTest(t *testing.T, enabled []string, additional []capability.Manifest) []capability.Manifest {
+	t.Helper()
+	registry := capability.NewRegistry()
+	for _, manifest := range append(core.DefaultManifests(), additional...) {
+		if err := registry.Register(manifest); err != nil {
+			t.Fatalf("Register(%s) error = %v", manifest.ID, err)
+		}
+	}
+	ids := make([]capability.ID, 0, len(enabled))
+	for _, id := range enabled {
+		ids = append(ids, capability.ID(id))
+	}
+	manifests, err := registry.ResolveEnabled(ids)
+	if err != nil {
+		t.Fatalf("ResolveEnabled() error = %v", err)
+	}
+	return manifests
 }
 
 func configuredWechatPlatformManifests(t *testing.T) []capability.Manifest {

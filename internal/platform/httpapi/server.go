@@ -43,6 +43,8 @@ type ServerOptions struct {
 	AdminIdentityBindings   AdminIdentityBindingStore
 	AppIdentityResolver     AppIdentityResolver
 	AppIdentityBindings     AppIdentityBindingStore
+	PhoneProtector          PhoneProtector
+	PhoneVerificationSender PhoneVerificationSender
 	SessionTTL              time.Duration
 	JWTSecret               string
 	OpenAPIDocument         []byte
@@ -72,6 +74,8 @@ type Server struct {
 	adminIdentityBindings   AdminIdentityBindingStore
 	appIdentityResolver     AppIdentityResolver
 	appIdentityBindings     AppIdentityBindingStore
+	phoneProtector          PhoneProtector
+	phoneVerificationSender PhoneVerificationSender
 	tokens                  *authjwt.Service
 	now                     func() time.Time
 	openAPIDocument         []byte
@@ -162,6 +166,8 @@ func New(options ServerOptions) *Server {
 		adminIdentityBindings:   adminIdentityBindings,
 		appIdentityResolver:     options.AppIdentityResolver,
 		appIdentityBindings:     appIdentityBindings,
+		phoneProtector:          options.PhoneProtector,
+		phoneVerificationSender: options.PhoneVerificationSender,
 		tokens:                  tokens,
 		now:                     now,
 		openAPIDocument:         append([]byte(nil), options.OpenAPIDocument...),

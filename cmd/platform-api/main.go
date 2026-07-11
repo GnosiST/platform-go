@@ -62,6 +62,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("load openapi document: %v", err)
 	}
+	phoneVerification, err := bootstrap.PhoneVerificationRuntimeFromConfig(cfg, nil)
+	if err != nil {
+		log.Fatalf("build phone verification runtime: %v", err)
+	}
 	server := httpapi.New(httpapi.ServerOptions{
 		Capabilities:            ordered,
 		Resources:               resources,
@@ -75,6 +79,8 @@ func main() {
 		AdminIdentityResolver:   adminIdentityResolver,
 		AdminIdentityBindings:   adminIdentityBindings,
 		AppIdentityResolver:     appIdentityResolver,
+		PhoneProtector:          phoneVerification.Protector,
+		PhoneVerificationSender: phoneVerification.Sender,
 		JWTSecret:               cfg.JWTSecret,
 		OpenAPIDocument:         openAPIDocument,
 		DisableDemoAuthProvider: cfg.DisableDemoAuthProvider,

@@ -52,6 +52,9 @@ type Config struct {
 	AdminOIDCRedirectURL              string
 	AdminOIDCScopes                   []string
 	DisableDemoAuthProvider           bool
+	PhoneHMACKey                      string
+	PhoneCodeHMACKey                  string
+	PhoneVerificationProvider         string
 }
 
 var defaultCapabilities = []string{
@@ -122,6 +125,9 @@ func Load() Config {
 		AdminOIDCRedirectURL:              env("PLATFORM_ADMIN_OIDC_REDIRECT_URL", ""),
 		AdminOIDCScopes:                   csvEnv("PLATFORM_ADMIN_OIDC_SCOPES", []string{"openid", "profile", "email"}),
 		DisableDemoAuthProvider:           boolEnv("PLATFORM_DISABLE_DEMO_AUTH_PROVIDER", false),
+		PhoneHMACKey:                      env("PLATFORM_PHONE_HMAC_KEY", ""),
+		PhoneCodeHMACKey:                  env("PLATFORM_PHONE_CODE_HMAC_KEY", ""),
+		PhoneVerificationProvider:         strings.ToLower(env("PLATFORM_PHONE_VERIFICATION_PROVIDER", "")),
 	}
 }
 
@@ -184,12 +190,41 @@ func (c Config) ValidateRuntime() error {
 		errs = append(errs, errors.New("wechat miniapp app id and secret must be configured together"))
 	}
 	errs = append(errs, c.validateAdminOIDC(environment)...)
+	errs = append(errs, c.validateAppPhone(environment)...)
 
 	if environment == RuntimeEnvironmentProduction {
 		errs = append(errs, c.validateProductionRuntime()...)
 	}
 
 	return errors.Join(errs...)
+}
+
+func (c Config) validateAppPhone(environment string) []error {
+	if !hasCapability(c.Capabilities, "app-phone") {
+		return nil
+	}
+	var errs []error
+	prefix := "app-phone"
+	if environment == RuntimeEnvironmentProduction {
+		prefix = "production app-phone"
+	}
+	if len([]byte(c.PhoneHMACKey)) < 32 {
+		errs = append(errs, fmt.Errorf("%s requires PLATFORM_PHONE_HMAC_KEY to be at least 32 bytes", prefix))
+	}
+	if len([]byte(c.PhoneCodeHMACKey)) < 32 {
+		errs = append(errs, fmt.Errorf("%s requires PLATFORM_PHONE_CODE_HMAC_KEY to be at least 32 bytes", prefix))
+	}
+	if c.PhoneHMACKey == c.PhoneCodeHMACKey {
+		errs = append(errs, fmt.Errorf("%s requires distinct phone and code HMAC keys", prefix))
+	}
+	provider := strings.ToLower(strings.TrimSpace(c.PhoneVerificationProvider))
+	if provider == "" {
+		errs = append(errs, fmt.Errorf("%s requires PLATFORM_PHONE_VERIFICATION_PROVIDER", prefix))
+	}
+	if provider == "debug" && environment != RuntimeEnvironmentDevelopment && environment != RuntimeEnvironmentTest {
+		errs = append(errs, errors.New("app-phone debug provider is allowed only in development or test"))
+	}
+	return errs
 }
 
 func (c Config) validateProductionRuntime() []error {

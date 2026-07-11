@@ -2,9 +2,7 @@ package httpapi
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -36,7 +34,7 @@ type appPhoneVerificationResponse struct {
 	MaskedPhone string    `json:"maskedPhone"`
 	Purpose     string    `json:"purpose"`
 	ExpiresAt   time.Time `json:"expiresAt"`
-	DebugCode   string    `json:"debugCode"`
+	DebugCode   string    `json:"debugCode,omitempty"`
 }
 
 type appPhoneBindingRequest struct {
@@ -75,32 +73,48 @@ func (s *Server) appPhoneCreateVerification(ctx *gin.Context) {
 		writeAuthError(ctx, http.StatusBadRequest, "APP_PHONE_PURPOSE_UNSUPPORTED", "app phone purpose is unsupported")
 		return
 	}
-	debugCode, err := newAppPhoneDebugCode()
+	if s.phoneProtector == nil || s.phoneVerificationSender == nil {
+		writeAuthError(ctx, http.StatusServiceUnavailable, "APP_PHONE_VERIFICATION_UNAVAILABLE", "app phone verification is unavailable")
+		return
+	}
+	phoneDigest, err := s.phoneProtector.PhoneDigest(phone)
+	if err != nil {
+		writeAuthError(ctx, http.StatusServiceUnavailable, "APP_PHONE_VERIFICATION_UNAVAILABLE", "app phone verification is unavailable")
+		return
+	}
+	now := s.now().UTC()
+	expiresAt := now.Add(appPhoneVerificationTTL)
+	username := appUsername(appSession.Username)
+	maskedPhone := maskAppPhone(phone)
+	if s.appPhoneVerificationRateLimited(username, phoneDigest, purpose, now) {
+		writeAuthError(ctx, http.StatusTooManyRequests, "APP_PHONE_VERIFICATION_RATE_LIMITED", "app phone verification rate limited")
+		return
+	}
+	verificationCode, err := newAppPhoneDebugCode()
 	if err != nil {
 		writeAuthError(ctx, http.StatusInternalServerError, "APP_PHONE_CODE_GENERATION_FAILED", "app phone code generation failed")
 		return
 	}
-
-	now := s.now().UTC()
-	expiresAt := now.Add(appPhoneVerificationTTL)
-	username := appUsername(appSession.Username)
-	phoneHash := appPhoneHash(phone)
-	maskedPhone := maskAppPhone(phone)
-	if s.appPhoneVerificationRateLimited(username, phoneHash, purpose, now) {
-		writeAuthError(ctx, http.StatusTooManyRequests, "APP_PHONE_VERIFICATION_RATE_LIMITED", "app phone verification rate limited")
+	codeDigest, err := s.phoneProtector.CodeDigest(phoneDigest, purpose, verificationCode)
+	if err != nil {
+		writeAuthError(ctx, http.StatusServiceUnavailable, "APP_PHONE_VERIFICATION_UNAVAILABLE", "app phone verification is unavailable")
+		return
+	}
+	if err := s.phoneVerificationSender.Send(ctx.Request.Context(), phone, purpose, verificationCode); err != nil {
+		writeAuthError(ctx, http.StatusBadGateway, "APP_PHONE_VERIFICATION_DELIVERY_FAILED", "app phone verification delivery failed")
 		return
 	}
 	record, err := s.resources.CreateInternal(appPhoneVerificationsResource, adminresource.WriteInput{
-		Code:        "phone-verification-" + phoneHash[:12] + "-" + fmt.Sprintf("%d", now.UnixNano()),
+		Code:        "phone-verification-" + phoneDigestTag(phoneDigest) + "-" + fmt.Sprintf("%d", now.UnixNano()),
 		Name:        "Phone verification / " + username,
 		Status:      "pending",
 		Description: "App phone verification managed by platform auth.",
 		Values: map[string]string{
 			"appUsername": username,
 			"maskedPhone": maskedPhone,
-			"phoneHash":   phoneHash,
+			"phoneHash":   phoneDigest,
 			"purpose":     purpose,
-			"codeHash":    appPhoneCodeHash(phoneHash, purpose, debugCode),
+			"codeHash":    codeDigest,
 			"requestedAt": now.Format(time.RFC3339),
 			"expiresAt":   expiresAt.Format(time.RFC3339),
 		},
@@ -109,14 +123,17 @@ func (s *Server) appPhoneCreateVerification(ctx *gin.Context) {
 		writeAuthError(ctx, http.StatusInternalServerError, "APP_PHONE_VERIFICATION_CREATE_FAILED", "app phone verification create failed")
 		return
 	}
+	response := appPhoneVerificationResponse{
+		ID:          record.ID,
+		MaskedPhone: maskedPhone,
+		Purpose:     purpose,
+		ExpiresAt:   expiresAt,
+	}
+	if normalizedPhoneVerificationProvider(s.phoneVerificationSender.Kind()) == PhoneVerificationProviderDebug {
+		response.DebugCode = verificationCode
+	}
 	ctx.JSON(http.StatusCreated, Response[appPhoneVerificationResponse]{
-		Data: appPhoneVerificationResponse{
-			ID:          record.ID,
-			MaskedPhone: maskedPhone,
-			Purpose:     purpose,
-			ExpiresAt:   expiresAt,
-			DebugCode:   debugCode,
-		},
+		Data: response,
 	})
 }
 
@@ -142,29 +159,42 @@ func (s *Server) appPhoneCreateBinding(ctx *gin.Context) {
 		return
 	}
 
+	if s.phoneProtector == nil {
+		writeAuthError(ctx, http.StatusServiceUnavailable, "APP_PHONE_VERIFICATION_UNAVAILABLE", "app phone verification is unavailable")
+		return
+	}
+	phoneDigest, err := s.phoneProtector.PhoneDigest(phone)
+	if err != nil {
+		writeAuthError(ctx, http.StatusServiceUnavailable, "APP_PHONE_VERIFICATION_UNAVAILABLE", "app phone verification is unavailable")
+		return
+	}
+	codeDigest, err := s.phoneProtector.CodeDigest(phoneDigest, appPhoneVerificationPurpose, code)
+	if err != nil {
+		writeAuthError(ctx, http.StatusServiceUnavailable, "APP_PHONE_VERIFICATION_UNAVAILABLE", "app phone verification is unavailable")
+		return
+	}
 	username := appUsername(appSession.Username)
-	phoneHash := appPhoneHash(phone)
 	maskedPhone := maskAppPhone(phone)
-	if s.appPhoneBindingExists(phoneHash) {
+	if s.appPhoneBindingExists(phoneDigest) {
 		writeAuthError(ctx, http.StatusConflict, "APP_PHONE_ALREADY_BOUND", "app phone is already bound")
 		return
 	}
 	now := s.now().UTC()
-	verification, ok := s.validAppPhoneVerification(username, phoneHash, appPhoneVerificationPurpose, code, now)
+	verification, ok := s.validAppPhoneVerification(username, phoneDigest, appPhoneVerificationPurpose, codeDigest, now)
 	if !ok {
 		writeAuthError(ctx, http.StatusBadRequest, "APP_PHONE_VERIFICATION_INVALID", "app phone verification is invalid")
 		return
 	}
 
 	record, err := s.resources.CreateInternal(appPhoneBindingsResource, adminresource.WriteInput{
-		Code:        "phone-binding-" + phoneHash[:12],
+		Code:        "phone-binding-" + phoneDigestTag(phoneDigest),
 		Name:        "Phone binding / " + username,
 		Status:      "enabled",
 		Description: "App phone binding managed by platform auth.",
 		Values: map[string]string{
 			"appUsername":    username,
 			"maskedPhone":    maskedPhone,
-			"phoneHash":      phoneHash,
+			"phoneHash":      phoneDigest,
 			"boundAt":        now.Format(time.RFC3339),
 			"verificationId": verification.ID,
 		},
@@ -233,12 +263,11 @@ func (s *Server) appPhoneVerificationRateLimited(username string, phoneHash stri
 	return false
 }
 
-func (s *Server) validAppPhoneVerification(username string, phoneHash string, purpose string, code string, now time.Time) (adminresource.Record, bool) {
+func (s *Server) validAppPhoneVerification(username string, phoneHash string, purpose string, codeDigest string, now time.Time) (adminresource.Record, bool) {
 	records, err := s.resources.List(appPhoneVerificationsResource)
 	if err != nil {
 		return adminresource.Record{}, false
 	}
-	expectedHash := appPhoneCodeHash(phoneHash, purpose, code)
 	for index := len(records) - 1; index >= 0; index-- {
 		record := records[index]
 		if record.Status != "pending" || record.Values["appUsername"] != username || record.Values["phoneHash"] != phoneHash || record.Values["purpose"] != purpose {
@@ -248,7 +277,7 @@ func (s *Server) validAppPhoneVerification(username string, phoneHash string, pu
 		if err != nil || !expiresAt.After(now) {
 			continue
 		}
-		if subtle.ConstantTimeCompare([]byte(record.Values["codeHash"]), []byte(expectedHash)) != 1 {
+		if subtle.ConstantTimeCompare([]byte(record.Values["codeHash"]), []byte(codeDigest)) != 1 {
 			continue
 		}
 		return record, true
@@ -295,21 +324,6 @@ func normalizeAppPhone(raw string) (string, bool) {
 	return phone, true
 }
 
-func appPhoneHash(phone string) string {
-	sum := sha256.Sum256([]byte("app-phone\x00" + phone))
-	return hex.EncodeToString(sum[:])
-}
-
-func appPhoneCodeHash(phoneHash string, purpose string, code string) string {
-	sum := sha256.Sum256([]byte(strings.Join([]string{
-		"app-phone-code",
-		phoneHash,
-		strings.TrimSpace(purpose),
-		strings.TrimSpace(code),
-	}, "\x00")))
-	return hex.EncodeToString(sum[:])
-}
-
 func maskAppPhone(phone string) string {
 	value := []rune(strings.TrimSpace(phone))
 	if len(value) == 0 {
@@ -319,6 +333,18 @@ func maskAppPhone(phone string) string {
 		return string(value[:1]) + "***" + string(value[len(value)-1:])
 	}
 	return string(value[:3]) + "****" + string(value[len(value)-4:])
+}
+
+func normalizedPhoneVerificationProvider(provider string) string {
+	return strings.ToLower(strings.TrimSpace(provider))
+}
+
+func phoneDigestTag(digest string) string {
+	digest = strings.TrimSpace(digest)
+	if len(digest) <= 12 {
+		return digest
+	}
+	return digest[len(digest)-12:]
 }
 
 func newAppPhoneDebugCode() (string, error) {
