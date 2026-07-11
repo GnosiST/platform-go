@@ -20,6 +20,8 @@ import (
 
 const bindAdminOIDCCommand = "bind-admin-oidc"
 
+type adminResourcesLoader func(config.Config, []capability.Manifest) (*adminresource.Store, error)
+
 func main() {
 	if err := run(context.Background(), os.Args[1:], os.Stdin, os.Stdout, os.Stderr, config.Load); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
@@ -28,12 +30,16 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, loadConfig func() config.Config) error {
+	return runWithAdminResources(ctx, args, stdin, stdout, stderr, loadConfig, bootstrap.AdminResourcesFromConfig)
+}
+
+func runWithAdminResources(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, loadConfig func() config.Config, loadAdminResources adminResourcesLoader) error {
 	if len(args) == 0 || args[0] != bindAdminOIDCCommand {
 		return errors.New("expected bind-admin-oidc command")
 	}
 
 	flags := flag.NewFlagSet(bindAdminOIDCCommand, flag.ContinueOnError)
-	flags.SetOutput(stderr)
+	flags.SetOutput(io.Discard)
 	providerID := flags.String("provider", "", "configured Admin OIDC provider ID")
 	issuer := flags.String("issuer", "", "configured OIDC issuer")
 	username := flags.String("username", "", "existing platform username")
@@ -53,6 +59,9 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	if loadConfig == nil {
 		return errors.New("platform configuration is unavailable")
 	}
+	if loadAdminResources == nil {
+		return errors.New("persistent Admin resource storage is unavailable")
+	}
 
 	cfg := loadConfig()
 	if err := cfg.ValidateRuntime(); err != nil {
@@ -71,7 +80,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		return errors.New("configured Admin OIDC provider is unavailable")
 	}
 
-	resources, err := bootstrap.AdminResourcesFromConfig(cfg, manifests)
+	resources, err := loadAdminResources(cfg, manifests)
 	if err != nil {
 		return fmt.Errorf("open persistent Admin resource store: %w", err)
 	}
@@ -92,9 +101,14 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		Username:        *username,
 	})
 	if err != nil {
+		if binding.RecordID != "" {
+			if auditErr := recordBindingProvisionAudit(ctx, resources, binding.RecordID, provider.ID, "", adminresource.AdminIdentityBindingAuditOutcomeConflict); auditErr != nil {
+				return errors.New("record Admin OIDC binding conflict audit")
+			}
+		}
 		return errors.New("Admin OIDC binding provisioning was rejected")
 	}
-	if err := recordBindingProvisionAudit(resources, provider.ID, binding.Username); err != nil {
+	if err := recordBindingProvisionAudit(ctx, resources, binding.RecordID, provider.ID, binding.Username, adminresource.AdminIdentityBindingAuditOutcomeBound); err != nil {
 		return errors.New("record Admin OIDC binding provisioning audit")
 	}
 	_, err = fmt.Fprintf(stdout, "provider=%s username=%s\n", provider.ID, binding.Username)
@@ -113,23 +127,13 @@ func findAdminOIDCProvider(manifests []capability.Manifest, providerID string) (
 	return capability.AuthProvider{}, false
 }
 
-func recordBindingProvisionAudit(resources *adminresource.Store, providerID string, username string) error {
-	values := map[string]string{
-		"action":    "admin_identity.bind",
-		"resource":  "admin-identities",
-		"provider":  strings.TrimSpace(providerID),
-		"outcome":   "bound",
-		"createdAt": time.Now().UTC().Format(time.RFC3339),
-	}
-	if strings.TrimSpace(username) != "" {
-		values["actor"] = strings.TrimSpace(username)
-	}
-	_, err := resources.Create("audit-logs", adminresource.WriteInput{
-		Code:        "admin_identity.bind",
-		Name:        "Admin OIDC Binding Provisioned",
-		Status:      "recorded",
-		Description: "Admin OIDC identity binding provisioning event.",
-		Values:      values,
+func recordBindingProvisionAudit(ctx context.Context, resources *adminresource.Store, bindingRecordID string, providerID string, username string, outcome string) error {
+	_, err := resources.EnsureAdminIdentityBindingAudit(ctx, adminresource.AdminIdentityBindingAuditInput{
+		BindingRecordID: bindingRecordID,
+		Provider:        providerID,
+		Username:        username,
+		Outcome:         outcome,
+		Now:             time.Now(),
 	})
 	if errors.Is(err, adminresource.ErrUnknownResource) {
 		return nil

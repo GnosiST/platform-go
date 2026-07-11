@@ -24,6 +24,9 @@ const (
 	adminIdentityBindingUsernameField    = "platformUsername"
 	adminIdentityBindingCreatedAtField   = "createdAt"
 	adminIdentityBindingLastLoginAtField = "lastLoginAt"
+
+	AdminIdentityBindingAuditOutcomeBound    = "bound"
+	AdminIdentityBindingAuditOutcomeConflict = "conflict"
 )
 
 type AdminIdentityBindingKey struct {
@@ -42,6 +45,20 @@ type AdminIdentityBindingProvisionInput struct {
 	Key              AdminIdentityBindingKey
 	PlatformUsername string
 	Now              time.Time
+}
+
+type AdminIdentityBindingProvisionResult struct {
+	RecordID         string
+	PlatformUsername string
+	Created          bool
+}
+
+type AdminIdentityBindingAuditInput struct {
+	BindingRecordID string
+	Provider        string
+	Username        string
+	Outcome         string
+	Now             time.Time
 }
 
 func (s *Store) ResolveAdminIdentityBinding(ctx context.Context, input AdminIdentityBindingResolveInput) (string, error) {
@@ -95,17 +112,17 @@ func (s *Store) ResolveAdminIdentityBinding(ctx context.Context, input AdminIden
 	return "", ErrRevisionConflict
 }
 
-func (s *Store) ProvisionAdminIdentityBinding(ctx context.Context, input AdminIdentityBindingProvisionInput) (string, error) {
+func (s *Store) ProvisionAdminIdentityBinding(ctx context.Context, input AdminIdentityBindingProvisionInput) (AdminIdentityBindingProvisionResult, error) {
 	if s == nil {
-		return "", ErrAdminIdentityBindingInvalid
+		return AdminIdentityBindingProvisionResult{}, ErrAdminIdentityBindingInvalid
 	}
 	if err := ctx.Err(); err != nil {
-		return "", err
+		return AdminIdentityBindingProvisionResult{}, err
 	}
 	key, ok := normalizeAdminIdentityBindingKey(input.Key)
 	username := strings.TrimSpace(input.PlatformUsername)
 	if !ok || username == "" {
-		return "", ErrAdminIdentityBindingInvalid
+		return AdminIdentityBindingProvisionResult{}, ErrAdminIdentityBindingInvalid
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -114,23 +131,26 @@ func (s *Store) ProvisionAdminIdentityBinding(ctx context.Context, input AdminId
 			if errors.Is(err, ErrRevisionConflict) {
 				continue
 			}
-			return "", err
-		}
-		previous := s.snapshotLocked()
-		if _, err := s.validateAdminPrincipalLocked(username); err != nil {
-			return "", ErrAdminIdentityBindingInvalid
+			return AdminIdentityBindingProvisionResult{}, err
 		}
 		matches, conflict, err := s.adminIdentityBindingMatchesLocked(key)
 		if err != nil || conflict || len(matches) > 1 {
-			return "", ErrAdminIdentityBindingInvalid
+			return AdminIdentityBindingProvisionResult{}, ErrAdminIdentityBindingInvalid
 		}
 		if len(matches) == 1 {
 			record := s.resources[adminIdentitiesResource][matches[0]]
 			if strings.TrimSpace(record.Status) == adminIdentityBindingEnabledStatus && strings.TrimSpace(record.Values[adminIdentityBindingUsernameField]) == username {
-				return username, nil
+				if _, err := s.validateAdminPrincipalLocked(username); err != nil {
+					return AdminIdentityBindingProvisionResult{}, ErrAdminIdentityBindingInvalid
+				}
+				return AdminIdentityBindingProvisionResult{RecordID: record.ID, PlatformUsername: username}, nil
 			}
-			return "", ErrAdminIdentityBindingInvalid
+			return AdminIdentityBindingProvisionResult{RecordID: record.ID}, ErrAdminIdentityBindingInvalid
 		}
+		if _, err := s.validateAdminPrincipalLocked(username); err != nil {
+			return AdminIdentityBindingProvisionResult{}, ErrAdminIdentityBindingInvalid
+		}
+		previous := s.snapshotLocked()
 		now := input.Now
 		if now.IsZero() {
 			now = s.now()
@@ -149,7 +169,7 @@ func (s *Store) ProvisionAdminIdentityBinding(ctx context.Context, input AdminId
 			Code: key.Provider + "-" + key.ProviderSubjectHash[:12], Name: adminIdentityBindingManagedName, Status: adminIdentityBindingEnabledStatus, Values: values,
 		})
 		if err != nil {
-			return "", err
+			return AdminIdentityBindingProvisionResult{}, err
 		}
 		s.nextID++
 		record.ID = fmt.Sprintf("%s-%d", adminIdentitiesResource, s.nextID)
@@ -159,11 +179,140 @@ func (s *Store) ProvisionAdminIdentityBinding(ctx context.Context, input AdminId
 			if errors.Is(err, ErrRevisionConflict) {
 				continue
 			}
-			return "", err
+			return AdminIdentityBindingProvisionResult{}, err
 		}
-		return username, nil
+		return AdminIdentityBindingProvisionResult{RecordID: record.ID, PlatformUsername: username, Created: true}, nil
 	}
-	return "", ErrRevisionConflict
+	return AdminIdentityBindingProvisionResult{}, ErrRevisionConflict
+}
+
+func (s *Store) EnsureAdminIdentityBindingAudit(ctx context.Context, input AdminIdentityBindingAuditInput) (Record, error) {
+	if s == nil {
+		return Record{}, ErrInvalidRecord
+	}
+	if err := ctx.Err(); err != nil {
+		return Record{}, err
+	}
+	input.BindingRecordID = strings.TrimSpace(input.BindingRecordID)
+	input.Provider = strings.TrimSpace(input.Provider)
+	input.Username = strings.TrimSpace(input.Username)
+	input.Outcome = strings.TrimSpace(input.Outcome)
+	if input.BindingRecordID == "" || input.Provider == "" || (input.Outcome != AdminIdentityBindingAuditOutcomeBound && input.Outcome != AdminIdentityBindingAuditOutcomeConflict) {
+		return Record{}, ErrInvalidRecord
+	}
+	if input.Outcome == AdminIdentityBindingAuditOutcomeBound && input.Username == "" {
+		return Record{}, ErrInvalidRecord
+	}
+	if input.Outcome == AdminIdentityBindingAuditOutcomeConflict && input.Username != "" {
+		return Record{}, ErrInvalidRecord
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for attempt := 0; attempt < adminIdentityMutationMaxAttempts; attempt++ {
+		if err := s.reloadContextLocked(ctx); err != nil {
+			if errors.Is(err, ErrRevisionConflict) {
+				continue
+			}
+			return Record{}, err
+		}
+		previous := s.snapshotLocked()
+		binding, ok := findRecordByID(s.resources[adminIdentitiesResource], input.BindingRecordID)
+		if !ok || strings.TrimSpace(binding.Status) != adminIdentityBindingEnabledStatus || strings.TrimSpace(binding.Values[adminIdentityBindingProviderField]) != input.Provider {
+			return Record{}, ErrInvalidRecord
+		}
+		if input.Outcome == AdminIdentityBindingAuditOutcomeBound && strings.TrimSpace(binding.Values[adminIdentityBindingUsernameField]) != input.Username {
+			return Record{}, ErrInvalidRecord
+		}
+		code := "admin_identity.bind." + input.Outcome + "." + input.BindingRecordID
+		values := map[string]string{
+			"action":    "admin_identity.bind",
+			"resource":  adminIdentitiesResource,
+			"targetId":  input.BindingRecordID,
+			"provider":  input.Provider,
+			"outcome":   input.Outcome,
+			"createdAt": resolveAdminIdentityAuditNow(input.Now, s.now).Format(time.RFC3339),
+		}
+		name := "Admin OIDC Binding Conflict"
+		if input.Outcome == AdminIdentityBindingAuditOutcomeBound {
+			values["actor"] = input.Username
+			name = "Admin OIDC Binding Provisioned"
+		}
+		audits, auditResourceAvailable := s.resources["audit-logs"]
+		if !auditResourceAvailable {
+			return Record{}, ErrUnknownResource
+		}
+		if existing, ok, err := matchingAdminIdentityAudit(audits, code, values); err != nil {
+			return Record{}, err
+		} else if ok {
+			return cloneRecord(existing), nil
+		}
+		record, err := s.recordFromInput("audit-logs", "", WriteInput{
+			Code: code, Name: name, Status: "recorded", Description: "Admin OIDC identity binding provisioning event.", Values: values,
+		})
+		if err != nil {
+			return Record{}, err
+		}
+		s.nextID++
+		record.ID = fmt.Sprintf("audit-logs-%d", s.nextID)
+		s.resources["audit-logs"] = append(s.resources["audit-logs"], record)
+		if err := s.persistContextLocked(ctx); err != nil {
+			s.restoreSnapshotLocked(previous)
+			if errors.Is(err, ErrRevisionConflict) {
+				continue
+			}
+			return Record{}, err
+		}
+		return cloneRecord(record), nil
+	}
+	return Record{}, ErrRevisionConflict
+}
+
+func findRecordByID(records []Record, id string) (Record, bool) {
+	for _, record := range records {
+		if record.ID == id {
+			return record, true
+		}
+	}
+	return Record{}, false
+}
+
+func resolveAdminIdentityAuditNow(value time.Time, now func() time.Time) time.Time {
+	if !value.IsZero() {
+		return value.UTC()
+	}
+	if now != nil {
+		return now().UTC()
+	}
+	return time.Now().UTC()
+}
+
+func matchingAdminIdentityAudit(records []Record, code string, expected map[string]string) (Record, bool, error) {
+	var matched *Record
+	for index := range records {
+		if records[index].Code != code {
+			continue
+		}
+		if matched != nil {
+			return Record{}, false, ErrInvalidRecord
+		}
+		matched = &records[index]
+	}
+	if matched == nil {
+		return Record{}, false, nil
+	}
+	for _, key := range []string{"action", "resource", "targetId", "provider", "outcome", "actor"} {
+		if strings.TrimSpace(matched.Values[key]) != strings.TrimSpace(expected[key]) {
+			return Record{}, false, ErrInvalidRecord
+		}
+	}
+	for key := range matched.Values {
+		normalized := strings.ToLower(strings.TrimSpace(key))
+		if strings.Contains(normalized, "issuer") || strings.Contains(normalized, "subject") || strings.Contains(normalized, "hash") {
+			return Record{}, false, ErrInvalidRecord
+		}
+	}
+	return *matched, true, nil
 }
 
 func (s *Store) ValidateAdminIdentityBindingReadiness(ctx context.Context, provider string, providerKind string) error {

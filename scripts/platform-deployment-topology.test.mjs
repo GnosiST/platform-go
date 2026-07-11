@@ -105,6 +105,21 @@ describe("validate-platform-deployment-topology", () => {
     assert.match(result.stderr, /deploymentPackage\.dockerTargets\.api must stay api/);
   });
 
+  it("rejects deployment contracts that do not require the Admin operator CLI in the API image", () => {
+    const contract = readJSON("resources/platform-deployment-topology.json");
+    contract.deploymentPackage.requiredSourceSnippets = contract.deploymentPackage.requiredSourceSnippets.filter(
+      (item) => !item.contains.includes("platform-admin") && !item.contains.includes('ENTRYPOINT ["platform-api"]'),
+    );
+    const contractPath = tempJSON("platform-deployment-topology.json", contract);
+
+    const result = runValidator(["--contract", contractPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /deploymentPackage\.requiredSourceSnippets must require building \/out\/platform-admin/);
+    assert.match(result.stderr, /deploymentPackage\.requiredSourceSnippets must require copying \/app\/platform-admin/);
+    assert.match(result.stderr, /deploymentPackage\.requiredSourceSnippets must preserve platform-api as the default entrypoint/);
+  });
+
   it("rejects deployment contracts that drop the Vercel admin-only adapter template", () => {
     const contract = readJSON("resources/platform-deployment-topology.json");
     contract.vercelPolicy.admin.adapterTemplate = "missing.vercel.json";

@@ -186,6 +186,18 @@
         "contains": "COPY resources/generated/openapi.admin.json"
       },
       {
+        "path": "Dockerfile",
+        "contains": "go build -trimpath -ldflags=\"-s -w\" -o /out/platform-admin ./cmd/platform-admin"
+      },
+      {
+        "path": "Dockerfile",
+        "contains": "COPY --from=api-builder /out/platform-admin /app/platform-admin"
+      },
+      {
+        "path": "Dockerfile",
+        "contains": "ENTRYPOINT [\"platform-api\"]"
+      },
+      {
         "path": "deploy/compose/docker-compose.prod.yml",
         "contains": "target: api"
       },

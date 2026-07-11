@@ -63,6 +63,8 @@ type AdminIdentityBindingInput struct {
 
 type AdminIdentityBinding struct {
 	Username string
+	RecordID string
+	Created  bool
 }
 
 type AdminIdentityProvisionInput struct {
@@ -113,7 +115,7 @@ func (s *resourceAdminIdentityBindingStore) ProvisionAdminIdentityBinding(ctx co
 	if !ok || username == "" || s.resources == nil {
 		return AdminIdentityBinding{}, ErrAdminIdentityBindingInvalid
 	}
-	resolvedUsername, err := s.resources.ProvisionAdminIdentityBinding(ctx, adminresource.AdminIdentityBindingProvisionInput{
+	result, err := s.resources.ProvisionAdminIdentityBinding(ctx, adminresource.AdminIdentityBindingProvisionInput{
 		Key: adminresource.AdminIdentityBindingKey{
 			Provider: provider.ID, ProviderKind: provider.Kind, IssuerHash: adminIssuerHash(issuer), ProviderSubjectHash: adminProviderSubjectHash(provider, issuer, subject),
 		},
@@ -121,9 +123,9 @@ func (s *resourceAdminIdentityBindingStore) ProvisionAdminIdentityBinding(ctx co
 		Now:              s.resolveNow(input.Now),
 	})
 	if err != nil {
-		return AdminIdentityBinding{}, normalizeAdminIdentityBindingStoreError(err)
+		return AdminIdentityBinding{RecordID: result.RecordID}, normalizeAdminIdentityBindingStoreError(err)
 	}
-	return AdminIdentityBinding{Username: resolvedUsername}, nil
+	return AdminIdentityBinding{Username: result.PlatformUsername, RecordID: result.RecordID, Created: result.Created}, nil
 }
 
 func (s *resourceAdminIdentityBindingStore) ValidateAdminIdentityBindingReadiness(ctx context.Context, provider capability.AuthProvider) error {

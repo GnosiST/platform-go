@@ -286,6 +286,25 @@ function validateDeploymentPackage(contract, errors) {
   if (deploymentPackage.dockerTargets?.admin !== "admin-static") {
     errors.push("deploymentPackage.dockerTargets.admin must stay admin-static");
   }
+  const requiredOperatorSnippets = [
+    {
+      contains: 'go build -trimpath -ldflags="-s -w" -o /out/platform-admin ./cmd/platform-admin',
+      error: "deploymentPackage.requiredSourceSnippets must require building /out/platform-admin",
+    },
+    {
+      contains: "COPY --from=api-builder /out/platform-admin /app/platform-admin",
+      error: "deploymentPackage.requiredSourceSnippets must require copying /app/platform-admin",
+    },
+    {
+      contains: 'ENTRYPOINT ["platform-api"]',
+      error: "deploymentPackage.requiredSourceSnippets must preserve platform-api as the default entrypoint",
+    },
+  ];
+  for (const required of requiredOperatorSnippets) {
+    if (!values(deploymentPackage.requiredSourceSnippets).some((snippet) => snippet.path === "Dockerfile" && snippet.contains === required.contains)) {
+      errors.push(required.error);
+    }
+  }
   if (deploymentPackage.sameOrigin?.apiProxy !== "/api/") {
     errors.push("deploymentPackage.sameOrigin.apiProxy must stay /api/");
   }

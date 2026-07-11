@@ -14,6 +14,7 @@ COPY cmd ./cmd
 COPY internal ./internal
 COPY resources/generated/openapi.admin.json ./resources/generated/openapi.admin.json
 RUN CGO_ENABLED=1 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/platform-api ./cmd/platform-api
+RUN CGO_ENABLED=1 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/platform-admin ./cmd/platform-admin
 
 FROM alpine:3.22 AS api
 WORKDIR /app
@@ -23,6 +24,7 @@ RUN apk add --no-cache ca-certificates tzdata \
   && mkdir -p /app/.platform/uploads /app/resources/generated \
   && chown -R platform:platform /app
 COPY --from=api-builder /out/platform-api /usr/local/bin/platform-api
+COPY --from=api-builder /out/platform-admin /app/platform-admin
 COPY --from=api-builder /src/resources/generated/openapi.admin.json /app/resources/generated/openapi.admin.json
 USER platform
 EXPOSE 9200

@@ -33,7 +33,7 @@ func TestAdminIdentityBindingProvisionResolveAndPersistHashesOnly(t *testing.T) 
 	provisioned, err := bindings.ProvisionAdminIdentityBinding(context.Background(), AdminIdentityProvisionInput{
 		Provider: provider, Issuer: " https://id.example/realms/platform ", ProviderSubject: " subject-123 ", Username: " admin ", Now: createdAt,
 	})
-	if err != nil || provisioned.Username != "admin" {
+	if err != nil || provisioned.Username != "admin" || provisioned.RecordID == "" || !provisioned.Created {
 		t.Fatalf("ProvisionAdminIdentityBinding() = %+v, %v", provisioned, err)
 	}
 
@@ -122,14 +122,17 @@ func TestAdminIdentityBindingRejectsDisabledDuplicateAndConflictingMappings(t *t
 		store := adminresource.NewStoreFromCapabilities(core.DefaultManifests())
 		bindings := NewResourceAdminIdentityBindingStore(store, func() time.Time { return now })
 		input := AdminIdentityProvisionInput{Provider: provider, Issuer: issuer, ProviderSubject: subject, Username: "admin", Now: now}
-		if _, err := bindings.ProvisionAdminIdentityBinding(context.Background(), input); err != nil {
+		created, err := bindings.ProvisionAdminIdentityBinding(context.Background(), input)
+		if err != nil || created.RecordID == "" || !created.Created {
 			t.Fatalf("initial ProvisionAdminIdentityBinding() error = %v", err)
 		}
-		if _, err := bindings.ProvisionAdminIdentityBinding(context.Background(), input); err != nil {
+		replayed, err := bindings.ProvisionAdminIdentityBinding(context.Background(), input)
+		if err != nil || replayed.RecordID != created.RecordID || replayed.Created {
 			t.Fatalf("idempotent ProvisionAdminIdentityBinding() error = %v", err)
 		}
 		input.Username = "ops"
-		if _, err := bindings.ProvisionAdminIdentityBinding(context.Background(), input); !errors.Is(err, ErrAdminIdentityBindingInvalid) {
+		conflict, err := bindings.ProvisionAdminIdentityBinding(context.Background(), input)
+		if !errors.Is(err, ErrAdminIdentityBindingInvalid) || conflict.RecordID != created.RecordID || conflict.Username != "" || conflict.Created {
 			t.Fatalf("conflicting ProvisionAdminIdentityBinding() error = %v, want rejection", err)
 		}
 		records, err := store.List(adminIdentitiesResource)

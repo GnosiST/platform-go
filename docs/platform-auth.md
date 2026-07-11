@@ -188,23 +188,43 @@ For the first production administrator, complete these steps before starting a d
 1. Configure `PLATFORM_CAPABILITIES` with `admin-oidc`, set all `PLATFORM_ADMIN_OIDC_*` values and point `PLATFORM_ADMIN_RESOURCE_DRIVER` plus `PLATFORM_ADMIN_RESOURCE_DSN` at the production Admin store.
 2. Ensure the target platform user already exists, is enabled and resolves to at least one effective permission.
 3. Obtain the immutable OIDC `sub` value through the trusted identity-provider administration path and expose it only to the command's standard input.
-4. Run the binding command from a trusted operator environment with the same platform configuration as the API process:
+4. Start the production database and cache without starting the API readiness gate:
 
 ```bash
-printf '%s' "$OIDC_SUBJECT" | platform-admin bind-admin-oidc \
+docker compose --env-file deploy/env/production.env \
+  -f deploy/compose/docker-compose.prod.yml \
+  up -d platform-mysql platform-redis
+```
+
+5. Run the binding command once inside the API image and Compose network. The image keeps `platform-api` as its default entrypoint, so the one-shot command must override it explicitly:
+
+```bash
+printf '%s' "$OIDC_SUBJECT" | docker compose \
+  --env-file deploy/env/production.env \
+  -f deploy/compose/docker-compose.prod.yml \
+  run --rm --no-deps --entrypoint /app/platform-admin platform-api \
+  bind-admin-oidc \
   --provider oidc \
   --issuer "$PLATFORM_ADMIN_OIDC_ISSUER_URL" \
   --username admin \
   --subject-stdin
 ```
 
-5. Start `cmd/platform-api`. With demo authentication disabled, its data-aware readiness check rejects startup unless a configured Admin provider has at least one enabled binding to a valid Admin principal.
+6. Start the API and Admin services:
+
+```bash
+docker compose --env-file deploy/env/production.env \
+  -f deploy/compose/docker-compose.prod.yml \
+  up -d platform-api platform-admin
+```
+
+With demo authentication disabled, the API data-aware readiness check rejects startup unless a configured Admin provider has at least one enabled binding to a valid Admin principal.
 
 The command is idempotent for the same provider, issuer, subject and platform username. It rejects a tuple that is already bound to another username and does not replace the existing binding. It also rejects missing, disabled or permissionless users through the shared Admin principal validation path.
 
 The raw subject is accepted only through standard input. `--subject` and positional subject arguments are rejected so the value cannot enter normal process arguments. Success output contains only the provider ID and platform username. Persistence stores issuer and subject hashes, and the provisioning audit contains only the provider ID, outcome and successful platform username; stdout, stderr and audit records do not contain raw issuer or subject values.
 
-Do not add this command to API startup, Compose service startup or automatic deployment promotion. Re-run it only as an explicit operator action against the intended persistent Admin store.
+Do not add this command to API startup, Compose service startup or automatic deployment promotion. `/app/platform-admin` is bundled only for explicit one-shot operator use against the intended persistent Admin store.
 
 ## Provider Promotion Matrix
 

@@ -8,12 +8,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"platform-go/internal/apps"
 	"platform-go/internal/platform/adminresource"
 	"platform-go/internal/platform/bootstrap"
+	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/config"
 )
 
@@ -43,6 +45,23 @@ func TestRunBindAdminOIDCRejectsSubjectArguments(t *testing.T) {
 	}{
 		{name: "subject flag", args: append(bindArgs("admin"), "--subject", testSubject)},
 		{name: "positional subject", args: append(bindArgs("admin"), testSubject)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := testConfig(t)
+			result := execute(t, cfg, tc.args, "")
+			assertRejectedWithoutSecrets(t, result, testSubject, testIssuer)
+		})
+	}
+}
+
+func TestRunBindAdminOIDCRedactsMalformedArgumentTokens(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{name: "invalid subject stdin bool", args: append(bindArgs("admin")[:len(bindArgs("admin"))-1], "--subject-stdin="+testSubject)},
+		{name: "raw subject embedded in unknown flag name", args: append(bindArgs("admin"), "--unknown-"+testSubject)},
+		{name: "raw subject embedded in unknown subject flag", args: append(bindArgs("admin"), "--subject="+testSubject)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := testConfig(t)
@@ -144,6 +163,11 @@ func TestRunBindAdminOIDCIsIdempotentAndRedactsRawIdentity(t *testing.T) {
 	if !hasProvisionAudit(audits, "admin", "oidc") {
 		t.Fatalf("audit logs = %+v, want redacted provisioning audit", audits)
 	}
+	boundAudits := bindingAudits(audits, adminresource.AdminIdentityBindingAuditOutcomeBound)
+	if len(boundAudits) != 1 {
+		t.Fatalf("bound audits = %+v, want one across replay", boundAudits)
+	}
+	assertCLIBindingAuditRedacted(t, boundAudits[0], bindings[0], "admin", "ops")
 }
 
 func TestRunBindAdminOIDCRejectsConflictingBindingWithoutRawIdentityLeak(t *testing.T) {
@@ -163,6 +187,67 @@ func TestRunBindAdminOIDCRejectsConflictingBindingWithoutRawIdentityLeak(t *test
 	if len(bindings) != 1 || bindings[0].Values["platformUsername"] != "admin" {
 		t.Fatalf("bindings after conflict = %+v, want original admin binding", bindings)
 	}
+	audits, err := store.List("audit-logs")
+	if err != nil {
+		t.Fatalf("List(audit-logs) error = %v", err)
+	}
+	conflictAudits := bindingAudits(audits, adminresource.AdminIdentityBindingAuditOutcomeConflict)
+	if len(conflictAudits) != 1 {
+		t.Fatalf("conflict audits = %+v, want one", conflictAudits)
+	}
+	assertCLIBindingAuditRedacted(t, conflictAudits[0], bindings[0], "admin", "ops")
+	if conflictAudits[0].Values["actor"] != "" {
+		t.Fatalf("conflict audit actor = %q, want omitted", conflictAudits[0].Values["actor"])
+	}
+}
+
+func TestRunBindAdminOIDCAuditFailureCanRetryWithoutDuplicates(t *testing.T) {
+	cfg := testConfig(t)
+	repository := newCLIAuditRepository()
+	loader := func(_ config.Config, manifests []capability.Manifest) (*adminresource.Store, error) {
+		return adminresource.NewRepositoryBackedStoreFromCapabilities(repository, manifests)
+	}
+	repository.failSaveNumber(2, errors.New("sensitive audit failure "+testSubject))
+
+	failed := executeWithResources(t, cfg, bindArgs("admin"), testSubject, loader)
+	assertRejectedWithoutSecrets(t, failed, testSubject, testIssuer)
+	if errorText(failed.err) != "record Admin OIDC binding provisioning audit" {
+		t.Fatalf("success audit failure error = %q, want sanitized error", failed.err)
+	}
+	succeeded := executeWithResources(t, cfg, bindArgs("admin"), testSubject, loader)
+	if succeeded.err != nil {
+		t.Fatalf("success audit retry error = %v", succeeded.err)
+	}
+	if replayed := executeWithResources(t, cfg, bindArgs("admin"), testSubject, loader); replayed.err != nil {
+		t.Fatalf("success audit replay error = %v", replayed.err)
+	}
+
+	repository.failNextSaveWith(errors.New("sensitive conflict audit failure " + testSubject))
+	conflictFailed := executeWithResources(t, cfg, bindArgs("ops"), testSubject, loader)
+	assertRejectedWithoutSecrets(t, conflictFailed, testSubject, testIssuer)
+	if errorText(conflictFailed.err) != "record Admin OIDC binding conflict audit" {
+		t.Fatalf("conflict audit failure error = %q, want sanitized error", conflictFailed.err)
+	}
+	conflictRetried := executeWithResources(t, cfg, bindArgs("ops"), testSubject, loader)
+	assertRejectedWithoutSecrets(t, conflictRetried, testSubject, testIssuer)
+	if errorText(conflictRetried.err) != "Admin OIDC binding provisioning was rejected" {
+		t.Fatalf("conflict retry error = %q, want normalized rejection", conflictRetried.err)
+	}
+
+	store, err := loader(cfg, testManifests(t, cfg))
+	if err != nil {
+		t.Fatalf("load store after retries error = %v", err)
+	}
+	audits, err := store.List("audit-logs")
+	if err != nil {
+		t.Fatalf("List(audit-logs) error = %v", err)
+	}
+	if got := len(bindingAudits(audits, adminresource.AdminIdentityBindingAuditOutcomeBound)); got != 1 {
+		t.Fatalf("bound audit count = %d, want 1", got)
+	}
+	if got := len(bindingAudits(audits, adminresource.AdminIdentityBindingAuditOutcomeConflict)); got != 1 {
+		t.Fatalf("conflict audit count = %d, want 1", got)
+	}
 }
 
 type executionResult struct {
@@ -176,6 +261,14 @@ func execute(t *testing.T, cfg config.Config, args []string, stdin string) execu
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	err := run(context.Background(), args, strings.NewReader(stdin), &stdout, &stderr, func() config.Config { return cfg })
+	return executionResult{stdout: stdout.String(), stderr: stderr.String(), err: err}
+}
+
+func executeWithResources(t *testing.T, cfg config.Config, args []string, stdin string, loader adminResourcesLoader) executionResult {
+	t.Helper()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := runWithAdminResources(context.Background(), args, strings.NewReader(stdin), &stdout, &stderr, func() config.Config { return cfg }, loader)
 	return executionResult{stdout: stdout.String(), stderr: stderr.String(), err: err}
 }
 
@@ -225,10 +318,7 @@ func updateUser(t *testing.T, cfg config.Config, username string, mutate func(*a
 
 func loadStore(t *testing.T, cfg config.Config) *adminresource.Store {
 	t.Helper()
-	manifests, err := bootstrap.CapabilitiesFromConfig(cfg, apps.DefaultManifests()...)
-	if err != nil {
-		t.Fatalf("CapabilitiesFromConfig() error = %v", err)
-	}
+	manifests := testManifests(t, cfg)
 	store, err := bootstrap.AdminResourcesFromConfig(cfg, manifests)
 	if err != nil {
 		t.Fatalf("AdminResourcesFromConfig() error = %v", err)
@@ -236,9 +326,53 @@ func loadStore(t *testing.T, cfg config.Config) *adminresource.Store {
 	return store
 }
 
+func testManifests(t *testing.T, cfg config.Config) []capability.Manifest {
+	t.Helper()
+	manifests, err := bootstrap.CapabilitiesFromConfig(cfg, apps.DefaultManifests()...)
+	if err != nil {
+		t.Fatalf("CapabilitiesFromConfig() error = %v", err)
+	}
+	return manifests
+}
+
 func hasProvisionAudit(records []adminresource.Record, username string, provider string) bool {
 	for _, record := range records {
 		if record.Values["action"] == "admin_identity.bind" && record.Values["actor"] == username && record.Values["provider"] == provider {
+			return true
+		}
+	}
+	return false
+}
+
+func bindingAudits(records []adminresource.Record, outcome string) []adminresource.Record {
+	matching := make([]adminresource.Record, 0)
+	for _, record := range records {
+		if record.Values["action"] == "admin_identity.bind" && record.Values["outcome"] == outcome {
+			matching = append(matching, record)
+		}
+	}
+	return matching
+}
+
+func assertCLIBindingAuditRedacted(t *testing.T, audit adminresource.Record, binding adminresource.Record, usernames ...string) {
+	t.Helper()
+	for _, value := range []string{testSubject, testIssuer, binding.Values["issuerHash"], binding.Values["providerSubjectHash"]} {
+		if value != "" && (strings.Contains(audit.Code, value) || containsMapValue(audit.Values, value)) {
+			t.Fatalf("audit exposed raw identity or hash: %+v", audit)
+		}
+	}
+	if audit.Values["outcome"] == adminresource.AdminIdentityBindingAuditOutcomeConflict {
+		for _, username := range usernames {
+			if containsMapValue(audit.Values, username) {
+				t.Fatalf("conflict audit exposed username: %+v", audit)
+			}
+		}
+	}
+}
+
+func containsMapValue(values map[string]string, expected string) bool {
+	for _, value := range values {
+		if value == expected {
 			return true
 		}
 	}
@@ -284,4 +418,79 @@ func readFile(t *testing.T, path string) string {
 		t.Fatalf("os.ReadFile(%s) error = %v", path, err)
 	}
 	return string(content)
+}
+
+type cliAuditRepository struct {
+	mu              sync.Mutex
+	snapshot        adminresource.ResourceSnapshot
+	saveCount       int
+	failAtSave      int
+	failAtSaveErr   error
+	failNextSaveErr error
+}
+
+func newCLIAuditRepository() *cliAuditRepository {
+	return &cliAuditRepository{snapshot: adminresource.ResourceSnapshot{Resources: map[string][]adminresource.Record{}}}
+}
+
+func (r *cliAuditRepository) Load(context.Context) (adminresource.ResourceSnapshot, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return cloneCLIResourceSnapshot(r.snapshot), nil
+}
+
+func (r *cliAuditRepository) Save(_ context.Context, snapshot adminresource.ResourceSnapshot) (uint64, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.saveCount++
+	if r.failAtSave == r.saveCount {
+		err := r.failAtSaveErr
+		if err == nil {
+			err = errors.New("injected save failure")
+		}
+		r.failAtSaveErr = nil
+		return 0, err
+	}
+	if r.failNextSaveErr != nil {
+		err := r.failNextSaveErr
+		r.failNextSaveErr = nil
+		return 0, err
+	}
+	if snapshot.Revision != r.snapshot.Revision {
+		return 0, &adminresource.RevisionConflictError{Expected: snapshot.Revision, Actual: r.snapshot.Revision}
+	}
+	snapshot.Revision++
+	r.snapshot = cloneCLIResourceSnapshot(snapshot)
+	return snapshot.Revision, nil
+}
+
+func (r *cliAuditRepository) failSaveNumber(number int, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.failAtSave = number
+	r.failAtSaveErr = err
+}
+
+func (r *cliAuditRepository) failNextSaveWith(err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.failAtSave = 0
+	r.failNextSaveErr = err
+}
+
+func cloneCLIResourceSnapshot(snapshot adminresource.ResourceSnapshot) adminresource.ResourceSnapshot {
+	cloned := adminresource.ResourceSnapshot{Revision: snapshot.Revision, NextID: snapshot.NextID, Resources: make(map[string][]adminresource.Record, len(snapshot.Resources))}
+	for resource, records := range snapshot.Resources {
+		items := make([]adminresource.Record, 0, len(records))
+		for _, record := range records {
+			values := make(map[string]string, len(record.Values))
+			for key, value := range record.Values {
+				values[key] = value
+			}
+			record.Values = values
+			items = append(items, record)
+		}
+		cloned.Resources[resource] = items
+	}
+	return cloned
 }
