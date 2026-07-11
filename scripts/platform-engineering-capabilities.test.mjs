@@ -223,20 +223,22 @@ describe("validate-platform-engineering-capabilities", () => {
 
     assert.ok(capability.evidence.sourcePaths.includes("docs/superpowers/specs/2026-07-11-production-admin-oidc-auth-design.md"));
     assert.ok(capability.evidence.sourcePaths.includes("resources/platform-foundation-task-graph.json"));
+    assert.ok(capability.evidence.sourcePaths.includes("resources/evidence/production-admin-oidc-auth-20260711.json"));
     assert.ok(capability.evidence.tests.includes("internal/platform/authprovider/oidc/resolver_test.go"));
     assert.ok(capability.evidence.tests.includes("scripts/platform-foundation-task-graph.test.mjs"));
-    assert.deepEqual(capability.pendingEvidenceRequirements, [
+    assert.deepEqual(capability.completedEvidence, [
       "production-like-oidc-rehearsal",
       "six-viewport-browser-acceptance",
       "neat-freak-cleanup-closeout",
     ]);
   });
 
-  it("rejects production auth hardening gates that drop pending OIDC evidence controls", () => {
+  it("rejects production auth hardening gates that drop completed OIDC evidence controls", () => {
     const matrix = readJSON("resources/platform-engineering-capabilities.json");
     const capability = matrix.capabilities.find((item) => item.id === "production-auth-hardening-gate");
-    capability.pendingEvidenceRequirements = [];
+    capability.completedEvidence = [];
     capability.evidence.sourcePaths = capability.evidence.sourcePaths.filter((item) => item !== "resources/platform-foundation-task-graph.json");
+    capability.evidence.sourcePaths = capability.evidence.sourcePaths.filter((item) => item !== "resources/evidence/production-admin-oidc-auth-20260711.json");
     capability.evidence.tests = capability.evidence.tests.filter((item) => item !== "internal/platform/authprovider/oidc/resolver_test.go");
     const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
 
@@ -244,8 +246,9 @@ describe("validate-platform-engineering-capabilities", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /production-auth-hardening-gate must cite resources\/platform-foundation-task-graph\.json/);
+    assert.match(result.stderr, /production-auth-hardening-gate must cite the tracked production Admin OIDC evidence manifest/);
     assert.match(result.stderr, /production-auth-hardening-gate must cite internal\/platform\/authprovider\/oidc\/resolver_test\.go/);
-    assert.match(result.stderr, /production-auth-hardening-gate pendingEvidenceRequirements must include production-like-oidc-rehearsal/);
+    assert.match(result.stderr, /production-auth-hardening-gate completedEvidence must include production-like-oidc-rehearsal/);
   });
 
   it("rejects cache invalidation capabilities that do not cite the cache contract gate", () => {

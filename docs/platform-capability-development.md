@@ -63,7 +63,7 @@ Permission prefixes:
 
 Provider IDs:
 
-- use stable lowercase IDs such as `demo`, `wechat`, `password`;
+- use stable lowercase IDs such as `demo`, `wechat`, `oidc`, `password`;
 - provider-specific secrets must stay in configuration, not in manifests.
 
 ## Manifest Example
@@ -220,6 +220,8 @@ Provider declarations may be visible but unconfigured. The UI should render unco
 
 Each provider manifest must use stable lowercase id and kind values with only letters, numbers and hyphens. `Title` and `Description` are required localized text. `ConfigKeys` lists environment-style configuration keys, using uppercase letters, numbers and underscores, and duplicate or empty keys are rejected. This keeps WeChat, SSO, password and future provider plugins discoverable without adding provider-specific fields to the shell.
 
+Every provider declares an explicit `admin` or `app` audience. Admin discovery and login must not expose App-only providers, App login must reject Admin-only providers, and the two security domains must not share identity resolvers, binding stores or token types. Admin OIDC uses `POST /api/auth/providers/:provider/start` plus the existing login exchange, then resolves only an enabled `admin-identities` binding to an existing enabled Admin user with effective permissions.
+
 Provider adapters must resolve to a platform username or platform user identity. Authorization is still calculated by:
 
 ```text
@@ -227,6 +229,8 @@ user -> roles -> permissions / denyPermissions -> menus/resources/actions
 ```
 
 Do not put role logic inside auth providers. Business capabilities should declare permission prefixes and route permissions; they should not invent custom role fields for action denies. Use the shared `roles.denyPermissions` field when a project needs deny-overrides-allow behavior.
+
+OIDC claims and groups authenticate an identity only. Provider adapters must not auto-create platform users or assign roles, permissions, tenants, organizations or areas. Persist only approved hash-and-mask binding fields; raw provider subjects, issuers, claims, authorization codes, tokens, state, nonce, PKCE material and credentials stay outside generic resources and audit payloads.
 
 ## Capability Admin Resource Rules
 
@@ -539,9 +543,16 @@ PLATFORM_LIFECYCLE_HISTORY_DRIVER=mysql
 PLATFORM_LIFECYCLE_HISTORY_DSN=user:pass@tcp(localhost:3306)/platform
 PLATFORM_CACHE_DRIVER=redis
 PLATFORM_REDIS_ADDR=127.0.0.1:6379
+PLATFORM_CAPABILITIES=tenant,identity,session,rbac,menu,api-resource,audit,admin-oidc,dictionary,parameter,file-storage,admin-shell,system-admin
+PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true
+PLATFORM_ADMIN_OIDC_ISSUER_URL=https://identity.example/realms/platform
+PLATFORM_ADMIN_OIDC_CLIENT_ID=platform-admin
+PLATFORM_ADMIN_OIDC_CLIENT_SECRET=<redacted-secret>
+PLATFORM_ADMIN_OIDC_REDIRECT_URL=https://admin.example/login
+PLATFORM_ADMIN_OIDC_SCOPES=openid,profile,email
 ```
 
-`cmd/platform-api` calls `config.Config.ValidateRuntime()` before opening stores. `PLATFORM_ADMIN_RESOURCE_DRIVER`, `PLATFORM_SESSION_DRIVER` and `PLATFORM_LIFECYCLE_HISTORY_DRIVER` use GORM-backed repositories for `mysql`, `postgres` and `sqlite`; when `PLATFORM_RUNTIME_ENV=production`, they must be configured with DSNs, the JWT secret must not be the development default, Redis must be selected for cache/invalidation, `PLATFORM_CAPABILITIES` must not include `demo-data`, and `PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true` must disable demo login. Standard platform resources including tenants, org units, users, role groups, roles, permissions, menus, area codes and operations resources are normalized in the GORM admin resource adapter; external business resources can remain generic in the consuming package until that package needs dedicated tables.
+`cmd/platform-api` calls `config.Config.ValidateRuntime()` before opening stores. `PLATFORM_ADMIN_RESOURCE_DRIVER`, `PLATFORM_SESSION_DRIVER` and `PLATFORM_LIFECYCLE_HISTORY_DRIVER` use GORM-backed repositories for `mysql`, `postgres` and `sqlite`; when `PLATFORM_RUNTIME_ENV=production`, they must be configured with DSNs, the JWT secret must not be the development default, Redis must be selected for cache/invalidation, `PLATFORM_CAPABILITIES` must not include `demo-data`, and `PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true` must disable demo login. If `admin-oidc` is enabled, all OIDC settings must be complete, scopes must include `openid`, the production redirect must use absolute HTTPS, and an operator must bind an existing enabled Admin identity through `platform-admin bind-admin-oidc --subject-stdin` before the demo-disabled readiness gate can pass. Standard platform resources including tenants, org units, users, role groups, roles, permissions, menus, area codes and operations resources are normalized in the GORM admin resource adapter; external business resources can remain generic in the consuming package until that package needs dedicated tables.
 
 Run `rtk node scripts/generate-platform-operations-plan.mjs`, `rtk node scripts/generate-production-auth-promotion-review.mjs`, `rtk node scripts/generate-platform-promotion-evidence-templates.mjs`, `rtk node scripts/validate-platform-promotion-evidence-templates.mjs`, `rtk node scripts/validate-platform-codegen-source-writing-readiness.mjs`, `rtk node scripts/validate-platform-personnel-runtime-readiness.mjs`, `rtk node scripts/validate-platform-production-auth-hardening.mjs`, `rtk node scripts/validate-platform-cache-invalidation.mjs` and `rtk node scripts/validate-platform-production-readiness.mjs` before release work. Use `rtk node scripts/run-platform-production-preflight.mjs --list` for the unified production preflight catalog and `rtk node scripts/run-platform-production-preflight.mjs --policy <policy-id>` for non-mutating policy dry-runs; append `--run` only when an operator intentionally executes the selected checks. These gates keep production auth, cache invalidation, production readiness, source-writing readiness, optional personnel readiness, external reference coverage, required env vars, runtime validation snippets, production session-policy spec evidence, Provider Promotion Matrix evidence, admin UI contract drift tests, docs, declared preflight commands, policy-level preflight requirements, draft-only promotion evidence templates, `resources/generated/platform-operations-plan.json` and `resources/generated/production-auth-promotion-review.json` consistent.
 

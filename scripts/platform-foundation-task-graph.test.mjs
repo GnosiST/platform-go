@@ -248,7 +248,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /task production-auth-provider-hardening must declare at least one evidence\.docs path/);
   });
 
-  it("tracks production Admin OIDC as the only pending evidence node", () => {
+  it("tracks production Admin OIDC as the final implemented foundation node", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
@@ -256,7 +256,7 @@ describe("validate-platform-foundation-task-graph", () => {
     const blocked = graph.tasks.filter((item) => item.status === "blocked");
 
     assert.ok(task, "task graph must include production-admin-oidc-auth");
-    assert.equal(task.status, "pending");
+    assert.equal(task.status, "implemented");
     assert.equal(task.visual, true);
     assert.deepEqual(task.dependsOn, [
       "production-auth-provider-hardening",
@@ -264,11 +264,12 @@ describe("validate-platform-foundation-task-graph", () => {
       "admin-ui-system-quality-hardening",
     ]);
     assert.deepEqual(task.designGate, ["superpowers:brainstorming", "product-design"]);
+    assert.deepEqual(task.evidence.screenshots, ["resources/evidence/production-admin-oidc-auth-20260711.json"]);
     assert.deepEqual(
-      task.pendingEvidenceRequirements.map((item) => item.id),
+      task.completionEvidence.map((item) => item.id),
       ["production-like-oidc-rehearsal", "six-viewport-browser-acceptance", "neat-freak-cleanup-closeout"],
     );
-    assert.deepEqual(task.pendingEvidenceRequirements[1].viewports, [
+    assert.deepEqual(task.completionEvidence[1].viewports, [
       "375x812",
       "390x844",
       "768x1024",
@@ -276,11 +277,22 @@ describe("validate-platform-foundation-task-graph", () => {
       "1280x720",
       "1440x1024",
     ]);
-    assert.ok(task.pendingEvidenceRequirements.every((item) => item.status === "pending"));
+    assert.ok(task.completionEvidence.every((item) => item.status === "verified"));
     assert.equal(graph.tasks.length, 37);
-    assert.equal(implemented.length, 36);
-    assert.deepEqual(pending.map((item) => item.id), ["production-admin-oidc-auth"]);
+    assert.equal(implemented.length, 37);
+    assert.deepEqual(pending, []);
     assert.equal(blocked.length, 0);
+  });
+
+  it("rejects production Admin OIDC evidence manifests without a completed redaction scan", () => {
+    const evidence = readJSON("resources/evidence/production-admin-oidc-auth-20260711.json");
+    evidence.redaction.scanPassed = false;
+    const evidencePath = tempJSON("production-admin-oidc-auth-20260711.json", evidence);
+
+    const result = runValidator(["--oidc-evidence", evidencePath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /production-admin-oidc-auth evidence redaction scan must pass/);
   });
 
   it("tracks completed platform foundation work and promoted visual task nodes", () => {

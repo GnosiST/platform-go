@@ -1,0 +1,209 @@
+{
+  "$schema": "https://platform-go.local/schemas/production-admin-oidc-auth-evidence.json",
+  "capturedAt": "2026-07-11",
+  "purpose": "Tracked, redacted manifest for the local production-like Admin OIDC rehearsal and browser acceptance. Source screenshots remain local under tmp and are integrity-addressed here so governance validation is reproducible from a clean checkout.",
+  "sourceEvidenceRoot": "tmp/product-design/production-admin-oidc-auth-20260711",
+  "sourceArtifactsTracked": false,
+  "provider": {
+    "product": "Keycloak",
+    "version": "26.3.3",
+    "imageDigest": "sha256:6a7217a100bd3e5de4063a27a538ef999a3c5a88c4b4ec0ffc0a642aee7b2597",
+    "realm": "platform-rehearsal",
+    "client": "platform-admin",
+    "confidentialClient": true,
+    "authorizationCodePKCE": true,
+    "directAccessGrantsEnabled": false
+  },
+  "runtime": {
+    "configuredAdminProviderOnly": true,
+    "demoAuthenticationDisabled": true,
+    "stdinOnlyBinding": true,
+    "boundExistingAdmin": true,
+    "successfulLogin": true,
+    "repeatedLogin": true,
+    "exactStateRejected": true,
+    "expiredTransactionRejected": true,
+    "missingBindingNormalized": true,
+    "disabledUserNormalized": true,
+    "refreshStatus": 200,
+    "logoutStatus": 200,
+    "revokedSessionStatus": 401,
+    "protectedNavigationStatus": 200
+  },
+  "browser": {
+    "viewports": ["375x812", "390x844", "768x1024", "1024x768", "1280x720", "1440x1024"],
+    "scenarios": [
+      "login",
+      "success",
+      "protected-navigation-refresh",
+      "cancellation-recovery",
+      "invalid-state-recovery",
+      "expired-transaction-recovery",
+      "missing-binding-recovery",
+      "disabled-user-recovery",
+      "keyboard-focus"
+    ],
+    "touchViewportsOverflow": false,
+    "desktopOverflow": false,
+    "touchProviderHeight": 52,
+    "touchPrimaryActionHeight": 44,
+    "touchLanguageTarget": "44x44",
+    "touchThemeTarget": "44x44",
+    "desktopThemeTarget": "26x26",
+    "reducedMotionDescendantCount": 67,
+    "maximumReducedMotionDuration": "0.00001s",
+    "consoleWarnings": 0,
+    "consoleErrors": 0
+  },
+  "redaction": {
+    "scanPassed": true,
+    "screenshotsInspected": true,
+    "prohibitedMaterialAbsent": [
+      "authorization-code",
+      "state",
+      "nonce",
+      "pkce-verifier",
+      "provider-claims",
+      "provider-subject",
+      "id-token",
+      "access-token",
+      "refresh-token",
+      "client-secret",
+      "test-credentials"
+    ],
+    "credentialBearingIntermediateFilesRemoved": [
+      "runtime/browser-success.json",
+      "runtime/browser-missing-binding.json",
+      "runtime/browser-disabled-user.json"
+    ]
+  },
+  "screenshots": [
+    {
+      "scenario": "login",
+      "viewport": "375x812",
+      "localPath": "tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-final-login-375x812.png",
+      "sha256": "sha256:209449ae09a0aed0575de08d518b9c851a09620f69950fe9df193a8f7224e5e5",
+      "sizeBytes": 27406,
+      "redacted": true
+    },
+    {
+      "scenario": "login",
+      "viewport": "390x844",
+      "localPath": "tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-final-login-390x844.png",
+      "sha256": "sha256:1ceef8ab7546a4dd693587775603bfafbf5121ca018f08bb2f8f065401d57f5c",
+      "sizeBytes": 27838,
+      "redacted": true
+    },
+    {
+      "scenario": "login",
+      "viewport": "768x1024",
+      "localPath": "tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-final-login-768x1024.png",
+      "sha256": "sha256:1f9ebc2bedd1c8718759e103e263ded83006a74124e59fa94986b37b0f0472fa",
+      "sizeBytes": 32834,
+      "redacted": true
+    },
+    {
+      "scenario": "login",
+      "viewport": "1024x768",
+      "localPath": "tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-final-login-1024x768.png",
+      "sha256": "sha256:acee93335504afd7308a80bcafa3d282b3af2f581ee4a051bfa565bc2b76e7e5",
+      "sizeBytes": 33822,
+      "redacted": true
+    },
+    {
+      "scenario": "login",
+      "viewport": "1280x720",
+      "localPath": "tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-final-login-1280x720.png",
+      "sha256": "sha256:bff42216e0f4ea0c1078dbeeb73016afaaff2575cd7c350196924ca293bbe6f8",
+      "sizeBytes": 32737,
+      "redacted": true
+    },
+    {
+      "scenario": "login",
+      "viewport": "1440x1024",
+      "localPath": "tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-final-login-1440x1024.png",
+      "sha256": "sha256:2d647205a05e310df4b07a33ad67872faa28642bc4149c6dba75cb12413c3031",
+      "sizeBytes": 36436,
+      "redacted": true
+    },
+    {
+      "scenario": "success",
+      "viewport": "390x844",
+      "localPath": "tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-success-overview-390x844.jpg",
+      "sha256": "sha256:9ca24ede11867774ba21df1194b83db6aee626c834272d6755db2c3e3f1840a8",
+      "sizeBytes": 36524,
+      "redacted": true
+    },
+    {
+      "scenario": "success",
+      "viewport": "1280x720",
+      "localPath": "tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-success-overview-1280x720.jpg",
+      "sha256": "sha256:935eec82118a53710bf15a0cc8d271ce90fa4dcae045788112c4698adf64b584",
+      "sizeBytes": 77675,
+      "redacted": true
+    },
+    {
+      "scenario": "protected-navigation-refresh",
+      "viewport": "1280x720",
+      "localPath": "tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-protected-users-refresh-1280x720.jpg",
+      "sha256": "sha256:1881cb525a8d31db40e4f0016487c0ff47927252e6c42bf353d691261c57bf96",
+      "sizeBytes": 66252,
+      "redacted": true
+    },
+    {
+      "scenario": "cancellation-recovery",
+      "viewport": "390x844",
+      "localPath": "tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-cancel-recovery-focus-390x844.jpg",
+      "sha256": "sha256:9090c3a6cac0e38a0eaa4d552bed289b47a03c553e3ba37081545587cddbe7d6",
+      "sizeBytes": 28031,
+      "redacted": true
+    },
+    {
+      "scenario": "invalid-state-recovery",
+      "viewport": "390x844",
+      "localPath": "tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-invalid-state-recovery-390x844.jpg",
+      "sha256": "sha256:9090c3a6cac0e38a0eaa4d552bed289b47a03c553e3ba37081545587cddbe7d6",
+      "sizeBytes": 28031,
+      "redacted": true
+    },
+    {
+      "scenario": "missing-binding-recovery",
+      "viewport": "390x844",
+      "localPath": "tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-missing-binding-recovery-390x844.png",
+      "sha256": "sha256:9090c3a6cac0e38a0eaa4d552bed289b47a03c553e3ba37081545587cddbe7d6",
+      "sizeBytes": 28031,
+      "redacted": true
+    },
+    {
+      "scenario": "disabled-user-recovery",
+      "viewport": "390x844",
+      "localPath": "tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-disabled-user-recovery-390x844.png",
+      "sha256": "sha256:9090c3a6cac0e38a0eaa4d552bed289b47a03c553e3ba37081545587cddbe7d6",
+      "sizeBytes": 28031,
+      "redacted": true
+    },
+    {
+      "scenario": "expired-transaction-recovery",
+      "viewport": "1440x1024",
+      "localPath": "tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-expired-transaction-recovery-1440x1024.png",
+      "sha256": "sha256:fd5fdf0aa75ee44e419e48c0a499d8b4a6e3ded7ebb0152544f9ac504fbf83f2",
+      "sizeBytes": 38521,
+      "redacted": true
+    },
+    {
+      "scenario": "keyboard-focus",
+      "viewport": "390x844",
+      "localPath": "tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-keyboard-focus-390x844.jpg",
+      "sha256": "sha256:1d60bdec50e653ce0e2fd365e6e3690fb157c3fe38cc95bbfb9b73664e43066a",
+      "sizeBytes": 28275,
+      "redacted": true
+    }
+  ],
+  "promotionBoundary": {
+    "foundationNodeClosed": true,
+    "productionPromotionApproved": false,
+    "runtimeMutation": "disabled",
+    "refreshTokenFamilyDefaultRuntime": "disabled",
+    "sourceWriting": "disabled"
+  }
+}

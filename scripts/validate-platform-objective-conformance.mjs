@@ -171,22 +171,22 @@ function validateTaskControl(audit, alignment, taskGraph, taskExecution, goal, e
     }
   }
 
-  if (JSON.stringify(values(policy.requiredUnfinishedNodes)) !== JSON.stringify(["production-admin-oidc-auth"])) {
-    errors.push("taskControlPolicy.requiredUnfinishedNodes must contain only production-admin-oidc-auth during Task 7 evidence collection");
+  if (values(policy.requiredUnfinishedNodes).length !== 0) {
+    errors.push("taskControlPolicy.requiredUnfinishedNodes must be empty after Task 8 closeout");
   }
-  if (JSON.stringify(values(taskExecution.requiredUnfinishedNodes)) !== JSON.stringify(["production-admin-oidc-auth"])) {
-    errors.push("task execution requiredUnfinishedNodes must contain only production-admin-oidc-auth during Task 7 evidence collection");
+  if (values(taskExecution.requiredUnfinishedNodes).length !== 0) {
+    errors.push("task execution requiredUnfinishedNodes must be empty after Task 8 closeout");
   }
-  if (JSON.stringify(values(alignment.requiredFutureTaskNodes)) !== JSON.stringify(["production-admin-oidc-auth"])) {
-    errors.push("alignment.requiredFutureTaskNodes must contain only production-admin-oidc-auth during Task 7 evidence collection");
+  if (values(alignment.requiredFutureTaskNodes).length !== 0) {
+    errors.push("alignment.requiredFutureTaskNodes must be empty after Task 8 closeout");
   }
-  if (JSON.stringify(values(goal.completionPolicy?.requiredControlledUnfinishedNodes)) !== JSON.stringify(["production-admin-oidc-auth"])) {
-    errors.push("goal completionPolicy.requiredControlledUnfinishedNodes must contain only production-admin-oidc-auth during Task 7 evidence collection");
+  if (values(goal.completionPolicy?.requiredControlledUnfinishedNodes).length !== 0) {
+    errors.push("goal completionPolicy.requiredControlledUnfinishedNodes must be empty after Task 8 closeout");
   }
 
   const unfinishedTaskIDs = values(taskGraph.tasks).filter((task) => task.status !== "implemented").map((task) => task.id);
-  if (JSON.stringify(unfinishedTaskIDs) !== JSON.stringify(["production-admin-oidc-auth"])) {
-    errors.push(`unfinished task graph nodes must contain only production-admin-oidc-auth during Task 7 evidence collection: ${unfinishedTaskIDs.join(", ")}`);
+  if (unfinishedTaskIDs.length !== 0) {
+    errors.push(`unfinished task graph nodes must be empty after Task 8 closeout: ${unfinishedTaskIDs.join(", ")}`);
   }
   if (values(taskGraph.resourceLocks).length === 0) {
     errors.push("task graph resourceLocks must not be empty");
@@ -346,11 +346,11 @@ function validateDeploymentPolicy(audit, alignment, deploymentTopology, errors) 
 
 function validateCompletionPolicy(audit, goal, taskExecution, errors) {
   const policy = audit.completionPolicy ?? {};
-  if (policy.goalCompletionStatus !== "not-complete-controlled") {
-    errors.push("completionPolicy.goalCompletionStatus must stay not-complete-controlled during Task 7 evidence collection");
+  if (policy.goalCompletionStatus !== "complete") {
+    errors.push("completionPolicy.goalCompletionStatus must be complete after Task 8 closeout");
   }
-  if (goal.completionStatus !== "not-complete-controlled") {
-    errors.push("goal completionStatus must stay not-complete-controlled during Task 7 evidence collection");
+  if (goal.completionStatus !== "complete") {
+    errors.push("goal completionStatus must be complete after Task 8 closeout");
   }
   if (policy.mustNotMarkCompleteWhileBlockersActive !== true) {
     errors.push("completionPolicy.mustNotMarkCompleteWhileBlockersActive must stay true");
@@ -358,11 +358,11 @@ function validateCompletionPolicy(audit, goal, taskExecution, errors) {
   if (policy.mustNotSelfCertifyExternalApprovalEvidence !== true) {
     errors.push("completionPolicy.mustNotSelfCertifyExternalApprovalEvidence must stay true");
   }
-  if (JSON.stringify(values(policy.controlledBlockers)) !== JSON.stringify(["production-admin-oidc-auth"])) {
-    errors.push("completionPolicy.controlledBlockers must contain only production-admin-oidc-auth during Task 7 evidence collection");
+  if (values(policy.controlledBlockers).length !== 0) {
+    errors.push("completionPolicy.controlledBlockers must be empty after Task 8 closeout");
   }
-  if (JSON.stringify(values(taskExecution.requiredUnfinishedNodes)) !== JSON.stringify(["production-admin-oidc-auth"])) {
-    errors.push("task execution requiredUnfinishedNodes must contain only production-admin-oidc-auth during Task 7 evidence collection");
+  if (values(taskExecution.requiredUnfinishedNodes).length !== 0) {
+    errors.push("task execution requiredUnfinishedNodes must be empty after Task 8 closeout");
   }
 
   const gateIDs = values(audit.futurePromotionGates).map((gate) => gate.taskId);

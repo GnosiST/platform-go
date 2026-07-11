@@ -41,7 +41,7 @@ The repository includes a standard adapter package for this topology:
 - `Dockerfile`: multi-stage build with `api` and `admin-static` targets;
 - `deploy/compose/docker-compose.prod.yml`: single-node production-like composition with API, admin static proxy, MySQL and Redis;
 - `deploy/nginx/platform.conf`: serves `admin/dist`, proxies `/api/` to the Go service and exposes local `/uploads/` for single-node file storage;
-- `deploy/env/production.example.env`: production environment template with `demo-data` removed and demo auth disabled.
+- `deploy/env/production.example.env`: production environment template with `demo-data` removed, demo auth disabled and the optional `admin-oidc` provider configuration declared.
 
 Use the package as a reviewable starting point:
 
@@ -53,7 +53,7 @@ rtk node scripts/run-platform-production-preflight.mjs --command production-env-
 rtk docker compose -f deploy/compose/docker-compose.prod.yml --env-file <private-production-env> up --build -d
 ```
 
-Copy `deploy/env/production.example.env` to a private environment file before deployment. Replace every secret, keep `PLATFORM_CAPABILITIES` business-neutral, and do not re-add `demo-data` in production.
+Copy `deploy/env/production.example.env` to a private environment file before deployment. Replace every secret, keep `PLATFORM_CAPABILITIES` business-neutral, and do not re-add `demo-data` in production. When `admin-oidc` is enabled, run the stdin-only `platform-admin bind-admin-oidc` procedure in `docs/platform-auth.md` against the same Admin store before starting the demo-disabled API.
 
 ### Split Admin And API
 
@@ -101,6 +101,7 @@ Production runtime must set:
 
 ```bash
 PLATFORM_RUNTIME_ENV=production
+PLATFORM_CAPABILITIES=tenant,identity,session,rbac,menu,api-resource,audit,admin-oidc,dictionary,parameter,file-storage,admin-shell,system-admin
 PLATFORM_JWT_SECRET=<at-least-32-characters-and-not-the-dev-default>
 PLATFORM_ADMIN_RESOURCE_DRIVER=mysql
 PLATFORM_ADMIN_RESOURCE_DSN=<dsn>
@@ -111,9 +112,16 @@ PLATFORM_LIFECYCLE_HISTORY_DSN=<dsn>
 PLATFORM_CACHE_DRIVER=redis
 PLATFORM_REDIS_ADDR=<host:port>
 PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true
+PLATFORM_ADMIN_OIDC_ISSUER_URL=https://identity.example/realms/platform
+PLATFORM_ADMIN_OIDC_CLIENT_ID=platform-admin
+PLATFORM_ADMIN_OIDC_CLIENT_SECRET=<redacted-secret>
+PLATFORM_ADMIN_OIDC_REDIRECT_URL=https://admin.example/login
+PLATFORM_ADMIN_OIDC_SCOPES=openid,profile,email
 ```
 
-Production `PLATFORM_CAPABILITIES` must not be empty and must not include `demo-data`. Capability IDs are trimmed, must use lowercase letters, numbers and hyphens, and must not contain empty or duplicate comma-separated entries. Use `minimal-admin` for the smallest supported admin foundation.
+Production `PLATFORM_CAPABILITIES` must not be empty and must not include `demo-data`. Capability IDs are trimmed, must use lowercase letters, numbers and hyphens, and must not contain empty or duplicate comma-separated entries. Use `minimal-admin` for the smallest supported admin foundation, or include `admin-oidc` with complete OIDC configuration when OIDC is the Admin provider. The OIDC subject must enter only through `platform-admin bind-admin-oidc --subject-stdin`; API startup does not provision accounts or authorization relationships.
+
+The local Keycloak rehearsal documented in `design-qa.md` proves the protocol, binding, session and browser paths against production-like components. It does not approve an external production promotion or satisfy provider-secret ownership, rotation, rollback and release-approval requirements.
 
 `rtk node scripts/validate-platform-production-env.mjs` validates the standard template shape. Use `rtk node scripts/run-platform-production-preflight.mjs --command production-env-audit --strict-env-file <private-production-env>` for a dry-run view of the strict env check, then add `--run` for real deployment files so copied placeholders, weak compose database passwords, `demo-data`, demo auth, non-Redis cache and non-GORM stores fail before startup.
 

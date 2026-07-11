@@ -26,11 +26,25 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
-  it("tracks the pending production Admin OIDC node in required and future alignment sets", () => {
+  it("tracks production Admin OIDC as required and no longer future work", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
 
     assert.ok(audit.requiredTaskNodes.includes("production-admin-oidc-auth"));
-    assert.deepEqual(audit.requiredFutureTaskNodes, ["production-admin-oidc-auth"]);
+    assert.deepEqual(audit.requiredFutureTaskNodes, []);
+  });
+
+  it("rejects regressing production Admin OIDC to pending after Task 8 closeout", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
+    task.status = "pending";
+    task.statusReason = { zh: "测试待完成。", en: "Test pending." };
+    task.completionGate = { zh: "完成测试。", en: "Complete the test." };
+    const graphPath = tempJSON("platform-foundation-task-graph.json", graph);
+
+    const result = runValidator(["--task-graph", graphPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /alignment audit task production-admin-oidc-auth must be implemented after Task 8 closeout/);
   });
 
   it("accepts the current platform foundation alignment audit", () => {
@@ -389,7 +403,7 @@ describe("validate-platform-foundation-alignment", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
     audit.requiredValidators = audit.requiredValidators.filter((validator) => validator !== "scripts/validate-platform-task-execution-audit.mjs");
     const taskExecution = readJSON("resources/platform-task-execution-audit.json");
-    taskExecution.requiredUnfinishedNodes = ["production-admin-oidc-auth", "source-writing-codegen-promotion"];
+    taskExecution.requiredUnfinishedNodes = ["source-writing-codegen-promotion"];
     const engineering = readJSON("resources/platform-engineering-capabilities.json");
     const capability = engineering.capabilities.find((item) => item.id === "task-dependency-governance");
     capability.evidence.validators = capability.evidence.validators.filter((validator) => validator !== "scripts/validate-platform-task-execution-audit.mjs");
@@ -400,7 +414,7 @@ describe("validate-platform-foundation-alignment", () => {
     const result = runValidator(["--audit", auditPath, "--task-execution-audit", taskExecutionPath, "--engineering-capabilities", engineeringPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /task execution audit requiredUnfinishedNodes must contain only production-admin-oidc-auth during Task 7 evidence collection/);
+    assert.match(result.stderr, /task execution audit requiredUnfinishedNodes must be empty after Task 8 closeout/);
     assert.match(result.stderr, /alignment requiredValidators must include task execution validator scripts\/validate-platform-task-execution-audit\.mjs/);
     assert.match(result.stderr, /engineering capability task-dependency-governance must cite validate-platform-task-execution-audit\.mjs/);
   });

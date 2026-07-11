@@ -63,7 +63,7 @@
     "admin-ui-system-quality-hardening",
     "production-admin-oidc-auth"
   ],
-  "requiredFutureTaskNodes": ["production-admin-oidc-auth"],
+  "requiredFutureTaskNodes": [],
   "nonDroppableGoalNodes": [
     "stack-alignment-and-architecture",
     "governance-org-area-role-groups",

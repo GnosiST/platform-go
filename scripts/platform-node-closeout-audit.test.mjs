@@ -33,27 +33,16 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("keeps the pending production Admin OIDC node out of closeout", () => {
+  it("closes the production Admin OIDC node with Task 8 evidence", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
 
     assert.ok(task, "task graph must include production-admin-oidc-auth");
-    assert.equal(task.status, "pending");
-    assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), false);
-    assert.equal(audit.nodeCloseouts.length, 36);
-    assert.deepEqual(audit.pendingNodeEvidence, [
-      {
-        taskId: "production-admin-oidc-auth",
-        status: "pending",
-        closeoutAllowed: false,
-        missingEvidence: [
-          "production-like OIDC provider rehearsal",
-          "six-viewport browser acceptance",
-          "neat-freak cleanup evidence",
-        ],
-      },
-    ]);
+    assert.equal(task.status, "implemented");
+    assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
+    assert.equal(audit.nodeCloseouts.length, 37);
+    assert.deepEqual(audit.pendingNodeEvidence, []);
   });
 
   it("rejects implemented task nodes without closeout evidence", () => {

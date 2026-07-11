@@ -23,6 +23,7 @@ function argValue(name, fallback) {
 }
 
 const graphPath = path.resolve(repoRoot, argValue("--graph", "resources/platform-foundation-task-graph.json"));
+const oidcEvidencePath = path.resolve(repoRoot, argValue("--oidc-evidence", "resources/evidence/production-admin-oidc-auth-20260711.json"));
 
 function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -302,35 +303,74 @@ function validateTask(task, context, errors) {
   }
 }
 
-function validateProductionAdminOIDCNode(tasks, errors) {
+function validateProductionAdminOIDCNode(tasks, evidence, errors) {
   const task = tasks.find((item) => item.id === "production-admin-oidc-auth");
   if (!task) {
     errors.push("task graph must include production-admin-oidc-auth");
     return;
   }
-  if (task.status !== "pending") {
-    errors.push("production-admin-oidc-auth must stay pending until Task 8 evidence exists");
+  if (task.status !== "implemented") {
+    errors.push("production-admin-oidc-auth must be implemented after Task 8 evidence closeout");
   }
   const implemented = tasks.filter((item) => item.status === "implemented");
   const pending = tasks.filter((item) => item.status === "pending");
   const blocked = tasks.filter((item) => item.status === "blocked");
-  if (tasks.length !== 37 || implemented.length !== 36 || pending.length !== 1 || blocked.length !== 0) {
-    errors.push("Task 7 task graph counts must stay 37 total, 36 implemented, 1 pending and 0 blocked");
+  if (tasks.length !== 37 || implemented.length !== 37 || pending.length !== 0 || blocked.length !== 0) {
+    errors.push("Task 8 task graph counts must stay 37 total, 37 implemented, 0 pending and 0 blocked");
   }
   if (!sameList(values(task.dependsOn), ["production-auth-provider-hardening", "production-persistence-correctness", "admin-ui-system-quality-hardening"])) {
     errors.push("production-admin-oidc-auth dependencies must stay production auth, persistence correctness and Admin UI hardening");
   }
-  const requirements = values(task.pendingEvidenceRequirements);
+  const requirements = values(task.completionEvidence);
   const requiredIDs = ["production-like-oidc-rehearsal", "six-viewport-browser-acceptance", "neat-freak-cleanup-closeout"];
   if (!sameList(requirements.map((item) => item.id), requiredIDs)) {
-    errors.push("production-admin-oidc-auth pendingEvidenceRequirements must name production-like, six-viewport browser and neat-freak cleanup evidence");
+    errors.push("production-admin-oidc-auth completionEvidence must name production-like, six-viewport browser and neat-freak cleanup evidence");
   }
-  if (requirements.some((item) => item.status !== "pending" || item.requiredIn !== "Task 8")) {
-    errors.push("production-admin-oidc-auth pending evidence must stay pending for Task 8");
+  if (requirements.some((item) => item.status !== "verified" || item.requiredIn !== "Task 8")) {
+    errors.push("production-admin-oidc-auth completion evidence must be verified by Task 8");
   }
   const browser = requirements.find((item) => item.id === "six-viewport-browser-acceptance");
   if (!sameList(values(browser?.viewports), ["375x812", "390x844", "768x1024", "1024x768", "1280x720", "1440x1024"])) {
     errors.push("production-admin-oidc-auth browser evidence must require all six approved viewports");
+  }
+  if (!sameList(values(task.evidence?.screenshots), ["resources/evidence/production-admin-oidc-auth-20260711.json"])) {
+    errors.push("production-admin-oidc-auth screenshot evidence must use the tracked Task 8 evidence manifest");
+  }
+  if (evidence.redaction?.scanPassed !== true || evidence.redaction?.screenshotsInspected !== true) {
+    errors.push("production-admin-oidc-auth evidence redaction scan must pass");
+  }
+  if (!sameList(values(evidence.browser?.viewports), ["375x812", "390x844", "768x1024", "1024x768", "1280x720", "1440x1024"])) {
+    errors.push("production-admin-oidc-auth evidence manifest must cover all six viewports");
+  }
+  requireIncludes(
+    evidence.browser?.scenarios,
+    ["login", "success", "protected-navigation-refresh", "cancellation-recovery", "invalid-state-recovery", "expired-transaction-recovery", "missing-binding-recovery", "disabled-user-recovery", "keyboard-focus"],
+    "production-admin-oidc-auth evidence scenarios",
+    errors,
+  );
+  const screenshots = values(evidence.screenshots);
+  if (screenshots.length < 15) {
+    errors.push("production-admin-oidc-auth evidence manifest must integrity-address at least 15 screenshots");
+  }
+  for (const screenshot of screenshots) {
+    if (screenshot.redacted !== true || !/^sha256:[0-9a-f]{64}$/.test(screenshot.sha256 ?? "")) {
+      errors.push(`production-admin-oidc-auth screenshot ${screenshot.scenario ?? "<missing>"} must be redacted and carry a sha256 hash`);
+    }
+    if (!String(screenshot.localPath ?? "").startsWith("tmp/product-design/production-admin-oidc-auth-20260711/screenshots/")) {
+      errors.push(`production-admin-oidc-auth screenshot ${screenshot.scenario ?? "<missing>"} has an invalid local evidence path`);
+    }
+  }
+  if (evidence.runtime?.expiredTransactionRejected !== true || evidence.runtime?.stdinOnlyBinding !== true) {
+    errors.push("production-admin-oidc-auth evidence manifest must verify expiry and stdin-only binding");
+  }
+  if (
+    evidence.promotionBoundary?.foundationNodeClosed !== true ||
+    evidence.promotionBoundary?.productionPromotionApproved !== false ||
+    evidence.promotionBoundary?.runtimeMutation !== "disabled" ||
+    evidence.promotionBoundary?.refreshTokenFamilyDefaultRuntime !== "disabled" ||
+    evidence.promotionBoundary?.sourceWriting !== "disabled"
+  ) {
+    errors.push("production-admin-oidc-auth evidence manifest must preserve promotion and runtime boundaries");
   }
 }
 
@@ -408,7 +448,13 @@ function hasDependencyPath(tasksByID, fromTaskID, toTaskID, visited = new Set())
 
 function validate() {
   const graph = readJSON(graphPath);
+  let oidcEvidence = {};
   const errors = [];
+  try {
+    oidcEvidence = readJSON(oidcEvidencePath);
+  } catch (error) {
+    errors.push(`production-admin-oidc-auth evidence manifest could not be read: ${error.message}`);
+  }
   validateApprovedStack(graph, errors);
 
   const phases = values(graph.phases);
@@ -440,7 +486,7 @@ function validate() {
   for (const task of tasks) {
     validateTask(task, context, errors);
   }
-  validateProductionAdminOIDCNode(tasks, errors);
+  validateProductionAdminOIDCNode(tasks, oidcEvidence, errors);
 
   for (const cycle of detectCycles(tasksByID)) {
     errors.push(`dependency cycle detected: ${cycle}`);

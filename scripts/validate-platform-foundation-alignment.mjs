@@ -165,7 +165,9 @@ function validateTaskGraph(audit, taskGraph, errors) {
       errors.push(`alignment audit required task node is missing: ${taskID}`);
       continue;
     }
-    if (task.status !== "implemented" && task.status !== "preview" && !(taskID === "production-admin-oidc-auth" && task.status === "pending")) {
+    if (taskID === "production-admin-oidc-auth" && task.status !== "implemented") {
+      errors.push("alignment audit task production-admin-oidc-auth must be implemented after Task 8 closeout");
+    } else if (task.status !== "implemented" && task.status !== "preview") {
       errors.push(`alignment audit task ${taskID} has unsupported status ${task.status}`);
     }
     if (promotionGateTaskIDs.has(taskID)) {
@@ -754,13 +756,13 @@ function validateTaskExecutionAudit(audit, taskExecutionAudit, engineering, erro
   if (taskExecutionAudit.alignmentAudit !== "resources/platform-foundation-alignment-audit.json") {
     errors.push("task execution audit alignmentAudit must point to resources/platform-foundation-alignment-audit.json");
   }
-  if (JSON.stringify(values(audit.requiredFutureTaskNodes)) !== JSON.stringify(["production-admin-oidc-auth"])) {
-    errors.push("alignment requiredFutureTaskNodes must contain only production-admin-oidc-auth during Task 7 evidence collection");
+  if (values(audit.requiredFutureTaskNodes).length !== 0) {
+    errors.push("alignment requiredFutureTaskNodes must be empty after Task 8 closeout");
   }
-  if (JSON.stringify(values(taskExecutionAudit.requiredUnfinishedNodes)) !== JSON.stringify(["production-admin-oidc-auth"])) {
-    errors.push("task execution audit requiredUnfinishedNodes must contain only production-admin-oidc-auth during Task 7 evidence collection");
+  if (values(taskExecutionAudit.requiredUnfinishedNodes).length !== 0) {
+    errors.push("task execution audit requiredUnfinishedNodes must be empty after Task 8 closeout");
   }
-  for (const taskID of ["production-auth-provider-hardening", "source-writing-codegen-promotion", "production-admin-oidc-auth"]) {
+  for (const taskID of ["production-auth-provider-hardening", "source-writing-codegen-promotion"]) {
     if (!values(taskExecutionAudit.knownPromotionBlockers).some((blocker) => blocker.taskId === taskID)) {
       errors.push(`task execution audit knownPromotionBlockers must describe ${taskID}`);
     }

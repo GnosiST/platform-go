@@ -1,7 +1,7 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-node-closeout-audit.json",
   "capturedAt": "2026-07-11",
-  "purpose": "Machine-checkable node closeout audit for the reusable platform foundation. It keeps implemented task nodes tied to neat-freak knowledge cleanup, evidence paths, objective-conflict review and visual design gates before a node can be treated as closed, while explicitly withholding closeout from the evidence-pending production Admin OIDC node.",
+  "purpose": "Machine-checkable node closeout audit for the reusable platform foundation. It keeps implemented task nodes tied to neat-freak knowledge cleanup, evidence paths, objective-conflict review and visual design gates before a node can be treated as closed.",
   "policy": {
     "taskGraph": "resources/platform-foundation-task-graph.json",
     "implementedTasksRequireCloseout": true,
@@ -23,18 +23,7 @@
     ],
     "unfinishedTasksMustNotHaveCloseout": true
   },
-  "pendingNodeEvidence": [
-    {
-      "taskId": "production-admin-oidc-auth",
-      "status": "pending",
-      "closeoutAllowed": false,
-      "missingEvidence": [
-        "production-like OIDC provider rehearsal",
-        "six-viewport browser acceptance",
-        "neat-freak cleanup evidence"
-      ]
-    }
-  ],
+  "pendingNodeEvidence": [],
   "nodeCloseouts": [
     {
       "taskId": "stack-alignment-and-architecture",
@@ -768,6 +757,48 @@
         "scripts/validate-platform-node-closeout-audit.mjs",
         "scripts/validate-platform-objective-conformance.mjs",
         ".superpowers/sdd/task-4-report.md"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ],
+      "visualEvidence": [
+        "superpowers:brainstorming",
+        "product-design"
+      ]
+    },
+    {
+      "taskId": "production-admin-oidc-auth",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "README.md",
+        "design-qa.md",
+        "docs/platform-auth.md",
+        "docs/admin-rbac-menu.md",
+        "docs/admin-resource-schema.md",
+        "docs/admin-ui-foundation.md",
+        "docs/platform-capability-development.md",
+        "docs/platform-deployment.md",
+        "docs/platform-foundation-task-map.md",
+        "docs/platform-roadmap.md",
+        "docs/platform-stack-alignment-audit.md",
+        "docs/platform-ui-optimization-assessment.md",
+        "resources/platform-foundation-task-graph.json",
+        "resources/platform-goal-completion-audit.json",
+        "resources/platform-task-execution-audit.json",
+        "resources/platform-foundation-alignment-audit.json",
+        "resources/platform-objective-conformance.json",
+        "resources/evidence/production-admin-oidc-auth-20260711.json",
+        "scripts/validate-platform-foundation-task-graph.mjs",
+        "scripts/validate-platform-task-execution-audit.mjs",
+        "scripts/validate-platform-foundation-alignment.mjs",
+        "scripts/validate-platform-goal-completion-audit.mjs",
+        "scripts/validate-platform-node-closeout-audit.mjs",
+        "scripts/validate-platform-objective-conformance.mjs",
+        "scripts/admin-ui-contracts.test.mjs"
       ],
       "dimensions": [
         "docs",

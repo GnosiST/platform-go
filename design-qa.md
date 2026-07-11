@@ -71,6 +71,105 @@ P3 follow-up polish:
 
 final result: passed
 
+## 2026-07-11 Task 8 Production-Like Admin OIDC Acceptance
+
+Status: implemented and accepted for the reusable production Admin OIDC foundation node. External production promotion remains `not-approved`; runtime mutation and the independent refresh-token-family runtime remain disabled.
+
+Production-like runtime:
+
+- Keycloak image: `quay.io/keycloak/keycloak:26.3.3`, digest `sha256:6a7217a100bd3e5de4063a27a538ef999a3c5a88c4b4ec0ffc0a642aee7b2597`.
+- Container: `platform-oidc-task8`, bound as `127.0.0.1:19180 -> 8080`.
+- Realm/client: `platform-rehearsal` with confidential `platform-admin`, authorization-code flow, direct grants disabled, exact redirect and origin `http://127.0.0.1:19182/login`.
+- Platform API: `127.0.0.1:19181`; Admin Vite: `127.0.0.1:19182`.
+- Admin resource, session and lifecycle stores used ignored SQLite files below `tmp/product-design/production-admin-oidc-auth-20260711/runtime/`.
+- Demo auth was disabled, `admin-oidc` was enabled, and the subject entered only through stdin. No raw subject or secret is recorded in this QA artifact.
+
+Sanitized commands:
+
+```bash
+docker run -d --name platform-oidc-task8 -p 127.0.0.1:19180:8080 \
+  -e KC_BOOTSTRAP_ADMIN_USERNAME=<redacted-admin> \
+  -e KC_BOOTSTRAP_ADMIN_PASSWORD=<redacted-secret> \
+  quay.io/keycloak/keycloak:26.3.3 \
+  start-dev --http-port=8080 --hostname-strict=false
+
+kcadm.sh create realms \
+  -s realm=platform-rehearsal \
+  -s enabled=true \
+  -s sslRequired=external \
+  -s registrationAllowed=false
+
+# client platform-admin: protocol=openid-connect, enabled=true,
+# publicClient=false, standardFlowEnabled=true, directAccessGrantsEnabled=false,
+# redirectUris=[http://127.0.0.1:19182/login],
+# webOrigins=[http://127.0.0.1:19182], secret=<redacted-secret>
+
+printf '%s' '<subject-via-stdin>' | env <same-sqlite-and-oidc-env> \
+  go run ./cmd/platform-admin bind-admin-oidc \
+  --provider oidc \
+  --issuer http://127.0.0.1:19180/realms/platform-rehearsal \
+  --username admin \
+  --subject-stdin
+
+env PLATFORM_RUNTIME_ENV=development \
+  PLATFORM_HTTP_ADDR=127.0.0.1:19181 \
+  PLATFORM_CAPABILITIES=tenant,identity,session,rbac,menu,api-resource,audit,dictionary,parameter,file-storage,admin-shell,system-admin,admin-oidc \
+  PLATFORM_ADMIN_RESOURCE_DRIVER=sqlite PLATFORM_ADMIN_RESOURCE_DSN=tmp/.../admin.db \
+  PLATFORM_SESSION_DRIVER=sqlite PLATFORM_SESSION_DSN=tmp/.../session.db \
+  PLATFORM_LIFECYCLE_HISTORY_DRIVER=sqlite PLATFORM_LIFECYCLE_HISTORY_DSN=tmp/.../lifecycle.db \
+  PLATFORM_CACHE_DRIVER=memory PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true \
+  PLATFORM_ADMIN_OIDC_ISSUER_URL=http://127.0.0.1:19180/realms/platform-rehearsal \
+  PLATFORM_ADMIN_OIDC_CLIENT_ID=platform-admin \
+  PLATFORM_ADMIN_OIDC_CLIENT_SECRET=<redacted-secret> \
+  PLATFORM_ADMIN_OIDC_REDIRECT_URL=http://127.0.0.1:19182/login \
+  go run ./cmd/platform-api
+
+env VITE_PLATFORM_API_PROXY_TARGET=http://127.0.0.1:19181 \
+  npm --prefix admin run dev -- --host 127.0.0.1 --port 19182
+```
+
+Runtime outcomes:
+
+- Successful and repeated bound-user login reached authenticated overview; refresh and protected `/users` navigation returned 200, logout returned 200, and the revoked session returned 401.
+- Missing binding and disabled user returned the same normalized `AUTH_IDENTITY_NOT_BOUND` response without credential or identity leakage.
+- Cancellation and invalid state returned to `/login`, cleared URL search values, announced the failure through `aria-live="polite"`, focused the error heading and exposed a 44px recovery action.
+- A real Keycloak form remained open for 470 seconds, beyond the five-minute server transaction window. Submission returned to `/login`, cleared URL search values, focused the error heading and announced `登录已超时，请重新开始登录。`.
+- The archived evidence set comprises the tracked manifest, top-level redacted JSON summaries and screenshots. It contains no authorization code, state, nonce, verifier, claims, subject, token or credential values. The local `runtime/` harness directory is excluded, and its three credential-bearing browser fixture files were deleted after verification.
+
+Responsive and accessibility evidence:
+
+- Viewports: `375x812`, `390x844`, `768x1024`, `1024x768`, `1280x720`, `1440x1024`.
+- The four touch-oriented viewports had `overflow=false`, 52px provider controls, a 44px OIDC primary action, a 44x44 language control and four 44x44 theme swatches. Failure recovery actions were 313px, 328px, 380px and 380px wide, all 44px high.
+- Desktop widths had no horizontal overflow. Theme swatches were 26x26px, above the 24px WCAG target-size floor; the 44px touch rule applies through 1024px.
+- CDP reduced-motion emulation inspected 67 login descendants; the maximum computed animation or transition duration was `0.00001s`.
+- Final console warning/error collection was empty.
+
+Evidence:
+
+- `resources/evidence/production-admin-oidc-auth-20260711.json` (tracked screenshot hashes, runtime outcomes, redaction result and promotion boundary)
+- `tmp/product-design/production-admin-oidc-auth-20260711/runtime-rehearsal-redacted.json`
+- `tmp/product-design/production-admin-oidc-auth-20260711/missing-binding-redacted.json`
+- `tmp/product-design/production-admin-oidc-auth-20260711/disabled-user-redacted.json`
+- `tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-final-login-375x812.png`
+- `tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-final-login-390x844.png`
+- `tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-final-login-768x1024.png`
+- `tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-final-login-1024x768.png`
+- `tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-final-login-1280x720.png`
+- `tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-final-login-1440x1024.png`
+- `tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-success-overview-390x844.jpg`
+- `tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-success-overview-1280x720.jpg`
+- `tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-protected-users-refresh-1280x720.jpg`
+- `tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-cancel-recovery-focus-390x844.jpg`
+- `tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-invalid-state-recovery-390x844.jpg`
+- `tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-missing-binding-recovery-390x844.png`
+- `tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-disabled-user-recovery-390x844.png`
+- `tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-expired-transaction-recovery-1440x1024.png`
+- `tmp/product-design/production-admin-oidc-auth-20260711/screenshots/task8-keyboard-focus-390x844.jpg`
+
+Review result: the Task-level review of `52ab75b` reported no Critical, Important or Minor findings.
+
+final result: passed
+
 ## 2026-07-05 Follow-Up QA
 
 Additional screenshots:

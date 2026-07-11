@@ -1,7 +1,7 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-task-execution-audit.json",
   "capturedAt": "2026-07-11",
-  "purpose": "Machine-checkable execution audit for the active platform foundation goal: every task node, dependency, resource lock, parallel batch, future runtime-promotion gate and visual workflow gate must remain explicit before implementation continues, including the evidence-pending production Admin OIDC node.",
+  "purpose": "Machine-checkable execution audit for the active platform foundation goal: every task node, dependency, resource lock, parallel batch, future runtime-promotion gate and visual workflow gate remains explicit after foundation implementation closes.",
   "taskGraph": "resources/platform-foundation-task-graph.json",
   "alignmentAudit": "resources/platform-foundation-alignment-audit.json",
   "engineeringCapability": "task-dependency-governance",
@@ -16,7 +16,7 @@
     "parallelBatchesMustAvoidResourceLockConflicts": true,
     "parallelBatchesMustAvoidDependencyPaths": true
   },
-  "requiredUnfinishedNodes": ["production-admin-oidc-auth"],
+  "requiredUnfinishedNodes": [],
   "knownPromotionBlockers": [
     {
       "taskId": "production-auth-provider-hardening",
@@ -59,18 +59,6 @@
         "rollback plan",
         "structured source-writing approval evidence package",
         "external absolute artifact URI evidence"
-      ]
-    },
-    {
-      "taskId": "production-admin-oidc-auth",
-      "runtimeMutationBlockedWhile": [
-        "resources/platform-foundation-task-graph.json production-admin-oidc-auth status is pending",
-        "Task 8 production-like OIDC, six-viewport browser and neat-freak evidence is missing"
-      ],
-      "requiredEvidenceBeforePromotion": [
-        "production-like OIDC provider rehearsal",
-        "six-viewport browser acceptance",
-        "neat-freak cleanup evidence"
       ]
     }
   ],

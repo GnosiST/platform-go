@@ -226,6 +226,12 @@ The raw subject is accepted only through standard input. `--subject` and positio
 
 Do not add this command to API startup, Compose service startup or automatic deployment promotion. `/app/platform-admin` is bundled only for explicit one-shot operator use against the intended persistent Admin store.
 
+### Production-Like Rehearsal Evidence
+
+The 2026-07-11 Task 8 rehearsal used Keycloak `26.3.3`, a confidential `platform-admin` client, an exact loopback redirect, ignored SQLite Admin/session/lifecycle stores, demo authentication disabled and `admin-oidc` enabled. The subject entered only through `platform-admin bind-admin-oidc --subject-stdin`. `resources/evidence/production-admin-oidc-auth-20260711.json` is the tracked redacted manifest for local source evidence under `tmp/product-design/production-admin-oidc-auth-20260711/`; it integrity-addresses successful and repeated login, exact-state rejection, a transaction expired after the five-minute server window, missing binding, disabled user, retry, logout, refresh, revoked-session rejection and protected navigation without requiring ignored files in a clean checkout.
+
+Browser acceptance covers `375x812`, `390x844`, `768x1024`, `1024x768`, `1280x720` and `1440x1024`, including keyboard focus, live announcements, callback URL cleanup, reduced motion, touch targets, no page overflow and an empty warning/error console. These local production-like results close the reusable foundation node; they do not approve production promotion. Provider-secret ownership, rotation runbooks, rollback evidence and external release approvals remain governed by the `not-approved` production promotion package, and the independent refresh-token-family runtime remains disabled.
+
 ## Provider Promotion Matrix
 
 `resources/platform-production-auth-hardening.json` keeps the production Provider Promotion Matrix. It records each built-in provider's capability owner, runtime boundary, production usage, required controls, config keys and source-backed evidence. The matrix is cross-checked against `resources/generated/platform-capability-audit.json`, so every auth provider declared by enabled capability manifests must have a promotion-matrix entry before production promotion can be claimed.

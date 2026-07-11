@@ -1,7 +1,7 @@
 # Admin RBAC And Dynamic Menu
 
 Date: 2026-07-04
-Last updated: 2026-07-06
+Last updated: 2026-07-11
 
 ## Purpose
 
@@ -20,12 +20,15 @@ This slice turns resource permission codes into executable behavior:
 
 ## Auth Boundary
 
-Authentication has a unified provider boundary. The bundled `demo` provider is for local development and verification, while the HTTP credential boundary is JWT by default.
+Authentication has an audience-aware provider boundary. The bundled `demo` provider is for local development and verification; optional Admin OIDC uses a dedicated resolver and explicit identity binding, while the issued HTTP credential remains the existing Admin JWT backed by a server-side session.
 
 - `GET /api/auth/providers` returns enabled provider declarations from capability manifests.
-- `POST /api/auth/login` currently supports the configured `demo` provider and returns a JWT admin bearer token plus `expiresAt`.
+- `POST /api/auth/providers/:provider/start` begins an Admin OIDC authorization-code flow with signed state and S256 PKCE for a configured Admin-audience provider.
+- `POST /api/auth/login` supports demo credentials or the OIDC callback exchange and returns a JWT admin bearer token plus `expiresAt`.
+- OIDC resolves an enabled `admin-identities` binding to an existing enabled platform user with effective permissions. It never auto-creates users or derives roles, permissions, tenants, organizations or areas from provider claims or groups.
+- Admin and App provider audiences, identity resolvers, bindings and token types remain isolated.
 - The bearer token carries an internal server-side session id, so TTL and revocation remain authoritative.
-- `POST /api/auth/refresh` renews a still-active admin session and returns a new JWT while keeping the same server-side session id.
+- `POST /api/auth/refresh` renews a still-active admin session and returns a new JWT while keeping the same server-side session id. It is sliding renewal, not the disabled refresh-token-family runtime.
 - `POST /api/auth/logout` revokes the server-side session referenced by the bearer token.
 - `GET /api/admin/session/current` resolves the current user from `Authorization: Bearer ...` first.
 - If a bearer token is present but expired or revoked, the backend returns `401`.
@@ -35,7 +38,7 @@ Authentication has a unified provider boundary. The bundled `demo` provider is f
 - The seed `ops` user has `operator`, and `operator` has read-only permissions for capabilities, tenants, and monitoring.
 - Updating a role record's `permissions` value changes the effective permissions used by sessions, menu filtering and resource authorization.
 
-This is enough to validate role-linked menus and backend authorization without coupling the platform base to a final login provider. Sessions use a repository-backed store, with memory, file-backed and GORM-backed modes available while keeping the auth provider, JWT, refresh, session, menu and permission APIs stable.
+This keeps role-linked menus and backend authorization independent from the concrete login provider. Sessions use a repository-backed store, with memory, file-backed and GORM-backed modes available while keeping the auth provider, JWT, refresh, session, menu and permission APIs stable.
 
 ## APIs
 

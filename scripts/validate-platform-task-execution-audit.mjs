@@ -234,11 +234,15 @@ function validateTasks(audit, graph, alignment, contracts, errors) {
   const unfinishedIDs = values(audit.requiredUnfinishedNodes);
   const foundationPromotionGateTasks = new Set(["production-auth-provider-hardening", "source-writing-codegen-promotion"]);
 
-  if (JSON.stringify(unfinishedIDs) !== JSON.stringify(["production-admin-oidc-auth"])) {
-    errors.push("requiredUnfinishedNodes must contain only production-admin-oidc-auth during Task 7 evidence collection");
+  if (unfinishedIDs.length !== 0) {
+    errors.push("requiredUnfinishedNodes must be empty after Task 8 closeout");
   }
-  if (JSON.stringify(values(alignment.requiredFutureTaskNodes)) !== JSON.stringify(["production-admin-oidc-auth"])) {
-    errors.push("alignment.requiredFutureTaskNodes must contain only production-admin-oidc-auth during Task 7 evidence collection");
+  const graphUnfinishedIDs = tasks.filter((task) => task.status !== "implemented").map((task) => task.id);
+  if (JSON.stringify(unfinishedIDs) !== JSON.stringify(graphUnfinishedIDs)) {
+    errors.push(`requiredUnfinishedNodes must match unfinished task graph nodes: ${graphUnfinishedIDs.join(", ")}`);
+  }
+  if (values(alignment.requiredFutureTaskNodes).length !== 0) {
+    errors.push("alignment.requiredFutureTaskNodes must be empty after Task 8 closeout");
   }
 
   for (const task of tasks) {
@@ -295,23 +299,6 @@ function validateTasks(audit, graph, alignment, contracts, errors) {
     }
     if (values(blocker.requiredEvidenceBeforePromotion).length === 0) {
       errors.push(`knownPromotionBlockers.${taskID}.requiredEvidenceBeforePromotion must not be empty`);
-    }
-    if (taskID === "production-admin-oidc-auth") {
-      requireIncludes(
-        blocker.runtimeMutationBlockedWhile,
-        [
-          "resources/platform-foundation-task-graph.json production-admin-oidc-auth status is pending",
-          "Task 8 production-like OIDC, six-viewport browser and neat-freak evidence is missing",
-        ],
-        `knownPromotionBlockers.${taskID}.runtimeMutationBlockedWhile`,
-        errors,
-      );
-      requireIncludes(
-        blocker.requiredEvidenceBeforePromotion,
-        ["production-like OIDC provider rehearsal", "six-viewport browser acceptance", "neat-freak cleanup evidence"],
-        `knownPromotionBlockers.${taskID}.requiredEvidenceBeforePromotion`,
-        errors,
-      );
     }
     if (taskID === "production-auth-provider-hardening") {
       requireIncludes(
@@ -374,7 +361,7 @@ function validateTasks(audit, graph, alignment, contracts, errors) {
         errors,
       );
     }
-    if (task.visual === true && taskID !== "production-admin-oidc-auth") {
+    if (task.visual === true) {
       requireIncludes(
         blocker.requiredEvidenceBeforePromotion,
         ["superpowers:brainstorming design approval", "product-design visual approval"],

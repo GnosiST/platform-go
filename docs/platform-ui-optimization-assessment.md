@@ -14,7 +14,7 @@ Candidate A has completed that activation path as `admin-ui-system-quality-harde
 
 ## Current Evidence
 
-The current run inspected the local admin at `1280x720` and `390x844` with fresh browser captures:
+The 2026-07-10 audit inspected the local admin at `1280x720` and `390x844` with fresh browser captures:
 
 - `tmp/product-design/ui-optimization-audit-20260710/01-login-current.png`
 - `tmp/product-design/ui-optimization-audit-20260710/02-dashboard-desktop-current.png`
@@ -122,6 +122,6 @@ Completion gate:
 
 1. Production persistence correctness and Candidate A are implemented.
 2. Keep Candidate B deferred until there is a real brand/public-surface brief. If only the admin console changes, use the existing quiet operational design language and the implemented Candidate A contracts.
-3. Any future visual candidate requires an explicit task-graph node, design gates, resource locks and fresh screenshot evidence. The current graph is closed at 36/36/0.
+3. Any future visual candidate requires an explicit task-graph node, design gates, resource locks and fresh screenshot evidence. Candidate A closed its 36-node graph slice; the full foundation graph now closes at 37/37/0 after the production Admin OIDC Task 8 evidence.
 
 Evidence remains scoped: screenshots, DOM measurements and keyboard checks support this implementation but do not certify WCAG conformance. Screen-reader announcements, high zoom/reflow and platform-specific assistive technology require separate evidence.

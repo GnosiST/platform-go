@@ -57,6 +57,7 @@ GET /api/capabilities
 GET /api/platform/branding
 GET /api/platform/cache/stats
 GET /api/auth/providers
+POST /api/auth/providers/:provider/start
 POST /api/auth/login
 POST /api/auth/refresh
 POST /api/auth/logout
@@ -173,6 +174,7 @@ Production `PLATFORM_CAPABILITIES` must also be non-empty, remove `demo-data`, c
 
 ```bash
 PLATFORM_RUNTIME_ENV=production
+PLATFORM_CAPABILITIES=tenant,identity,session,rbac,menu,api-resource,audit,admin-oidc,dictionary,parameter,file-storage,admin-shell,system-admin
 PLATFORM_JWT_SECRET=<at-least-32-characters-and-not-the-dev-default>
 PLATFORM_ADMIN_RESOURCE_DRIVER=mysql
 PLATFORM_ADMIN_RESOURCE_DSN=user:pass@tcp(localhost:3306)/platform
@@ -183,7 +185,14 @@ PLATFORM_LIFECYCLE_HISTORY_DSN=user:pass@tcp(localhost:3306)/platform
 PLATFORM_CACHE_DRIVER=redis
 PLATFORM_REDIS_ADDR=127.0.0.1:6379
 PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true
+PLATFORM_ADMIN_OIDC_ISSUER_URL=https://identity.example/realms/platform
+PLATFORM_ADMIN_OIDC_CLIENT_ID=platform-admin
+PLATFORM_ADMIN_OIDC_CLIENT_SECRET=<redacted-secret>
+PLATFORM_ADMIN_OIDC_REDIRECT_URL=https://admin.example/login
+PLATFORM_ADMIN_OIDC_SCOPES=openid,profile,email
 ```
+
+When `admin-oidc` is the production Admin provider, provision an existing enabled Admin user through `platform-admin bind-admin-oidc --subject-stdin` before API startup. OIDC authentication never creates platform users, roles, permissions, tenants, organizations or areas automatically. See `docs/platform-auth.md` for the stdin-only binding procedure and readiness gate.
 
 Run `rtk node scripts/generate-platform-operations-plan.mjs`, `rtk node scripts/generate-production-auth-promotion-review.mjs` and `rtk node scripts/validate-platform-production-readiness.mjs` before release or production configuration work. Use `rtk node scripts/run-platform-production-preflight.mjs --list` to inspect the declared preflight catalog, `rtk node scripts/run-platform-production-preflight.mjs --policy <policy-id>` to dry-run a policy-specific command set, and add `--run` only when the operator is ready to execute the selected checks. Production operation policies and their policy-level preflight requirements are contract-first and non-mutating by default:
 

@@ -245,12 +245,15 @@ function validateProductionAuthHardening(capability, errors) {
   if (!values(capability.evidence?.sourcePaths).includes("resources/platform-foundation-task-graph.json")) {
     errors.push("production-auth-hardening-gate must cite resources/platform-foundation-task-graph.json");
   }
+  if (!values(capability.evidence?.sourcePaths).includes("resources/evidence/production-admin-oidc-auth-20260711.json")) {
+    errors.push("production-auth-hardening-gate must cite the tracked production Admin OIDC evidence manifest");
+  }
   if (!values(capability.evidence?.tests).includes("internal/platform/authprovider/oidc/resolver_test.go")) {
     errors.push("production-auth-hardening-gate must cite internal/platform/authprovider/oidc/resolver_test.go");
   }
   for (const requirement of ["production-like-oidc-rehearsal", "six-viewport-browser-acceptance", "neat-freak-cleanup-closeout"]) {
-    if (!values(capability.pendingEvidenceRequirements).includes(requirement)) {
-      errors.push(`production-auth-hardening-gate pendingEvidenceRequirements must include ${requirement}`);
+    if (!values(capability.completedEvidence).includes(requirement)) {
+      errors.push(`production-auth-hardening-gate completedEvidence must include ${requirement}`);
     }
   }
 }

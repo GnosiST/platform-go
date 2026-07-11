@@ -1397,6 +1397,7 @@
         "sourcePaths": [
           "resources/platform-production-auth-hardening.json",
           "resources/platform-foundation-task-graph.json",
+          "resources/evidence/production-admin-oidc-auth-20260711.json",
           "scripts/generate-production-auth-promotion-review.mjs",
           "docs/superpowers/specs/2026-07-11-production-admin-oidc-auth-design.md",
           "docs/platform-auth.md",
@@ -1664,7 +1665,7 @@
           }
         ]
       },
-      "pendingEvidenceRequirements": [
+      "completedEvidence": [
         "production-like-oidc-rehearsal",
         "six-viewport-browser-acceptance",
         "neat-freak-cleanup-closeout"
@@ -2292,7 +2293,7 @@
         "requiredSourceSnippets": [
           {
             "path": "resources/platform-goal-completion-audit.json",
-            "contains": "\"completionStatus\": \"not-complete-controlled\""
+            "contains": "\"completionStatus\": \"complete\""
           },
           {
             "path": "resources/platform-goal-completion-audit.json",
@@ -2547,7 +2548,7 @@
           },
           {
             "path": "resources/platform-objective-conformance.json",
-            "contains": "\"goalCompletionStatus\": \"not-complete-controlled\""
+            "contains": "\"goalCompletionStatus\": \"complete\""
           },
           {
             "path": "resources/platform-objective-conformance.json",

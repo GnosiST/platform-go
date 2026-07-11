@@ -153,23 +153,11 @@ function validate() {
     }
   }
 
-  const pendingEvidence = values(audit.pendingNodeEvidence);
-  if (JSON.stringify(unfinishedTasks.map((task) => task.id)) !== JSON.stringify(["production-admin-oidc-auth"])) {
-    errors.push("node closeout audit must track only production-admin-oidc-auth as unfinished during Task 7 evidence collection");
+  if (unfinishedTasks.length !== 0) {
+    errors.push(`node closeout audit requires every foundation task to be implemented after Task 8: ${unfinishedTasks.map((task) => task.id).join(", ")}`);
   }
-  if (pendingEvidence.length !== 1 || pendingEvidence[0]?.taskId !== "production-admin-oidc-auth") {
-    errors.push("pendingNodeEvidence must describe production-admin-oidc-auth");
-  } else {
-    const pending = pendingEvidence[0];
-    if (pending.status !== "pending" || pending.closeoutAllowed !== false) {
-      errors.push("pendingNodeEvidence.production-admin-oidc-auth must stay pending with closeoutAllowed false");
-    }
-    requireIncludes(
-      pending.missingEvidence,
-      ["production-like OIDC provider rehearsal", "six-viewport browser acceptance", "neat-freak cleanup evidence"],
-      "pendingNodeEvidence.production-admin-oidc-auth.missingEvidence",
-      errors,
-    );
+  if (values(audit.pendingNodeEvidence).length !== 0) {
+    errors.push("pendingNodeEvidence must be empty after Task 8 closeout");
   }
 
   return { audit, implementedCount: implementedTasks.length, errors };
