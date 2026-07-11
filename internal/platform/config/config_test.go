@@ -354,7 +354,7 @@ func TestLoadParsesAdminOIDCConfiguration(t *testing.T) {
 
 	cfg := Load()
 	if !cfg.AdminOIDCConfigured() || len(cfg.AdminOIDCScopes) != 3 {
-		t.Fatalf("OIDC config = %+v", cfg)
+		t.Fatalf("AdminOIDCConfigured() = %t, scopes = %d", cfg.AdminOIDCConfigured(), len(cfg.AdminOIDCScopes))
 	}
 }
 
