@@ -132,17 +132,19 @@ export function hasOIDCCallbackParams(search: string) {
 
 export async function consumePendingOIDCLoginTransaction<TResult>(search: string, dependencies: OIDCCallbackDependencies<TResult>): Promise<TResult | null> {
   const params = new URLSearchParams(search);
+  const hasCode = params.has("code");
+  const hasCallbackState = params.has("state");
+  const hasProviderError = params.has("error");
   const code = params.get("code");
   const callbackState = params.get("state");
-  const providerError = params.get("error");
-  if (!code && !callbackState && !providerError) {
+  if (!hasCode && !hasCallbackState && !hasProviderError) {
     return null;
   }
 
   dependencies.cleanupURL();
   const rawPending = dependencies.readPending();
   dependencies.removePending();
-  if (providerError || !code || !callbackState) {
+  if (hasProviderError || !code || !callbackState) {
     throw new OIDCCallbackError("callback");
   }
 

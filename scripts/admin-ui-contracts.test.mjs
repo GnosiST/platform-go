@@ -317,6 +317,7 @@ describe("validate-admin-ui-contracts", () => {
           createSingleUseGuard,
           createSubmissionLock,
           filterAdminAuthProviders,
+          OIDCCallbackError,
           validateOIDCAuthorizationURL,
         } from ${JSON.stringify(moduleURL)};
 
@@ -424,6 +425,21 @@ describe("validate-admin-ui-contracts", () => {
         const noCallback = makeConsumeDependencies();
         assert.equal(await consumePendingOIDCLoginTransaction("", noCallback.dependencies), null);
         assert.deepEqual(noCallback.events, []);
+
+        for (const scenario of [
+          { name: "empty code and state", search: "?code=&state=" },
+          { name: "empty provider error", search: "?error=" },
+          { name: "empty provider error with code and state", search: "?code=x&state=y&error=" },
+        ]) {
+          const current = makeConsumeDependencies();
+          await assert.rejects(
+            consumePendingOIDCLoginTransaction(scenario.search, current.dependencies),
+            (error) => error instanceof OIDCCallbackError && error.reason === "callback" && error.message === "callback",
+            scenario.name,
+          );
+          assert.deepEqual(current.events, ["cleanup", "read", "remove"], scenario.name);
+          assert.deepEqual(current.exchanges, [], scenario.name);
+        }
 
         for (const scenario of [
           { name: "missing code", search: "?state=state-exact" },
