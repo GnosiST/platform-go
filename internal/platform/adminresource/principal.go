@@ -12,16 +12,23 @@ import (
 var ErrAdminPrincipalInvalid = errors.New("invalid admin principal")
 
 func ValidateAdminPrincipal(store *Store, username string) (rbac.Principal, error) {
-	username = strings.TrimSpace(username)
-	if store == nil || username == "" {
+	if store == nil {
 		return rbac.Principal{}, ErrAdminPrincipalInvalid
 	}
 	store.mu.Lock()
 	defer store.mu.Unlock()
-	if !store.hasSingleEnabledUserLocked(username) {
+	return store.validateAdminPrincipalLocked(username)
+}
+
+func (s *Store) validateAdminPrincipalLocked(username string) (rbac.Principal, error) {
+	username = strings.TrimSpace(username)
+	if username == "" {
 		return rbac.Principal{}, ErrAdminPrincipalInvalid
 	}
-	principal := store.currentPrincipalLocked(username)
+	if !s.hasSingleEnabledUserLocked(username) {
+		return rbac.Principal{}, ErrAdminPrincipalInvalid
+	}
+	principal := s.currentPrincipalLocked(username)
 	if strings.TrimSpace(principal.User.ID) == "" || principal.User.Username != username || !hasEffectivePermission(principal) {
 		return rbac.Principal{}, ErrAdminPrincipalInvalid
 	}

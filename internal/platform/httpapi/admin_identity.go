@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"strings"
-	"sync"
 	"time"
 
 	"platform-go/internal/platform/adminresource"
@@ -79,7 +78,6 @@ const adminIdentitiesResource = "admin-identities"
 type resourceAdminIdentityBindingStore struct {
 	resources *adminresource.Store
 	now       func() time.Time
-	mu        sync.Mutex
 }
 
 func NewResourceAdminIdentityBindingStore(resources *adminresource.Store, now func() time.Time) AdminIdentityBindingStore {
@@ -90,33 +88,17 @@ func (s *resourceAdminIdentityBindingStore) ResolveAdminIdentityBinding(ctx cont
 	if err := ctx.Err(); err != nil {
 		return AdminIdentityBinding{}, err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	provider, issuer, subject, ok := normalizedAdminIdentityTuple(input.Provider, input.Issuer, input.ProviderSubject)
 	if !ok || s.resources == nil {
 		return AdminIdentityBinding{}, ErrAdminIdentityBindingInvalid
 	}
-	issuerHash := adminIssuerHash(issuer)
-	subjectHash := adminProviderSubjectHash(provider, issuer, subject)
-	records, err := s.resources.List(adminIdentitiesResource)
+	username, err := s.resources.ResolveAdminIdentityBinding(ctx, adminresource.AdminIdentityBindingResolveInput{
+		Key: adminresource.AdminIdentityBindingKey{
+			Provider: provider.ID, ProviderKind: provider.Kind, IssuerHash: adminIssuerHash(issuer), ProviderSubjectHash: adminProviderSubjectHash(provider, issuer, subject),
+		},
+		Now: s.resolveNow(input.Now),
+	})
 	if err != nil {
-		return AdminIdentityBinding{}, normalizeAdminIdentityBindingStoreError(err)
-	}
-	match := matchingAdminIdentityRecords(records, provider, issuerHash, subjectHash)
-	if match.conflict || len(match.records) != 1 || strings.TrimSpace(match.records[0].Status) != "enabled" {
-		return AdminIdentityBinding{}, ErrAdminIdentityBindingInvalid
-	}
-	record := match.records[0]
-	username := strings.TrimSpace(record.Values["platformUsername"])
-	if username == "" {
-		return AdminIdentityBinding{}, ErrAdminIdentityBindingInvalid
-	}
-	now := s.resolveNow(input.Now)
-	values := cloneStringMap(record.Values)
-	values["lastLoginAt"] = now.UTC().Format(time.RFC3339)
-	if _, err := s.resources.Update(adminIdentitiesResource, record.ID, adminresource.WriteInput{
-		Code: record.Code, Name: record.Name, Status: record.Status, Description: record.Description, Values: values,
-	}); err != nil {
 		return AdminIdentityBinding{}, normalizeAdminIdentityBindingStoreError(err)
 	}
 	return AdminIdentityBinding{Username: username}, nil
@@ -126,48 +108,22 @@ func (s *resourceAdminIdentityBindingStore) ProvisionAdminIdentityBinding(ctx co
 	if err := ctx.Err(); err != nil {
 		return AdminIdentityBinding{}, err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	provider, issuer, subject, ok := normalizedAdminIdentityTuple(input.Provider, input.Issuer, input.ProviderSubject)
 	username := strings.TrimSpace(input.Username)
 	if !ok || username == "" || s.resources == nil {
 		return AdminIdentityBinding{}, ErrAdminIdentityBindingInvalid
 	}
-	if _, err := adminresource.ValidateAdminPrincipal(s.resources, username); err != nil {
-		return AdminIdentityBinding{}, ErrAdminIdentityBindingInvalid
-	}
-	issuerHash := adminIssuerHash(issuer)
-	subjectHash := adminProviderSubjectHash(provider, issuer, subject)
-	records, err := s.resources.List(adminIdentitiesResource)
+	resolvedUsername, err := s.resources.ProvisionAdminIdentityBinding(ctx, adminresource.AdminIdentityBindingProvisionInput{
+		Key: adminresource.AdminIdentityBindingKey{
+			Provider: provider.ID, ProviderKind: provider.Kind, IssuerHash: adminIssuerHash(issuer), ProviderSubjectHash: adminProviderSubjectHash(provider, issuer, subject),
+		},
+		PlatformUsername: username,
+		Now:              s.resolveNow(input.Now),
+	})
 	if err != nil {
 		return AdminIdentityBinding{}, normalizeAdminIdentityBindingStoreError(err)
 	}
-	match := matchingAdminIdentityRecords(records, provider, issuerHash, subjectHash)
-	if match.conflict {
-		return AdminIdentityBinding{}, ErrAdminIdentityBindingInvalid
-	}
-	if len(match.records) > 0 {
-		if len(match.records) == 1 && strings.TrimSpace(match.records[0].Status) == "enabled" && strings.TrimSpace(match.records[0].Values["platformUsername"]) == username {
-			return AdminIdentityBinding{Username: username}, nil
-		}
-		return AdminIdentityBinding{}, ErrAdminIdentityBindingInvalid
-	}
-	now := s.resolveNow(input.Now).UTC()
-	values := map[string]string{
-		"provider":            provider.ID,
-		"providerKind":        provider.Kind,
-		"issuerHash":          issuerHash,
-		"providerSubjectHash": subjectHash,
-		"platformUsername":    username,
-		"createdAt":           now.Format(time.RFC3339),
-		"lastLoginAt":         now.Format(time.RFC3339),
-	}
-	if _, err := s.resources.Create(adminIdentitiesResource, adminresource.WriteInput{
-		Code: provider.ID + "-" + subjectHash[:12], Name: "Admin identity binding", Status: "enabled", Values: values,
-	}); err != nil {
-		return AdminIdentityBinding{}, normalizeAdminIdentityBindingStoreError(err)
-	}
-	return AdminIdentityBinding{Username: username}, nil
+	return AdminIdentityBinding{Username: resolvedUsername}, nil
 }
 
 func (s *resourceAdminIdentityBindingStore) ValidateAdminIdentityBindingReadiness(ctx context.Context, provider capability.AuthProvider) error {
@@ -179,45 +135,10 @@ func (s *resourceAdminIdentityBindingStore) ValidateAdminIdentityBindingReadines
 	if provider.ID == "" || provider.Kind != "oidc" || !provider.Enabled || !provider.Configured || !provider.SupportsAudience(capability.AuthProviderAudienceAdmin) {
 		return ErrAdminIdentityBindingInvalid
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.resources == nil {
 		return ErrAdminIdentityBindingInvalid
 	}
-	records, err := s.resources.List(adminIdentitiesResource)
-	if err != nil {
-		return normalizeAdminIdentityBindingStoreError(err)
-	}
-	seenTuples := make(map[string]struct{})
-	ready := false
-	for _, record := range records {
-		if strings.TrimSpace(record.Status) != "enabled" {
-			continue
-		}
-		values := record.Values
-		recordProvider := strings.TrimSpace(values["provider"])
-		recordProviderKind := strings.TrimSpace(values["providerKind"])
-		issuerHash := strings.TrimSpace(values["issuerHash"])
-		subjectHash := strings.TrimSpace(values["providerSubjectHash"])
-		if recordProvider != provider.ID || recordProviderKind != provider.Kind {
-			continue
-		}
-		if !validAdminIdentityHash(issuerHash) || !validAdminIdentityHash(subjectHash) {
-			continue
-		}
-		tupleKey := issuerHash + "\x00" + subjectHash
-		if _, exists := seenTuples[tupleKey]; exists {
-			return ErrAdminIdentityBindingInvalid
-		}
-		seenTuples[tupleKey] = struct{}{}
-		if _, err := adminresource.ValidateAdminPrincipal(s.resources, values["platformUsername"]); err == nil {
-			ready = true
-		}
-	}
-	if ready {
-		return nil
-	}
-	return ErrAdminIdentityBindingInvalid
+	return normalizeAdminIdentityBindingStoreError(s.resources.ValidateAdminIdentityBindingReadiness(ctx, provider.ID, provider.Kind))
 }
 
 func ValidateAdminAuthReadiness(ctx context.Context, manifests []capability.Manifest, bindings AdminIdentityBindingStore, disableDemo bool) error {
@@ -260,27 +181,6 @@ func normalizedAdminIdentityTuple(provider capability.AuthProvider, issuer strin
 	return provider, issuer, subject, valid
 }
 
-type adminIdentityRecordMatch struct {
-	records  []adminresource.Record
-	conflict bool
-}
-
-func matchingAdminIdentityRecords(records []adminresource.Record, provider capability.AuthProvider, issuerHash string, subjectHash string) adminIdentityRecordMatch {
-	match := adminIdentityRecordMatch{records: make([]adminresource.Record, 0, 1)}
-	for _, record := range records {
-		values := record.Values
-		if values["issuerHash"] != issuerHash || values["providerSubjectHash"] != subjectHash {
-			continue
-		}
-		if strings.TrimSpace(values["provider"]) != provider.ID || strings.TrimSpace(values["providerKind"]) != provider.Kind {
-			match.conflict = true
-			continue
-		}
-		match.records = append(match.records, record)
-	}
-	return match
-}
-
 func adminIssuerHash(issuer string) string {
 	sum := sha256.Sum256([]byte(strings.TrimSpace(issuer)))
 	return hex.EncodeToString(sum[:])
@@ -297,12 +197,6 @@ func adminProviderSubjectHash(provider capability.AuthProvider, issuer string, s
 	return hex.EncodeToString(sum[:])
 }
 
-func validAdminIdentityHash(value string) bool {
-	value = strings.TrimSpace(value)
-	decoded, err := hex.DecodeString(value)
-	return err == nil && len(decoded) == sha256.Size && hex.EncodeToString(decoded) == value
-}
-
 func (s *resourceAdminIdentityBindingStore) resolveNow(value time.Time) time.Time {
 	if !value.IsZero() {
 		return value
@@ -314,7 +208,7 @@ func (s *resourceAdminIdentityBindingStore) resolveNow(value time.Time) time.Tim
 }
 
 func normalizeAdminIdentityBindingStoreError(err error) error {
-	if errors.Is(err, adminresource.ErrUnknownResource) || errors.Is(err, adminresource.ErrRecordNotFound) || errors.Is(err, adminresource.ErrInvalidRecord) {
+	if errors.Is(err, adminresource.ErrAdminIdentityBindingInvalid) || errors.Is(err, adminresource.ErrUnknownResource) || errors.Is(err, adminresource.ErrRecordNotFound) || errors.Is(err, adminresource.ErrInvalidRecord) {
 		return ErrAdminIdentityBindingInvalid
 	}
 	return err

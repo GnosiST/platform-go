@@ -64,10 +64,14 @@ func NewStore() *Store {
 }
 
 func (s *Store) persistLocked() error {
+	return s.persistContextLocked(context.Background())
+}
+
+func (s *Store) persistContextLocked(ctx context.Context) error {
 	if s.repository == nil {
 		return nil
 	}
-	committed, err := s.repository.Save(context.Background(), s.snapshotLocked())
+	committed, err := s.repository.Save(ctx, s.snapshotLocked())
 	if err != nil {
 		return err
 	}
@@ -97,10 +101,14 @@ func (s *Store) Reload() error {
 }
 
 func (s *Store) reloadLocked() error {
+	return s.reloadContextLocked(context.Background())
+}
+
+func (s *Store) reloadContextLocked(ctx context.Context) error {
 	if s.repository == nil {
 		return nil
 	}
-	snapshot, err := s.repository.Load(context.Background())
+	snapshot, err := s.repository.Load(ctx)
 	if err != nil {
 		return err
 	}

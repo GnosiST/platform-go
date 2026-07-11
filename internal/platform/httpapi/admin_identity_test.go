@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -136,6 +137,229 @@ func TestAdminIdentityBindingRejectsDisabledDuplicateAndConflictingMappings(t *t
 			t.Fatalf("conflicting provision changed records: count = %d, error = %v", len(records), err)
 		}
 	})
+}
+
+func TestAdminIdentityBindingResolveDoesNotRestoreBindingDisabledByConcurrentCRUD(t *testing.T) {
+	repository := newRevisionAwareIdentityRepository()
+	seedAdminIdentityBinding(t, repository)
+	resolveStore := newAdminIdentityRepositoryStore(t, repository)
+	crudStore := newAdminIdentityRepositoryStore(t, repository)
+	bindings := NewResourceAdminIdentityBindingStore(resolveStore, time.Now)
+	before := adminIdentityRecordFromRepository(t, repository)
+	reached, release := repository.pauseNextLoad()
+
+	result := make(chan error, 1)
+	go func() {
+		_, err := bindings.ResolveAdminIdentityBinding(context.Background(), AdminIdentityBindingInput{
+			Provider: adminOIDCProviderForTest(), Issuer: "https://id.example", ProviderSubject: "subject-123", Now: time.Date(2026, time.July, 11, 12, 0, 0, 0, time.UTC),
+		})
+		result <- err
+	}()
+	waitForRepositoryPause(t, reached)
+
+	records, err := crudStore.List(adminIdentitiesResource)
+	if err != nil || len(records) != 1 {
+		t.Fatalf("List(admin-identities) = %d, %v", len(records), err)
+	}
+	if _, err := crudStore.Update(adminIdentitiesResource, records[0].ID, adminresource.WriteInput{
+		Code: records[0].Code, Name: records[0].Name, Status: "disabled", Description: records[0].Description, Values: records[0].Values,
+	}); err != nil {
+		t.Fatalf("Update(disable admin identity) error = %v", err)
+	}
+	close(release)
+
+	if err := <-result; !errors.Is(err, ErrAdminIdentityBindingInvalid) {
+		t.Fatalf("ResolveAdminIdentityBinding() error = %v, want disabled binding rejection", err)
+	}
+	after := adminIdentityRecordFromRepository(t, repository)
+	if after.Status != "disabled" {
+		t.Fatalf("binding status = %q, want concurrent disable preserved", after.Status)
+	}
+	if after.Values["platformUsername"] != before.Values["platformUsername"] || after.Values["lastLoginAt"] != before.Values["lastLoginAt"] {
+		t.Fatalf("concurrent disable changed binding mapping or lastLoginAt")
+	}
+}
+
+func TestAdminIdentityBindingResolveDoesNotOverwriteBindingReassignedByConcurrentCRUD(t *testing.T) {
+	repository := newRevisionAwareIdentityRepository()
+	seedAdminIdentityBinding(t, repository)
+	resolveStore := newAdminIdentityRepositoryStore(t, repository)
+	crudStore := newAdminIdentityRepositoryStore(t, repository)
+	bindings := NewResourceAdminIdentityBindingStore(resolveStore, time.Now)
+	reached, release := repository.pauseNextLoad()
+
+	type resolveResult struct {
+		binding AdminIdentityBinding
+		err     error
+	}
+	result := make(chan resolveResult, 1)
+	go func() {
+		binding, err := bindings.ResolveAdminIdentityBinding(context.Background(), AdminIdentityBindingInput{
+			Provider: adminOIDCProviderForTest(), Issuer: "https://id.example", ProviderSubject: "subject-123", Now: time.Date(2026, time.July, 11, 12, 30, 0, 0, time.UTC),
+		})
+		result <- resolveResult{binding: binding, err: err}
+	}()
+	waitForRepositoryPause(t, reached)
+
+	records, err := crudStore.List(adminIdentitiesResource)
+	if err != nil || len(records) != 1 {
+		t.Fatalf("List(admin-identities) = %d, %v", len(records), err)
+	}
+	values := cloneAdminIdentityValues(records[0].Values)
+	values["platformUsername"] = "ops"
+	if _, err := crudStore.Update(adminIdentitiesResource, records[0].ID, adminresource.WriteInput{
+		Code: records[0].Code, Name: records[0].Name, Status: records[0].Status, Description: records[0].Description, Values: values,
+	}); err != nil {
+		t.Fatalf("Update(reassign admin identity) error = %v", err)
+	}
+	close(release)
+
+	resolved := <-result
+	if resolved.err != nil || resolved.binding.Username != "ops" {
+		t.Fatalf("ResolveAdminIdentityBinding() = %+v, %v, want reassigned ops binding", resolved.binding, resolved.err)
+	}
+	after := adminIdentityRecordFromRepository(t, repository)
+	if after.Values["platformUsername"] != "ops" {
+		t.Fatalf("binding username = %q, want concurrent reassignment preserved", after.Values["platformUsername"])
+	}
+}
+
+func TestAdminIdentityBindingResolveRetriesRevisionConflictAndFailsClosed(t *testing.T) {
+	repository := newRevisionAwareIdentityRepository()
+	seedAdminIdentityBinding(t, repository)
+	resolveStore := newAdminIdentityRepositoryStore(t, repository)
+	crudStore := newAdminIdentityRepositoryStore(t, repository)
+	bindings := NewResourceAdminIdentityBindingStore(resolveStore, time.Now)
+	reached, release := repository.pauseNextSave()
+
+	result := make(chan error, 1)
+	go func() {
+		_, err := bindings.ResolveAdminIdentityBinding(context.Background(), AdminIdentityBindingInput{
+			Provider: adminOIDCProviderForTest(), Issuer: "https://id.example", ProviderSubject: "subject-123", Now: time.Date(2026, time.July, 11, 13, 0, 0, 0, time.UTC),
+		})
+		result <- err
+	}()
+	waitForRepositoryPause(t, reached)
+
+	records, err := crudStore.List(adminIdentitiesResource)
+	if err != nil || len(records) != 1 {
+		t.Fatalf("List(admin-identities) = %d, %v", len(records), err)
+	}
+	if _, err := crudStore.Update(adminIdentitiesResource, records[0].ID, adminresource.WriteInput{
+		Code: records[0].Code, Name: records[0].Name, Status: "disabled", Description: records[0].Description, Values: records[0].Values,
+	}); err != nil {
+		t.Fatalf("Update(disable admin identity) error = %v", err)
+	}
+	close(release)
+
+	if err := <-result; !errors.Is(err, ErrAdminIdentityBindingInvalid) {
+		t.Fatalf("ResolveAdminIdentityBinding() error = %v, want conflict retry followed by disabled rejection", err)
+	}
+	if record := adminIdentityRecordFromRepository(t, repository); record.Status != "disabled" {
+		t.Fatalf("binding status = %q, want disabled after revision conflict", record.Status)
+	}
+}
+
+func TestAdminIdentityBindingProvisionIsAtomicAcrossStoreWrappers(t *testing.T) {
+	tests := []struct {
+		name          string
+		firstUsername string
+		wantFirstErr  error
+	}{
+		{name: "same mapping is idempotent", firstUsername: "admin"},
+		{name: "conflicting username is rejected", firstUsername: "ops", wantFirstErr: ErrAdminIdentityBindingInvalid},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repository := newRevisionAwareIdentityRepository()
+			firstStore := newAdminIdentityRepositoryStore(t, repository)
+			secondStore := newAdminIdentityRepositoryStore(t, repository)
+			firstBindings := NewResourceAdminIdentityBindingStore(firstStore, time.Now)
+			secondBindings := NewResourceAdminIdentityBindingStore(secondStore, time.Now)
+			reached, release := repository.pauseNextLoad()
+
+			result := make(chan error, 1)
+			go func() {
+				_, err := firstBindings.ProvisionAdminIdentityBinding(context.Background(), AdminIdentityProvisionInput{
+					Provider: adminOIDCProviderForTest(), Issuer: "https://id.example", ProviderSubject: "subject-123", Username: test.firstUsername,
+				})
+				result <- err
+			}()
+			waitForRepositoryPause(t, reached)
+			if _, err := secondBindings.ProvisionAdminIdentityBinding(context.Background(), AdminIdentityProvisionInput{
+				Provider: adminOIDCProviderForTest(), Issuer: "https://id.example", ProviderSubject: "subject-123", Username: "admin",
+			}); err != nil {
+				t.Fatalf("second ProvisionAdminIdentityBinding() error = %v", err)
+			}
+			close(release)
+
+			firstErr := <-result
+			if test.wantFirstErr == nil && firstErr != nil {
+				t.Fatalf("first ProvisionAdminIdentityBinding() error = %v", firstErr)
+			}
+			if test.wantFirstErr != nil && !errors.Is(firstErr, test.wantFirstErr) {
+				t.Fatalf("first ProvisionAdminIdentityBinding() error = %v, want %v", firstErr, test.wantFirstErr)
+			}
+			snapshot, err := repository.Load(context.Background())
+			if err != nil {
+				t.Fatalf("repository.Load() error = %v", err)
+			}
+			records := snapshot.Resources[adminIdentitiesResource]
+			if len(records) != 1 || records[0].Values["platformUsername"] != "admin" {
+				t.Fatalf("persisted bindings = %+v, want one admin mapping", records)
+			}
+		})
+	}
+}
+
+func TestAdminIdentityBindingResolveValidatesPrincipalBeforeLastLoginUpdate(t *testing.T) {
+	repository := newRevisionAwareIdentityRepository()
+	seedAdminIdentityBinding(t, repository)
+	crudStore := newAdminIdentityRepositoryStore(t, repository)
+	if _, err := crudStore.Update("users", "user-admin", adminresource.WriteInput{
+		Name: "Platform Admin", Status: "disabled", Values: map[string]string{"roles": "super-admin", "tenantCode": "platform"},
+	}); err != nil {
+		t.Fatalf("Update(disable user-admin) error = %v", err)
+	}
+	before := adminIdentityRecordFromRepository(t, repository)
+	resolveStore := newAdminIdentityRepositoryStore(t, repository)
+	bindings := NewResourceAdminIdentityBindingStore(resolveStore, time.Now)
+
+	_, err := bindings.ResolveAdminIdentityBinding(context.Background(), AdminIdentityBindingInput{
+		Provider: adminOIDCProviderForTest(), Issuer: "https://id.example", ProviderSubject: "subject-123", Now: time.Date(2026, time.July, 11, 14, 0, 0, 0, time.UTC),
+	})
+	if !errors.Is(err, ErrAdminIdentityBindingInvalid) {
+		t.Fatalf("ResolveAdminIdentityBinding() error = %v, want invalid principal rejection", err)
+	}
+	after := adminIdentityRecordFromRepository(t, repository)
+	if after.Values["lastLoginAt"] != before.Values["lastLoginAt"] {
+		t.Fatalf("lastLoginAt = %q, want unchanged %q", after.Values["lastLoginAt"], before.Values["lastLoginAt"])
+	}
+}
+
+func TestAdminIdentityBindingResolveRollsBackRepositorySaveFailure(t *testing.T) {
+	repository := newRevisionAwareIdentityRepository()
+	seedAdminIdentityBinding(t, repository)
+	store := newAdminIdentityRepositoryStore(t, repository)
+	bindings := NewResourceAdminIdentityBindingStore(store, time.Now)
+	before := adminIdentityRecordFromRepository(t, repository)
+	wantErr := errors.New("injected admin identity save failure")
+	repository.failNextSaveWith(wantErr)
+
+	_, err := bindings.ResolveAdminIdentityBinding(context.Background(), AdminIdentityBindingInput{
+		Provider: adminOIDCProviderForTest(), Issuer: "https://id.example", ProviderSubject: "subject-123", Now: time.Date(2026, time.July, 11, 15, 0, 0, 0, time.UTC),
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("ResolveAdminIdentityBinding() error = %v, want injected save failure", err)
+	}
+	after := adminIdentityRecordFromRepository(t, repository)
+	if after.Values["lastLoginAt"] != before.Values["lastLoginAt"] {
+		t.Fatalf("persisted lastLoginAt changed after failed save")
+	}
+	records, listErr := store.List(adminIdentitiesResource)
+	if listErr != nil || len(records) != 1 || records[0].Values["lastLoginAt"] != before.Values["lastLoginAt"] {
+		t.Fatalf("store snapshot was not rolled back after failed save: %+v, %v", records, listErr)
+	}
 }
 
 func TestAdminAuthReadinessIsDataAwareAndRedacted(t *testing.T) {
@@ -327,5 +551,149 @@ func assertAdminIdentityRedacted(t *testing.T, value string, sensitive ...string
 		if item != "" && strings.Contains(value, item) {
 			t.Fatalf("value exposed sensitive admin identity data")
 		}
+	}
+}
+
+type repositoryPause struct {
+	reached chan struct{}
+	release chan struct{}
+}
+
+type revisionAwareIdentityRepository struct {
+	mu           sync.Mutex
+	snapshot     adminresource.ResourceSnapshot
+	loadPause    *repositoryPause
+	savePause    *repositoryPause
+	failNextSave error
+}
+
+func newRevisionAwareIdentityRepository() *revisionAwareIdentityRepository {
+	return &revisionAwareIdentityRepository{snapshot: adminresource.ResourceSnapshot{Resources: map[string][]adminresource.Record{}}}
+}
+
+func (r *revisionAwareIdentityRepository) Load(context.Context) (adminresource.ResourceSnapshot, error) {
+	r.mu.Lock()
+	pause := r.loadPause
+	r.loadPause = nil
+	r.mu.Unlock()
+	if pause != nil {
+		close(pause.reached)
+		<-pause.release
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return cloneAdminResourceSnapshot(r.snapshot), nil
+}
+
+func (r *revisionAwareIdentityRepository) Save(_ context.Context, snapshot adminresource.ResourceSnapshot) (uint64, error) {
+	r.mu.Lock()
+	pause := r.savePause
+	r.savePause = nil
+	r.mu.Unlock()
+	if pause != nil {
+		close(pause.reached)
+		<-pause.release
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.failNextSave != nil {
+		err := r.failNextSave
+		r.failNextSave = nil
+		return 0, err
+	}
+	if snapshot.Revision != r.snapshot.Revision {
+		return 0, &adminresource.RevisionConflictError{Expected: snapshot.Revision, Actual: r.snapshot.Revision}
+	}
+	snapshot.Revision++
+	r.snapshot = cloneAdminResourceSnapshot(snapshot)
+	return snapshot.Revision, nil
+}
+
+func (r *revisionAwareIdentityRepository) pauseNextLoad() (<-chan struct{}, chan struct{}) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	pause := &repositoryPause{reached: make(chan struct{}), release: make(chan struct{})}
+	r.loadPause = pause
+	return pause.reached, pause.release
+}
+
+func (r *revisionAwareIdentityRepository) pauseNextSave() (<-chan struct{}, chan struct{}) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	pause := &repositoryPause{reached: make(chan struct{}), release: make(chan struct{})}
+	r.savePause = pause
+	return pause.reached, pause.release
+}
+
+func (r *revisionAwareIdentityRepository) failNextSaveWith(err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.failNextSave = err
+}
+
+func cloneAdminResourceSnapshot(snapshot adminresource.ResourceSnapshot) adminresource.ResourceSnapshot {
+	cloned := adminresource.ResourceSnapshot{Revision: snapshot.Revision, NextID: snapshot.NextID, Resources: make(map[string][]adminresource.Record, len(snapshot.Resources))}
+	for resource, records := range snapshot.Resources {
+		items := make([]adminresource.Record, 0, len(records))
+		for _, record := range records {
+			values := make(map[string]string, len(record.Values))
+			for key, value := range record.Values {
+				values[key] = value
+			}
+			record.Values = values
+			items = append(items, record)
+		}
+		cloned.Resources[resource] = items
+	}
+	return cloned
+}
+
+func cloneAdminIdentityValues(values map[string]string) map[string]string {
+	cloned := make(map[string]string, len(values))
+	for key, value := range values {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func newAdminIdentityRepositoryStore(t *testing.T, repository adminresource.AdminResourceRepository) *adminresource.Store {
+	t.Helper()
+	store, err := adminresource.NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	if err != nil {
+		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+	}
+	return store
+}
+
+func seedAdminIdentityBinding(t *testing.T, repository adminresource.AdminResourceRepository) {
+	t.Helper()
+	store := newAdminIdentityRepositoryStore(t, repository)
+	bindings := NewResourceAdminIdentityBindingStore(store, time.Now)
+	if _, err := bindings.ProvisionAdminIdentityBinding(context.Background(), AdminIdentityProvisionInput{
+		Provider: adminOIDCProviderForTest(), Issuer: "https://id.example", ProviderSubject: "subject-123", Username: "admin", Now: time.Date(2026, time.July, 11, 10, 0, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("seed ProvisionAdminIdentityBinding() error = %v", err)
+	}
+}
+
+func adminIdentityRecordFromRepository(t *testing.T, repository adminresource.AdminResourceRepository) adminresource.Record {
+	t.Helper()
+	snapshot, err := repository.Load(context.Background())
+	if err != nil {
+		t.Fatalf("repository.Load() error = %v", err)
+	}
+	records := snapshot.Resources[adminIdentitiesResource]
+	if len(records) != 1 {
+		t.Fatalf("admin identity records = %+v, want one", records)
+	}
+	return records[0]
+}
+
+func waitForRepositoryPause(t *testing.T, reached <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-reached:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for repository pause")
 	}
 }
