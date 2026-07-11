@@ -316,10 +316,14 @@ export function PlatformDataTable<T extends object>({
           {columns.map((column) => {
             const hiddenAtCurrentWidth =
               (column.lockVisible || visibleColumnKeys.includes(column.key)) && !renderedColumnKeys.has(column.key);
+            const columnLabel = columnPlainTextLabel(column);
+            const checkboxAccessibleLabel = hiddenAtCurrentWidth ? `${columnLabel} ${labels.hiddenAtCurrentWidth}` : columnLabel;
             return (
-              <Checkbox aria-label={String(column.title)} disabled={column.lockVisible} key={column.key} value={column.key}>
+              <Checkbox aria-label={checkboxAccessibleLabel} disabled={column.lockVisible} key={column.key} value={column.key}>
                 <span className="platform-column-option">
-                  <span className="platform-column-option-label">{column.title as ReactNode}</span>
+                  <span className="platform-column-option-label" title={columnLabel}>
+                    {column.title as ReactNode}
+                  </span>
                   {hiddenAtCurrentWidth ? (
                     <Typography.Text className="platform-column-option-state" type="secondary">
                       {labels.hiddenAtCurrentWidth}
@@ -519,6 +523,10 @@ function withResponsivePriority<T extends object>(column: PlatformDataTableColum
 
 function columnRenderedAtCurrentWidth<T extends object>(column: PlatformDataTableColumn<T>, screens: PlatformBreakpointState) {
   return effectiveResponsiveBreakpoints(column).some((breakpoint) => screens[breakpoint]);
+}
+
+function columnPlainTextLabel<T extends object>(column: PlatformDataTableColumn<T>) {
+  return typeof column.title === "string" || typeof column.title === "number" ? String(column.title) : String(column.key);
 }
 
 function FilterControl({

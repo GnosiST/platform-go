@@ -148,6 +148,26 @@ requireIncludes(files.table, "columnRenderedAtCurrentWidth", "PlatformDataTable 
 requireIncludes(files.table, "labels.selectedColumns", "Column settings must distinguish selected columns.");
 requireIncludes(files.table, "labels.renderedColumns", "Column settings must report currently rendered columns.");
 requireIncludes(files.table, "labels.hiddenAtCurrentWidth", "Column settings must explain breakpoint-hidden selected columns.");
+requireRegex(
+  files.table,
+  /function columnPlainTextLabel<[\s\S]*?typeof column\.title === "string" \|\| typeof column\.title === "number"[\s\S]*?String\(column\.key\)/,
+  "Column settings must derive stable plain-text labels and fall back to the column key for non-text titles.",
+);
+requireRegex(
+  files.table,
+  /const checkboxAccessibleLabel = hiddenAtCurrentWidth \? `\$\{columnLabel\} \$\{labels\.hiddenAtCurrentWidth\}` : columnLabel;[\s\S]*?<Checkbox aria-label=\{checkboxAccessibleLabel\}/,
+  "Column settings must include the breakpoint-hidden state in each hidden checkbox accessible name.",
+);
+requireIncludes(
+  files.table,
+  '<span className="platform-column-option-label" title={columnLabel}>',
+  "Column settings must expose each full plain-text label through the option title attribute.",
+);
+requireIncludes(
+  files.table,
+  ".some((breakpoint) => screens[breakpoint])",
+  "PlatformDataTable must treat a column as rendered when any responsive breakpoint is active.",
+);
 requireIncludes(files.resourceConsole, "tableColumnPriority(index)", "Generic resource tables must derive priority from schema order.");
 requireIncludes(files.resourceConsole, "form.getFieldInstance", "Resource modals must focus the first editable schema field.");
 requireIncludes(files.resourceConsole, "afterOpenChange={(open) => {", "Resource modals must focus through the AntD open lifecycle.");

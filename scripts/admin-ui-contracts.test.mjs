@@ -28,6 +28,13 @@ function replaceInTemp(tempRoot, relativePath, from, to) {
   fs.writeFileSync(filePath, source.split(from).join(to));
 }
 
+function replaceRegexInTemp(tempRoot, relativePath, pattern, to) {
+  const filePath = path.join(tempRoot, relativePath);
+  const source = fs.readFileSync(filePath, "utf8");
+  assert.match(source, pattern);
+  fs.writeFileSync(filePath, source.replace(pattern, to));
+}
+
 describe("validate-admin-ui-contracts", () => {
   it("accepts the current componentized admin UI contract", () => {
     const result = runValidator();
@@ -94,6 +101,51 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /Column settings must explain breakpoint-hidden selected columns/);
+  });
+
+  it("rejects a breakpoint-hidden column checkbox without the hidden state in its accessible name", () => {
+    const tempRoot = tempAdminRoot();
+    replaceRegexInTemp(
+      tempRoot,
+      "admin/src/platform/ui/PlatformDataTable.tsx",
+      /aria-label=\{(?:String\(column\.title\)|checkboxAccessibleLabel)\}/,
+      "aria-label={columnLabel}",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Column settings must include the breakpoint-hidden state in each hidden checkbox accessible name/);
+  });
+
+  it("rejects a truncated column label without its full plain-text title", () => {
+    const tempRoot = tempAdminRoot();
+    replaceRegexInTemp(
+      tempRoot,
+      "admin/src/platform/ui/PlatformDataTable.tsx",
+      /<span className="platform-column-option-label"(?: title=\{columnLabel\})?>/,
+      '<span className="platform-column-option-label">',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Column settings must expose each full plain-text label through the option title attribute/);
+  });
+
+  it("rejects responsive column matching that requires every breakpoint", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/ui/PlatformDataTable.tsx",
+      ".some((breakpoint) => screens[breakpoint])",
+      ".every((breakpoint) => screens[breakpoint])",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /PlatformDataTable must treat a column as rendered when any responsive breakpoint is active/);
   });
 
   it("rejects a settings drawer that drops import/export configuration support", () => {
