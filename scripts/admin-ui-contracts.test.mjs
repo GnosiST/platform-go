@@ -293,6 +293,7 @@ describe("validate-admin-ui-contracts", () => {
     ["recovery action", "admin/src/platform/auth/AdminLoginView.tsx", 'className="login-recovery-action"', 'className="login-reset-action"', "explicit recovery action"],
     ["login reduced motion", "admin/src/styles.css", ".login-page *", ".login-motion-uncovered *", "suppress non-essential login transitions"],
     ["mobile login target", "admin/src/styles.css", ".login-submit,\n  .login-oidc-action,\n  .login-recovery-action", ".login-actions-missing", "Mobile login submit, OIDC, and recovery actions must expose 44px touch targets"],
+    ["tablet login target", "admin/src/styles.css", "@media (max-width: 1024px)", "@media (max-width: 1023px)", "Tablet login submit, OIDC, and recovery actions must expose 44px touch targets"],
   ]) {
     it(`rejects Task 6 without ${name}`, () => {
       const tempRoot = tempAdminRoot();

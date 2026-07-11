@@ -1695,6 +1695,10 @@ func (s *Server) authProviderAvailable(provider capability.AuthProvider) bool {
 }
 
 func (s *Server) recordAudit(code string, name string, username string, provider string, token string) error {
+	auditCode, err := newAuthAuditCode(code)
+	if err != nil {
+		return err
+	}
 	values := map[string]string{
 		"actor":     username,
 		"action":    code,
@@ -1705,8 +1709,8 @@ func (s *Server) recordAudit(code string, name string, username string, provider
 	if provider != "" {
 		values["provider"] = provider
 	}
-	_, err := s.resources.Create("audit-logs", adminresource.WriteInput{
-		Code:        code,
+	_, err = s.resources.Create("audit-logs", adminresource.WriteInput{
+		Code:        auditCode,
 		Name:        name,
 		Status:      "recorded",
 		Description: "Authentication event recorded by platform auth.",
@@ -1716,6 +1720,14 @@ func (s *Server) recordAudit(code string, name string, username string, provider
 		return nil
 	}
 	return err
+}
+
+func newAuthAuditCode(action string) (string, error) {
+	var suffix [12]byte
+	if _, err := rand.Read(suffix[:]); err != nil {
+		return "", err
+	}
+	return action + "." + hex.EncodeToString(suffix[:]), nil
 }
 
 func (s *Server) recordAdminResourceAudit(ctx *gin.Context, action string, resource string, record adminresource.Record) {

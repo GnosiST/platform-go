@@ -1114,7 +1114,7 @@ func TestAdminOIDCAuthLoginUsesAtomicBindingAndExistingAdminSessionAuditPath(t *
 	}
 	var loginAudit *adminresource.Record
 	for index := range auditRecords {
-		if auditRecords[index].Code == "auth.login" {
+		if auditRecords[index].Values["action"] == "auth.login" {
 			loginAudit = &auditRecords[index]
 		}
 	}
@@ -1138,6 +1138,33 @@ func TestAuthLoginWithDemoProviderRejectsDisabledPrincipal(t *testing.T) {
 	server.Router().ServeHTTP(recorder, request)
 
 	assertAuthErrorResponse(t, recorder, http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS")
+}
+
+func TestRepeatedAdminLoginsPersistDistinctAuditCodes(t *testing.T) {
+	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit"})
+	resources := openGORMAdminResourceStoreForHTTPTest(t, filepath.Join(t.TempDir(), "admin-resources.db"), capabilities)
+	server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources})
+
+	loginForTest(t, server, "admin")
+	loginForTest(t, server, "admin")
+
+	audits, err := resources.List("audit-logs")
+	if err != nil {
+		t.Fatalf("List(audit-logs) error = %v", err)
+	}
+	codes := map[string]struct{}{}
+	for _, audit := range audits {
+		if audit.Values["action"] != "auth.login" {
+			continue
+		}
+		if !strings.HasPrefix(audit.Code, "auth.login.") {
+			t.Fatalf("auth login audit code = %q, want unique auth.login prefix", audit.Code)
+		}
+		codes[audit.Code] = struct{}{}
+	}
+	if len(codes) != 2 {
+		t.Fatalf("auth login audit codes = %+v, want two distinct persisted events", codes)
+	}
 }
 
 func TestAuthLoginCleansUpIssuedSessionWhenAuditFails(t *testing.T) {
@@ -2173,10 +2200,10 @@ func TestAuthLoginAndLogoutWriteAuditRecords(t *testing.T) {
 	if err := json.Unmarshal(auditRecorder.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode audit: %v body = %s", err, auditRecorder.Body.String())
 	}
-	if !hasTestRecordCode(payload.Data.Items, "auth.login") {
+	if !hasTestRecordAction(payload.Data.Items, "auth.login") {
 		t.Fatalf("audit records missing auth.login: %+v", payload.Data.Items)
 	}
-	if !hasTestRecordCode(payload.Data.Items, "auth.logout") {
+	if !hasTestRecordAction(payload.Data.Items, "auth.logout") {
 		t.Fatalf("audit records missing auth.logout: %+v", payload.Data.Items)
 	}
 }
@@ -4087,6 +4114,15 @@ func countTestRecordID(records []adminResourceRecordTest, id string) int {
 func hasTestRecordCode(records []adminResourceRecordTest, code string) bool {
 	for _, record := range records {
 		if record.Code == code {
+			return true
+		}
+	}
+	return false
+}
+
+func hasTestRecordAction(records []adminResourceRecordTest, action string) bool {
+	for _, record := range records {
+		if record.Values["action"] == action {
 			return true
 		}
 	}

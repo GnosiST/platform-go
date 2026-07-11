@@ -35,6 +35,7 @@ const files = {
 
 const failures = [];
 const mobileStyles = extractCssBlock(files.styles, "@media (max-width: 767px)");
+const tabletLoginStyles = extractCssBlock(files.styles, "@media (max-width: 1024px)");
 
 requireIncludes(files.app, "readStoredUIConfig", "App must keep persisted admin UI configuration.");
 requireIncludes(files.app, "writeStorageValue(adminPreferenceStorageKeys.ui", "App must persist admin UI configuration changes.");
@@ -440,6 +441,18 @@ requireCssRule(
   ".login-submit,\n  .login-oidc-action,\n  .login-recovery-action",
   ["min-height: 44px;"],
   "Mobile login submit, OIDC, and recovery actions must expose 44px touch targets.",
+);
+requireCssRule(
+  tabletLoginStyles,
+  ".login-submit,\n  .login-oidc-action,\n  .login-recovery-action",
+  ["min-height: 44px;"],
+  "Tablet login submit, OIDC, and recovery actions must expose 44px touch targets.",
+);
+requireCssRule(
+  tabletLoginStyles,
+  ".login-panel-toolbar .topbar-icon-button,\n  .login-theme-swatch",
+  ["min-width: 44px;", "min-height: 44px;"],
+  "Tablet login toolbar controls must expose 44px touch targets.",
 );
 requireCssRule(mobileStyles, ".platform-data-table-panel .table-actions .ant-btn", ["min-width: 44px;", "min-height: 44px;"], "Mobile resource table actions must expose 44px touch targets.");
 requireCssRule(

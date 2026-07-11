@@ -4345,6 +4345,20 @@ select {
   }
 }
 
+@media (max-width: 1024px) {
+  .login-submit,
+  .login-oidc-action,
+  .login-recovery-action {
+    min-height: 44px;
+  }
+
+  .login-panel-toolbar .topbar-icon-button,
+  .login-theme-swatch {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 @media (max-width: 767px) {
   .login-page {
     grid-template-columns: minmax(0, 1fr);
