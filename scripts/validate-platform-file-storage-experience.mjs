@@ -186,10 +186,13 @@ function validateExperienceContract(contract, errors) {
   requireIncludes(experience.previewTypes, ["image", "text", "pdf", "unsupported-fallback"], "experienceContract.previewTypes", errors);
   requireIncludes(
     experience.metadataFields,
-    ["name", "mimeType", "size", "storageDriver", "storageKey", "createdAt", "updatedAt"],
+    ["name", "mimeType", "size", "storageDriver", "createdAt", "updatedAt"],
     "experienceContract.metadataFields",
     errors,
   );
+  if (values(experience.metadataFields).includes("storageKey")) {
+    errors.push("experienceContract.metadataFields must not include storageKey");
+  }
   requireIncludes(experience.auditVisualization, ["file.upload", "file.content", "file.delete"], "experienceContract.auditVisualization", errors);
   requireIncludes(
     experience.errorStates,

@@ -6,9 +6,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -28,11 +28,7 @@ type fakeS3Object struct {
 
 func TestLocalObjectStoreSavesOpensAndDeletesObject(t *testing.T) {
 	baseDir := t.TempDir()
-	now := time.Date(2026, 7, 5, 10, 20, 30, 40, time.UTC)
-	store := NewLocalObjectStore(LocalObjectStoreOptions{
-		BaseDir: baseDir,
-		Now:     func() time.Time { return now },
-	})
+	store := NewLocalObjectStore(LocalObjectStoreOptions{BaseDir: baseDir})
 
 	metadata, err := store.Save(context.Background(), ObjectSaveInput{
 		FileName:    "demo file.txt",
@@ -45,8 +41,8 @@ func TestLocalObjectStoreSavesOpensAndDeletesObject(t *testing.T) {
 	if metadata.Driver != "local" || metadata.Key == "" || metadata.SizeBytes != int64(len("hello platform")) {
 		t.Fatalf("metadata = %+v, want local key and size", metadata)
 	}
-	if !strings.Contains(metadata.Key, "demo_file.txt") {
-		t.Fatalf("metadata key = %q, want sanitized file name", metadata.Key)
+	if !regexp.MustCompile(`^objects/[a-f0-9]{64}$`).MatchString(metadata.Key) || strings.Contains(metadata.Key, "demo") {
+		t.Fatalf("metadata key = %q, want opaque object key", metadata.Key)
 	}
 	info, err := os.Stat(store.pathForKey(metadata.Key))
 	if err != nil {
@@ -84,7 +80,7 @@ func TestLocalObjectStoreSavesOpensAndDeletesObject(t *testing.T) {
 	}
 }
 
-func TestLocalObjectStoreSanitizesCrossPlatformAndControlCharacterFilenames(t *testing.T) {
+func TestLocalObjectStoreKeyIgnoresCrossPlatformAndControlCharacterFilenames(t *testing.T) {
 	store := NewLocalObjectStore(LocalObjectStoreOptions{BaseDir: t.TempDir()})
 
 	metadata, err := store.Save(context.Background(), ObjectSaveInput{
@@ -94,20 +90,23 @@ func TestLocalObjectStoreSanitizesCrossPlatformAndControlCharacterFilenames(t *t
 	if err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
-	if strings.Contains(metadata.Key, "..") || strings.ContainsAny(metadata.Key, "\\\x00\n\r") || !strings.HasSuffix(metadata.Key, "/unsafe_report.txt") {
-		t.Fatalf("sanitized key = %q", metadata.Key)
+	if !regexp.MustCompile(`^objects/[a-f0-9]{64}$`).MatchString(metadata.Key) || strings.Contains(metadata.Key, "unsafe") {
+		t.Fatalf("opaque key = %q", metadata.Key)
 	}
 }
 
-func TestLocalObjectStoreDoesNotOverwriteCollidingObjectKey(t *testing.T) {
-	now := time.Date(2026, 7, 12, 10, 0, 0, 0, time.UTC)
-	store := NewLocalObjectStore(LocalObjectStoreOptions{BaseDir: t.TempDir(), Now: func() time.Time { return now }})
+func TestLocalObjectStoreSameNameAndTimeDoNotCollide(t *testing.T) {
+	store := NewLocalObjectStore(LocalObjectStoreOptions{BaseDir: t.TempDir()})
 	first, err := store.Save(context.Background(), ObjectSaveInput{FileName: "same.txt", Reader: strings.NewReader("first")})
 	if err != nil {
 		t.Fatalf("first Save() error = %v", err)
 	}
-	if _, err := store.Save(context.Background(), ObjectSaveInput{FileName: "same.txt", Reader: strings.NewReader("second")}); err == nil {
-		t.Fatal("second Save() succeeded, want collision error")
+	second, err := store.Save(context.Background(), ObjectSaveInput{FileName: "same.txt", Reader: strings.NewReader("second")})
+	if err != nil {
+		t.Fatalf("second Save() error = %v", err)
+	}
+	if first.Key == second.Key || strings.Contains(first.Key, "same") || strings.Contains(second.Key, "same") {
+		t.Fatalf("same-name keys = %q/%q, want distinct opaque keys", first.Key, second.Key)
 	}
 	body, err := store.Open(context.Background(), first.Key)
 	if err != nil {
@@ -120,50 +119,94 @@ func TestLocalObjectStoreDoesNotOverwriteCollidingObjectKey(t *testing.T) {
 	}
 }
 
-func TestLocalObjectStoreRejectsSymlinkDirectoryEscape(t *testing.T) {
-	baseDir := t.TempDir()
-	outsideDir := t.TempDir()
-	if err := os.Symlink(outsideDir, filepath.Join(baseDir, "2026")); err != nil {
-		t.Fatalf("Symlink() error = %v", err)
+func TestLocalObjectStoreCanonicalizesConfiguredSymlinkRoot(t *testing.T) {
+	parent := t.TempDir()
+	canonicalDir := filepath.Join(parent, "canonical")
+	if err := os.Mkdir(canonicalDir, 0o700); err != nil {
+		t.Fatalf("Mkdir(canonical) error = %v", err)
 	}
-	store := NewLocalObjectStore(LocalObjectStoreOptions{
-		BaseDir: baseDir,
-		Now: func() time.Time {
-			return time.Date(2026, 7, 12, 10, 0, 0, 0, time.UTC)
-		},
-	})
-
-	if _, err := store.Save(context.Background(), ObjectSaveInput{FileName: "private.txt", Reader: strings.NewReader("private")}); err == nil {
-		t.Fatal("Save() through symlink directory succeeded, want error")
+	configuredDir := filepath.Join(parent, "configured")
+	if err := os.Symlink(canonicalDir, configuredDir); err != nil {
+		t.Fatalf("Symlink(configured root) error = %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(outsideDir, "07", "12")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("outside directory was modified through symlink, Stat error = %v", err)
-	}
-}
-
-func TestLocalObjectStoreLimitsFilenameComponent(t *testing.T) {
-	store := NewLocalObjectStore(LocalObjectStoreOptions{BaseDir: t.TempDir()})
-	metadata, err := store.Save(context.Background(), ObjectSaveInput{
-		FileName: strings.Repeat("a", 400) + ".txt",
-		Reader:   strings.NewReader("private"),
-	})
+	store := NewLocalObjectStore(LocalObjectStoreOptions{BaseDir: configuredDir})
+	wantCanonical, err := filepath.EvalSymlinks(canonicalDir)
 	if err != nil {
-		t.Fatalf("Save() error = %v", err)
+		t.Fatalf("EvalSymlinks(canonical) error = %v", err)
 	}
-	name := filepath.Base(metadata.Key)
-	if len(name) > 255 || !strings.HasSuffix(name, ".txt") {
-		t.Fatalf("stored filename length/suffix = %d/%q", len(name), name)
+	if store.baseDir != wantCanonical {
+		t.Fatalf("store baseDir = %q, want canonical %q", store.baseDir, wantCanonical)
+	}
+	if _, err := store.Save(context.Background(), ObjectSaveInput{FileName: "private.txt", Reader: strings.NewReader("private")}); err != nil {
+		t.Fatalf("Save() through canonicalized root error = %v", err)
 	}
 }
 
-func TestLocalObjectStoreKeepsTraversalKeysInsideBaseDir(t *testing.T) {
+func TestLocalObjectStoreRejectsReplacedCanonicalRoot(t *testing.T) {
+	parent := t.TempDir()
+	baseDir := filepath.Join(parent, "objects")
+	store := NewLocalObjectStore(LocalObjectStoreOptions{BaseDir: baseDir})
+	stored, err := store.Save(context.Background(), ObjectSaveInput{FileName: "private.txt", Reader: strings.NewReader("private")})
+	if err != nil {
+		t.Fatalf("initial Save() error = %v", err)
+	}
+	originalDir := filepath.Join(parent, "objects-original")
+	if err := os.Rename(baseDir, originalDir); err != nil {
+		t.Fatalf("Rename(root) error = %v", err)
+	}
+	outsideDir := t.TempDir()
+	if err := os.Symlink(outsideDir, baseDir); err != nil {
+		t.Fatalf("Symlink(replacement root) error = %v", err)
+	}
+	if _, err := store.Save(context.Background(), ObjectSaveInput{FileName: "new.txt", Reader: strings.NewReader("new")}); !errors.Is(err, ErrUnsafeObjectPath) {
+		t.Fatalf("Save() after root replacement error = %v, want unsafe path", err)
+	}
+	if _, err := store.Open(context.Background(), stored.Key); !errors.Is(err, ErrUnsafeObjectPath) {
+		t.Fatalf("Open() after root replacement error = %v, want unsafe path", err)
+	}
+	if err := store.Delete(context.Background(), stored.Key); !errors.Is(err, ErrUnsafeObjectPath) {
+		t.Fatalf("Delete() after root replacement error = %v, want unsafe path", err)
+	}
+}
+
+func TestLocalObjectStoreRejectsSymlinkDirectoryComponent(t *testing.T) {
 	baseDir := t.TempDir()
 	store := NewLocalObjectStore(LocalObjectStoreOptions{BaseDir: baseDir})
+	outsideDir := t.TempDir()
+	if err := os.Symlink(outsideDir, filepath.Join(baseDir, "objects")); err != nil {
+		t.Fatalf("Symlink(directory component) error = %v", err)
+	}
+	if _, err := store.Save(context.Background(), ObjectSaveInput{FileName: "private.txt", Reader: strings.NewReader("private")}); !errors.Is(err, ErrUnsafeObjectPath) {
+		t.Fatalf("Save() through symlink directory error = %v, want unsafe path", err)
+	}
+	entries, err := os.ReadDir(outsideDir)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("outside directory entries/error = %v/%v, want empty", entries, err)
+	}
+}
 
-	path := store.pathForKey("../../secret.txt")
-	expected := filepath.Join(baseDir, "secret.txt")
-	if path != expected {
-		t.Fatalf("pathForKey traversal = %q, want %q", path, expected)
+func TestLocalObjectStoreRejectsSymlinkObjectForSaveOpenAndDelete(t *testing.T) {
+	baseDir := t.TempDir()
+	store := NewLocalObjectStore(LocalObjectStoreOptions{BaseDir: baseDir})
+	store.keyGenerator = func() (string, error) { return "objects/fixed", nil }
+	if err := os.Mkdir(filepath.Join(baseDir, "objects"), 0o700); err != nil {
+		t.Fatalf("Mkdir(objects) error = %v", err)
+	}
+	outsideFile := filepath.Join(t.TempDir(), "outside.txt")
+	if err := os.WriteFile(outsideFile, []byte("outside"), 0o600); err != nil {
+		t.Fatalf("WriteFile(outside) error = %v", err)
+	}
+	if err := os.Symlink(outsideFile, filepath.Join(baseDir, "objects", "fixed")); err != nil {
+		t.Fatalf("Symlink(object) error = %v", err)
+	}
+	if _, err := store.Save(context.Background(), ObjectSaveInput{FileName: "private.txt", Reader: strings.NewReader("private")}); !errors.Is(err, ErrUnsafeObjectPath) {
+		t.Fatalf("Save() target symlink error = %v, want unsafe path", err)
+	}
+	if _, err := store.Open(context.Background(), "objects/fixed"); !errors.Is(err, ErrUnsafeObjectPath) {
+		t.Fatalf("Open() target symlink error = %v, want unsafe path", err)
+	}
+	if err := store.Delete(context.Background(), "objects/fixed"); !errors.Is(err, ErrUnsafeObjectPath) {
+		t.Fatalf("Delete() target symlink error = %v, want unsafe path", err)
 	}
 }
 
@@ -195,13 +238,12 @@ func TestNewObjectStoreRejectsS3PartialCredentials(t *testing.T) {
 }
 
 func TestS3ObjectStoreSavesOpensAndDeletesObject(t *testing.T) {
-	now := time.Date(2026, 7, 5, 10, 20, 30, 40, time.UTC)
 	client := &fakeS3ObjectClient{objects: map[string]fakeS3Object{}}
 	store, err := newS3ObjectStoreWithClient(client, S3ObjectStoreConfig{
 		Bucket:               "platform-bucket",
 		Prefix:               "tenant/platform",
 		ServerSideEncryption: "AES256",
-	}, func() time.Time { return now })
+	}, nil)
 	if err != nil {
 		t.Fatalf("newS3ObjectStoreWithClient() error = %v", err)
 	}
@@ -217,8 +259,8 @@ func TestS3ObjectStoreSavesOpensAndDeletesObject(t *testing.T) {
 	if metadata.Driver != "s3" || metadata.SizeBytes != int64(len("hello s3")) {
 		t.Fatalf("metadata = %+v, want s3 metadata with size", metadata)
 	}
-	if !strings.HasPrefix(metadata.Key, "tenant/platform/2026/07/05/") || !strings.HasSuffix(metadata.Key, "/demo_file.txt") {
-		t.Fatalf("metadata key = %q, want prefix and sanitized file name", metadata.Key)
+	if !regexp.MustCompile(`^tenant/platform/objects/[a-f0-9]{64}$`).MatchString(metadata.Key) || strings.Contains(metadata.Key, "demo") {
+		t.Fatalf("metadata key = %q, want prefixed opaque key", metadata.Key)
 	}
 	if client.objects[metadata.Key].contentType != "text/plain" {
 		t.Fatalf("stored content type = %q, want text/plain", client.objects[metadata.Key].contentType)
@@ -245,6 +287,25 @@ func TestS3ObjectStoreSavesOpensAndDeletesObject(t *testing.T) {
 	}
 }
 
+func TestS3ObjectStoreSameNameAndTimeDoNotCollide(t *testing.T) {
+	client := &fakeS3ObjectClient{objects: map[string]fakeS3Object{}}
+	store, err := newS3ObjectStoreWithClient(client, S3ObjectStoreConfig{Bucket: "platform", ServerSideEncryption: "AES256"}, nil)
+	if err != nil {
+		t.Fatalf("newS3ObjectStoreWithClient() error = %v", err)
+	}
+	first, err := store.Save(context.Background(), ObjectSaveInput{FileName: "same.txt", Reader: strings.NewReader("first")})
+	if err != nil {
+		t.Fatalf("first Save() error = %v", err)
+	}
+	second, err := store.Save(context.Background(), ObjectSaveInput{FileName: "same.txt", Reader: strings.NewReader("second")})
+	if err != nil {
+		t.Fatalf("second Save() error = %v", err)
+	}
+	if first.Key == second.Key || strings.Contains(first.Key, "same") || strings.Contains(second.Key, "same") {
+		t.Fatalf("same-name S3 keys = %q/%q, want distinct opaque keys", first.Key, second.Key)
+	}
+}
+
 func TestS3ObjectStoreAppliesConfiguredServerSideEncryption(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -262,7 +323,7 @@ func TestS3ObjectStoreAppliesConfiguredServerSideEncryption(t *testing.T) {
 				Bucket:               "platform",
 				ServerSideEncryption: tt.encryption,
 				KMSKeyID:             tt.kmsKeyID,
-			}, time.Now)
+			}, nil)
 			if err != nil {
 				t.Fatalf("newS3ObjectStoreWithClient() error = %v", err)
 			}
@@ -293,7 +354,7 @@ func TestNewS3ObjectStoreRejectsInvalidEncryptionPolicy(t *testing.T) {
 	}
 	for _, config := range tests {
 		client := &fakeS3ObjectClient{objects: map[string]fakeS3Object{}}
-		if _, err := newS3ObjectStoreWithClient(client, config, time.Now); !errors.Is(err, ErrInvalidObjectStoreConfig) {
+		if _, err := newS3ObjectStoreWithClient(client, config, nil); !errors.Is(err, ErrInvalidObjectStoreConfig) {
 			t.Fatalf("newS3ObjectStoreWithClient(%+v) error = %v, want invalid config", config, err)
 		}
 	}

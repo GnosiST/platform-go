@@ -4162,9 +4162,6 @@ func TestAdminAPITokenUpdateCannotReplaceTokenMaterial(t *testing.T) {
 func TestAdminFileUploadContentAndDelete(t *testing.T) {
 	fileStore := storage.NewLocalObjectStore(storage.LocalObjectStoreOptions{
 		BaseDir: t.TempDir(),
-		Now: func() time.Time {
-			return time.Date(2026, 7, 5, 9, 30, 0, 0, time.UTC)
-		},
 	})
 	server := newTestServer(ServerOptions{
 		Capabilities: capabilitiesFromConfigForTest(t, []string{"tenant", "identity", "session", "rbac", "menu", "audit", "dictionary", "parameter", "file-storage", "admin-shell"}),
@@ -4247,6 +4244,7 @@ func TestAdminFileUploadContentAndDelete(t *testing.T) {
 type recordingObjectStore struct {
 	saveCalls   int
 	deleteCalls int
+	deleteErr   error
 }
 
 func (store *recordingObjectStore) Save(_ context.Context, input storage.ObjectSaveInput) (storage.ObjectMetadata, error) {
@@ -4264,7 +4262,7 @@ func (*recordingObjectStore) Open(context.Context, string) (io.ReadCloser, error
 
 func (store *recordingObjectStore) Delete(context.Context, string) error {
 	store.deleteCalls++
-	return nil
+	return store.deleteErr
 }
 
 func TestAdminFileUploadRejectsOversizeBeforeObjectCreation(t *testing.T) {
@@ -4346,6 +4344,68 @@ func TestAdminFileUploadDeletesObjectWhenMetadataCreateFails(t *testing.T) {
 
 	if recorder.Code != http.StatusInternalServerError {
 		t.Fatalf("POST file with metadata failure status = %d body = %s, want 500", recorder.Code, recorder.Body.String())
+	}
+	if fileStore.saveCalls != 1 || fileStore.deleteCalls != 1 {
+		t.Fatalf("object store calls save/delete = %d/%d, want 1/1", fileStore.saveCalls, fileStore.deleteCalls)
+	}
+}
+
+func TestAdminFileUploadReportsRollbackFailureWithoutLeakingDetails(t *testing.T) {
+	capabilities := capabilitiesFromConfigForTest(t, []string{"tenant", "identity", "session", "rbac", "menu", "audit", "dictionary", "parameter", "file-storage", "admin-shell"})
+	repository := &controllableAdminResourceRepository{}
+	resources, err := adminresource.NewRepositoryBackedStoreFromCapabilities(repository, capabilities)
+	if err != nil {
+		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+	}
+	repository.saveErr = errors.New("metadata-private-detail")
+	fileStore := &recordingObjectStore{deleteErr: errors.New("delete-private/object-secret")}
+	server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources, FileStorage: fileStore})
+	body, contentType := multipartUploadBodyWithMediaType(t, "report.txt", "text/plain", "private")
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/files/upload", body)
+	request.Header.Set("Content-Type", contentType)
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusInternalServerError || !strings.Contains(recorder.Body.String(), `"code":"ADMIN_FILE_ROLLBACK_FAILED"`) {
+		t.Fatalf("POST file rollback failure status/body = %d/%s", recorder.Code, recorder.Body.String())
+	}
+	for _, secret := range []string{"metadata-private-detail", "delete-private", "private/object"} {
+		if strings.Contains(recorder.Body.String(), secret) {
+			t.Fatalf("rollback response leaked %q: %s", secret, recorder.Body.String())
+		}
+	}
+	if fileStore.saveCalls != 1 || fileStore.deleteCalls != 1 {
+		t.Fatalf("object store calls save/delete = %d/%d, want 1/1", fileStore.saveCalls, fileStore.deleteCalls)
+	}
+}
+
+func TestAppFileUploadReportsRollbackFailureWithoutLeakingDetails(t *testing.T) {
+	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"})
+	repository := &controllableAdminResourceRepository{}
+	resources, err := adminresource.NewRepositoryBackedStoreFromCapabilities(repository, capabilities)
+	if err != nil {
+		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+	}
+	fileStore := &recordingObjectStore{deleteErr: errors.New("delete-private/object-secret")}
+	server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources, FileStorage: fileStore})
+	login := appLoginForTest(t, server, "buyer")
+	repository.saveErr = errors.New("metadata-private-detail")
+	body, contentType := multipartUploadBodyWithMediaType(t, "report.txt", "text/plain", "private")
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/app/files", body)
+	request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	request.Header.Set("Content-Type", contentType)
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusInternalServerError || !strings.Contains(recorder.Body.String(), `"code":"APP_FILE_ROLLBACK_FAILED"`) {
+		t.Fatalf("POST app file rollback failure status/body = %d/%s", recorder.Code, recorder.Body.String())
+	}
+	for _, secret := range []string{"metadata-private-detail", "delete-private", "private/object"} {
+		if strings.Contains(recorder.Body.String(), secret) {
+			t.Fatalf("app rollback response leaked %q: %s", secret, recorder.Body.String())
+		}
 	}
 	if fileStore.saveCalls != 1 || fileStore.deleteCalls != 1 {
 		t.Fatalf("object store calls save/delete = %d/%d, want 1/1", fileStore.saveCalls, fileStore.deleteCalls)
@@ -4465,9 +4525,6 @@ func TestAdminFileUploadRequiresEnabledFileStorageCapability(t *testing.T) {
 func TestAppFileUploadAndContentUseAppSession(t *testing.T) {
 	fileStore := storage.NewLocalObjectStore(storage.LocalObjectStoreOptions{
 		BaseDir: t.TempDir(),
-		Now: func() time.Time {
-			return time.Date(2026, 7, 8, 9, 30, 0, 0, time.UTC)
-		},
 	})
 	server := newTestServer(ServerOptions{
 		Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"}),

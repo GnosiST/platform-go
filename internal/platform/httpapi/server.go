@@ -1179,7 +1179,11 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 		},
 	})
 	if err != nil {
-		_ = s.fileStorage.Delete(ctx.Request.Context(), metadata.Key)
+		if rollbackErr := s.fileStorage.Delete(ctx.Request.Context(), metadata.Key); rollbackErr != nil {
+			_ = ctx.Error(errors.New("admin file metadata persistence and object rollback failed"))
+			writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_ROLLBACK_FAILED", "file upload rollback failed")
+			return
+		}
 		writeAdminResourceError(ctx, err)
 		return
 	}
@@ -1276,7 +1280,11 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 		},
 	})
 	if err != nil {
-		_ = s.fileStorage.Delete(ctx.Request.Context(), metadata.Key)
+		if rollbackErr := s.fileStorage.Delete(ctx.Request.Context(), metadata.Key); rollbackErr != nil {
+			_ = ctx.Error(errors.New("app file metadata persistence and object rollback failed"))
+			writeFileError(ctx, http.StatusInternalServerError, "APP_FILE_ROLLBACK_FAILED", "file upload rollback failed")
+			return
+		}
 		writeAdminResourceError(ctx, err)
 		return
 	}

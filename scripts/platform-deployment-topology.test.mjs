@@ -25,6 +25,13 @@ function tempJSON(name, value) {
   return filePath;
 }
 
+function tempText(name, value) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-deployment-topology-"));
+  const filePath = path.join(tempDir, name);
+  fs.writeFileSync(filePath, value);
+  return filePath;
+}
+
 describe("validate-platform-deployment-topology", () => {
   it("accepts the current deployment topology contract", () => {
     const result = runValidator();
@@ -105,40 +112,75 @@ describe("validate-platform-deployment-topology", () => {
     assert.match(result.stderr, /deploymentPackage\.dockerTargets\.api must stay api/);
   });
 
-  it("rejects reintroducing a public uploads alias", () => {
-	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-private-files-"));
-	try {
-	  const nginxPath = path.join(tempDir, "platform.conf");
-	  const current = fs.readFileSync(path.join(repoRoot, "deploy/nginx/platform.conf"), "utf8");
-	  fs.writeFileSync(nginxPath, `${current}\nlocation /uploads/ { alias /var/lib/platform-go/uploads/; }\n`);
+  it("rejects active Nginx upload locations and upload directory aliases", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/nginx/platform.conf"), "utf8");
+    const variants = [
+      "location /uploads { proxy_pass http://platform_api; }",
+      "location /private-files/ { alias /var/lib/platform-go/uploads; }",
+      "location /private-files/ { root /srv/platform/uploads/; }",
+    ];
 
-	  const result = runValidator(["--admin-proxy", nginxPath]);
+    for (const directive of variants) {
+      const nginxPath = tempText("platform.conf", `${current}\n${directive}\n`);
+      const result = runValidator(["--admin-proxy", nginxPath]);
 
-	  assert.notEqual(result.status, 0, result.stdout);
-	  assert.match(result.stderr, /admin proxy must not expose \/uploads\//);
-	} finally {
-	  fs.rmSync(tempDir, { recursive: true, force: true });
-	}
+      assert.notEqual(result.status, 0, `${directive}\n${result.stdout}`);
+      assert.match(result.stderr, /admin proxy must not expose upload storage/);
+    }
   });
 
-  it("rejects public upload environment and Admin volume wiring", () => {
-	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-private-files-"));
-	try {
-	  const composePath = path.join(tempDir, "docker-compose.prod.yml");
-	  const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
-	  fs.writeFileSync(
-		composePath,
-		`${current}\n# PLATFORM_FILE_STORAGE_PUBLIC_URL=/uploads\n# platform_uploads:/var/lib/platform-go/uploads:ro\n`,
-	  );
+  it("rejects any active Admin volume mount in Compose", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
+    const mounts = ["platform_uploads:/var/lib/platform-go/uploads:ro", "private_assets:/srv/private-data:ro"];
 
-	  const result = runValidator(["--compose", composePath]);
+    for (const mount of mounts) {
+      const compose = current.replace("    ports:\n", `    volumes:\n      - ${mount}\n    ports:\n`);
+      const composePath = tempText("docker-compose.prod.yml", compose);
+      const result = runValidator(["--compose", composePath]);
 
-	  assert.notEqual(result.status, 0, result.stdout);
-	  assert.match(result.stderr, /compose file must not configure PLATFORM_FILE_STORAGE_PUBLIC_URL/);
-	  assert.match(result.stderr, /Admin service must not mount file storage/);
-	} finally {
-	  fs.rmSync(tempDir, { recursive: true, force: true });
-	}
+      assert.notEqual(result.status, 0, `${mount}\n${result.stdout}`);
+      assert.match(result.stderr, /Admin service must not mount volumes/);
+    }
+  });
+
+  it("rejects public upload environment mappings in any Compose service", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
+    const compose = current.replace(
+      "      PLATFORM_RUNTIME_ENV: ${PLATFORM_RUNTIME_ENV:?required}\n",
+      "      PLATFORM_RUNTIME_ENV: ${PLATFORM_RUNTIME_ENV:?required}\n      PLATFORM_FILE_STORAGE_PUBLIC_URL: /uploads\n",
+    );
+    const composePath = tempText("docker-compose.prod.yml", compose);
+
+    const result = runValidator(["--compose", composePath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /compose file must not configure PLATFORM_FILE_STORAGE_PUBLIC_URL/);
+  });
+
+  it("ignores commented Nginx and Compose upload examples", () => {
+    const nginx = fs.readFileSync(path.join(repoRoot, "deploy/nginx/platform.conf"), "utf8");
+    const nginxPath = tempText(
+      "platform.conf",
+      `${nginx}\n# location /uploads { alias /var/lib/platform-go/uploads; }\n# root /srv/platform/uploads;\n`,
+    );
+    const compose = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
+    const composePath = tempText(
+      "docker-compose.prod.yml",
+      `${compose}\n# PLATFORM_FILE_STORAGE_PUBLIC_URL=/uploads\n# platform_uploads:/var/lib/platform-go/uploads:ro\n`,
+    );
+
+    const result = runValidator(["--admin-proxy", nginxPath, "--compose", composePath]);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  it("rejects malformed Compose YAML", () => {
+    const composePath = tempText("docker-compose.prod.yml", "services:\n  platform-admin: [\n");
+
+    const result = runValidator(["--compose", composePath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /compose file must be valid YAML/);
   });
 
   it("rejects topology contracts that declare a public upload alias", () => {

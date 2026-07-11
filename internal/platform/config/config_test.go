@@ -343,6 +343,18 @@ func TestLoadParsesFileStorageConfig(t *testing.T) {
 	}
 }
 
+func TestLoadPreservesInvalidFileUploadLimitForRuntimeValidation(t *testing.T) {
+	t.Setenv("PLATFORM_FILE_MAX_UPLOAD_BYTES", "not-a-number")
+
+	cfg := Load()
+	if cfg.FileMaxUploadBytes >= 0 {
+		t.Fatalf("FileMaxUploadBytes = %d, want invalid sentinel", cfg.FileMaxUploadBytes)
+	}
+	if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "file upload limit") {
+		t.Fatalf("ValidateRuntime() error = %v, want invalid file upload limit", err)
+	}
+}
+
 func TestValidateRuntimeRejectsProductionS3WithoutPrivateEncryptionPolicy(t *testing.T) {
 	cfg := validProductionRuntimeConfig()
 	cfg.FileStorageS3ServerSideEncryption = ""

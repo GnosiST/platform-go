@@ -3011,8 +3011,6 @@
               "en": "Object Key"
             },
             "type": "text",
-            "search": true,
-            "detail": true,
             "readOnly": true,
             "sensitivity": "internal",
             "storageMode": "plain",

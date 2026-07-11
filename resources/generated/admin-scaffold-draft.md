@@ -647,7 +647,7 @@ Audit candidates: `file.create`, `file.delete`, `file.upload`
 
 - Field count: 13
 - Search: `code`, `createdAt`, `mimeType`, `name`, `storageDriver`
-- Filter: `code`, `createdAt`, `mimeType`, `name`, `size`, `status`, `storageDriver`, `storageKey`, `updatedAt`
+- Filter: `code`, `createdAt`, `mimeType`, `name`, `size`, `status`, `storageDriver`, `updatedAt`
 - Sort: `code`, `createdAt`, `mimeType`, `name`, `size`, `status`, `storageDriver`, `updatedAt`
 - Table: `name`, `mimeType`, `size`, `storageDriver`, `createdAt`
 - Form: `name`, `status`, `description`, `mimeType`

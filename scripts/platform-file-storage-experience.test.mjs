@@ -86,6 +86,17 @@ describe("validate-platform-file-storage-experience", () => {
     assert.match(result.stderr, /experienceContract\.auditFallback must document audit-log fallback/);
   });
 
+  it("rejects exposing the internal storage key as visible metadata", () => {
+    const contract = readJSON("resources/platform-file-storage-experience.json");
+    contract.experienceContract.metadataFields.push("storageKey");
+    const contractPath = tempJSON("platform-file-storage-experience.json", contract);
+
+    const result = runValidator(["--contract", contractPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /experienceContract\.metadataFields must not include storageKey/);
+  });
+
   it("rejects browser evidence with missing screenshot files", () => {
     const contract = readJSON("resources/platform-file-storage-experience.json");
     contract.designGate.browserEvidence.screenshots[0].path = "tmp/product-design/file-storage-experience-20260707/missing.png";

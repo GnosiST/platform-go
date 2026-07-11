@@ -2,6 +2,8 @@ package storage
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -9,18 +11,16 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
-	"unicode"
-	"unicode/utf8"
 )
 
 var (
 	ErrObjectNotFound               = errors.New("file object not found")
 	ErrUnsupportedObjectStoreDriver = errors.New("unsupported object store driver")
 	ErrInvalidObjectStoreConfig     = errors.New("invalid object store config")
+	ErrUnsafeObjectPath             = errors.New("unsafe file object path")
 )
 
-const maxObjectFileNameBytes = 255
+type objectKeyGenerator func() (string, error)
 
 type ObjectStore interface {
 	Save(ctx context.Context, input ObjectSaveInput) (ObjectMetadata, error)
@@ -60,19 +60,25 @@ type S3ObjectStoreConfig struct {
 
 type LocalObjectStoreOptions struct {
 	BaseDir string
-	Now     func() time.Time
 }
 
 type LocalObjectStore struct {
-	baseDir string
-	now     func() time.Time
+	baseDir      string
+	root         *os.Root
+	rootInfo     os.FileInfo
+	initErr      error
+	keyGenerator objectKeyGenerator
 }
 
 func NewObjectStore(config ObjectStoreConfig) (ObjectStore, error) {
 	driver := strings.ToLower(strings.TrimSpace(config.Driver))
 	switch driver {
 	case "", "local":
-		return NewLocalObjectStore(LocalObjectStoreOptions{BaseDir: config.LocalBaseDir}), nil
+		store := NewLocalObjectStore(LocalObjectStoreOptions{BaseDir: config.LocalBaseDir})
+		if store.initErr != nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidObjectStoreConfig, store.initErr)
+		}
+		return store, nil
 	case "s3":
 		return NewS3ObjectStore(context.Background(), config.S3)
 	default:
@@ -81,13 +87,35 @@ func NewObjectStore(config ObjectStoreConfig) (ObjectStore, error) {
 }
 
 func NewLocalObjectStore(options LocalObjectStoreOptions) LocalObjectStore {
-	now := options.Now
-	if now == nil {
-		now = time.Now
+	baseDir := resolveLocalObjectBaseDir(options.BaseDir)
+	if err := os.MkdirAll(baseDir, 0o700); err != nil {
+		return LocalObjectStore{baseDir: baseDir, initErr: err, keyGenerator: newOpaqueObjectKey}
 	}
+	canonicalDir, err := filepath.EvalSymlinks(baseDir)
+	if err != nil {
+		return LocalObjectStore{baseDir: baseDir, initErr: err, keyGenerator: newOpaqueObjectKey}
+	}
+	canonicalDir, err = filepath.Abs(canonicalDir)
+	if err != nil {
+		return LocalObjectStore{baseDir: canonicalDir, initErr: err, keyGenerator: newOpaqueObjectKey}
+	}
+	info, err := os.Lstat(canonicalDir)
+	if err != nil {
+		return LocalObjectStore{baseDir: canonicalDir, initErr: err, keyGenerator: newOpaqueObjectKey}
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return LocalObjectStore{baseDir: canonicalDir, initErr: fmt.Errorf("%w: local object root must be a real directory", ErrUnsafeObjectPath), keyGenerator: newOpaqueObjectKey}
+	}
+	if err := os.Chmod(canonicalDir, 0o700); err != nil {
+		return LocalObjectStore{baseDir: canonicalDir, initErr: err, keyGenerator: newOpaqueObjectKey}
+	}
+	root, err := os.OpenRoot(canonicalDir)
 	return LocalObjectStore{
-		baseDir: resolveLocalObjectBaseDir(options.BaseDir),
-		now:     now,
+		baseDir:      canonicalDir,
+		root:         root,
+		rootInfo:     info,
+		initErr:      err,
+		keyGenerator: newOpaqueObjectKey,
 	}
 }
 
@@ -95,24 +123,40 @@ func (store LocalObjectStore) Save(_ context.Context, input ObjectSaveInput) (Ob
 	if input.Reader == nil {
 		return ObjectMetadata{}, errors.New("object reader is required")
 	}
-	name := sanitizedObjectFileName(input.FileName)
-	key := path.Join(store.timestampPrefix(), name)
-	targetPath := store.pathForKey(key)
-	if err := ensurePrivateObjectDir(store.baseDir, filepath.Dir(targetPath)); err != nil {
+	if err := store.validateRoot(); err != nil {
 		return ObjectMetadata{}, err
 	}
-	file, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	key, err := store.keyGenerator()
+	if err != nil {
+		return ObjectMetadata{}, fmt.Errorf("generate object key: %w", err)
+	}
+	key, err = safeObjectKey(key)
+	if err != nil {
+		return ObjectMetadata{}, err
+	}
+	if err := store.ensurePrivateObjectDir(path.Dir(key)); err != nil {
+		return ObjectMetadata{}, err
+	}
+	if info, err := store.root.Lstat(key); err == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			return ObjectMetadata{}, fmt.Errorf("%w: object target must not be a symlink", ErrUnsafeObjectPath)
+		}
+		return ObjectMetadata{}, os.ErrExist
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return ObjectMetadata{}, err
+	}
+	file, err := store.root.OpenFile(key, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return ObjectMetadata{}, err
 	}
 	size, copyErr := io.Copy(file, input.Reader)
 	closeErr := file.Close()
 	if copyErr != nil {
-		_ = os.Remove(targetPath)
+		_ = store.root.Remove(key)
 		return ObjectMetadata{}, copyErr
 	}
 	if closeErr != nil {
-		_ = os.Remove(targetPath)
+		_ = store.root.Remove(key)
 		return ObjectMetadata{}, closeErr
 	}
 	return ObjectMetadata{
@@ -123,7 +167,17 @@ func (store LocalObjectStore) Save(_ context.Context, input ObjectSaveInput) (Ob
 }
 
 func (store LocalObjectStore) Open(_ context.Context, key string) (io.ReadCloser, error) {
-	file, err := os.Open(store.pathForKey(key))
+	if err := store.validateRoot(); err != nil {
+		return nil, err
+	}
+	key, err := safeObjectKey(key)
+	if err != nil {
+		return nil, err
+	}
+	if err := store.validateObjectTarget(key); err != nil {
+		return nil, err
+	}
+	file, err := store.root.Open(key)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, ErrObjectNotFound
 	}
@@ -134,7 +188,17 @@ func (store LocalObjectStore) Delete(_ context.Context, key string) error {
 	if strings.TrimSpace(key) == "" {
 		return nil
 	}
-	err := os.Remove(store.pathForKey(key))
+	if err := store.validateRoot(); err != nil {
+		return err
+	}
+	key, err := safeObjectKey(key)
+	if err != nil {
+		return err
+	}
+	if err := store.validateObjectTarget(key); err != nil {
+		return err
+	}
+	err = store.root.Remove(key)
 	if errors.Is(err, os.ErrNotExist) {
 		return ErrObjectNotFound
 	}
@@ -142,13 +206,7 @@ func (store LocalObjectStore) Delete(_ context.Context, key string) error {
 }
 
 func (store LocalObjectStore) pathForKey(key string) string {
-	cleanKey := cleanObjectKey(key)
-	return filepath.Join(store.baseDir, filepath.FromSlash(cleanKey))
-}
-
-func (store LocalObjectStore) timestampPrefix() string {
-	now := store.now().UTC()
-	return fmt.Sprintf("%04d/%02d/%02d/%d", now.Year(), now.Month(), now.Day(), now.UnixNano())
+	return filepath.Join(store.baseDir, filepath.FromSlash(cleanObjectKey(key)))
 }
 
 func resolveLocalObjectBaseDir(input string) string {
@@ -166,79 +224,16 @@ func resolveLocalObjectBaseDir(input string) string {
 	return absolute
 }
 
-func sanitizedObjectFileName(fileName string) string {
-	name := path.Base(strings.ReplaceAll(strings.TrimSpace(fileName), "\\", "/"))
-	var builder strings.Builder
-	lastUnderscore := false
-	for _, char := range name {
-		switch {
-		case unicode.IsControl(char):
-			continue
-		case unicode.IsLetter(char), unicode.IsDigit(char), char == '.', char == '-', char == '_':
-			builder.WriteRune(char)
-			lastUnderscore = false
-		case unicode.IsSpace(char):
-			if !lastUnderscore {
-				builder.WriteByte('_')
-				lastUnderscore = true
-			}
-		default:
-			if !lastUnderscore {
-				builder.WriteByte('_')
-				lastUnderscore = true
-			}
-		}
+func (store LocalObjectStore) ensurePrivateObjectDir(relative string) error {
+	if relative == "." || relative == "" {
+		return nil
 	}
-	name = strings.Trim(builder.String(), "._")
-	if name == "" {
-		return "file"
-	}
-	return truncateObjectFileName(name, maxObjectFileNameBytes)
-}
-
-func truncateObjectFileName(name string, maxBytes int) string {
-	if len(name) <= maxBytes {
-		return name
-	}
-	extension := path.Ext(name)
-	if len(extension) > 32 {
-		extension = ""
-	}
-	base := strings.TrimSuffix(name, extension)
-	budget := maxBytes - len(extension)
-	for len(base) > budget {
-		_, size := utf8.DecodeLastRuneInString(base)
-		base = base[:len(base)-size]
-	}
-	base = strings.TrimRight(base, "._-")
-	if base == "" {
-		base = "file"
-	}
-	return base + extension
-}
-
-func ensurePrivateObjectDir(baseDir string, targetDir string) error {
-	baseDir = filepath.Clean(baseDir)
-	targetDir = filepath.Clean(targetDir)
-	relative, err := filepath.Rel(baseDir, targetDir)
-	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return fmt.Errorf("object directory %q escapes base directory", targetDir)
-	}
-	if err := os.MkdirAll(baseDir, 0o700); err != nil {
-		return err
-	}
-	if err := os.Chmod(baseDir, 0o700); err != nil {
-		return err
-	}
-	current := baseDir
-	for _, component := range strings.Split(relative, string(filepath.Separator)) {
-		if component == "" || component == "." {
-			continue
-		}
-		current = filepath.Join(current, component)
-		info, err := os.Lstat(current)
+	current := ""
+	for _, component := range strings.Split(relative, "/") {
+		current = path.Join(current, component)
+		info, err := store.root.Lstat(current)
 		if errors.Is(err, os.ErrNotExist) {
-			if err := os.Mkdir(current, 0o700); err != nil {
+			if err := store.root.Mkdir(current, 0o700); err != nil {
 				return err
 			}
 			continue
@@ -247,13 +242,58 @@ func ensurePrivateObjectDir(baseDir string, targetDir string) error {
 			return err
 		}
 		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-			return fmt.Errorf("object directory component %q must be a real directory", current)
+			return fmt.Errorf("%w: object directory component must be a real directory", ErrUnsafeObjectPath)
 		}
-		if err := os.Chmod(current, 0o700); err != nil {
+		if err := store.root.Chmod(current, 0o700); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (store LocalObjectStore) validateRoot() error {
+	if store.initErr != nil {
+		return store.initErr
+	}
+	info, err := os.Lstat(store.baseDir)
+	if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.IsDir() || !os.SameFile(store.rootInfo, info) {
+		return fmt.Errorf("%w: local object root changed after initialization", ErrUnsafeObjectPath)
+	}
+	return nil
+}
+
+func (store LocalObjectStore) validateObjectTarget(key string) error {
+	info, err := store.root.Lstat(key)
+	if errors.Is(err, os.ErrNotExist) {
+		return ErrObjectNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return fmt.Errorf("%w: object target must be a regular file", ErrUnsafeObjectPath)
+	}
+	return nil
+}
+
+func newOpaqueObjectKey() (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return path.Join("objects", hex.EncodeToString(bytes)), nil
+}
+
+func safeObjectKey(key string) (string, error) {
+	value := strings.TrimSpace(filepath.ToSlash(key))
+	if value == "" || strings.HasPrefix(value, "/") {
+		return "", fmt.Errorf("%w: invalid object key", ErrUnsafeObjectPath)
+	}
+	cleaned := path.Clean(value)
+	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return "", fmt.Errorf("%w: invalid object key", ErrUnsafeObjectPath)
+	}
+	return cleaned, nil
 }
 
 func cleanObjectKey(key string) string {

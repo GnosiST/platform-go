@@ -1,9 +1,12 @@
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
+const require = createRequire(path.join(repoRoot, "admin/package.json"));
+const { parse: parseYAML } = require("yaml");
 
 function argValue(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -46,6 +49,33 @@ function requireIncludes(items, required, label, errors) {
       errors.push(`${label} must include ${item}`);
     }
   }
+}
+
+function stripNginxComments(source) {
+  return source
+    .split(/\r?\n/)
+    .map((line) => line.replace(/#.*$/, ""))
+    .join("\n");
+}
+
+function hasComposeEnvironment(environment, name) {
+  if (Array.isArray(environment)) {
+    return environment.some((item) => {
+      const value = String(item ?? "");
+      return value === name || value.startsWith(`${name}=`);
+    });
+  }
+  return environment !== null && typeof environment === "object" && Object.hasOwn(environment, name);
+}
+
+function hasComposeVolumes(volumes) {
+  if (Array.isArray(volumes)) {
+    return volumes.length > 0;
+  }
+  if (volumes !== null && typeof volumes === "object") {
+    return Object.keys(volumes).length > 0;
+  }
+  return Boolean(volumes);
 }
 
 function validateDecision(contract, errors) {
@@ -339,9 +369,11 @@ function validateDeploymentPackage(contract, errors) {
   if (!fs.existsSync(adminProxyPath)) {
     errors.push(`admin proxy source is missing: ${adminProxyPath}`);
   } else {
-    const adminProxy = fs.readFileSync(adminProxyPath, "utf8");
-    if (/location\s+\/uploads\//.test(adminProxy) || /alias\s+[^;]*uploads\//.test(adminProxy)) {
-      errors.push("admin proxy must not expose /uploads/");
+    const adminProxy = stripNginxComments(fs.readFileSync(adminProxyPath, "utf8"));
+    const exposesUploadLocation = /\blocation\s+(?:[=~*^]+\s*)?\/uploads(?:\/|\s|\{|$)/i.test(adminProxy);
+    const exposesUploadDirectory = /\b(?:alias|root)\s+[^;\n]*\/uploads?(?:\/|;|\s|$)/i.test(adminProxy);
+    if (exposesUploadLocation || exposesUploadDirectory) {
+      errors.push("admin proxy must not expose upload storage");
     }
   }
 
@@ -388,14 +420,30 @@ function validateDeploymentPackage(contract, errors) {
   const composePath = path.resolve(repoRoot, composeOverride || deploymentPackage.composeFile || "");
   if (fs.existsSync(composePath)) {
     const composeSource = fs.readFileSync(composePath, "utf8");
-    if (composeSource.includes("env_file:")) {
-      errors.push("deploymentPackage.composeFile must use explicit environment mappings instead of env_file");
+    let compose;
+    try {
+      compose = parseYAML(composeSource);
+    } catch (error) {
+      errors.push(`compose file must be valid YAML: ${error.message}`);
     }
-    if (composeSource.includes("PLATFORM_FILE_STORAGE_PUBLIC_URL")) {
-      errors.push("compose file must not configure PLATFORM_FILE_STORAGE_PUBLIC_URL");
-    }
-    if (composeSource.includes("/var/lib/platform-go/uploads")) {
-      errors.push("Admin service must not mount file storage");
+    if (compose !== null && typeof compose === "object") {
+      const services = compose.services !== null && typeof compose.services === "object" ? compose.services : {};
+      for (const service of Object.values(services)) {
+        if (service !== null && typeof service === "object") {
+          if (service.env_file !== undefined) {
+            errors.push("deploymentPackage.composeFile must use explicit environment mappings instead of env_file");
+          }
+          if (hasComposeEnvironment(service.environment, "PLATFORM_FILE_STORAGE_PUBLIC_URL")) {
+            errors.push("compose file must not configure PLATFORM_FILE_STORAGE_PUBLIC_URL");
+          }
+        }
+      }
+      const adminService = services["platform-admin"];
+      if (adminService !== null && typeof adminService === "object") {
+        if (hasComposeVolumes(adminService.volumes)) {
+          errors.push("Admin service must not mount volumes");
+        }
+      }
     }
   }
 }

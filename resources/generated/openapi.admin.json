@@ -3198,7 +3198,6 @@
                   "size",
                   "status",
                   "storageDriver",
-                  "storageKey",
                   "updatedAt"
                 ],
                 "x-platform-search-fields": [
@@ -3216,7 +3215,6 @@
                   "size",
                   "status",
                   "storageDriver",
-                  "storageKey",
                   "updatedAt"
                 ],
                 "x-platform-sort-fields": [
@@ -10418,7 +10416,7 @@
               "zh": "对象键",
               "en": "Object Key"
             },
-            "x-platform-searchable": true,
+            "x-platform-searchable": false,
             "x-platform-filterable": false,
             "x-platform-sortable": false,
             "x-platform-localizable": false,

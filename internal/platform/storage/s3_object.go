@@ -7,7 +7,6 @@ import (
 	"io"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
@@ -29,7 +28,7 @@ type S3ObjectStore struct {
 	prefix               string
 	serverSideEncryption types.ServerSideEncryption
 	kmsKeyID             string
-	now                  func() time.Time
+	keyGenerator         objectKeyGenerator
 }
 
 func NewS3ObjectStore(ctx context.Context, config S3ObjectStoreConfig) (S3ObjectStore, error) {
@@ -62,15 +61,15 @@ func NewS3ObjectStore(ctx context.Context, config S3ObjectStoreConfig) (S3Object
 	return newS3ObjectStoreWithClient(client, config, nil)
 }
 
-func newS3ObjectStoreWithClient(client s3ObjectAPI, config S3ObjectStoreConfig, now func() time.Time) (S3ObjectStore, error) {
+func newS3ObjectStoreWithClient(client s3ObjectAPI, config S3ObjectStoreConfig, keyGenerator objectKeyGenerator) (S3ObjectStore, error) {
 	if client == nil {
 		return S3ObjectStore{}, fmt.Errorf("%w: s3 client is required", ErrInvalidObjectStoreConfig)
 	}
 	if err := validateS3ObjectStoreConfig(config); err != nil {
 		return S3ObjectStore{}, err
 	}
-	if now == nil {
-		now = time.Now
+	if keyGenerator == nil {
+		keyGenerator = newOpaqueObjectKey
 	}
 	return S3ObjectStore{
 		client:               client,
@@ -78,7 +77,7 @@ func newS3ObjectStoreWithClient(client s3ObjectAPI, config S3ObjectStoreConfig, 
 		prefix:               strings.Trim(strings.TrimSpace(config.Prefix), "/"),
 		serverSideEncryption: types.ServerSideEncryption(strings.TrimSpace(config.ServerSideEncryption)),
 		kmsKeyID:             strings.TrimSpace(config.KMSKeyID),
-		now:                  now,
+		keyGenerator:         keyGenerator,
 	}, nil
 }
 
@@ -106,7 +105,15 @@ func (store S3ObjectStore) Save(ctx context.Context, input ObjectSaveInput) (Obj
 	if input.Reader == nil {
 		return ObjectMetadata{}, errors.New("object reader is required")
 	}
-	key := path.Join(store.prefix, store.timestampPrefix(), sanitizedObjectFileName(input.FileName))
+	opaqueKey, err := store.keyGenerator()
+	if err != nil {
+		return ObjectMetadata{}, fmt.Errorf("generate object key: %w", err)
+	}
+	opaqueKey, err = safeObjectKey(opaqueKey)
+	if err != nil {
+		return ObjectMetadata{}, err
+	}
+	key := path.Join(store.prefix, opaqueKey)
 	reader := &countingReader{reader: input.Reader}
 	putInput := &s3.PutObjectInput{
 		Bucket:               aws.String(store.bucket),
@@ -154,11 +161,6 @@ func (store S3ObjectStore) Delete(ctx context.Context, key string) error {
 		Key:    aws.String(cleanKey),
 	})
 	return err
-}
-
-func (store S3ObjectStore) timestampPrefix() string {
-	now := store.now().UTC()
-	return fmt.Sprintf("%04d/%02d/%02d/%d", now.Year(), now.Month(), now.Day(), now.UnixNano())
 }
 
 type countingReader struct {

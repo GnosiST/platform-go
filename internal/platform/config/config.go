@@ -525,7 +525,7 @@ func int64Env(key string, fallback int64) int64 {
 	}
 	parsed, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
-		return fallback
+		return -1
 	}
 	return parsed
 }
