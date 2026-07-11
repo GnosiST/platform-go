@@ -2293,7 +2293,7 @@
         "requiredSourceSnippets": [
           {
             "path": "resources/platform-goal-completion-audit.json",
-            "contains": "\"completionStatus\": \"complete\""
+            "contains": "\"completionStatus\": \"not-complete-controlled\""
           },
           {
             "path": "resources/platform-goal-completion-audit.json",
@@ -2473,7 +2473,7 @@
           },
           {
             "path": "scripts/validate-platform-node-closeout-audit.mjs",
-            "contains": "must reference an implemented task"
+            "contains": "must not have closeout evidence"
           },
           {
             "path": "scripts/platform-node-closeout-audit.test.mjs",
@@ -2548,7 +2548,7 @@
           },
           {
             "path": "resources/platform-objective-conformance.json",
-            "contains": "\"goalCompletionStatus\": \"complete\""
+            "contains": "\"goalCompletionStatus\": \"not-complete-controlled\""
           },
           {
             "path": "resources/platform-objective-conformance.json",

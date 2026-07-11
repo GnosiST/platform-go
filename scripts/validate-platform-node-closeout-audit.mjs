@@ -22,6 +22,10 @@ function values(items) {
   return Array.isArray(items) ? items.filter(Boolean) : [];
 }
 
+function sameList(left, right) {
+  return left.length === right.length && left.every((item, index) => item === right[index]);
+}
+
 function relativeExistingPath(relativePath) {
   if (!relativePath || path.isAbsolute(relativePath)) {
     return false;
@@ -115,7 +119,7 @@ function validate() {
       continue;
     }
     if (policy.unfinishedTasksMustNotHaveCloseout === true && task.status !== "implemented") {
-      errors.push(`${prefix} must reference an implemented task`);
+      errors.push(`${task.status} task ${taskID} must not have closeout evidence`);
     }
     if (closeout.status !== "closed") {
       errors.push(`${prefix}.status must be closed`);
@@ -153,11 +157,9 @@ function validate() {
     }
   }
 
-  if (unfinishedTasks.length !== 0) {
-    errors.push(`node closeout audit requires every foundation task to be implemented after Task 8: ${unfinishedTasks.map((task) => task.id).join(", ")}`);
-  }
-  if (values(audit.pendingNodeEvidence).length !== 0) {
-    errors.push("pendingNodeEvidence must be empty after Task 8 closeout");
+  const unfinishedTaskIDs = unfinishedTasks.map((task) => task.id);
+  if (!sameList(values(audit.pendingNodeEvidence), unfinishedTaskIDs)) {
+    errors.push("pendingNodeEvidence must exactly match unfinished task graph nodes in graph order");
   }
 
   return { audit, implementedCount: implementedTasks.length, errors };

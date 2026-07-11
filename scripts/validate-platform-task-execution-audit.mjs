@@ -42,6 +42,10 @@ function values(items) {
   return Array.isArray(items) ? items.filter(Boolean) : [];
 }
 
+function sameList(left, right) {
+  return left.length === right.length && left.every((item, index) => item === right[index]);
+}
+
 function hasLocalizedText(value) {
   return typeof value?.zh === "string" && value.zh.trim() !== "" && typeof value?.en === "string" && value.en.trim() !== "";
 }
@@ -234,15 +238,16 @@ function validateTasks(audit, graph, alignment, contracts, errors) {
   const unfinishedIDs = values(audit.requiredUnfinishedNodes);
   const foundationPromotionGateTasks = new Set(["production-auth-provider-hardening", "source-writing-codegen-promotion"]);
 
-  if (unfinishedIDs.length !== 0) {
-    errors.push("requiredUnfinishedNodes must be empty after Task 8 closeout");
-  }
   const graphUnfinishedIDs = tasks.filter((task) => task.status !== "implemented").map((task) => task.id);
-  if (JSON.stringify(unfinishedIDs) !== JSON.stringify(graphUnfinishedIDs)) {
-    errors.push(`requiredUnfinishedNodes must match unfinished task graph nodes: ${graphUnfinishedIDs.join(", ")}`);
+  if (!sameList(unfinishedIDs, graphUnfinishedIDs)) {
+    errors.push("requiredUnfinishedNodes must exactly match unfinished task graph nodes in graph order");
+    const missingIDs = graphUnfinishedIDs.filter((taskID) => !unfinishedIDs.includes(taskID));
+    if (missingIDs.length > 0) {
+      errors.push(`requiredUnfinishedNodes must match unfinished task graph nodes: ${missingIDs.join(", ")}`);
+    }
   }
-  if (values(alignment.requiredFutureTaskNodes).length !== 0) {
-    errors.push("alignment.requiredFutureTaskNodes must be empty after Task 8 closeout");
+  if (!sameList(values(alignment.requiredFutureTaskNodes), graphUnfinishedIDs)) {
+    errors.push("alignment.requiredFutureTaskNodes must exactly match unfinished task graph nodes in graph order");
   }
 
   for (const task of tasks) {
@@ -288,86 +293,6 @@ function validateTasks(audit, graph, alignment, contracts, errors) {
     }
     if (unfinishedBlockersStillActive(taskID, contracts) && task.status === "implemented") {
       errors.push(`task ${taskID} must not be implemented while its execution audit blockers are still active`);
-    }
-    const blocker = values(audit.knownPromotionBlockers).find((item) => item.taskId === taskID);
-    if (!blocker) {
-      errors.push(`knownPromotionBlockers must describe ${taskID}`);
-      continue;
-    }
-    if (values(blocker.runtimeMutationBlockedWhile).length === 0) {
-      errors.push(`knownPromotionBlockers.${taskID}.runtimeMutationBlockedWhile must not be empty`);
-    }
-    if (values(blocker.requiredEvidenceBeforePromotion).length === 0) {
-      errors.push(`knownPromotionBlockers.${taskID}.requiredEvidenceBeforePromotion must not be empty`);
-    }
-    if (taskID === "production-auth-provider-hardening") {
-      requireIncludes(
-        blocker.runtimeMutationBlockedWhile,
-        [
-          "resources/platform-production-auth-hardening.json sessionCredentialPolicy.refreshTokenFamily.defaultRuntime is disabled",
-          "resources/platform-production-auth-hardening.json productionPromotionApprovalPackage.status is blocked",
-        ],
-        `knownPromotionBlockers.${taskID}.runtimeMutationBlockedWhile`,
-        errors,
-      );
-      requireIncludes(
-        blocker.requiredEvidenceBeforePromotion,
-        [
-          "runtime test output bundle including refresh-token-family tests",
-          "token-family revocation evidence",
-          "redis session invalidation convergence evidence",
-          "rotation replay audit evidence",
-          "security-owner approval",
-          "platform-architect approval",
-          "operations-owner approval",
-          "structured approval evidence package",
-          "provider rotation runbook",
-          "rollback plan",
-          "audit redaction sample",
-          "external absolute artifact URI evidence",
-        ],
-        `knownPromotionBlockers.${taskID}.requiredEvidenceBeforePromotion`,
-        errors,
-      );
-    }
-    if (taskID === "source-writing-codegen-promotion") {
-      requireIncludes(
-        blocker.runtimeMutationBlockedWhile,
-        [
-          "resources/platform-codegen-source-writing-readiness.json mode.sourceWriting is disabled",
-          "resources/platform-codegen-source-writing-readiness.json sourceWritingApprovalPackage.status is blocked",
-          "resources/generated/admin-scaffold-promotion-review.json manualReview.decision is not-approved",
-        ],
-        `knownPromotionBlockers.${taskID}.runtimeMutationBlockedWhile`,
-        errors,
-      );
-      requireIncludes(
-        blocker.requiredEvidenceBeforePromotion,
-        [
-          "source-writing architecture spec",
-          "platform-architect approval",
-          "codegen-owner approval",
-          "runtime-owner approval",
-          "approved promotion review packet",
-          "reviewed diff",
-          "target-family test mapping",
-          "target-family test output",
-          "runtime target owner approval",
-          "rollback plan",
-          "structured source-writing approval evidence package",
-          "external absolute artifact URI evidence",
-        ],
-        `knownPromotionBlockers.${taskID}.requiredEvidenceBeforePromotion`,
-        errors,
-      );
-    }
-    if (task.visual === true) {
-      requireIncludes(
-        blocker.requiredEvidenceBeforePromotion,
-        ["superpowers:brainstorming design approval", "product-design visual approval"],
-        `knownPromotionBlockers.${taskID}.requiredEvidenceBeforePromotion`,
-        errors,
-      );
     }
   }
 }

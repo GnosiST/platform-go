@@ -21,7 +21,7 @@ const adminPackagePath = path.resolve(repoRoot, argValue("--admin-package", "adm
 const stackSourceRoot = path.resolve(repoRoot, argValue("--stack-source-root", "."));
 
 const allowedStatuses = new Set(["implemented", "preview-scaffold", "partial", "deferred"]);
-const requiredCapabilityIDs = [
+const requiredImplementedCapabilityIDs = [
   "dynamic-admin-resources",
   "dynamic-menus",
   "permission-codes",
@@ -37,6 +37,7 @@ const requiredCapabilityIDs = [
   "system-management",
   "app-route-contracts",
   "app-client-api-boundary",
+  "production-persistence-correctness",
   "production-runtime-gate",
   "production-auth-hardening-gate",
   "runtime-cache-invalidation",
@@ -53,6 +54,14 @@ const requiredCapabilityIDs = [
   "production-readiness-preflight",
   "deployment-topology-gate",
 ];
+const requiredPartialCapabilityIDs = [
+  "runtime-security-containment",
+  "admin-watermark-export-governance",
+  "sensitive-data-protection",
+  "open-source-portability",
+  "public-documentation-and-release",
+];
+const requiredCapabilityIDs = [...requiredImplementedCapabilityIDs, ...requiredPartialCapabilityIDs];
 
 function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -379,6 +388,18 @@ function validate() {
   for (const capabilityID of requiredCapabilityIDs) {
     if (!capabilityIDs.has(capabilityID)) {
       errors.push(`engineering capability matrix is missing required capability ${capabilityID}`);
+    }
+  }
+  for (const capabilityID of requiredImplementedCapabilityIDs) {
+    const capability = capabilityByID.get(capabilityID);
+    if (capability && capability.status !== "implemented") {
+      errors.push(`required implemented capability ${capabilityID} must stay implemented`);
+    }
+  }
+  for (const capabilityID of requiredPartialCapabilityIDs) {
+    const capability = capabilityByID.get(capabilityID);
+    if (capability && capability.status !== "partial") {
+      errors.push(`approved completion program capability ${capabilityID} must stay partial until implementation closeout`);
     }
   }
   validateSafeCodegenScaffold(capabilityByID.get("safe-codegen-scaffold"), errors);

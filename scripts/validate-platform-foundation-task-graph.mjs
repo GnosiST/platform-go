@@ -15,6 +15,55 @@ const allowedVisualDesignGates = new Set(requiredVisualDesignGate);
 const evidencePathKeys = ["docs", "validators", "tests", "screenshots"];
 const requiredAdminUIContractTests = ["scripts/admin-ui-contracts.test.mjs"];
 const foundationPromotionGateTaskIDs = new Set(["production-auth-provider-hardening", "source-writing-codegen-promotion"]);
+const foundationBaselineTaskIDs = [
+  "stack-alignment-and-architecture",
+  "capability-manifest-contract",
+  "resource-schema-contract",
+  "capability-profile-composition-gate",
+  "capability-contract-governance",
+  "rbac-menu-data-scope",
+  "governance-org-area-role-groups",
+  "auth-session-provider-jwt-wechat",
+  "gorm-storage-runtime",
+  "cache-redis-invalidation",
+  "production-persistence-correctness",
+  "production-runtime-gate",
+  "production-readiness-preflight",
+  "openapi-app-contracts",
+  "admin-api-boundary-query-security",
+  "codegen-preview-scaffold",
+  "codegen-source-writing-readiness",
+  "admin-ui-shell-and-list-components",
+  "branding-demo-data-dashboard",
+  "personnel-extension-boundary",
+  "notification-extension-boundary",
+  "job-extension-boundary",
+  "visual-product-design-qa",
+  "policy-review-and-audit-workflow",
+  "production-auth-provider-hardening",
+  "form-schema-layout-and-slots",
+  "refine-custom-panels-and-actions",
+  "file-storage-preview-and-audit-workflow",
+  "policy-review-custom-ui",
+  "source-writing-codegen-promotion",
+  "task-dependency-governance",
+  "reference-discovery-classification-gate",
+  "reference-coverage-boundary-gate",
+  "node-closeout-audit",
+  "foundation-alignment-audit",
+  "admin-ui-system-quality-hardening",
+  "production-admin-oidc-auth",
+];
+const approvedCompletionProgramTaskIDs = [
+  "runtime-security-containment",
+  "admin-watermark-export-governance",
+  "sensitive-data-protection-runtime",
+  "sensitive-data-historical-migration",
+  "open-source-portability",
+  "public-docs-community",
+  "public-docs-site",
+  "github-release-publication",
+];
 
 function argValue(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -312,11 +361,9 @@ function validateProductionAdminOIDCNode(tasks, evidence, errors) {
   if (task.status !== "implemented") {
     errors.push("production-admin-oidc-auth must be implemented after Task 8 evidence closeout");
   }
-  const implemented = tasks.filter((item) => item.status === "implemented");
-  const pending = tasks.filter((item) => item.status === "pending");
-  const blocked = tasks.filter((item) => item.status === "blocked");
-  if (tasks.length !== 37 || implemented.length !== 37 || pending.length !== 0 || blocked.length !== 0) {
-    errors.push("Task 8 task graph counts must stay 37 total, 37 implemented, 0 pending and 0 blocked");
+  const baselineTasks = tasks.slice(0, foundationBaselineTaskIDs.length);
+  if (!sameList(baselineTasks.map((item) => item.id), foundationBaselineTaskIDs) || baselineTasks.some((item) => item.status !== "implemented")) {
+    errors.push("Task 8 baseline must preserve the original 37 implemented task nodes in order");
   }
   if (!sameList(values(task.dependsOn), ["production-auth-provider-hardening", "production-persistence-correctness", "admin-ui-system-quality-hardening"])) {
     errors.push("production-admin-oidc-auth dependencies must stay production auth, persistence correctness and Admin UI hardening");
@@ -371,6 +418,19 @@ function validateProductionAdminOIDCNode(tasks, evidence, errors) {
     evidence.promotionBoundary?.sourceWriting !== "disabled"
   ) {
     errors.push("production-admin-oidc-auth evidence manifest must preserve promotion and runtime boundaries");
+  }
+}
+
+function validateCompletionProgram(tasks, errors) {
+  const taskIDs = tasks.map((task) => task.id);
+  for (const taskID of approvedCompletionProgramTaskIDs) {
+    if (!taskIDs.includes(taskID)) {
+      errors.push(`approved completion program task is missing: ${taskID}`);
+    }
+  }
+  const completionProgramTaskIDs = taskIDs.filter((taskID) => approvedCompletionProgramTaskIDs.includes(taskID));
+  if (completionProgramTaskIDs.length === approvedCompletionProgramTaskIDs.length && !sameList(completionProgramTaskIDs, approvedCompletionProgramTaskIDs)) {
+    errors.push("completion program task order must match approved order");
   }
 }
 
@@ -486,6 +546,7 @@ function validate() {
   for (const task of tasks) {
     validateTask(task, context, errors);
   }
+  validateCompletionProgram(tasks, errors);
   validateProductionAdminOIDCNode(tasks, oidcEvidence, errors);
 
   for (const cycle of detectCycles(tasksByID)) {

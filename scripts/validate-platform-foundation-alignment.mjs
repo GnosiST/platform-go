@@ -154,8 +154,9 @@ function validateTaskGraph(audit, taskGraph, errors) {
   const tasks = values(taskGraph.tasks);
   const tasksByID = new Map(tasks.map((task) => [task.id, task]));
   const promotionGateTaskIDs = new Set(["production-auth-provider-hardening", "source-writing-codegen-promotion"]);
+  const requiredTaskCoverage = new Set([...values(audit.requiredTaskNodes), ...values(audit.requiredFutureTaskNodes)]);
   for (const taskID of values(audit.nonDroppableGoalNodes)) {
-    if (!values(audit.requiredTaskNodes).includes(taskID)) {
+    if (!requiredTaskCoverage.has(taskID)) {
       errors.push(`requiredTaskNodes is missing required goal node ${taskID}`);
     }
   }
@@ -196,6 +197,10 @@ function validateTaskGraph(audit, taskGraph, errors) {
         errors.push(`alignment audit future task ${taskID} must declare zh/en completionGate`);
       }
     }
+  }
+  const unfinishedTaskIDs = tasks.filter((task) => task.status !== "implemented").map((task) => task.id);
+  if (!sameList(values(audit.requiredFutureTaskNodes), unfinishedTaskIDs)) {
+    errors.push("alignment requiredFutureTaskNodes must exactly match unfinished task graph nodes in graph order");
   }
   const visualRequired = values(audit.visualDesignGate?.requiredForVisualTasks);
   const visualRequiredOrder = values(audit.visualDesignGate?.requiredOrder);
@@ -746,7 +751,7 @@ function validateRefreshTokenFamilyPromotion(audit, refreshTokenFamilyPromotion,
   }
 }
 
-function validateTaskExecutionAudit(audit, taskExecutionAudit, engineering, errors) {
+function validateTaskExecutionAudit(audit, taskGraph, taskExecutionAudit, engineering, errors) {
   if (!taskExecutionAudit.purpose) {
     errors.push("task execution audit purpose is required");
   }
@@ -756,11 +761,12 @@ function validateTaskExecutionAudit(audit, taskExecutionAudit, engineering, erro
   if (taskExecutionAudit.alignmentAudit !== "resources/platform-foundation-alignment-audit.json") {
     errors.push("task execution audit alignmentAudit must point to resources/platform-foundation-alignment-audit.json");
   }
-  if (values(audit.requiredFutureTaskNodes).length !== 0) {
-    errors.push("alignment requiredFutureTaskNodes must be empty after Task 8 closeout");
+  const unfinishedTaskIDs = values(taskGraph.tasks).filter((task) => task.status !== "implemented").map((task) => task.id);
+  if (!sameList(values(audit.requiredFutureTaskNodes), unfinishedTaskIDs)) {
+    errors.push("alignment requiredFutureTaskNodes must exactly match unfinished task graph nodes in graph order");
   }
-  if (values(taskExecutionAudit.requiredUnfinishedNodes).length !== 0) {
-    errors.push("task execution audit requiredUnfinishedNodes must be empty after Task 8 closeout");
+  if (!sameList(values(taskExecutionAudit.requiredUnfinishedNodes), unfinishedTaskIDs)) {
+    errors.push("task execution audit requiredUnfinishedNodes must exactly match unfinished task graph nodes in graph order");
   }
   for (const taskID of ["production-auth-provider-hardening", "source-writing-codegen-promotion"]) {
     if (!values(taskExecutionAudit.knownPromotionBlockers).some((blocker) => blocker.taskId === taskID)) {
@@ -861,7 +867,7 @@ function validate() {
   validateFileStorageExperience(audit, fileStorageExperience, errors);
   validateObjectiveConflictPolicy(audit, productionReadiness, errors);
   validateDeploymentTopology(audit, deploymentTopology, errors);
-  validateTaskExecutionAudit(audit, taskExecutionAudit, engineering, errors);
+  validateTaskExecutionAudit(audit, taskGraph, taskExecutionAudit, engineering, errors);
   validateProductionReadiness(productionReadiness, errors);
   validateProductionAuthHardening(audit, productionAuthHardening, errors);
   validateRefreshTokenFamilyPromotion(audit, refreshTokenFamilyPromotion, productionAuthHardening, errors);

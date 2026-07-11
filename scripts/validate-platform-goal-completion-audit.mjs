@@ -60,6 +60,10 @@ function values(items) {
   return Array.isArray(items) ? items.filter(Boolean) : [];
 }
 
+function sameList(left, right) {
+  return left.length === right.length && left.every((item, index) => item === right[index]);
+}
+
 function hasLocalizedText(value) {
   return typeof value?.zh === "string" && value.zh.trim() !== "" && typeof value?.en === "string" && value.en.trim() !== "";
 }
@@ -99,13 +103,13 @@ function validateTaskSummary(audit, graph, taskExecution, errors) {
   }
 
   const controlled = values(audit.completionPolicy?.requiredControlledUnfinishedNodes);
-  if (unfinished.length === 0 && controlled.length !== 0) {
-    errors.push("completionPolicy.requiredControlledUnfinishedNodes must be empty after foundation completion");
-  }
   const unfinishedIDs = unfinished.map((task) => task.id);
-  requireIncludes(controlled, values(taskExecution.requiredUnfinishedNodes), "completionPolicy.requiredControlledUnfinishedNodes", errors);
-  requireIncludes(values(taskExecution.requiredUnfinishedNodes), controlled, "task execution requiredUnfinishedNodes", errors);
-  requireIncludes(controlled, unfinishedIDs, "completionPolicy.requiredControlledUnfinishedNodes", errors);
+  if (!sameList(controlled, unfinishedIDs)) {
+    errors.push("completionPolicy.requiredControlledUnfinishedNodes must exactly match unfinished task graph nodes in graph order");
+  }
+  if (!sameList(values(taskExecution.requiredUnfinishedNodes), unfinishedIDs)) {
+    errors.push("task execution requiredUnfinishedNodes must exactly match unfinished task graph nodes in graph order");
+  }
 }
 
 function validateCompletionStatus(audit, graph, productionAuth, codegenReadiness, codegenReview, errors) {

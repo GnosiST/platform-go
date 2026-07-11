@@ -171,22 +171,16 @@ function validateTaskControl(audit, alignment, taskGraph, taskExecution, goal, e
     }
   }
 
-  if (values(policy.requiredUnfinishedNodes).length !== 0) {
-    errors.push("taskControlPolicy.requiredUnfinishedNodes must be empty after Task 8 closeout");
-  }
-  if (values(taskExecution.requiredUnfinishedNodes).length !== 0) {
-    errors.push("task execution requiredUnfinishedNodes must be empty after Task 8 closeout");
-  }
-  if (values(alignment.requiredFutureTaskNodes).length !== 0) {
-    errors.push("alignment.requiredFutureTaskNodes must be empty after Task 8 closeout");
-  }
-  if (values(goal.completionPolicy?.requiredControlledUnfinishedNodes).length !== 0) {
-    errors.push("goal completionPolicy.requiredControlledUnfinishedNodes must be empty after Task 8 closeout");
-  }
-
   const unfinishedTaskIDs = values(taskGraph.tasks).filter((task) => task.status !== "implemented").map((task) => task.id);
-  if (unfinishedTaskIDs.length !== 0) {
-    errors.push(`unfinished task graph nodes must be empty after Task 8 closeout: ${unfinishedTaskIDs.join(", ")}`);
+  for (const [items, label] of [
+    [values(policy.requiredUnfinishedNodes), "taskControlPolicy.requiredUnfinishedNodes"],
+    [values(taskExecution.requiredUnfinishedNodes), "task execution requiredUnfinishedNodes"],
+    [values(alignment.requiredFutureTaskNodes), "alignment.requiredFutureTaskNodes"],
+    [values(goal.completionPolicy?.requiredControlledUnfinishedNodes), "goal completionPolicy.requiredControlledUnfinishedNodes"],
+  ]) {
+    if (!sameList(items, unfinishedTaskIDs)) {
+      errors.push(`${label} must exactly match unfinished task graph nodes in graph order`);
+    }
   }
   if (values(taskGraph.resourceLocks).length === 0) {
     errors.push("task graph resourceLocks must not be empty");
@@ -344,13 +338,15 @@ function validateDeploymentPolicy(audit, alignment, deploymentTopology, errors) 
   }
 }
 
-function validateCompletionPolicy(audit, goal, taskExecution, errors) {
+function validateCompletionPolicy(audit, goal, taskGraph, taskExecution, errors) {
   const policy = audit.completionPolicy ?? {};
-  if (policy.goalCompletionStatus !== "complete") {
-    errors.push("completionPolicy.goalCompletionStatus must be complete after Task 8 closeout");
+  const unfinishedTaskIDs = values(taskGraph.tasks).filter((task) => task.status !== "implemented").map((task) => task.id);
+  const expectedCompletionStatus = unfinishedTaskIDs.length === 0 ? "complete" : "not-complete-controlled";
+  if (policy.goalCompletionStatus !== expectedCompletionStatus) {
+    errors.push(`completionPolicy.goalCompletionStatus must be ${expectedCompletionStatus} for current task graph state`);
   }
-  if (goal.completionStatus !== "complete") {
-    errors.push("goal completionStatus must be complete after Task 8 closeout");
+  if (goal.completionStatus !== expectedCompletionStatus) {
+    errors.push(`goal completionStatus must be ${expectedCompletionStatus} for current task graph state`);
   }
   if (policy.mustNotMarkCompleteWhileBlockersActive !== true) {
     errors.push("completionPolicy.mustNotMarkCompleteWhileBlockersActive must stay true");
@@ -358,11 +354,11 @@ function validateCompletionPolicy(audit, goal, taskExecution, errors) {
   if (policy.mustNotSelfCertifyExternalApprovalEvidence !== true) {
     errors.push("completionPolicy.mustNotSelfCertifyExternalApprovalEvidence must stay true");
   }
-  if (values(policy.controlledBlockers).length !== 0) {
-    errors.push("completionPolicy.controlledBlockers must be empty after Task 8 closeout");
+  if (!sameList(values(policy.controlledBlockers), unfinishedTaskIDs)) {
+    errors.push("completionPolicy.controlledBlockers must exactly match unfinished task graph nodes in graph order");
   }
-  if (values(taskExecution.requiredUnfinishedNodes).length !== 0) {
-    errors.push("task execution requiredUnfinishedNodes must be empty after Task 8 closeout");
+  if (!sameList(values(taskExecution.requiredUnfinishedNodes), unfinishedTaskIDs)) {
+    errors.push("task execution requiredUnfinishedNodes must exactly match unfinished task graph nodes in graph order");
   }
 
   const gateIDs = values(audit.futurePromotionGates).map((gate) => gate.taskId);
@@ -468,7 +464,7 @@ function validate() {
   validateVisualPolicy(audit, alignment, taskExecution, errors);
   validateCloseoutPolicy(audit, errors);
   validateDeploymentPolicy(audit, alignment, deploymentTopology, errors);
-  validateCompletionPolicy(audit, goal, taskExecution, errors);
+  validateCompletionPolicy(audit, goal, taskGraph, taskExecution, errors);
   validateEvidence(audit, engineering, productionReadiness, errors);
 
   return { audit, errors };
