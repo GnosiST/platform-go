@@ -1,12 +1,56 @@
 package adminresource
 
 import (
+	"errors"
 	"slices"
 	"sort"
 	"strings"
 
 	"platform-go/internal/platform/rbac"
 )
+
+var ErrAdminPrincipalInvalid = errors.New("invalid admin principal")
+
+func ValidateAdminPrincipal(store *Store, username string) (rbac.Principal, error) {
+	username = strings.TrimSpace(username)
+	if store == nil || username == "" {
+		return rbac.Principal{}, ErrAdminPrincipalInvalid
+	}
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if !store.hasSingleEnabledUserLocked(username) {
+		return rbac.Principal{}, ErrAdminPrincipalInvalid
+	}
+	principal := store.currentPrincipalLocked(username)
+	if strings.TrimSpace(principal.User.ID) == "" || principal.User.Username != username || !hasEffectivePermission(principal) {
+		return rbac.Principal{}, ErrAdminPrincipalInvalid
+	}
+	return principal, nil
+}
+
+func (s *Store) hasSingleEnabledUserLocked(username string) bool {
+	matches := 0
+	for _, user := range s.resources["users"] {
+		if user.Code != username {
+			continue
+		}
+		matches++
+		if strings.TrimSpace(user.Status) != "enabled" {
+			return false
+		}
+	}
+	return matches == 1
+}
+
+func hasEffectivePermission(principal rbac.Principal) bool {
+	policy := rbac.NewPolicySetWithDeny(principal.Permissions, principal.DeniedPermissions)
+	for _, permission := range principal.Permissions {
+		if policy.Allows(permission) {
+			return true
+		}
+	}
+	return false
+}
 
 func (s *Store) CurrentPrincipal(username string) rbac.Principal {
 	s.mu.Lock()

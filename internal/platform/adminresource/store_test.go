@@ -1108,6 +1108,54 @@ func TestCurrentPrincipalReadsRolesFieldWithLegacyRoleFallback(t *testing.T) {
 	}
 }
 
+func TestValidateAdminPrincipalRequiresEnabledExistingUserWithEffectivePermission(t *testing.T) {
+	t.Run("missing user", func(t *testing.T) {
+		store := NewStoreFromCapabilities(core.DefaultManifests())
+		if _, err := ValidateAdminPrincipal(store, "missing"); !errors.Is(err, ErrAdminPrincipalInvalid) {
+			t.Fatalf("ValidateAdminPrincipal() error = %v, want missing user rejection", err)
+		}
+	})
+
+	t.Run("disabled user", func(t *testing.T) {
+		store := NewStoreFromCapabilities(core.DefaultManifests())
+		if _, err := store.Update("users", "user-admin", WriteInput{
+			Name: "Platform Admin", Status: "disabled", Values: map[string]string{"roles": "super-admin", "tenantCode": "platform"},
+		}); err != nil {
+			t.Fatalf("Update(user-admin) error = %v", err)
+		}
+		if _, err := ValidateAdminPrincipal(store, "admin"); !errors.Is(err, ErrAdminPrincipalInvalid) {
+			t.Fatalf("ValidateAdminPrincipal() error = %v, want disabled user rejection", err)
+		}
+	})
+
+	t.Run("no effective permission", func(t *testing.T) {
+		store := NewStoreFromCapabilities(core.DefaultManifests())
+		role, err := store.Create("roles", WriteInput{
+			Code: "denied-role", Name: "Denied Role", Status: "enabled",
+			Values: map[string]string{"dataScope": "all", "permissions": "admin:user:read", "denyPermissions": "admin:user:read"},
+		})
+		if err != nil {
+			t.Fatalf("Create(denied-role) error = %v", err)
+		}
+		if _, err := store.Create("users", WriteInput{
+			Code: "denied", Name: "Denied User", Status: "enabled", Values: map[string]string{"roles": role.Code, "tenantCode": "platform"},
+		}); err != nil {
+			t.Fatalf("Create(denied user) error = %v", err)
+		}
+		if _, err := ValidateAdminPrincipal(store, "denied"); !errors.Is(err, ErrAdminPrincipalInvalid) {
+			t.Fatalf("ValidateAdminPrincipal() error = %v, want no effective permission rejection", err)
+		}
+	})
+
+	t.Run("valid", func(t *testing.T) {
+		store := NewStoreFromCapabilities(core.DefaultManifests())
+		principal, err := ValidateAdminPrincipal(store, " admin ")
+		if err != nil || principal.User.ID != "user-admin" || len(principal.Permissions) == 0 {
+			t.Fatalf("ValidateAdminPrincipal() = %+v, %v", principal, err)
+		}
+	})
+}
+
 func TestQueryForPrincipalAppliesCurrentOrgDataScope(t *testing.T) {
 	store := NewStoreFromCapabilities(core.DefaultManifests())
 	principal := store.CurrentPrincipal("ops")

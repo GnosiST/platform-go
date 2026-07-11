@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	"platform-go/internal/apps"
 	"platform-go/internal/platform/authprovider"
@@ -31,6 +32,13 @@ func main() {
 	resources, err := bootstrap.AdminResourcesFromConfig(cfg, ordered)
 	if err != nil {
 		log.Fatalf("build admin resources: %v", err)
+	}
+	if _, err := authprovider.AdminIdentityResolverFromConfig(cfg); err != nil {
+		log.Fatalf("build admin identity resolver: %v", err)
+	}
+	adminIdentityBindings := httpapi.NewResourceAdminIdentityBindingStore(resources, time.Now)
+	if err := httpapi.ValidateAdminAuthReadiness(context.Background(), ordered, adminIdentityBindings, cfg.DisableDemoAuthProvider); err != nil {
+		log.Fatalf("validate admin auth readiness: %v", err)
 	}
 	sessions, err := bootstrap.SessionsFromConfig(cfg)
 	if err != nil {
