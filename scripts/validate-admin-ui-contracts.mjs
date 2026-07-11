@@ -13,6 +13,7 @@ const root = resolve(defaultRoot, argValue("--root", defaultRoot));
 
 const files = {
   app: readSource("admin/src/App.tsx"),
+  authProvider: readSource("admin/src/platform/refine/authProvider.ts"),
   client: readSource("admin/src/platform/api/client.ts"),
   primitives: readSource("admin/src/platform/ui/AdminPrimitives.tsx"),
   resourceConsole: readSource("admin/src/platform/resources/GenericResourceConsole.tsx"),
@@ -35,6 +36,15 @@ requireIncludes(files.app, "writeStorageValue(adminPreferenceStorageKeys.ui", "A
 requireIncludes(files.app, "defaultAdminUIConfig", "App must fall back to the shared default admin UI config.");
 requireIncludes(files.app, "PolicyReviewConsole", "App must mount the policy-review custom governance console when the resource is enabled.");
 requireIncludes(files.app, 'resource.route !== "/policy-reviews"', "Generic resource routing must not also mount policy-reviews when the custom console is active.");
+requireIncludes(files.client, "export class AdminAPIError", "Admin API failures must expose typed status codes.");
+requireIncludes(files.client, "ADMIN_SESSION_EXPIRED_EVENT", "The shared client must expose the session-expired event contract.");
+requireIncludes(files.client, "statusCode", "Admin API errors must carry HTTP status.");
+requireIncludes(files.client, "dispatchEvent", "Stored-token 401 responses must notify the app.");
+requireIncludes(files.app, "ADMIN_SESSION_EXPIRED_EVENT", "App must listen for shared session expiry.");
+requireIncludes(files.app, "dictionary.sessionExpired", "Session expiry feedback must be localized.");
+requireIncludes(files.app, "current === dictionary.sessionExpired", "Provider discovery must not overwrite localized session-expired feedback.");
+requireIncludes(files.client, "parsePlatformResponse", "Direct fetch helpers must share response normalization.");
+requireIncludes(files.authProvider, "error instanceof AdminAPIError", "Refine auth errors must use the typed admin API error contract.");
 
 requireIncludes(files.shell, "SystemSettingsDrawer", "AdminShell must expose account/system settings through the shared drawer.");
 requireIncludes(files.shell, "user-menu-trigger", "AdminShell must keep the avatar/settings trigger in the topbar.");

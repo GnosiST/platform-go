@@ -5,6 +5,8 @@ import { App as AntdApp, Empty, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import {
+  ADMIN_SESSION_EXPIRED_EVENT,
+  AdminAPIError,
   clearAuthToken,
   getBrandingConfig,
   getAuthToken,
@@ -112,6 +114,21 @@ function PlatformApp() {
   }, [location.hash, location.pathname, location.search, navigate]);
 
   useEffect(() => {
+    const handleSessionExpired = () => {
+      setSession(null);
+      setPermissions([]);
+      setDeniedPermissions([]);
+      setCapabilityItems([]);
+      setResources(coreResources);
+      setAuthError(dictionary.sessionExpired);
+      setError("");
+      setLoading(false);
+    };
+    window.addEventListener(ADMIN_SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(ADMIN_SESSION_EXPIRED_EVENT, handleSessionExpired);
+  }, [dictionary.sessionExpired]);
+
+  useEffect(() => {
     Promise.all([getBrandingConfig(), listAuthProviders()])
       .then(([nextBranding, providers]) => {
         setBranding(nextBranding);
@@ -119,13 +136,15 @@ function PlatformApp() {
           applyThemeName(normalizeThemeName(nextBranding.defaultTheme));
         }
         setAuthProviders(providers.items);
-        setAuthError("");
+        setAuthError((current) => current === dictionary.sessionExpired ? current : "");
       })
       .catch((nextError: unknown) => {
-        setAuthError(nextError instanceof Error ? nextError.message : dictionary.authProvidersLoadFailed);
+        setAuthError((current) => current === dictionary.sessionExpired
+          ? current
+          : nextError instanceof Error ? nextError.message : dictionary.authProvidersLoadFailed);
       })
       .finally(() => setAuthLoading(false));
-  }, [applyThemeName, dictionary.authProvidersLoadFailed, hasStoredTheme]);
+  }, [applyThemeName, dictionary.authProvidersLoadFailed, dictionary.sessionExpired, hasStoredTheme]);
 
   const loadAdminWorkspace = () => {
     setLoading(true);
@@ -143,6 +162,11 @@ function PlatformApp() {
         setError("");
       })
       .catch((nextError: unknown) => {
+        if (nextError instanceof AdminAPIError && nextError.statusCode === 401) {
+          setAuthError(dictionary.sessionExpired);
+          setError("");
+          return;
+        }
         clearAuthToken();
         setSession(null);
         setDeniedPermissions([]);

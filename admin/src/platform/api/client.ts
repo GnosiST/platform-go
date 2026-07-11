@@ -1,6 +1,19 @@
 const API_BASE = import.meta.env.VITE_PLATFORM_API_BASE ?? "/api";
 const AUTH_TOKEN_KEY = "platform.auth.token";
 
+export const ADMIN_SESSION_EXPIRED_EVENT = "platform:auth:session-expired";
+
+export class AdminAPIError extends Error {
+  constructor(
+    message: string,
+    readonly statusCode: number,
+    readonly code = "",
+  ) {
+    super(message);
+    this.name = "AdminAPIError";
+  }
+}
+
 export type PlatformResponse<T> = {
   data?: T;
   error?: {
@@ -350,6 +363,42 @@ export type AdminPolicyReviewExport = {
   audits: AdminResourceRecord[];
 };
 
+type PlatformResponseMode = "data" | "raw" | "blob";
+
+function handleUnauthorizedResponse(statusCode: number, hadToken: boolean) {
+  if (statusCode !== 401 || !hadToken || !getAuthToken()) {
+    return;
+  }
+  clearAuthToken();
+  window.dispatchEvent(new Event(ADMIN_SESSION_EXPIRED_EVENT));
+}
+
+async function parsePlatformResponse<T>(response: Response, hadToken: boolean, mode: PlatformResponseMode = "data"): Promise<T> {
+  if (mode === "blob" && response.ok) {
+    return (await response.blob()) as T;
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = undefined;
+  }
+
+  const error = payload && typeof payload === "object" && "error" in payload
+    ? (payload as PlatformResponse<unknown>).error
+    : undefined;
+  if (!response.ok || error || payload === undefined) {
+    handleUnauthorizedResponse(response.status, hadToken);
+    throw new AdminAPIError(error?.message ?? `HTTP ${response.status}`, response.status, error?.code);
+  }
+
+  if (mode === "raw") {
+    return payload as T;
+  }
+  return (payload as PlatformResponse<T>).data as T;
+}
+
 export async function request<T>(path: `/${string}`, init?: RequestInit): Promise<T> {
   const token = getAuthToken();
   const response = await fetch(`${API_BASE}${path}`, {
@@ -360,11 +409,7 @@ export async function request<T>(path: `/${string}`, init?: RequestInit): Promis
       ...init?.headers,
     },
   });
-  const payload = (await response.json()) as PlatformResponse<T>;
-  if (!response.ok || payload.error) {
-    throw new Error(payload.error?.message ?? `HTTP ${response.status}`);
-  }
-  return payload.data as T;
+  return parsePlatformResponse<T>(response, Boolean(token));
 }
 
 export function getAuthToken() {
@@ -445,11 +490,7 @@ export async function getAdminOpenAPI() {
   const response = await fetch(`${API_BASE}/openapi.json`, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload?.error?.message ?? `HTTP ${response.status}`);
-  }
-  return payload as AdminOpenAPIDocument;
+  return parsePlatformResponse<AdminOpenAPIDocument>(response, Boolean(token), "raw");
 }
 
 export function applyAdminDemoData(capabilityId: string, datasetId: string) {
@@ -539,11 +580,7 @@ export async function uploadAdminFile(file: File) {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: formData,
   });
-  const payload = (await response.json()) as PlatformResponse<AdminResourceMutation>;
-  if (!response.ok || payload.error) {
-    throw new Error(payload.error?.message ?? `HTTP ${response.status}`);
-  }
-  return payload.data as AdminResourceMutation;
+  return parsePlatformResponse<AdminResourceMutation>(response, Boolean(token));
 }
 
 export function adminFileContentUrl(id: string) {
@@ -555,8 +592,5 @@ export async function getAdminFileBlob(id: string) {
   const response = await fetch(adminFileContentUrl(id), {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-  return response.blob();
+  return parsePlatformResponse<Blob>(response, Boolean(token), "blob");
 }

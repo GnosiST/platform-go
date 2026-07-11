@@ -87,4 +87,19 @@ describe("validate-admin-ui-contracts", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /AdminShell must expose a skip-to-content link/);
   });
+
+  it("rejects a client that renames the session-expired event contract", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/api/client.ts",
+      "ADMIN_SESSION_EXPIRED_EVENT",
+      "ADMIN_SESSION_INVALID_EVENT",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /The shared client must expose the session-expired event contract/);
+  });
 });

@@ -1,5 +1,6 @@
 import type { AuthProvider } from "@refinedev/core";
 import {
+  AdminAPIError,
   clearAuthToken,
   getAuthToken,
   getCurrentAdminSession,
@@ -59,9 +60,7 @@ export const authProvider: AuthProvider = {
     };
   },
   onError: async (error) => {
-    const statusCode = typeof error?.statusCode === "number" ? error.statusCode : 0;
-    if (statusCode === 401) {
-      clearAuthToken();
+    if (error instanceof AdminAPIError && error.statusCode === 401) {
       return { logout: true, redirectTo: "/login" };
     }
     return {};
