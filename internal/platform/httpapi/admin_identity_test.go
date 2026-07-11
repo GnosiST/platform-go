@@ -362,6 +362,56 @@ func TestAdminIdentityBindingResolveRollsBackRepositorySaveFailure(t *testing.T)
 	}
 }
 
+func TestAdminIdentityBindingProvisionRollsBackRepositorySaveFailure(t *testing.T) {
+	repository := newRevisionAwareIdentityRepository()
+	store := newAdminIdentityRepositoryStore(t, repository)
+	bindings := NewResourceAdminIdentityBindingStore(store, time.Now)
+	provider := adminOIDCProviderForTest()
+	issuer := "https://sensitive-id.example/provision"
+	subject := "sensitive-provision-subject"
+	username := "admin"
+	before, err := repository.Load(context.Background())
+	if err != nil {
+		t.Fatalf("repository.Load(before) error = %v", err)
+	}
+	wantErr := errors.New("injected persistence failure")
+	repository.failNextSaveWith(wantErr)
+
+	_, err = bindings.ProvisionAdminIdentityBinding(context.Background(), AdminIdentityProvisionInput{
+		Provider: provider, Issuer: issuer, ProviderSubject: subject, Username: username, Now: time.Date(2026, time.July, 11, 15, 30, 0, 0, time.UTC),
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("ProvisionAdminIdentityBinding() error = %v, want injected save failure", err)
+	}
+	assertAdminIdentityRedacted(t, err.Error(), issuer, subject, adminProviderSubjectHash(provider, issuer, subject), username)
+
+	persisted, loadErr := repository.Load(context.Background())
+	if loadErr != nil {
+		t.Fatalf("repository.Load(after failure) error = %v", loadErr)
+	}
+	if len(persisted.Resources[adminIdentitiesResource]) != 0 || persisted.NextID != before.NextID {
+		t.Fatalf("repository changed after failed provision: bindings = %+v, nextID = %d, want %d", persisted.Resources[adminIdentitiesResource], persisted.NextID, before.NextID)
+	}
+	records, listErr := store.List(adminIdentitiesResource)
+	if listErr != nil || len(records) != 0 {
+		t.Fatalf("store retained failed provision: bindings = %+v, error = %v", records, listErr)
+	}
+
+	if _, err := bindings.ProvisionAdminIdentityBinding(context.Background(), AdminIdentityProvisionInput{
+		Provider: provider, Issuer: issuer, ProviderSubject: subject, Username: username, Now: time.Date(2026, time.July, 11, 15, 31, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("ProvisionAdminIdentityBinding(retry) error = %v", err)
+	}
+	persisted, loadErr = repository.Load(context.Background())
+	if loadErr != nil {
+		t.Fatalf("repository.Load(after retry) error = %v", loadErr)
+	}
+	records = persisted.Resources[adminIdentitiesResource]
+	if len(records) != 1 || records[0].ID != "admin-identities-1001" || persisted.NextID != 1001 {
+		t.Fatalf("retry persistence = %+v, nextID = %d, want first binding at 1001", records, persisted.NextID)
+	}
+}
+
 func TestAdminAuthReadinessIsDataAwareAndRedacted(t *testing.T) {
 	ctx := context.Background()
 	provider := adminOIDCProviderForTest()
