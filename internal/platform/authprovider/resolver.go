@@ -3,6 +3,7 @@ package authprovider
 import (
 	"strings"
 
+	authoidc "platform-go/internal/platform/authprovider/oidc"
 	authwechat "platform-go/internal/platform/authprovider/wechat"
 	"platform-go/internal/platform/config"
 	"platform-go/internal/platform/httpapi"
@@ -16,6 +17,20 @@ func AppIdentityResolverFromConfig(cfg config.Config) (httpapi.AppIdentityResolv
 		AppID:    cfg.WechatMiniAppID,
 		Secret:   cfg.WechatMiniAppSecret,
 		Endpoint: cfg.WechatMiniAppCode2SessionEndpoint,
+	})
+}
+
+func AdminIdentityResolverFromConfig(cfg config.Config) (httpapi.AdminIdentityResolver, error) {
+	if !cfg.AdminOIDCConfigured() {
+		return nil, nil
+	}
+	return authoidc.NewResolver(authoidc.Config{
+		IssuerURL:    cfg.AdminOIDCIssuerURL,
+		ClientID:     cfg.AdminOIDCClientID,
+		ClientSecret: cfg.AdminOIDCClientSecret,
+		RedirectURL:  cfg.AdminOIDCRedirectURL,
+		Scopes:       cfg.AdminOIDCScopes,
+		StateKey:     authoidc.DeriveStateKey(cfg.JWTSecret),
 	})
 }
 
