@@ -1,7 +1,7 @@
 # Platform Auth Provider Contract
 
 Date: 2026-07-04
-Last updated: 2026-07-07
+Last updated: 2026-07-11
 
 ## Purpose
 
@@ -178,6 +178,33 @@ PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT=https://api.weixin.qq.com/sns/jsco
 `PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT` is optional. Leave it empty to use the official WeChat endpoint. The adapter sends `appid`, `secret`, `js_code` and `grant_type=authorization_code`, returns OpenID/UnionID only through the resolver boundary, and never writes raw provider subjects into login responses, audit records or generic admin resource rows. Provider exchange failures return the normalized `ErrProviderResolveFailed` sentinel with sanitized reason codes only; WeChat `errmsg`, request code values, credentials and provider subjects must not appear in resolver errors or HTTP responses. Platform binding storage remains hash-and-mask only: `providerSubjectHash` and `maskedSubject` are the allowed persisted generic fields, while raw OpenID, UnionID and provider subject material stay outside responses, audit payloads and generic resources.
 
 Production provider promotion must keep adapter registration manifest-declared and composition-root injected. Before enabling additional production providers, add tests for unconfigured-provider rejection, subject redaction, configured-provider-only login and provider error normalization. These are contract gates; they do not require enabling a refresh-token family or adding a provider to the default platform profile.
+
+## Production Admin OIDC Initialization
+
+Production Admin OIDC requires the optional `admin-oidc` capability, complete OIDC configuration and the same persistent Admin resource store used by `cmd/platform-api`. Provisioning is an explicit operator action; API startup never creates users, roles, permissions or OIDC bindings.
+
+For the first production administrator, complete these steps before starting a demo-disabled API process:
+
+1. Configure `PLATFORM_CAPABILITIES` with `admin-oidc`, set all `PLATFORM_ADMIN_OIDC_*` values and point `PLATFORM_ADMIN_RESOURCE_DRIVER` plus `PLATFORM_ADMIN_RESOURCE_DSN` at the production Admin store.
+2. Ensure the target platform user already exists, is enabled and resolves to at least one effective permission.
+3. Obtain the immutable OIDC `sub` value through the trusted identity-provider administration path and expose it only to the command's standard input.
+4. Run the binding command from a trusted operator environment with the same platform configuration as the API process:
+
+```bash
+printf '%s' "$OIDC_SUBJECT" | platform-admin bind-admin-oidc \
+  --provider oidc \
+  --issuer "$PLATFORM_ADMIN_OIDC_ISSUER_URL" \
+  --username admin \
+  --subject-stdin
+```
+
+5. Start `cmd/platform-api`. With demo authentication disabled, its data-aware readiness check rejects startup unless a configured Admin provider has at least one enabled binding to a valid Admin principal.
+
+The command is idempotent for the same provider, issuer, subject and platform username. It rejects a tuple that is already bound to another username and does not replace the existing binding. It also rejects missing, disabled or permissionless users through the shared Admin principal validation path.
+
+The raw subject is accepted only through standard input. `--subject` and positional subject arguments are rejected so the value cannot enter normal process arguments. Success output contains only the provider ID and platform username. Persistence stores issuer and subject hashes, and the provisioning audit contains only the provider ID, outcome and successful platform username; stdout, stderr and audit records do not contain raw issuer or subject values.
+
+Do not add this command to API startup, Compose service startup or automatic deployment promotion. Re-run it only as an explicit operator action against the intended persistent Admin store.
 
 ## Provider Promotion Matrix
 
