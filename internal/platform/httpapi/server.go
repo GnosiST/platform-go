@@ -13,6 +13,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,6 +39,8 @@ type ServerOptions struct {
 	CacheTTL                time.Duration
 	FileStorage             storage.ObjectStore
 	UploadPolicy            UploadPolicy
+	InternalErrorSink       InternalErrorSink
+	FileCleanupSink         FileCleanupSink
 	AdminRoutes             []AdminRouteRegistration
 	AppRoutes               []AppRouteRegistration
 	AdminIdentityResolver   AdminIdentityResolver
@@ -61,6 +64,26 @@ type Authorizer interface {
 	Can(user string, tenant string, permission string, action string) bool
 }
 
+type InternalErrorEvent struct {
+	Code string
+	Err  error
+}
+
+type InternalErrorSink interface {
+	Record(context.Context, InternalErrorEvent)
+}
+
+type FileCleanupRecord struct {
+	ObjectIdentifier string
+	ReasonCode       string
+	RetryStatus      string
+	CreatedAt        time.Time
+}
+
+type FileCleanupSink interface {
+	Record(context.Context, FileCleanupRecord) error
+}
+
 type Server struct {
 	router                  *gin.Engine
 	capabilities            []capability.Manifest
@@ -72,6 +95,8 @@ type Server struct {
 	cacheTTL                time.Duration
 	fileStorage             storage.ObjectStore
 	uploadPolicy            UploadPolicy
+	internalErrorSink       InternalErrorSink
+	fileCleanupSink         FileCleanupSink
 	appRoutes               map[appRouteKey]gin.HandlerFunc
 	adminIdentityResolver   AdminIdentityResolver
 	adminIdentityBindings   AdminIdentityBindingStore
@@ -148,6 +173,10 @@ func New(options ServerOptions) *Server {
 	if now == nil {
 		now = time.Now
 	}
+	fileCleanupSink := options.FileCleanupSink
+	if fileCleanupSink == nil {
+		fileCleanupSink = resourceFileCleanupSink{resources: resources}
+	}
 	adminIdentityBindings := options.AdminIdentityBindings
 	if adminIdentityBindings == nil {
 		adminIdentityBindings = NewResourceAdminIdentityBindingStore(resources, now)
@@ -167,6 +196,8 @@ func New(options ServerOptions) *Server {
 		cacheTTL:                cacheTTL,
 		fileStorage:             fileStorage,
 		uploadPolicy:            normalizeUploadPolicy(options.UploadPolicy),
+		internalErrorSink:       options.InternalErrorSink,
+		fileCleanupSink:         fileCleanupSink,
 		adminIdentityResolver:   options.AdminIdentityResolver,
 		adminIdentityBindings:   adminIdentityBindings,
 		appIdentityResolver:     options.AppIdentityResolver,
@@ -1162,7 +1193,8 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 		Reader:      upload.Reader,
 	})
 	if err != nil {
-		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_SAVE_FAILED", err.Error())
+		s.recordInternalError(ctx, "ADMIN_FILE_SAVE_FAILED", err)
+		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_SAVE_FAILED", "file save failed")
 		return
 	}
 	record, err := s.resources.CreateInternal("files", adminresource.WriteInput{
@@ -1180,7 +1212,9 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 	})
 	if err != nil {
 		if rollbackErr := s.fileStorage.Delete(ctx.Request.Context(), metadata.Key); rollbackErr != nil {
-			_ = ctx.Error(errors.New("admin file metadata persistence and object rollback failed"))
+			s.recordInternalError(ctx, "ADMIN_FILE_METADATA_CREATE_FAILED", err)
+			s.recordInternalError(ctx, "ADMIN_FILE_ROLLBACK_DELETE_FAILED", rollbackErr)
+			s.recordFileCleanup(ctx, metadata.Key)
 			writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_ROLLBACK_FAILED", "file upload rollback failed")
 			return
 		}
@@ -1222,7 +1256,8 @@ func (s *Server) adminFileContent(ctx *gin.Context) {
 		return
 	}
 	if err != nil {
-		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_OPEN_FAILED", err.Error())
+		s.recordInternalError(ctx, "ADMIN_FILE_OPEN_FAILED", err)
+		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_OPEN_FAILED", "file open failed")
 		return
 	}
 	defer body.Close()
@@ -1259,7 +1294,8 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 		Reader:      upload.Reader,
 	})
 	if err != nil {
-		writeFileError(ctx, http.StatusInternalServerError, "APP_FILE_SAVE_FAILED", err.Error())
+		s.recordInternalError(ctx, "APP_FILE_SAVE_FAILED", err)
+		writeFileError(ctx, http.StatusInternalServerError, "APP_FILE_SAVE_FAILED", "file save failed")
 		return
 	}
 	username := appUsername(appSession.Username)
@@ -1281,7 +1317,9 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 	})
 	if err != nil {
 		if rollbackErr := s.fileStorage.Delete(ctx.Request.Context(), metadata.Key); rollbackErr != nil {
-			_ = ctx.Error(errors.New("app file metadata persistence and object rollback failed"))
+			s.recordInternalError(ctx, "APP_FILE_METADATA_CREATE_FAILED", err)
+			s.recordInternalError(ctx, "APP_FILE_ROLLBACK_DELETE_FAILED", rollbackErr)
+			s.recordFileCleanup(ctx, metadata.Key)
 			writeFileError(ctx, http.StatusInternalServerError, "APP_FILE_ROLLBACK_FAILED", "file upload rollback failed")
 			return
 		}
@@ -1330,7 +1368,8 @@ func (s *Server) appFileContent(ctx *gin.Context) {
 		return
 	}
 	if err != nil {
-		writeFileError(ctx, http.StatusInternalServerError, "APP_FILE_OPEN_FAILED", err.Error())
+		s.recordInternalError(ctx, "APP_FILE_OPEN_FAILED", err)
+		writeFileError(ctx, http.StatusInternalServerError, "APP_FILE_OPEN_FAILED", "file open failed")
 		return
 	}
 	defer body.Close()
@@ -1370,7 +1409,8 @@ func (s *Server) deleteAdminFileObject(ctx *gin.Context, id string) bool {
 		return true
 	}
 	if err := s.fileStorage.Delete(ctx.Request.Context(), key); err != nil {
-		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_DELETE_FAILED", err.Error())
+		s.recordInternalError(ctx, "ADMIN_FILE_DELETE_FAILED", err)
+		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_DELETE_FAILED", "file delete failed")
 		return false
 	}
 	return true
@@ -2265,6 +2305,53 @@ func writeFileError(ctx *gin.Context, status int, code string, message string) {
 	ctx.JSON(status, Response[gin.H]{
 		Error: &ErrorBody{Code: code, Message: message},
 	})
+}
+
+func (s *Server) recordInternalError(ctx *gin.Context, code string, err error) {
+	if err == nil {
+		return
+	}
+	_ = ctx.Error(fmt.Errorf("%s: %w", code, err))
+	if s.internalErrorSink != nil {
+		s.internalErrorSink.Record(ctx.Request.Context(), InternalErrorEvent{Code: code, Err: err})
+	}
+}
+
+func (s *Server) recordFileCleanup(ctx *gin.Context, objectKey string) {
+	record := FileCleanupRecord{
+		ObjectIdentifier: safeFileObjectIdentifier(objectKey),
+		ReasonCode:       "metadata-create-failed-object-delete-failed",
+		RetryStatus:      "pending",
+		CreatedAt:        s.now().UTC(),
+	}
+	if err := s.fileCleanupSink.Record(ctx.Request.Context(), record); err != nil {
+		s.recordInternalError(ctx, "FILE_CLEANUP_RECORD_FAILED", err)
+	}
+}
+
+func safeFileObjectIdentifier(objectKey string) string {
+	base := path.Base(strings.TrimSpace(objectKey))
+	if len(base) == 64 {
+		if decoded, err := hex.DecodeString(base); err == nil && len(decoded) == 32 && base == strings.ToLower(base) {
+			return "object:" + base
+		}
+	}
+	digest := sha256.Sum256([]byte(objectKey))
+	return "sha256:" + hex.EncodeToString(digest[:])
+}
+
+type resourceFileCleanupSink struct {
+	resources *adminresource.Store
+}
+
+func (sink resourceFileCleanupSink) Record(_ context.Context, record FileCleanupRecord) error {
+	_, err := sink.resources.CreateInternal("error-logs", adminresource.WriteInput{
+		Code:        "file.cleanup." + strings.ReplaceAll(record.ObjectIdentifier, ":", "."),
+		Name:        "File Cleanup Required",
+		Status:      record.RetryStatus,
+		Description: record.ReasonCode,
+	})
+	return err
 }
 
 func writeUploadPolicyError(ctx *gin.Context, err error) {

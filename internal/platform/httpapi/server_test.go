@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -4244,19 +4245,50 @@ func TestAdminFileUploadContentAndDelete(t *testing.T) {
 type recordingObjectStore struct {
 	saveCalls   int
 	deleteCalls int
+	key         string
+	saveErr     error
+	openErr     error
 	deleteErr   error
+}
+
+type recordingInternalErrorSink struct {
+	events []InternalErrorEvent
+}
+
+type recordingFileCleanupSink struct {
+	records []FileCleanupRecord
+	err     error
+}
+
+func (sink *recordingFileCleanupSink) Record(_ context.Context, record FileCleanupRecord) error {
+	sink.records = append(sink.records, record)
+	return sink.err
+}
+
+func (sink *recordingInternalErrorSink) Record(_ context.Context, event InternalErrorEvent) {
+	sink.events = append(sink.events, event)
 }
 
 func (store *recordingObjectStore) Save(_ context.Context, input storage.ObjectSaveInput) (storage.ObjectMetadata, error) {
 	store.saveCalls++
+	if store.saveErr != nil {
+		return storage.ObjectMetadata{}, store.saveErr
+	}
 	content, err := io.ReadAll(input.Reader)
 	if err != nil {
 		return storage.ObjectMetadata{}, err
 	}
-	return storage.ObjectMetadata{Driver: "recording", Key: "private/object", SizeBytes: int64(len(content))}, nil
+	key := store.key
+	if key == "" {
+		key = "private/object"
+	}
+	return storage.ObjectMetadata{Driver: "recording", Key: key, SizeBytes: int64(len(content))}, nil
 }
 
-func (*recordingObjectStore) Open(context.Context, string) (io.ReadCloser, error) {
+func (store *recordingObjectStore) Open(context.Context, string) (io.ReadCloser, error) {
+	if store.openErr != nil {
+		return nil, store.openErr
+	}
 	return nil, storage.ErrObjectNotFound
 }
 
@@ -4351,6 +4383,9 @@ func TestAdminFileUploadDeletesObjectWhenMetadataCreateFails(t *testing.T) {
 }
 
 func TestAdminFileUploadReportsRollbackFailureWithoutLeakingDetails(t *testing.T) {
+	now := time.Date(2026, 7, 12, 14, 30, 0, 0, time.UTC)
+	opaqueID := strings.Repeat("a", 64)
+	objectKey := "tenant/platform/objects/" + opaqueID
 	capabilities := capabilitiesFromConfigForTest(t, []string{"tenant", "identity", "session", "rbac", "menu", "audit", "dictionary", "parameter", "file-storage", "admin-shell"})
 	repository := &controllableAdminResourceRepository{}
 	resources, err := adminresource.NewRepositoryBackedStoreFromCapabilities(repository, capabilities)
@@ -4358,8 +4393,9 @@ func TestAdminFileUploadReportsRollbackFailureWithoutLeakingDetails(t *testing.T
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
 	}
 	repository.saveErr = errors.New("metadata-private-detail")
-	fileStore := &recordingObjectStore{deleteErr: errors.New("delete-private/object-secret")}
-	server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources, FileStorage: fileStore})
+	fileStore := &recordingObjectStore{key: objectKey, deleteErr: errors.New("delete-private/object-secret")}
+	cleanupSink := &recordingFileCleanupSink{}
+	server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources, FileStorage: fileStore, FileCleanupSink: cleanupSink, Now: func() time.Time { return now }})
 	body, contentType := multipartUploadBodyWithMediaType(t, "report.txt", "text/plain", "private")
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/admin/files/upload", body)
@@ -4370,7 +4406,7 @@ func TestAdminFileUploadReportsRollbackFailureWithoutLeakingDetails(t *testing.T
 	if recorder.Code != http.StatusInternalServerError || !strings.Contains(recorder.Body.String(), `"code":"ADMIN_FILE_ROLLBACK_FAILED"`) {
 		t.Fatalf("POST file rollback failure status/body = %d/%s", recorder.Code, recorder.Body.String())
 	}
-	for _, secret := range []string{"metadata-private-detail", "delete-private", "private/object"} {
+	for _, secret := range []string{"metadata-private-detail", "delete-private", objectKey} {
 		if strings.Contains(recorder.Body.String(), secret) {
 			t.Fatalf("rollback response leaked %q: %s", secret, recorder.Body.String())
 		}
@@ -4378,17 +4414,22 @@ func TestAdminFileUploadReportsRollbackFailureWithoutLeakingDetails(t *testing.T
 	if fileStore.saveCalls != 1 || fileStore.deleteCalls != 1 {
 		t.Fatalf("object store calls save/delete = %d/%d, want 1/1", fileStore.saveCalls, fileStore.deleteCalls)
 	}
+	assertSafeCleanupRecord(t, cleanupSink.records, "object:"+opaqueID, now, "metadata-private-detail", "delete-private", objectKey, "report.txt")
 }
 
 func TestAppFileUploadReportsRollbackFailureWithoutLeakingDetails(t *testing.T) {
+	now := time.Date(2026, 7, 12, 14, 35, 0, 0, time.UTC)
+	opaqueID := strings.Repeat("b", 64)
+	objectKey := "tenant/platform/objects/" + opaqueID
 	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"})
 	repository := &controllableAdminResourceRepository{}
 	resources, err := adminresource.NewRepositoryBackedStoreFromCapabilities(repository, capabilities)
 	if err != nil {
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
 	}
-	fileStore := &recordingObjectStore{deleteErr: errors.New("delete-private/object-secret")}
-	server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources, FileStorage: fileStore})
+	fileStore := &recordingObjectStore{key: objectKey, deleteErr: errors.New("delete-private/object-secret")}
+	cleanupSink := &recordingFileCleanupSink{}
+	server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources, FileStorage: fileStore, FileCleanupSink: cleanupSink, Now: func() time.Time { return now }})
 	login := appLoginForTest(t, server, "buyer")
 	repository.saveErr = errors.New("metadata-private-detail")
 	body, contentType := multipartUploadBodyWithMediaType(t, "report.txt", "text/plain", "private")
@@ -4402,7 +4443,7 @@ func TestAppFileUploadReportsRollbackFailureWithoutLeakingDetails(t *testing.T) 
 	if recorder.Code != http.StatusInternalServerError || !strings.Contains(recorder.Body.String(), `"code":"APP_FILE_ROLLBACK_FAILED"`) {
 		t.Fatalf("POST app file rollback failure status/body = %d/%s", recorder.Code, recorder.Body.String())
 	}
-	for _, secret := range []string{"metadata-private-detail", "delete-private", "private/object"} {
+	for _, secret := range []string{"metadata-private-detail", "delete-private", objectKey} {
 		if strings.Contains(recorder.Body.String(), secret) {
 			t.Fatalf("app rollback response leaked %q: %s", secret, recorder.Body.String())
 		}
@@ -4410,6 +4451,169 @@ func TestAppFileUploadReportsRollbackFailureWithoutLeakingDetails(t *testing.T) 
 	if fileStore.saveCalls != 1 || fileStore.deleteCalls != 1 {
 		t.Fatalf("object store calls save/delete = %d/%d, want 1/1", fileStore.saveCalls, fileStore.deleteCalls)
 	}
+	assertSafeCleanupRecord(t, cleanupSink.records, "object:"+opaqueID, now, "metadata-private-detail", "delete-private", objectKey, "report.txt")
+}
+
+func TestResourceFileCleanupSinkPersistsOnlySafeRetryMetadata(t *testing.T) {
+	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit"})
+	resources := openGORMAdminResourceStoreForHTTPTest(t, filepath.Join(t.TempDir(), "cleanup-records.db"), capabilities)
+	sink := resourceFileCleanupSink{resources: resources}
+	record := FileCleanupRecord{
+		ObjectIdentifier: "object:" + strings.Repeat("c", 64),
+		ReasonCode:       "metadata-create-failed-object-delete-failed",
+		RetryStatus:      "pending",
+		CreatedAt:        time.Date(2026, 7, 12, 14, 40, 0, 0, time.UTC),
+	}
+
+	if err := sink.Record(context.Background(), record); err != nil {
+		t.Fatalf("Record(cleanup) error = %v", err)
+	}
+	logs, err := resources.List("error-logs")
+	if err != nil {
+		t.Fatalf("List(error-logs) error = %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("error logs = %d, want 1", len(logs))
+	}
+	if logs[0].Code != "file.cleanup."+strings.ReplaceAll(record.ObjectIdentifier, ":", ".") || logs[0].Description != record.ReasonCode || logs[0].Status != record.RetryStatus || logs[0].UpdatedAt == "" {
+		t.Fatalf("cleanup error log = %+v", logs[0])
+	}
+	serialized := fmt.Sprintf("%+v", logs[0])
+	for _, forbidden := range []string{"tenant/platform/objects", "metadata-private-detail", "delete-private", "report.txt"} {
+		if strings.Contains(serialized, forbidden) {
+			t.Fatalf("cleanup error log persisted forbidden value %q: %s", forbidden, serialized)
+		}
+	}
+}
+
+func TestAdminAndAppFileSaveErrorsDoNotLeakObjectStoreDetails(t *testing.T) {
+	const marker = "save-secret-bucket-endpoint-object-key"
+	for _, test := range []struct {
+		name     string
+		path     string
+		wantCode string
+		app      bool
+	}{
+		{name: "admin", path: "/api/admin/files/upload", wantCode: "ADMIN_FILE_SAVE_FAILED"},
+		{name: "app", path: "/api/app/files", wantCode: "APP_FILE_SAVE_FAILED", app: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fileStore := &recordingObjectStore{saveErr: errors.New(marker)}
+			internalErrors := &recordingInternalErrorSink{}
+			server := newTestServer(ServerOptions{
+				Capabilities:      capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"}),
+				FileStorage:       fileStore,
+				InternalErrorSink: internalErrors,
+			})
+			body, contentType := multipartUploadBodyWithMediaType(t, "report.txt", "text/plain", "private")
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, test.path, body)
+			request.Header.Set("Content-Type", contentType)
+			if test.app {
+				login := appLoginForTest(t, server, "buyer")
+				request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+			}
+
+			server.Router().ServeHTTP(recorder, request)
+
+			if recorder.Code != http.StatusInternalServerError || !strings.Contains(recorder.Body.String(), `"code":"`+test.wantCode+`"`) {
+				t.Fatalf("POST file save failure status/body = %d/%s", recorder.Code, recorder.Body.String())
+			}
+			assertHTTPResponseRedacts(t, recorder, marker)
+			assertInternalErrorRecorded(t, internalErrors.events, test.wantCode, marker)
+		})
+	}
+}
+
+func TestAdminAndAppFileOpenErrorsDoNotLeakObjectStoreDetails(t *testing.T) {
+	const marker = "open-secret-local-path-bucket-object-key"
+	for _, test := range []struct {
+		name       string
+		uploadPath string
+		openPath   func(string) string
+		wantCode   string
+		app        bool
+	}{
+		{name: "admin", uploadPath: "/api/admin/files/upload", openPath: func(id string) string { return "/api/admin/files/" + id + "/content" }, wantCode: "ADMIN_FILE_OPEN_FAILED"},
+		{name: "app", uploadPath: "/api/app/files", openPath: func(id string) string { return "/api/app/files/" + id + "/content" }, wantCode: "APP_FILE_OPEN_FAILED", app: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fileStore := &recordingObjectStore{}
+			internalErrors := &recordingInternalErrorSink{}
+			server := newTestServer(ServerOptions{
+				Capabilities:      capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"}),
+				FileStorage:       fileStore,
+				InternalErrorSink: internalErrors,
+			})
+			var token string
+			if test.app {
+				token = appLoginForTest(t, server, "buyer").Data.Token
+			}
+			body, contentType := multipartUploadBodyWithMediaType(t, "report.txt", "text/plain", "private")
+			uploadRecorder := httptest.NewRecorder()
+			uploadRequest := httptest.NewRequest(http.MethodPost, test.uploadPath, body)
+			uploadRequest.Header.Set("Content-Type", contentType)
+			if token != "" {
+				uploadRequest.Header.Set("Authorization", "Bearer "+token)
+			}
+			server.Router().ServeHTTP(uploadRecorder, uploadRequest)
+			if uploadRecorder.Code != http.StatusCreated {
+				t.Fatalf("POST file before open failure status/body = %d/%s", uploadRecorder.Code, uploadRecorder.Body.String())
+			}
+			var uploaded adminResourceRecordTestPayload
+			if err := json.Unmarshal(uploadRecorder.Body.Bytes(), &uploaded); err != nil {
+				t.Fatalf("decode uploaded file: %v", err)
+			}
+			fileStore.openErr = errors.New(marker)
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodGet, test.openPath(uploaded.Data.Record.ID), nil)
+			if token != "" {
+				request.Header.Set("Authorization", "Bearer "+token)
+			}
+
+			server.Router().ServeHTTP(recorder, request)
+
+			if recorder.Code != http.StatusInternalServerError || !strings.Contains(recorder.Body.String(), `"code":"`+test.wantCode+`"`) {
+				t.Fatalf("GET file open failure status/body = %d/%s", recorder.Code, recorder.Body.String())
+			}
+			assertHTTPResponseRedacts(t, recorder, marker)
+			assertInternalErrorRecorded(t, internalErrors.events, test.wantCode, marker)
+		})
+	}
+}
+
+func TestAdminFileDeleteErrorDoesNotLeakObjectStoreDetails(t *testing.T) {
+	const marker = "delete-secret-local-path-bucket-object-key"
+	fileStore := &recordingObjectStore{}
+	internalErrors := &recordingInternalErrorSink{}
+	server := newTestServer(ServerOptions{
+		Capabilities:      capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"}),
+		FileStorage:       fileStore,
+		InternalErrorSink: internalErrors,
+	})
+	body, contentType := multipartUploadBodyWithMediaType(t, "report.txt", "text/plain", "private")
+	uploadRecorder := httptest.NewRecorder()
+	uploadRequest := httptest.NewRequest(http.MethodPost, "/api/admin/files/upload", body)
+	uploadRequest.Header.Set("Content-Type", contentType)
+	server.Router().ServeHTTP(uploadRecorder, uploadRequest)
+	if uploadRecorder.Code != http.StatusCreated {
+		t.Fatalf("POST file before delete failure status/body = %d/%s", uploadRecorder.Code, uploadRecorder.Body.String())
+	}
+	var uploaded adminResourceRecordTestPayload
+	if err := json.Unmarshal(uploadRecorder.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decode uploaded file: %v", err)
+	}
+	fileStore.deleteErr = errors.New(marker)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodDelete, "/api/admin/resources/files/"+uploaded.Data.Record.ID, nil)
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusInternalServerError || !strings.Contains(recorder.Body.String(), `"code":"ADMIN_FILE_DELETE_FAILED"`) {
+		t.Fatalf("DELETE file failure status/body = %d/%s", recorder.Code, recorder.Body.String())
+	}
+	assertHTTPResponseRedacts(t, recorder, marker)
+	assertInternalErrorRecorded(t, internalErrors.events, "ADMIN_FILE_DELETE_FAILED", marker)
 }
 
 func TestAdminFileUploadRejectsSpoofedOrDisallowedMIME(t *testing.T) {
@@ -5269,6 +5473,46 @@ func assertResponseRedactsValues(t *testing.T, value string, sensitive ...string
 	for _, item := range sensitive {
 		if item != "" && strings.Contains(value, item) {
 			t.Fatalf("response exposed sensitive admin oidc value")
+		}
+	}
+}
+
+func assertHTTPResponseRedacts(t *testing.T, recorder *httptest.ResponseRecorder, sensitive ...string) {
+	t.Helper()
+	result := recorder.Result()
+	surfaces := []string{result.Status, recorder.Body.String(), fmt.Sprint(result.Header)}
+	for _, value := range sensitive {
+		for _, surface := range surfaces {
+			if value != "" && strings.Contains(surface, value) {
+				t.Fatalf("HTTP response exposed sensitive value %q in %q", value, surface)
+			}
+		}
+	}
+}
+
+func assertInternalErrorRecorded(t *testing.T, events []InternalErrorEvent, code string, marker string) {
+	t.Helper()
+	if len(events) != 1 {
+		t.Fatalf("internal error events = %d, want 1", len(events))
+	}
+	if events[0].Code != code || events[0].Err == nil || !strings.Contains(events[0].Err.Error(), marker) {
+		t.Fatalf("internal error event = %+v, want code %q and raw marker", events[0], code)
+	}
+}
+
+func assertSafeCleanupRecord(t *testing.T, records []FileCleanupRecord, objectIdentifier string, createdAt time.Time, forbidden ...string) {
+	t.Helper()
+	if len(records) != 1 {
+		t.Fatalf("cleanup records = %d, want 1", len(records))
+	}
+	record := records[0]
+	if record.ObjectIdentifier != objectIdentifier || record.ReasonCode != "metadata-create-failed-object-delete-failed" || record.RetryStatus != "pending" || !record.CreatedAt.Equal(createdAt) {
+		t.Fatalf("cleanup record = %+v, want safe pending metadata rollback record", record)
+	}
+	serialized := fmt.Sprintf("%+v", record)
+	for _, value := range forbidden {
+		if value != "" && strings.Contains(serialized, value) {
+			t.Fatalf("cleanup record persisted forbidden value %q: %s", value, serialized)
 		}
 	}
 }

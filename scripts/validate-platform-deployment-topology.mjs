@@ -68,14 +68,21 @@ function hasComposeEnvironment(environment, name) {
   return environment !== null && typeof environment === "object" && Object.hasOwn(environment, name);
 }
 
-function hasComposeVolumes(volumes) {
+function isFileStorageVolume(volume) {
+  const values = [];
+  if (typeof volume === "string") {
+    values.push(...volume.split(":").slice(0, 2));
+  } else if (volume !== null && typeof volume === "object") {
+    values.push(volume.source, volume.target);
+  }
+  return values.some((value) => /(^|[\/_.-])(uploads?|file[-_]?storage)([\/_.-]|$)/i.test(String(value ?? "")));
+}
+
+function hasAdminFileStorageVolume(volumes) {
   if (Array.isArray(volumes)) {
-    return volumes.length > 0;
+    return volumes.some(isFileStorageVolume);
   }
-  if (volumes !== null && typeof volumes === "object") {
-    return Object.keys(volumes).length > 0;
-  }
-  return Boolean(volumes);
+  return isFileStorageVolume(volumes);
 }
 
 function validateDecision(contract, errors) {
@@ -440,8 +447,8 @@ function validateDeploymentPackage(contract, errors) {
       }
       const adminService = services["platform-admin"];
       if (adminService !== null && typeof adminService === "object") {
-        if (hasComposeVolumes(adminService.volumes)) {
-          errors.push("Admin service must not mount volumes");
+        if (hasAdminFileStorageVolume(adminService.volumes)) {
+          errors.push("Admin service must not mount file storage");
         }
       }
     }

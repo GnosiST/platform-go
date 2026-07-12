@@ -59,6 +59,24 @@ type Config struct {
 	PhoneHMACKey                      string
 	PhoneCodeHMACKey                  string
 	PhoneVerificationProvider         string
+	filePolicySource                  filePolicySource
+}
+
+type envConfigState uint8
+
+const (
+	envConfigUnknown envConfigState = iota
+	envConfigMissing
+	envConfigEmpty
+	envConfigPresent
+	envConfigInvalid
+)
+
+type filePolicySource struct {
+	loadedFromEnvironment bool
+	maxUploadBytes        envConfigState
+	allowedMIMETypes      envConfigState
+	s3Encryption          envConfigState
 }
 
 var defaultCapabilities = []string{
@@ -91,6 +109,9 @@ const (
 var defaultFileAllowedMIMETypes = []string{"application/pdf", "image/jpeg", "image/png", "text/plain"}
 
 func Load() Config {
+	fileMaxUploadBytes, fileMaxUploadBytesState := int64EnvWithState("PLATFORM_FILE_MAX_UPLOAD_BYTES", 10<<20)
+	fileAllowedMIMETypes, fileAllowedMIMETypesState := csvEnvWithState("PLATFORM_FILE_ALLOWED_MIME_TYPES", defaultFileAllowedMIMETypes)
+	fileS3Encryption, fileS3EncryptionState := envWithState("PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION", "AES256")
 	return Config{
 		RuntimeEnvironment:                strings.ToLower(env("PLATFORM_RUNTIME_ENV", RuntimeEnvironmentDevelopment)),
 		HTTPAddr:                          env("PLATFORM_HTTP_ADDR", "127.0.0.1:9200"),
@@ -115,8 +136,8 @@ func Load() Config {
 		RedisDB:                           intEnv("PLATFORM_REDIS_DB", 0),
 		FileStorageDriver:                 env("PLATFORM_FILE_STORAGE_DRIVER", "local"),
 		FileStorageLocalDir:               env("PLATFORM_FILE_STORAGE_LOCAL_DIR", ".platform/uploads"),
-		FileMaxUploadBytes:                int64Env("PLATFORM_FILE_MAX_UPLOAD_BYTES", 10<<20),
-		FileAllowedMIMETypes:              csvEnv("PLATFORM_FILE_ALLOWED_MIME_TYPES", defaultFileAllowedMIMETypes),
+		FileMaxUploadBytes:                fileMaxUploadBytes,
+		FileAllowedMIMETypes:              fileAllowedMIMETypes,
 		FileStorageS3Endpoint:             env("PLATFORM_FILE_STORAGE_S3_ENDPOINT", ""),
 		FileStorageS3Region:               env("PLATFORM_FILE_STORAGE_S3_REGION", ""),
 		FileStorageS3Bucket:               env("PLATFORM_FILE_STORAGE_S3_BUCKET", ""),
@@ -124,7 +145,7 @@ func Load() Config {
 		FileStorageS3SecretKey:            env("PLATFORM_FILE_STORAGE_S3_SECRET_KEY", ""),
 		FileStorageS3Prefix:               env("PLATFORM_FILE_STORAGE_S3_PREFIX", ""),
 		FileStorageS3PathStyle:            boolEnv("PLATFORM_FILE_STORAGE_S3_FORCE_PATH_STYLE", false),
-		FileStorageS3ServerSideEncryption: env("PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION", "AES256"),
+		FileStorageS3ServerSideEncryption: fileS3Encryption,
 		FileStorageS3KMSKeyID:             env("PLATFORM_FILE_STORAGE_S3_KMS_KEY_ID", ""),
 		WechatMiniAppID:                   env("PLATFORM_WECHAT_MINIAPP_APP_ID", ""),
 		WechatMiniAppSecret:               env("PLATFORM_WECHAT_MINIAPP_SECRET", ""),
@@ -138,6 +159,12 @@ func Load() Config {
 		PhoneHMACKey:                      env("PLATFORM_PHONE_HMAC_KEY", ""),
 		PhoneCodeHMACKey:                  env("PLATFORM_PHONE_CODE_HMAC_KEY", ""),
 		PhoneVerificationProvider:         env("PLATFORM_PHONE_VERIFICATION_PROVIDER", ""),
+		filePolicySource: filePolicySource{
+			loadedFromEnvironment: true,
+			maxUploadBytes:        fileMaxUploadBytesState,
+			allowedMIMETypes:      fileAllowedMIMETypesState,
+			s3Encryption:          fileS3EncryptionState,
+		},
 	}
 }
 
@@ -220,6 +247,17 @@ func (c Config) ValidateRuntime() error {
 	errs = append(errs, c.validateAppPhone(environment)...)
 
 	if environment == RuntimeEnvironmentProduction {
+		if c.filePolicySource.loadedFromEnvironment {
+			if c.filePolicySource.maxUploadBytes == envConfigMissing || c.filePolicySource.maxUploadBytes == envConfigEmpty {
+				errs = append(errs, errors.New("production runtime requires PLATFORM_FILE_MAX_UPLOAD_BYTES to be explicitly configured"))
+			}
+			if c.filePolicySource.allowedMIMETypes == envConfigMissing || c.filePolicySource.allowedMIMETypes == envConfigEmpty {
+				errs = append(errs, errors.New("production runtime requires PLATFORM_FILE_ALLOWED_MIME_TYPES to be explicitly configured"))
+			}
+			if c.FileStorageDriver == "s3" && (c.filePolicySource.s3Encryption == envConfigMissing || c.filePolicySource.s3Encryption == envConfigEmpty) {
+				errs = append(errs, errors.New("production runtime requires PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION to be explicitly configured"))
+			}
+		}
 		errs = append(errs, c.validateProductionRuntime()...)
 	}
 
@@ -518,16 +556,41 @@ func intEnv(key string, fallback int) int {
 	return parsed
 }
 
-func int64Env(key string, fallback int64) int64 {
-	value := strings.TrimSpace(os.Getenv(key))
+func envWithState(key string, fallback string) (string, envConfigState) {
+	raw, exists := os.LookupEnv(key)
+	if !exists {
+		return fallback, envConfigMissing
+	}
+	value := strings.TrimSpace(raw)
 	if value == "" {
-		return fallback
+		return fallback, envConfigEmpty
+	}
+	return value, envConfigPresent
+}
+
+func csvEnvWithState(key string, fallback []string) ([]string, envConfigState) {
+	value, state := envWithState(key, "")
+	if state != envConfigPresent {
+		return append([]string(nil), fallback...), state
+	}
+	parts := strings.Split(value, ",")
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		items = append(items, strings.TrimSpace(part))
+	}
+	return items, envConfigPresent
+}
+
+func int64EnvWithState(key string, fallback int64) (int64, envConfigState) {
+	value, state := envWithState(key, "")
+	if state != envConfigPresent {
+		return fallback, state
 	}
 	parsed, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
-		return -1
+		return -1, envConfigInvalid
 	}
-	return parsed
+	return parsed, envConfigPresent
 }
 
 func boolEnv(key string, fallback bool) bool {

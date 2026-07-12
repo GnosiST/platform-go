@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -352,6 +353,71 @@ func TestLoadPreservesInvalidFileUploadLimitForRuntimeValidation(t *testing.T) {
 	}
 	if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "file upload limit") {
 		t.Fatalf("ValidateRuntime() error = %v, want invalid file upload limit", err)
+	}
+}
+
+func TestLoadProductionRequiresExplicitFileSecurityPolicy(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		empty bool
+	}{
+		{name: "missing"},
+		{name: "explicit empty", empty: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			setValidProductionLoadEnvironment(t)
+			for _, key := range []string{
+				"PLATFORM_FILE_MAX_UPLOAD_BYTES",
+				"PLATFORM_FILE_ALLOWED_MIME_TYPES",
+				"PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION",
+			} {
+				if test.empty {
+					t.Setenv(key, "")
+					continue
+				}
+				if err := os.Unsetenv(key); err != nil {
+					t.Fatalf("Unsetenv(%s): %v", key, err)
+				}
+			}
+
+			cfg := Load()
+			err := cfg.ValidateRuntime()
+			if err == nil {
+				t.Fatal("ValidateRuntime() error = nil, want explicit production file policy errors")
+			}
+			for _, key := range []string{
+				"PLATFORM_FILE_MAX_UPLOAD_BYTES",
+				"PLATFORM_FILE_ALLOWED_MIME_TYPES",
+				"PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION",
+			} {
+				if !strings.Contains(err.Error(), key+" to be explicitly configured") {
+					t.Fatalf("ValidateRuntime() error = %q, missing explicit %s error", err, key)
+				}
+			}
+		})
+	}
+}
+
+func TestLoadProductionAcceptsExplicitFileSecurityPolicy(t *testing.T) {
+	setValidProductionLoadEnvironment(t)
+
+	cfg := Load()
+	if err := cfg.ValidateRuntime(); err != nil {
+		t.Fatalf("ValidateRuntime() error = %v", err)
+	}
+}
+
+func TestLoadProductionDistinguishesInvalidFileUploadLimitFromMissing(t *testing.T) {
+	setValidProductionLoadEnvironment(t)
+	t.Setenv("PLATFORM_FILE_MAX_UPLOAD_BYTES", "not-a-number")
+
+	cfg := Load()
+	err := cfg.ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "file upload limit") {
+		t.Fatalf("ValidateRuntime() error = %v, want invalid upload limit", err)
+	}
+	if strings.Contains(err.Error(), "PLATFORM_FILE_MAX_UPLOAD_BYTES to be explicitly configured") {
+		t.Fatalf("ValidateRuntime() error = %v, invalid value must not be reported as missing", err)
 	}
 }
 
@@ -865,5 +931,38 @@ func validDevelopmentOIDCConfig(redirectURL string) Config {
 		AdminOIDCClientSecret: "client-secret",
 		AdminOIDCRedirectURL:  redirectURL,
 		AdminOIDCScopes:       []string{"openid", "profile", "email"},
+	}
+}
+
+func setValidProductionLoadEnvironment(t *testing.T) {
+	t.Helper()
+	values := map[string]string{
+		"PLATFORM_RUNTIME_ENV":                            "production",
+		"PLATFORM_HTTP_ADDR":                              "0.0.0.0:9200",
+		"PLATFORM_CAPABILITIES":                           "tenant,identity,session,rbac,menu,audit,dictionary,parameter,file-storage,admin-shell,admin-oidc",
+		"PLATFORM_JWT_SECRET":                             "0123456789abcdef0123456789abcdef",
+		"PLATFORM_ADMIN_RESOURCE_DRIVER":                  "postgres",
+		"PLATFORM_ADMIN_RESOURCE_DSN":                     "postgres://platform:secret@localhost:5432/platform",
+		"PLATFORM_SESSION_DRIVER":                         "postgres",
+		"PLATFORM_SESSION_DSN":                            "postgres://platform:secret@localhost:5432/platform",
+		"PLATFORM_LIFECYCLE_HISTORY_DRIVER":               "postgres",
+		"PLATFORM_LIFECYCLE_HISTORY_DSN":                  "postgres://platform:secret@localhost:5432/platform",
+		"PLATFORM_CACHE_DRIVER":                           "redis",
+		"PLATFORM_REDIS_ADDR":                             "127.0.0.1:6379",
+		"PLATFORM_DISABLE_DEMO_AUTH_PROVIDER":             "true",
+		"PLATFORM_FILE_STORAGE_DRIVER":                    "s3",
+		"PLATFORM_FILE_MAX_UPLOAD_BYTES":                  "10485760",
+		"PLATFORM_FILE_ALLOWED_MIME_TYPES":                "application/pdf,image/jpeg,image/png,text/plain",
+		"PLATFORM_FILE_STORAGE_S3_REGION":                 "us-east-1",
+		"PLATFORM_FILE_STORAGE_S3_BUCKET":                 "platform",
+		"PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION": "AES256",
+		"PLATFORM_ADMIN_OIDC_ISSUER_URL":                  "https://id.example/realms/platform",
+		"PLATFORM_ADMIN_OIDC_CLIENT_ID":                   "platform-admin",
+		"PLATFORM_ADMIN_OIDC_CLIENT_SECRET":               "client-secret",
+		"PLATFORM_ADMIN_OIDC_REDIRECT_URL":                "https://admin.example/login",
+		"PLATFORM_ADMIN_OIDC_SCOPES":                      "openid,profile,email",
+	}
+	for key, value := range values {
+		t.Setenv(key, value)
 	}
 }

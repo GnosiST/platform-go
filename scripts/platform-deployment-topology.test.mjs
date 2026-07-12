@@ -129,9 +129,9 @@ describe("validate-platform-deployment-topology", () => {
     }
   });
 
-  it("rejects any active Admin volume mount in Compose", () => {
+  it("rejects active Admin file-storage volume mounts in Compose", () => {
     const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
-    const mounts = ["platform_uploads:/var/lib/platform-go/uploads:ro", "private_assets:/srv/private-data:ro"];
+    const mounts = ["platform_uploads:/var/lib/platform-go/uploads:ro", "private_assets:/app/.platform/uploads:ro"];
 
     for (const mount of mounts) {
       const compose = current.replace("    ports:\n", `    volumes:\n      - ${mount}\n    ports:\n`);
@@ -139,8 +139,18 @@ describe("validate-platform-deployment-topology", () => {
       const result = runValidator(["--compose", composePath]);
 
       assert.notEqual(result.status, 0, `${mount}\n${result.stdout}`);
-      assert.match(result.stderr, /Admin service must not mount volumes/);
+      assert.match(result.stderr, /Admin service must not mount file storage/);
     }
+  });
+
+  it("allows unrelated Admin volumes in Compose", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
+    const compose = current.replace("    ports:\n", "    volumes:\n      - admin_cache:/var/cache/nginx\n    ports:\n");
+    const composePath = tempText("docker-compose.prod.yml", compose);
+
+    const result = runValidator(["--compose", composePath]);
+
+    assert.equal(result.status, 0, result.stderr);
   });
 
   it("rejects public upload environment mappings in any Compose service", () => {
