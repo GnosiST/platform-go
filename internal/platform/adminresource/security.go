@@ -1,10 +1,12 @@
 package adminresource
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"platform-go/internal/platform/capability"
+	"platform-go/internal/platform/dataprotection"
 )
 
 type WriteOrigin string
@@ -13,6 +15,10 @@ const (
 	WriteOriginExternal WriteOrigin = "external"
 	WriteOriginInternal WriteOrigin = "internal"
 )
+
+type ProtectedFieldAuthorizer interface {
+	AuthorizeProtectedField(context.Context, string, string, string, ProjectionPurpose) error
+}
 
 type ProjectionPurpose string
 
@@ -52,6 +58,21 @@ func (s *Store) validateWriteValues(resource string, values map[string]string, o
 		field, declared := fields[key]
 		if !declared {
 			return invalidSecurityField(key, "is not declared by the active schema")
+		}
+		if field.StorageMode == capability.FieldStorageEncrypted && origin == WriteOriginExternal {
+			if s.protection == nil {
+				return invalidSecurityField(key, "requires the data protection runtime")
+			}
+			if field.ReadOnly {
+				return invalidSecurityField(key, "is read-only")
+			}
+			if dataprotection.IsEnvelope(value) {
+				return invalidSecurityField(key, "does not accept client-supplied envelopes")
+			}
+			if err := validateFieldWrite(key, value, field, WriteOriginInternal); err != nil {
+				return err
+			}
+			continue
 		}
 		if err := validateFieldWrite(key, value, field, origin); err != nil {
 			return err
@@ -284,6 +305,9 @@ func (s *Store) validateSnapshot(snapshot ResourceSnapshot) error {
 			if err := s.validateStoredRecordFields(resource, record); err != nil {
 				return fmt.Errorf("%w: resource %s record %s", err, resource, record.ID)
 			}
+			if err := s.validateProtectedRecord(context.Background(), resource, record); err != nil {
+				return fmt.Errorf("%w: resource %s record %s", err, resource, record.ID)
+			}
 		}
 	}
 	return nil
@@ -365,6 +389,10 @@ func (s *Store) projectRecordLocked(resource string, record Record, purpose Proj
 	if !ok {
 		return Record{}, ErrUnknownResource
 	}
+	return projectRecordWithSchema(schema, record, purpose)
+}
+
+func projectRecordWithSchema(schema Schema, record Record, purpose ProjectionPurpose) (Record, error) {
 	projected := Record{ID: record.ID}
 	projected.Values = map[string]string{}
 	for _, rawField := range schema.Fields {
@@ -390,6 +418,259 @@ func (s *Store) projectRecordLocked(resource string, record Record, purpose Proj
 		projected.Values = nil
 	}
 	return projected, nil
+}
+
+func (s *Store) ProjectRecordPrivileged(ctx context.Context, resource string, record Record, purpose ProjectionPurpose, authorizer ProtectedFieldAuthorizer) (Record, error) {
+	s.mu.Lock()
+	schema, ok := s.schemas[resource]
+	runtime := s.protection
+	s.mu.Unlock()
+	if !ok {
+		return Record{}, ErrUnknownResource
+	}
+	if authorizer == nil {
+		return Record{}, fmt.Errorf("%w: protected field authorizer is required", ErrInvalidRecord)
+	}
+	projected, err := projectRecordWithSchema(schema, record, purpose)
+	if err != nil {
+		return Record{}, err
+	}
+	for _, rawField := range schema.Fields {
+		field := defaultFieldPolicy(rawField)
+		mode, modeErr := projectionMode(field, purpose)
+		if modeErr != nil {
+			return Record{}, modeErr
+		}
+		if mode != capability.FieldProjectionPrivileged || field.StorageMode != capability.FieldStorageEncrypted {
+			continue
+		}
+		envelope, exists := record.Values[field.Key]
+		if !exists {
+			continue
+		}
+		if err := authorizer.AuthorizeProtectedField(ctx, resource, record.ID, field.Key, purpose); err != nil {
+			return Record{}, err
+		}
+		if runtime == nil {
+			return Record{}, invalidSecurityField(field.Key, "requires the data protection runtime")
+		}
+		policy, fieldContext, contextErr := protectedPolicyAndContext(schema, resource, record, field)
+		if contextErr != nil {
+			return Record{}, contextErr
+		}
+		value, revealErr := runtime.Reveal(ctx, envelope, policy, fieldContext)
+		if revealErr != nil {
+			return Record{}, fmt.Errorf("%w: protected field reveal failed", ErrInvalidRecord)
+		}
+		if projected.Values == nil {
+			projected.Values = map[string]string{}
+		}
+		projected.Values[field.Key] = value
+	}
+	return projected, nil
+}
+
+func (s *Store) validateProtectionRuntime() error {
+	for _, schema := range s.schemas {
+		if schemaHasEncryptedFields(schema) && s.protection == nil {
+			return fmt.Errorf("%w: encrypted resources require the data protection runtime", ErrInvalidRecord)
+		}
+	}
+	return nil
+}
+
+func (s *Store) protectRecordForStorage(ctx context.Context, resource string, record *Record, existing *Record) error {
+	schema, ok := s.schemas[resource]
+	if !ok {
+		return ErrUnknownResource
+	}
+	if !schemaHasEncryptedFields(schema) {
+		return nil
+	}
+	if s.protection == nil {
+		return fmt.Errorf("%w: encrypted resources require the data protection runtime", ErrInvalidRecord)
+	}
+	if err := validateProtectedTenantImmutable(schema, *record, existing); err != nil {
+		return err
+	}
+	if record.Values == nil {
+		record.Values = map[string]string{}
+	}
+	for _, rawField := range schema.Fields {
+		field := defaultFieldPolicy(rawField)
+		if field.StorageMode != capability.FieldStorageEncrypted {
+			continue
+		}
+		value, submitted := record.Values[field.Key]
+		if !submitted && existing != nil {
+			if envelope, exists := existing.Values[field.Key]; exists {
+				record.Values[field.Key] = envelope
+			}
+			continue
+		}
+		if !submitted {
+			continue
+		}
+		if dataprotection.IsEnvelope(value) {
+			return invalidSecurityField(field.Key, "does not accept client-supplied envelopes")
+		}
+		policy, fieldContext, err := protectedPolicyAndContext(schema, resource, *record, field)
+		if err != nil {
+			return err
+		}
+		envelope, err := s.protection.Protect(ctx, value, policy, fieldContext)
+		if err != nil {
+			return fmt.Errorf("%w: field %s protection failed", ErrInvalidRecord, field.Key)
+		}
+		record.Values[field.Key] = envelope
+	}
+	if len(record.Values) == 0 {
+		record.Values = nil
+	}
+	return nil
+}
+
+func (s *Store) ValidateProtectedData(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.validateProtectedDataLocked(ctx)
+}
+
+func (s *Store) validateProtectedDataLocked(ctx context.Context) error {
+	if err := s.validateProtectionRuntime(); err != nil {
+		return err
+	}
+	for resource, records := range s.resources {
+		for _, record := range records {
+			if err := s.validateProtectedRecord(ctx, resource, record); err != nil {
+				return fmt.Errorf("%w: resource %s record %s", err, resource, record.ID)
+			}
+		}
+	}
+	return nil
+}
+
+func (s *Store) validateProtectedRecord(ctx context.Context, resource string, record Record) error {
+	schema, ok := s.schemas[resource]
+	if !ok || !schemaHasEncryptedFields(schema) {
+		return nil
+	}
+	if s.protection == nil {
+		return fmt.Errorf("%w: encrypted resources require the data protection runtime", ErrInvalidRecord)
+	}
+	if _, err := protectedTenantID(schema, record); err != nil {
+		return err
+	}
+	for _, rawField := range schema.Fields {
+		field := defaultFieldPolicy(rawField)
+		if field.StorageMode != capability.FieldStorageEncrypted {
+			continue
+		}
+		envelope, exists := record.Values[field.Key]
+		if !exists {
+			continue
+		}
+		if !dataprotection.IsEnvelope(envelope) {
+			return invalidSecurityField(field.Key, "does not contain a valid envelope")
+		}
+		policy, fieldContext, err := protectedPolicyAndContext(schema, resource, record, field)
+		if err != nil {
+			return err
+		}
+		if err := s.protection.Validate(ctx, envelope, policy, fieldContext); err != nil {
+			return fmt.Errorf("%w: field %s envelope validation failed", ErrInvalidRecord, field.Key)
+		}
+	}
+	return nil
+}
+
+func protectedPolicyAndContext(schema Schema, resource string, record Record, field FieldDefinition) (dataprotection.FieldPolicy, dataprotection.FieldContext, error) {
+	if field.Protection == nil || schema.Protection == nil {
+		return dataprotection.FieldPolicy{}, dataprotection.FieldContext{}, invalidSecurityField(field.Key, "is missing protection context")
+	}
+	tenantID, err := protectedTenantID(schema, record)
+	if err != nil {
+		return dataprotection.FieldPolicy{}, dataprotection.FieldContext{}, err
+	}
+	return dataprotection.FieldPolicy{
+			Format: field.Protection.Format, Normalization: field.Protection.Normalization, BlindIndexNamespace: field.Protection.BlindIndexNamespace,
+		}, dataprotection.FieldContext{
+			TenantID: tenantID, Resource: resource, RecordID: record.ID, FieldKey: field.Key, SchemaVersion: schema.Protection.SchemaVersion,
+		}, nil
+}
+
+func protectedTenantID(schema Schema, record Record) (string, error) {
+	if schema.Protection == nil {
+		return "", fmt.Errorf("%w: protected resource context is missing", ErrInvalidRecord)
+	}
+	switch schema.Protection.Scope {
+	case "global":
+		return dataprotection.GlobalTenantID, nil
+	case "tenant-field":
+		field, ok := schemaFieldByKey(schema, schema.Protection.TenantField)
+		if !ok {
+			return "", fmt.Errorf("%w: protected tenant field is missing", ErrInvalidRecord)
+		}
+		tenantID := strings.TrimSpace(storedFieldValue(record, field))
+		if tenantID == "" {
+			return "", invalidSecurityField(field.Key, "is required for protected data")
+		}
+		return tenantID, nil
+	default:
+		return "", fmt.Errorf("%w: protected resource scope is unsupported", ErrInvalidRecord)
+	}
+}
+
+func validateProtectedTenantImmutable(schema Schema, record Record, existing *Record) error {
+	if existing == nil || schema.Protection == nil || schema.Protection.Scope != "tenant-field" {
+		return nil
+	}
+	field, ok := schemaFieldByKey(schema, schema.Protection.TenantField)
+	if !ok {
+		return fmt.Errorf("%w: protected tenant field is missing", ErrInvalidRecord)
+	}
+	if strings.TrimSpace(storedFieldValue(*existing, field)) != strings.TrimSpace(storedFieldValue(record, field)) {
+		return invalidSecurityField(field.Key, "is immutable for protected data")
+	}
+	return nil
+}
+
+func schemaHasEncryptedFields(schema Schema) bool {
+	for _, field := range schema.Fields {
+		if field.StorageMode == capability.FieldStorageEncrypted {
+			return true
+		}
+	}
+	return false
+}
+
+func schemaFieldByKey(schema Schema, key string) (FieldDefinition, bool) {
+	for _, field := range schema.Fields {
+		if field.Key == key {
+			return field, true
+		}
+	}
+	return FieldDefinition{}, false
+}
+
+func storedFieldValue(record Record, field FieldDefinition) string {
+	if field.Source == "values" {
+		return record.Values[field.Key]
+	}
+	switch field.Key {
+	case "code":
+		return record.Code
+	case "name":
+		return record.Name
+	case "status":
+		return record.Status
+	case "description":
+		return record.Description
+	case "updatedAt":
+		return record.UpdatedAt
+	default:
+		return ""
+	}
 }
 
 func projectionMode(field FieldDefinition, purpose ProjectionPurpose) (string, error) {

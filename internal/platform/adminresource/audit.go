@@ -1,6 +1,7 @@
 package adminresource
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -66,11 +67,14 @@ func (s *Store) createWithAudit(resource string, input WriteInput, origin WriteO
 	if !ok {
 		return MutationResult{}, ErrUnknownResource
 	}
-	record, err := s.recordFromInputWithOrigin(resource, "", input, origin)
+	nextRecordID := s.nextID + 1
+	record, err := s.recordFromInputWithOrigin(resource, fmt.Sprintf("%s-%d", resource, nextRecordID), input, origin)
 	if err != nil {
 		return MutationResult{}, err
 	}
-	record.ID = fmt.Sprintf("%s-%d", resource, s.nextID+1)
+	if err := s.protectRecordForStorage(context.Background(), resource, &record, nil); err != nil {
+		return MutationResult{}, err
+	}
 	event.TargetID = record.ID
 	event.Resource = resource
 	audit, err := s.auditRecordLocked(event, s.nextID+2)
@@ -84,7 +88,11 @@ func (s *Store) createWithAudit(resource string, input WriteInput, origin WriteO
 		s.restoreSnapshotLocked(previous)
 		return MutationResult{}, err
 	}
-	return MutationResult{Record: cloneRecord(record), Audit: cloneRecord(audit)}, nil
+	resultRecord, err := s.mutationRecordResultLocked(resource, record, origin)
+	if err != nil {
+		return MutationResult{}, err
+	}
+	return MutationResult{Record: resultRecord, Audit: cloneRecord(audit)}, nil
 }
 
 func (s *Store) UpdateWithAudit(resource string, id string, input WriteInput, event AuditEvent) (MutationResult, error) {
@@ -113,8 +121,11 @@ func (s *Store) updateWithAudit(resource string, id string, input WriteInput, or
 	if strings.TrimSpace(input.Code) == "" {
 		input.Code = items[index].Code
 	}
-	record, err := s.recordFromInputWithOrigin(resource, id, input, origin)
+	record, err := s.recordFromInputWithOriginExisting(resource, id, input, origin, &items[index])
 	if err != nil {
+		return MutationResult{}, err
+	}
+	if err := s.protectRecordForStorage(context.Background(), resource, &record, &items[index]); err != nil {
 		return MutationResult{}, err
 	}
 	event.TargetID = record.ID
@@ -131,7 +142,11 @@ func (s *Store) updateWithAudit(resource string, id string, input WriteInput, or
 		s.restoreSnapshotLocked(previous)
 		return MutationResult{}, err
 	}
-	return MutationResult{Record: cloneRecord(record), Audit: cloneRecord(audit)}, nil
+	resultRecord, err := s.mutationRecordResultLocked(resource, record, origin)
+	if err != nil {
+		return MutationResult{}, err
+	}
+	return MutationResult{Record: resultRecord, Audit: cloneRecord(audit)}, nil
 }
 
 func (s *Store) DeleteWithAudit(resource string, id string, event AuditEvent) (MutationResult, error) {

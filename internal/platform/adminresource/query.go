@@ -1,6 +1,7 @@
 package adminresource
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"sort"
@@ -88,14 +89,18 @@ func (s *Store) queryRecordsLocked(resource string, input QueryInput, items []Re
 	if !ok {
 		return QueryResult{}, ErrUnknownResource
 	}
-	plan, err := buildQueryPlan(schema, input)
+	plan, err := buildQueryPlanWithProtection(schema, input, s.protection != nil)
 	if err != nil {
 		return QueryResult{}, err
 	}
 
 	matched := make([]Record, 0, len(items))
 	for _, item := range items {
-		if queryRecordMatches(item, plan) {
+		matches, matchErr := s.queryRecordMatchesProtected(context.Background(), resource, item, plan)
+		if matchErr != nil {
+			return QueryResult{}, matchErr
+		}
+		if matches {
 			matched = append(matched, cloneRecord(item))
 		}
 	}
@@ -111,9 +116,18 @@ func (s *Store) queryRecordsLocked(resource string, input QueryInput, items []Re
 		end = total
 	}
 
+	projected := make([]Record, 0, end-start)
+	for _, record := range matched[start:end] {
+		item, projectErr := s.projectRecordLocked(resource, record, ProjectionResponse)
+		if projectErr != nil {
+			return QueryResult{}, projectErr
+		}
+		projected = append(projected, item)
+	}
+
 	return QueryResult{
 		Resource: resource,
-		Items:    matched[start:end],
+		Items:    projected,
 		Total:    total,
 		Page:     plan.page,
 		PageSize: plan.pageSize,
@@ -142,6 +156,10 @@ type normalizedSort struct {
 }
 
 func buildQueryPlan(schema Schema, input QueryInput) (queryPlan, error) {
+	return buildQueryPlanWithProtection(schema, input, false)
+}
+
+func buildQueryPlanWithProtection(schema Schema, input QueryInput, allowEncrypted bool) (queryPlan, error) {
 	fields := queryableFields(schema)
 	plan := queryPlan{
 		fields:       fields,
@@ -171,7 +189,7 @@ func buildQueryPlan(schema Schema, input QueryInput) (queryPlan, error) {
 	}
 
 	for _, condition := range input.Conditions {
-		normalized, err := normalizeCondition(condition, fields)
+		normalized, err := normalizeConditionWithProtection(condition, fields, allowEncrypted)
 		if err != nil {
 			return queryPlan{}, err
 		}
@@ -216,7 +234,7 @@ func queryableSearchFields(schema Schema, fields map[string]FieldDefinition) []F
 	result = append(result, fields["id"])
 	for _, key := range searchKeys {
 		field, ok := fields[key]
-		if !ok || isSensitiveQueryField(key) {
+		if !ok || field.StorageMode == capability.FieldStorageEncrypted || isSensitiveQueryField(key) {
 			continue
 		}
 		result = append(result, field)
@@ -225,19 +243,37 @@ func queryableSearchFields(schema Schema, fields map[string]FieldDefinition) []F
 }
 
 func normalizeCondition(condition QueryCondition, fields map[string]FieldDefinition) (normalizedCondition, error) {
+	return normalizeConditionWithProtection(condition, fields, false)
+}
+
+func normalizeConditionWithProtection(condition QueryCondition, fields map[string]FieldDefinition, allowEncrypted bool) (normalizedCondition, error) {
 	fieldKey := strings.TrimSpace(condition.Field)
 	if fieldKey == "" {
 		return normalizedCondition{}, QueryValidationError{Field: "field", Reason: "query field is required"}
-	}
-	if isSensitiveQueryField(fieldKey) {
-		return normalizedCondition{}, QueryValidationError{Field: fieldKey, Reason: "sensitive field cannot be queried"}
 	}
 	field, ok := fields[fieldKey]
 	if !ok {
 		return normalizedCondition{}, QueryValidationError{Field: fieldKey, Reason: "query field is not declared by resource schema"}
 	}
 	if field.StorageMode == capability.FieldStorageEncrypted {
-		return normalizedCondition{}, QueryValidationError{Field: fieldKey, Reason: "encrypted field query requires the data protection runtime"}
+		if !allowEncrypted {
+			return normalizedCondition{}, QueryValidationError{Field: fieldKey, Reason: "encrypted field query requires the data protection runtime"}
+		}
+		if field.Protection == nil || field.Protection.BlindIndexNamespace == "" {
+			return normalizedCondition{}, QueryValidationError{Field: fieldKey, Reason: "encrypted field exact-match query is disabled"}
+		}
+		operator, supported := normalizeOperator(condition.Operator)
+		if !supported || operator != "=" {
+			return normalizedCondition{}, QueryValidationError{Field: fieldKey, Reason: "encrypted field supports only exact-match queries"}
+		}
+		value := condition.Value
+		if len(value) > maxQueryValueLength {
+			return normalizedCondition{}, QueryValidationError{Field: fieldKey, Reason: "query value is too long"}
+		}
+		return normalizedCondition{field: field, operator: operator, value: value}, nil
+	}
+	if isSensitiveQueryField(fieldKey) {
+		return normalizedCondition{}, QueryValidationError{Field: fieldKey, Reason: "sensitive field cannot be queried"}
 	}
 	if !field.Filterable && !field.Searchable {
 		return normalizedCondition{}, QueryValidationError{Field: fieldKey, Reason: "query field is not filterable"}
@@ -324,6 +360,50 @@ func queryRecordMatches(record Record, plan queryPlan) bool {
 		}
 	}
 	return true
+}
+
+func (s *Store) queryRecordMatchesProtected(ctx context.Context, resource string, record Record, plan queryPlan) (bool, error) {
+	for _, condition := range plan.conditions {
+		if condition.field.StorageMode != capability.FieldStorageEncrypted {
+			if !conditionMatches(record, condition) {
+				return false, nil
+			}
+			continue
+		}
+		if s.protection == nil {
+			return false, QueryValidationError{Field: condition.field.Key, Reason: "encrypted field query requires the data protection runtime"}
+		}
+		envelope, exists := record.Values[condition.field.Key]
+		if !exists || envelope == "" {
+			return false, nil
+		}
+		schema := s.schemas[resource]
+		policy, fieldContext, err := protectedPolicyAndContext(schema, resource, record, condition.field)
+		if err != nil {
+			return false, err
+		}
+		matched, err := s.protection.MatchExact(ctx, envelope, condition.value, policy, fieldContext)
+		if err != nil {
+			return false, fmt.Errorf("%w: encrypted field exact-match query failed", ErrInvalidRecord)
+		}
+		if !matched {
+			return false, nil
+		}
+	}
+	if len(plan.keywords) == 0 {
+		return true, nil
+	}
+	haystackValues := make([]string, 0, len(plan.searchFields))
+	for _, field := range plan.searchFields {
+		haystackValues = append(haystackValues, queryFieldValues(record, field)...)
+	}
+	haystack := strings.ToLower(strings.Join(haystackValues, " "))
+	for _, keyword := range plan.keywords {
+		if !strings.Contains(haystack, strings.ToLower(keyword)) {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func conditionMatches(record Record, condition normalizedCondition) bool {

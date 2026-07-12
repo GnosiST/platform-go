@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"platform-go/internal/platform/capability"
+	"platform-go/internal/platform/dataprotection"
 )
 
 var ErrRevisionConflict = errors.New("admin resource revision conflict")
@@ -43,7 +44,31 @@ func NewRepositoryBackedStoreFromCapabilities(repository AdminResourceRepository
 	schemas := seedResourceSchemasFromCapabilities(manifests)
 	store := newStore(baseResources, schemas)
 	store.repository = repository
+	if err := store.validateProtectionRuntime(); err != nil {
+		return nil, err
+	}
 	if err := store.reloadContextLocked(context.Background()); err != nil {
+		return nil, err
+	}
+	return store, nil
+}
+
+func NewRepositoryBackedStoreFromCapabilitiesWithProtection(repository AdminResourceRepository, manifests []capability.Manifest, runtime dataprotection.Runtime) (*Store, error) {
+	baseResources := seedResourcesFromCapabilities(manifests)
+	schemas := seedResourceSchemasFromCapabilities(manifests)
+	store := newStore(baseResources, schemas)
+	store.repository = repository
+	store.protection = runtime
+	if err := store.validateProtectionRuntime(); err != nil {
+		return nil, err
+	}
+	if err := store.protectSeedResources(context.Background()); err != nil {
+		return nil, err
+	}
+	if err := store.reloadContextLocked(context.Background()); err != nil {
+		return nil, err
+	}
+	if err := store.validateProtectedDataLocked(context.Background()); err != nil {
 		return nil, err
 	}
 	return store, nil

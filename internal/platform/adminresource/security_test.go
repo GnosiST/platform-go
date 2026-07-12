@@ -528,7 +528,11 @@ func TestRepositoryLoadScrubsLegacyUnknownAndProhibitedValues(t *testing.T) {
 	if len(records) != 1 {
 		t.Fatalf("records = %+v, want one legacy record", records)
 	}
-	values := records[0].Values
+	internal, err := store.InternalRecord("app-phone-verifications", records[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	values := internal.Values
 	for _, key := range []string{"phone", "password", "legacyUnknown"} {
 		if _, ok := values[key]; ok {
 			t.Fatalf("legacy field %s survived scrub", key)

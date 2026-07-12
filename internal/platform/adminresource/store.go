@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"platform-go/internal/platform/capability"
+	"platform-go/internal/platform/dataprotection"
 )
 
 var (
@@ -57,6 +58,7 @@ type Store struct {
 	revision      uint64
 	now           func() time.Time
 	repository    AdminResourceRepository
+	protection    dataprotection.Runtime
 }
 
 func NewStore() *Store {
@@ -85,6 +87,18 @@ func (s *Store) persistContextLocked(ctx context.Context) error {
 
 func NewStoreFromCapabilities(manifests []capability.Manifest) *Store {
 	return newStore(seedResourcesFromCapabilities(manifests), seedResourceSchemasFromCapabilities(manifests))
+}
+
+func NewStoreFromCapabilitiesWithProtection(manifests []capability.Manifest, runtime dataprotection.Runtime) (*Store, error) {
+	store := newStore(seedResourcesFromCapabilities(manifests), seedResourceSchemasFromCapabilities(manifests))
+	store.protection = runtime
+	if err := store.validateProtectionRuntime(); err != nil {
+		return nil, err
+	}
+	if err := store.protectSeedResources(context.Background()); err != nil {
+		return nil, err
+	}
+	return store, nil
 }
 
 func newStore(resources map[string][]Record, schemas map[string]Schema) *Store {
@@ -199,18 +213,21 @@ func (s *Store) create(resource string, input WriteInput, origin WriteOrigin) (R
 	if !ok {
 		return Record{}, ErrUnknownResource
 	}
-	record, err := s.recordFromInputWithOrigin(resource, "", input, origin)
+	nextID := s.nextID + 1
+	record, err := s.recordFromInputWithOrigin(resource, fmt.Sprintf("%s-%d", resource, nextID), input, origin)
 	if err != nil {
 		return Record{}, err
 	}
-	s.nextID++
-	record.ID = fmt.Sprintf("%s-%d", resource, s.nextID)
+	if err := s.protectRecordForStorage(context.Background(), resource, &record, nil); err != nil {
+		return Record{}, err
+	}
+	s.nextID = nextID
 	s.resources[resource] = append(items, record)
 	if err := s.persistLocked(); err != nil {
 		s.restoreSnapshotLocked(previous)
 		return Record{}, err
 	}
-	return cloneRecord(record), nil
+	return s.mutationRecordResultLocked(resource, record, origin)
 }
 
 func (s *Store) Update(resource string, id string, input WriteInput) (Record, error) {
@@ -241,8 +258,11 @@ func (s *Store) update(resource string, id string, input WriteInput, origin Writ
 	if strings.TrimSpace(input.Code) == "" {
 		input.Code = items[index].Code
 	}
-	record, err := s.recordFromInputWithOrigin(resource, id, input, origin)
+	record, err := s.recordFromInputWithOriginExisting(resource, id, input, origin, &items[index])
 	if err != nil {
+		return Record{}, err
+	}
+	if err := s.protectRecordForStorage(context.Background(), resource, &record, &items[index]); err != nil {
 		return Record{}, err
 	}
 	items[index] = record
@@ -251,7 +271,7 @@ func (s *Store) update(resource string, id string, input WriteInput, origin Writ
 		s.restoreSnapshotLocked(previous)
 		return Record{}, err
 	}
-	return cloneRecord(record), nil
+	return s.mutationRecordResultLocked(resource, record, origin)
 }
 
 func (s *Store) Delete(resource string, id string) error {
@@ -285,11 +305,15 @@ func (s *Store) recordFromInput(resource string, id string, input WriteInput) (R
 }
 
 func (s *Store) recordFromInputWithOrigin(resource string, id string, input WriteInput, origin WriteOrigin) (Record, error) {
+	return s.recordFromInputWithOriginExisting(resource, id, input, origin, nil)
+}
+
+func (s *Store) recordFromInputWithOriginExisting(resource string, id string, input WriteInput, origin WriteOrigin, existing *Record) (Record, error) {
 	name := strings.TrimSpace(input.Name)
 	if name == "" {
 		return Record{}, ValidationError{Field: "name"}
 	}
-	if err := s.validateRequiredFields(resource, input); err != nil {
+	if err := s.validateRequiredFieldsExisting(resource, input, existing); err != nil {
 		return Record{}, err
 	}
 	if err := s.validateWriteInput(resource, input, origin); err != nil {
@@ -312,6 +336,10 @@ func (s *Store) recordFromInputWithOrigin(resource string, id string, input Writ
 }
 
 func (s *Store) validateRequiredFields(resource string, input WriteInput) error {
+	return s.validateRequiredFieldsExisting(resource, input, nil)
+}
+
+func (s *Store) validateRequiredFieldsExisting(resource string, input WriteInput, existing *Record) error {
 	schema, ok := s.schemas[resource]
 	if !ok {
 		return ErrUnknownResource
@@ -326,11 +354,49 @@ func (s *Store) validateRequiredFields(resource string, input WriteInput) error 
 			value = recordInputValue(input, field.Key)
 		case "values":
 			value = input.Values[field.Key]
+			if strings.TrimSpace(value) == "" && existing != nil && field.StorageMode == capability.FieldStorageEncrypted {
+				value = existing.Values[field.Key]
+			}
 		}
 		if strings.TrimSpace(value) == "" {
 			return ValidationError{Field: field.Key}
 		}
 	}
+	return nil
+}
+
+func (s *Store) mutationRecordResultLocked(resource string, record Record, origin WriteOrigin) (Record, error) {
+	if origin == WriteOriginInternal {
+		result := cloneRecord(record)
+		schema, ok := s.schemas[resource]
+		if !ok {
+			return Record{}, ErrUnknownResource
+		}
+		for _, field := range schema.Fields {
+			if field.StorageMode == capability.FieldStorageEncrypted && field.Source == "values" {
+				delete(result.Values, field.Key)
+			}
+		}
+		if len(result.Values) == 0 {
+			result.Values = nil
+		}
+		return result, nil
+	}
+	return s.projectRecordLocked(resource, record, ProjectionResponse)
+}
+
+func (s *Store) protectSeedResources(ctx context.Context) error {
+	protected := cloneResourceMap(s.seedResources)
+	for resource, records := range protected {
+		for index := range records {
+			if err := s.protectRecordForStorage(ctx, resource, &records[index], nil); err != nil {
+				return fmt.Errorf("protect seed resource %s record %s: %w", resource, records[index].ID, err)
+			}
+		}
+		protected[resource] = records
+	}
+	s.seedResources = protected
+	s.resources = cloneResourceMap(protected)
 	return nil
 }
 

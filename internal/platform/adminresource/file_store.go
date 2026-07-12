@@ -71,10 +71,13 @@ func (r *FileAdminResourceRepository) Save(_ context.Context, snapshot ResourceS
 		return 0, err
 	}
 	tempPath := r.path + ".tmp"
-	if err := os.WriteFile(tempPath, content, 0o644); err != nil {
+	if err := os.WriteFile(tempPath, content, 0o600); err != nil {
 		return 0, err
 	}
 	if err := os.Rename(tempPath, r.path); err != nil {
+		return 0, err
+	}
+	if err := os.Chmod(r.path, 0o600); err != nil {
 		return 0, err
 	}
 	return nextRevision, nil
