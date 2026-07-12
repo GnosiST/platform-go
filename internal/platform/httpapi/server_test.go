@@ -144,6 +144,7 @@ type authLoginTestPayload struct {
 		ExpiresAt time.Time `json:"expiresAt"`
 		Principal struct {
 			User struct {
+				ID       string `json:"id"`
 				Username string `json:"username"`
 			} `json:"user"`
 			Roles       []string `json:"roles"`
@@ -1221,7 +1222,7 @@ func TestAdminOIDCAuthLoginUsesAtomicBindingAndExistingAdminSessionAuditPath(t *
 			loginAudit = &auditRecords[index]
 		}
 	}
-	if loginAudit == nil || loginAudit.Values["actor"] != "ops" || loginAudit.Values["provider"] != "oidc" || loginAudit.Values["sessionId"] != "" {
+	if loginAudit == nil || loginAudit.Values["actor"] != login.Data.Principal.User.ID || loginAudit.Values["provider"] != "" || loginAudit.Values["sessionId"] != "" {
 		t.Fatalf("admin oidc audit = %+v, want credential-free auth.login shape", loginAudit)
 	}
 	serializedAudit, err := json.Marshal(loginAudit)
@@ -1260,8 +1261,8 @@ func TestRepeatedAdminLoginsPersistDistinctAuditCodes(t *testing.T) {
 		if audit.Values["action"] != "auth.login" {
 			continue
 		}
-		if !strings.HasPrefix(audit.Code, "auth.login.") {
-			t.Fatalf("auth login audit code = %q, want unique auth.login prefix", audit.Code)
+		if strings.TrimSpace(audit.Values["eventId"]) == "" {
+			t.Fatalf("auth login audit event id is empty: %+v", audit)
 		}
 		codes[audit.Code] = struct{}{}
 	}
@@ -1298,12 +1299,14 @@ func TestAuthLoginCleansUpIssuedSessionWhenAuditFails(t *testing.T) {
 				t.Fatalf("NewRepositoryBackedStore() error = %v", err)
 			}
 			bus := cache.NewMemoryInvalidationBus()
+			internalErrors := &recordingInternalErrorSink{}
 			invalidations := 0
 			server := newTestServer(ServerOptions{
-				Capabilities:    capabilities,
-				Resources:       resources,
-				Sessions:        sessions,
-				InvalidationBus: bus,
+				Capabilities:      capabilities,
+				Resources:         resources,
+				Sessions:          sessions,
+				InvalidationBus:   bus,
+				InternalErrorSink: internalErrors,
 			})
 			if err := bus.SubscribeInvalidations(context.Background(), func(_ context.Context, event cache.InvalidationEvent) {
 				if event.Resource == sessionInvalidationResource {
@@ -1337,39 +1340,69 @@ func TestAuthLoginCleansUpIssuedSessionWhenAuditFails(t *testing.T) {
 			if invalidations != test.wantInvalidations {
 				t.Fatalf("session invalidations = %d, want %d", invalidations, test.wantInvalidations)
 			}
+			if test.cleanupErr != nil {
+				if len(internalErrors.events) != 1 || internalErrors.events[0].Code != "AUTH_SESSION_CLEANUP_FAILED" {
+					t.Fatalf("cleanup internal errors = %+v, want safe cleanup diagnostic", internalErrors.events)
+				}
+			}
 			assertResponseRedactsValues(t, recorder.Body.String(), issuedDigest, "audit-save-detail-sensitive", "revoke-detail-sensitive")
 		})
 	}
 }
 
 func TestAppAuthLoginCleansUpIssuedSessionWhenAuditFails(t *testing.T) {
-	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit"})
-	adminRepository := &controllableAdminResourceRepository{saveErr: errors.New("audit-save-detail-sensitive")}
-	resources, err := adminresource.NewRepositoryBackedStoreFromCapabilities(adminRepository, capabilities)
-	if err != nil {
-		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
-	}
-	sessionRepository := newControllableSessionRepository()
-	sessions, err := session.NewRepositoryBackedStore(session.Options{TTL: time.Hour}, sessionRepository)
-	if err != nil {
-		t.Fatalf("NewRepositoryBackedStore() error = %v", err)
-	}
-	server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources, Sessions: sessions})
-	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/app/auth/login", bytes.NewBufferString(`{"username":"buyer"}`))
-	request.Header.Set("Content-Type", "application/json")
+	for _, test := range []struct {
+		name           string
+		cleanupErr     error
+		wantCode       string
+		wantResolvable bool
+	}{
+		{name: "cleanup succeeds", wantCode: "APP_AUTH_AUDIT_FAILED"},
+		{name: "cleanup fails", cleanupErr: errors.New("revoke-detail-sensitive"), wantCode: "APP_AUTH_SESSION_CLEANUP_FAILED", wantResolvable: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit"})
+			adminRepository := &controllableAdminResourceRepository{saveErr: errors.New("audit-save-detail-sensitive")}
+			resources, err := adminresource.NewRepositoryBackedStoreFromCapabilities(adminRepository, capabilities)
+			if err != nil {
+				t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+			}
+			sessionRepository := newControllableSessionRepository()
+			sessionRepository.revokeErr = test.cleanupErr
+			sessions, err := session.NewRepositoryBackedStore(session.Options{TTL: time.Hour}, sessionRepository)
+			if err != nil {
+				t.Fatalf("NewRepositoryBackedStore() error = %v", err)
+			}
+			internalErrors := &recordingInternalErrorSink{}
+			server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources, Sessions: sessions, InternalErrorSink: internalErrors})
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/api/app/auth/login", bytes.NewBufferString(`{"username":"buyer"}`))
+			request.Header.Set("Content-Type", "application/json")
 
-	server.Router().ServeHTTP(recorder, request)
+			server.Router().ServeHTTP(recorder, request)
 
-	assertAuthErrorResponse(t, recorder, http.StatusInternalServerError, "APP_AUTH_AUDIT_FAILED")
-	for digest := range sessionRepository.sessions {
-		if _, resolvable, err := sessionRepository.Resolve(context.Background(), digest, time.Now()); err != nil || resolvable {
-			t.Fatalf("app login session resolvable after audit failure = %v err = %v", resolvable, err)
-		}
+			assertAuthErrorResponse(t, recorder, http.StatusInternalServerError, test.wantCode)
+			for digest := range sessionRepository.sessions {
+				_, resolvable, resolveErr := sessionRepository.Resolve(context.Background(), digest, time.Now())
+				if resolveErr != nil && test.cleanupErr == nil {
+					t.Fatalf("app login session resolve error = %v", resolveErr)
+				}
+				if resolvable != test.wantResolvable {
+					t.Fatalf("app login session resolvable after audit failure = %v, want %v", resolvable, test.wantResolvable)
+				}
+			}
+			if test.cleanupErr != nil {
+				if len(internalErrors.events) != 1 || internalErrors.events[0].Code != "APP_AUTH_SESSION_CLEANUP_FAILED" {
+					t.Fatalf("app cleanup internal errors = %+v, want safe cleanup diagnostic", internalErrors.events)
+				}
+			}
+			assertResponseRedactsValues(t, recorder.Body.String(), "audit-save-detail-sensitive", "revoke-detail-sensitive")
+		})
 	}
 }
 
-func TestAuthRefreshRevokesRenewedSessionWhenAuditFails(t *testing.T) {
+func TestAuthRefreshAuditFailureDoesNotRenewKnownSessionWhenCleanupFails(t *testing.T) {
+	now := time.Date(2026, 7, 12, 9, 0, 0, 0, time.UTC)
 	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit"})
 	adminRepository := &controllableAdminResourceRepository{}
 	resources, err := adminresource.NewRepositoryBackedStoreFromCapabilities(adminRepository, capabilities)
@@ -1377,13 +1410,21 @@ func TestAuthRefreshRevokesRenewedSessionWhenAuditFails(t *testing.T) {
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
 	}
 	sessionRepository := newControllableSessionRepository()
-	sessions, err := session.NewRepositoryBackedStore(session.Options{TTL: time.Hour}, sessionRepository)
+	sessions, err := session.NewRepositoryBackedStore(session.Options{TTL: time.Hour, Now: func() time.Time { return now }}, sessionRepository)
 	if err != nil {
 		t.Fatalf("NewRepositoryBackedStore() error = %v", err)
 	}
-	server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources, Sessions: sessions})
+	server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources, Sessions: sessions, Now: func() time.Time { return now }})
 	login := loginForTest(t, server, "admin")
+	claims, err := server.tokens.Parse(login.Data.Token)
+	if err != nil {
+		t.Fatalf("Parse(login token) error = %v", err)
+	}
+	digest := session.DigestToken(claims.SessionID)
+	original := sessionRepository.sessions[digest]
+	now = now.Add(30 * time.Minute)
 	adminRepository.saveErr = errors.New("refresh-audit-private-detail")
+	sessionRepository.revokeErr = errors.New("refresh-cleanup-private-detail")
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
 	request.Header.Set("Authorization", "Bearer "+login.Data.Token)
@@ -1391,9 +1432,202 @@ func TestAuthRefreshRevokesRenewedSessionWhenAuditFails(t *testing.T) {
 	server.Router().ServeHTTP(recorder, request)
 
 	assertAuthErrorResponse(t, recorder, http.StatusInternalServerError, "AUTH_AUDIT_FAILED")
-	for digest := range sessionRepository.sessions {
-		if _, resolvable, err := sessionRepository.Resolve(context.Background(), digest, time.Now()); err != nil || resolvable {
-			t.Fatalf("renewed session resolvable after audit failure = %v err = %v", resolvable, err)
+	stored := sessionRepository.sessions[digest]
+	if !stored.ExpiresAt.Equal(original.ExpiresAt) || !stored.RevokedAt.Equal(original.RevokedAt) {
+		t.Fatalf("known session changed after audit failure: got %+v want %+v", stored, original)
+	}
+	if sessionRepository.revokeCalls != 0 {
+		t.Fatalf("refresh cleanup revoke calls = %d, want 0 because renewal must not precede audit", sessionRepository.revokeCalls)
+	}
+	assertResponseRedactsValues(t, recorder.Body.String(), "refresh-audit-private-detail", "refresh-cleanup-private-detail")
+}
+
+func TestAuditActorsUseStableIDsAndDoNotPersistEmailShapedUsernames(t *testing.T) {
+	const emailMarker = "buyer-sensitive@example.test"
+	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "api-resource", "audit", "parameter", "admin-shell", "system-admin"})
+	server := newTestServer(ServerOptions{Capabilities: capabilities})
+
+	appRecorder := httptest.NewRecorder()
+	appRequest := httptest.NewRequest(http.MethodPost, "/api/app/auth/login", bytes.NewBufferString(`{"username":"`+emailMarker+`"}`))
+	appRequest.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(appRecorder, appRequest)
+	if appRecorder.Code != http.StatusOK {
+		t.Fatalf("POST app login status = %d body = %s", appRecorder.Code, appRecorder.Body.String())
+	}
+
+	token, tokenID := createAdminAPITokenForTest(t, server, "admin:tenant:create")
+	tenantRecorder := httptest.NewRecorder()
+	tenantRequest := httptest.NewRequest(http.MethodPost, "/api/admin/resources/tenants", bytes.NewBufferString(`{"code":"api-attribution","name":"API Attribution","status":"enabled","values":{"isolation":"sandbox"}}`))
+	tenantRequest.Header.Set("Content-Type", "application/json")
+	tenantRequest.Header.Set("Authorization", "Bearer "+token)
+	server.Router().ServeHTTP(tenantRecorder, tenantRequest)
+	if tenantRecorder.Code != http.StatusCreated {
+		t.Fatalf("POST tenant with API token status = %d body = %s", tenantRecorder.Code, tenantRecorder.Body.String())
+	}
+
+	audits, err := server.resources.List("audit-logs")
+	if err != nil {
+		t.Fatalf("List(audit-logs) error = %v", err)
+	}
+	serialized := fmt.Sprintf("%+v", audits)
+	if strings.Contains(serialized, emailMarker) {
+		t.Fatalf("audit records persisted email-shaped username: %s", serialized)
+	}
+	foundAppActor := false
+	foundTokenActor := false
+	for _, audit := range audits {
+		switch audit.Values["action"] {
+		case "app.auth.login":
+			foundAppActor = audit.Values["actor"] == appUserID(emailMarker)
+		case "admin_resource.create":
+			if audit.Values["targetId"] != "" && audit.Values["actor"] == tokenID {
+				foundTokenActor = true
+			}
+		}
+	}
+	if !foundAppActor || !foundTokenActor {
+		t.Fatalf("stable audit actor attribution missing: app=%v token=%v audits=%+v", foundAppActor, foundTokenActor, audits)
+	}
+}
+
+func TestAuthAndFileContentFailClosedWhenAuditCapabilityIsUnavailable(t *testing.T) {
+	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"})
+	withoutAudit := make([]capability.Manifest, 0, len(capabilities)-1)
+	for _, manifest := range capabilities {
+		if manifest.ID != "audit" {
+			withoutAudit = append(withoutAudit, manifest)
+		}
+	}
+	resources := adminresource.NewStoreFromCapabilities(withoutAudit)
+	objectStore := storage.NewLocalObjectStore(storage.LocalObjectStoreOptions{BaseDir: t.TempDir()})
+	metadata, err := objectStore.Save(context.Background(), storage.ObjectSaveInput{FileName: "private.txt", ContentType: "text/plain", Reader: strings.NewReader("private-content-marker")})
+	if err != nil {
+		t.Fatalf("Save(file) error = %v", err)
+	}
+	fileRecord, err := resources.CreateInternal("files", adminresource.WriteInput{
+		Code: "no-audit-file", Name: "private.txt", Status: "enabled",
+		Values: map[string]string{"mimeType": "text/plain", "size": "22", "storageDriver": metadata.Driver, "storageKey": metadata.Key, "createdAt": time.Now().UTC().Format(time.RFC3339)},
+	})
+	if err != nil {
+		t.Fatalf("CreateInternal(files) error = %v", err)
+	}
+	server := newTestServer(ServerOptions{Capabilities: withoutAudit, Resources: resources, FileStorage: objectStore})
+
+	loginRecorder := httptest.NewRecorder()
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"provider":"demo","username":"admin"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(loginRecorder, loginRequest)
+	assertAuthErrorResponse(t, loginRecorder, http.StatusInternalServerError, "AUTH_AUDIT_FAILED")
+
+	contentRecorder := httptest.NewRecorder()
+	contentRequest := httptest.NewRequest(http.MethodGet, "/api/admin/files/"+fileRecord.ID+"/content", nil)
+	contentRequest.Header.Set("X-Platform-User", "admin")
+	server.Router().ServeHTTP(contentRecorder, contentRequest)
+	if contentRecorder.Code != http.StatusNotFound && contentRecorder.Code != http.StatusInternalServerError {
+		t.Fatalf("GET content without audit status = %d body = %s, want fail-closed", contentRecorder.Code, contentRecorder.Body.String())
+	}
+	if strings.Contains(contentRecorder.Body.String(), "private-content-marker") {
+		t.Fatalf("GET content without audit leaked file bytes: %s", contentRecorder.Body.String())
+	}
+}
+
+func TestAuthAndFileContentAuditsUseStructuredRedactedFields(t *testing.T) {
+	server := newTestServer(ServerOptions{Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"})})
+	login := loginForTest(t, server, "admin")
+	body, contentType := multipartUploadBodyWithMediaType(t, "audit.txt", "text/plain", "private")
+	upload := httptest.NewRecorder()
+	uploadRequest := httptest.NewRequest(http.MethodPost, "/api/admin/files/upload", body)
+	uploadRequest.Header.Set("Content-Type", contentType)
+	uploadRequest.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	server.Router().ServeHTTP(upload, uploadRequest)
+	if upload.Code != http.StatusCreated {
+		t.Fatalf("POST file status = %d body = %s", upload.Code, upload.Body.String())
+	}
+	var payload adminResourceRecordTestPayload
+	if err := json.Unmarshal(upload.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode upload: %v", err)
+	}
+	content := httptest.NewRecorder()
+	contentRequest := httptest.NewRequest(http.MethodGet, "/api/admin/files/"+payload.Data.Record.ID+"/content", nil)
+	contentRequest.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	server.Router().ServeHTTP(content, contentRequest)
+	if content.Code != http.StatusOK {
+		t.Fatalf("GET file content status = %d body = %s", content.Code, content.Body.String())
+	}
+	audits, err := server.resources.List("audit-logs")
+	if err != nil {
+		t.Fatalf("List(audit-logs) error = %v", err)
+	}
+	for _, action := range []string{"auth.login", "file.content"} {
+		found := false
+		for _, audit := range audits {
+			if audit.Values["action"] != action {
+				continue
+			}
+			found = true
+			for _, key := range []string{"actor", "action", "resource", "targetId", "outcome", "eventId", "reasonCode", "createdAt"} {
+				if strings.TrimSpace(audit.Values[key]) == "" {
+					t.Fatalf("%s audit missing %s: %+v", action, key, audit)
+				}
+			}
+			if audit.Values["targetCode"] != "" || audit.Values["traceId"] != "" {
+				t.Fatalf("%s audit retained legacy fields: %+v", action, audit)
+			}
+		}
+		if !found {
+			t.Fatalf("missing %s audit in %+v", action, audits)
+		}
+	}
+}
+
+func TestRuntimeInternalErrorsUseSafeCauseClassAndCorrelationID(t *testing.T) {
+	const marker = "request-email@example.test/private/object"
+	fileStore := &recordingObjectStore{saveErr: errors.New("raw-storage-secret")}
+	internalErrors := &recordingInternalErrorSink{}
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"}),
+		FileStorage:  fileStore, InternalErrorSink: internalErrors,
+	})
+	body, contentType := multipartUploadBodyWithMediaType(t, "private.txt", "text/plain", "private")
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/files/upload", body)
+	request.Header.Set("Content-Type", contentType)
+	request.Header.Set("X-Request-ID", marker)
+	server.Router().ServeHTTP(recorder, request)
+	if len(internalErrors.events) != 1 {
+		t.Fatalf("internal error events = %d, want 1", len(internalErrors.events))
+	}
+	event := internalErrors.events[0]
+	if event.Code != "ADMIN_FILE_SAVE_FAILED" || event.CauseClass != "storage" || strings.TrimSpace(event.EventID) == "" {
+		t.Fatalf("internal error event = %+v, want code/storage/correlation", event)
+	}
+	serialized := fmt.Sprintf("%+v", event)
+	for _, forbidden := range []string{marker, "raw-storage-secret", "private.txt"} {
+		if strings.Contains(serialized, forbidden) {
+			t.Fatalf("internal error event leaked %q: %s", forbidden, serialized)
+		}
+	}
+}
+
+func TestRuntimeInternalErrorsAttachStructuredSafeGinMetadata(t *testing.T) {
+	server := newTestServer(ServerOptions{})
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/internal-test", nil)
+	ctx.Request.Header.Set("X-Request-ID", "private-request@example.test/path")
+
+	server.recordInternalError(ctx, "PROVIDER_UNAVAILABLE", errors.New("raw-provider-secret"))
+
+	if len(ctx.Errors) != 1 {
+		t.Fatalf("gin errors = %+v, want one", ctx.Errors)
+	}
+	event, ok := ctx.Errors[0].Meta.(InternalErrorEvent)
+	if !ok || event.Code != "PROVIDER_UNAVAILABLE" || event.CauseClass != "provider" || strings.TrimSpace(event.EventID) == "" {
+		t.Fatalf("gin error metadata = %+v, want structured safe diagnostic", ctx.Errors[0].Meta)
+	}
+	serialized := fmt.Sprintf("%+v", event)
+	for _, forbidden := range []string{"private-request@example.test/path", "raw-provider-secret"} {
+		if strings.Contains(serialized, forbidden) {
+			t.Fatalf("gin error metadata leaked %q: %s", forbidden, serialized)
 		}
 	}
 }
@@ -1690,8 +1924,8 @@ func TestAppAuthLoginWithConfiguredWechatProviderUsesIdentityResolver(t *testing
 	if strings.Contains(auditRecorder.Body.String(), "server_openid_store_06005") || strings.Contains(auditRecorder.Body.String(), "server_unionid_store_06005") {
 		t.Fatalf("audit response leaked provider subject: %s", auditRecorder.Body.String())
 	}
-	if !strings.Contains(auditRecorder.Body.String(), `"provider":"wechat"`) {
-		t.Fatalf("audit response = %s, want provider marker", auditRecorder.Body.String())
+	if strings.Contains(auditRecorder.Body.String(), `"provider":"wechat"`) {
+		t.Fatalf("audit response retained provider field: %s", auditRecorder.Body.String())
 	}
 }
 
@@ -1939,7 +2173,7 @@ func TestAppRouteRegistrationUsesManifestSessionAndPermissionPolicy(t *testing.T
 			},
 		},
 		Authorizer: allowAppPermissionAuthorizer{
-			user:       "app:buyer",
+			user:       appUserID("buyer"),
 			tenant:     appTenant,
 			permission: "app:orders:read",
 			action:     "read",
@@ -3552,7 +3786,7 @@ func TestPolicyReviewApproveEndpointAppliesRoleChangeAndInvalidatesCaches(t *tes
 	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode approve payload: %v body = %s", err, recorder.Body.String())
 	}
-	if payload.Data.Review.Values["reviewStatus"] != "approved" || payload.Data.Review.Values["reviewedBy"] != "admin" {
+	if payload.Data.Review.Values["reviewStatus"] != "approved" || payload.Data.Review.Values["reviewedBy"] != "user-admin" {
 		t.Fatalf("review response values = %+v, want approved by admin", payload.Data.Review.Values)
 	}
 	if payload.Data.Role.Code != "operator" || payload.Data.Role.Values["permissions"] != "admin:user:read" {
@@ -3629,7 +3863,7 @@ func TestPolicyReviewRequestRejectAndExportEndpoints(t *testing.T) {
 	if err := json.Unmarshal(requestRecorder.Body.Bytes(), &requested); err != nil {
 		t.Fatalf("decode request payload: %v body = %s", err, requestRecorder.Body.String())
 	}
-	if requested.Data.Review.Values["reviewStatus"] != "pending" || requested.Data.Review.Values["requestedBy"] != "admin" || requested.Data.Audit.Values["action"] != "policy-review.request" {
+	if requested.Data.Review.Values["reviewStatus"] != "pending" || requested.Data.Review.Values["requestedBy"] != "user-admin" || requested.Data.Audit.Values["action"] != "policy-review.request" {
 		t.Fatalf("request payload = %+v, want pending request audit", requested.Data)
 	}
 
@@ -3660,7 +3894,7 @@ func TestPolicyReviewRequestRejectAndExportEndpoints(t *testing.T) {
 	if err := json.Unmarshal(exportRecorder.Body.Bytes(), &exported); err != nil {
 		t.Fatalf("decode export payload: %v body = %s", err, exportRecorder.Body.String())
 	}
-	if exported.Data.ExportedBy != "admin" || exported.Data.ExportedAt == "" || !hasAdminRecordCode(exported.Data.Reviews, "PR-HTTP-1002") {
+	if exported.Data.ExportedBy != "user-admin" || exported.Data.ExportedAt == "" || !hasAdminRecordCode(exported.Data.Reviews, "PR-HTTP-1002") {
 		t.Fatalf("export payload = %+v, want exported review", exported.Data)
 	}
 	if !hasTestRecordAction(exported.Data.Audits, "policy-review.request") || !hasTestRecordAction(exported.Data.Audits, "policy-review.reject") {
@@ -3845,6 +4079,53 @@ func TestFileDeleteRetriesObjectCleanupAfterObjectOrAuditFailure(t *testing.T) {
 	}
 	if fileStore.deleteCalls != 2 {
 		t.Fatalf("object delete calls = %d, want 2", fileStore.deleteCalls)
+	}
+}
+
+func TestFileDeleteRetryAfterPurgeAuditFailureKeepsRecoverableTombstone(t *testing.T) {
+	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"})
+	repository := &controllableAdminResourceRepository{}
+	resources, err := adminresource.NewRepositoryBackedStoreFromCapabilities(repository, capabilities)
+	if err != nil {
+		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+	}
+	fileStore := &recordingObjectStore{key: "objects/" + strings.Repeat("a", 64)}
+	server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources, FileStorage: fileStore})
+	body, contentType := multipartUploadBodyWithMediaType(t, "purge-retry.txt", "text/plain", "private")
+	upload := httptest.NewRecorder()
+	uploadRequest := httptest.NewRequest(http.MethodPost, "/api/admin/files/upload", body)
+	uploadRequest.Header.Set("Content-Type", contentType)
+	server.Router().ServeHTTP(upload, uploadRequest)
+	var payload adminResourceRecordTestPayload
+	if err := json.Unmarshal(upload.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode upload: %v", err)
+	}
+	repository.failAuditAction = "file.delete"
+	repository.saveErr = errors.New("purge-audit-private-detail")
+	first := httptest.NewRecorder()
+	server.Router().ServeHTTP(first, httptest.NewRequest(http.MethodDelete, "/api/admin/resources/files/"+payload.Data.Record.ID, nil))
+	if first.Code != http.StatusInternalServerError {
+		t.Fatalf("first DELETE status = %d body = %s, want 500", first.Code, first.Body.String())
+	}
+	internal, err := resources.InternalRecord("files", payload.Data.Record.ID)
+	if err != nil {
+		t.Fatalf("InternalRecord(files) error = %v", err)
+	}
+	if internal.Values["deletionState"] != "pending" || internal.Values["storageKey"] != fileStore.key {
+		t.Fatalf("recoverable tombstone lost after purge audit failure: %+v", internal)
+	}
+	visible, err := resources.List("files")
+	if err != nil || hasAdminResourceRecordID(visible, payload.Data.Record.ID) {
+		t.Fatalf("tombstone visibility after purge audit failure = %+v err=%v", visible, err)
+	}
+	repository.saveErr = nil
+	second := httptest.NewRecorder()
+	server.Router().ServeHTTP(second, httptest.NewRequest(http.MethodDelete, "/api/admin/resources/files/"+payload.Data.Record.ID, nil))
+	if second.Code != http.StatusOK {
+		t.Fatalf("retry DELETE status = %d body = %s", second.Code, second.Body.String())
+	}
+	if _, err := resources.InternalRecord("files", payload.Data.Record.ID); !errors.Is(err, adminresource.ErrRecordNotFound) {
+		t.Fatalf("InternalRecord(files) after retry error = %v, want not found", err)
 	}
 }
 
@@ -4441,7 +4722,7 @@ func TestAdminResourceWriteOperationsRecordAuditEvents(t *testing.T) {
 		t.Fatalf("decode audit records: %v body = %s", err, auditRecorder.Body.String())
 	}
 	for _, action := range []string{"admin_resource.create", "admin_resource.update", "admin_resource.delete"} {
-		if !hasAdminResourceAuditRecord(auditPayload.Data.Items, action, "dictionary-parameters", created.ID, created.Code, "admin") {
+		if !hasAdminResourceAuditRecord(auditPayload.Data.Items, action, "dictionary-parameters", created.ID, created.Code, "user-admin") {
 			t.Fatalf("audit records missing %s for created record %+v: %+v", action, created, auditPayload.Data.Items)
 		}
 	}
@@ -4459,7 +4740,7 @@ func TestAdminResourceWriteOperationsRecordAuditEvents(t *testing.T) {
 	if err := json.Unmarshal(queryRecorder.Body.Bytes(), &queryPayload); err != nil {
 		t.Fatalf("decode audit query records: %v body = %s", err, queryRecorder.Body.String())
 	}
-	if queryPayload.Data.Total != 1 || !hasAdminResourceAuditRecord(queryPayload.Data.Items, "admin_resource.create", "dictionary-parameters", created.ID, created.Code, "admin") {
+	if queryPayload.Data.Total != 1 || !hasAdminResourceAuditRecord(queryPayload.Data.Items, "admin_resource.create", "dictionary-parameters", created.ID, created.Code, "user-admin") {
 		t.Fatalf("audit query payload = %+v, want create audit for %+v", queryPayload.Data, created)
 	}
 	if createdAt := queryPayload.Data.Items[0].Values["createdAt"]; createdAt == "" {
@@ -4777,7 +5058,7 @@ func TestAdminFileUploadContentAndDelete(t *testing.T) {
 		t.Fatalf("decode audit logs: %v body = %s", err, auditRecorder.Body.String())
 	}
 	for _, action := range []string{"file.upload", "file.content", "file.delete"} {
-		if !hasAdminResourceAuditRecord(audits.Data.Items, action, "files", record.ID, record.Code, "admin") {
+		if !hasAdminResourceAuditRecord(audits.Data.Items, action, "files", record.ID, record.Code, "user-admin") {
 			t.Fatalf("audit logs missing %s for uploaded file: %+v", action, audits.Data.Items)
 		}
 	}
@@ -5253,7 +5534,7 @@ func TestAdminFileDeleteTreatsMissingObjectAsIdempotentCleanup(t *testing.T) {
 	if err := json.Unmarshal(auditRecorder.Body.Bytes(), &audits); err != nil {
 		t.Fatalf("decode audit logs: %v body = %s", err, auditRecorder.Body.String())
 	}
-	if !hasAdminResourceAuditRecord(audits.Data.Items, "file.delete", "files", record.ID, record.Code, "admin") {
+	if !hasAdminResourceAuditRecord(audits.Data.Items, "file.delete", "files", record.ID, record.Code, "user-admin") {
 		t.Fatalf("audit logs missing idempotent file delete: %+v", audits.Data.Items)
 	}
 }
@@ -5298,7 +5579,7 @@ func TestAppFileUploadAndContentUseAppSession(t *testing.T) {
 		t.Fatalf("decode app upload response: %v body = %s", err, uploadRecorder.Body.String())
 	}
 	record := uploaded.Data.Record
-	if record.ID == "" || record.Name != "avatar.png" || record.Values["storageKey"] != "" || record.Values["tenantId"] != "" || record.Values["sessionId"] != "" || record.Values["uploadedBy"] != "buyer" {
+	if record.ID == "" || record.Name != "avatar.png" || record.Values["storageKey"] != "" || record.Values["tenantId"] != "" || record.Values["sessionId"] != "" || record.Values["uploadedBy"] != "" {
 		t.Fatalf("app uploaded record mismatch: %+v", record)
 	}
 	storedRecord, err := server.adminResourceRecordByID("files", record.ID)
@@ -5418,7 +5699,7 @@ func TestAppFileContentReturnsNotFoundForCrossUser(t *testing.T) {
 }
 
 func TestAppFileUploadRequiresEnabledFileStorageCapability(t *testing.T) {
-	server := newTestServer(ServerOptions{Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "admin-shell"})})
+	server := newTestServer(ServerOptions{Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "admin-shell"})})
 	login := appLoginForTest(t, server, "buyer")
 	body, contentType := multipartUploadBody(t, "avatar.png", "hello")
 	recorder := httptest.NewRecorder()
@@ -5741,10 +6022,11 @@ func authProviderTestManifest() capability.Manifest {
 }
 
 type controllableSessionRepository struct {
-	sessions   map[string]session.StoredSession
-	resolveErr error
-	renewErr   error
-	revokeErr  error
+	sessions    map[string]session.StoredSession
+	resolveErr  error
+	renewErr    error
+	revokeErr   error
+	revokeCalls int
 }
 
 type controllableAdminResourceRepository struct {
@@ -5884,6 +6166,7 @@ func (r *controllableSessionRepository) Renew(_ context.Context, tokenDigest str
 }
 
 func (r *controllableSessionRepository) Revoke(_ context.Context, tokenDigest string, now time.Time) (session.StoredSession, bool, error) {
+	r.revokeCalls++
 	if r.revokeErr != nil {
 		return session.StoredSession{}, false, r.revokeErr
 	}

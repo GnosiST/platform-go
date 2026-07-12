@@ -125,6 +125,9 @@ PLATFORM_LIFECYCLE_HISTORY_DRIVER=mysql
 PLATFORM_LIFECYCLE_HISTORY_DSN=<dsn>
 PLATFORM_CACHE_DRIVER=redis
 PLATFORM_REDIS_ADDR=<host:port>
+PLATFORM_RATE_LIMIT_HMAC_KEY=<dedicated-at-least-32-byte-secret>
+PLATFORM_FILE_MAX_UPLOAD_BYTES=10485760
+PLATFORM_FILE_ALLOWED_MIME_TYPES=application/pdf,image/jpeg,image/png,text/plain
 PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true
 PLATFORM_ADMIN_OIDC_ISSUER_URL=https://identity.example/realms/platform
 PLATFORM_ADMIN_OIDC_CLIENT_ID=platform-admin
@@ -134,6 +137,8 @@ PLATFORM_ADMIN_OIDC_SCOPES=openid,profile,email
 ```
 
 Production `PLATFORM_CAPABILITIES` must not be empty and must not include `demo-data`. Capability IDs are trimmed, must use lowercase letters, numbers and hyphens, and must not contain empty or duplicate comma-separated entries. Use `minimal-admin` for the smallest supported admin foundation, or include `admin-oidc` with complete OIDC configuration when OIDC is the Admin provider. The OIDC subject must enter only through `platform-admin bind-admin-oidc --subject-stdin`; API startup does not provision accounts or authorization relationships.
+
+When the optional `app-phone` capability is enabled, also set `PLATFORM_PHONE_HMAC_KEY=<dedicated-at-least-32-byte-secret>`, `PLATFORM_PHONE_CODE_HMAC_KEY=<different-dedicated-at-least-32-byte-secret>` and `PLATFORM_PHONE_VERIFICATION_PROVIDER=<configured-provider-id>`. The rate-limit, phone and verification-code HMAC keys must be mutually distinct, and the production verification provider must not be `debug`.
 
 The local Keycloak rehearsal documented in `design-qa.md` proves the protocol, binding, session and browser paths against production-like components. It does not approve an external production promotion or satisfy provider-secret ownership, rotation, rollback and release-approval requirements.
 

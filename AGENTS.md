@@ -87,6 +87,7 @@ POST /api/admin/resources/:resource/query
 The UI may expose SQL-like search text, but transport must remain structured JSON conditions and backend/database implementations must use whitelisted fields and parameterized predicates.
 Run `rtk node scripts/validate-platform-admin-api-boundary.mjs` when changing admin API clients, Refine data providers, generic resource query behavior, generated OpenAPI query schemas or backend query validation.
 Run `rtk node scripts/validate-platform-app-client-api-boundary.mjs` when changing App route contracts, App OpenAPI output, App codegen previews or downstream App/H5/mini-program request/upload client conventions.
+Run `rtk node scripts/validate-platform-production-env.mjs` when changing production environment templates, production security settings, Compose environment wiring or production configuration validation.
 
 ## Verification
 
@@ -113,12 +114,14 @@ rtk node scripts/validate-platform-production-readiness.mjs
 rtk node scripts/validate-platform-codegen-source-writing-readiness.mjs
 rtk node scripts/validate-platform-cache-invalidation.mjs
 rtk node scripts/validate-platform-deployment-topology.mjs
+rtk node scripts/validate-platform-production-env.mjs
 rtk node scripts/validate-platform-task-execution-audit.mjs
 rtk node scripts/validate-platform-goal-completion-audit.mjs
 rtk node scripts/validate-platform-node-closeout-audit.mjs
 rtk node scripts/validate-platform-objective-conformance.mjs
 rtk node scripts/validate-platform-promotion-evidence-templates.mjs
 rtk node scripts/validate-platform-file-storage-experience.mjs
+rtk node --test scripts/platform-foundation-docs-drift.test.mjs
 rtk node scripts/validate-admin-i18n.mjs
 rtk node scripts/validate-admin-ui-contracts.mjs
 rtk node --test scripts/admin-ui-contracts.test.mjs

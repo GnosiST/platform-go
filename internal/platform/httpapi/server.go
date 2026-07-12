@@ -70,8 +70,10 @@ type Authorizer interface {
 }
 
 type InternalErrorEvent struct {
-	Code string
-	Err  error
+	Code       string
+	CauseClass string
+	EventID    string
+	Err        error
 }
 
 type InternalErrorSink interface {
@@ -138,6 +140,7 @@ const (
 	apiTokenPrefix              = "pgo_"
 	sessionInvalidationResource = "sessions"
 	appLogoutResolveErrorKey    = "platform.app.logout.session.resolve-error"
+	systemActorID               = "system:platform"
 )
 
 func New(options ServerOptions) *Server {
@@ -643,14 +646,16 @@ func (s *Server) issueAdminLogin(ctx *gin.Context, principal rbac.Principal, pro
 	}, issued.ExpiresAt.Sub(issued.IssuedAt))
 	if err != nil {
 		if !s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token) {
+			s.recordInternalError(ctx, "AUTH_SESSION_CLEANUP_FAILED", err)
 			writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_CLEANUP_FAILED", "session cleanup failed")
 			return
 		}
 		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_TOKEN_SIGN_FAILED", "auth token sign failed")
 		return
 	}
-	if err := s.recordAudit("auth.login", "Auth Login", principal.User.Username, provider.ID); err != nil {
+	if err := s.recordAudit("auth.login", principal.User.ID, principal.User.ID, "success", "authenticated"); err != nil {
 		if !s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token) {
+			s.recordInternalError(ctx, "AUTH_SESSION_CLEANUP_FAILED", err)
 			writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_CLEANUP_FAILED", "session cleanup failed")
 			return
 		}
@@ -681,6 +686,15 @@ func (s *Server) authRefresh(ctx *gin.Context) {
 		writeUnauthorized(ctx)
 		return
 	}
+	principal := s.currentPrincipalForUsername(ctx.Request.Context(), authSession.Username)
+	if principal.User.ID == "" || len(principal.Permissions) == 0 {
+		writeUnauthorized(ctx)
+		return
+	}
+	if err := s.recordAudit("auth.refresh", principal.User.ID, principal.User.ID, "allowed", "renewal-approved"); err != nil {
+		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_AUDIT_FAILED", "auth audit failed")
+		return
+	}
 	renewed, ok, err := s.sessions.RenewContext(ctx.Request.Context(), authSession.Token)
 	if err != nil {
 		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_RENEW_FAILED", "session renewal failed")
@@ -691,11 +705,6 @@ func (s *Server) authRefresh(ctx *gin.Context) {
 		return
 	}
 	s.publishSessionInvalidation(ctx.Request.Context())
-	principal := s.currentPrincipalForUsername(ctx.Request.Context(), renewed.Username)
-	if principal.User.Username == "" || len(principal.Permissions) == 0 {
-		writeUnauthorized(ctx)
-		return
-	}
 	tokenTTL := renewed.ExpiresAt.Sub(s.now().UTC())
 	token, _, err := s.tokens.Sign(authjwt.Subject{
 		UserID:    principal.User.ID,
@@ -706,11 +715,6 @@ func (s *Server) authRefresh(ctx *gin.Context) {
 	}, tokenTTL)
 	if err != nil {
 		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_TOKEN_SIGN_FAILED", "auth token sign failed")
-		return
-	}
-	if err := s.recordAudit("auth.refresh", "Auth Refresh", principal.User.Username, ""); err != nil {
-		_ = s.cleanupIssuedAdminSession(ctx.Request.Context(), renewed.Token)
-		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_AUDIT_FAILED", "auth audit failed")
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[authLoginResponse]{
@@ -728,6 +732,15 @@ func (s *Server) authLogout(ctx *gin.Context) {
 		writeUnauthorized(ctx)
 		return
 	}
+	principal := s.currentPrincipalForUsername(ctx.Request.Context(), authSession.Username)
+	if principal.User.ID == "" {
+		writeUnauthorized(ctx)
+		return
+	}
+	if err := s.recordAudit("auth.logout", principal.User.ID, principal.User.ID, "allowed", "revocation-approved"); err != nil {
+		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_AUDIT_FAILED", "auth audit failed")
+		return
+	}
 	revoked, err := s.sessions.RevokeContext(ctx.Request.Context(), authSession.Token)
 	if err != nil {
 		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_REVOKE_FAILED", "session revoke failed")
@@ -738,10 +751,6 @@ func (s *Server) authLogout(ctx *gin.Context) {
 		return
 	}
 	s.publishSessionInvalidation(ctx.Request.Context())
-	if err := s.recordAudit("auth.logout", "Auth Logout", authSession.Username, ""); err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_AUDIT_FAILED", "auth audit failed")
-		return
-	}
 	ctx.JSON(http.StatusOK, Response[gin.H]{Data: gin.H{"revoked": true}})
 }
 
@@ -758,7 +767,7 @@ func (s *Server) appAuthLogin(ctx *gin.Context) {
 	if !s.enforceRateLimit(ctx, ratelimit.OperationAppLogin, rateLimitClientIP(ctx), providerDimension, appUsername(input.Username)) {
 		return
 	}
-	username, providerID, ok := s.resolveAppLoginIdentity(ctx, input)
+	username, _, ok := s.resolveAppLoginIdentity(ctx, input)
 	if !ok {
 		return
 	}
@@ -776,12 +785,21 @@ func (s *Server) appAuthLogin(ctx *gin.Context) {
 		TokenType: authjwt.TokenTypeApp,
 	}, issued.ExpiresAt.Sub(issued.IssuedAt))
 	if err != nil {
-		_ = s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token)
+		if !s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token) {
+			s.recordInternalError(ctx, "APP_AUTH_SESSION_CLEANUP_FAILED", err)
+			writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_SESSION_CLEANUP_FAILED", "app session cleanup failed")
+			return
+		}
 		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_TOKEN_SIGN_FAILED", "app auth token sign failed")
 		return
 	}
-	if err := s.recordAudit("app.auth.login", "App Auth Login", username, providerID); err != nil {
-		_ = s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token)
+	actorID := appUserID(username)
+	if err := s.recordAudit("app.auth.login", actorID, actorID, "success", "authenticated"); err != nil {
+		if !s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token) {
+			s.recordInternalError(ctx, "APP_AUTH_SESSION_CLEANUP_FAILED", err)
+			writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_SESSION_CLEANUP_FAILED", "app session cleanup failed")
+			return
+		}
 		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_AUDIT_FAILED", "app auth audit failed")
 		return
 	}
@@ -864,6 +882,11 @@ func (s *Server) appAuthLogout(ctx *gin.Context) {
 		writeUnauthorized(ctx)
 		return
 	}
+	actorID := appUserID(appSession.Username)
+	if err := s.recordAudit("app.auth.logout", actorID, actorID, "allowed", "revocation-approved"); err != nil {
+		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_AUDIT_FAILED", "app auth audit failed")
+		return
+	}
 	revoked, err := s.sessions.RevokeContext(ctx.Request.Context(), appSession.Token)
 	if err != nil {
 		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_SESSION_REVOKE_FAILED", "app session revoke failed")
@@ -874,10 +897,6 @@ func (s *Server) appAuthLogout(ctx *gin.Context) {
 		return
 	}
 	s.publishSessionInvalidation(ctx.Request.Context())
-	if err := s.recordAudit("app.auth.logout", "App Auth Logout", appSession.Username, ""); err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_AUDIT_FAILED", "app auth audit failed")
-		return
-	}
 	ctx.JSON(http.StatusOK, Response[gin.H]{Data: gin.H{"revoked": true}})
 }
 
@@ -1384,10 +1403,9 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 			"storageKey":    metadata.Key,
 			"tenantId":      appTenant,
 			"ownerId":       appUserID(username),
-			"uploadedBy":    username,
 			"createdAt":     s.now().UTC().Format(time.RFC3339),
 		},
-	}, adminresource.AuditEvent{Actor: username, Action: "file.upload", Resource: "files", Result: "success", ReasonCode: "uploaded"})
+	}, adminresource.AuditEvent{Actor: appUserID(username), Action: "file.upload", Resource: "files", Result: "success", ReasonCode: "uploaded"})
 	if err != nil {
 		if rollbackErr := s.fileStorage.Delete(ctx.Request.Context(), metadata.Key); rollbackErr != nil {
 			s.recordInternalError(ctx, "APP_FILE_METADATA_CREATE_FAILED", err)
@@ -1463,9 +1481,13 @@ func appFileVisibleToSession(record adminresource.Record, username string) bool 
 	}
 	ownerID := strings.TrimSpace(record.Values["ownerId"])
 	if ownerID != "" {
-		return ownerID == appUserID(username)
+		return ownerID == appUserID(username) || ownerID == legacyAppUserID(username)
 	}
 	return strings.TrimSpace(record.Values["uploadedBy"]) == username
+}
+
+func legacyAppUserID(username string) string {
+	return "app:" + appUsername(username)
 }
 
 func (s *Server) deleteAdminFile(ctx *gin.Context, id string) {
@@ -1658,15 +1680,23 @@ func (s *Server) authorizeAPIToken(token string, permission string) (bool, bool)
 }
 
 func (s *Server) resolveAPITokenScopes(token string) ([]string, bool) {
+	record, ok := s.resolveAPITokenRecord(token)
+	if !ok {
+		return nil, false
+	}
+	return splitAPITokenScopes(record.Values["scope"]), true
+}
+
+func (s *Server) resolveAPITokenRecord(token string) (adminresource.Record, bool) {
 	token = strings.TrimSpace(token)
 	if token == "" || !strings.HasPrefix(token, apiTokenPrefix) {
-		return nil, false
+		return adminresource.Record{}, false
 	}
 	tokenPrefix := apiTokenPrefixValue(token)
 	tokenHash := hashAPIToken(token)
 	records, err := s.resources.List(apiTokensResource)
 	if err != nil {
-		return nil, false
+		return adminresource.Record{}, false
 	}
 	for _, record := range records {
 		values := record.Values
@@ -1678,11 +1708,11 @@ func (s *Server) resolveAPITokenScopes(token string) ([]string, bool) {
 			continue
 		}
 		if apiTokenExpired(values["expiresAt"], s.now()) {
-			return nil, false
+			return adminresource.Record{}, false
 		}
-		return splitAPITokenScopes(values["scope"]), true
+		return record, true
 	}
-	return nil, false
+	return adminresource.Record{}, false
 }
 
 func apiTokenExpired(expiresAt string, now time.Time) bool {
@@ -1772,22 +1802,27 @@ func cloneStringMap(values map[string]string) map[string]string {
 
 func (s *Server) currentActor(ctx *gin.Context) string {
 	if ctx == nil {
-		return "system"
+		return systemActorID
+	}
+	if token, ok := bearerToken(ctx.GetHeader("Authorization")); ok && strings.HasPrefix(token, apiTokenPrefix) {
+		if record, valid := s.resolveAPITokenRecord(token); valid {
+			return record.ID
+		}
 	}
 	if principal, ok := ctx.Get("platform.principal"); ok {
-		if typed, ok := principal.(rbac.Principal); ok && strings.TrimSpace(typed.User.Username) != "" {
-			return strings.TrimSpace(typed.User.Username)
+		if typed, ok := principal.(rbac.Principal); ok && strings.TrimSpace(typed.User.ID) != "" {
+			return strings.TrimSpace(typed.User.ID)
 		}
 	}
 	if principal, ok := ctx.Get("principal"); ok {
-		if typed, ok := principal.(rbac.Principal); ok && strings.TrimSpace(typed.User.Username) != "" {
-			return strings.TrimSpace(typed.User.Username)
+		if typed, ok := principal.(rbac.Principal); ok && strings.TrimSpace(typed.User.ID) != "" {
+			return strings.TrimSpace(typed.User.ID)
 		}
 	}
-	if principal, ok := s.currentPrincipal(ctx); ok && strings.TrimSpace(principal.User.Username) != "" {
-		return strings.TrimSpace(principal.User.Username)
+	if principal, ok := s.currentPrincipal(ctx); ok && strings.TrimSpace(principal.User.ID) != "" {
+		return strings.TrimSpace(principal.User.ID)
 	}
-	return "system"
+	return systemActorID
 }
 
 func (s *Server) adminCurrentSession(ctx *gin.Context) {
@@ -1895,62 +1930,12 @@ func (s *Server) authProviderAvailable(provider capability.AuthProvider) bool {
 	return !(s.disableDemoAuthProvider && provider.Kind == "demo")
 }
 
-func (s *Server) recordAudit(code string, name string, username string, provider string) error {
-	auditCode, err := newAuthAuditCode(code)
-	if err != nil {
-		return err
-	}
-	values := map[string]string{
-		"actor":     username,
-		"action":    code,
-		"resource":  "auth",
-		"createdAt": s.now().UTC().Format(time.RFC3339),
-	}
-	if provider != "" {
-		values["provider"] = provider
-	}
-	_, err = s.resources.CreateInternal("audit-logs", adminresource.WriteInput{
-		Code:        auditCode,
-		Name:        name,
-		Status:      "recorded",
-		Description: "Authentication event recorded by platform auth.",
-		Values:      values,
+func (s *Server) recordAudit(action string, actorID string, targetID string, outcome string, reasonCode string) error {
+	_, err := s.resources.RecordAudit(adminresource.AuditEvent{
+		Actor: actorID, Action: action, Resource: "auth", TargetID: targetID,
+		Result: outcome, ReasonCode: reasonCode,
 	})
-	if errors.Is(err, adminresource.ErrUnknownResource) {
-		return nil
-	}
 	return err
-}
-
-func newAuthAuditCode(action string) (string, error) {
-	var suffix [12]byte
-	if _, err := rand.Read(suffix[:]); err != nil {
-		return "", err
-	}
-	return action + "." + hex.EncodeToString(suffix[:]), nil
-}
-
-func (s *Server) recordAdminResourceAudit(ctx *gin.Context, action string, resource string, record adminresource.Record) {
-	if resource == "audit" || resource == "audit-logs" || action == "" {
-		return
-	}
-	_, err := s.resources.CreateInternal("audit-logs", adminresource.WriteInput{
-		Code:        "admin_resource." + action + "." + resource + "." + record.ID,
-		Name:        "Admin Resource " + strings.ToUpper(action[:1]) + action[1:],
-		Status:      "recorded",
-		Description: "Admin resource write operation recorded by platform admin.",
-		Values: map[string]string{
-			"actor":      s.currentActor(ctx),
-			"action":     "admin_resource." + action,
-			"resource":   resource,
-			"targetId":   record.ID,
-			"targetCode": record.Code,
-			"createdAt":  s.now().UTC().Format(time.RFC3339),
-		},
-	})
-	if errors.Is(err, adminresource.ErrUnknownResource) {
-		return
-	}
 }
 
 func (s *Server) recordFileAudit(ctx *gin.Context, action string, record adminresource.Record) error {
@@ -1963,25 +1948,12 @@ func (s *Server) recordFileAuditForActor(action string, actor string, record adm
 	}
 	actor = strings.TrimSpace(actor)
 	if actor == "" {
-		actor = "system"
+		actor = systemActorID
 	}
-	_, err := s.resources.CreateInternal("audit-logs", adminresource.WriteInput{
-		Code:        action + "." + record.ID,
-		Name:        "File Operation",
-		Status:      "recorded",
-		Description: "File operation recorded by platform admin.",
-		Values: map[string]string{
-			"actor":      actor,
-			"action":     action,
-			"resource":   "files",
-			"targetId":   record.ID,
-			"targetCode": record.Code,
-			"createdAt":  s.now().UTC().Format(time.RFC3339),
-		},
+	_, err := s.resources.RecordAudit(adminresource.AuditEvent{
+		Actor: actor, Action: action, Resource: "files", TargetID: record.ID,
+		Result: "success", ReasonCode: "content-authorized",
 	})
-	if errors.Is(err, adminresource.ErrUnknownResource) {
-		return nil
-	}
 	return err
 }
 
@@ -2083,7 +2055,9 @@ func appUsername(raw string) string {
 }
 
 func appUserID(username string) string {
-	return "app:" + username
+	normalized := appUsername(username)
+	digest := sha256.Sum256([]byte("platform-go:app-user:v1\x00" + normalized))
+	return "app-user:v1:" + hex.EncodeToString(digest[:])
 }
 
 func appSessionResponseFromSession(appSession session.Session) appSessionResponse {
@@ -2387,10 +2361,43 @@ func (s *Server) recordInternalError(ctx *gin.Context, code string, err error) {
 		return
 	}
 	publicErr := errors.New(code)
-	_ = ctx.Error(publicErr)
-	if s.internalErrorSink != nil {
-		s.internalErrorSink.Record(ctx.Request.Context(), InternalErrorEvent{Code: code, Err: publicErr})
+	event := InternalErrorEvent{
+		Code:       code,
+		CauseClass: internalErrorCauseClass(code),
+		EventID:    internalErrorEventID(ctx),
+		Err:        publicErr,
 	}
+	_ = ctx.Error(publicErr).SetMeta(event)
+	if s.internalErrorSink != nil {
+		s.internalErrorSink.Record(ctx.Request.Context(), event)
+	}
+}
+
+func internalErrorCauseClass(code string) string {
+	upper := strings.ToUpper(strings.TrimSpace(code))
+	for marker, class := range map[string]string{
+		"TIMEOUT": "timeout", "AUTH": "auth", "FILE": "storage", "STORAGE": "storage",
+		"PROVIDER": "provider", "REPOSITORY": "repository", "UNAVAILABLE": "unavailable",
+	} {
+		if strings.Contains(upper, marker) {
+			return class
+		}
+	}
+	return "unknown"
+}
+
+func internalErrorEventID(ctx *gin.Context) string {
+	if ctx != nil {
+		if requestID := strings.TrimSpace(ctx.GetHeader("X-Request-ID")); requestID != "" {
+			digest := sha256.Sum256([]byte("platform-go:request-correlation:v1\x00" + requestID))
+			return "request:v1:" + hex.EncodeToString(digest[:])
+		}
+	}
+	var suffix [12]byte
+	if _, err := rand.Read(suffix[:]); err != nil {
+		return "event-unavailable"
+	}
+	return "event-" + hex.EncodeToString(suffix[:])
 }
 
 func (s *Server) mutationAuditEvent(ctx *gin.Context, action string, resource string, reasonCode string) adminresource.AuditEvent {

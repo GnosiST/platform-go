@@ -385,11 +385,12 @@
   "auditPolicy": {
     "requiredActions": ["auth.login", "auth.refresh", "auth.logout", "app.auth.login", "app.auth.logout", "api_token.create", "api_token.update", "api_token.revoke"],
     "forbiddenRawFields": ["jwt", "bearerToken", "refreshToken", "apiToken", "openid", "unionid", "phone", "secret", "sessionId", "sessionDigest", "tokenDigest"],
-    "allowedAuthAuditFields": ["actor", "action", "resource", "provider", "createdAt"],
+    "allowedAuthAuditFields": ["actor", "action", "resource", "targetId", "outcome", "eventId", "reasonCode", "createdAt"],
     "sessionIdentifier": "none",
     "runtimeEvidence": [
       "internal/platform/httpapi/server.go",
       "internal/platform/httpapi/server_test.go",
+      "internal/platform/adminresource/audit.go",
       "docs/platform-auth.md"
     ]
   },

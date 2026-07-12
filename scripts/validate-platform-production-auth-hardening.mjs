@@ -926,13 +926,12 @@ function validateAuditPolicy(contract, errors) {
     "auditPolicy.forbiddenRawFields",
     errors,
   );
-  requireIncludes(
-    contract.auditPolicy?.allowedAuthAuditFields,
-    ["actor", "action", "resource", "provider", "createdAt"],
-    "auditPolicy.allowedAuthAuditFields",
-    errors,
-  );
-  const allowedFields = new Set(values(contract.auditPolicy?.allowedAuthAuditFields));
+  const requiredAuthAuditFields = ["actor", "action", "resource", "targetId", "outcome", "eventId", "reasonCode", "createdAt"];
+  const configuredAuthAuditFields = values(contract.auditPolicy?.allowedAuthAuditFields);
+  if (!sameSet(configuredAuthAuditFields, requiredAuthAuditFields)) {
+    errors.push(`auditPolicy.allowedAuthAuditFields must exactly match ${requiredAuthAuditFields.join(",")}`);
+  }
+  const allowedFields = new Set(configuredAuthAuditFields);
   for (const field of values(contract.auditPolicy?.forbiddenRawFields)) {
     if (allowedFields.has(field)) {
       errors.push(`auditPolicy.allowedAuthAuditFields must not include forbidden raw field ${field}`);
@@ -950,20 +949,22 @@ function validateAuditPolicy(contract, errors) {
   if (relativeExistingPath(serverPath)) {
     const server = fs.readFileSync(path.resolve(repoRoot, serverPath), "utf8");
     const recordAuditStart = server.indexOf("func (s *Server) recordAudit(");
-    const nextFunctionStart = server.indexOf("func newAuthAuditCode(", recordAuditStart);
+    const nextFunctionStart = server.indexOf("func (s *Server) recordFileAudit(", recordAuditStart);
     const recordAuditBody = recordAuditStart >= 0 && nextFunctionStart > recordAuditStart ? server.slice(recordAuditStart, nextFunctionStart) : "";
     if (!recordAuditBody) {
-      errors.push(`${serverPath} must expose recordAudit before newAuthAuditCode`);
+      errors.push(`${serverPath} must expose recordAudit before recordFileAudit`);
     }
-    if (!recordAuditBody.includes("func (s *Server) recordAudit(code string, name string, username string, provider string) error")) {
-      errors.push(`${serverPath} recordAudit must not accept a session credential parameter`);
+    if (!recordAuditBody.includes("func (s *Server) recordAudit(action string, actorID string, targetID string, outcome string, reasonCode string) error")) {
+      errors.push(`${serverPath} recordAudit must accept only structured audit identifiers and result fields`);
     }
     for (const snippet of [
-      '"actor":     username',
-      '"action":    code',
-      '"resource":  "auth"',
-      '"createdAt": s.now().UTC().Format(time.RFC3339)',
-      'values["provider"] = provider',
+      "s.resources.RecordAudit(adminresource.AuditEvent{",
+      "Actor: actorID",
+      "Action: action",
+      'Resource: "auth"',
+      "TargetID: targetID",
+      "Result: outcome",
+      "ReasonCode: reasonCode",
     ]) {
       if (!recordAuditBody.includes(snippet)) {
         errors.push(`${serverPath} recordAudit must include audit whitelist evidence ${snippet}`);
@@ -977,6 +978,20 @@ function validateAuditPolicy(contract, errors) {
     }
     if (server.includes("func shortSessionID(")) {
       errors.push(`${serverPath} must not expose shortSessionID`);
+    }
+    const refreshStart = server.indexOf("func (s *Server) authRefresh(");
+    const refreshEnd = server.indexOf("func (s *Server) authLogout(", refreshStart);
+    const refreshBody = refreshStart >= 0 && refreshEnd > refreshStart ? server.slice(refreshStart, refreshEnd) : "";
+    const refreshAudit = refreshBody.indexOf('s.recordAudit("auth.refresh"');
+    const refreshRenewal = refreshBody.indexOf("s.sessions.RenewContext(");
+    if (refreshAudit < 0 || refreshRenewal < 0 || refreshAudit > refreshRenewal) {
+      errors.push(`${serverPath} authRefresh must persist its allowed-attempt audit before renewing the known session`);
+    }
+    if (!server.includes('return "app-user:v1:" + hex.EncodeToString(digest[:])')) {
+      errors.push(`${serverPath} appUserID must return a domain-separated opaque digest`);
+    }
+    if (!server.includes("return strings.TrimSpace(principal.User.ID)")) {
+      errors.push(`${serverPath} currentActor must use the stable principal user ID`);
     }
   }
   const authDocPath = "docs/platform-auth.md";

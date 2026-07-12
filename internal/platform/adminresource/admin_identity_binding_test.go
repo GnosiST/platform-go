@@ -82,8 +82,8 @@ func TestEnsureAdminIdentityBindingAuditIsIdempotentAcrossStoreWrappers(t *testi
 		t.Fatalf("bound audits = %+v, want one", matching)
 	}
 	assertIdentityAuditRedacted(t, matching[0], input)
-	if matching[0].Values["actor"] != "admin" {
-		t.Fatalf("bound audit actor = %q, want admin", matching[0].Values["actor"])
+	if matching[0].Values["actor"] != "user-admin" {
+		t.Fatalf("bound audit actor = %q, want stable user ID", matching[0].Values["actor"])
 	}
 }
 
@@ -156,8 +156,8 @@ func TestEnsureAdminIdentityBindingConflictAuditIsRedactedAndIdempotent(t *testi
 		t.Fatalf("conflict audits = %+v, want one", matching)
 	}
 	assertIdentityAuditRedacted(t, matching[0], input)
-	if matching[0].Values["actor"] != "" {
-		t.Fatalf("conflict audit actor = %q, want omitted", matching[0].Values["actor"])
+	if matching[0].Values["actor"] != "system:platform" {
+		t.Fatalf("conflict audit actor = %q, want explicit system ID", matching[0].Values["actor"])
 	}
 	for key, value := range matching[0].Values {
 		if key == "platformUsername" || value == "admin" || value == "ops" {
@@ -192,7 +192,7 @@ func matchingAdminIdentityAudits(records []Record, outcome string) []Record {
 func assertIdentityAuditRedacted(t *testing.T, record Record, input AdminIdentityBindingAuditInput, forbidden ...string) {
 	t.Helper()
 	serialized := record.Code + strings.Join([]string{
-		record.Values["actor"], record.Values["provider"], record.Values["outcome"], record.Values["resource"], record.Values["createdAt"],
+		record.Values["actor"], record.Values["outcome"], record.Values["resource"], record.Values["createdAt"],
 	}, "\x00")
 	for _, value := range append(forbidden, strings.Repeat("a", 64), strings.Repeat("b", 64)) {
 		if value != "" && strings.Contains(serialized, value) {
@@ -202,8 +202,13 @@ func assertIdentityAuditRedacted(t *testing.T, record Record, input AdminIdentit
 	if strings.Contains(record.Code, "aaaa") || strings.Contains(record.Code, "bbbb") {
 		t.Fatalf("audit code = %q, want no identity hash", record.Code)
 	}
-	if record.Values["provider"] != input.Provider || record.Values["outcome"] != input.Outcome {
-		t.Fatalf("audit values = %+v, want provider/outcome", record.Values)
+	if record.Values["provider"] != "" || record.Values["outcome"] != input.Outcome {
+		t.Fatalf("audit values = %+v, want redacted structured outcome", record.Values)
+	}
+	for _, key := range []string{"actor", "action", "resource", "targetId", "outcome", "eventId", "reasonCode", "createdAt"} {
+		if strings.TrimSpace(record.Values[key]) == "" {
+			t.Fatalf("audit values = %+v, missing %s", record.Values, key)
+		}
 	}
 }
 

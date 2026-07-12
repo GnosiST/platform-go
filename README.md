@@ -21,7 +21,7 @@ The `zshenmez` project is only external reference evidence for reusable capabili
 
 ## Active Completion Program
 
-The original 37-node foundation baseline remains implemented and closed. The active completion program adds eight controlled pending nodes, so the current governance state is `45 total / 37 implemented / 8 controlled unfinished` with `completionStatus=not-complete-controlled`. This does not reopen the baseline and does not approve production auth promotion, refresh-token-family default runtime, source writing or external publication.
+The original 37-node foundation baseline remains implemented and closed. The active completion program originally added eight controlled nodes; `runtime-security-containment` is `implemented`, so the current governance state is `45 total / 38 implemented / 7 controlled unfinished` with `completionStatus=not-complete-controlled`. The remaining nodes, in task-graph order, are `admin-watermark-export-governance`, `sensitive-data-protection-runtime`, `sensitive-data-historical-migration`, `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`. This does not reopen the baseline and does not approve production auth promotion, refresh-token-family default runtime, source writing or external publication.
 
 Approved 2026-07-12 specifications:
 
@@ -83,6 +83,10 @@ GET /api/admin/resources/:resource
 POST /api/admin/resources/:resource
 PUT /api/admin/resources/:resource/:id
 DELETE /api/admin/resources/:resource/:id
+POST /api/admin/policy-reviews/:id/request
+POST /api/admin/policy-reviews/:id/reject
+POST /api/admin/policy-reviews/:id/approve
+GET /api/admin/policy-reviews/export
 POST /api/admin/files/upload
 GET /api/admin/files/:id/content
 POST /api/app/auth/login

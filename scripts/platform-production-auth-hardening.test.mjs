@@ -615,7 +615,7 @@ describe("validate-platform-production-auth-hardening", () => {
 
   it("accepts credential-free auth audits without a session identifier", () => {
     const contract = readJSON("resources/platform-production-auth-hardening.json");
-    contract.auditPolicy.allowedAuthAuditFields = ["actor", "action", "resource", "provider", "createdAt"];
+    contract.auditPolicy.allowedAuthAuditFields = ["actor", "action", "resource", "targetId", "outcome", "eventId", "reasonCode", "createdAt"];
     contract.auditPolicy.sessionIdentifier = "none";
     const contractPath = tempJSON("platform-production-auth-hardening.json", contract);
     const review = readJSON("resources/generated/production-auth-promotion-review.json");

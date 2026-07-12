@@ -27,6 +27,26 @@ type MutationResult struct {
 	Audit  Record
 }
 
+func (s *Store) RecordAudit(event AuditEvent) (Record, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	previous, err := s.prepareMutationLocked()
+	if err != nil {
+		return Record{}, err
+	}
+	audit, err := s.auditRecordLocked(event, s.nextID+1)
+	if err != nil {
+		return Record{}, err
+	}
+	s.nextID++
+	s.resources["audit-logs"] = append(s.resources["audit-logs"], audit)
+	if err := s.persistLocked(); err != nil {
+		s.restoreSnapshotLocked(previous)
+		return Record{}, err
+	}
+	return cloneRecord(audit), nil
+}
+
 func (s *Store) CreateWithAudit(resource string, input WriteInput, event AuditEvent) (MutationResult, error) {
 	return s.createWithAudit(resource, input, WriteOriginExternal, event)
 }

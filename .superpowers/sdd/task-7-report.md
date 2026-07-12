@@ -30,6 +30,16 @@ Governance now reports `45 total / 38 implemented / 7 controlled unfinished`. Th
 - Updated auth, resource schema, deployment and capability-development documentation.
 - Regenerated Admin resource contracts, OpenAPI, codegen preview and scaffold review artifacts.
 
+## Independent Review Remediation
+
+- Admin refresh now persists an `allowed` refresh-attempt audit before renewing the caller-known session. Audit failure leaves the existing session expiry and revocation state unchanged and does not depend on cleanup compensation.
+- Admin actors use principal user IDs, API-token calls use the API-token record ID, App actors and file owners use a domain-separated opaque SHA-256 ID, and unauthenticated/system events use `system:platform`. Legacy `app:<username>` ownership remains read-compatible without being written by new uploads.
+- Authentication, App phone and file-content audit paths now use the validated `AuditEvent` builder. Unknown audit resources and repository failures fail protected operations; file-content audits complete before response headers or bytes are written.
+- OIDC binding audits also use the same approved field set and deterministic opaque event IDs. Provider IDs, usernames, provider subjects, target codes and session-derived values are not persisted in new audit records.
+- Internal diagnostics now expose only a public code, a whitelisted cause class and a safe request/event correlation ID. The same structured event is attached to Gin error metadata and sent to the internal sink; raw adapter errors, request IDs, paths, URLs, filenames and personal values are omitted.
+- Added independent rollback coverage for Store update/delete audit failures, issued-session cleanup failures, purge-audit retry recovery and durable tombstone/storage-key preservation.
+- Updated the production-auth hardening contract and validator so the approved audit field set and refresh-before-renew ordering are enforced rather than the legacy username/provider audit shape.
+
 ## TDD Evidence
 
 The focused RED run initially reported 7 expected failures: export reused read permission, legacy audit fields leaked, generic mutation survived audit failure, file mutation survived audit failure, failed deletion stayed visible, runtime error sinks exposed backend errors and the credential boundary was missing.
@@ -46,9 +56,9 @@ Governance mutation coverage rejects:
 
 ## Verification
 
-- `rtk go test ./...`: 861 passed in 24 packages.
+- `rtk go test ./...`: 872 passed in 24 packages.
 - `rtk go vet ./...`: no issues.
-- Explicit Node suites passed:
+- Explicit Node suites passed, 385 tests across 18 suites:
   - Admin resource generators: 13.
   - Admin UI contracts: 63.
   - Admin API boundary: 8.
@@ -63,8 +73,9 @@ Governance mutation coverage rejects:
   - Deployment topology: 34.
   - Production environment: 19.
   - Production readiness: 36.
-- The two Task 7 alignment mutation cases passed independently. The full alignment suite repeatedly failed to produce a terminal result and was terminated; it is not counted as passing. The direct `validate-platform-foundation-alignment.mjs` validator passed after the same resources and docs were finalized.
-- All Task 7 brief validators passed, including Admin resources, Admin API boundary, deployment topology, production readiness/env, foundation alignment, task execution, goal completion, node closeout, objective conformance, Admin i18n and Admin UI contracts.
+- Production auth hardening: 34.
+- Platform foundation docs drift: passed.
+- All Task 7 brief validators passed, including Admin resources, Admin API boundary, deployment topology, production readiness/env, production auth hardening, foundation alignment, task execution, goal completion, node closeout, objective conformance, engineering capabilities, file-storage experience, Admin i18n and Admin UI contracts.
 - `rtk npm --prefix admin run build`: TypeScript and Vite production build passed; 3759 modules transformed.
 - `rtk git diff --check`: passed.
 - `rtk codegraph sync .` and `rtk codegraph status`: index is up to date.

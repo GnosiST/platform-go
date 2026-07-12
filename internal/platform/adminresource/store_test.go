@@ -1487,6 +1487,42 @@ func TestRepositoryBackedStoreRollsBackFullSnapshotOnConflict(t *testing.T) {
 	}
 }
 
+func TestStoreUpdateAndDeleteRollBackWhenAuditPersistenceFails(t *testing.T) {
+	for _, operation := range []string{"update", "delete"} {
+		t.Run(operation, func(t *testing.T) {
+			repository := &auditFailingRepository{}
+			store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+			if err != nil {
+				t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+			}
+			created, err := store.CreateWithAudit("tenants", WriteInput{
+				Code: "audit-rollback", Name: "Before", Status: "enabled", Values: map[string]string{"isolation": "sandbox"},
+			}, AuditEvent{Actor: "user-admin", Action: "admin_resource.create", Resource: "tenants", Result: "success", ReasonCode: "created"})
+			if err != nil {
+				t.Fatalf("CreateWithAudit(tenants) error = %v", err)
+			}
+			before := store.snapshotLocked()
+			repository.failAction = "admin_resource." + operation
+			repository.saveErr = errors.New("audit-save-private-detail")
+			switch operation {
+			case "update":
+				_, err = store.UpdateWithAudit("tenants", created.Record.ID, WriteInput{
+					Code: created.Record.Code, Name: "After", Status: created.Record.Status, Values: created.Record.Values,
+				}, AuditEvent{Actor: "user-admin", Action: "admin_resource.update", Resource: "tenants", Result: "success", ReasonCode: "updated"})
+			case "delete":
+				_, err = store.DeleteWithAudit("tenants", created.Record.ID, AuditEvent{Actor: "user-admin", Action: "admin_resource.delete", Resource: "tenants", Result: "success", ReasonCode: "deleted"})
+			}
+			if err == nil {
+				t.Fatalf("%s with audit failure error = nil", operation)
+			}
+			after := store.snapshotLocked()
+			if !reflect.DeepEqual(after, before) {
+				t.Fatalf("snapshot after failed %s = %#v, want rollback to %#v", operation, after, before)
+			}
+		})
+	}
+}
+
 func TestRepositoryBackedStoreReloadsBeforeMutationAndPreservesConcurrentRecord(t *testing.T) {
 	repository := &revisionMemoryRepository{snapshot: ResourceSnapshot{Resources: map[string][]Record{}}}
 	first, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
@@ -1554,6 +1590,30 @@ func (r *conflictingRepository) Save(context.Context, ResourceSnapshot) (uint64,
 
 type revisionMemoryRepository struct {
 	snapshot ResourceSnapshot
+}
+
+type auditFailingRepository struct {
+	snapshot   ResourceSnapshot
+	failAction string
+	saveErr    error
+}
+
+func (r *auditFailingRepository) Load(context.Context) (ResourceSnapshot, error) {
+	return ResourceSnapshot{Revision: r.snapshot.Revision, NextID: r.snapshot.NextID, Resources: cloneResourceMap(r.snapshot.Resources)}, nil
+}
+
+func (r *auditFailingRepository) Save(_ context.Context, snapshot ResourceSnapshot) (uint64, error) {
+	if r.saveErr != nil {
+		for _, audit := range snapshot.Resources["audit-logs"] {
+			if audit.Values["action"] == r.failAction {
+				return 0, r.saveErr
+			}
+		}
+	}
+	snapshot.Revision++
+	snapshot.Resources = cloneResourceMap(snapshot.Resources)
+	r.snapshot = snapshot
+	return snapshot.Revision, nil
 }
 
 func (r *revisionMemoryRepository) Load(context.Context) (ResourceSnapshot, error) {

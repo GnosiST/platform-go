@@ -159,7 +159,7 @@ func TestRunBindAdminOIDCIsIdempotentAndRedactsRawIdentity(t *testing.T) {
 		t.Fatalf("json.Marshal() error = %v", err)
 	}
 	assertRedacted(t, []string{testSubject, testIssuer}, string(encoded), readFile(t, cfg.AdminResourceFile))
-	if !hasProvisionAudit(audits, "admin", "oidc") {
+	if !hasProvisionAudit(audits, "user-admin") {
 		t.Fatalf("audit logs = %+v, want redacted provisioning audit", audits)
 	}
 	boundAudits := bindingAudits(audits, adminresource.AdminIdentityBindingAuditOutcomeBound)
@@ -195,8 +195,8 @@ func TestRunBindAdminOIDCRejectsConflictingBindingWithoutRawIdentityLeak(t *test
 		t.Fatalf("conflict audits = %+v, want one", conflictAudits)
 	}
 	assertCLIBindingAuditRedacted(t, conflictAudits[0], bindings[0], "admin", "ops")
-	if conflictAudits[0].Values["actor"] != "" {
-		t.Fatalf("conflict audit actor = %q, want omitted", conflictAudits[0].Values["actor"])
+	if conflictAudits[0].Values["actor"] != "system:platform" {
+		t.Fatalf("conflict audit actor = %q, want explicit system ID", conflictAudits[0].Values["actor"])
 	}
 }
 
@@ -334,9 +334,9 @@ func testManifests(t *testing.T, cfg config.Config) []capability.Manifest {
 	return manifests
 }
 
-func hasProvisionAudit(records []adminresource.Record, username string, provider string) bool {
+func hasProvisionAudit(records []adminresource.Record, actorID string) bool {
 	for _, record := range records {
-		if record.Values["action"] == "admin_identity.bind" && record.Values["actor"] == username && record.Values["provider"] == provider {
+		if record.Values["action"] == "admin_identity.bind" && record.Values["actor"] == actorID && record.Values["provider"] == "" {
 			return true
 		}
 	}

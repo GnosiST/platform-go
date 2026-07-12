@@ -224,37 +224,32 @@ func (s *Store) EnsureAdminIdentityBindingAudit(ctx context.Context, input Admin
 		if input.Outcome == AdminIdentityBindingAuditOutcomeBound && strings.TrimSpace(binding.Values[adminIdentityBindingUsernameField]) != input.Username {
 			return Record{}, ErrInvalidRecord
 		}
-		code := "admin_identity.bind." + input.Outcome + "." + input.BindingRecordID
-		values := map[string]string{
-			"action":    "admin_identity.bind",
-			"resource":  adminIdentitiesResource,
-			"targetId":  input.BindingRecordID,
-			"provider":  input.Provider,
-			"outcome":   input.Outcome,
-			"createdAt": resolveAdminIdentityAuditNow(input.Now, s.now).Format(time.RFC3339),
-		}
-		name := "Admin OIDC Binding Conflict"
+		actorID := "system:platform"
 		if input.Outcome == AdminIdentityBindingAuditOutcomeBound {
-			values["actor"] = input.Username
-			name = "Admin OIDC Binding Provisioned"
+			actorID = adminIdentityAuditActorID(s.resources["users"], input.Username)
+			if actorID == "" {
+				return Record{}, ErrInvalidRecord
+			}
 		}
 		audits, auditResourceAvailable := s.resources["audit-logs"]
 		if !auditResourceAvailable {
 			return Record{}, ErrUnknownResource
 		}
-		if existing, ok, err := matchingAdminIdentityAudit(audits, code, values); err != nil {
+		event := AuditEvent{
+			Actor: actorID, Action: "admin_identity.bind", Resource: adminIdentitiesResource,
+			TargetID: input.BindingRecordID, Result: input.Outcome,
+			EventID: adminIdentityAuditEventID(input.BindingRecordID, input.Outcome), ReasonCode: "identity-binding-" + input.Outcome,
+		}
+		if existing, ok, err := matchingAdminIdentityAudit(audits, event); err != nil {
 			return Record{}, err
 		} else if ok {
 			return cloneRecord(existing), nil
 		}
-		record, err := s.recordFromInputWithOrigin("audit-logs", "", WriteInput{
-			Code: code, Name: name, Status: "recorded", Description: "Admin OIDC identity binding provisioning event.", Values: values,
-		}, WriteOriginInternal)
+		record, err := s.auditRecordLocked(event, s.nextID+1)
 		if err != nil {
 			return Record{}, err
 		}
 		s.nextID++
-		record.ID = fmt.Sprintf("audit-logs-%d", s.nextID)
 		s.resources["audit-logs"] = append(s.resources["audit-logs"], record)
 		if err := s.persistContextLocked(ctx); err != nil {
 			s.restoreSnapshotLocked(previous)
@@ -277,20 +272,25 @@ func findRecordByID(records []Record, id string) (Record, bool) {
 	return Record{}, false
 }
 
-func resolveAdminIdentityAuditNow(value time.Time, now func() time.Time) time.Time {
-	if !value.IsZero() {
-		return value.UTC()
+func adminIdentityAuditActorID(users []Record, username string) string {
+	username = strings.TrimSpace(username)
+	for _, user := range users {
+		if strings.TrimSpace(user.Code) == username {
+			return strings.TrimSpace(user.ID)
+		}
 	}
-	if now != nil {
-		return now().UTC()
-	}
-	return time.Now().UTC()
+	return ""
 }
 
-func matchingAdminIdentityAudit(records []Record, code string, expected map[string]string) (Record, bool, error) {
+func adminIdentityAuditEventID(bindingRecordID string, outcome string) string {
+	digest := sha256.Sum256([]byte("platform-go:admin-identity-audit:v1\x00" + strings.TrimSpace(bindingRecordID) + "\x00" + strings.TrimSpace(outcome)))
+	return "event:admin-identity:v1:" + hex.EncodeToString(digest[:])
+}
+
+func matchingAdminIdentityAudit(records []Record, event AuditEvent) (Record, bool, error) {
 	var matched *Record
 	for index := range records {
-		if records[index].Code != code {
+		if strings.TrimSpace(records[index].Values["eventId"]) != event.EventID {
 			continue
 		}
 		if matched != nil {
@@ -301,14 +301,19 @@ func matchingAdminIdentityAudit(records []Record, code string, expected map[stri
 	if matched == nil {
 		return Record{}, false, nil
 	}
-	for _, key := range []string{"action", "resource", "targetId", "provider", "outcome", "actor"} {
-		if strings.TrimSpace(matched.Values[key]) != strings.TrimSpace(expected[key]) {
+	expected := map[string]string{
+		"actor": event.Actor, "action": event.Action, "resource": event.Resource,
+		"targetId": event.TargetID, "outcome": event.Result, "eventId": event.EventID, "reasonCode": event.ReasonCode,
+	}
+	for key, value := range expected {
+		if strings.TrimSpace(matched.Values[key]) != strings.TrimSpace(value) {
 			return Record{}, false, ErrInvalidRecord
 		}
 	}
 	for key := range matched.Values {
-		normalized := strings.ToLower(strings.TrimSpace(key))
-		if strings.Contains(normalized, "issuer") || strings.Contains(normalized, "subject") || strings.Contains(normalized, "hash") {
+		switch key {
+		case "actor", "action", "resource", "targetId", "outcome", "eventId", "reasonCode", "createdAt":
+		default:
 			return Record{}, false, ErrInvalidRecord
 		}
 	}
