@@ -102,6 +102,35 @@ func TestMigrationPlanRejectsDuplicates(t *testing.T) {
 	})
 }
 
+func TestMigrationPlanRejectsWhitespaceEquivalentResourceKeys(t *testing.T) {
+	canonical := migrationResource("duplicate-records", "global", "", []capability.AdminField{
+		encryptedMigrationField("alphaSecret", "raw-v1", ""),
+	})
+	whitespace := migrationResource(" duplicate-records ", "global", "", []capability.AdminField{
+		encryptedMigrationField("zetaSecret", "raw-v1", ""),
+	})
+	whitespace.PermissionPrefix = "admin:duplicate-records-alt"
+	whitespace.Menu.Route = "/duplicate-records-alt"
+
+	tests := []struct {
+		name      string
+		resources []capability.AdminResource
+	}{
+		{name: "canonical first", resources: []capability.AdminResource{canonical, whitespace}},
+		{name: "whitespace first", resources: []capability.AdminResource{whitespace, canonical}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := PlanFromManifests([]capability.Manifest{{
+				ID: "duplicates", Admin: capability.AdminSurface{Resources: tt.resources},
+			}})
+			if err == nil || !strings.Contains(err.Error(), "duplicate resource") {
+				t.Fatalf("PlanFromManifests() error = %v, want canonical duplicate resource error", err)
+			}
+		})
+	}
+}
+
 func TestMigrationPlanRejectsNoEncryptedFields(t *testing.T) {
 	resource := migrationResource("plain-records", "global", "", []capability.AdminField{
 		plainMigrationField("displayName", false),

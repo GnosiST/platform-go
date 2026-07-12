@@ -32,6 +32,7 @@ func PlanFromManifests(manifests []capability.Manifest) (Plan, error) {
 	}
 
 	plan := Plan{}
+	seenResources := map[string]struct{}{}
 	for _, manifest := range manifests {
 		for _, resource := range manifest.Admin.Resources {
 			fields := make([]FieldPlan, 0)
@@ -51,12 +52,17 @@ func PlanFromManifests(manifests []capability.Manifest) (Plan, error) {
 			if len(fields) == 0 {
 				continue
 			}
+			resourceKey := strings.TrimSpace(resource.Resource)
+			if _, exists := seenResources[resourceKey]; exists {
+				return Plan{}, fmt.Errorf("sensitive migration plan duplicate resource %q", resourceKey)
+			}
+			seenResources[resourceKey] = struct{}{}
 
 			slices.SortFunc(fields, func(left FieldPlan, right FieldPlan) int {
 				return strings.Compare(left.Key, right.Key)
 			})
 			plan.Resources = append(plan.Resources, ResourcePlan{
-				Resource:      strings.TrimSpace(resource.Resource),
+				Resource:      resourceKey,
 				Scope:         strings.TrimSpace(resource.Protection.Scope),
 				TenantField:   strings.TrimSpace(resource.Protection.TenantField),
 				SchemaVersion: resource.Protection.SchemaVersion,
