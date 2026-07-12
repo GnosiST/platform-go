@@ -63,16 +63,28 @@ function tempStackSourceRoot(mutator) {
 }
 
 describe("validate-platform-engineering-capabilities", () => {
-  it("tracks runtime security as implemented and remaining completion program capabilities as partial", () => {
+  it("tracks runtime security and watermark governance as implemented", () => {
     const matrix = readJSON("resources/platform-engineering-capabilities.json");
     const capabilities = matrix.capabilities.filter((item) => completionProgramCapabilityIDs.includes(item.id));
 
     assert.deepEqual(capabilities.map((item) => item.id), completionProgramCapabilityIDs);
-    assert.equal(capabilities[0].status, "implemented");
-    assert.ok(capabilities[0].evidence.sourcePaths.length > 0);
-    assert.ok(capabilities[0].evidence.tests.length > 0);
-    assert.ok(capabilities[0].evidence.validators.length > 0);
-    assert.ok(capabilities.slice(1).every((item) => item.status === "partial"));
+    for (const capability of capabilities.slice(0, 2)) {
+      assert.equal(capability.status, "implemented");
+      assert.ok(capability.evidence.sourcePaths.length > 0);
+      assert.ok(capability.evidence.tests.length > 0);
+      assert.ok(capability.evidence.validators.length > 0);
+    }
+    assert.ok(capabilities.slice(2).every((item) => item.status === "partial"));
+  });
+
+  it("rejects regressing watermark governance to partial after closeout", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities.find((item) => item.id === "admin-watermark-export-governance").status = "partial";
+
+    const result = runValidator(["--matrix", tempJSON("partial-watermark-capability.json", matrix)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /required implemented capability admin-watermark-export-governance must stay implemented/);
   });
 
   it("rejects regressing runtime security capability to partial after closeout", () => {

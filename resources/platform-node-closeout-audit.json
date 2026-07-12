@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-node-closeout-audit.json",
-  "capturedAt": "2026-07-11",
+  "capturedAt": "2026-07-12",
   "purpose": "Machine-checkable node closeout audit for the reusable platform foundation. It keeps implemented task nodes tied to neat-freak knowledge cleanup, evidence paths, objective-conflict review and visual design gates before a node can be treated as closed.",
   "policy": {
     "taskGraph": "resources/platform-foundation-task-graph.json",
@@ -24,7 +24,6 @@
     "unfinishedTasksMustNotHaveCloseout": true
   },
   "pendingNodeEvidence": [
-    "admin-watermark-export-governance",
     "sensitive-data-protection-runtime",
     "sensitive-data-historical-migration",
     "open-source-portability",
@@ -845,6 +844,50 @@
         "tests-or-validators",
         "resource-lock-review",
         "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "admin-watermark-export-governance",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "README.md",
+        "docs/superpowers/specs/2026-07-12-admin-watermark-export-design.md",
+        "docs/superpowers/plans/2026-07-12-admin-watermark-export-governance.md",
+        "docs/platform-roadmap.md",
+        "docs/platform-foundation-task-map.md",
+        "docs/platform-ui-optimization-assessment.md",
+        "admin/src/platform/ui/adminUIConfig.ts",
+        "admin/src/platform/ui/SystemSettingsDrawer.tsx",
+        "admin/src/platform/shell/AdminShell.tsx",
+        "admin/src/platform/policy-review/PolicyReviewConsole.tsx",
+        "admin/src/platform/api/client.ts",
+        "admin/src/styles.css",
+        "internal/platform/adminresource/policy_review.go",
+        "internal/platform/adminresource/policy_review_test.go",
+        "internal/platform/httpapi/server.go",
+        "internal/platform/httpapi/server_test.go",
+        "resources/platform-foundation-task-graph.json",
+        "resources/platform-engineering-capabilities.json",
+        "scripts/validate-admin-i18n.mjs",
+        "scripts/validate-admin-ui-contracts.mjs",
+        "scripts/admin-ui-contracts.test.mjs",
+        "scripts/validate-platform-foundation-task-graph.mjs",
+        "scripts/platform-foundation-task-graph.test.mjs",
+        "scripts/validate-platform-node-closeout-audit.mjs",
+        "scripts/platform-node-closeout-audit.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ],
+      "visualEvidence": [
+        "superpowers:brainstorming",
+        "product-design",
+        "ui-ux-pro-max",
+        "browser:control-in-app-browser"
       ]
     }
   ]

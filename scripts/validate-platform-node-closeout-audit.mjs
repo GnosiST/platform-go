@@ -62,12 +62,27 @@ function hasAnyEvidenceKind(closeout) {
 const requiredCleanupEvidenceByTask = new Map([
   ["admin-ui-shell-and-list-components", ["scripts/admin-ui-contracts.test.mjs"]],
   [
+    "admin-watermark-export-governance",
+    [
+      "docs/superpowers/plans/2026-07-12-admin-watermark-export-governance.md",
+      "scripts/admin-ui-contracts.test.mjs",
+      "internal/platform/httpapi/server_test.go",
+    ],
+  ],
+  [
     "production-readiness-preflight",
     [
       "resources/generated/platform-operations-plan.json",
       "scripts/platform-operations-plan.test.mjs",
       "scripts/platform-production-preflight-runner.test.mjs",
     ],
+  ],
+]);
+
+const requiredVisualEvidenceByTask = new Map([
+  [
+    "admin-watermark-export-governance",
+    ["superpowers:brainstorming", "product-design", "ui-ux-pro-max", "browser:control-in-app-browser"],
   ],
 ]);
 
@@ -148,6 +163,10 @@ function validate() {
     const requiresVisualEvidence = values(task.resourceLocks).some((lock) => visualLocks.includes(lock));
     if (requiresVisualEvidence) {
       requireIncludes(closeout.visualEvidence, values(policy.visualEvidenceRequired), `${prefix}.visualEvidence`, errors);
+    }
+    const requiredTaskVisualEvidence = requiredVisualEvidenceByTask.get(taskID);
+    if (requiredTaskVisualEvidence) {
+      requireIncludes(closeout.visualEvidence, requiredTaskVisualEvidence, `${prefix}.visualEvidence`, errors);
     }
   }
 

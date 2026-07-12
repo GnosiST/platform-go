@@ -29,7 +29,18 @@ describe("platform foundation documentation drift", () => {
     ]) {
       const source = read(relativePath);
       assert.ok(source.includes(graphSummary), `${relativePath} must include ${graphSummary}`);
-      assert.doesNotMatch(source, /45 total \/ 37 implemented \/ 8 controlled unfinished|45\/37\/8/);
+      assert.doesNotMatch(source, /45 total \/ (?:37|38) implemented \/ (?:8|7) controlled unfinished|45\/(?:37\/8|38\/7)/);
+    }
+  });
+
+  it("records watermark export governance as implemented", () => {
+    for (const relativePath of [
+      "README.md",
+      "docs/platform-foundation-task-map.md",
+      "docs/platform-roadmap.md",
+      "docs/platform-ui-optimization-assessment.md",
+    ]) {
+      assert.match(read(relativePath), /`admin-watermark-export-governance` is `implemented`/);
     }
   });
 

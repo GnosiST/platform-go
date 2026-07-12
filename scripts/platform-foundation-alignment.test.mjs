@@ -7,10 +7,9 @@ import { describe, it } from "node:test";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
-const completedRuntimeSecurityTaskID = "runtime-security-containment";
+const completedProgramTaskIDs = ["runtime-security-containment", "admin-watermark-export-governance"];
 
 const remainingCompletionProgramTaskIDs = [
-  "admin-watermark-export-governance",
   "sensitive-data-protection-runtime",
   "sensitive-data-historical-migration",
   "open-source-portability",
@@ -38,25 +37,51 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
-  it("migrates runtime security to required work and tracks the remaining completion program as future work", () => {
+  it("migrates runtime security and watermark governance to required work and tracks six future nodes", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
 
     assert.ok(audit.requiredTaskNodes.includes("production-admin-oidc-auth"));
-    assert.ok(audit.requiredTaskNodes.includes(completedRuntimeSecurityTaskID));
+    for (const taskID of completedProgramTaskIDs) {
+      assert.ok(audit.requiredTaskNodes.includes(taskID), `${taskID} must be required work`);
+    }
     assert.deepEqual(audit.requiredFutureTaskNodes, remainingCompletionProgramTaskIDs);
-    for (const taskID of [completedRuntimeSecurityTaskID, ...remainingCompletionProgramTaskIDs]) {
+    for (const taskID of [...completedProgramTaskIDs, ...remainingCompletionProgramTaskIDs]) {
       assert.ok(audit.nonDroppableGoalNodes.includes(taskID), `${taskID} must be non-droppable`);
     }
   });
 
   it("rejects omitting the implemented runtime security node from required task tracking", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
-    audit.requiredTaskNodes = audit.requiredTaskNodes.filter((taskID) => taskID !== completedRuntimeSecurityTaskID);
+    audit.requiredTaskNodes = audit.requiredTaskNodes.filter((taskID) => taskID !== completedProgramTaskIDs[0]);
 
     const result = runValidator(["--audit", tempJSON("missing-runtime-security-required-task.json", audit)]);
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /requiredTaskNodes is missing required goal node runtime-security-containment/);
+  });
+
+  it("rejects missing required tracking or stale future tracking for implemented watermark governance", () => {
+    const missingRequiredAudit = readJSON("resources/platform-foundation-alignment-audit.json");
+    missingRequiredAudit.requiredTaskNodes = missingRequiredAudit.requiredTaskNodes.filter(
+      (taskID) => taskID !== "admin-watermark-export-governance",
+    );
+    const missingRequiredResult = runValidator([
+      "--audit",
+      tempJSON("missing-required-watermark-governance.json", missingRequiredAudit),
+    ]);
+
+    assert.notEqual(missingRequiredResult.status, 0, missingRequiredResult.stdout);
+    assert.match(missingRequiredResult.stderr, /requiredTaskNodes is missing required goal node admin-watermark-export-governance/);
+
+    const staleFutureAudit = readJSON("resources/platform-foundation-alignment-audit.json");
+    staleFutureAudit.requiredFutureTaskNodes = ["admin-watermark-export-governance", ...remainingCompletionProgramTaskIDs];
+    const staleFutureResult = runValidator([
+      "--audit",
+      tempJSON("future-watermark-governance.json", staleFutureAudit),
+    ]);
+
+    assert.notEqual(staleFutureResult.status, 0, staleFutureResult.stdout);
+    assert.match(staleFutureResult.stderr, /alignment requiredFutureTaskNodes must exactly match unfinished task graph nodes in graph order/);
   });
 
   it("rejects regressing production Admin OIDC to pending after Task 8 closeout", () => {

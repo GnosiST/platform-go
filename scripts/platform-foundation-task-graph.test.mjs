@@ -58,7 +58,7 @@ const completionProgramTaskIDs = [
   "github-release-publication",
 ];
 
-const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(1);
+const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(2);
 
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-foundation-task-graph.mjs", ...args], {
@@ -301,7 +301,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /task production-auth-provider-hardening must declare at least one evidence\.docs path/);
   });
 
-  it("preserves the closed 37-node baseline, closes runtime security and tracks seven pending program nodes", () => {
+  it("preserves the closed 37-node baseline, closes runtime security and watermark governance, and tracks six pending program nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
@@ -334,10 +334,25 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
     assert.equal(graph.tasks.length, 45);
-    assert.equal(implemented.length, 38);
+    assert.equal(implemented.length, 39);
     assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
+    assert.equal(graph.tasks.find((item) => item.id === "admin-watermark-export-governance")?.status, "implemented");
     assert.deepEqual(pending.map((item) => item.id), pendingCompletionProgramTaskIDs);
     assert.equal(blocked.length, 0);
+  });
+
+  it("rejects watermark closeout without UI UX and browser evidence", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const task = graph.tasks.find((item) => item.id === "admin-watermark-export-governance");
+    assert.equal(task.status, "implemented");
+
+    task.evidence.skills = task.evidence.skills.filter((skill) => skill !== "ui-ux-pro-max");
+    task.evidence.screenshots = [];
+    const result = runValidator(["--graph", tempJSON("missing-watermark-design-evidence.json", graph)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /admin-watermark-export-governance evidence\.skills must include ui-ux-pro-max/);
+    assert.match(result.stderr, /visual task admin-watermark-export-governance with status implemented must declare screenshot evidence/);
   });
 
   it("rejects missing or reordered completion program task IDs", () => {

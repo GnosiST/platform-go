@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-engineering-capabilities.json",
-  "capturedAt": "2026-07-06",
+  "capturedAt": "2026-07-12",
   "purpose": "Machine-checkable engineering capability coverage for the reusable platform foundation.",
   "stack": {
     "backend": [
@@ -2641,7 +2641,7 @@
         "zh": "管理台水印与导出治理",
         "en": "Admin Watermark And Export Governance"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Provide one accessible, responsive watermark policy for screen counts and policy-review JSON export provenance without changing canonical or original artifacts.",
       "dependsOn": [
         "system-management",
@@ -2651,7 +2651,26 @@
       "evidence": {
         "sourcePaths": [
           "docs/superpowers/specs/2026-07-12-admin-watermark-export-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+          "docs/superpowers/plans/2026-07-12-admin-watermark-export-governance.md",
+          "admin/src/platform/ui/adminUIConfig.ts",
+          "admin/src/platform/ui/SystemSettingsDrawer.tsx",
+          "admin/src/platform/shell/AdminShell.tsx",
+          "admin/src/platform/policy-review/PolicyReviewConsole.tsx",
+          "admin/src/platform/api/client.ts",
+          "admin/src/styles.css",
+          "internal/platform/adminresource/policy_review.go",
+          "internal/platform/httpapi/server.go"
+        ],
+        "validators": [
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs"
+        ],
+        "tests": [
+          "internal/platform/adminresource/policy_review_test.go",
+          "internal/platform/httpapi/server_test.go",
+          "scripts/admin-ui-contracts.test.mjs",
+          "scripts/platform-engineering-capabilities.test.mjs"
         ],
         "taskIds": [
           "admin-watermark-export-governance"

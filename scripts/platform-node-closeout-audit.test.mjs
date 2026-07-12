@@ -9,7 +9,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "admin-watermark-export-governance",
   "sensitive-data-protection-runtime",
   "sensitive-data-historical-migration",
   "open-source-portability",
@@ -86,7 +85,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("preserves 37 baseline closeouts, closes runtime security and tracks seven pending nodes", () => {
+  it("preserves 37 baseline closeouts, closes runtime security and watermark governance, and tracks six pending nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -94,7 +93,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(task, "task graph must include production-admin-oidc-auth");
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
-    assert.equal(audit.nodeCloseouts.length, 38);
+    assert.equal(audit.nodeCloseouts.length, 39);
     assert.deepEqual(audit.nodeCloseouts.slice(0, 37).map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
     assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts.slice(0, 37))).digest("hex"), foundationBaselineCloseoutDigest);
     const runtimeSecurityCloseout = audit.nodeCloseouts[37];
@@ -102,7 +101,28 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.equal(runtimeSecurityCloseout.status, "closed");
     assert.equal(runtimeSecurityCloseout.neatFreak, true);
     assert.ok(runtimeSecurityCloseout.cleanupEvidence.length > 0);
+    const watermarkCloseout = audit.nodeCloseouts[38];
+    assert.equal(watermarkCloseout.taskId, "admin-watermark-export-governance");
+    assert.equal(watermarkCloseout.status, "closed");
+    assert.equal(watermarkCloseout.neatFreak, true);
+    assert.ok(watermarkCloseout.cleanupEvidence.length > 0);
+    assert.ok(watermarkCloseout.visualEvidence.includes("product-design"));
+    assert.ok(watermarkCloseout.visualEvidence.includes("ui-ux-pro-max"));
+    assert.ok(watermarkCloseout.visualEvidence.includes("browser:control-in-app-browser"));
     assert.deepEqual(audit.pendingNodeEvidence, completionProgramTaskIDs);
+  });
+
+  it("rejects watermark closeout without Product Design, UI UX and browser evidence", () => {
+    const audit = readJSON("resources/platform-node-closeout-audit.json");
+    const closeout = audit.nodeCloseouts.find((item) => item.taskId === "admin-watermark-export-governance");
+    closeout.visualEvidence = ["superpowers:brainstorming"];
+
+    const result = runValidator(["--audit", tempJSON("missing-watermark-visual-evidence.json", audit)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /nodeCloseouts\.admin-watermark-export-governance\.visualEvidence must include product-design/);
+    assert.match(result.stderr, /nodeCloseouts\.admin-watermark-export-governance\.visualEvidence must include ui-ux-pro-max/);
+    assert.match(result.stderr, /nodeCloseouts\.admin-watermark-export-governance\.visualEvidence must include browser:control-in-app-browser/);
   });
 
   it("rejects omitting runtime security closeout evidence after implementation", () => {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-foundation-alignment-audit.json",
-  "capturedAt": "2026-07-11",
+  "capturedAt": "2026-07-12",
   "purpose": "Machine-checkable alignment audit for the active platform foundation goal: approved stack, task dependencies, reference coverage, capability boundaries, governance topology, visual design gates and source-writing safety must not conflict.",
   "approvedStack": {
     "backend": [
@@ -62,10 +62,10 @@
     "source-writing-codegen-promotion",
     "admin-ui-system-quality-hardening",
     "production-admin-oidc-auth",
-    "runtime-security-containment"
+    "runtime-security-containment",
+    "admin-watermark-export-governance"
   ],
   "requiredFutureTaskNodes": [
-    "admin-watermark-export-governance",
     "sensitive-data-protection-runtime",
     "sensitive-data-historical-migration",
     "open-source-portability",

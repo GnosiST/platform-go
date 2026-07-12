@@ -10,9 +10,9 @@ This assessment records how two design aids are routed without disrupting the pl
 - `ui-ux-pro-max` for implementation-level admin UI quality, accessibility, responsive behavior and shared-component hardening;
 - `design-taste-frontend` for the visual direction of login, brand-entry, landing, portfolio, marketing or deliberate redesign surfaces.
 
-Candidate A has completed that activation path as `admin-ui-system-quality-hardening`. Candidate B's broader brand-entry redesign remains deferred until a real public or brand brief is approved. The active completion graph now includes bounded visual nodes for admin watermark/export governance and the public documentation site; those nodes require `superpowers:brainstorming` and Product Design and remain pending until implementation and fresh browser evidence exist.
+Candidate A has completed that activation path as `admin-ui-system-quality-hardening`. Candidate B's broader brand-entry redesign remains deferred until a real public or brand brief is approved. The bounded `admin-watermark-export-governance` visual node has now completed implementation and fresh browser acceptance; `public-docs-site` remains pending and still requires `superpowers:brainstorming`, Product Design and fresh browser evidence.
 
-The original 37-node foundation baseline remains closed. `runtime-security-containment` is `implemented`, so current governance is `45 total / 38 implemented / 7 controlled unfinished` with `completionStatus=not-complete-controlled`. Approved specifications: [completion program](superpowers/specs/2026-07-12-platform-go-completion-program-design.md), [runtime security](superpowers/specs/2026-07-12-runtime-security-hardening-design.md), [watermark/export governance](superpowers/specs/2026-07-12-admin-watermark-export-design.md), [sensitive data encryption](superpowers/specs/2026-07-12-sensitive-data-encryption-design.md) and [open-source docs/site](superpowers/specs/2026-07-12-open-source-docs-site-design.md).
+The original 37-node foundation baseline remains closed. `runtime-security-containment` is `implemented` and `admin-watermark-export-governance` is `implemented`, so current governance is `45 total / 39 implemented / 6 controlled unfinished` with `completionStatus=not-complete-controlled`. Approved specifications: [completion program](superpowers/specs/2026-07-12-platform-go-completion-program-design.md), [runtime security](superpowers/specs/2026-07-12-runtime-security-hardening-design.md), [watermark/export governance](superpowers/specs/2026-07-12-admin-watermark-export-design.md), [sensitive data encryption](superpowers/specs/2026-07-12-sensitive-data-encryption-design.md) and [open-source docs/site](superpowers/specs/2026-07-12-open-source-docs-site-design.md).
 
 ## Current Evidence
 
@@ -94,6 +94,22 @@ Implemented result:
 
 Fresh implementation evidence is under `tmp/product-design/p1-admin-ui-hardening-20260711/` and covers login, dashboard, menu list, create modal, settings drawer and localized stale-session recovery across the required 375, 390, 768, 1024, 1280 and 1440 widths. `09-settings-drawer-390x844.png` records the accepted narrow Drawer state. `10-stale-session-390x844.png` records “会话已过期，请重新登录。” without raw `unauthorized` copy.
 
+## Watermark And Export Governance Closeout
+
+Status: implemented on 2026-07-12.
+
+Requested aid: `ui-ux-pro-max`, with `superpowers:brainstorming` and Product Design evidence.
+
+Implemented result:
+
+- one master switch progressively reveals independent screen/export scope controls; valid empty, screen-only, export-only and combined scope selections persist through normalization;
+- screen watermark count is restricted to exact `1`, `4`, `9` and `16` DOM marks, rendered through an inert grid layer with `aria-hidden="true"` and no pointer capture;
+- the master switch has an explicit localized accessible name, mobile controls retain the shared 44px target contract and the `390x844` settings state has no horizontal overflow;
+- light and dark themes preserve readable settings hierarchy without turning the operational drawer into a promotional surface;
+- Policy Review JSON export alone accepts explicit watermark intent and returns structured provenance; canonical OpenAPI, original file bytes and other export formats are unchanged.
+
+Accepted evidence is stored under `.superpowers/product-design-audit/watermark/`: settings controls, sixteen-mark desktop layout, mobile settings/count controls, dark theme and Policy Review export success. Runtime inspection confirmed exact `1/4/9/16` DOM counts, all scope combinations, a clean browser console, and export metadata whose `exportedAt` matches the export timestamp while audit policy records only `watermarkApplied=true`.
+
 ## Candidate B: Brand Entry And Public-Surface Visual Redesign
 
 Requested aid: `design-taste-frontend`
@@ -124,6 +140,6 @@ Completion gate:
 
 1. Production persistence correctness and Candidate A are implemented.
 2. Keep Candidate B deferred until there is a real brand/public-surface brief. If only the admin console changes, use the existing quiet operational design language and the implemented Candidate A contracts.
-3. Any future visual candidate requires an explicit task-graph node, design gates, resource locks and fresh screenshot evidence. Candidate A and production Admin OIDC remain closed in the original 37-node baseline; `admin-watermark-export-governance` and `public-docs-site` are controlled pending nodes in the active `45 total / 38 implemented / 7 controlled unfinished` completion program and do not yet claim screenshot evidence.
+3. Any future visual candidate requires an explicit task-graph node, design gates, resource locks and fresh screenshot evidence. Candidate A and production Admin OIDC remain closed in the original 37-node baseline; `admin-watermark-export-governance` is `implemented` with Product Design, `ui-ux-pro-max` and browser evidence, while `public-docs-site` remains a controlled pending node in the active `45 total / 39 implemented / 6 controlled unfinished` completion program.
 
 Evidence remains scoped: screenshots, DOM measurements and keyboard checks support this implementation but do not certify WCAG conformance. Screen-reader announcements, high zoom/reflow and platform-specific assistive technology require separate evidence.

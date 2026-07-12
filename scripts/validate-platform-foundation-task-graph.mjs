@@ -304,6 +304,21 @@ function validateTask(task, context, errors) {
   if (task.id === "admin-ui-shell-and-list-components") {
     requireIncludes(task.evidence?.tests, requiredAdminUIContractTests, `${task.id} evidence.tests`, errors);
   }
+  if (task.id === "admin-watermark-export-governance" && task.status === "implemented") {
+    requireIncludes(task.evidence?.skills, ["ui-ux-pro-max"], `${task.id} evidence.skills`, errors);
+    requireIncludes(
+      task.evidence?.tests,
+      ["internal/platform/httpapi/server_test.go", "scripts/admin-ui-contracts.test.mjs"],
+      `${task.id} evidence.tests`,
+      errors,
+    );
+    requireIncludes(
+      task.evidence?.validators,
+      ["scripts/validate-admin-i18n.mjs", "scripts/validate-admin-ui-contracts.mjs"],
+      `${task.id} evidence.validators`,
+      errors,
+    );
+  }
   if (task.status === "implemented" || task.status === "preview") {
     const evidence = task.evidence ?? {};
     const evidencePaths = evidencePathKeys.flatMap((key) => values(evidence[key]));
