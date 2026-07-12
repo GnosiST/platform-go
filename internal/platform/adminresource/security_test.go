@@ -336,7 +336,7 @@ func TestPersistBoundaryRejectsPolicyReviewDirectSnapshotMutation(t *testing.T) 
 	repository.saveCount = 0
 	wantSnapshot := cloneSecuritySnapshot(repository.snapshot)
 
-	_, err = store.ApprovePolicyReview(review.ID, "admin")
+	_, err = store.ApprovePolicyReview(review.ID, "admin", "user-admin")
 	if !errors.Is(err, ErrInvalidRecord) {
 		t.Fatalf("ApprovePolicyReview() error = %v, want ErrInvalidRecord", err)
 	}

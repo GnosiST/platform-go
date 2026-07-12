@@ -990,8 +990,11 @@ function validateAuditPolicy(contract, errors) {
     if (!server.includes('return "app-user:v1:" + hex.EncodeToString(digest[:])')) {
       errors.push(`${serverPath} appUserID must return a domain-separated opaque digest`);
     }
-    if (!server.includes("return strings.TrimSpace(principal.User.ID)")) {
-      errors.push(`${serverPath} currentActor must use the stable principal user ID`);
+    if (!server.includes("func (s *Server) auditActorID(ctx *gin.Context) string") || !server.includes("return strings.TrimSpace(principal.User.ID)")) {
+      errors.push(`${serverPath} auditActorID must use the stable principal user ID`);
+    }
+    if (!server.includes("func (s *Server) businessUserCode(ctx *gin.Context) string") || !server.includes("return strings.TrimSpace(principal.User.Username)")) {
+      errors.push(`${serverPath} businessUserCode must preserve users.code relation values`);
     }
   }
   const authDocPath = "docs/platform-auth.md";

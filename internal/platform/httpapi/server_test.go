@@ -1632,6 +1632,24 @@ func TestRuntimeInternalErrorsAttachStructuredSafeGinMetadata(t *testing.T) {
 	}
 }
 
+func TestInternalErrorCauseClassUsesStableSpecificPriority(t *testing.T) {
+	tests := map[string]string{
+		"PROVIDER_UNAVAILABLE":         "provider",
+		"AUTH_PROVIDER_UNAVAILABLE":    "auth",
+		"FILE_PROVIDER_UNAVAILABLE":    "storage",
+		"REPOSITORY_UNAVAILABLE":       "repository",
+		"UPSTREAM_TIMEOUT_UNAVAILABLE": "timeout",
+		"SERVICE_UNAVAILABLE":          "unavailable",
+	}
+	for code, want := range tests {
+		for attempt := 0; attempt < 100; attempt++ {
+			if got := internalErrorCauseClass(code); got != want {
+				t.Fatalf("internalErrorCauseClass(%q) = %q, want %q", code, got, want)
+			}
+		}
+	}
+}
+
 func TestAuthLogoutRevokesSessionToken(t *testing.T) {
 	server := newTestServer(ServerOptions{Capabilities: []capability.Manifest{authProviderTestManifest()}})
 	login := loginForTest(t, server, "ops")
@@ -3786,7 +3804,7 @@ func TestPolicyReviewApproveEndpointAppliesRoleChangeAndInvalidatesCaches(t *tes
 	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode approve payload: %v body = %s", err, recorder.Body.String())
 	}
-	if payload.Data.Review.Values["reviewStatus"] != "approved" || payload.Data.Review.Values["reviewedBy"] != "user-admin" {
+	if payload.Data.Review.Values["reviewStatus"] != "approved" || payload.Data.Review.Values["reviewedBy"] != "admin" {
 		t.Fatalf("review response values = %+v, want approved by admin", payload.Data.Review.Values)
 	}
 	if payload.Data.Role.Code != "operator" || payload.Data.Role.Values["permissions"] != "admin:user:read" {
@@ -3794,6 +3812,9 @@ func TestPolicyReviewApproveEndpointAppliesRoleChangeAndInvalidatesCaches(t *tes
 	}
 	if payload.Data.Audit.Values["action"] != "policy-review.approve" || payload.Data.Audit.Values["targetId"] != payload.Data.Role.ID {
 		t.Fatalf("audit response values = %+v, want policy approval audit", payload.Data.Audit.Values)
+	}
+	if payload.Data.Audit.Values["actor"] != "user-admin" {
+		t.Fatalf("approval audit actor = %q, want stable user ID", payload.Data.Audit.Values["actor"])
 	}
 
 	roles, err := resources.List("roles")
@@ -3863,7 +3884,7 @@ func TestPolicyReviewRequestRejectAndExportEndpoints(t *testing.T) {
 	if err := json.Unmarshal(requestRecorder.Body.Bytes(), &requested); err != nil {
 		t.Fatalf("decode request payload: %v body = %s", err, requestRecorder.Body.String())
 	}
-	if requested.Data.Review.Values["reviewStatus"] != "pending" || requested.Data.Review.Values["requestedBy"] != "user-admin" || requested.Data.Audit.Values["action"] != "policy-review.request" {
+	if requested.Data.Review.Values["reviewStatus"] != "pending" || requested.Data.Review.Values["requestedBy"] != "admin" || requested.Data.Audit.Values["action"] != "policy-review.request" || requested.Data.Audit.Values["actor"] != "user-admin" {
 		t.Fatalf("request payload = %+v, want pending request audit", requested.Data)
 	}
 
@@ -3879,7 +3900,7 @@ func TestPolicyReviewRequestRejectAndExportEndpoints(t *testing.T) {
 	if err := json.Unmarshal(rejectRecorder.Body.Bytes(), &rejected); err != nil {
 		t.Fatalf("decode reject payload: %v body = %s", err, rejectRecorder.Body.String())
 	}
-	if rejected.Data.Review.Values["reviewStatus"] != "rejected" || rejected.Data.Review.Values["rejectionReason"] != "too broad" || rejected.Data.Audit.Values["action"] != "policy-review.reject" {
+	if rejected.Data.Review.Values["reviewStatus"] != "rejected" || rejected.Data.Review.Values["reviewedBy"] != "admin" || rejected.Data.Review.Values["rejectionReason"] != "too broad" || rejected.Data.Audit.Values["action"] != "policy-review.reject" || rejected.Data.Audit.Values["actor"] != "user-admin" {
 		t.Fatalf("reject payload = %+v, want rejected audit", rejected.Data)
 	}
 
@@ -3894,8 +3915,12 @@ func TestPolicyReviewRequestRejectAndExportEndpoints(t *testing.T) {
 	if err := json.Unmarshal(exportRecorder.Body.Bytes(), &exported); err != nil {
 		t.Fatalf("decode export payload: %v body = %s", err, exportRecorder.Body.String())
 	}
-	if exported.Data.ExportedBy != "user-admin" || exported.Data.ExportedAt == "" || !hasAdminRecordCode(exported.Data.Reviews, "PR-HTTP-1002") {
+	if exported.Data.ExportedBy != "admin" || exported.Data.ExportedAt == "" || !hasAdminRecordCode(exported.Data.Reviews, "PR-HTTP-1002") {
 		t.Fatalf("export payload = %+v, want exported review", exported.Data)
+	}
+	exportAudit := recordByTestAction(exported.Data.Audits, "policy-review.export")
+	if exportAudit == nil || exportAudit.Values["actor"] != "user-admin" {
+		t.Fatalf("export audit = %+v, want stable user ID actor", exportAudit)
 	}
 	if !hasTestRecordAction(exported.Data.Audits, "policy-review.request") || !hasTestRecordAction(exported.Data.Audits, "policy-review.reject") {
 		t.Fatalf("export audits = %+v, want request and reject audits", exported.Data.Audits)
@@ -5613,6 +5638,56 @@ func TestAppFileUploadAndContentUseAppSession(t *testing.T) {
 	}
 }
 
+func TestAppFileContentAuditUsesOpaqueActorForEmailShapedUsername(t *testing.T) {
+	const username = "file-owner@example.test"
+	fileStore := storage.NewLocalObjectStore(storage.LocalObjectStoreOptions{BaseDir: t.TempDir()})
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"}),
+		FileStorage:  fileStore,
+	})
+	login := appLoginForTest(t, server, username)
+	body, contentType := multipartUploadBody(t, "private.txt", "private")
+	upload := httptest.NewRecorder()
+	uploadRequest := httptest.NewRequest(http.MethodPost, "/api/app/files", body)
+	uploadRequest.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	uploadRequest.Header.Set("Content-Type", contentType)
+	server.Router().ServeHTTP(upload, uploadRequest)
+	if upload.Code != http.StatusCreated {
+		t.Fatalf("POST app file status = %d body = %s", upload.Code, upload.Body.String())
+	}
+	var uploaded adminResourceRecordTestPayload
+	if err := json.Unmarshal(upload.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decode app upload: %v", err)
+	}
+	content := httptest.NewRecorder()
+	contentRequest := httptest.NewRequest(http.MethodGet, "/api/app/files/"+uploaded.Data.Record.ID+"/content", nil)
+	contentRequest.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	server.Router().ServeHTTP(content, contentRequest)
+	if content.Code != http.StatusOK {
+		t.Fatalf("GET app file content status = %d body = %s", content.Code, content.Body.String())
+	}
+	audits, err := server.resources.List("audit-logs")
+	if err != nil {
+		t.Fatalf("List(audit-logs) error = %v", err)
+	}
+	var contentAudit *adminresource.Record
+	for index := range audits {
+		if audits[index].Values["action"] == "file.content" && audits[index].Values["targetId"] == uploaded.Data.Record.ID {
+			contentAudit = &audits[index]
+		}
+	}
+	if contentAudit == nil || contentAudit.Values["actor"] != appUserID(username) {
+		t.Fatalf("file content audit = %+v, want opaque app actor", contentAudit)
+	}
+	exported, err := server.resources.ProjectRecord("audit-logs", *contentAudit, adminresource.ProjectionExport)
+	if err != nil {
+		t.Fatalf("ProjectRecord(audit export) error = %v", err)
+	}
+	if strings.Contains(fmt.Sprintf("%+v", exported), username) {
+		t.Fatalf("audit export leaked email-shaped username: %+v", exported)
+	}
+}
+
 func TestAppFileMetadataOmitsSessionPathAndPublicURL(t *testing.T) {
 	fileStore := storage.NewLocalObjectStore(storage.LocalObjectStoreOptions{BaseDir: t.TempDir()})
 	server := newTestServer(ServerOptions{
@@ -5782,6 +5857,15 @@ func hasTestRecordAction(records []adminResourceRecordTest, action string) bool 
 		}
 	}
 	return false
+}
+
+func recordByTestAction(records []adminResourceRecordTest, action string) *adminResourceRecordTest {
+	for index := range records {
+		if records[index].Values["action"] == action {
+			return &records[index]
+		}
+	}
+	return nil
 }
 
 func hasTestRecordName(records []adminResourceRecordTest, name string) bool {

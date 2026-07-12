@@ -1022,7 +1022,7 @@ func (s *Server) adminResourceCreate(ctx *gin.Context) {
 		return
 	}
 	if resource == apiTokensResource {
-		issued, token, err := s.issueAdminAPIToken(ctx.Request.Context(), s.currentActor(ctx), input)
+		issued, token, err := s.issueAdminAPIToken(ctx.Request.Context(), s.auditActorID(ctx), input)
 		if err != nil {
 			writeAdminResourceError(ctx, err)
 			return
@@ -1067,7 +1067,7 @@ func (s *Server) adminResourceUpdate(ctx *gin.Context) {
 		return
 	}
 	if resource == apiTokensResource {
-		record, err := s.updateAdminAPIToken(ctx.Request.Context(), s.currentActor(ctx), id, input)
+		record, err := s.updateAdminAPIToken(ctx.Request.Context(), s.auditActorID(ctx), id, input)
 		if err != nil {
 			writeAdminResourceError(ctx, err)
 			return
@@ -1104,7 +1104,12 @@ func (s *Server) adminPolicyReviewApprove(ctx *gin.Context) {
 	if !s.authorizeAdminResource(ctx, "policy-reviews", "update") {
 		return
 	}
-	result, err := s.resources.ApprovePolicyReview(ctx.Param("id"), s.currentActor(ctx))
+	userCode := s.businessUserCode(ctx)
+	if userCode == "" {
+		writeForbidden(ctx)
+		return
+	}
+	result, err := s.resources.ApprovePolicyReview(ctx.Param("id"), userCode, s.auditActorID(ctx))
 	if err != nil {
 		writeAdminResourceError(ctx, err)
 		return
@@ -1140,7 +1145,12 @@ func (s *Server) adminPolicyReviewRequest(ctx *gin.Context) {
 	if !s.authorizeAdminResource(ctx, "policy-reviews", "update") {
 		return
 	}
-	result, err := s.resources.RequestPolicyReview(ctx.Param("id"), s.currentActor(ctx))
+	userCode := s.businessUserCode(ctx)
+	if userCode == "" {
+		writeForbidden(ctx)
+		return
+	}
+	result, err := s.resources.RequestPolicyReview(ctx.Param("id"), userCode, s.auditActorID(ctx))
 	if err != nil {
 		writeAdminResourceError(ctx, err)
 		return
@@ -1175,7 +1185,12 @@ func (s *Server) adminPolicyReviewReject(ctx *gin.Context) {
 		writeAdminResourceError(ctx, adminresource.ErrInvalidRecord)
 		return
 	}
-	result, err := s.resources.RejectPolicyReview(ctx.Param("id"), s.currentActor(ctx), input.Reason)
+	userCode := s.businessUserCode(ctx)
+	if userCode == "" {
+		writeForbidden(ctx)
+		return
+	}
+	result, err := s.resources.RejectPolicyReview(ctx.Param("id"), userCode, s.auditActorID(ctx), input.Reason)
 	if err != nil {
 		writeAdminResourceError(ctx, err)
 		return
@@ -1205,7 +1220,12 @@ func (s *Server) adminPolicyReviewExport(ctx *gin.Context) {
 	if !s.authorize(ctx, "admin:policy-review:export") {
 		return
 	}
-	result, err := s.resources.ExportPolicyReviews(s.currentActor(ctx))
+	userCode := s.businessUserCode(ctx)
+	if userCode == "" {
+		writeForbidden(ctx)
+		return
+	}
+	result, err := s.resources.ExportPolicyReviews(userCode, s.auditActorID(ctx))
 	if err != nil {
 		writeAdminResourceError(ctx, err)
 		return
@@ -1249,7 +1269,7 @@ func (s *Server) adminResourceDelete(ctx *gin.Context) {
 		return
 	}
 	if resource == apiTokensResource {
-		if err := s.revokeAdminAPIToken(ctx.Request.Context(), s.currentActor(ctx), ctx.Param("id")); err != nil {
+		if err := s.revokeAdminAPIToken(ctx.Request.Context(), s.auditActorID(ctx), ctx.Param("id")); err != nil {
 			writeAdminResourceError(ctx, err)
 			return
 		}
@@ -1269,7 +1289,7 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 	if !s.authorizeAdminResource(ctx, "files", "create") {
 		return
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminUpload, rateLimitClientIP(ctx), s.currentActor(ctx)) {
+	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminUpload, rateLimitClientIP(ctx), s.auditActorID(ctx)) {
 		return
 	}
 	upload, err := readValidatedUpload(ctx, s.uploadPolicy, "ADMIN_FILE")
@@ -1461,7 +1481,7 @@ func (s *Server) appFileContent(ctx *gin.Context) {
 		return
 	}
 	defer body.Close()
-	if err := s.recordFileAuditForActor("file.content", username, record); err != nil {
+	if err := s.recordFileAuditForActor("file.content", appUserID(username), record); err != nil {
 		writeAdminResourceError(ctx, err)
 		return
 	}
@@ -1800,7 +1820,7 @@ func cloneStringMap(values map[string]string) map[string]string {
 	return cloned
 }
 
-func (s *Server) currentActor(ctx *gin.Context) string {
+func (s *Server) auditActorID(ctx *gin.Context) string {
 	if ctx == nil {
 		return systemActorID
 	}
@@ -1823,6 +1843,23 @@ func (s *Server) currentActor(ctx *gin.Context) string {
 		return strings.TrimSpace(principal.User.ID)
 	}
 	return systemActorID
+}
+
+func (s *Server) businessUserCode(ctx *gin.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	for _, key := range []string{"platform.principal", "principal"} {
+		if value, ok := ctx.Get(key); ok {
+			if principal, ok := value.(rbac.Principal); ok && strings.TrimSpace(principal.User.Username) != "" {
+				return strings.TrimSpace(principal.User.Username)
+			}
+		}
+	}
+	if principal, ok := s.currentPrincipal(ctx); ok {
+		return strings.TrimSpace(principal.User.Username)
+	}
+	return ""
 }
 
 func (s *Server) adminCurrentSession(ctx *gin.Context) {
@@ -1939,7 +1976,7 @@ func (s *Server) recordAudit(action string, actorID string, targetID string, out
 }
 
 func (s *Server) recordFileAudit(ctx *gin.Context, action string, record adminresource.Record) error {
-	return s.recordFileAuditForActor(action, s.currentActor(ctx), record)
+	return s.recordFileAuditForActor(action, s.auditActorID(ctx), record)
 }
 
 func (s *Server) recordFileAuditForActor(action string, actor string, record adminresource.Record) error {
@@ -2375,13 +2412,19 @@ func (s *Server) recordInternalError(ctx *gin.Context, code string, err error) {
 
 func internalErrorCauseClass(code string) string {
 	upper := strings.ToUpper(strings.TrimSpace(code))
-	for marker, class := range map[string]string{
-		"TIMEOUT": "timeout", "AUTH": "auth", "FILE": "storage", "STORAGE": "storage",
-		"PROVIDER": "provider", "REPOSITORY": "repository", "UNAVAILABLE": "unavailable",
-	} {
-		if strings.Contains(upper, marker) {
-			return class
-		}
+	switch {
+	case strings.Contains(upper, "TIMEOUT"):
+		return "timeout"
+	case strings.Contains(upper, "AUTH"):
+		return "auth"
+	case strings.Contains(upper, "FILE"), strings.Contains(upper, "STORAGE"):
+		return "storage"
+	case strings.Contains(upper, "PROVIDER"):
+		return "provider"
+	case strings.Contains(upper, "REPOSITORY"):
+		return "repository"
+	case strings.Contains(upper, "UNAVAILABLE"):
+		return "unavailable"
 	}
 	return "unknown"
 }
@@ -2402,7 +2445,7 @@ func internalErrorEventID(ctx *gin.Context) string {
 
 func (s *Server) mutationAuditEvent(ctx *gin.Context, action string, resource string, reasonCode string) adminresource.AuditEvent {
 	return adminresource.AuditEvent{
-		Actor:      s.currentActor(ctx),
+		Actor:      s.auditActorID(ctx),
 		Action:     action,
 		Resource:   resource,
 		Result:     "success",

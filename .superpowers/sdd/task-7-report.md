@@ -39,12 +39,16 @@ Governance now reports `45 total / 38 implemented / 7 controlled unfinished`. Th
 - Internal diagnostics now expose only a public code, a whitelisted cause class and a safe request/event correlation ID. The same structured event is attached to Gin error metadata and sent to the internal sink; raw adapter errors, request IDs, paths, URLs, filenames and personal values are omitted.
 - Added independent rollback coverage for Store update/delete audit failures, issued-session cleanup failures, purge-audit retry recovery and durable tombstone/storage-key preservation.
 - Updated the production-auth hardening contract and validator so the approved audit field set and refresh-before-renew ordering are enforced rather than the legacy username/provider audit shape.
+- Final review split policy-review identity semantics: `requestedBy`, `reviewedBy` and `exportedBy` remain `users.code` values, while their audit records use opaque principal IDs. App file-content audits now hash email-shaped usernames before persistence/export.
+- Internal error cause classification now uses an explicit ordered priority, so compound codes such as `AUTH_PROVIDER_UNAVAILABLE` and `PROVIDER_UNAVAILABLE` have deterministic classes.
 
 ## TDD Evidence
 
 The focused RED run initially reported 7 expected failures: export reused read permission, legacy audit fields leaked, generic mutation survived audit failure, file mutation survived audit failure, failed deletion stayed visible, runtime error sinks exposed backend errors and the credential boundary was missing.
 
 Focused GREEN coverage includes export/redaction, audit rollback, file cleanup/tombstone retry, runtime error sanitization, credential-boundary validation, app-login/session compensation, Admin refresh compensation and API-token audit-failure rollback.
+
+Final review RED coverage reproduced four issues: raw App file-content actor persistence, policy-review `reviewedBy` drift, policy-review `requestedBy` drift and nondeterministic compound internal-error classification. The corresponding seven focused App/policy/security tests passed after the identity split and ordered classification fix.
 
 Governance mutation coverage rejects:
 
@@ -56,7 +60,7 @@ Governance mutation coverage rejects:
 
 ## Verification
 
-- `rtk go test ./...`: 872 passed in 24 packages.
+- `rtk go test ./...`: 874 passed in 24 packages.
 - `rtk go vet ./...`: no issues.
 - Explicit Node suites passed, 385 tests across 18 suites:
   - Admin resource generators: 13.
@@ -75,8 +79,10 @@ Governance mutation coverage rejects:
   - Production readiness: 36.
 - Production auth hardening: 34.
 - Platform foundation docs drift: passed.
+- Final review relevant Node suites: 53 passed across production-auth hardening, foundation docs drift and Admin resource generators.
 - All Task 7 brief validators passed, including Admin resources, Admin API boundary, deployment topology, production readiness/env, production auth hardening, foundation alignment, task execution, goal completion, node closeout, objective conformance, engineering capabilities, file-storage experience, Admin i18n and Admin UI contracts.
 - `rtk npm --prefix admin run build`: TypeScript and Vite production build passed; 3759 modules transformed.
+- The final review fix changed only Go backend/tests and a validator; Admin build was not rerun for that small fix because no UI or generated frontend contract changed.
 - `rtk git diff --check`: passed.
 - `rtk codegraph sync .` and `rtk codegraph status`: index is up to date.
 

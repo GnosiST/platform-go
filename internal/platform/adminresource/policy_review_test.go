@@ -27,7 +27,7 @@ func TestApprovePolicyReviewAppliesRolePermissionChangeAndRecordsAudit(t *testin
 		t.Fatalf("Create(policy-reviews) error = %v", err)
 	}
 
-	result, err := store.ApprovePolicyReview(review.ID, "admin")
+	result, err := store.ApprovePolicyReview(review.ID, "admin", "user-admin")
 	if err != nil {
 		t.Fatalf("ApprovePolicyReview() error = %v", err)
 	}
@@ -61,6 +61,9 @@ func TestApprovePolicyReviewAppliesRolePermissionChangeAndRecordsAudit(t *testin
 	if audit.Values["action"] != "policy-review.approve" || audit.Values["resource"] != "roles" || audit.Values["targetId"] != result.Role.ID {
 		t.Fatalf("audit values = %+v, want role policy approval audit", audit.Values)
 	}
+	if audit.Values["actor"] != "user-admin" {
+		t.Fatalf("audit actor = %q, want stable user ID", audit.Values["actor"])
+	}
 }
 
 func TestRequestRejectAndExportPolicyReviewWorkflow(t *testing.T) {
@@ -84,29 +87,29 @@ func TestRequestRejectAndExportPolicyReviewWorkflow(t *testing.T) {
 		t.Fatalf("Create(policy-reviews) error = %v", err)
 	}
 
-	requested, err := store.RequestPolicyReview(review.ID, "ops")
+	requested, err := store.RequestPolicyReview(review.ID, "ops", "user-ops")
 	if err != nil {
 		t.Fatalf("RequestPolicyReview() error = %v", err)
 	}
 	if requested.Review.Values["reviewStatus"] != "pending" || requested.Review.Values["requestedBy"] != "ops" || requested.Review.Values["submittedAt"] == "" {
 		t.Fatalf("requested review values = %+v, want pending request metadata", requested.Review.Values)
 	}
-	if requested.Audit.Values["action"] != "policy-review.request" || requested.Audit.Values["targetId"] != review.ID {
+	if requested.Audit.Values["action"] != "policy-review.request" || requested.Audit.Values["targetId"] != review.ID || requested.Audit.Values["actor"] != "user-ops" {
 		t.Fatalf("request audit values = %+v, want policy-review.request audit", requested.Audit.Values)
 	}
 
-	rejected, err := store.RejectPolicyReview(review.ID, "admin", "too broad for operator")
+	rejected, err := store.RejectPolicyReview(review.ID, "admin", "user-admin", "too broad for operator")
 	if err != nil {
 		t.Fatalf("RejectPolicyReview() error = %v", err)
 	}
 	if rejected.Review.Values["reviewStatus"] != "rejected" || rejected.Review.Values["reviewedBy"] != "admin" || rejected.Review.Values["rejectionReason"] != "too broad for operator" {
 		t.Fatalf("rejected review values = %+v, want rejected metadata", rejected.Review.Values)
 	}
-	if rejected.Audit.Values["action"] != "policy-review.reject" || rejected.Audit.Values["targetId"] != review.ID {
+	if rejected.Audit.Values["action"] != "policy-review.reject" || rejected.Audit.Values["targetId"] != review.ID || rejected.Audit.Values["actor"] != "user-admin" {
 		t.Fatalf("reject audit values = %+v, want policy-review.reject audit", rejected.Audit.Values)
 	}
 
-	exported, err := store.ExportPolicyReviews("auditor")
+	exported, err := store.ExportPolicyReviews("auditor", "user-auditor")
 	if err != nil {
 		t.Fatalf("ExportPolicyReviews() error = %v", err)
 	}
@@ -121,6 +124,9 @@ func TestRequestRejectAndExportPolicyReviewWorkflow(t *testing.T) {
 	}
 	if recordByAction(exported.Audits, "policy-review.export") == nil {
 		t.Fatalf("exported audits = %+v, want export audit", exported.Audits)
+	}
+	if recordByAction(exported.Audits, "policy-review.export").Values["actor"] != "user-auditor" {
+		t.Fatalf("export audit actor = %+v, want stable user ID", recordByAction(exported.Audits, "policy-review.export"))
 	}
 }
 
