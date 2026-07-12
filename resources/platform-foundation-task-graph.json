@@ -1795,15 +1795,7 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
-      "statusReason": {
-        "zh": "资源写入、会话摘要、手机号校验、私有文件、HTTPS 和滥用控制的实现计划已批准，但运行时代码尚未完成。",
-        "en": "The resource-write, session-digest, phone-verification, private-file, HTTPS and abuse-control plan is approved, but runtime implementation is not complete."
-      },
-      "completionGate": {
-        "zh": "完成运行时安全计划的七个 TDD 切片、全量安全验证、文档同步和节点收口审计。",
-        "en": "Complete all seven runtime-security TDD slices, full security verification, documentation sync and node closeout audit."
-      },
+      "status": "implemented",
       "resourceLocks": [
         "admin-resource-contract",
         "jwt-session",
@@ -1820,7 +1812,25 @@
         "docs": [
           "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
           "docs/superpowers/specs/2026-07-12-runtime-security-hardening-design.md",
-          "docs/superpowers/plans/2026-07-12-runtime-security-containment.md"
+          "docs/superpowers/plans/2026-07-12-runtime-security-containment.md",
+          "docs/platform-auth.md",
+          "docs/admin-resource-schema.md",
+          "docs/platform-deployment.md",
+          "docs/platform-capability-development.md"
+        ],
+        "validators": [
+          "scripts/validate-admin-resources.mjs",
+          "scripts/validate-admin-ui-contracts.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs"
+        ],
+        "tests": [
+          "internal/platform/adminresource/store_test.go",
+          "internal/platform/httpapi/server_test.go",
+          "cmd/platform-api/main_test.go",
+          "scripts/admin-ui-contracts.test.mjs",
+          "scripts/platform-engineering-capabilities.test.mjs",
+          "scripts/platform-node-closeout-audit.test.mjs"
         ]
       }
     },

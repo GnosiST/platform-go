@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"platform-go/internal/apps"
@@ -21,6 +23,9 @@ func main() {
 	ordered, err := bootstrap.CapabilitiesFromConfig(cfg, apps.DefaultManifests()...)
 	if err != nil {
 		log.Fatalf("resolve capabilities: %v", err)
+	}
+	if err := validateCredentialBoundary(ordered); err != nil {
+		log.Fatalf("validate credential boundary: %v", err)
 	}
 	runtime, err := bootstrap.RuntimeFromConfig(cfg)
 	if err != nil {
@@ -105,6 +110,27 @@ func main() {
 	if err := server.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("run platform api: %v", err)
 	}
+}
+
+func validateCredentialBoundary(manifests []capability.Manifest) error {
+	for _, manifest := range manifests {
+		for _, provider := range manifest.AuthProviders {
+			kind := strings.ToLower(strings.TrimSpace(provider.Kind))
+			id := strings.ToLower(strings.TrimSpace(provider.ID))
+			if strings.Contains(kind, "password") || strings.Contains(id, "password") {
+				return fmt.Errorf("local password provider requires a separately approved Argon2id capability")
+			}
+		}
+		for _, resource := range manifest.Admin.Resources {
+			for _, field := range resource.Fields {
+				key := strings.ToLower(strings.TrimSpace(field.Key))
+				if strings.Contains(key, "password") || strings.Contains(key, "passwd") {
+					return fmt.Errorf("password fields cannot use generic admin resource persistence")
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func securityOptionsFromConfig(cfg config.Config) httpapi.SecurityOptions {

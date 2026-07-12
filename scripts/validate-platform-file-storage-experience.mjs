@@ -101,7 +101,9 @@ function validateCurrentRuntime(contract, errors) {
     for (const snippet of [
       "func (s *Server) adminFileUpload",
       "func (s *Server) adminFileContent",
-      "func (s *Server) deleteAdminFileObject",
+      "func (s *Server) deleteAdminFile",
+      "TombstoneFileWithAudit",
+      "PurgeTombstonedFileWithAudit",
       "func (s *Server) recordFileAudit",
       'api.POST("/admin/files/upload", s.adminFileUpload)',
       'api.GET("/admin/files/:id/content", s.adminFileContent)',

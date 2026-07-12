@@ -187,6 +187,21 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /SystemSettingsDrawer must keep importConfig support/);
   });
 
+  it("rejects a policy review export control that ignores the dedicated permission", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/policy-review/PolicyReviewConsole.tsx",
+      'permissionAllows(permissions, "admin:policy-review:export", deniedPermissions)',
+      'permissionAllows(permissions, "admin:policy-review:read", deniedPermissions)',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /PolicyReviewConsole must derive export access from the dedicated permission/);
+  });
+
   it("rejects a shell whose skip link does not target main content", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(

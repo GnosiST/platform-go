@@ -17,7 +17,6 @@
     "parallelBatchesMustAvoidDependencyPaths": true
   },
   "requiredUnfinishedNodes": [
-    "runtime-security-containment",
     "admin-watermark-export-governance",
     "sensitive-data-protection-runtime",
     "sensitive-data-historical-migration",

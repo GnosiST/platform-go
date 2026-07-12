@@ -24,7 +24,6 @@
     "unfinishedTasksMustNotHaveCloseout": true
   },
   "pendingNodeEvidence": [
-    "runtime-security-containment",
     "admin-watermark-export-governance",
     "sensitive-data-protection-runtime",
     "sensitive-data-historical-migration",
@@ -818,6 +817,34 @@
       "visualEvidence": [
         "superpowers:brainstorming",
         "product-design"
+      ]
+    },
+    {
+      "taskId": "runtime-security-containment",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-auth.md",
+        "docs/admin-resource-schema.md",
+        "docs/platform-deployment.md",
+        "docs/platform-capability-development.md",
+        "internal/platform/adminresource/audit.go",
+        "internal/platform/adminresource/store_test.go",
+        "internal/platform/httpapi/server_test.go",
+        "cmd/platform-api/main_test.go",
+        "resources/admin-resources.json",
+        "resources/platform-engineering-capabilities.json",
+        "scripts/validate-admin-resources.mjs",
+        "scripts/validate-admin-ui-contracts.mjs",
+        "scripts/validate-platform-engineering-capabilities.mjs",
+        "scripts/platform-engineering-capabilities.test.mjs",
+        "scripts/platform-node-closeout-audit.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
       ]
     }
   ]

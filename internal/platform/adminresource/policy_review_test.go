@@ -54,11 +54,11 @@ func TestApprovePolicyReviewAppliesRolePermissionChangeAndRecordsAudit(t *testin
 	if err != nil {
 		t.Fatalf("List(audit-logs) error = %v", err)
 	}
-	audit := recordByCode(audits, "policy-review:PR-1001:approved")
+	audit := recordByAction(audits, "policy-review.approve")
 	if audit == nil {
 		t.Fatalf("audit logs = %+v, want policy review approval audit", audits)
 	}
-	if audit.Values["action"] != "policy-review.approve" || audit.Values["resource"] != "roles" || audit.Values["targetCode"] != "operator" {
+	if audit.Values["action"] != "policy-review.approve" || audit.Values["resource"] != "roles" || audit.Values["targetId"] != result.Role.ID {
 		t.Fatalf("audit values = %+v, want role policy approval audit", audit.Values)
 	}
 }
@@ -91,7 +91,7 @@ func TestRequestRejectAndExportPolicyReviewWorkflow(t *testing.T) {
 	if requested.Review.Values["reviewStatus"] != "pending" || requested.Review.Values["requestedBy"] != "ops" || requested.Review.Values["submittedAt"] == "" {
 		t.Fatalf("requested review values = %+v, want pending request metadata", requested.Review.Values)
 	}
-	if requested.Audit.Values["action"] != "policy-review.request" || requested.Audit.Values["targetCode"] != "PR-1002" {
+	if requested.Audit.Values["action"] != "policy-review.request" || requested.Audit.Values["targetId"] != review.ID {
 		t.Fatalf("request audit values = %+v, want policy-review.request audit", requested.Audit.Values)
 	}
 
@@ -102,7 +102,7 @@ func TestRequestRejectAndExportPolicyReviewWorkflow(t *testing.T) {
 	if rejected.Review.Values["reviewStatus"] != "rejected" || rejected.Review.Values["reviewedBy"] != "admin" || rejected.Review.Values["rejectionReason"] != "too broad for operator" {
 		t.Fatalf("rejected review values = %+v, want rejected metadata", rejected.Review.Values)
 	}
-	if rejected.Audit.Values["action"] != "policy-review.reject" || rejected.Audit.Values["targetCode"] != "PR-1002" {
+	if rejected.Audit.Values["action"] != "policy-review.reject" || rejected.Audit.Values["targetId"] != review.ID {
 		t.Fatalf("reject audit values = %+v, want policy-review.reject audit", rejected.Audit.Values)
 	}
 
@@ -116,10 +116,19 @@ func TestRequestRejectAndExportPolicyReviewWorkflow(t *testing.T) {
 	if !hasRecordCode(exported.Reviews, "PR-1002") {
 		t.Fatalf("exported reviews = %+v, want PR-1002", exported.Reviews)
 	}
-	if !hasRecordCode(exported.Audits, "policy-review:PR-1002:requested") || !hasRecordCode(exported.Audits, "policy-review:PR-1002:rejected") {
+	if recordByAction(exported.Audits, "policy-review.request") == nil || recordByAction(exported.Audits, "policy-review.reject") == nil {
 		t.Fatalf("exported audits = %+v, want request and reject audits", exported.Audits)
 	}
-	if !hasRecordCode(exported.Audits, "policy-review:export") {
+	if recordByAction(exported.Audits, "policy-review.export") == nil {
 		t.Fatalf("exported audits = %+v, want export audit", exported.Audits)
 	}
+}
+
+func recordByAction(records []Record, action string) *Record {
+	for index := range records {
+		if records[index].Values["action"] == action {
+			return &records[index]
+		}
+	}
+	return nil
 }

@@ -2270,6 +2270,46 @@
           "exportMode": "full"
         },
         {
+          "key": "deletionState",
+          "label": {
+            "zh": "删除状态",
+            "en": "Deletion State"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "width": 140,
+          "validation": {},
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
+        },
+        {
+          "key": "deletionRequestedAt",
+          "label": {
+            "zh": "删除请求时间",
+            "en": "Deletion Requested At"
+          },
+          "type": "datetime",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
+        },
+        {
           "key": "createdAt",
           "label": {
             "zh": "上传时间",

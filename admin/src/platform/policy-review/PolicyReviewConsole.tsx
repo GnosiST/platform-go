@@ -87,8 +87,9 @@ export function PolicyReviewConsole({ resource, language, dictionary, permission
     void loadPolicyReviews();
   }, [loadPolicyReviews]);
 
-  const canRead = permissionAllows(permissions, "admin:policy-review:read", deniedPermissions);
-  const canUpdate = permissionAllows(permissions, "admin:policy-review:update", deniedPermissions);
+	const canRead = permissionAllows(permissions, "admin:policy-review:read", deniedPermissions);
+	const canUpdate = permissionAllows(permissions, "admin:policy-review:update", deniedPermissions);
+	const canExport = permissionAllows(permissions, "admin:policy-review:export", deniedPermissions);
   const filteredReviews = useMemo(
     () =>
       reviews.filter((review) => {
@@ -160,9 +161,11 @@ export function PolicyReviewConsole({ resource, language, dictionary, permission
       actions={(
         <Space size={8}>
           <AdminActionButton icon={<ReloadOutlined />} label={dictionary.refresh} loading={loading} onClick={() => void loadPolicyReviews()} />
-          <AdminActionButton icon={<DownloadOutlined />} label={dictionary.policyReviewExportEvidence} loading={actingID === "export"} onClick={() => void exportEvidence()}>
-            {dictionary.policyReviewExportEvidence}
-          </AdminActionButton>
+		  {canExport ? (
+			<AdminActionButton icon={<DownloadOutlined />} label={dictionary.policyReviewExportEvidence} loading={actingID === "export"} onClick={() => void exportEvidence()}>
+			  {dictionary.policyReviewExportEvidence}
+			</AdminActionButton>
+		  ) : null}
         </Space>
       )}
       summary={(
@@ -505,7 +508,7 @@ function dataScopeSummary(dictionary: Dictionary, record: AdminResourceRecord) {
 }
 
 function auditForReview(audit: AdminResourceRecord, review: AdminResourceRecord) {
-  return valueOf(audit, "traceId") === review.code || valueOf(audit, "targetCode") === review.code || audit.code.includes(review.code);
+	return valueOf(audit, "targetId") === review.id;
 }
 
 function isPolicyReviewAudit(record: AdminResourceRecord) {

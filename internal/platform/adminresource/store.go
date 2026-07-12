@@ -145,7 +145,7 @@ func (s *Store) List(resource string) ([]Record, error) {
 	if !ok {
 		return nil, ErrUnknownResource
 	}
-	return cloneRecords(items), nil
+	return cloneRecords(visibleRecords(resource, items)), nil
 }
 
 func (s *Store) Create(resource string, input WriteInput) (Record, error) {

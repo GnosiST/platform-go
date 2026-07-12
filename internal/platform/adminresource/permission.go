@@ -48,6 +48,32 @@ func permissionCatalogFromCapabilities(manifests []capability.Manifest, updatedA
 					}, title.ZH+action.LabelZH, title.EN+" "+action.LabelEN, title.ZH+action.LabelZH+"权限。", title.EN+" "+action.LabelEN+" permission."),
 				))
 			}
+			for _, action := range resource.Actions {
+				code := strings.TrimSpace(action.Permission)
+				if code == "" {
+					continue
+				}
+				if _, exists := seen[code]; exists {
+					continue
+				}
+				seen[code] = struct{}{}
+				actionKey := strings.TrimSpace(action.Key)
+				label := localizedTextFromCapability(action.Label)
+				records = append(records, seed(
+					"permission-"+strings.NewReplacer(":", "-", "*", "all").Replace(code),
+					code,
+					title.EN+" "+label.EN,
+					"enabled",
+					title.EN+" "+label.EN+" permission.",
+					updatedAt,
+					withLocalizedValues(map[string]string{
+						"capability": string(manifest.ID),
+						"resource":   resource.Resource,
+						"action":     actionKey,
+						"prefix":     resource.PermissionPrefix,
+					}, title.ZH+label.ZH, title.EN+" "+label.EN, title.ZH+label.ZH+"权限。", title.EN+" "+label.EN+" permission."),
+				))
+			}
 		}
 	}
 	sort.SliceStable(records, func(i int, j int) bool {

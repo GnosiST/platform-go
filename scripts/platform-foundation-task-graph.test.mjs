@@ -58,6 +58,8 @@ const completionProgramTaskIDs = [
   "github-release-publication",
 ];
 
+const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(1);
+
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-foundation-task-graph.mjs", ...args], {
     cwd: repoRoot,
@@ -299,7 +301,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /task production-auth-provider-hardening must declare at least one evidence\.docs path/);
   });
 
-  it("preserves the closed 37-node baseline and tracks the completion program as pending", () => {
+  it("preserves the closed 37-node baseline, closes runtime security and tracks seven pending program nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
@@ -332,8 +334,9 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
     assert.equal(graph.tasks.length, 45);
-    assert.equal(implemented.length, 37);
-    assert.deepEqual(pending.map((item) => item.id), completionProgramTaskIDs);
+    assert.equal(implemented.length, 38);
+    assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
+    assert.deepEqual(pending.map((item) => item.id), pendingCompletionProgramTaskIDs);
     assert.equal(blocked.length, 0);
   });
 

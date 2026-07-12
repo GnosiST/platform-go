@@ -18,8 +18,9 @@ type AuditLog struct {
 	Actor string `json:"actor"`
 	Action string `json:"action"`
 	Resource string `json:"resource"`
-	TargetCode string `json:"targetCode"`
 	Provider string `json:"provider"`
+	Outcome string `json:"outcome"`
+	ReasonCode string `json:"reasonCode"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }

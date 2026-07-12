@@ -8,7 +8,6 @@
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "businessReferenceMode": "reference-only",
     "requiredControlledUnfinishedNodes": [
-      "runtime-security-containment",
       "admin-watermark-export-governance",
       "sensitive-data-protection-runtime",
       "sensitive-data-historical-migration",
@@ -24,8 +23,8 @@
   },
   "taskSummary": {
     "expectedTotal": 45,
-    "expectedImplemented": 37,
-    "expectedControlledUnfinished": 8
+    "expectedImplemented": 38,
+    "expectedControlledUnfinished": 7
   },
   "requirements": [
     {

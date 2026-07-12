@@ -1927,31 +1927,32 @@
                   "action",
                   "actor",
                   "createdAt",
+                  "eventId",
                   "outcome",
                   "provider",
+                  "reasonCode",
                   "resource",
-                  "targetCode",
-                  "targetId",
-                  "traceId"
+                  "targetId"
                 ],
                 "x-platform-search-fields": [
                   "action",
                   "actor",
+                  "eventId",
+                  "outcome",
                   "provider",
-                  "resource",
-                  "targetCode",
-                  "traceId"
+                  "reasonCode",
+                  "resource"
                 ],
                 "x-platform-filter-fields": [
                   "action",
                   "actor",
                   "createdAt",
+                  "eventId",
                   "outcome",
                   "provider",
+                  "reasonCode",
                   "resource",
-                  "targetCode",
-                  "targetId",
-                  "traceId"
+                  "targetId"
                 ],
                 "x-platform-sort-fields": [
                   "action",
@@ -1959,8 +1960,8 @@
                   "createdAt",
                   "outcome",
                   "provider",
-                  "resource",
-                  "targetCode"
+                  "reasonCode",
+                  "resource"
                 ],
                 "x-platform-localized-fields": []
               }
@@ -3193,6 +3194,7 @@
                 "x-platform-allowed-fields": [
                   "code",
                   "createdAt",
+                  "deletionRequestedAt",
                   "mimeType",
                   "name",
                   "size",
@@ -3210,6 +3212,7 @@
                 "x-platform-filter-fields": [
                   "code",
                   "createdAt",
+                  "deletionRequestedAt",
                   "mimeType",
                   "name",
                   "size",
@@ -3220,6 +3223,7 @@
                 "x-platform-sort-fields": [
                   "code",
                   "createdAt",
+                  "deletionRequestedAt",
                   "mimeType",
                   "name",
                   "size",
@@ -8995,6 +8999,24 @@
             "type": "string",
             "format": "date-time"
           },
+          "eventId": {
+            "description": "en: Event ID; zh: 事件 ID",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "事件 ID",
+              "en": "Event ID"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
           "outcome": {
             "description": "en: Outcome; zh: 结果",
             "x-platform-field-type": "text",
@@ -9020,6 +9042,24 @@
             "x-platform-label": {
               "zh": "提供方",
               "en": "Provider"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "reasonCode": {
+            "description": "en: Reason Code; zh: 原因码",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "原因码",
+              "en": "Reason Code"
             },
             "x-platform-searchable": true,
             "x-platform-filterable": false,
@@ -9057,14 +9097,14 @@
               "zh": "目标编码",
               "en": "Target Code"
             },
-            "x-platform-searchable": true,
+            "x-platform-searchable": false,
             "x-platform-filterable": false,
             "x-platform-sortable": false,
             "x-platform-localizable": false,
-            "x-platform-sensitivity": "public",
+            "x-platform-sensitivity": "internal",
             "x-platform-storage-mode": "plain",
-            "x-platform-response-mode": "full",
-            "x-platform-export-mode": "full",
+            "x-platform-response-mode": "omitted",
+            "x-platform-export-mode": "omitted",
             "type": "string"
           },
           "targetId": {
@@ -9093,14 +9133,14 @@
               "zh": "链路 ID",
               "en": "Trace ID"
             },
-            "x-platform-searchable": true,
+            "x-platform-searchable": false,
             "x-platform-filterable": false,
             "x-platform-sortable": false,
             "x-platform-localizable": false,
-            "x-platform-sensitivity": "public",
+            "x-platform-sensitivity": "internal",
             "x-platform-storage-mode": "plain",
-            "x-platform-response-mode": "full",
-            "x-platform-export-mode": "full",
+            "x-platform-response-mode": "omitted",
+            "x-platform-export-mode": "omitted",
             "type": "string"
           }
         },
@@ -10335,6 +10375,43 @@
             "x-platform-export-mode": "full",
             "type": "string",
             "format": "date-time"
+          },
+          "deletionRequestedAt": {
+            "description": "en: Deletion Requested At; zh: 删除请求时间",
+            "x-platform-field-type": "datetime",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "删除请求时间",
+              "en": "Deletion Requested At"
+            },
+            "x-platform-searchable": false,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "internal",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "omitted",
+            "x-platform-export-mode": "omitted",
+            "type": "string",
+            "format": "date-time"
+          },
+          "deletionState": {
+            "description": "en: Deletion State; zh: 删除状态",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "删除状态",
+              "en": "Deletion State"
+            },
+            "x-platform-searchable": false,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "internal",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "omitted",
+            "x-platform-export-mode": "omitted",
+            "type": "string"
           },
           "mimeType": {
             "description": "en: MIME Type; zh: 类型",

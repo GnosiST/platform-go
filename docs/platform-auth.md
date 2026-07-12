@@ -1,13 +1,13 @@
 # Platform Auth Provider Contract
 
 Date: 2026-07-04
-Last updated: 2026-07-11
+Last updated: 2026-07-12
 
 ## Purpose
 
 Authentication is now declared through capability manifests instead of being hard-coded into the admin shell or business modules.
 
-Enabled capabilities can expose login providers through `capability.Manifest.AuthProviders`. This gives the platform a stable discovery and login API while allowing projects to add or remove providers such as demo login, WeChat login, SSO or password login by changing enabled capabilities.
+Enabled capabilities can expose login providers through `capability.Manifest.AuthProviders`. This gives the platform a stable discovery and login API while allowing projects to add or remove providers such as demo login, WeChat login or SSO by changing enabled capabilities.
 
 ## Provider Contract
 
@@ -21,6 +21,14 @@ Each provider declares:
 - `configKeys`: optional environment-style configuration keys required by the provider, using uppercase letters, numbers or underscores.
 
 Provider ids must be unique across enabled capabilities after trimming whitespace. Missing id, kind, localized title, localized description or malformed/duplicate config keys fail capability resolution.
+
+## Credential Boundary
+
+The current platform has no local-password provider, password repository or generic password field. `cmd/platform-api` rejects startup when an enabled provider uses the local `password` kind or when any generic Admin resource schema declares `password` or `passwd`. The generic resource write boundary also rejects undeclared and prohibited password, token, secret, credential, verification-code, provider-subject and raw-session keys before persistence.
+
+Do not add password hashes to `Record.Values`. A future local-password capability requires a separately approved authentication and migration design with an Argon2id password-hashing boundary, dedicated storage, upgrade parameters, reset/rotation behavior, breach response and historical-data migration. Passwords are not reversibly encrypted, and changing hashing policy cannot be treated as an ordinary runtime configuration toggle.
+
+The current browser login flows send demo usernames or provider authorization codes, not local passwords. JWTs, provider codes and API tokens are credentials and must cross browser-to-server and provider-to-server boundaries over the production HTTPS contract. TLS protects credentials in transit; application payload encoding is not a substitute for HTTPS. The Admin client currently keeps its bearer token in browser storage, so CSP and same-origin delivery reduce exposure but do not remove the residual localStorage/XSS risk. Moving credentials to cookies requires a separate CSRF and session-client specification.
 
 ## APIs
 
@@ -104,6 +112,8 @@ The admin app now starts with a provider-driven login view when no platform toke
 
 The login UI should remain generic. Provider-specific behavior belongs in auth adapters and capability manifests, not in the shell layout.
 
+Login, app login and Admin refresh treat audit persistence as part of credential issuance. If token signing or audit persistence fails after a server-side session is created or renewed, the new credential state is revoked or discarded and the HTTP response fails without returning a usable credential.
+
 ## Audit Events
 
 Successful login and logout write audit records when the `audit-logs` admin resource is enabled:
@@ -114,9 +124,9 @@ Successful login and logout write audit records when the `audit-logs` admin reso
 - `app.auth.login`
 - `app.auth.logout`
 
-The audit record stores actor, action, resource, provider when available and created time. It does not store the raw session handle, its digest or a shortened derivative.
+Audit records use stable investigation fields: actor ID, action, resource, target ID, outcome, event ID, reason code and created time, plus provider only when the schema explicitly allows it. Target labels, filenames, personal values, raw adapter errors, bearer tokens and credential material are omitted. The audit record does not store the raw session handle, its digest or a shortened derivative. Legacy `targetCode` and `traceId` fields remain readable only as internal compatibility data and are omitted from response and export projections.
 
-Generic admin resource create, update and delete handlers also write `admin_resource.create`, `admin_resource.update` and `admin_resource.delete` records after successful writes. These records store the actor, resource code, target id, target code, target name and created time, and skip the audit resource itself to avoid recursive audit rows. The `audit-logs` resource is read-focused: its runtime schema exposes structured query fields but no create/edit form fields.
+Generic Admin resource create, update and delete handlers persist the business mutation and its `admin_resource.create`, `admin_resource.update` or `admin_resource.delete` audit in one repository snapshot. If the audit record cannot be validated or saved, the business mutation is rolled back. Authentication and file flows follow the same fail-closed rule instead of returning success after swallowing an audit error. The `audit-logs` resource is read-focused: its runtime schema exposes structured query fields but no create/edit form fields.
 
 ## Admin API Tokens
 
@@ -130,6 +140,7 @@ The `system-admin` capability registers the `api-tokens` resource under the secu
 - Updating an API token preserves `tokenPrefix`, `tokenHash`, `createdAt` and `revokedAt`; callers cannot replace token material through the generic update endpoint.
 - `DELETE /api/admin/resources/api-tokens/:id` revokes the token by setting status to `revoked` and retaining the sanitized record.
 - `api_token.create`, `api_token.update` and `api_token.revoke` audit events store actor and token prefix, not the raw token.
+- API-token create, update and revoke persist the sanitized record and redacted audit atomically. The clear `pgo_` token is returned only after that transaction succeeds; audit failure leaves no token record and no usable credential response.
 
 The admin UI treats the returned token as a one-time secret: it is shown in a modal immediately after creation and must not be recoverable from later list or detail reads.
 

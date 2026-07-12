@@ -61,10 +61,10 @@
     "production-auth-provider-hardening",
     "source-writing-codegen-promotion",
     "admin-ui-system-quality-hardening",
-    "production-admin-oidc-auth"
+    "production-admin-oidc-auth",
+    "runtime-security-containment"
   ],
   "requiredFutureTaskNodes": [
-    "runtime-security-containment",
     "admin-watermark-export-governance",
     "sensitive-data-protection-runtime",
     "sensitive-data-historical-migration",

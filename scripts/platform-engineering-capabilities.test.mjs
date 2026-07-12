@@ -63,12 +63,26 @@ function tempStackSourceRoot(mutator) {
 }
 
 describe("validate-platform-engineering-capabilities", () => {
-  it("tracks approved completion program capabilities as partial", () => {
+  it("tracks runtime security as implemented and remaining completion program capabilities as partial", () => {
     const matrix = readJSON("resources/platform-engineering-capabilities.json");
     const capabilities = matrix.capabilities.filter((item) => completionProgramCapabilityIDs.includes(item.id));
 
     assert.deepEqual(capabilities.map((item) => item.id), completionProgramCapabilityIDs);
-    assert.ok(capabilities.every((item) => item.status === "partial"));
+    assert.equal(capabilities[0].status, "implemented");
+    assert.ok(capabilities[0].evidence.sourcePaths.length > 0);
+    assert.ok(capabilities[0].evidence.tests.length > 0);
+    assert.ok(capabilities[0].evidence.validators.length > 0);
+    assert.ok(capabilities.slice(1).every((item) => item.status === "partial"));
+  });
+
+  it("rejects regressing runtime security capability to partial after closeout", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities.find((item) => item.id === "runtime-security-containment").status = "partial";
+
+    const result = runValidator(["--matrix", tempJSON("partial-runtime-security-capability.json", matrix)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /required implemented capability runtime-security-containment must stay implemented/);
   });
 
   it("rejects dropping an approved completion program capability", () => {

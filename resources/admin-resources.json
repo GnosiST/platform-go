@@ -2593,10 +2593,11 @@
               "en": "Target Code"
             },
             "type": "text",
-            "search": true,
-            "table": true,
-            "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "omitted",
+            "exportMode": "omitted"
           },
           {
             "key": "provider",
@@ -2623,6 +2624,29 @@
             "readOnly": true
           },
           {
+            "key": "eventId",
+            "label": {
+              "zh": "事件 ID",
+              "en": "Event ID"
+            },
+            "type": "text",
+            "search": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
+            "key": "reasonCode",
+            "label": {
+              "zh": "原因码",
+              "en": "Reason Code"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true
+          },
+          {
             "key": "createdAt",
             "label": {
               "zh": "发生时间",
@@ -2641,25 +2665,29 @@
               "en": "Trace ID"
             },
             "type": "text",
-            "search": true,
-            "detail": true,
-            "readOnly": true
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "omitted",
+            "exportMode": "omitted"
           }
         ],
         "search": [
           "actor",
           "action",
           "resource",
-          "targetCode",
           "provider",
-          "traceId"
+          "outcome",
+          "eventId",
+          "reasonCode"
         ],
         "table": [
           "actor",
           "action",
           "resource",
-          "targetCode",
           "provider",
+          "outcome",
+          "reasonCode",
           "createdAt"
         ],
         "form": []
@@ -3051,6 +3079,32 @@
               "en": "Owner ID"
             },
             "type": "text",
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "omitted",
+            "exportMode": "omitted"
+          },
+          {
+            "key": "deletionState",
+            "label": {
+              "zh": "删除状态",
+              "en": "Deletion State"
+            },
+            "type": "text",
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "omitted",
+            "exportMode": "omitted"
+          },
+          {
+            "key": "deletionRequestedAt",
+            "label": {
+              "zh": "删除请求时间",
+              "en": "Deletion Requested At"
+            },
+            "type": "datetime",
             "readOnly": true,
             "sensitivity": "internal",
             "storageMode": "plain",

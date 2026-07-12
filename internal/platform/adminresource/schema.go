@@ -518,16 +518,20 @@ func areaCodeResourceSchema() Schema {
 }
 
 func auditLogResourceSchema() Schema {
+	legacyTargetCode := secureFieldDefinition(auditLogField("targetCode", text("目标编码", "Target Code"), "text", false, false, 180), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted)
+	legacyTraceID := secureFieldDefinition(auditLogField("traceId", text("旧链路 ID", "Legacy Trace ID"), "text", false, false, 180), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted)
 	fields := withStandardRecordFields([]FieldDefinition{
 		auditLogField("actor", text("操作人", "Actor"), "text", true, true, 140),
 		auditLogField("action", text("动作", "Action"), "text", true, true, 180),
 		auditLogField("resource", text("资源", "Resource"), "text", true, true, 160),
 		auditLogField("targetId", text("目标 ID", "Target ID"), "text", true, false, 180),
-		auditLogField("targetCode", text("目标编码", "Target Code"), "text", true, true, 180),
+		legacyTargetCode,
 		auditLogField("provider", text("提供方", "Provider"), "text", true, true, 130),
 		auditLogField("outcome", text("结果", "Outcome"), "text", true, true, 130),
+		auditLogField("eventId", text("事件 ID", "Event ID"), "text", true, false, 180),
+		auditLogField("reasonCode", text("原因码", "Reason Code"), "text", true, true, 160),
 		auditLogField("createdAt", text("发生时间", "Created At"), "datetime", true, true, 180),
-		auditLogField("traceId", text("链路 ID", "Trace ID"), "text", true, false, 180),
+		legacyTraceID,
 	})
 	return Schema{
 		Resource:    "audit-logs",
@@ -541,10 +545,10 @@ func auditLogResourceSchema() Schema {
 			"actor",
 			"action",
 			"resource",
-			"targetCode",
 			"provider",
 			"outcome",
-			"traceId",
+			"eventId",
+			"reasonCode",
 		},
 		DefaultSortKey: "createdAt",
 	}

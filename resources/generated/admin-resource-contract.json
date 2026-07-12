@@ -2234,6 +2234,21 @@
           "exportMode": "full"
         },
         {
+          "key": "eventId",
+          "label": {
+            "zh": "事件 ID",
+            "en": "Event ID"
+          },
+          "type": "text",
+          "search": true,
+          "detail": true,
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
           "key": "outcome",
           "label": {
             "zh": "结果",
@@ -2254,6 +2269,22 @@
           "label": {
             "zh": "提供方",
             "en": "Provider"
+          },
+          "type": "text",
+          "search": true,
+          "table": true,
+          "detail": true,
+          "readOnly": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "reasonCode",
+          "label": {
+            "zh": "原因码",
+            "en": "Reason Code"
           },
           "type": "text",
           "search": true,
@@ -2288,14 +2319,11 @@
             "en": "Target Code"
           },
           "type": "text",
-          "search": true,
-          "table": true,
-          "detail": true,
           "readOnly": true,
-          "sensitivity": "public",
+          "sensitivity": "internal",
           "storageMode": "plain",
-          "responseMode": "full",
-          "exportMode": "full"
+          "responseMode": "omitted",
+          "exportMode": "omitted"
         },
         {
           "key": "targetId",
@@ -2319,33 +2347,32 @@
             "en": "Trace ID"
           },
           "type": "text",
-          "search": true,
-          "detail": true,
           "readOnly": true,
-          "sensitivity": "public",
+          "sensitivity": "internal",
           "storageMode": "plain",
-          "responseMode": "full",
-          "exportMode": "full"
+          "responseMode": "omitted",
+          "exportMode": "omitted"
         }
       ],
       "search": [
         "action",
         "actor",
+        "eventId",
+        "outcome",
         "provider",
-        "resource",
-        "targetCode",
-        "traceId"
+        "reasonCode",
+        "resource"
       ],
       "filter": [
         "action",
         "actor",
         "createdAt",
+        "eventId",
         "outcome",
         "provider",
+        "reasonCode",
         "resource",
-        "targetCode",
-        "targetId",
-        "traceId"
+        "targetId"
       ],
       "sort": [
         "action",
@@ -2353,15 +2380,16 @@
         "createdAt",
         "outcome",
         "provider",
-        "resource",
-        "targetCode"
+        "reasonCode",
+        "resource"
       ],
       "table": [
         "actor",
         "action",
         "resource",
-        "targetCode",
         "provider",
+        "outcome",
+        "reasonCode",
         "createdAt"
       ],
       "form": [],
@@ -3187,6 +3215,32 @@
           "exportMode": "full"
         },
         {
+          "key": "deletionRequestedAt",
+          "label": {
+            "zh": "删除请求时间",
+            "en": "Deletion Requested At"
+          },
+          "type": "datetime",
+          "readOnly": true,
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
+        },
+        {
+          "key": "deletionState",
+          "label": {
+            "zh": "删除状态",
+            "en": "Deletion State"
+          },
+          "type": "text",
+          "readOnly": true,
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "omitted",
+          "exportMode": "omitted"
+        },
+        {
           "key": "description",
           "label": {
             "zh": "描述",
@@ -3357,6 +3411,7 @@
       "filter": [
         "code",
         "createdAt",
+        "deletionRequestedAt",
         "mimeType",
         "name",
         "size",
@@ -3367,6 +3422,7 @@
       "sort": [
         "code",
         "createdAt",
+        "deletionRequestedAt",
         "mimeType",
         "name",
         "size",
@@ -6898,6 +6954,21 @@
             "exportMode": "full"
           },
           {
+            "key": "eventId",
+            "label": {
+              "zh": "事件 ID",
+              "en": "Event ID"
+            },
+            "type": "text",
+            "search": true,
+            "detail": true,
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
             "key": "outcome",
             "label": {
               "zh": "结果",
@@ -6918,6 +6989,22 @@
             "label": {
               "zh": "提供方",
               "en": "Provider"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "detail": true,
+            "readOnly": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "reasonCode",
+            "label": {
+              "zh": "原因码",
+              "en": "Reason Code"
             },
             "type": "text",
             "search": true,
@@ -6952,14 +7039,11 @@
               "en": "Target Code"
             },
             "type": "text",
-            "search": true,
-            "table": true,
-            "detail": true,
             "readOnly": true,
-            "sensitivity": "public",
+            "sensitivity": "internal",
             "storageMode": "plain",
-            "responseMode": "full",
-            "exportMode": "full"
+            "responseMode": "omitted",
+            "exportMode": "omitted"
           },
           {
             "key": "targetId",
@@ -6983,33 +7067,32 @@
               "en": "Trace ID"
             },
             "type": "text",
-            "search": true,
-            "detail": true,
             "readOnly": true,
-            "sensitivity": "public",
+            "sensitivity": "internal",
             "storageMode": "plain",
-            "responseMode": "full",
-            "exportMode": "full"
+            "responseMode": "omitted",
+            "exportMode": "omitted"
           }
         ],
         "search": [
           "action",
           "actor",
+          "eventId",
+          "outcome",
           "provider",
-          "resource",
-          "targetCode",
-          "traceId"
+          "reasonCode",
+          "resource"
         ],
         "filter": [
           "action",
           "actor",
           "createdAt",
+          "eventId",
           "outcome",
           "provider",
+          "reasonCode",
           "resource",
-          "targetCode",
-          "targetId",
-          "traceId"
+          "targetId"
         ],
         "sort": [
           "action",
@@ -7017,15 +7100,16 @@
           "createdAt",
           "outcome",
           "provider",
-          "resource",
-          "targetCode"
+          "reasonCode",
+          "resource"
         ],
         "table": [
           "actor",
           "action",
           "resource",
-          "targetCode",
           "provider",
+          "outcome",
+          "reasonCode",
           "createdAt"
         ],
         "form": [],
@@ -8247,6 +8331,32 @@
             "exportMode": "full"
           },
           {
+            "key": "deletionRequestedAt",
+            "label": {
+              "zh": "删除请求时间",
+              "en": "Deletion Requested At"
+            },
+            "type": "datetime",
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "omitted",
+            "exportMode": "omitted"
+          },
+          {
+            "key": "deletionState",
+            "label": {
+              "zh": "删除状态",
+              "en": "Deletion State"
+            },
+            "type": "text",
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "omitted",
+            "exportMode": "omitted"
+          },
+          {
             "key": "description",
             "label": {
               "zh": "描述",
@@ -8417,6 +8527,7 @@
         "filter": [
           "code",
           "createdAt",
+          "deletionRequestedAt",
           "mimeType",
           "name",
           "size",
@@ -8427,6 +8538,7 @@
         "sort": [
           "code",
           "createdAt",
+          "deletionRequestedAt",
           "mimeType",
           "name",
           "size",

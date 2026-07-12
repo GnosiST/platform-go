@@ -980,7 +980,7 @@ func TestStoreAuditLogsSchemaExposesStructuredReadOnlyFields(t *testing.T) {
 	if schema.DefaultSortKey != "createdAt" {
 		t.Fatalf("audit-logs default sort = %q, want createdAt", schema.DefaultSortKey)
 	}
-	for _, key := range []string{"actor", "action", "resource", "targetId", "targetCode", "provider", "outcome", "createdAt", "traceId"} {
+	for _, key := range []string{"actor", "action", "resource", "targetId", "targetCode", "provider", "outcome", "eventId", "reasonCode", "createdAt", "traceId"} {
 		field := fieldByKey(schema.Fields, key)
 		if field == nil {
 			t.Fatalf("audit-logs schema missing %s field: %+v", key, schema.Fields)
@@ -989,12 +989,12 @@ func TestStoreAuditLogsSchemaExposesStructuredReadOnlyFields(t *testing.T) {
 			t.Fatalf("audit-logs.%s = %+v, want read-only values detail field outside forms", key, *field)
 		}
 	}
-	for _, key := range []string{"actor", "action", "resource", "targetCode", "provider", "outcome", "traceId"} {
+	for _, key := range []string{"actor", "action", "resource", "provider", "outcome", "eventId", "reasonCode"} {
 		if !slices.Contains(schema.SearchFields, key) {
 			t.Fatalf("audit-logs search fields = %+v, want %s", schema.SearchFields, key)
 		}
 	}
-	for _, key := range []string{"actor", "action", "resource", "targetCode", "provider", "outcome", "createdAt"} {
+	for _, key := range []string{"actor", "action", "resource", "provider", "outcome", "reasonCode", "createdAt"} {
 		field := fieldByKey(schema.Fields, key)
 		if field == nil || !field.InTable || !field.Searchable || !field.Sortable {
 			t.Fatalf("audit-logs.%s = %+v, want searchable sortable table field", key, field)

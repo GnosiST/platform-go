@@ -738,25 +738,26 @@
         "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
       },
       "schema": {
-        "fieldCount": 9,
+        "fieldCount": 11,
         "search": [
           "action",
           "actor",
+          "eventId",
+          "outcome",
           "provider",
-          "resource",
-          "targetCode",
-          "traceId"
+          "reasonCode",
+          "resource"
         ],
         "filter": [
           "action",
           "actor",
           "createdAt",
+          "eventId",
           "outcome",
           "provider",
+          "reasonCode",
           "resource",
-          "targetCode",
-          "targetId",
-          "traceId"
+          "targetId"
         ],
         "sort": [
           "action",
@@ -764,15 +765,16 @@
           "createdAt",
           "outcome",
           "provider",
-          "resource",
-          "targetCode"
+          "reasonCode",
+          "resource"
         ],
         "table": [
           "actor",
           "action",
           "resource",
-          "targetCode",
           "provider",
+          "outcome",
+          "reasonCode",
           "createdAt"
         ],
         "form": [],
@@ -1385,7 +1387,7 @@
         "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
       },
       "schema": {
-        "fieldCount": 13,
+        "fieldCount": 15,
         "search": [
           "code",
           "createdAt",
@@ -1396,6 +1398,7 @@
         "filter": [
           "code",
           "createdAt",
+          "deletionRequestedAt",
           "mimeType",
           "name",
           "size",
@@ -1406,6 +1409,7 @@
         "sort": [
           "code",
           "createdAt",
+          "deletionRequestedAt",
           "mimeType",
           "name",
           "size",

@@ -330,9 +330,9 @@ func TestPersistBoundaryRejectsPolicyReviewDirectSnapshotMutation(t *testing.T) 
 		t.Fatalf("Create(policy-reviews) error = %v", err)
 	}
 	for index := range repository.snapshot.Resources["audit-logs"] {
-		delete(repository.snapshot.Resources["audit-logs"][index].Values, "traceId")
+		delete(repository.snapshot.Resources["audit-logs"][index].Values, "eventId")
 	}
-	removeSecuritySchemaField(store, "audit-logs", "traceId")
+	removeSecuritySchemaField(store, "audit-logs", "eventId")
 	repository.saveCount = 0
 	wantSnapshot := cloneSecuritySnapshot(repository.snapshot)
 
@@ -340,8 +340,8 @@ func TestPersistBoundaryRejectsPolicyReviewDirectSnapshotMutation(t *testing.T) 
 	if !errors.Is(err, ErrInvalidRecord) {
 		t.Fatalf("ApprovePolicyReview() error = %v, want ErrInvalidRecord", err)
 	}
-	if !strings.Contains(err.Error(), "traceId") {
-		t.Fatalf("ApprovePolicyReview() error = %v, want final snapshot rejection for traceId", err)
+	if !strings.Contains(err.Error(), "eventId") {
+		t.Fatalf("ApprovePolicyReview() error = %v, want final snapshot rejection for eventId", err)
 	}
 	if repository.saveCount != 0 {
 		t.Fatalf("repository saveCount = %d, want 0", repository.saveCount)

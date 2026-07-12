@@ -9,7 +9,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "runtime-security-containment",
   "admin-watermark-export-governance",
   "sensitive-data-protection-runtime",
   "sensitive-data-historical-migration",
@@ -87,7 +86,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("preserves 37 baseline closeouts and tracks eight pending nodes", () => {
+  it("preserves 37 baseline closeouts, closes runtime security and tracks seven pending nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -95,29 +94,28 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(task, "task graph must include production-admin-oidc-auth");
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
-    assert.equal(audit.nodeCloseouts.length, 37);
-    assert.deepEqual(audit.nodeCloseouts.map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
-    assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts)).digest("hex"), foundationBaselineCloseoutDigest);
+    assert.equal(audit.nodeCloseouts.length, 38);
+    assert.deepEqual(audit.nodeCloseouts.slice(0, 37).map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
+    assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts.slice(0, 37))).digest("hex"), foundationBaselineCloseoutDigest);
+    const runtimeSecurityCloseout = audit.nodeCloseouts[37];
+    assert.equal(runtimeSecurityCloseout.taskId, "runtime-security-containment");
+    assert.equal(runtimeSecurityCloseout.status, "closed");
+    assert.equal(runtimeSecurityCloseout.neatFreak, true);
+    assert.ok(runtimeSecurityCloseout.cleanupEvidence.length > 0);
     assert.deepEqual(audit.pendingNodeEvidence, completionProgramTaskIDs);
   });
 
-  it("rejects premature closeout evidence for a pending completion node", () => {
+  it("rejects omitting runtime security closeout evidence after implementation", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
-    const task = graph.tasks.find((item) => item.id === completionProgramTaskIDs[0]);
+    const task = graph.tasks.find((item) => item.id === "runtime-security-containment");
     assert.ok(task, "runtime security completion node must exist before closeout mutation validation");
-    assert.equal(task.status, "pending");
-    audit.nodeCloseouts.push({
-      taskId: task.id,
-      status: "closed",
-      neatFreak: true,
-      cleanupEvidence: ["docs/platform-auth.md"],
-      dimensions: ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"],
-    });
+    assert.equal(task.status, "implemented");
+    audit.nodeCloseouts = audit.nodeCloseouts.filter((item) => item.taskId !== task.id);
 
-    const result = runValidator(["--audit", tempJSON("premature-node-closeout-audit.json", audit)]);
+    const result = runValidator(["--audit", tempJSON("missing-runtime-security-closeout-audit.json", audit)]);
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /pending task runtime-security-containment must not have closeout evidence/);
+    assert.match(result.stderr, /implemented task runtime-security-containment must declare node closeout evidence/);
   });
 
   it("rejects implemented task nodes without closeout evidence", () => {

@@ -322,6 +322,10 @@ func (s *Store) scrubSnapshot(snapshot ResourceSnapshot) (ResourceSnapshot, bool
 func (s *Store) ProjectRecord(resource string, record Record, purpose ProjectionPurpose) (Record, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.projectRecordLocked(resource, record, purpose)
+}
+
+func (s *Store) projectRecordLocked(resource string, record Record, purpose ProjectionPurpose) (Record, error) {
 	schema, ok := s.schemas[resource]
 	if !ok {
 		return Record{}, ErrUnknownResource

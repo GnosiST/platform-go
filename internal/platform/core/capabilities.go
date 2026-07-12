@@ -277,6 +277,12 @@ func policyReviewAdminResource() capability.AdminResource {
 			adminField("description", "评审说明", "Review Notes", "textarea", "record", false, false, false, false, true, true, 260, nil),
 			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
 		},
+		Actions: []capability.AdminResourceAction{
+			{
+				Key: "export", Label: capability.Text("导出证据", "Export Evidence"), Kind: "resource", Tone: "default", Icon: "download",
+				Permission: "admin:policy-review:export", Route: "/api/admin/policy-reviews/export", Method: "GET", AuditAction: "policy-review.export",
+			},
+		},
 		SearchFields:   []string{"name", "code", "policyType", "requestedAction", "reviewStatus", "roleCode", "permissionCodes", "requestedBy", "reviewedBy"},
 		DefaultSortKey: "submittedAt",
 	}
@@ -665,6 +671,8 @@ func fileStorageAdminResource() capability.AdminResource {
 			secureAdminField(adminField("tenantId", "租户 ID", "Tenant ID", "text", "values", false, true, false, false, false, false, 180, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 			secureAdminField(adminField("ownerId", "所有者 ID", "Owner ID", "text", "values", false, true, false, false, false, false, 180, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 			secureAdminField(adminField("uploadedBy", "上传人", "Uploaded By", "text", "values", false, true, false, false, false, true, 180, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionFull, capability.FieldProjectionFull),
+			secureAdminField(adminField("deletionState", "删除状态", "Deletion State", "text", "values", false, true, false, false, false, false, 140, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
+			secureAdminField(adminField("deletionRequestedAt", "删除请求时间", "Deletion Requested At", "datetime", "values", false, true, false, false, false, false, 180, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted),
 			adminField("createdAt", "上传时间", "Created At", "datetime", "values", false, true, true, true, false, true, 180, nil),
 			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
 		},

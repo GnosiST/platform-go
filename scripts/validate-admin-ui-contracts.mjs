@@ -376,6 +376,9 @@ for (const key of [
   requireIncludes(files.policyReview, key, `PolicyReviewConsole must keep ${key}.`);
 }
 requireNotIncludes(files.policyReview, "fetch(", "PolicyReviewConsole must use the shared platform API client instead of direct fetch.");
+requireIncludes(files.policyReview, 'permissionAllows(permissions, "admin:policy-review:export", deniedPermissions)', "PolicyReviewConsole must derive export access from the dedicated permission.");
+requireRegex(files.policyReview, /\{canExport\s*\?\s*\([\s\S]*?<AdminActionButton[\s\S]*?policyReviewExportEvidence[\s\S]*?\)\s*:\s*null\}/, "PolicyReviewConsole must remove the export button from unauthorized focus order.");
+requireIncludes(files.policyReview, 'valueOf(audit, "targetId") === review.id', "PolicyReviewConsole audit matching must use stable target IDs.");
 requireIncludes(files.table, 'type?: "text" | "select" | "treeSelect"', "PlatformDataTable filters must keep treeSelect support.");
 requireIncludes(files.table, "type === \"treeSelect\"", "PlatformDataTable must render tree relation filters with PlatformTreeSelect.");
 

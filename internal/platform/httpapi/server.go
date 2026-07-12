@@ -709,6 +709,7 @@ func (s *Server) authRefresh(ctx *gin.Context) {
 		return
 	}
 	if err := s.recordAudit("auth.refresh", "Auth Refresh", principal.User.Username, ""); err != nil {
+		_ = s.cleanupIssuedAdminSession(ctx.Request.Context(), renewed.Token)
 		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_AUDIT_FAILED", "auth audit failed")
 		return
 	}
@@ -775,10 +776,12 @@ func (s *Server) appAuthLogin(ctx *gin.Context) {
 		TokenType: authjwt.TokenTypeApp,
 	}, issued.ExpiresAt.Sub(issued.IssuedAt))
 	if err != nil {
+		_ = s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token)
 		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_TOKEN_SIGN_FAILED", "app auth token sign failed")
 		return
 	}
 	if err := s.recordAudit("app.auth.login", "App Auth Login", username, providerID); err != nil {
+		_ = s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token)
 		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_AUDIT_FAILED", "app auth audit failed")
 		return
 	}
@@ -1016,12 +1019,12 @@ func (s *Server) adminResourceCreate(ctx *gin.Context) {
 		})
 		return
 	}
-	record, err := s.resources.Create(resource, input)
+	mutation, err := s.resources.CreateWithAudit(resource, input, s.mutationAuditEvent(ctx, "admin_resource.create", resource, "created"))
 	if err != nil {
 		writeAdminResourceError(ctx, err)
 		return
 	}
-	s.recordAdminResourceAudit(ctx, "create", resource, record)
+	record := mutation.Record
 	s.invalidateCachesForResource(ctx.Request.Context(), resource)
 	projected, err := s.resources.ProjectRecord(resource, record, adminresource.ProjectionResponse)
 	if err != nil {
@@ -1061,12 +1064,12 @@ func (s *Server) adminResourceUpdate(ctx *gin.Context) {
 		})
 		return
 	}
-	record, err := s.resources.Update(resource, id, input)
+	mutation, err := s.resources.UpdateWithAudit(resource, id, input, s.mutationAuditEvent(ctx, "admin_resource.update", resource, "updated"))
 	if err != nil {
 		writeAdminResourceError(ctx, err)
 		return
 	}
-	s.recordAdminResourceAudit(ctx, "update", resource, record)
+	record := mutation.Record
 	s.invalidateCachesForResource(ctx.Request.Context(), resource)
 	projected, err := s.resources.ProjectRecord(resource, record, adminresource.ProjectionResponse)
 	if err != nil {
@@ -1180,7 +1183,7 @@ func (s *Server) adminPolicyReviewReject(ctx *gin.Context) {
 }
 
 func (s *Server) adminPolicyReviewExport(ctx *gin.Context) {
-	if !s.authorizeAdminResource(ctx, "policy-reviews", "read") {
+	if !s.authorize(ctx, "admin:policy-review:export") {
 		return
 	}
 	result, err := s.resources.ExportPolicyReviews(s.currentActor(ctx))
@@ -1223,9 +1226,8 @@ func (s *Server) adminResourceDelete(ctx *gin.Context) {
 		return
 	}
 	if resource == "files" {
-		if !s.deleteAdminFileObject(ctx, ctx.Param("id")) {
-			return
-		}
+		s.deleteAdminFile(ctx, ctx.Param("id"))
+		return
 	}
 	if resource == apiTokensResource {
 		if err := s.revokeAdminAPIToken(ctx.Request.Context(), s.currentActor(ctx), ctx.Param("id")); err != nil {
@@ -1236,22 +1238,9 @@ func (s *Server) adminResourceDelete(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, Response[gin.H]{Data: gin.H{"resource": resource, "revoked": true}})
 		return
 	}
-	record, err := s.adminResourceRecordByID(resource, ctx.Param("id"))
-	if err != nil {
+	if _, err := s.resources.DeleteWithAudit(resource, ctx.Param("id"), s.mutationAuditEvent(ctx, "admin_resource.delete", resource, "deleted")); err != nil {
 		writeAdminResourceError(ctx, err)
 		return
-	}
-	if err := s.resources.Delete(resource, ctx.Param("id")); err != nil {
-		writeAdminResourceError(ctx, err)
-		return
-	}
-	if resource == "files" {
-		if err := s.recordFileAudit(ctx, "file.delete", record); err != nil {
-			writeAdminResourceError(ctx, err)
-			return
-		}
-	} else {
-		s.recordAdminResourceAudit(ctx, "delete", resource, record)
 	}
 	s.invalidateCachesForResource(ctx.Request.Context(), resource)
 	ctx.JSON(http.StatusOK, Response[gin.H]{Data: gin.H{"resource": resource, "deleted": true}})
@@ -1281,7 +1270,7 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_SAVE_FAILED", "file save failed")
 		return
 	}
-	record, err := s.resources.CreateInternal("files", adminresource.WriteInput{
+	mutation, err := s.resources.CreateInternalWithAudit("files", adminresource.WriteInput{
 		Code:        fmt.Sprintf("file-%d", s.now().UTC().UnixNano()),
 		Name:        upload.FileName,
 		Status:      "enabled",
@@ -1293,7 +1282,7 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 			"storageKey":    metadata.Key,
 			"createdAt":     time.Now().UTC().Format(time.RFC3339),
 		},
-	})
+	}, s.mutationAuditEvent(ctx, "file.upload", "files", "uploaded"))
 	if err != nil {
 		if rollbackErr := s.fileStorage.Delete(ctx.Request.Context(), metadata.Key); rollbackErr != nil {
 			s.recordInternalError(ctx, "ADMIN_FILE_METADATA_CREATE_FAILED", err)
@@ -1305,10 +1294,7 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 		writeAdminResourceError(ctx, err)
 		return
 	}
-	if err := s.recordFileAudit(ctx, "file.upload", record); err != nil {
-		writeAdminResourceError(ctx, err)
-		return
-	}
+	record := mutation.Record
 	s.invalidateCachesForResource(ctx.Request.Context(), "files")
 	projected, err := s.resources.ProjectRecord("files", record, adminresource.ProjectionResponse)
 	if err != nil {
@@ -1386,7 +1372,7 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 		writeFileError(ctx, http.StatusInternalServerError, "APP_FILE_SAVE_FAILED", "file save failed")
 		return
 	}
-	record, err := s.resources.CreateInternal("files", adminresource.WriteInput{
+	mutation, err := s.resources.CreateInternalWithAudit("files", adminresource.WriteInput{
 		Code:        fmt.Sprintf("file-%d", s.now().UTC().UnixNano()),
 		Name:        upload.FileName,
 		Status:      "enabled",
@@ -1401,7 +1387,7 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 			"uploadedBy":    username,
 			"createdAt":     s.now().UTC().Format(time.RFC3339),
 		},
-	})
+	}, adminresource.AuditEvent{Actor: username, Action: "file.upload", Resource: "files", Result: "success", ReasonCode: "uploaded"})
 	if err != nil {
 		if rollbackErr := s.fileStorage.Delete(ctx.Request.Context(), metadata.Key); rollbackErr != nil {
 			s.recordInternalError(ctx, "APP_FILE_METADATA_CREATE_FAILED", err)
@@ -1413,10 +1399,7 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 		writeAdminResourceError(ctx, err)
 		return
 	}
-	if err := s.recordFileAuditForActor("file.upload", username, record); err != nil {
-		writeAdminResourceError(ctx, err)
-		return
-	}
+	record := mutation.Record
 	s.invalidateCachesForResource(ctx.Request.Context(), "files")
 	projected, err := s.resources.ProjectRecord("files", record, adminresource.ProjectionResponse)
 	if err != nil {
@@ -1485,22 +1468,29 @@ func appFileVisibleToSession(record adminresource.Record, username string) bool 
 	return strings.TrimSpace(record.Values["uploadedBy"]) == username
 }
 
-func (s *Server) deleteAdminFileObject(ctx *gin.Context, id string) bool {
-	record, err := s.adminResourceRecordByID("files", id)
+func (s *Server) deleteAdminFile(ctx *gin.Context, id string) {
+	mutation, err := s.resources.TombstoneFileWithAudit(id, s.mutationAuditEvent(ctx, "file.delete.request", "files", "cleanup-pending"))
 	if err != nil {
 		writeAdminResourceError(ctx, err)
-		return false
+		return
 	}
+	record := mutation.Record
+	s.invalidateCachesForResource(ctx.Request.Context(), "files")
 	key := fileStorageKey(record)
-	if key == "" {
-		return true
+	if key != "" {
+		err = s.fileStorage.Delete(ctx.Request.Context(), key)
 	}
-	if err := s.fileStorage.Delete(ctx.Request.Context(), key); err != nil {
+	if err != nil && !errors.Is(err, storage.ErrObjectNotFound) {
 		s.recordInternalError(ctx, "ADMIN_FILE_DELETE_FAILED", err)
 		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_DELETE_FAILED", "file delete failed")
-		return false
+		return
 	}
-	return true
+	if _, err := s.resources.PurgeTombstonedFileWithAudit(id, s.mutationAuditEvent(ctx, "file.delete", "files", "deleted")); err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
+	s.invalidateCachesForResource(ctx.Request.Context(), "files")
+	ctx.JSON(http.StatusOK, Response[gin.H]{Data: gin.H{"resource": "files", "deleted": true}})
 }
 
 func (s *Server) adminResourceRecordByID(resource string, id string) (adminresource.Record, error) {
@@ -1546,14 +1536,13 @@ func (s *Server) issueAdminAPIToken(ctx context.Context, actor string, input adm
 		input.Code = prefix
 	}
 	input.Values = values
-	record, err := s.resources.CreateInternal(apiTokensResource, input)
+	mutation, err := s.resources.CreateInternalWithAudit(apiTokensResource, input, adminresource.AuditEvent{
+		Actor: actor, Action: "api_token.create", Resource: apiTokensResource, Result: "success", ReasonCode: "issued",
+	})
 	if err != nil {
 		return adminresource.Record{}, "", err
 	}
-	if err := s.recordAudit("api_token.create", "API Token Issued", actor, ""); err != nil {
-		return adminresource.Record{}, "", err
-	}
-	return record, token, nil
+	return mutation.Record, token, nil
 }
 
 func (s *Server) revokeAdminAPIToken(ctx context.Context, actor string, id string) error {
@@ -1563,17 +1552,17 @@ func (s *Server) revokeAdminAPIToken(ctx context.Context, actor string, id strin
 	}
 	values := cloneStringMap(record.Values)
 	values["revokedAt"] = s.now().UTC().Format(time.RFC3339)
-	_, err = s.resources.UpdateInternal(apiTokensResource, id, adminresource.WriteInput{
+	_, err = s.resources.UpdateInternalWithAudit(apiTokensResource, id, adminresource.WriteInput{
 		Code:        record.Code,
 		Name:        record.Name,
 		Status:      "revoked",
 		Description: record.Description,
 		Values:      values,
-	})
+	}, adminresource.AuditEvent{Actor: actor, Action: "api_token.revoke", Resource: apiTokensResource, Result: "success", ReasonCode: "revoked"})
 	if err != nil {
 		return err
 	}
-	return s.recordAudit("api_token.revoke", "API Token Revoked", actor, "")
+	return nil
 }
 
 func (s *Server) updateAdminAPIToken(ctx context.Context, actor string, id string, input adminresource.WriteInput) (adminresource.Record, error) {
@@ -1621,14 +1610,13 @@ func (s *Server) updateAdminAPIToken(ctx context.Context, actor string, id strin
 	}
 	input.Status = status
 	input.Values = values
-	record, err := s.resources.UpdateInternal(apiTokensResource, id, input)
+	mutation, err := s.resources.UpdateInternalWithAudit(apiTokensResource, id, input, adminresource.AuditEvent{
+		Actor: actor, Action: "api_token.update", Resource: apiTokensResource, Result: "success", ReasonCode: "updated",
+	})
 	if err != nil {
 		return adminresource.Record{}, err
 	}
-	if err := s.recordAudit("api_token.update", "API Token Updated", actor, ""); err != nil {
-		return adminresource.Record{}, err
-	}
-	return record, nil
+	return mutation.Record, nil
 }
 
 func (s *Server) validateAPITokenScopes(scopeValue string) ([]string, error) {
@@ -2398,9 +2386,21 @@ func (s *Server) recordInternalError(ctx *gin.Context, code string, err error) {
 	if err == nil {
 		return
 	}
-	_ = ctx.Error(fmt.Errorf("%s: %w", code, err))
+	publicErr := errors.New(code)
+	_ = ctx.Error(publicErr)
 	if s.internalErrorSink != nil {
-		s.internalErrorSink.Record(ctx.Request.Context(), InternalErrorEvent{Code: code, Err: err})
+		s.internalErrorSink.Record(ctx.Request.Context(), InternalErrorEvent{Code: code, Err: publicErr})
+	}
+}
+
+func (s *Server) mutationAuditEvent(ctx *gin.Context, action string, resource string, reasonCode string) adminresource.AuditEvent {
+	return adminresource.AuditEvent{
+		Actor:      s.currentActor(ctx),
+		Action:     action,
+		Resource:   resource,
+		Result:     "success",
+		EventID:    strings.TrimSpace(ctx.GetHeader("X-Request-ID")),
+		ReasonCode: reasonCode,
 	}
 }
 
@@ -2453,7 +2453,7 @@ func writeUploadPolicyError(ctx *gin.Context, err error) {
 func writeAdminResourceError(ctx *gin.Context, err error) {
 	status := http.StatusInternalServerError
 	code := "ADMIN_RESOURCE_ERROR"
-	message := err.Error()
+	message := "admin resource operation failed"
 	switch {
 	case errors.Is(err, adminresource.ErrUnknownResource):
 		status = http.StatusNotFound

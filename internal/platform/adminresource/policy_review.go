@@ -1,7 +1,6 @@
 package adminresource
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -100,24 +99,15 @@ func (s *Store) ApprovePolicyReview(reviewID string, reviewerCode string) (Polic
 	reviews[reviewIndex] = updatedReview
 	s.resources["policy-reviews"] = reviews
 
-	s.nextID++
-	audit := Record{
-		ID:          fmt.Sprintf("audit-logs-%d", s.nextID),
-		Code:        fmt.Sprintf("policy-review:%s:approved", review.Code),
-		Name:        "Policy review approved",
-		Status:      "recorded",
-		Description: fmt.Sprintf("Policy review %s approved and applied to role %s.", review.Code, role.Code),
-		UpdatedAt:   now,
-		Values: map[string]string{
-			"actor":      strings.TrimSpace(reviewerCode),
-			"action":     "policy-review.approve",
-			"resource":   "roles",
-			"targetId":   role.ID,
-			"targetCode": role.Code,
-			"provider":   "policy-review",
-			"traceId":    review.Code,
-		},
+	audit, err := s.auditRecordLocked(AuditEvent{
+		Actor: strings.TrimSpace(reviewerCode), Action: "policy-review.approve", Resource: "roles",
+		TargetID: role.ID, Result: "success", ReasonCode: "approved",
+	}, s.nextID+1)
+	if err != nil {
+		s.restoreSnapshotLocked(previous)
+		return PolicyReviewResult{}, err
 	}
+	s.nextID++
 	audits = append(audits, audit)
 	s.resources["audit-logs"] = audits
 
@@ -166,9 +156,34 @@ func (s *Store) ExportPolicyReviews(actorCode string) (PolicyReviewExport, error
 		return PolicyReviewExport{}, ErrUnknownResource
 	}
 
+	projectedReviews := make([]Record, 0, len(reviews))
+	for _, review := range reviews {
+		projected, projectErr := s.projectRecordLocked("policy-reviews", review, ProjectionExport)
+		if projectErr != nil {
+			return PolicyReviewExport{}, projectErr
+		}
+		projectedReviews = append(projectedReviews, projected)
+	}
+	projectedAudits := make([]Record, 0, len(audits)+1)
+	for _, existing := range policyReviewAuditRecords(audits) {
+		projected, projectErr := s.projectRecordLocked("audit-logs", existing, ProjectionExport)
+		if projectErr != nil {
+			return PolicyReviewExport{}, projectErr
+		}
+		projectedAudits = append(projectedAudits, projected)
+	}
 	now := s.now().UTC().Format("2006-01-02T15:04:05Z07:00")
-	audit := policyReviewAuditRecord(s.nextID+1, "export", "Policy review export", "policy-review.export", "policy-review:export", "Policy review ledger exported.", strings.TrimSpace(actorCode), Record{}, now)
-	audit.Values["targetCode"] = "policy-reviews"
+	audit, err := s.auditRecordLocked(AuditEvent{
+		Actor: strings.TrimSpace(actorCode), Action: "policy-review.export", Resource: "policy-reviews",
+		TargetID: "policy-reviews", Result: "success", ReasonCode: "exported",
+	}, s.nextID+1)
+	if err != nil {
+		return PolicyReviewExport{}, err
+	}
+	projectedAudit, err := s.projectRecordLocked("audit-logs", audit, ProjectionExport)
+	if err != nil {
+		return PolicyReviewExport{}, err
+	}
 	s.nextID++
 	audits = append(audits, audit)
 	s.resources["audit-logs"] = audits
@@ -180,8 +195,8 @@ func (s *Store) ExportPolicyReviews(actorCode string) (PolicyReviewExport, error
 	return PolicyReviewExport{
 		ExportedBy: strings.TrimSpace(actorCode),
 		ExportedAt: now,
-		Reviews:    cloneRecords(reviews),
-		Audits:     policyReviewAuditRecords(audits),
+		Reviews:    projectedReviews,
+		Audits:     append(projectedAudits, projectedAudit),
 	}, nil
 }
 
@@ -233,8 +248,15 @@ func (s *Store) transitionPolicyReview(reviewID string, transition policyReviewT
 	reviews[reviewIndex] = updatedReview
 	s.resources["policy-reviews"] = reviews
 
+	audit, err := s.auditRecordLocked(AuditEvent{
+		Actor: strings.TrimSpace(transition.actorCode), Action: transition.auditAction, Resource: "policy-reviews",
+		TargetID: review.ID, Result: "success", ReasonCode: transition.auditSuffix,
+	}, s.nextID+1)
+	if err != nil {
+		s.restoreSnapshotLocked(previous)
+		return PolicyReviewActionResult{}, err
+	}
 	s.nextID++
-	audit := policyReviewAuditRecord(s.nextID, transition.auditSuffix, transition.auditName, transition.auditAction, fmt.Sprintf("policy-review:%s:%s", review.Code, transition.auditSuffix), fmt.Sprintf("Policy review %s moved to %s.", review.Code, transition.toStatus), strings.TrimSpace(transition.actorCode), review, now)
 	audits = append(audits, audit)
 	s.resources["audit-logs"] = audits
 	if err := s.persistLocked(); err != nil {
@@ -265,31 +287,6 @@ func applyPolicyReviewToRole(review Record, role *Record) error {
 		return ValidationError{Field: "policyType"}
 	}
 	return nil
-}
-
-func policyReviewAuditRecord(nextID int, suffix string, name string, action string, code string, description string, actorCode string, review Record, now string) Record {
-	targetCode := review.Code
-	targetID := review.ID
-	if suffix == "" {
-		suffix = "recorded"
-	}
-	return Record{
-		ID:          fmt.Sprintf("audit-logs-%d", nextID),
-		Code:        code,
-		Name:        name,
-		Status:      "recorded",
-		Description: description,
-		UpdatedAt:   now,
-		Values: map[string]string{
-			"actor":      actorCode,
-			"action":     action,
-			"resource":   "policy-reviews",
-			"targetId":   targetID,
-			"targetCode": targetCode,
-			"provider":   "policy-review",
-			"traceId":    targetCode,
-		},
-	}
 }
 
 func policyReviewAuditRecords(records []Record) []Record {

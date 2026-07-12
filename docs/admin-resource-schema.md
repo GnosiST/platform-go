@@ -68,10 +68,16 @@ Each field declares:
 - `options`: select or multiselect options for enum-like fields;
 - `relation`: optional dynamic option source for `select` or `multiselect` fields. It declares `resource`, `valueField`, `labelField`, optional `filters`, `sortField`, `sortOrder`, `multiple`, `display`, `parentField`, `pathField` and `rootValue`;
 - `validation`: optional form validation metadata. Supported keys are `minLength`, `maxLength`, `min`, `max` and `pattern`.
+- `sensitivity`: `public`, `internal`, `personal`, `sensitive` or `secret` classification;
+- `storageMode`: `plain`, `masked`, `hashed` or `encrypted` storage contract;
+- `responseMode` and `exportMode`: `full`, `masked`, `hashed` or `omitted` projections applied before values leave the Store.
 
 ## Current Behavior
 
 - Backend validates required fields before creating or updating records.
+- Backend rejects unknown `values` keys and globally prohibited password, token, secret, credential, verification-code, provider-subject and raw-session keys before persistence. External writes cannot populate internal/personal/sensitive/secret or read-only fields.
+- List, query, detail and export responses are rebuilt from declared schema fields. Internal and protected values do not leak through a cloned `Record.Values` map, and any projection failure aborts the response rather than falling back to raw values.
+- Generic create, update and delete persist the business record and redacted audit record in one repository snapshot. A repository or audit validation failure restores the previous snapshot.
 - Backend checks resource action permissions before schema, query, list, create, update and delete responses.
 - Frontend `GenericResourceConsole` reads the schema and dynamically builds:
   - table columns;
@@ -95,7 +101,8 @@ Each field declares:
 - Role groups are exposed through the `role-groups` resource and `roles.groupCode` tree relation, using `role-groups.parentCode` for multi-level role catalog selectors. Roles also expose required `roles.dataScope` with `all`, `current_org`, `current_and_children`, `custom_orgs`, `current_area`, `current_and_children_areas`, `custom_areas` and `self`, plus `roles.dataScopeOrgCodes` for custom org sets and `roles.dataScopeAreaCodes` for custom area sets. Action permissions use `roles.permissions` for allows and `roles.denyPermissions` for explicit denies; deny matches override allow matches in backend Casbin checks, menu filtering and frontend access controls. Role groups classify and govern roles but do not own role membership, inherit permissions, grant permissions or carry data scopes in the base model. `users.roles` owns role membership; `roles.permissions`, `roles.denyPermissions` and `roles.dataScope` own policy. Existing role snapshots that predate `dataScope` remain readable, but new role writes must choose a scope explicitly.
 - `users` is the platform account and principal resource. Personnel files, employees, staff profiles, positions and position assignments are optional capability resources, not default foundation resources. When the `personnel` capability is enabled, `personnel-profiles` must declare `tenantCode`, `orgUnitCode`, optional `areaCode` and optional `userCode` relations; `positions` and `position-assignments` reuse shared tenant/org unit relations rather than creating a separate organization model.
 - User role bindings use the `users.roles` multiselect relation to the `roles` resource, so configurations that expose the user role binding surface must enable RBAC. The backend still accepts legacy `role` values for older snapshots, but `roles` is the canonical field.
-- `audit-logs` is a system-written, read-focused resource. Its runtime schema exposes structured fields `actor`, `action`, `resource`, `targetId`, `targetCode`, `targetName`, `provider`, `createdAt` and `traceId`; list/query pages can search and sort declared fields, while the form field set stays empty so generic admin pages do not expose manual audit-log creation. The audit schema does not expose `sessionId`, raw session handles, session digests or shortened derivatives.
+- `audit-logs` is a system-written, read-focused resource. Its exposed structured fields are `actor`, `action`, `resource`, `targetId`, `provider`, `outcome`, `eventId`, `reasonCode` and `createdAt`; list/query pages can search and sort only declared fields, while the form field set stays empty. Legacy `targetCode` and `traceId` remain internal compatibility fields with omitted response/export projections. The audit schema does not expose `sessionId`, raw session handles, session digests or shortened derivatives. Audit records also omit target labels, raw errors, personal values, object paths and credential material.
+- The optional policy-review export route requires `admin:policy-review:export`, independently from read access. It projects every review and audit record with `ProjectionExport`; one projection failure aborts the whole export. The Admin export button is not rendered for principals without that permission, so an unauthorized control cannot receive keyboard focus.
 - App phone verification and binding are declared as `app-phone-verifications` and `app-phone-bindings`. They expose `appUsername`, `maskedPhone`, `phoneHash`, timestamps and status for governance; they must not store raw phone numbers or raw verification codes in generic records. The verification code is stored as `codeHash`; local/demo verification returns `debugCode` only from the create-verification App API response.
 - Generic default resources reserve optional localized input fields in `values.nameZh`, `values.nameEn`, `values.descriptionZh` and `values.descriptionEn`. They are not table columns by default; the active language decides which value is displayed in the shared list and detail UI.
 - Business resources are not forced to translate every row. When a business domain needs multi-language content, declare `localizable` on the field and store values as `<key>Zh` / `<key>En` in `Record.values`; the generic list/detail/search path uses the active language and falls back to the other language or canonical value. Promote to a translation table or domain-specific adapter only when volume or workflow requires it.
@@ -245,6 +252,8 @@ PLATFORM_ADMIN_RESOURCE_DSN=user:pass@tcp(localhost:3306)/platform
 ```
 
 Selection order is GORM driver, file, then memory. The GORM adapter creates `platform_admin_resource_records` and `platform_admin_resource_state`, and persists generic resource snapshots through the shared GORM storage opener. The older `database/sql` adapter remains behind the same repository port for compatibility tests, but the target runtime path is GORM.
+
+Mutation-plus-audit APIs use this snapshot as their transaction boundary. Create/update/delete either save both records and advance the revision, or restore the complete prior in-memory snapshot when `Save` fails. File deletion additionally stores its internal tombstone and delete-request audit in one snapshot before object cleanup starts.
 
 The GORM adapter now stores core system resources in normalized tables while preserving the same `ResourceSnapshot` API:
 

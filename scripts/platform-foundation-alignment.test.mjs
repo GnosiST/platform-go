@@ -7,8 +7,9 @@ import { describe, it } from "node:test";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
-const completionProgramTaskIDs = [
-  "runtime-security-containment",
+const completedRuntimeSecurityTaskID = "runtime-security-containment";
+
+const remainingCompletionProgramTaskIDs = [
   "admin-watermark-export-governance",
   "sensitive-data-protection-runtime",
   "sensitive-data-historical-migration",
@@ -37,14 +38,25 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
-  it("tracks the completion program as non-droppable future work", () => {
+  it("migrates runtime security to required work and tracks the remaining completion program as future work", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
 
     assert.ok(audit.requiredTaskNodes.includes("production-admin-oidc-auth"));
-    assert.deepEqual(audit.requiredFutureTaskNodes, completionProgramTaskIDs);
-    for (const taskID of completionProgramTaskIDs) {
+    assert.ok(audit.requiredTaskNodes.includes(completedRuntimeSecurityTaskID));
+    assert.deepEqual(audit.requiredFutureTaskNodes, remainingCompletionProgramTaskIDs);
+    for (const taskID of [completedRuntimeSecurityTaskID, ...remainingCompletionProgramTaskIDs]) {
       assert.ok(audit.nonDroppableGoalNodes.includes(taskID), `${taskID} must be non-droppable`);
     }
+  });
+
+  it("rejects omitting the implemented runtime security node from required task tracking", () => {
+    const audit = readJSON("resources/platform-foundation-alignment-audit.json");
+    audit.requiredTaskNodes = audit.requiredTaskNodes.filter((taskID) => taskID !== completedRuntimeSecurityTaskID);
+
+    const result = runValidator(["--audit", tempJSON("missing-runtime-security-required-task.json", audit)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /requiredTaskNodes is missing required goal node runtime-security-containment/);
   });
 
   it("rejects regressing production Admin OIDC to pending after Task 8 closeout", () => {

@@ -932,7 +932,7 @@
         "en": "File Operation Audit Contract"
       },
       "status": "implemented",
-      "purpose": "Record successful upload, content-read and delete operations for file resources through the shared audit-log resource while avoiding success audits for failed object deletions.",
+      "purpose": "Persist file metadata and redacted audit events atomically, hide durable deletion tombstones immediately, retry object cleanup idempotently and purge metadata only after cleanup succeeds.",
       "dependsOn": [
         "system-management",
         "permission-codes"
@@ -957,7 +957,7 @@
         "requiredSourceSnippets": [
           {
             "path": "internal/platform/httpapi/server.go",
-            "contains": "if err := s.recordFileAudit(ctx, \"file.upload\", record); err != nil"
+            "contains": "CreateInternalWithAudit(\"files\""
           },
           {
             "path": "internal/platform/httpapi/server.go",
@@ -965,15 +965,15 @@
           },
           {
             "path": "internal/platform/httpapi/server.go",
-            "contains": "if err := s.recordFileAudit(ctx, \"file.delete\", record); err != nil"
+            "contains": "TombstoneFileWithAudit(id"
           },
           {
             "path": "internal/platform/httpapi/server.go",
-            "contains": "func (s *Server) recordFileAudit(ctx *gin.Context, action string, record adminresource.Record) error"
+            "contains": "PurgeTombstonedFileWithAudit(id"
           },
           {
             "path": "internal/platform/httpapi/server_test.go",
-            "contains": "TestAdminFileDeleteDoesNotAuditFailedObjectDeletion"
+            "contains": "TestFileDeleteTombstoneKeepsContentHiddenUntilObjectCleanupCompletes"
           },
           {
             "path": "internal/platform/httpapi/server_test.go",
@@ -2595,7 +2595,7 @@
         "zh": "运行时安全收敛",
         "en": "Runtime Security Containment"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Centralize resource write and projection policy, digest-only sessions, private files, transport security, rate limiting and redacted audit/export boundaries before public release.",
       "dependsOn": [
         "production-runtime-gate",
@@ -2605,7 +2605,30 @@
       "evidence": {
         "sourcePaths": [
           "docs/superpowers/specs/2026-07-12-runtime-security-hardening-design.md",
-          "docs/superpowers/plans/2026-07-12-runtime-security-containment.md"
+          "docs/superpowers/plans/2026-07-12-runtime-security-containment.md",
+          "internal/platform/adminresource/audit.go",
+          "internal/platform/adminresource/security.go",
+          "internal/platform/httpapi/server.go",
+          "cmd/platform-api/main.go",
+          "admin/src/platform/policy-review/PolicyReviewConsole.tsx"
+        ],
+        "tests": [
+          "internal/platform/adminresource/store_test.go",
+          "internal/platform/adminresource/policy_review_test.go",
+          "internal/platform/adminresource/security_test.go",
+          "internal/platform/httpapi/server_test.go",
+          "cmd/platform-api/main_test.go",
+          "scripts/admin-ui-contracts.test.mjs"
+        ],
+        "validators": [
+          "scripts/validate-admin-resources.mjs",
+          "scripts/validate-admin-ui-contracts.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs"
+        ],
+        "adminResources": [
+          "audit-logs",
+          "files",
+          "api-tokens"
         ],
         "taskIds": [
           "runtime-security-containment"

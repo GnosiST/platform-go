@@ -28,7 +28,6 @@
     "requiresDependencyConflictChecks": true,
     "requiresTaskGraphBeforeNewNode": true,
     "requiredUnfinishedNodes": [
-      "runtime-security-containment",
       "admin-watermark-export-governance",
       "sensitive-data-protection-runtime",
       "sensitive-data-historical-migration",
@@ -70,7 +69,6 @@
     "mustNotMarkCompleteWhileBlockersActive": true,
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "controlledBlockers": [
-      "runtime-security-containment",
       "admin-watermark-export-governance",
       "sensitive-data-protection-runtime",
       "sensitive-data-historical-migration",
