@@ -1,13 +1,13 @@
 package adminresource
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -59,14 +59,15 @@ type gormSensitiveMigrationRun struct {
 }
 
 type gormSensitiveMigrationTarget struct {
-	TargetID        string `gorm:"column:target_id;size:64;primaryKey"`
-	RunID           string `gorm:"column:run_id;size:64;not null;index:idx_sensitive_target_lookup,priority:1"`
-	Resource        string `gorm:"column:resource;size:128;not null;index:idx_sensitive_target_lookup,priority:2"`
-	TenantScope     string `gorm:"column:tenant_scope;size:191;not null"`
-	TenantScopeHash string `gorm:"column:tenant_scope_hash;size:71;not null;index:idx_sensitive_target_lookup,priority:3"`
-	RecordID        string `gorm:"column:record_id;size:191;not null;index:idx_sensitive_target_lookup,priority:4"`
-	FieldKey        string `gorm:"column:field_key;size:128;not null"`
-	SnapshotHash    string `gorm:"column:snapshot_hash;size:71;not null"`
+	TargetID         string `gorm:"column:target_id;size:64;primaryKey"`
+	RunID            string `gorm:"column:run_id;size:64;not null;index:idx_sensitive_target_lookup,priority:1"`
+	Resource         string `gorm:"column:resource;size:128;not null;index:idx_sensitive_target_lookup,priority:2"`
+	TenantScope      string `gorm:"column:tenant_scope;size:191;not null"`
+	TenantScopeHash  string `gorm:"column:tenant_scope_hash;size:71;not null;index:idx_sensitive_target_lookup,priority:3"`
+	RecordID         string `gorm:"column:record_id;size:191;not null;index:idx_sensitive_target_lookup,priority:4"`
+	FieldKey         string `gorm:"column:field_key;size:128;not null"`
+	ResourcePlanHash string `gorm:"column:resource_plan_hash;size:71;not null"`
+	SnapshotHash     string `gorm:"column:snapshot_hash;size:71;not null"`
 }
 
 type gormSensitiveMigrationCheckpoint struct {
@@ -98,6 +99,7 @@ type gormSensitiveMigrationEvent struct {
 	Mode            string `gorm:"column:mode;size:32;not null"`
 	Resource        string `gorm:"column:resource;size:128;not null"`
 	TenantScopeHash string `gorm:"column:tenant_scope_hash;size:71;not null"`
+	LastRecordID    string `gorm:"column:last_record_id;size:191;not null"`
 	Rows            int    `gorm:"column:row_count;not null"`
 	Missing         int    `gorm:"column:missing_count;not null"`
 	Plaintext       int    `gorm:"column:plaintext_count;not null"`
@@ -232,7 +234,7 @@ func (s *GORMProtectedValueMigrationStore) Rows(ctx context.Context, plan sensit
 }
 
 func (s *GORMProtectedValueMigrationStore) Prepare(ctx context.Context, request sensitivemigration.RunRequest) (sensitivemigration.RunState, error) {
-	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil || !sensitivemigration.ValidMutationRequest(request) || len(request.Plan.Resources) == 0 {
+	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil || !sensitivemigration.ValidMutationRequest(request) || len(request.Plan.Resources) == 0 || sensitivemigration.PlanHash(request.Plan) != request.PlanHash {
 		return sensitivemigration.RunState{}, ErrMigrationInvalidOptions
 	}
 	for _, plan := range request.Plan.Resources {
@@ -327,6 +329,9 @@ func (s *GORMProtectedValueMigrationStore) StartOrResume(ctx context.Context, re
 	if request.Mode == sensitivemigration.ModeApply && !sensitivemigration.ValidMutationRequest(request) || request.Mode != sensitivemigration.ModeApply && request.Mode != sensitivemigration.ModeVerify {
 		return sensitivemigration.RunState{}, ErrMigrationInvalidOptions
 	}
+	if len(request.Plan.Resources) == 0 || sensitivemigration.PlanHash(request.Plan) != request.PlanHash {
+		return sensitivemigration.RunState{}, ErrMigrationInvalidOptions
+	}
 	var state sensitivemigration.RunState
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var run gormSensitiveMigrationRun
@@ -343,21 +348,13 @@ func (s *GORMProtectedValueMigrationStore) StartOrResume(ctx context.Context, re
 		if request.Mode == sensitivemigration.ModeApply && !runMatchesRequest(run, request) {
 			return ErrMigrationConflict
 		}
-		head, err := verifyEventChain(tx, request.RunID)
+		journal, err := verifyMigrationJournal(tx, request.RunID)
 		if err != nil {
 			return err
 		}
-		var checkpoints []gormSensitiveMigrationCheckpoint
-		if err := tx.Where("run_id = ? AND mode = ?", request.RunID, string(sensitivemigration.ModeApply)).
-			Order("resource, tenant_scope_hash").Find(&checkpoints).Error; err != nil {
-			return ErrMigrationStore
-		}
 		state = runState(run)
-		state.EventChainHead = head
-		for _, checkpoint := range checkpoints {
-			if checkpoint.EventHash == "" || checkpoint.EventSequence == 0 {
-				return ErrMigrationConflict
-			}
+		state.EventChainHead = journal.Head
+		for _, checkpoint := range journal.Checkpoints {
 			counts := checkpointCounts(checkpoint)
 			state.Counts = addMigrationCounts(state.Counts, counts)
 			state.Checkpoints = append(state.Checkpoints, sensitivemigration.CheckpointState{
@@ -451,19 +448,16 @@ func (s *GORMProtectedValueMigrationStore) FinishRun(ctx context.Context, runID 
 		if run.Status != sensitivemigration.StatusPrepared {
 			return ErrMigrationConflict
 		}
-		var checkpoints []gormSensitiveMigrationCheckpoint
-		if err := tx.Where("run_id = ? AND mode = ?", runID, string(sensitivemigration.ModeApply)).Find(&checkpoints).Error; err != nil {
-			return ErrMigrationStore
+		journal, err := verifyMigrationJournal(tx, runID)
+		if err != nil {
+			return err
 		}
 		processed := 0
-		for _, checkpoint := range checkpoints {
+		for _, checkpoint := range journal.Checkpoints {
 			processed += migrationCountsTotal(checkpointCounts(checkpoint))
 		}
 		if processed != run.TargetCount {
 			return ErrMigrationConflict
-		}
-		if _, err := verifyEventChain(tx, runID); err != nil {
-			return err
 		}
 		updated := tx.Model(&gormSensitiveMigrationRun{}).
 			Where("run_id = ? AND status = ?", runID, sensitivemigration.StatusPrepared).
@@ -533,6 +527,10 @@ func (s *GORMProtectedValueMigrationStore) ApplyBatch(ctx context.Context, mutat
 		if err != nil || actual != mutation.ExpectedRevision {
 			return ErrMigrationConflict
 		}
+		journal, err := verifyMigrationJournal(tx, mutation.RunID)
+		if err != nil {
+			return err
+		}
 
 		var checkpoint gormSensitiveMigrationCheckpoint
 		checkpointQuery := tx.Where("checkpoint_id = ?", checkpointID)
@@ -569,7 +567,7 @@ func (s *GORMProtectedValueMigrationStore) ApplyBatch(ctx context.Context, mutat
 			targetFields := make([]string, 0, len(targets))
 			snapshotHash := migrationHash("values-json", row.OriginalValuesJSON)
 			for _, target := range targets {
-				if target.SnapshotHash != snapshotHash {
+				if target.SnapshotHash != snapshotHash || target.ResourcePlanHash != resourcePlanHash(mutation.Resource) {
 					return ErrMigrationConflict
 				}
 				targetFields = append(targetFields, target.FieldKey)
@@ -598,20 +596,14 @@ func (s *GORMProtectedValueMigrationStore) ApplyBatch(ctx context.Context, mutat
 			return ErrMigrationConflict
 		}
 
-		priorHash, err := verifyEventChain(tx, mutation.RunID)
-		if err != nil {
-			return err
-		}
-		var sequence uint64
-		if err := tx.Model(&gormSensitiveMigrationEvent{}).Where("run_id = ?", mutation.RunID).Select("COALESCE(MAX(sequence), 0)").Scan(&sequence).Error; err != nil {
-			return ErrMigrationStore
-		}
-		sequence++
+		priorHash := journal.Head
+		sequence := journal.Sequence + 1
 		now := migrationTimestamp()
 		event := gormSensitiveMigrationEvent{
 			EventID: migrationSurrogateID("event", mutation.RunID, strconv.FormatUint(sequence, 10)),
 			RunID:   mutation.RunID, Sequence: sequence, Mode: string(mutation.Mode), Resource: mutation.Resource.Resource,
-			TenantScopeHash: tenantHash, Rows: len(mutation.Rows), Missing: mutation.Counts.Missing,
+			TenantScopeHash: tenantHash, LastRecordID: mutation.LastRecordID,
+			Rows: len(mutation.Rows), Missing: mutation.Counts.Missing,
 			Plaintext: mutation.Counts.Plaintext, TargetEnvelope: mutation.Counts.TargetEnvelope,
 			ForeignEnvelope: mutation.Counts.ForeignEnvelope, Malformed: mutation.Counts.MalformedEnvelope,
 			Revision: nextRevision, PriorEventHash: priorHash, CreatedAt: now,
@@ -650,6 +642,10 @@ func (s *GORMProtectedValueMigrationStore) ApplyBatch(ctx context.Context, mutat
 			if err := tx.Create(&checkpoint).Error; err != nil {
 				return ErrMigrationStore
 			}
+		}
+		verifiedJournal, err := verifyMigrationJournal(tx, mutation.RunID)
+		if err != nil || verifiedJournal.Head != event.EventHash || verifiedJournal.Sequence != sequence {
+			return ErrMigrationConflict
 		}
 		cas := tx.Model(&gormAdminResourceState{}).
 			Where("key = ? AND value = ?", "revision", strconv.FormatUint(mutation.ExpectedRevision, 10)).
@@ -701,6 +697,7 @@ func (s *GORMProtectedValueMigrationStore) readPhysicalRows(ctx context.Context,
 func (s *GORMProtectedValueMigrationStore) prepareTargets(ctx context.Context, request sensitivemigration.RunRequest) ([]gormSensitiveMigrationTarget, error) {
 	targets := make([]gormSensitiveMigrationTarget, 0)
 	for _, plan := range request.Plan.Resources {
+		planHash := resourcePlanHash(plan)
 		scopes, err := s.TenantScopes(ctx, plan)
 		if err != nil {
 			return nil, err
@@ -721,7 +718,8 @@ func (s *GORMProtectedValueMigrationStore) prepareTargets(ctx context.Context, r
 						targets = append(targets, gormSensitiveMigrationTarget{
 							TargetID: migrationSurrogateID("target", request.RunID, plan.Resource, tenantHash, row.RecordID, field.Key),
 							RunID:    request.RunID, Resource: plan.Resource, TenantScope: tenant, TenantScopeHash: tenantHash,
-							RecordID: row.RecordID, FieldKey: field.Key, SnapshotHash: migrationHash("values-json", row.ValuesJSON),
+							RecordID: row.RecordID, FieldKey: field.Key, ResourcePlanHash: planHash,
+							SnapshotHash: migrationHash("values-json", row.ValuesJSON),
 						})
 					}
 					after = row.RecordID
@@ -770,12 +768,12 @@ func migrationValues(raw string) (map[string]any, error) {
 }
 
 func migrationChangedFields(original string, updated string) ([]string, error) {
-	originalValues, err := migrationValues(original)
-	if err != nil {
+	originalValues := map[string]json.RawMessage{}
+	if err := json.Unmarshal([]byte(original), &originalValues); err != nil {
 		return nil, err
 	}
-	updatedValues, err := migrationValues(updated)
-	if err != nil {
+	updatedValues := map[string]json.RawMessage{}
+	if err := json.Unmarshal([]byte(updated), &updatedValues); err != nil {
 		return nil, err
 	}
 	keys := map[string]struct{}{}
@@ -787,7 +785,9 @@ func migrationChangedFields(original string, updated string) ([]string, error) {
 	}
 	changed := make([]string, 0)
 	for key := range keys {
-		if !reflect.DeepEqual(originalValues[key], updatedValues[key]) {
+		originalValue, originalExists := originalValues[key]
+		updatedValue, updatedExists := updatedValues[key]
+		if originalExists != updatedExists || !bytes.Equal(bytes.TrimSpace(originalValue), bytes.TrimSpace(updatedValue)) {
 			changed = append(changed, key)
 		}
 	}
@@ -843,12 +843,17 @@ func targetsMatchPlan(targets []gormSensitiveMigrationTarget, plan sensitivemigr
 	if len(targets) != len(plan.Fields) {
 		return false
 	}
+	planHash := resourcePlanHash(plan)
 	for index, field := range plan.Fields {
-		if targets[index].FieldKey != field.Key {
+		if targets[index].FieldKey != field.Key || targets[index].ResourcePlanHash != planHash {
 			return false
 		}
 	}
 	return true
+}
+
+func resourcePlanHash(plan sensitivemigration.ResourcePlan) string {
+	return sensitivemigration.PlanHash(sensitivemigration.Plan{Resources: []sensitivemigration.ResourcePlan{plan}})
 }
 
 func checkpointCounts(checkpoint gormSensitiveMigrationCheckpoint) sensitivemigration.Counts {
@@ -871,25 +876,89 @@ func migrationCountsTotal(counts sensitivemigration.Counts) int {
 	return counts.Missing + counts.Plaintext + counts.TargetEnvelope + counts.ForeignEnvelope + counts.MalformedEnvelope
 }
 
-func verifyEventChain(tx *gorm.DB, runID string) (string, error) {
+type migrationJournalVerification struct {
+	Head        string
+	Sequence    uint64
+	Checkpoints []gormSensitiveMigrationCheckpoint
+}
+
+type migrationEventScopeState struct {
+	LastRecordID     string
+	ExpectedRevision uint64
+	Rows             int
+	Counts           sensitivemigration.Counts
+	Batches          int
+	EventSequence    uint64
+	EventHash        string
+}
+
+func verifyMigrationJournal(tx *gorm.DB, runID string) (migrationJournalVerification, error) {
 	var events []gormSensitiveMigrationEvent
 	if err := tx.Where("run_id = ?", runID).Order("sequence").Find(&events).Error; err != nil {
-		return "", ErrMigrationStore
+		return migrationJournalVerification{}, ErrMigrationStore
 	}
 	prior := migrationHash("event-genesis", runID)
+	reconstructed := map[string]migrationEventScopeState{}
 	for index, event := range events {
 		if event.Sequence != uint64(index+1) || event.PriorEventHash != prior || event.EventHash == "" || event.EventHash != migrationEventHash(event) {
-			return "", ErrMigrationConflict
+			return migrationJournalVerification{}, ErrMigrationConflict
+		}
+		if event.Mode == string(sensitivemigration.ModeApply) {
+			if event.Resource == "" || event.TenantScopeHash == "" || event.LastRecordID == "" || event.Rows < 1 {
+				return migrationJournalVerification{}, ErrMigrationConflict
+			}
+			key := migrationSurrogateID("event-scope", event.Resource, event.TenantScopeHash, event.Mode)
+			state := reconstructed[key]
+			if state.LastRecordID != "" && event.LastRecordID <= state.LastRecordID {
+				return migrationJournalVerification{}, ErrMigrationConflict
+			}
+			state.LastRecordID = event.LastRecordID
+			state.ExpectedRevision = event.Revision
+			state.Rows += event.Rows
+			state.Counts = addMigrationCounts(state.Counts, eventCounts(event))
+			state.Batches++
+			state.EventSequence = event.Sequence
+			state.EventHash = event.EventHash
+			reconstructed[key] = state
 		}
 		prior = event.EventHash
 	}
-	return prior, nil
+
+	var checkpoints []gormSensitiveMigrationCheckpoint
+	if err := tx.Where("run_id = ? AND mode = ?", runID, string(sensitivemigration.ModeApply)).
+		Order("resource, tenant_scope_hash").Find(&checkpoints).Error; err != nil {
+		return migrationJournalVerification{}, ErrMigrationStore
+	}
+	if len(checkpoints) != len(reconstructed) {
+		return migrationJournalVerification{}, ErrMigrationConflict
+	}
+	for _, checkpoint := range checkpoints {
+		if migrationHash("tenant-scope", checkpoint.TenantScope) != checkpoint.TenantScopeHash {
+			return migrationJournalVerification{}, ErrMigrationConflict
+		}
+		key := migrationSurrogateID("event-scope", checkpoint.Resource, checkpoint.TenantScopeHash, checkpoint.Mode)
+		expected, ok := reconstructed[key]
+		if !ok || checkpoint.Status != sensitivemigration.StatusCompleted || checkpoint.LastRecordID != expected.LastRecordID ||
+			checkpoint.ExpectedRevision != expected.ExpectedRevision || checkpoint.Rows != expected.Rows ||
+			checkpointCounts(checkpoint) != expected.Counts || checkpoint.Batches != expected.Batches ||
+			checkpoint.EventSequence != expected.EventSequence || checkpoint.EventHash != expected.EventHash {
+			return migrationJournalVerification{}, ErrMigrationConflict
+		}
+	}
+	return migrationJournalVerification{Head: prior, Sequence: uint64(len(events)), Checkpoints: checkpoints}, nil
+}
+
+func eventCounts(event gormSensitiveMigrationEvent) sensitivemigration.Counts {
+	return sensitivemigration.Counts{
+		Missing: event.Missing, Plaintext: event.Plaintext, TargetEnvelope: event.TargetEnvelope,
+		ForeignEnvelope: event.ForeignEnvelope, MalformedEnvelope: event.Malformed,
+	}
 }
 
 func migrationEventHash(event gormSensitiveMigrationEvent) string {
 	return migrationHash(
 		"event", event.RunID, strconv.FormatUint(event.Sequence, 10), event.Mode, event.Resource,
-		event.TenantScopeHash, strconv.Itoa(event.Rows), strconv.Itoa(event.Missing), strconv.Itoa(event.Plaintext),
+		event.TenantScopeHash, event.LastRecordID, strconv.Itoa(event.Rows), strconv.Itoa(event.Missing), strconv.Itoa(event.Plaintext),
 		strconv.Itoa(event.TargetEnvelope), strconv.Itoa(event.ForeignEnvelope), strconv.Itoa(event.Malformed),
 		strconv.FormatUint(event.Revision, 10), event.PriorEventHash, event.CreatedAt,
 	)

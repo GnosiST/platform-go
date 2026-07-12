@@ -479,6 +479,29 @@ func TestApplyRequiresCanonicalApprovalsAndPreparedPlan(t *testing.T) {
 	}
 }
 
+func TestRunnerRejectsCallerPlanHashThatDoesNotMatchCanonicalPlan(t *testing.T) {
+	for _, mode := range []Mode{ModePrepare, ModeApply, ModeVerify} {
+		t.Run(string(mode), func(t *testing.T) {
+			plan := migrationApplyPlan()
+			store := newMemoryMutatingStore(plan, nil)
+			request := approvedMigrationRequest("run-resume")
+			request.PlanHash = "sha256:" + strings.Repeat("f", 64)
+			if mode == ModeVerify {
+				request = RunRequest{RunID: request.RunID, PlanHash: request.PlanHash}
+			}
+
+			if _, err := NewRunner(plan, migrationTestRuntime(t), store).Run(context.Background(), Options{
+				Mode: mode, BatchSize: 1, Request: request,
+			}); !errors.Is(err, ErrInvalidOptions) {
+				t.Fatalf("Run(%s mismatched plan hash) error = %v, want ErrInvalidOptions", mode, err)
+			}
+			if store.prepareCalls != 0 || store.startCalls != 0 {
+				t.Fatalf("store calls prepare=%d start=%d, want zero", store.prepareCalls, store.startCalls)
+			}
+		})
+	}
+}
+
 func TestApplyRequiresEveryApprovalFieldAndCanonicalBackupHash(t *testing.T) {
 	mutations := []struct {
 		name   string
@@ -687,7 +710,7 @@ func migrationApplyPlan() Plan {
 
 func approvedMigrationRequest(runID string) RunRequest {
 	return RunRequest{
-		RunID: runID, PlanHash: "sha256:" + strings.Repeat("a", 64), ActorID: "operator-1",
+		RunID: runID, PlanHash: PlanHash(migrationApplyPlan()), ActorID: "operator-1",
 		Reason: "approved maintenance", ApprovalRef: "approval-1", BackupURI: "s3://backup/location",
 		BackupHash: "sha256:" + strings.Repeat("b", 64), RestoreEvidence: "restore-evidence-1",
 		MaintenanceConfirmed: true,
@@ -700,6 +723,7 @@ type memoryMutatingStore struct {
 	state                     RunState
 	checkpoint                CheckpointState
 	startErr                  error
+	prepareCalls              int
 	startCalls                int
 	applyCalls                int
 	interruptAfterFirstCommit bool
@@ -709,7 +733,7 @@ type memoryMutatingStore struct {
 func newMemoryMutatingStore(plan Plan, rows []Row) *memoryMutatingStore {
 	return &memoryMutatingStore{
 		plan: plan, rows: append([]Row(nil), rows...),
-		state: RunState{RunID: "run-resume", PlanHash: "sha256:" + strings.Repeat("a", 64), Status: StatusPrepared, ExpectedRevision: 7, TargetCount: len(rows)},
+		state: RunState{RunID: "run-resume", PlanHash: PlanHash(plan), Status: StatusPrepared, ExpectedRevision: 7, TargetCount: len(rows)},
 	}
 }
 
@@ -722,6 +746,7 @@ func (s *memoryMutatingStore) Rows(_ context.Context, plan ResourcePlan, tenant 
 }
 
 func (s *memoryMutatingStore) Prepare(context.Context, RunRequest) (RunState, error) {
+	s.prepareCalls++
 	return s.state, nil
 }
 

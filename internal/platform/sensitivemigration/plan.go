@@ -1,6 +1,9 @@
 package sensitivemigration
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -24,6 +27,47 @@ type ResourcePlan struct {
 type FieldPlan struct {
 	Key    string
 	Policy dataprotection.FieldPolicy
+}
+
+type canonicalPlanResource struct {
+	Resource      string               `json:"resource"`
+	Scope         string               `json:"scope"`
+	TenantField   string               `json:"tenantField"`
+	SchemaVersion uint32               `json:"schemaVersion"`
+	Fields        []canonicalPlanField `json:"fields"`
+}
+
+type canonicalPlanField struct {
+	Key                 string `json:"key"`
+	Format              string `json:"format"`
+	Normalization       string `json:"normalization"`
+	BlindIndexNamespace string `json:"blindIndexNamespace"`
+}
+
+func PlanHash(plan Plan) string {
+	resources := make([]canonicalPlanResource, 0, len(plan.Resources))
+	for _, resource := range plan.Resources {
+		fields := make([]canonicalPlanField, 0, len(resource.Fields))
+		for _, field := range resource.Fields {
+			fields = append(fields, canonicalPlanField{
+				Key: field.Key, Format: field.Policy.Format, Normalization: field.Policy.Normalization,
+				BlindIndexNamespace: field.Policy.BlindIndexNamespace,
+			})
+		}
+		slices.SortFunc(fields, func(left canonicalPlanField, right canonicalPlanField) int {
+			return strings.Compare(left.Key, right.Key)
+		})
+		resources = append(resources, canonicalPlanResource{
+			Resource: resource.Resource, Scope: resource.Scope, TenantField: resource.TenantField,
+			SchemaVersion: resource.SchemaVersion, Fields: fields,
+		})
+	}
+	slices.SortFunc(resources, func(left canonicalPlanResource, right canonicalPlanResource) int {
+		return strings.Compare(left.Resource, right.Resource)
+	})
+	payload, _ := json.Marshal(resources)
+	digest := sha256.Sum256(payload)
+	return "sha256:" + hex.EncodeToString(digest[:])
 }
 
 func PlanFromManifests(manifests []capability.Manifest) (Plan, error) {

@@ -12,9 +12,10 @@ import (
 )
 
 type Runner struct {
-	plan    Plan
-	runtime dataprotection.Runtime
-	store   ReadStore
+	plan     Plan
+	planHash string
+	runtime  dataprotection.Runtime
+	store    ReadStore
 }
 
 func NewRunner(plan Plan, runtime dataprotection.Runtime, store ReadStore) *Runner {
@@ -28,7 +29,8 @@ func NewRunner(plan Plan, runtime dataprotection.Runtime, store ReadStore) *Runn
 	slices.SortFunc(resources, func(left ResourcePlan, right ResourcePlan) int {
 		return strings.Compare(left.Resource, right.Resource)
 	})
-	return &Runner{plan: Plan{Resources: resources}, runtime: runtime, store: store}
+	canonicalPlan := Plan{Resources: resources}
+	return &Runner{plan: canonicalPlan, planHash: PlanHash(canonicalPlan), runtime: runtime, store: store}
 }
 
 func (r *Runner) Run(ctx context.Context, options Options) (Report, error) {
@@ -96,6 +98,9 @@ func (r *Runner) runPrepared(ctx context.Context, options Options, batchSize int
 	request.Mode = options.Mode
 	request.Plan = r.plan
 	report.Mode = options.Mode
+	if request.PlanHash != r.planHash {
+		return report, ErrInvalidOptions
+	}
 	switch options.Mode {
 	case ModePrepare:
 		if !validMutationRequest(request) {

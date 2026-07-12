@@ -1,6 +1,8 @@
 package sensitivemigration
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"reflect"
 	"strings"
 	"testing"
@@ -8,6 +10,45 @@ import (
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/dataprotection"
 )
+
+func TestPlanHashUsesCanonicalOrderedCompleteProtectionMetadata(t *testing.T) {
+	forward := Plan{Resources: []ResourcePlan{
+		{
+			Resource: "zeta-records", Scope: "global", SchemaVersion: 3,
+			Fields: []FieldPlan{
+				{Key: "zetaSecret", Policy: dataprotection.FieldPolicy{Format: "aes-256-gcm-v1", Normalization: "trim-v1", BlindIndexNamespace: "zeta-index"}},
+				{Key: "alphaSecret", Policy: dataprotection.FieldPolicy{Format: "aes-256-gcm-v1", Normalization: "raw-v1"}},
+			},
+		},
+		{
+			Resource: "alpha-records", Scope: "tenant-field", TenantField: "tenantCode", SchemaVersion: 7,
+			Fields: []FieldPlan{{Key: "emailSecret", Policy: dataprotection.FieldPolicy{
+				Format: "aes-256-gcm-v1", Normalization: "email-v1", BlindIndexNamespace: "email-index",
+			}}},
+		},
+	}}
+	reverse := Plan{Resources: []ResourcePlan{forward.Resources[1], forward.Resources[0]}}
+	reverse.Resources[1].Fields = []FieldPlan{forward.Resources[0].Fields[1], forward.Resources[0].Fields[0]}
+
+	forwardHash := PlanHash(forward)
+	if forwardHash != PlanHash(reverse) || !strings.HasPrefix(forwardHash, "sha256:") || len(forwardHash) != 71 {
+		t.Fatalf("canonical hashes forward=%q reverse=%q", forwardHash, PlanHash(reverse))
+	}
+
+	changed := forward
+	changed.Resources = append([]ResourcePlan(nil), forward.Resources...)
+	changed.Resources[0].Fields = append([]FieldPlan(nil), forward.Resources[0].Fields...)
+	changed.Resources[0].Fields[0].Policy.BlindIndexNamespace = "changed-index"
+	if PlanHash(changed) == forwardHash {
+		t.Fatal("plan hash did not bind complete protection policy")
+	}
+
+	canonicalJSON := []byte(`[{"resource":"alpha-records","scope":"tenant-field","tenantField":"tenantCode","schemaVersion":7,"fields":[{"key":"emailSecret","format":"aes-256-gcm-v1","normalization":"email-v1","blindIndexNamespace":"email-index"}]},{"resource":"zeta-records","scope":"global","tenantField":"","schemaVersion":3,"fields":[{"key":"alphaSecret","format":"aes-256-gcm-v1","normalization":"raw-v1","blindIndexNamespace":""},{"key":"zetaSecret","format":"aes-256-gcm-v1","normalization":"trim-v1","blindIndexNamespace":"zeta-index"}]}]`)
+	digest := sha256.Sum256(canonicalJSON)
+	if want := "sha256:" + hex.EncodeToString(digest[:]); forwardHash != want {
+		t.Fatalf("PlanHash() = %q, want canonical JSON hash %q", forwardHash, want)
+	}
+}
 
 func TestMigrationPlanAcceptsArbitraryValuesSourceAndRetainsMetadata(t *testing.T) {
 	manifests := []capability.Manifest{
