@@ -17,6 +17,7 @@ const (
 	ModeRollback        Mode = "rollback"
 	StatusCompleted          = "completed"
 	StatusFailed             = "failed"
+	StatusPrepared           = "prepared"
 	DefaultBatchSize         = 100
 	MaximumBatchSize         = 1000
 )
@@ -40,6 +41,43 @@ type Row struct {
 type ReadStore interface {
 	TenantScopes(context.Context, ResourcePlan) ([]string, error)
 	Rows(context.Context, ResourcePlan, string, string, int) ([]Row, error)
+}
+
+type RunRequest struct {
+	RunID    string
+	PlanHash string
+	Plan     Plan
+}
+
+type RunState struct {
+	RunID            string
+	PlanHash         string
+	Status           string
+	ExpectedRevision uint64
+	TargetCount      int
+}
+
+type RowMutation struct {
+	RecordID           string
+	OriginalValuesJSON string
+	UpdatedValuesJSON  string
+}
+
+type BatchMutation struct {
+	RunID            string
+	Mode             Mode
+	Resource         ResourcePlan
+	TenantID         string
+	ExpectedRevision uint64
+	LastRecordID     string
+	Rows             []RowMutation
+}
+
+type BatchCommit struct {
+	Revision      uint64
+	Rows          int
+	LastRecordID  string
+	EventSequence uint64
 }
 
 type Options struct {

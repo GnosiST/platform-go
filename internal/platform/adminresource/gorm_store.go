@@ -32,6 +32,97 @@ const (
 	adminVersionsTable        = "platform_versions"
 )
 
+type gormAdminResourceLayout struct {
+	Table            string
+	ValueProjections map[string][]string
+}
+
+var normalizedGORMResourceLayouts = map[string]gormAdminResourceLayout{
+	"users": {
+		Table: adminUsersTable,
+		ValueProjections: map[string][]string{
+			"role": {adminUserRolesTable + ".role_code"}, "roles": {adminUserRolesTable + ".role_code"},
+		},
+	},
+	"tenants": {
+		Table:            adminTenantsTable,
+		ValueProjections: map[string][]string{"areaCode": {adminTenantsTable + ".area_code"}},
+	},
+	"org-units": {
+		Table: adminOrgUnitsTable,
+		ValueProjections: map[string][]string{
+			"type": {adminOrgUnitsTable + ".type"}, "tenantCode": {adminOrgUnitsTable + ".tenant_code"},
+			"parentCode": {adminOrgUnitsTable + ".parent_code"}, "areaCode": {adminOrgUnitsTable + ".area_code"},
+			"sortOrder": {adminOrgUnitsTable + ".sort_order"},
+		},
+	},
+	"roles": {
+		Table:            adminRolesTable,
+		ValueProjections: map[string][]string{"permissions": {adminRolePermissionsTable + ".permission"}},
+	},
+	"role-groups": {
+		Table: adminRoleGroupsTable,
+		ValueProjections: map[string][]string{
+			"parentCode": {adminRoleGroupsTable + ".parent_code"}, "sortOrder": {adminRoleGroupsTable + ".sort_order"},
+		},
+	},
+	"permissions": {
+		Table: adminPermissionsTable,
+		ValueProjections: map[string][]string{
+			"capability": {adminPermissionsTable + ".capability"}, "resource": {adminPermissionsTable + ".resource"},
+			"action": {adminPermissionsTable + ".action"}, "prefix": {adminPermissionsTable + ".prefix"},
+		},
+	},
+	"menus": {
+		Table: adminMenusTable,
+		ValueProjections: map[string][]string{
+			"route": {adminMenusTable + ".route"}, "parent": {adminMenusTable + ".parent"},
+			"isExternal": {adminMenusTable + ".is_external"}, "cacheEnabled": {adminMenusTable + ".cache_enabled"},
+			"resource": {adminMenusTable + ".resource"}, "permission": {adminMenusTable + ".permission"},
+			"group": {adminMenusTable + ".group_name"}, "icon": {adminMenusTable + ".icon"},
+			"order": {adminMenusTable + ".sort_order"}, "titleZh": {adminMenusTable + ".title_zh"},
+			"nameZh": {adminMenusTable + ".title_zh"}, "titleEn": {adminMenusTable + ".title_en"},
+			"nameEn": {adminMenusTable + ".title_en"}, "descriptionZh": {adminMenusTable + ".description_zh"},
+			"descriptionEn": {adminMenusTable + ".description_en"},
+		},
+	},
+	"area-codes": {
+		Table: adminAreaCodesTable,
+		ValueProjections: map[string][]string{
+			"parentCode": {adminAreaCodesTable + ".parent_code"}, "level": {adminAreaCodesTable + ".level"},
+			"path": {adminAreaCodesTable + ".path"}, "sortOrder": {adminAreaCodesTable + ".sort_order"},
+		},
+	},
+	"audit-logs": {
+		Table: adminAuditLogsTable,
+		ValueProjections: map[string][]string{
+			"actor": {adminAuditLogsTable + ".actor"}, "action": {adminAuditLogsTable + ".action"},
+			"resource": {adminAuditLogsTable + ".resource"}, "createdAt": {adminAuditLogsTable + ".created_at"},
+		},
+	},
+	"login-logs": {
+		Table: adminLoginLogsTable,
+		ValueProjections: map[string][]string{
+			"username": {adminLoginLogsTable + ".username"}, "provider": {adminLoginLogsTable + ".provider"},
+			"ip": {adminLoginLogsTable + ".ip"}, "createdAt": {adminLoginLogsTable + ".created_at"},
+		},
+	},
+	"error-logs": {
+		Table: adminErrorLogsTable,
+		ValueProjections: map[string][]string{
+			"level": {adminErrorLogsTable + ".level"}, "message": {adminErrorLogsTable + ".message"},
+			"traceId": {adminErrorLogsTable + ".trace_id"}, "createdAt": {adminErrorLogsTable + ".created_at"},
+		},
+	},
+	"versions": {
+		Table: adminVersionsTable,
+		ValueProjections: map[string][]string{
+			"version": {adminVersionsTable + ".version"}, "channel": {adminVersionsTable + ".channel"},
+			"releasedAt": {adminVersionsTable + ".released_at"},
+		},
+	},
+}
+
 type gormAdminResourceRecord struct {
 	Resource    string `gorm:"column:resource;primaryKey"`
 	ID          string `gorm:"column:id;primaryKey"`
@@ -1307,12 +1398,8 @@ func emptyValuesToNil(values map[string]string) map[string]string {
 }
 
 func isNormalizedResource(resource string) bool {
-	switch resource {
-	case "users", "tenants", "org-units", "roles", "role-groups", "permissions", "menus", "area-codes", "audit-logs", "login-logs", "error-logs", "versions":
-		return true
-	default:
-		return false
-	}
+	_, ok := normalizedGORMResourceLayouts[resource]
+	return ok
 }
 
 func parseCSV(value string) []string {
