@@ -190,6 +190,40 @@ describe("admin resource contract generators", () => {
     assert.equal(validation.status, 0, `enterprise admin resource contract validation failed\n${validation.stdout}${validation.stderr}`);
   });
 
+  it("rejects generated contracts whose route permissions are not declared at resource and contract level", () => {
+    const contract = runAdminResourceContract({
+      PLATFORM_CAPABILITIES:
+        "tenant,identity,session,rbac,menu,api-resource,audit,policy-review,wechat-login,dictionary,parameter,file-storage,admin-shell,demo-data,system-admin",
+    });
+    const policyReviews = contract.resources.find((resource) => resource.name === "policy-reviews");
+    policyReviews.permissionCodes = policyReviews.permissionCodes.filter((permission) => permission !== "admin:policy-review:export");
+
+    let validation = validateAdminResourceContract(contract);
+    assert.notEqual(validation.status, 0);
+    assert.match(`${validation.stdout}${validation.stderr}`, /uses undeclared resource permission admin:policy-review:export/);
+
+    policyReviews.permissionCodes.push("admin:policy-review:export");
+    contract.permissions = contract.permissions.filter((permission) => permission !== "admin:policy-review:export");
+    validation = validateAdminResourceContract(contract);
+    assert.notEqual(validation.status, 0);
+    assert.match(`${validation.stdout}${validation.stderr}`, /permission admin:policy-review:export is missing from contract.permissions/);
+
+    contract.permissions.push("admin:policy-review:export");
+    const exportRoute = policyReviews.routes.find((route) => route.path === "/api/admin/policy-reviews/export");
+    delete exportRoute.permission;
+    validation = validateAdminResourceContract(contract);
+    assert.notEqual(validation.status, 0);
+    assert.match(`${validation.stdout}${validation.stderr}`, /route GET \/api\/admin\/policy-reviews\/export must declare permission/);
+
+    exportRoute.permission = "admin:policy-review:export";
+    const resourceWithAction = contract.resources.find((resource) => resource.actions.length > 0);
+    const action = resourceWithAction.actions[0];
+    delete action.permission;
+    validation = validateAdminResourceContract(contract);
+    assert.notEqual(validation.status, 0);
+    assert.match(`${validation.stdout}${validation.stderr}`, new RegExp(`action ${action.key} must declare permission`));
+  });
+
   it("documents policy-review custom actions in enterprise OpenAPI", () => {
     const contract = runAdminResourceContract({
       PLATFORM_CAPABILITIES:

@@ -54,8 +54,11 @@ describe("platform foundation documentation drift", () => {
   it("keeps completed plan and sensitive-data dependency wording honest", () => {
     const plan = read("docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md");
     const assessment = read("docs/platform-data-governance-and-integrations-assessment.md");
+    const trackedSteps = plan.split("\n").filter((line) => /^- \[[ x]\] \*\*Step /.test(line));
 
-    assert.doesNotMatch(plan, /- \[ \]/);
+    assert.match(plan, /> \*\*Status:\*\* Completed\./);
+    assert.ok(trackedSteps.length > 0, "completed plan must retain tracked steps");
+    assert.ok(trackedSteps.every((line) => line.startsWith("- [x]")), "every tracked step must be checked");
     assert.doesNotMatch(
       assessment,
       /Depends on the existing `sensitive-data-protection-runtime` field, encryption and key-provider contracts\./,

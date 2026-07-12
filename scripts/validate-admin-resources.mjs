@@ -177,6 +177,17 @@ function loadAdminResourceContractForValidation() {
 function validateGeneratedResourceContract(contract) {
   const errors = [];
   const schemas = contract.schemas ?? {};
+  const contractPermissions = Array.isArray(contract.permissions) ? contract.permissions : [];
+  const contractPermissionSet = new Set(contractPermissions);
+  if (contractPermissions.length === 0) {
+    errors.push("generated contract must declare permissions");
+  }
+  errors.push(...assertUnique(contractPermissions, "generated contract.permissions"));
+  for (const permission of contractPermissions) {
+    if (!permissionPattern.test(permission)) {
+      errors.push(`generated contract has invalid permission code: ${permission}`);
+    }
+  }
   for (const resource of contract.resources ?? []) {
     const name = resource.name ?? resource.code ?? resource.refine?.resource;
     const prefix = `generated resource ${name}`;
@@ -194,8 +205,42 @@ function validateGeneratedResourceContract(contract) {
         errors.push(`${prefix} must declare ${listName === "fields" ? "schema fields" : "table fields"}`);
       }
     }
-    if (!Array.isArray(resource.permissionCodes) || resource.permissionCodes.length === 0) {
+    const resourcePermissions = Array.isArray(resource.permissionCodes) ? resource.permissionCodes : [];
+    const resourcePermissionSet = new Set(resourcePermissions);
+    if (resourcePermissions.length === 0) {
       errors.push(`${prefix} must declare permission codes`);
+    }
+    errors.push(...assertUnique(resourcePermissions, `${prefix}.permissionCodes`));
+    for (const permission of resourcePermissions) {
+      if (!permissionPattern.test(permission)) {
+        errors.push(`${prefix} has invalid permission code: ${permission}`);
+      }
+      if (!contractPermissionSet.has(permission)) {
+        errors.push(`${prefix} permission ${permission} is missing from contract.permissions`);
+      }
+    }
+    const validatePermissionReference = (permission, label, required) => {
+      if (!permission) {
+        if (required) {
+          errors.push(`${prefix} ${label} must declare permission`);
+        }
+        return;
+      }
+      if (!resourcePermissionSet.has(permission)) {
+        errors.push(`${prefix} ${label} uses undeclared resource permission ${permission}`);
+      }
+      if (!contractPermissionSet.has(permission)) {
+        errors.push(`${prefix} ${label} permission ${permission} is missing from contract.permissions`);
+      }
+    };
+    for (const route of resource.routes ?? []) {
+      validatePermissionReference(route.permission, `route ${route.method ?? ""} ${route.path ?? ""}`.trim(), true);
+    }
+    for (const action of resource.actions ?? []) {
+      validatePermissionReference(action.permission, `action ${action.key ?? ""}`.trim(), true);
+    }
+    for (const panel of resource.panels ?? []) {
+      validatePermissionReference(panel.permission, `panel ${panel.key ?? ""}`.trim(), false);
     }
     const queryable = (resource.routes ?? []).some((route) => route.method === "POST" && /\/quer(?:y|ies)$/.test(route.path ?? ""));
     if (queryable) {
