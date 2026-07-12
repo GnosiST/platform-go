@@ -11,13 +11,45 @@ import (
 )
 
 const (
-	envelopePrefix  = "pgo:enc:v1:"
-	envelopeVersion = 1
-	algorithmAESGCM = "AES-256-GCM"
-	blindIndexV1    = "hmac-sha256-v1"
+	envelopeFamilyPrefix = "pgo:enc:"
+	envelopePrefix       = "pgo:enc:v1:"
+	envelopeVersion      = 1
+	algorithmAESGCM      = "AES-256-GCM"
+	blindIndexV1         = "hmac-sha256-v1"
 )
 
 var ErrInvalidEnvelope = errors.New("invalid data protection envelope")
+
+type EnvelopeShape string
+
+const (
+	EnvelopeShapeNone      EnvelopeShape = "none"
+	EnvelopeShapeCurrent   EnvelopeShape = "current"
+	EnvelopeShapeForeign   EnvelopeShape = "foreign"
+	EnvelopeShapeMalformed EnvelopeShape = "malformed"
+)
+
+func ClassifyEnvelopeShape(value string) EnvelopeShape {
+	if !strings.HasPrefix(value, envelopeFamilyPrefix) {
+		return EnvelopeShapeNone
+	}
+	version, _, found := strings.Cut(strings.TrimPrefix(value, envelopeFamilyPrefix), ":")
+	if !found || version == "" {
+		return EnvelopeShapeMalformed
+	}
+	if version == "v1" {
+		return EnvelopeShapeCurrent
+	}
+	if len(version) > 1 && version[0] == 'v' {
+		for _, digit := range version[1:] {
+			if digit < '0' || digit > '9' {
+				return EnvelopeShapeMalformed
+			}
+		}
+		return EnvelopeShapeForeign
+	}
+	return EnvelopeShapeMalformed
+}
 
 type blindIndexEnvelopeV1 struct {
 	Version        string `json:"version"`
