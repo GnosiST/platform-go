@@ -93,7 +93,7 @@ Only one MQ adapter should be implemented for the first real workload. RabbitMQ 
 The work should be decomposed into four independent specifications and implementation plans:
 
 1. `sensitive-data-reveal-step-up`
-   - Depends on the existing `sensitive-data-protection-runtime` field, encryption and key-provider contracts.
+   - Depends on the pending `sensitive-data-protection-runtime` node delivering approved field, encryption, key-provider and persistence contracts before reveal work begins.
    - Adds mask strategies, reveal policy, step-up registry, grants, audit and Admin masked-field components.
 2. `data-lifecycle-retention`
    - Adds deletion policy contracts, reference guards, soft-delete/recycle-bin runtime, file recovery, session/token linkage and the maintenance retention runner.

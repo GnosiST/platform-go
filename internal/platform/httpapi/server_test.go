@@ -4051,7 +4051,7 @@ func TestPolicyReviewExportRejectsInvalidWatermarkQuery(t *testing.T) {
 	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "rbac", "audit", "policy-review"})
 	server := newTestServer(ServerOptions{Capabilities: capabilities})
 
-	for _, query := range []string{"watermark=", "watermark=TRUE", "watermark=1", "watermark=true&watermark=false"} {
+	for _, query := range []string{"watermark=", "watermark=TRUE", "watermark=1", "watermark=true&watermark=false", "watermark=true;other=x"} {
 		t.Run(query, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodGet, "/api/admin/policy-reviews/export?"+query, nil)

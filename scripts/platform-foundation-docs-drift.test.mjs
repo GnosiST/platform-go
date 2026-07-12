@@ -48,6 +48,18 @@ describe("platform foundation documentation drift", () => {
     const source = read("docs/platform-foundation-task-map.md");
 
     assert.ok(source.includes(`Remaining nodes, in task-graph order: ${orderedRemainingSummary}.`));
+    assert.doesNotMatch(source, /ordered seven-node remainder/);
+  });
+
+  it("keeps completed plan and sensitive-data dependency wording honest", () => {
+    const plan = read("docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md");
+    const assessment = read("docs/platform-data-governance-and-integrations-assessment.md");
+
+    assert.doesNotMatch(plan, /- \[ \]/);
+    assert.doesNotMatch(
+      assessment,
+      /Depends on the existing `sensitive-data-protection-runtime` field, encryption and key-provider contracts\./,
+    );
   });
 
   it("records runtime security containment as implemented", () => {

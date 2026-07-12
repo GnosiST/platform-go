@@ -1,6 +1,6 @@
 # Platform Completion Task Graph Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status:** Completed. The checked steps preserve the verified execution record. REQUIRED SUB-SKILL for any future replay: use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans task-by-task.
 
 **Goal:** Register the approved eight-node completion program as controlled pending work without reopening or falsifying the 37 closed foundation nodes.
 
@@ -35,7 +35,7 @@
 - Consumes: current seven governance JSON resources and validators.
 - Produces: failing tests that require one ordered `completionProgramTaskIDs` projection.
 
-- [ ] **Step 1: Add the shared expected ID list to each focused test file**
+- [x] **Step 1: Add the shared expected ID list to each focused test file**
 
 ```js
 const completionProgramTaskIDs = [
@@ -50,7 +50,7 @@ const completionProgramTaskIDs = [
 ];
 ```
 
-- [ ] **Step 2: Add graph and projection assertions**
+- [x] **Step 2: Add graph and projection assertions**
 
 ```js
 it("tracks the approved completion program as controlled pending work", () => {
@@ -79,7 +79,7 @@ Also replace the production Admin OIDC test's terminal `37/37/0` assertion with 
 
 Replace rather than append to every obsolete terminal-state assertion across the seven focused test files: `37/37/0`, empty unfinished/future/pending lists, `completionStatus: "complete"` and empty controlled blockers. Keep separate baseline assertions proving the original 37 task IDs, their implemented status and their 37 closeouts are unchanged.
 
-- [ ] **Step 3: Add mutation tests for missing IDs, reordered IDs and premature closeout**
+- [x] **Step 3: Add mutation tests for missing IDs, reordered IDs and premature closeout**
 
 ```js
 const graph = readJSON("resources/platform-foundation-task-graph.json");
@@ -97,7 +97,7 @@ closeout.nodeCloseouts.push({
 // Validator must fail because pending nodes cannot have closeout entries.
 ```
 
-- [ ] **Step 4: Run the focused tests and verify RED**
+- [x] **Step 4: Run the focused tests and verify RED**
 
 Run:
 
@@ -122,7 +122,7 @@ Expected: FAIL because the graph still has 37 tasks and the projection lists are
 - Consumes: approved completion-program spec and existing task graph schema.
 - Produces: eight pending nodes and exact ordered projections.
 
-- [ ] **Step 1: Add new resource locks and policies**
+- [x] **Step 1: Add new resource locks and policies**
 
 Add these locks to `resourceLocks` with exclusive localized policies:
 
@@ -132,7 +132,7 @@ Add these locks to `resourceLocks` with exclusive localized policies:
 
 Add conflict groups so `data-protection` conflicts with `storage-runtime` and `admin-resource-contract`, while publication locks conflict with `docs` and each other.
 
-- [ ] **Step 2: Append the exact task declarations in approved order**
+- [x] **Step 2: Append the exact task declarations in approved order**
 
 Each task uses `phase: "production-governance"`, `status: "pending"` and localized rationale/gates. Use these exact scopes and resource locks:
 
@@ -171,7 +171,7 @@ Required dependency chain:
 
 Evidence docs initially reference the approved spec and plan only. Do not add screenshot paths before files exist.
 
-- [ ] **Step 3: Update every pending-node projection**
+- [x] **Step 3: Update every pending-node projection**
 
 Use the exact ID list from Task 1 in all resources. Set:
 
@@ -191,7 +191,7 @@ In `platform-objective-conformance.json`, set `completionPolicy.controlledBlocke
 
 Also set `platform-objective-conformance.json` `completionPolicy.goalCompletionStatus` to `"not-complete-controlled"`; the goal audit's `completionStatus`, objective status and controlled blockers must be derived from the same unfinished graph list.
 
-- [ ] **Step 4: Add partial engineering capabilities**
+- [x] **Step 4: Add partial engineering capabilities**
 
 Add these partial capability records in the same order and add their IDs to `requiredEngineeringCapabilities` and `nonDroppableEngineeringCapabilities`:
 
@@ -220,7 +220,7 @@ Their evidence points only to the approved specs, plans and pending task IDs; no
 - Consumes: graph-derived implemented and unfinished task lists.
 - Produces: exact projection validation without Task 8 terminal-state constants.
 
-- [ ] **Step 1: Derive graph state once in each validator**
+- [x] **Step 1: Derive graph state once in each validator**
 
 ```js
 const implementedTaskIDs = graph.tasks.filter((task) => task.status === "implemented").map((task) => task.id);
@@ -228,7 +228,7 @@ const unfinishedTaskIDs = graph.tasks.filter((task) => task.status !== "implemen
 const expectedCompletionStatus = unfinishedTaskIDs.length === 0 ? "complete" : "not-complete-controlled";
 ```
 
-- [ ] **Step 2: Replace hard-coded empty-list rules with exact projection rules**
+- [x] **Step 2: Replace hard-coded empty-list rules with exact projection rules**
 
 ```js
 if (!sameList(audit.requiredUnfinishedNodes, unfinishedTaskIDs)) {
@@ -240,11 +240,11 @@ Apply the same rule to goal, closeout, objective and alignment resources. Reject
 
 Keep the production Admin OIDC evidence validator scoped to that completed node, but remove its global `37/37/0` terminal-count assertion. Instead, assert that the preserved 37-node baseline prefix and its 37 closeouts remain unchanged, then derive current totals from the full graph.
 
-- [ ] **Step 3: Preserve visual and promotion boundaries**
+- [x] **Step 3: Preserve visual and promotion boundaries**
 
 Keep existing visual-gate, screenshot, promotion blocker and disabled-runtime checks. Pending visual tasks need design gates but do not need screenshot evidence until implemented.
 
-- [ ] **Step 4: Run focused tests and validators and verify GREEN**
+- [x] **Step 4: Run focused tests and validators and verify GREEN**
 
 Run the Task 1 command, then:
 
@@ -272,11 +272,11 @@ Expected: all focused tests and validators PASS with 45/37/8.
 - Consumes: verified 45/37/8 governance state.
 - Produces: honest current-state documentation without changing promotion status.
 
-- [ ] **Step 1: Document the new active program**
+- [x] **Step 1: Document the new active program**
 
 State that the original 37-node foundation baseline remains closed while the active completion program adds eight controlled pending nodes. Link the five approved 2026-07-12 specifications.
 
-- [ ] **Step 2: Run final governance verification**
+- [x] **Step 2: Run final governance verification**
 
 ```bash
 rtk node --test scripts/platform-foundation-task-graph.test.mjs scripts/platform-task-execution-audit.test.mjs scripts/platform-goal-completion-audit.test.mjs scripts/platform-node-closeout-audit.test.mjs scripts/platform-objective-conformance.test.mjs scripts/platform-foundation-alignment.test.mjs scripts/platform-engineering-capabilities.test.mjs
@@ -286,7 +286,7 @@ rtk codegraph sync .
 rtk codegraph status
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 rtk git add README.md docs resources scripts
