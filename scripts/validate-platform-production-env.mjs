@@ -191,6 +191,19 @@ function addressInPrefix(address, proxy) {
   return true;
 }
 
+function normalizedProxyKey(proxy) {
+  const bytes = Uint8Array.from(proxy.bytes);
+  const wholeBytes = Math.floor(proxy.bits / 8);
+  const remainingBits = proxy.bits % 8;
+  if (remainingBits > 0) {
+    bytes[wholeBytes] &= (0xff << (8 - remainingBits)) & 0xff;
+  }
+  for (let index = wholeBytes + (remainingBits > 0 ? 1 : 0); index < bytes.length; index += 1) {
+    bytes[index] = 0;
+  }
+  return `${proxy.family}/${proxy.bits}/${Buffer.from(bytes).toString("hex")}`;
+}
+
 function validateRequiredReadinessEnv(env, readiness, errors) {
   for (const item of values(readiness.requiredEnv)) {
     requireKey(env, item.name, errors);
@@ -245,6 +258,7 @@ function validatePlatformEnv(env, errors) {
   const parsedTrustedProxies = [];
   const coverage = { 4: newCoverageNode(), 6: newCoverageNode() };
   const directTrustAll = new Set();
+  const normalizedProxies = new Set();
   for (const proxy of trustedProxies) {
     const parsed = parseTrustedProxy(proxy);
     if (!parsed) {
@@ -253,8 +267,14 @@ function validatePlatformEnv(env, errors) {
       errors.push("PLATFORM_TRUSTED_PROXIES must not trust all addresses");
       directTrustAll.add(parsed.family);
     } else {
-      parsedTrustedProxies.push(parsed);
-      insertCoverage(coverage[parsed.family], parsed);
+      const normalized = normalizedProxyKey(parsed);
+      if (normalizedProxies.has(normalized)) {
+        errors.push(`PLATFORM_TRUSTED_PROXIES contains duplicate normalized prefix ${proxy}`);
+      } else {
+        normalizedProxies.add(normalized);
+        parsedTrustedProxies.push(parsed);
+        insertCoverage(coverage[parsed.family], parsed);
+      }
     }
   }
   if (coverage[4].covered && !directTrustAll.has(4)) {

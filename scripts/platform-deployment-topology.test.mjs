@@ -168,6 +168,41 @@ describe("validate-platform-deployment-topology", () => {
     assert.match(result.stderr, /admin proxy HSTS must be conditional on the trusted HTTPS edge signal/);
   });
 
+  it("rejects case-insensitive Nginx edge signal maps", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/nginx/platform.conf"), "utf8");
+    const unsafe = current
+      .replace('~^https$ "https";', 'https "https";')
+      .replace('~^http$ "http";', 'http "http";');
+    const nginxPath = tempText("platform.conf", unsafe);
+
+    const result = runValidator(["--admin-proxy", nginxPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /admin proxy must use case-sensitive canonical http and https edge signal regexes/);
+  });
+
+  it("renders only case-sensitive canonical edge signal patterns", () => {
+    const source = fs.readFileSync(path.join(repoRoot, "deploy/nginx/platform.conf"), "utf8");
+    const rendered = spawnSync("envsubst", ["${PLATFORM_PUBLIC_BASE_URL}"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PLATFORM_PUBLIC_BASE_URL: "https://platform.example.test",
+      },
+      input: source,
+    });
+
+    assert.equal(rendered.status, 0, rendered.stderr);
+    assert.match(rendered.stdout, /~\^https\$ "https";/);
+    assert.match(rendered.stdout, /~\^http\$ "http";/);
+    assert.doesNotMatch(rendered.stdout, /~\*\^https\$/);
+    assert.match(rendered.stdout, /return 308 https:\/\/platform\.example\.test\$request_uri;/);
+    for (const value of ["HTTPS", "Https", "https,http", "https, https", "https http"]) {
+      assert.equal(/^https$/.test(value), false, `${value} must not enable HTTPS or HSTS`);
+    }
+  });
+
   it("rejects bypassing the official Nginx template entrypoint", () => {
     const contract = readJSON("resources/platform-deployment-topology.json");
     contract.deploymentPackage.requiredSourceSnippets = contract.deploymentPackage.requiredSourceSnippets.filter(

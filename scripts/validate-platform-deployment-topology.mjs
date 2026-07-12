@@ -398,8 +398,8 @@ function validateDeploymentPackage(contract, errors) {
     if (!adminProxy.includes("proxy_set_header X-Forwarded-Proto $platform_forwarded_proto;")) {
       errors.push("admin proxy must forward only the normalized HTTPS edge signal");
     }
-    if (!adminProxy.includes('https "https";') || !adminProxy.includes('http "http";') || adminProxy.includes("~*^https$")) {
-      errors.push("admin proxy must accept only canonical single-value http or https edge signals");
+    if (!adminProxy.includes('~^https$ "https";') || !adminProxy.includes('~^http$ "http";') || adminProxy.includes("~*^https$") || adminProxy.includes('  https "https";') || adminProxy.includes('  http "http";')) {
+      errors.push("admin proxy must use case-sensitive canonical http and https edge signal regexes");
     }
     if (!adminProxy.includes("add_header Strict-Transport-Security") || !adminProxy.includes("add_header Content-Security-Policy")) {
       errors.push("admin proxy must emit HSTS and Content-Security-Policy");

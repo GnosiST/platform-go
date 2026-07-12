@@ -187,6 +187,22 @@ describe("validate-platform-production-env", () => {
     }
   });
 
+  it("rejects normalized duplicate trusted proxy prefixes", () => {
+    const source = validStrictEnv.replace(
+      "PLATFORM_TRUSTED_PROXIES=10.20.0.0/16",
+      "PLATFORM_TRUSTED_PROXIES=10.20.1.4,10.20.1.4/32,10.20.1.5/24,10.20.1.0/24",
+    );
+    const { tempDir, filePath } = tempEnv(source);
+    try {
+      const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /PLATFORM_TRUSTED_PROXIES contains duplicate normalized prefix/);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it("rejects unsafe app-phone protection settings", () => {
     const source = validStrictEnv
       .replace("system-admin", "system-admin,app-phone")

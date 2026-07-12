@@ -258,6 +258,14 @@
       },
       {
         "path": "deploy/nginx/platform.conf",
+        "contains": "~^https$ \"https\";"
+      },
+      {
+        "path": "deploy/nginx/platform.conf",
+        "contains": "~^http$ \"http\";"
+      },
+      {
+        "path": "deploy/nginx/platform.conf",
         "contains": "add_header Strict-Transport-Security $platform_hsts always;"
       },
       {
