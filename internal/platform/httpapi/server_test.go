@@ -71,10 +71,16 @@ type policyReviewActionTestPayload struct {
 
 type policyReviewExportTestPayload struct {
 	Data struct {
-		ExportedBy string                    `json:"exportedBy"`
-		ExportedAt string                    `json:"exportedAt"`
-		Reviews    []adminResourceRecordTest `json:"reviews"`
-		Audits     []adminResourceRecordTest `json:"audits"`
+		ExportedBy string `json:"exportedBy"`
+		ExportedAt string `json:"exportedAt"`
+		Watermark  struct {
+			Applied    bool   `json:"applied"`
+			Product    string `json:"product"`
+			ExportedBy string `json:"exportedBy"`
+			ExportedAt string `json:"exportedAt"`
+		} `json:"watermark"`
+		Reviews []adminResourceRecordTest `json:"reviews"`
+		Audits  []adminResourceRecordTest `json:"audits"`
 	} `json:"data"`
 }
 
@@ -3993,12 +3999,51 @@ func TestPolicyReviewRequestRejectAndExportEndpoints(t *testing.T) {
 	if exported.Data.ExportedBy != "admin" || exported.Data.ExportedAt == "" || !hasAdminRecordCode(exported.Data.Reviews, "PR-HTTP-1002") {
 		t.Fatalf("export payload = %+v, want exported review", exported.Data)
 	}
+	if exported.Data.Watermark.Applied || exported.Data.Watermark.Product != "Platform Go" || exported.Data.Watermark.ExportedBy != "admin" || exported.Data.Watermark.ExportedAt != exported.Data.ExportedAt {
+		t.Fatalf("export watermark = %+v, want disabled stable provenance", exported.Data.Watermark)
+	}
 	exportAudit := recordByTestAction(exported.Data.Audits, "policy-review.export")
-	if exportAudit == nil || exportAudit.Values["actor"] != "user-admin" {
-		t.Fatalf("export audit = %+v, want stable user ID actor", exportAudit)
+	if exportAudit == nil || exportAudit.Values["actor"] != "user-admin" || exportAudit.Values["reasonCode"] != "watermarkApplied=false" {
+		t.Fatalf("export audit = %+v, want stable user ID actor and disabled watermark audit", exportAudit)
 	}
 	if !hasTestRecordAction(exported.Data.Audits, "policy-review.request") || !hasTestRecordAction(exported.Data.Audits, "policy-review.reject") {
 		t.Fatalf("export audits = %+v, want request and reject audits", exported.Data.Audits)
+	}
+}
+
+func TestPolicyReviewExportAppliesRequestedWatermarkMetadata(t *testing.T) {
+	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "rbac", "audit", "policy-review"})
+	server := newTestServer(ServerOptions{Capabilities: capabilities})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/admin/policy-reviews/export?watermark=true", nil)
+	request.Header.Set("X-Platform-User", "admin")
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET watermarked policy review export status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	var exported policyReviewExportTestPayload
+	if err := json.Unmarshal(recorder.Body.Bytes(), &exported); err != nil {
+		t.Fatalf("decode export payload: %v body = %s", err, recorder.Body.String())
+	}
+	if !exported.Data.Watermark.Applied || exported.Data.Watermark.Product != "Platform Go" || exported.Data.Watermark.ExportedBy != "admin" {
+		t.Fatalf("export watermark = %+v, want applied stable provenance", exported.Data.Watermark)
+	}
+	if exported.Data.Watermark.ExportedAt == "" || exported.Data.Watermark.ExportedAt != exported.Data.ExportedAt {
+		t.Fatalf("export watermark = %+v exportedAt = %q, want matching time", exported.Data.Watermark, exported.Data.ExportedAt)
+	}
+	if _, err := time.Parse(time.RFC3339, exported.Data.Watermark.ExportedAt); err != nil {
+		t.Fatalf("watermark exportedAt = %q, want RFC3339: %v", exported.Data.Watermark.ExportedAt, err)
+	}
+	exportAudit := recordByTestAction(exported.Data.Audits, "policy-review.export")
+	if exportAudit == nil || exportAudit.Values["actor"] != "user-admin" || exportAudit.Values["reasonCode"] != "watermarkApplied=true" {
+		t.Fatalf("export audit = %+v, want opaque actor and applied watermark audit", exportAudit)
+	}
+	for _, key := range []string{"watermark", "product", "exportedBy", "exportedAt"} {
+		if value := exportAudit.Values[key]; value != "" {
+			t.Fatalf("export audit %s = %q, want no free-form watermark metadata", key, value)
+		}
 	}
 }
 

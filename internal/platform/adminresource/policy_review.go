@@ -1,8 +1,11 @@
 package adminresource
 
 import (
+	"fmt"
 	"strings"
 )
+
+const policyReviewExportProduct = "Platform Go"
 
 type PolicyReviewResult struct {
 	Review Record `json:"review"`
@@ -16,10 +19,18 @@ type PolicyReviewActionResult struct {
 }
 
 type PolicyReviewExport struct {
-	ExportedBy string   `json:"exportedBy"`
-	ExportedAt string   `json:"exportedAt"`
-	Reviews    []Record `json:"reviews"`
-	Audits     []Record `json:"audits"`
+	ExportedBy string                      `json:"exportedBy"`
+	ExportedAt string                      `json:"exportedAt"`
+	Watermark  PolicyReviewExportWatermark `json:"watermark"`
+	Reviews    []Record                    `json:"reviews"`
+	Audits     []Record                    `json:"audits"`
+}
+
+type PolicyReviewExportWatermark struct {
+	Applied    bool   `json:"applied"`
+	Product    string `json:"product"`
+	ExportedBy string `json:"exportedBy"`
+	ExportedAt string `json:"exportedAt"`
 }
 
 func (s *Store) RequestPolicyReview(reviewID string, requesterCode string, auditActorID string) (PolicyReviewActionResult, error) {
@@ -141,7 +152,7 @@ func (s *Store) RejectPolicyReview(reviewID string, reviewerCode string, auditAc
 	})
 }
 
-func (s *Store) ExportPolicyReviews(actorCode string, auditActorID string) (PolicyReviewExport, error) {
+func (s *Store) ExportPolicyReviews(actorCode string, auditActorID string, watermarkApplied bool) (PolicyReviewExport, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	previous, err := s.prepareMutationLocked()
@@ -177,7 +188,7 @@ func (s *Store) ExportPolicyReviews(actorCode string, auditActorID string) (Poli
 	now := s.now().UTC().Format("2006-01-02T15:04:05Z07:00")
 	audit, err := s.auditRecordLocked(AuditEvent{
 		Actor: strings.TrimSpace(auditActorID), Action: "policy-review.export", Resource: "policy-reviews",
-		TargetID: "policy-reviews", Result: "success", ReasonCode: "exported",
+		TargetID: "policy-reviews", Result: "success", ReasonCode: fmt.Sprintf("watermarkApplied=%t", watermarkApplied),
 	}, s.nextID+1)
 	if err != nil {
 		return PolicyReviewExport{}, err
@@ -194,11 +205,15 @@ func (s *Store) ExportPolicyReviews(actorCode string, auditActorID string) (Poli
 		return PolicyReviewExport{}, err
 	}
 
+	exportedBy := strings.TrimSpace(actorCode)
 	return PolicyReviewExport{
-		ExportedBy: strings.TrimSpace(actorCode),
+		ExportedBy: exportedBy,
 		ExportedAt: now,
-		Reviews:    projectedReviews,
-		Audits:     append(projectedAudits, projectedAudit),
+		Watermark: PolicyReviewExportWatermark{
+			Applied: watermarkApplied, Product: policyReviewExportProduct, ExportedBy: exportedBy, ExportedAt: now,
+		},
+		Reviews: projectedReviews,
+		Audits:  append(projectedAudits, projectedAudit),
 	}, nil
 }
 

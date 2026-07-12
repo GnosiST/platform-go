@@ -402,10 +402,11 @@ type policyReviewActionResponse struct {
 }
 
 type policyReviewExportResponse struct {
-	ExportedBy string                 `json:"exportedBy"`
-	ExportedAt string                 `json:"exportedAt"`
-	Reviews    []adminresource.Record `json:"reviews"`
-	Audits     []adminresource.Record `json:"audits"`
+	ExportedBy string                                    `json:"exportedBy"`
+	ExportedAt string                                    `json:"exportedAt"`
+	Watermark  adminresource.PolicyReviewExportWatermark `json:"watermark"`
+	Reviews    []adminresource.Record                    `json:"reviews"`
+	Audits     []adminresource.Record                    `json:"audits"`
 }
 
 type policyReviewRejectRequest struct {
@@ -1243,7 +1244,8 @@ func (s *Server) adminPolicyReviewExport(ctx *gin.Context) {
 		writeForbidden(ctx)
 		return
 	}
-	result, err := s.resources.ExportPolicyReviews(userCode, s.auditActorID(ctx))
+	watermarkApplied := ctx.Query("watermark") == "true"
+	result, err := s.resources.ExportPolicyReviews(userCode, s.auditActorID(ctx), watermarkApplied)
 	if err != nil {
 		writeAdminResourceError(ctx, err)
 		return
@@ -1271,6 +1273,7 @@ func (s *Server) adminPolicyReviewExport(ctx *gin.Context) {
 		Data: policyReviewExportResponse{
 			ExportedBy: result.ExportedBy,
 			ExportedAt: result.ExportedAt,
+			Watermark:  result.Watermark,
 			Reviews:    reviews,
 			Audits:     audits,
 		},

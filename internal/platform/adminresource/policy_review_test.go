@@ -2,6 +2,7 @@ package adminresource
 
 import (
 	"testing"
+	"time"
 
 	"platform-go/internal/platform/core"
 )
@@ -109,7 +110,7 @@ func TestRequestRejectAndExportPolicyReviewWorkflow(t *testing.T) {
 		t.Fatalf("reject audit values = %+v, want policy-review.reject audit", rejected.Audit.Values)
 	}
 
-	exported, err := store.ExportPolicyReviews("auditor", "user-auditor")
+	exported, err := store.ExportPolicyReviews("auditor", "user-auditor", false)
 	if err != nil {
 		t.Fatalf("ExportPolicyReviews() error = %v", err)
 	}
@@ -127,6 +128,42 @@ func TestRequestRejectAndExportPolicyReviewWorkflow(t *testing.T) {
 	}
 	if recordByAction(exported.Audits, "policy-review.export").Values["actor"] != "user-auditor" {
 		t.Fatalf("export audit actor = %+v, want stable user ID", recordByAction(exported.Audits, "policy-review.export"))
+	}
+	if exported.Watermark.Applied {
+		t.Fatalf("export watermark = %+v, want disabled", exported.Watermark)
+	}
+}
+
+func TestExportPolicyReviewsAddsWatermarkProvenanceAndBooleanAuditValue(t *testing.T) {
+	fixedNow := time.Date(2026, time.July, 12, 10, 30, 0, 0, time.UTC)
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	store.now = func() time.Time { return fixedNow }
+
+	exported, err := store.ExportPolicyReviews("auditor", "opaque-user-id", true)
+	if err != nil {
+		t.Fatalf("ExportPolicyReviews() error = %v", err)
+	}
+	if !exported.Watermark.Applied || exported.Watermark.Product != "Platform Go" {
+		t.Fatalf("watermark = %+v, want applied Platform Go provenance", exported.Watermark)
+	}
+	if exported.Watermark.ExportedBy != "auditor" || exported.Watermark.ExportedAt != fixedNow.Format(time.RFC3339) {
+		t.Fatalf("watermark = %+v, want stable actor and time", exported.Watermark)
+	}
+	if exported.Watermark.ExportedBy != exported.ExportedBy || exported.Watermark.ExportedAt != exported.ExportedAt {
+		t.Fatalf("watermark = %+v export = %+v, want matching export metadata", exported.Watermark, exported)
+	}
+
+	audit := recordByAction(exported.Audits, "policy-review.export")
+	if audit == nil {
+		t.Fatalf("exported audits = %+v, want export audit", exported.Audits)
+	}
+	if audit.Values["actor"] != "opaque-user-id" || audit.Values["reasonCode"] != "watermarkApplied=true" {
+		t.Fatalf("export audit = %+v, want opaque actor and boolean watermark audit value", audit)
+	}
+	for _, key := range []string{"watermark", "product", "exportedBy", "exportedAt"} {
+		if value := audit.Values[key]; value != "" {
+			t.Fatalf("export audit %s = %q, want no free-form watermark metadata", key, value)
+		}
 	}
 }
 
