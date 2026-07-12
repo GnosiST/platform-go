@@ -210,8 +210,8 @@ func (r *Runner) protectRows(ctx context.Context, resource ResourcePlan, tenant 
 		if ctx.Err() != nil || row.RecordID == "" || row.RecordID <= after || row.Resource != "" && row.Resource != resource.Resource {
 			return nil, Counts{}, ErrMutationFailed
 		}
-		values := map[string]json.RawMessage{}
-		if err := json.Unmarshal([]byte(row.ValuesJSON), &values); err != nil {
+		values, err := DecodeUniqueObject(row.ValuesJSON)
+		if err != nil {
 			return nil, Counts{}, ErrMutationFailed
 		}
 		for _, field := range resource.Fields {
@@ -379,8 +379,8 @@ func (r *Runner) classifyRow(ctx context.Context, resource ResourcePlan, tenant 
 	if ctx.Err() != nil {
 		return ErrReadFailed
 	}
-	values := map[string]any{}
-	if err := json.Unmarshal([]byte(row.ValuesJSON), &values); err != nil {
+	values, err := DecodeUniqueObject(row.ValuesJSON)
+	if err != nil {
 		return ErrReadFailed
 	}
 	for _, field := range resource.Fields {
@@ -388,12 +388,12 @@ func (r *Runner) classifyRow(ctx context.Context, resource ResourcePlan, tenant 
 			return ErrReadFailed
 		}
 		raw, exists := values[field.Key]
-		if !exists || raw == nil {
+		if !exists || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
 			counts.add(ClassificationMissing)
 			continue
 		}
-		value, ok := raw.(string)
-		if !ok {
+		var value string
+		if err := json.Unmarshal(raw, &value); err != nil {
 			counts.add(ClassificationMalformedEnvelope)
 			continue
 		}

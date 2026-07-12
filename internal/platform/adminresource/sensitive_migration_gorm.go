@@ -442,10 +442,7 @@ func (s *GORMProtectedValueMigrationStore) FinishRun(ctx context.Context, runID 
 		if err := tx.Where("run_id = ?", runID).First(&run).Error; err != nil {
 			return ErrMigrationConflict
 		}
-		if run.Status == sensitivemigration.StatusCompleted {
-			return nil
-		}
-		if run.Status != sensitivemigration.StatusPrepared {
+		if run.Status != sensitivemigration.StatusPrepared && run.Status != sensitivemigration.StatusCompleted {
 			return ErrMigrationConflict
 		}
 		journal, err := verifyMigrationJournal(tx, runID)
@@ -458,6 +455,9 @@ func (s *GORMProtectedValueMigrationStore) FinishRun(ctx context.Context, runID 
 		}
 		if processed != run.TargetCount {
 			return ErrMigrationConflict
+		}
+		if run.Status == sensitivemigration.StatusCompleted {
+			return nil
 		}
 		updated := tx.Model(&gormSensitiveMigrationRun{}).
 			Where("run_id = ? AND status = ?", runID, sensitivemigration.StatusPrepared).
@@ -760,20 +760,28 @@ func migrationLayout(plan sensitivemigration.ResourcePlan) (gormAdminResourceLay
 }
 
 func migrationValues(raw string) (map[string]any, error) {
-	values := map[string]any{}
-	if err := json.Unmarshal([]byte(raw), &values); err != nil {
+	rawValues, err := sensitivemigration.DecodeUniqueObject(raw)
+	if err != nil {
 		return nil, err
+	}
+	values := map[string]any{}
+	for key, rawValue := range rawValues {
+		var value any
+		if err := json.Unmarshal(rawValue, &value); err != nil {
+			return nil, err
+		}
+		values[key] = value
 	}
 	return values, nil
 }
 
 func migrationChangedFields(original string, updated string) ([]string, error) {
-	originalValues := map[string]json.RawMessage{}
-	if err := json.Unmarshal([]byte(original), &originalValues); err != nil {
+	originalValues, err := sensitivemigration.DecodeUniqueObject(original)
+	if err != nil {
 		return nil, err
 	}
-	updatedValues := map[string]json.RawMessage{}
-	if err := json.Unmarshal([]byte(updated), &updatedValues); err != nil {
+	updatedValues, err := sensitivemigration.DecodeUniqueObject(updated)
+	if err != nil {
 		return nil, err
 	}
 	keys := map[string]struct{}{}

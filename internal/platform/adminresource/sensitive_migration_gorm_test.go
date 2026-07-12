@@ -689,6 +689,23 @@ func TestGORMProtectedValueMigrationFinishRejectsCheckpointForgedPastEvents(t *t
 	}
 }
 
+func TestGORMProtectedValueMigrationFinishCompletedRunStillVerifiesJournal(t *testing.T) {
+	db, store := preparedMigrationStore(t, map[string]string{"record-1": `{"secretNote":"plain-one"}`})
+	if _, err := store.ApplyBatch(context.Background(), migrationBatch("record-1", `{"secretNote":"plain-one"}`, `{"secretNote":"pgo:enc:v1:one"}`, 7)); err != nil {
+		t.Fatalf("ApplyBatch() error = %v", err)
+	}
+	if err := store.FinishRun(context.Background(), "run-apply", sensitivemigration.StatusCompleted); err != nil {
+		t.Fatalf("FinishRun(first) error = %v", err)
+	}
+	result := db.Model(&gormSensitiveMigrationCheckpoint{}).Where("run_id = ?", "run-apply").Update("last_record_id", "record-9")
+	if result.Error != nil || result.RowsAffected != 1 {
+		t.Fatalf("tamper completed checkpoint = %d, %v", result.RowsAffected, result.Error)
+	}
+	if err := store.FinishRun(context.Background(), "run-apply", sensitivemigration.StatusCompleted); !errors.Is(err, ErrMigrationConflict) {
+		t.Fatalf("FinishRun(completed tampered run) error = %v, want ErrMigrationConflict", err)
+	}
+}
+
 func TestGORMProtectedValueMigrationApplyBatchUsesSnapshotAndRevisionCAS(t *testing.T) {
 	db, store := preparedMigrationStore(t, map[string]string{
 		"record-1": `{"secretNote":"plain-one"}`,
@@ -787,6 +804,18 @@ func TestGORMProtectedValueMigrationApplyBatchRejectsLargeIntegerNonTargetChange
 
 	if _, err := store.ApplyBatch(context.Background(), mutation); !errors.Is(err, ErrMigrationConflict) {
 		t.Fatalf("ApplyBatch(large non-target mutation) error = %v, want ErrMigrationConflict", err)
+	}
+	assertMigrationRecordJSON(t, db, "record-1", original)
+}
+
+func TestGORMProtectedValueMigrationApplyBatchRejectsDuplicateNonTargetKey(t *testing.T) {
+	const original = `{"displayName":"first","displayName":"second","secretNote":"plain-one"}`
+	const updated = `{"displayName":"first","displayName":"second","secretNote":"pgo:enc:v1:one"}`
+	db, store := preparedMigrationStore(t, map[string]string{"record-1": original})
+	mutation := migrationBatch("record-1", original, updated, 7)
+
+	if _, err := store.ApplyBatch(context.Background(), mutation); !errors.Is(err, ErrMigrationConflict) {
+		t.Fatalf("ApplyBatch(duplicate non-target key) error = %v, want ErrMigrationConflict", err)
 	}
 	assertMigrationRecordJSON(t, db, "record-1", original)
 }

@@ -674,6 +674,24 @@ func TestApplyPreservesNonTargetJSONNumberRepresentations(t *testing.T) {
 	}
 }
 
+func TestApplyRejectsDuplicateTopLevelNonTargetKeyBeforeProtecting(t *testing.T) {
+	plan := migrationApplyPlan()
+	store := newMemoryMutatingStore(plan, []Row{{
+		Resource: "customer-records", RecordID: "record-1",
+		ValuesJSON: `{"displayName":"first","displayName":"second","secretNote":"plain-one"}`,
+	}})
+	runtime := &trackingRuntime{Runtime: migrationTestRuntime(t)}
+
+	if _, err := NewRunner(plan, runtime, store).Run(context.Background(), Options{
+		Mode: ModeApply, BatchSize: 1, Request: approvedMigrationRequest("run-resume"),
+	}); !errors.Is(err, ErrMutationFailed) {
+		t.Fatalf("Run(duplicate non-target key) error = %v, want ErrMutationFailed", err)
+	}
+	if store.applyCalls != 0 || runtime.protectCalls != 0 || runtime.revealCalls != 0 {
+		t.Fatalf("duplicate-key calls apply=%d protect=%d reveal=%d, want zero", store.applyCalls, runtime.protectCalls, runtime.revealCalls)
+	}
+}
+
 func TestVerifyRejectsPreparedProcessedCountMismatch(t *testing.T) {
 	plan := migrationApplyPlan()
 	store := newMemoryMutatingStore(plan, []Row{
