@@ -216,6 +216,10 @@ for (const key of [
 ]) {
   requireIncludes(files.settings, key, `SystemSettingsDrawer must keep ${key} support.`);
 }
+requireIncludes(files.settings, "<Switch aria-label={label}", "Shared settings switches must expose their visible label as an accessible name.");
+requireIncludes(files.settings, 'className="settings-switch-hit-target"', "Shared settings switches must expose a 44px pointer target without replacing the native switch.");
+requireIncludes(files.settings, 'role="group"', "Watermark scope choices must expose group semantics for their accessible name.");
+requireRegex(files.styles, /\.settings-switch-hit-target\s*\{[\s\S]*?min-height:\s*44px[\s\S]*?min-width:\s*44px/, "Settings switch pointer targets must be at least 44px by 44px.");
 
 requireIncludes(files.table, "PlatformPaginationBar", "PlatformDataTable must use the shared pagination bar.");
 requireIncludes(files.table, "PlatformDropdownPlugin", "PlatformDataTable must use shared dropdown plugins for filters and columns.");
@@ -377,6 +381,10 @@ for (const key of [
 }
 requireNotIncludes(files.policyReview, "fetch(", "PolicyReviewConsole must use the shared platform API client instead of direct fetch.");
 requireIncludes(files.policyReview, 'permissionAllows(permissions, "admin:policy-review:export", deniedPermissions)', "PolicyReviewConsole must derive export access from the dedicated permission.");
+requireIncludes(files.client, "export function exportAdminPolicyReviews({ watermark }: { watermark: boolean })", "Policy review export must require an explicit watermark intent.");
+requireIncludes(files.client, '`/admin/policy-reviews/export?watermark=${watermark}`', "Policy review export must pass watermark intent through the dedicated query parameter.");
+requireIncludes(files.app, 'uiConfig.watermark && uiConfig.watermarkScopes.includes("export")', "App must derive policy-review export watermark intent from the shared UI configuration.");
+requireIncludes(files.policyReview, "exportAdminPolicyReviews({ watermark: exportWatermark })", "PolicyReviewConsole must pass the derived export watermark intent to the API client.");
 requireRegex(files.policyReview, /\{canExport\s*\?\s*\([\s\S]*?<AdminActionButton[\s\S]*?policyReviewExportEvidence[\s\S]*?\)\s*:\s*null\}/, "PolicyReviewConsole must remove the export button from unauthorized focus order.");
 requireIncludes(files.policyReview, 'valueOf(audit, "targetId") === review.id', "PolicyReviewConsole audit matching must use stable target IDs.");
 requireIncludes(files.table, 'type?: "text" | "select" | "treeSelect"', "PlatformDataTable filters must keep treeSelect support.");

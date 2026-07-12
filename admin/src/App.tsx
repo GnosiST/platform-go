@@ -34,7 +34,7 @@ import { ResourceRoutePage } from "./platform/refine/ResourceRoutePage";
 import { accessControlProvider, authProvider, dataProvider } from "./platform/refine";
 import { AdminShell } from "./platform/shell/AdminShell";
 import { themeTokens, type AdminLayoutMode, type ThemeName } from "./platform/theme";
-import { AdminDesignProvider, defaultAdminUIConfig, type AdminUIConfig } from "./platform/ui";
+import { AdminDesignProvider, defaultAdminUIConfig, normalizeAdminUIConfig, type AdminUIConfig } from "./platform/ui";
 
 const adminPreferenceStorageKeys = {
   language: "platform-go.admin.language",
@@ -85,7 +85,7 @@ function PlatformApp() {
     writeStorageValue(adminPreferenceStorageKeys.layout, nextLayoutMode);
   }, []);
   const changeUIConfig = useCallback((nextConfig: AdminUIConfig) => {
-    const normalizedConfig = normalizeUIConfig(nextConfig);
+    const normalizedConfig = normalizeAdminUIConfig(nextConfig);
     setUIConfigState(normalizedConfig);
     writeStorageValue(adminPreferenceStorageKeys.ui, JSON.stringify(normalizedConfig));
   }, []);
@@ -261,6 +261,7 @@ function PlatformApp() {
           loading={loading}
           permissions={permissions}
           deniedPermissions={deniedPermissions}
+          exportWatermark={uiConfig.watermark && uiConfig.watermarkScopes.includes("export")}
           resources={resources}
           session={session}
           onRouteChange={navigateToRoute}
@@ -280,6 +281,7 @@ function PlatformRoutePages({
   loading,
   permissions,
   deniedPermissions,
+  exportWatermark,
   resources,
   session,
   onRouteChange,
@@ -293,6 +295,7 @@ function PlatformRoutePages({
   loading: boolean;
   permissions: string[];
   deniedPermissions: string[];
+  exportWatermark: boolean;
   resources: AdminResourceDefinition[];
   session: AdminCurrentSession;
   onRouteChange: (route: string, mode?: "push" | "replace") => void;
@@ -342,6 +345,7 @@ function PlatformRoutePages({
               dictionary={dictionary}
               permissions={permissions}
               deniedPermissions={deniedPermissions}
+              exportWatermark={exportWatermark}
             />
           )}
         />
@@ -428,29 +432,10 @@ function readStoredUIConfig(): AdminUIConfig {
     return { ...defaultAdminUIConfig, customPrimary: themePrimary };
   }
   try {
-    return normalizeUIConfig(JSON.parse(rawConfig));
+    return normalizeAdminUIConfig(JSON.parse(rawConfig));
   } catch {
     return { ...defaultAdminUIConfig, customPrimary: themePrimary };
   }
-}
-
-function normalizeUIConfig(value: unknown): AdminUIConfig {
-  if (!value || typeof value !== "object") {
-    return defaultAdminUIConfig;
-  }
-  const config = value as Partial<AdminUIConfig>;
-  return {
-    density: config.density === "comfortable" ? "comfortable" : "compact",
-    showWorkTabs: typeof config.showWorkTabs === "boolean" ? config.showWorkTabs : defaultAdminUIConfig.showWorkTabs,
-    pageTransition: typeof config.pageTransition === "boolean" ? config.pageTransition : defaultAdminUIConfig.pageTransition,
-    sidebarCollapsed: typeof config.sidebarCollapsed === "boolean" ? config.sidebarCollapsed : defaultAdminUIConfig.sidebarCollapsed,
-    showLayoutLegend: typeof config.showLayoutLegend === "boolean" ? config.showLayoutLegend : defaultAdminUIConfig.showLayoutLegend,
-    watermark: typeof config.watermark === "boolean" ? config.watermark : defaultAdminUIConfig.watermark,
-    visualAid: typeof config.visualAid === "boolean" ? config.visualAid : defaultAdminUIConfig.visualAid,
-    sidebarWidth: clampNumber(config.sidebarWidth, 220, 304, defaultAdminUIConfig.sidebarWidth),
-    menuItemHeight: clampNumber(config.menuItemHeight, 34, 48, defaultAdminUIConfig.menuItemHeight),
-    customPrimary: typeof config.customPrimary === "string" && config.customPrimary.trim() ? config.customPrimary : defaultAdminUIConfig.customPrimary,
-  };
 }
 
 function readStorageValue(key: string) {
@@ -520,13 +505,6 @@ function normalizeThemeName(theme: string): ThemeName {
     return theme;
   }
   return "tech";
-}
-
-function clampNumber(value: unknown, min: number, max: number, fallback: number) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return fallback;
-  }
-  return Math.min(Math.max(value, min), max);
 }
 
 function routeFromPathname(pathname: string) {

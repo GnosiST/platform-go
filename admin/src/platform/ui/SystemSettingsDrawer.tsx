@@ -9,37 +9,20 @@ import {
   ThunderboltOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
-import { Avatar, Button, ColorPicker, Divider, Drawer, InputNumber, Segmented, Slider, Space, Switch, Tabs, Tag, Typography } from "antd";
+import { Avatar, Button, Checkbox, ColorPicker, Divider, Drawer, InputNumber, Segmented, Slider, Space, Switch, Tabs, Tag, Typography } from "antd";
 import { useMemo, type ReactNode } from "react";
 import type { AdminCurrentSession, BrandingConfig } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
 import { adminLayoutModes, themeNames, type AdminLayoutMode, type ThemeName } from "../theme";
-
-export type AdminUIConfig = {
-  density: "compact" | "comfortable";
-  showWorkTabs: boolean;
-  pageTransition: boolean;
-  sidebarCollapsed: boolean;
-  showLayoutLegend: boolean;
-  watermark: boolean;
-  visualAid: boolean;
-  sidebarWidth: number;
-  menuItemHeight: number;
-  customPrimary: string;
-};
-
-export const defaultAdminUIConfig: AdminUIConfig = {
-  density: "compact",
-  showWorkTabs: true,
-  pageTransition: true,
-  sidebarCollapsed: false,
-  showLayoutLegend: true,
-  watermark: false,
-  visualAid: false,
-  sidebarWidth: 248,
-  menuItemHeight: 40,
-  customPrimary: "#1d63ed",
-};
+import {
+  defaultAdminUIConfig,
+  normalizeAdminUIConfig,
+  watermarkCounts,
+  watermarkScopes,
+  type AdminUIConfig,
+  type WatermarkCount,
+  type WatermarkScope,
+} from "./adminUIConfig";
 
 type SystemSettingsDrawerProps = {
   open: boolean;
@@ -116,7 +99,7 @@ export function SystemSettingsDrawer({
         onLayoutModeChange(parsed.layoutMode);
       }
       if (parsed.uiConfig) {
-        onUIConfigChange({ ...defaultAdminUIConfig, ...parsed.uiConfig });
+        onUIConfigChange(normalizeAdminUIConfig(parsed.uiConfig));
       }
     } catch {
       window.alert(dictionary.invalidConfigJson);
@@ -319,6 +302,37 @@ export function SystemSettingsDrawer({
                     onChange={(checked) => updateConfig({ visualAid: checked })}
                   />
                 </div>
+                {uiConfig.watermark ? (
+                  <div className="watermark-settings-group">
+                    <SettingRow label={dictionary.watermarkScopes} hint={dictionary.watermarkScopesDescription}>
+                      <div aria-label={dictionary.watermarkScopes} role="group">
+                        <Checkbox.Group
+                          className="watermark-scope-options"
+                          options={watermarkScopes.map((scope) => ({
+                            label: scope === "screen" ? dictionary.watermarkScopeScreen : dictionary.watermarkScopeExport,
+                            value: scope,
+                          }))}
+                          value={uiConfig.watermarkScopes}
+                          onChange={(values) => updateConfig({ watermarkScopes: values as WatermarkScope[] })}
+                        />
+                      </div>
+                    </SettingRow>
+                    {uiConfig.watermarkScopes.includes("screen") ? (
+                      <SettingRow label={dictionary.watermarkCount} hint={dictionary.watermarkCountDescription}>
+                        <Segmented
+                          aria-label={dictionary.watermarkCount}
+                          className="watermark-count-control"
+                          options={watermarkCounts}
+                          value={uiConfig.watermarkCount}
+                          onChange={(value) => updateConfig({ watermarkCount: value as WatermarkCount })}
+                        />
+                      </SettingRow>
+                    ) : null}
+                    <Typography.Text className="watermark-format-note" type="secondary">
+                      {dictionary.watermarkExportFormatNote}
+                    </Typography.Text>
+                  </div>
+                ) : null}
               </div>
             ),
           },
@@ -390,7 +404,9 @@ function SettingSwitchCard({
         <Typography.Text strong>{label}</Typography.Text>
         {hint ? <Typography.Text type="secondary">{hint}</Typography.Text> : null}
       </div>
-      <Switch checked={checked} onChange={onChange} />
+      <label className="settings-switch-hit-target">
+        <Switch aria-label={label} checked={checked} onChange={onChange} />
+      </label>
     </div>
   );
 }

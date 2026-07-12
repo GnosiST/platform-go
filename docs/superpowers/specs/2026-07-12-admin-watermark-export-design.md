@@ -47,7 +47,7 @@ The first supported export scope is policy-review evidence JSON. The request exp
 
 ### Canonical OpenAPI
 
-`GET /api/openapi.json` and the canonical downloaded OpenAPI document remain unchanged. A future marked derivative may use a standards-compliant extension, but it must not replace the canonical artifact.
+`GET /api/openapi.json` and the canonical downloaded OpenAPI document are never watermarked or replaced by a marked derivative. The generated contract must still evolve when the API adds the policy-review watermark query and response metadata; this schema update is not watermarking the OpenAPI artifact.
 
 ### Original Files
 
@@ -62,5 +62,6 @@ Deferred formats are explicit: this phase does not claim generic CSV, XLSX, PDF,
 - The DOM contains exactly `1`, `4`, `9` or `16` hidden watermark items.
 - Mobile and desktop layouts have no horizontal overflow in light and dark themes.
 - Policy-review JSON stays valid and carries accurate structured metadata.
-- Canonical OpenAPI bytes and original downloaded file bytes do not change.
+- Watermark settings never create or replace a marked OpenAPI derivative, and original downloaded file bytes do not change.
+- The enabled policy-review Admin OpenAPI accurately describes the watermark query and response metadata.
 - UI contract drift tests fail when counts, compatibility normalization, accessibility hiding or grid rules are removed.

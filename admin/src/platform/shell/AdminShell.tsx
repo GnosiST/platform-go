@@ -135,6 +135,8 @@ export function AdminShell({
     .filter((resource): resource is AdminResourceDefinition => Boolean(resource));
   const targetLanguage = language === "zh" ? "en" : "zh";
   const displayName = session.user.name || session.user.username || dictionary.admin;
+  const watermarkText = `${branding?.shortName || "platform-go"} · ${displayName}`;
+  const showScreenWatermark = uiConfig.watermark && uiConfig.watermarkScopes.includes("screen");
   const avatarLetter = (displayName.trim()[0] || "A").toUpperCase();
   const shellStyle = {
     "--sidebar-width": `${uiConfig.sidebarCollapsed ? 64 : uiConfig.sidebarWidth}px`,
@@ -234,7 +236,7 @@ export function AdminShell({
     `layout-${layoutMode}`,
     uiConfig.sidebarCollapsed && layoutMode !== "top" ? "sider-collapsed" : "",
     uiConfig.pageTransition ? "transition-enabled" : "",
-    uiConfig.watermark ? "watermark-enabled" : "",
+    showScreenWatermark ? "watermark-enabled" : "",
     uiConfig.visualAid ? "visual-aid-enabled" : "",
   ]
     .filter(Boolean)
@@ -520,7 +522,14 @@ export function AdminShell({
           </div>
         </section>
 
-        <section className="platform-content" data-watermark={`${branding?.shortName || "platform-go"} · ${displayName}`}>
+        <section className="platform-content">
+          {showScreenWatermark ? (
+            <div className="platform-watermark-layer" aria-hidden="true" data-count={uiConfig.watermarkCount}>
+              {Array.from({ length: uiConfig.watermarkCount }, (_, index) => (
+                <span key={`${watermarkText}-${index}`}>{watermarkText}</span>
+              ))}
+            </div>
+          ) : null}
           {children}
         </section>
       </main>

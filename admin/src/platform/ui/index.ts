@@ -1,4 +1,5 @@
 export * from "./AdminDesignProvider";
+export * from "./adminUIConfig";
 export * from "./AdminPage";
 export * from "./AdminPrimitives";
 export * from "./PlatformDataTable";

@@ -372,6 +372,12 @@ export type AdminPolicyReviewActionResult = {
 export type AdminPolicyReviewExport = {
   exportedBy: string;
   exportedAt: string;
+  watermark: {
+    applied: boolean;
+    product: string;
+    exportedBy: string;
+    exportedAt: string;
+  };
   reviews: AdminResourceRecord[];
   audits: AdminResourceRecord[];
 };
@@ -594,8 +600,8 @@ export function rejectAdminPolicyReview(id: string, reason: string) {
   });
 }
 
-export function exportAdminPolicyReviews() {
-  return request<AdminPolicyReviewExport>("/admin/policy-reviews/export", {
+export function exportAdminPolicyReviews({ watermark }: { watermark: boolean }) {
+  return request<AdminPolicyReviewExport>(`/admin/policy-reviews/export?watermark=${watermark}`, {
     method: "GET",
   });
 }

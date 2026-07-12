@@ -38,6 +38,7 @@ type PolicyReviewConsoleProps = {
   dictionary: Dictionary;
   permissions: string[];
   deniedPermissions: string[];
+  exportWatermark: boolean;
 };
 
 type RejectState = {
@@ -45,7 +46,7 @@ type RejectState = {
   reason: string;
 };
 
-export function PolicyReviewConsole({ resource, language, dictionary, permissions, deniedPermissions }: PolicyReviewConsoleProps) {
+export function PolicyReviewConsole({ resource, language, dictionary, permissions, deniedPermissions, exportWatermark }: PolicyReviewConsoleProps) {
   const [reviews, setReviews] = useState<AdminResourceRecord[]>([]);
   const [audits, setAudits] = useState<AdminResourceRecord[]>([]);
   const [selectedID, setSelectedID] = useState("");
@@ -138,7 +139,7 @@ export function PolicyReviewConsole({ resource, language, dictionary, permission
     setActingID("export");
     setNotice("");
     try {
-      const payload = await exportAdminPolicyReviews();
+      const payload = await exportAdminPolicyReviews({ watermark: exportWatermark });
       downloadPolicyReviewExport(payload);
       setNotice(dictionary.policyReviewExported);
       await loadPolicyReviews();

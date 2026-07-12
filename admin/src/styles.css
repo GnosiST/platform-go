@@ -972,24 +972,90 @@ select {
   background: var(--page);
 }
 
-.platform-content > * {
+.platform-content > *:not(.platform-watermark-layer) {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
-.watermark-enabled .platform-content::before {
+.platform-watermark-layer {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 1;
   display: grid;
-  place-items: center;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  gap: 24px;
+  align-items: center;
+  justify-items: center;
+  padding: clamp(24px, 6%, 72px);
+  overflow: hidden;
   color: color-mix(in srgb, var(--muted) 18%, transparent);
-  content: attr(data-watermark);
-  font-size: 34px;
-  font-weight: 700;
   pointer-events: none;
+  contain: layout paint;
+}
+
+.platform-watermark-layer[data-count="4"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.platform-watermark-layer[data-count="9"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+}
+
+.platform-watermark-layer[data-count="16"] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+}
+
+.platform-watermark-layer span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  text-overflow: ellipsis;
   transform: rotate(-24deg);
   white-space: nowrap;
+}
+
+.platform-watermark-layer[data-count="9"] span,
+.platform-watermark-layer[data-count="16"] span {
+  font-size: 18px;
+}
+
+.watermark-settings-group {
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.watermark-scope-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.watermark-scope-options .ant-checkbox-wrapper,
+.watermark-count-control .ant-segmented-item-label {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.settings-switch-hit-target {
+  display: inline-grid;
+  min-height: 44px;
+  min-width: 44px;
+  cursor: pointer;
+  place-items: center;
+}
+
+.watermark-format-note {
+  line-height: 1.5;
 }
 
 .transition-enabled .admin-page,

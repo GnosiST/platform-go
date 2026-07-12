@@ -187,6 +187,61 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /SystemSettingsDrawer must keep importConfig support/);
   });
 
+  it("normalizes legacy and invalid watermark preferences", () => {
+    const result = runTypeScriptProbe("admin/src/platform/ui/adminUIConfig.ts", (moduleURL) => `
+      import assert from "node:assert/strict";
+      const { defaultAdminUIConfig, normalizeAdminUIConfig } = await import(${JSON.stringify(moduleURL)});
+      const legacy = normalizeAdminUIConfig({ watermark: true });
+      assert.equal(legacy.watermark, true);
+      assert.equal(legacy.watermarkCount, 1);
+      assert.deepEqual(legacy.watermarkScopes, ["screen"]);
+      const invalid = normalizeAdminUIConfig({
+        density: "comfortable",
+        watermark: true,
+        watermarkCount: 7,
+        watermarkScopes: ["screen", "unknown", "export", "screen"],
+      });
+      assert.equal(invalid.density, "comfortable");
+      assert.equal(invalid.watermarkCount, defaultAdminUIConfig.watermarkCount);
+      assert.deepEqual(invalid.watermarkScopes, ["screen", "export"]);
+      assert.deepEqual(normalizeAdminUIConfig({ watermark: true, watermarkScopes: [] }).watermarkScopes, []);
+    `);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  });
+
+  it("keeps accessible watermark scope controls and exact grid rendering", () => {
+    const settings = fs.readFileSync(path.join(repoRoot, "admin/src/platform/ui/SystemSettingsDrawer.tsx"), "utf8");
+    const shell = fs.readFileSync(path.join(repoRoot, "admin/src/platform/shell/AdminShell.tsx"), "utf8");
+    const styles = fs.readFileSync(path.join(repoRoot, "admin/src/styles.css"), "utf8");
+
+    assert.match(settings, /Checkbox\.Group/);
+    assert.match(settings, /<Switch aria-label=\{label\}/);
+    assert.match(settings, /className="settings-switch-hit-target"/);
+    assert.match(settings, /role="group"/);
+    assert.match(settings, /watermarkScopes/);
+    assert.match(settings, /watermarkCount/);
+    assert.match(settings, /options=\{watermarkCounts\}/);
+    assert.match(shell, /className="platform-watermark-layer"/);
+    assert.match(shell, /aria-hidden="true"/);
+    assert.match(shell, /Array\.from\(\{ length: uiConfig\.watermarkCount \}/);
+    assert.match(styles, /\.platform-watermark-layer/);
+    assert.match(styles, /grid-template-columns/);
+    assert.match(styles, /min-height:\s*44px/);
+    assert.match(styles, /\.settings-switch-hit-target\s*\{[\s\S]*?min-height:\s*44px[\s\S]*?min-width:\s*44px/);
+  });
+
+  it("passes the shared export watermark intent to policy review JSON exports", () => {
+    const client = fs.readFileSync(path.join(repoRoot, "admin/src/platform/api/client.ts"), "utf8");
+    const app = fs.readFileSync(path.join(repoRoot, "admin/src/App.tsx"), "utf8");
+    const policyReview = fs.readFileSync(path.join(repoRoot, "admin/src/platform/policy-review/PolicyReviewConsole.tsx"), "utf8");
+
+    assert.match(client, /export function exportAdminPolicyReviews\(\{ watermark \}: \{ watermark: boolean \}\)/);
+    assert.match(client, /policy-reviews\/export\?watermark=\$\{watermark\}/);
+    assert.match(app, /uiConfig\.watermark && uiConfig\.watermarkScopes\.includes\("export"\)/);
+    assert.match(policyReview, /exportAdminPolicyReviews\(\{ watermark: exportWatermark \}\)/);
+  });
+
   it("rejects a policy review export control that ignores the dedicated permission", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
