@@ -351,6 +351,15 @@ function operationSuccessSchema(resource, route) {
 
 function operation(resource, route) {
   const parameters = pathParams(route.path).map(pathParameter);
+  if (route.path.endsWith("/export") && resource.name === "policy-reviews") {
+    parameters.push({
+      name: "watermark",
+      in: "query",
+      required: false,
+      description: "Apply branding and export provenance watermark metadata to the JSON evidence package.",
+      schema: { type: "boolean", default: false },
+    });
+  }
   const requestBody = operationRequestBody(resource, route);
   const op = {
     tags: [resource.name],
@@ -534,11 +543,12 @@ function schemas() {
     };
     generated.PolicyReviewExportData = {
       type: "object",
-      required: ["exportedBy", "exportedAt", "reviews", "audits"],
+      required: ["exportedBy", "exportedAt", "watermark", "reviews", "audits"],
       additionalProperties: false,
       properties: {
         exportedBy: { type: "string" },
         exportedAt: { type: "string", format: "date-time" },
+        watermark: { $ref: "#/components/schemas/PolicyReviewExportWatermark" },
         reviews: {
           type: "array",
           items: { $ref: "#/components/schemas/PolicyReviewsRecord" },
@@ -547,6 +557,17 @@ function schemas() {
           type: "array",
           items: { $ref: "#/components/schemas/AuditLogsRecord" },
         },
+      },
+    };
+    generated.PolicyReviewExportWatermark = {
+      type: "object",
+      required: ["applied", "product", "exportedBy", "exportedAt"],
+      additionalProperties: false,
+      properties: {
+        applied: { type: "boolean" },
+        product: { type: "string" },
+        exportedBy: { type: "string" },
+        exportedAt: { type: "string", format: "date-time" },
       },
     };
   }

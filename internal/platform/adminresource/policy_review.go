@@ -5,8 +5,6 @@ import (
 	"strings"
 )
 
-const policyReviewExportProduct = "Platform Go"
-
 type PolicyReviewResult struct {
 	Review Record `json:"review"`
 	Role   Record `json:"role"`
@@ -206,11 +204,12 @@ func (s *Store) ExportPolicyReviews(actorCode string, auditActorID string, water
 	}
 
 	exportedBy := strings.TrimSpace(actorCode)
+	productName := s.brandingConfigLocked().ProductName
 	return PolicyReviewExport{
 		ExportedBy: exportedBy,
 		ExportedAt: now,
 		Watermark: PolicyReviewExportWatermark{
-			Applied: watermarkApplied, Product: policyReviewExportProduct, ExportedBy: exportedBy, ExportedAt: now,
+			Applied: watermarkApplied, Product: productName, ExportedBy: exportedBy, ExportedAt: now,
 		},
 		Reviews: projectedReviews,
 		Audits:  append(projectedAudits, projectedAudit),

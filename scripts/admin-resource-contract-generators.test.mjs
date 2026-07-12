@@ -207,6 +207,30 @@ describe("admin resource contract generators", () => {
     assert.equal(exportOperation.operationId, "exportPolicyReviews");
     assert.equal(exportOperation["x-platform-permission"], "admin:policy-review:read");
     assert.equal(exportOperation["x-platform-audit-action"], "policy_review.export");
+    assert.deepEqual(exportOperation.parameters, [
+      {
+        name: "watermark",
+        in: "query",
+        required: false,
+        description: "Apply branding and export provenance watermark metadata to the JSON evidence package.",
+        schema: { type: "boolean", default: false },
+      },
+    ]);
+    const exportSchema = openapi.components.schemas.PolicyReviewExportData;
+    assert.equal(exportSchema.additionalProperties, false);
+    assert.deepEqual(exportSchema.required, ["exportedBy", "exportedAt", "watermark", "reviews", "audits"]);
+    assert.deepEqual(exportSchema.properties.watermark, {
+      $ref: "#/components/schemas/PolicyReviewExportWatermark",
+    });
+    const watermarkSchema = openapi.components.schemas.PolicyReviewExportWatermark;
+    assert.equal(watermarkSchema.additionalProperties, false);
+    assert.deepEqual(watermarkSchema.required, ["applied", "product", "exportedBy", "exportedAt"]);
+    assert.deepEqual(watermarkSchema.properties, {
+      applied: { type: "boolean" },
+      product: { type: "string" },
+      exportedBy: { type: "string" },
+      exportedAt: { type: "string", format: "date-time" },
+    });
   });
 
   it("adds personnel resources with shared ownership relations when personnel is enabled", () => {

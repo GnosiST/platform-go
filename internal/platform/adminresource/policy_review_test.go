@@ -138,13 +138,28 @@ func TestExportPolicyReviewsAddsWatermarkProvenanceAndBooleanAuditValue(t *testi
 	fixedNow := time.Date(2026, time.July, 12, 10, 30, 0, 0, time.UTC)
 	store := NewStoreFromCapabilities(core.DefaultManifests())
 	store.now = func() time.Time { return fixedNow }
+	if _, err := store.Update("settings", "setting-branding", WriteInput{
+		Name:   "Branding Settings",
+		Status: "enabled",
+		Values: map[string]string{
+			"capability":    "branding",
+			"productName":   "Acme Ops",
+			"shortName":     "Acme",
+			"primaryColor":  "#1677ff",
+			"defaultTheme":  "tech",
+			"loginTitle":    "Acme Ops",
+			"loginSubtitle": "Operate with confidence.",
+		},
+	}); err != nil {
+		t.Fatalf("Update(settings branding) error = %v", err)
+	}
 
 	exported, err := store.ExportPolicyReviews("auditor", "opaque-user-id", true)
 	if err != nil {
 		t.Fatalf("ExportPolicyReviews() error = %v", err)
 	}
-	if !exported.Watermark.Applied || exported.Watermark.Product != "Platform Go" {
-		t.Fatalf("watermark = %+v, want applied Platform Go provenance", exported.Watermark)
+	if !exported.Watermark.Applied || exported.Watermark.Product != "Acme Ops" {
+		t.Fatalf("watermark = %+v, want applied current branding provenance", exported.Watermark)
 	}
 	if exported.Watermark.ExportedBy != "auditor" || exported.Watermark.ExportedAt != fixedNow.Format(time.RFC3339) {
 		t.Fatalf("watermark = %+v, want stable actor and time", exported.Watermark)

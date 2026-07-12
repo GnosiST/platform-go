@@ -4047,6 +4047,28 @@ func TestPolicyReviewExportAppliesRequestedWatermarkMetadata(t *testing.T) {
 	}
 }
 
+func TestPolicyReviewExportRejectsInvalidWatermarkQuery(t *testing.T) {
+	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "rbac", "audit", "policy-review"})
+	server := newTestServer(ServerOptions{Capabilities: capabilities})
+
+	for _, query := range []string{"watermark=", "watermark=TRUE", "watermark=1", "watermark=true&watermark=false"} {
+		t.Run(query, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodGet, "/api/admin/policy-reviews/export?"+query, nil)
+			request.Header.Set("X-Platform-User", "admin")
+
+			server.Router().ServeHTTP(recorder, request)
+
+			if recorder.Code != http.StatusBadRequest {
+				t.Fatalf("GET policy review export with %q status = %d body = %s, want 400", query, recorder.Code, recorder.Body.String())
+			}
+			if !strings.Contains(recorder.Body.String(), "ADMIN_POLICY_REVIEW_WATERMARK_INVALID") {
+				t.Fatalf("GET policy review export with %q body = %s, want stable validation code", query, recorder.Body.String())
+			}
+		})
+	}
+}
+
 func TestPolicyReviewExportRequiresExportPermissionSeparateFromRead(t *testing.T) {
 	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "rbac", "audit", "policy-review"})
 	server := newTestServer(ServerOptions{

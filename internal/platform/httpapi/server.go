@@ -1244,7 +1244,16 @@ func (s *Server) adminPolicyReviewExport(ctx *gin.Context) {
 		writeForbidden(ctx)
 		return
 	}
-	watermarkApplied := ctx.Query("watermark") == "true"
+	watermarkApplied := false
+	if values, exists := ctx.Request.URL.Query()["watermark"]; exists {
+		if len(values) != 1 || (values[0] != "true" && values[0] != "false") {
+			ctx.JSON(http.StatusBadRequest, Response[gin.H]{Error: &ErrorBody{
+				Code: "ADMIN_POLICY_REVIEW_WATERMARK_INVALID", Message: "watermark must be true or false",
+			}})
+			return
+		}
+		watermarkApplied = values[0] == "true"
+	}
 	result, err := s.resources.ExportPolicyReviews(userCode, s.auditActorID(ctx), watermarkApplied)
 	if err != nil {
 		writeAdminResourceError(ctx, err)

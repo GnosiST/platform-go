@@ -15,6 +15,10 @@ type BrandingConfig struct {
 func (s *Store) BrandingConfig() BrandingConfig {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.brandingConfigLocked()
+}
+
+func (s *Store) brandingConfigLocked() BrandingConfig {
 	config := defaultBrandingConfig()
 	record := findRecordByCode(s.resources["settings"], "branding")
 	if record == nil || record.Status == "disabled" {
