@@ -111,6 +111,7 @@ function auditActionBase(resource) {
 function capabilityRoutes(resource) {
   const base = `/api/admin/${resource.resource}`;
   const auditBase = auditActionBase(resource.resource);
+  const policyReviewAuditBase = resource.resource === "policy-reviews" ? "policy-review" : auditBase;
   const routes = [
     {
       method: "POST",
@@ -142,16 +143,17 @@ function capabilityRoutes(resource) {
         method: "POST",
         path: `${base}/:id/${action}`,
         permission: resource.permissions.update,
-        auditAction: `${auditBase}.${action}`,
+        auditAction: `${policyReviewAuditBase}.${action}`,
       });
     }
   }
-  if (resource.resource === "policy-reviews" && resource.permissions?.read) {
+  const policyReviewExportPermission = resource.permissionPrefix ? `${resource.permissionPrefix}:export` : "";
+  if (resource.resource === "policy-reviews" && policyReviewExportPermission) {
     routes.push({
       method: "GET",
       path: `${base}/export`,
-      permission: resource.permissions.read,
-      auditAction: `${auditBase}.export`,
+      permission: policyReviewExportPermission,
+      auditAction: `${policyReviewAuditBase}.export`,
     });
   }
   return routes.filter((route) => route.permission);

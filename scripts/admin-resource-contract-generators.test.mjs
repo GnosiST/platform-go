@@ -155,7 +155,7 @@ describe("admin resource contract generators", () => {
             route.method === "POST" &&
             route.path === `/api/admin/policy-reviews/:id/${action}` &&
             route.permission === "admin:policy-review:update" &&
-            route.auditAction === `policy_review.${action}`,
+            route.auditAction === `policy-review.${action}`,
         ),
         `expected policy-reviews ${action} route`,
       );
@@ -165,8 +165,8 @@ describe("admin resource contract generators", () => {
         (route) =>
           route.method === "GET" &&
           route.path === "/api/admin/policy-reviews/export" &&
-          route.permission === "admin:policy-review:read" &&
-          route.auditAction === "policy_review.export",
+          route.permission === "admin:policy-review:export" &&
+          route.auditAction === "policy-review.export",
       ),
       "expected policy-reviews export route",
     );
@@ -188,25 +188,25 @@ describe("admin resource contract generators", () => {
     assert.ok(approve, "expected policy review approve OpenAPI path");
     assert.equal(approve.operationId, "approvePolicyReviewsById");
     assert.equal(approve["x-platform-permission"], "admin:policy-review:update");
-    assert.equal(approve["x-platform-audit-action"], "policy_review.approve");
+    assert.equal(approve["x-platform-audit-action"], "policy-review.approve");
     assert.equal(approve.requestBody, undefined);
     const request = openapi.paths["/api/admin/policy-reviews/{id}/request"]?.post;
     assert.ok(request, "expected policy review request OpenAPI path");
     assert.equal(request.operationId, "requestPolicyReviewsById");
     assert.equal(request["x-platform-permission"], "admin:policy-review:update");
-    assert.equal(request["x-platform-audit-action"], "policy_review.request");
+    assert.equal(request["x-platform-audit-action"], "policy-review.request");
     assert.equal(request.requestBody, undefined);
     const reject = openapi.paths["/api/admin/policy-reviews/{id}/reject"]?.post;
     assert.ok(reject, "expected policy review reject OpenAPI path");
     assert.equal(reject.operationId, "rejectPolicyReviewsById");
     assert.equal(reject["x-platform-permission"], "admin:policy-review:update");
-    assert.equal(reject["x-platform-audit-action"], "policy_review.reject");
+    assert.equal(reject["x-platform-audit-action"], "policy-review.reject");
     assert.ok(reject.requestBody, "expected reject reason request body");
     const exportOperation = openapi.paths["/api/admin/policy-reviews/export"]?.get;
     assert.ok(exportOperation, "expected policy review export OpenAPI path");
     assert.equal(exportOperation.operationId, "exportPolicyReviews");
-    assert.equal(exportOperation["x-platform-permission"], "admin:policy-review:read");
-    assert.equal(exportOperation["x-platform-audit-action"], "policy_review.export");
+    assert.equal(exportOperation["x-platform-permission"], "admin:policy-review:export");
+    assert.equal(exportOperation["x-platform-audit-action"], "policy-review.export");
     assert.deepEqual(exportOperation.parameters, [
       {
         name: "watermark",
