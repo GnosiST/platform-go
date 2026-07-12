@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 type Limiter interface {
@@ -63,16 +65,28 @@ func NewKeyBuilder(key []byte) (*KeyBuilder, error) {
 	return &KeyBuilder{key: append([]byte(nil), key...)}, nil
 }
 
-func (b *KeyBuilder) Build(operation Operation, dimensions ...string) string {
+func (b *KeyBuilder) Build(operation Operation, dimensions ...string) (string, error) {
+	if b == nil || len(b.key) == 0 {
+		return "", errors.New("rate limit HMAC key is required")
+	}
+	if _, ok := PolicyFor(operation); !ok {
+		return "", errors.New("rate limit operation is invalid")
+	}
+	if len(dimensions) == 0 {
+		return "", errors.New("rate limit dimensions are required")
+	}
 	mac := hmac.New(sha256.New, b.key)
 	_, _ = mac.Write([]byte("platform-rate-limit-v1\x00"))
 	_, _ = mac.Write([]byte(operation))
 	for _, dimension := range dimensions {
-		normalized := strings.ToLower(strings.TrimSpace(dimension))
+		normalized := strings.TrimSpace(dimension)
+		if normalized == "" || !utf8.ValidString(normalized) || strings.IndexFunc(normalized, unicode.IsControl) >= 0 {
+			return "", errors.New("rate limit dimension is invalid")
+		}
 		_, _ = fmt.Fprintf(mac, "\x00%d:", len(normalized))
 		_, _ = mac.Write([]byte(normalized))
 	}
-	return "platform:ratelimit:v1:" + string(operation) + ":" + hex.EncodeToString(mac.Sum(nil))
+	return "platform:ratelimit:v1:" + string(operation) + ":" + hex.EncodeToString(mac.Sum(nil)), nil
 }
 
 func validateAllowInput(key string, limit int, window time.Duration) error {

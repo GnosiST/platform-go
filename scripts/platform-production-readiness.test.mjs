@@ -91,10 +91,10 @@ describe("validate-platform-production-readiness", () => {
   it("rejects readiness contracts that omit transport security configuration", () => {
     const readiness = readJSON("resources/platform-production-readiness.json");
     readiness.requiredEnv = readiness.requiredEnv.filter(
-      (item) => !["PLATFORM_PUBLIC_BASE_URL", "PLATFORM_TRUSTED_PROXIES", "PLATFORM_HTTP_MAX_BODY_BYTES"].includes(item.name),
+      (item) => !["PLATFORM_PUBLIC_BASE_URL", "PLATFORM_TRUSTED_PROXIES", "PLATFORM_EDGE_TRUSTED_PROXY", "PLATFORM_HTTP_MAX_BODY_BYTES"].includes(item.name),
     );
     readiness.runtimeGate.requiredSnippets = readiness.runtimeGate.requiredSnippets.filter(
-      (snippet) => !snippet.includes("PLATFORM_PUBLIC_BASE_URL") && !snippet.includes("PLATFORM_TRUSTED_PROXIES"),
+      (snippet) => !snippet.includes("PLATFORM_PUBLIC_BASE_URL") && !snippet.includes("PLATFORM_TRUSTED_PROXIES") && !snippet.includes("PLATFORM_EDGE_TRUSTED_PROXY"),
     );
     const readinessPath = tempJSON("platform-production-readiness.json", readiness);
 
@@ -104,9 +104,11 @@ describe("validate-platform-production-readiness", () => {
     assert.match(result.stderr, /requiredEnv must include PLATFORM_PUBLIC_BASE_URL/);
     assert.match(result.stderr, /requiredEnv must include PLATFORM_TRUSTED_PROXIES/);
     assert.match(result.stderr, /requiredEnv must include PLATFORM_HTTP_MAX_BODY_BYTES/);
+    assert.match(result.stderr, /requiredEnv must include PLATFORM_EDGE_TRUSTED_PROXY/);
     assert.match(result.stderr, /runtimeGate\.requiredSnippets must include production runtime requires PLATFORM_PUBLIC_BASE_URL/);
     assert.match(result.stderr, /runtimeGate\.requiredSnippets must include production runtime requires a non-empty PLATFORM_TRUSTED_PROXIES policy/);
     assert.match(result.stderr, /runtimeGate\.requiredSnippets must include PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv4 addresses/);
+    assert.match(result.stderr, /runtimeGate\.requiredSnippets must include production runtime requires PLATFORM_EDGE_TRUSTED_PROXY to be one canonical IP address/);
   });
 
 	it("rejects readiness contracts that omit shared rate-limit key configuration", () => {

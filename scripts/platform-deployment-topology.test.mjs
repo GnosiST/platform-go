@@ -91,7 +91,8 @@ describe("validate-platform-deployment-topology", () => {
         item !== "PLATFORM_PUBLIC_BASE_URL" &&
         item !== "PLATFORM_TRUSTED_PROXIES" &&
         item !== "PLATFORM_HTTP_MAX_BODY_BYTES" &&
-        item !== "PLATFORM_RATE_LIMIT_HMAC_KEY",
+        item !== "PLATFORM_RATE_LIMIT_HMAC_KEY" &&
+        item !== "PLATFORM_EDGE_TRUSTED_PROXY",
     );
     contract.productionApiRequirements.forbiddenProductionCapabilities = [];
     const contractPath = tempJSON("platform-deployment-topology.json", contract);
@@ -105,6 +106,7 @@ describe("validate-platform-deployment-topology", () => {
     assert.match(result.stderr, /productionApiRequirements\.requiredEnv must include PLATFORM_TRUSTED_PROXIES/);
     assert.match(result.stderr, /productionApiRequirements\.requiredEnv must include PLATFORM_HTTP_MAX_BODY_BYTES/);
     assert.match(result.stderr, /productionApiRequirements\.requiredEnv must include PLATFORM_RATE_LIMIT_HMAC_KEY/);
+		assert.match(result.stderr, /productionApiRequirements\.requiredEnv must include PLATFORM_EDGE_TRUSTED_PROXY/);
     assert.match(result.stderr, /productionApiRequirements\.forbiddenProductionCapabilities must include demo-data/);
   });
 
@@ -156,6 +158,35 @@ describe("validate-platform-deployment-topology", () => {
     assert.match(result.stderr, /admin proxy must emit HSTS and Content-Security-Policy/);
   });
 
+  it("rejects an Admin proxy that does not rebuild a trusted canonical client IP", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/nginx/platform.conf"), "utf8");
+    const unsafe = current
+      .replace("set_real_ip_from ${PLATFORM_EDGE_TRUSTED_PROXY};\n", "")
+      .replace("real_ip_header X-Forwarded-For;\n", "")
+      .replace("real_ip_recursive on;\n", "")
+      .replace("proxy_set_header X-Forwarded-For $remote_addr;", "proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;");
+    const nginxPath = tempText("platform.conf", unsafe);
+
+    const result = runValidator(["--admin-proxy", nginxPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /admin proxy must trust only PLATFORM_EDGE_TRUSTED_PROXY for real client IP/);
+    assert.match(result.stderr, /admin proxy must overwrite X-Forwarded-For with one canonical client IP/);
+  });
+
+  it("rejects forwarded HTTPS that is not gated by the original trusted edge peer", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/nginx/platform.conf"), "utf8");
+    const unsafe = current
+      .replace("geo $realip_remote_addr $platform_edge_peer_trusted {\n", "geo $remote_addr $platform_edge_peer_trusted {\n")
+      .replace('map "$platform_edge_peer_trusted:$http_x_forwarded_proto" $platform_forwarded_proto {', "map $http_x_forwarded_proto $platform_forwarded_proto {");
+    const nginxPath = tempText("platform.conf", unsafe);
+
+    const result = runValidator(["--admin-proxy", nginxPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /admin proxy must accept forwarded protocol only from PLATFORM_EDGE_TRUSTED_PROXY/);
+  });
+
   it("rejects Host-derived redirects and unconditional HSTS", () => {
     const current = fs.readFileSync(path.join(repoRoot, "deploy/nginx/platform.conf"), "utf8");
     const unsafe = current
@@ -185,12 +216,13 @@ describe("validate-platform-deployment-topology", () => {
 
   it("renders only case-sensitive canonical edge signal patterns", () => {
     const source = fs.readFileSync(path.join(repoRoot, "deploy/nginx/platform.conf"), "utf8");
-    const rendered = spawnSync("envsubst", ["${PLATFORM_PUBLIC_BASE_URL}"], {
+    const rendered = spawnSync("envsubst", ["${PLATFORM_PUBLIC_BASE_URL} ${PLATFORM_EDGE_TRUSTED_PROXY}"], {
       cwd: repoRoot,
       encoding: "utf8",
       env: {
         ...process.env,
         PLATFORM_PUBLIC_BASE_URL: "https://platform.example.test",
+        PLATFORM_EDGE_TRUSTED_PROXY: "172.30.0.1",
       },
       input: source,
     });
@@ -200,6 +232,9 @@ describe("validate-platform-deployment-topology", () => {
     assert.match(rendered.stdout, /~\^http\$ "http";/);
     assert.doesNotMatch(rendered.stdout, /~\*\^https\$/);
     assert.match(rendered.stdout, /return 308 https:\/\/platform\.example\.test\$request_uri;/);
+    assert.match(rendered.stdout, /set_real_ip_from 172\.30\.0\.1;/);
+    assert.match(rendered.stdout, /proxy_set_header X-Forwarded-For \$remote_addr;/);
+    assert.doesNotMatch(rendered.stdout, /proxy_add_x_forwarded_for/);
     for (const value of ["HTTPS", "Https", "https,http", "https, https", "https http"]) {
       assert.equal(/^https$/.test(value), false, `${value} must not enable HTTPS or HSTS`);
     }
@@ -238,6 +273,19 @@ describe("validate-platform-deployment-topology", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /standard production env must trust PLATFORM_ADMIN_PROXY_IP/);
+  });
+
+  it("rejects a standard env template whose edge peer is a CIDR or outside the fixed internal subnet", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/env/production.example.env"), "utf8");
+    for (const value of ["172.30.0.1/32", "192.0.2.1"]) {
+      const unsafe = current.replace("PLATFORM_EDGE_TRUSTED_PROXY=172.30.0.1", `PLATFORM_EDGE_TRUSTED_PROXY=${value}`);
+      const envPath = tempText("production.example.env", unsafe);
+
+      const result = runValidator(["--env-template", envPath]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /standard production edge peer must be one IP contained in PLATFORM_INTERNAL_SUBNET/);
+    }
   });
 
   it("rejects active Admin file-storage volume mounts in Compose", () => {
@@ -298,6 +346,21 @@ describe("validate-platform-deployment-topology", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /platform-api must receive PLATFORM_RATE_LIMIT_HMAC_KEY/);
+  });
+
+  it("rejects production Compose without API or Admin edge trust mappings", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
+    const mapping = "      PLATFORM_EDGE_TRUSTED_PROXY: ${PLATFORM_EDGE_TRUSTED_PROXY:?required}\n";
+    const apiMissing = current.replace(mapping, "");
+    const adminMissing = current.replace(`${mapping}    ports:\n`, "    ports:\n");
+
+    for (const [service, compose] of [["platform-api", apiMissing], ["platform-admin", adminMissing]]) {
+      const composePath = tempText("docker-compose.prod.yml", compose);
+      const result = runValidator(["--compose", composePath]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, new RegExp(`${service} must receive PLATFORM_EDGE_TRUSTED_PROXY`));
+    }
   });
 
   it("ignores commented Nginx and Compose upload examples", () => {

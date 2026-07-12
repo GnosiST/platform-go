@@ -40,10 +40,12 @@ const requiredRuntimeGateSnippets = [
   "production runtime requires a non-empty PLATFORM_TRUSTED_PROXIES policy",
   "PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv4 addresses",
   "PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv6 addresses",
+  "production runtime requires PLATFORM_EDGE_TRUSTED_PROXY to be one canonical IP address",
 ];
 const requiredProductionEnv = [
   "PLATFORM_PUBLIC_BASE_URL",
   "PLATFORM_TRUSTED_PROXIES",
+  "PLATFORM_EDGE_TRUSTED_PROXY",
   "PLATFORM_HTTP_MAX_BODY_BYTES",
   "PLATFORM_RATE_LIMIT_HMAC_KEY",
 ];

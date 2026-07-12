@@ -204,6 +204,50 @@ function normalizedProxyKey(proxy) {
   return `${proxy.family}/${proxy.bits}/${Buffer.from(bytes).toString("hex")}`;
 }
 
+function hasCanonicalPrefixAddress(proxy) {
+  const normalized = normalizedProxyKey(proxy).split("/").at(-1);
+  return normalized === Buffer.from(proxy.bytes).toString("hex");
+}
+
+function canonicalProxyValue(value, proxy) {
+  if (!proxy || !hasCanonicalPrefixAddress(proxy)) return "";
+  let address;
+  if (proxy.family === 4) {
+    address = Array.from(proxy.bytes).join(".");
+  } else {
+    const groups = Array.from({ length: 8 }, (_, index) => ((proxy.bytes[index * 2] << 8) | proxy.bytes[index * 2 + 1]).toString(16));
+    let bestStart = -1;
+    let bestLength = 0;
+    for (let start = 0; start < groups.length;) {
+      if (groups[start] !== "0") {
+        start += 1;
+        continue;
+      }
+      let end = start;
+      while (end < groups.length && groups[end] === "0") end += 1;
+      if (end - start > bestLength && end - start >= 2) {
+        bestStart = start;
+        bestLength = end - start;
+      }
+      start = end;
+    }
+    address = bestStart === -1
+      ? groups.join(":")
+      : `${groups.slice(0, bestStart).join(":")}::${groups.slice(bestStart + bestLength).join(":")}`;
+  }
+  return value.includes("/") ? `${address}/${proxy.bits}` : address;
+}
+
+function isInvalidEdgeAddress(proxy) {
+  if (!proxy) return true;
+  if (proxy.family === 4) {
+    return proxy.bytes.every((byte) => byte === 0) || proxy.bytes[0] === 127 || (proxy.bytes[0] >= 224 && proxy.bytes[0] <= 239);
+  }
+  const unspecified = proxy.bytes.every((byte) => byte === 0);
+  const loopback = proxy.bytes.slice(0, -1).every((byte) => byte === 0) && proxy.bytes.at(-1) === 1;
+  return unspecified || loopback || proxy.bytes[0] === 0xff;
+}
+
 function validateRequiredReadinessEnv(env, readiness, errors) {
   for (const item of values(readiness.requiredEnv)) {
     requireKey(env, item.name, errors);
@@ -295,6 +339,11 @@ function validatePlatformEnv(env, errors) {
   if (coverage[6].covered && !directTrustAll.has(6)) {
     errors.push("PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv6 addresses");
   }
+  const edgeTrustedProxyValue = requireKey(env, "PLATFORM_EDGE_TRUSTED_PROXY", errors).trim();
+  const edgeTrustedProxy = parseTrustedProxy(edgeTrustedProxyValue);
+  if (edgeTrustedProxyValue.includes("/") || isInvalidEdgeAddress(edgeTrustedProxy) || canonicalProxyValue(edgeTrustedProxyValue, edgeTrustedProxy) !== edgeTrustedProxyValue) {
+    errors.push("PLATFORM_EDGE_TRUSTED_PROXY must be one canonical IP address");
+  }
   if (composeProfile) {
     const adminProxyValue = requireKey(env, "PLATFORM_ADMIN_PROXY_IP", errors).trim();
     const adminProxyFamily = isIP(adminProxyValue);
@@ -304,6 +353,13 @@ function validatePlatformEnv(env, errors) {
     };
     if (!adminProxy || !parsedTrustedProxies.some((proxy) => addressInPrefix(adminProxy, proxy))) {
       errors.push("PLATFORM_ADMIN_PROXY_IP must be contained in PLATFORM_TRUSTED_PROXIES");
+    }
+    const internalSubnetValue = requireKey(env, "PLATFORM_INTERNAL_SUBNET", errors).trim();
+    const internalSubnet = parseTrustedProxy(internalSubnetValue);
+    if (!internalSubnet || internalSubnet.bits === 0 || canonicalProxyValue(internalSubnetValue, internalSubnet) !== internalSubnetValue) {
+      errors.push("PLATFORM_INTERNAL_SUBNET must be one canonical narrow CIDR");
+    } else if (!edgeTrustedProxy || edgeTrustedProxy.bits < internalSubnet.bits || !addressInPrefix(edgeTrustedProxy, internalSubnet)) {
+      errors.push("PLATFORM_EDGE_TRUSTED_PROXY must be contained in PLATFORM_INTERNAL_SUBNET");
     }
   }
   const maxBodyBytes = Number(requireKey(env, "PLATFORM_HTTP_MAX_BODY_BYTES", errors));

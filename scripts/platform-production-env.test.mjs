@@ -28,6 +28,7 @@ const validStrictEnv = [
   "PLATFORM_TRUSTED_PROXIES=10.20.0.0/16",
   "PLATFORM_INTERNAL_SUBNET=10.20.0.0/16",
   "PLATFORM_ADMIN_PROXY_IP=10.20.1.4",
+  "PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1",
   "PLATFORM_HTTP_MAX_BODY_BYTES=1048576",
   "PLATFORM_JWT_SECRET=prod-jwt-signing-value-with-strong-length-001",
   "PLATFORM_CAPABILITIES=tenant,identity,session,rbac,menu,api-resource,audit,wechat-login,dictionary,parameter,file-storage,admin-shell,system-admin",
@@ -40,7 +41,7 @@ const validStrictEnv = [
   "PLATFORM_LIFECYCLE_HISTORY_DSN=platform:strong-db-pass@tcp(platform-mysql:3306)/platform?charset=utf8mb4&parseTime=True&loc=Local",
   "PLATFORM_CACHE_DRIVER=redis",
   "PLATFORM_REDIS_ADDR=platform-redis:6379",
-	"PLATFORM_RATE_LIMIT_HMAC_KEY=rate-limit-production-key-value-0001",
+  "PLATFORM_RATE_LIMIT_HMAC_KEY=rate-limit-production-key-value-0001",
   "PLATFORM_FILE_STORAGE_DRIVER=s3",
   "PLATFORM_FILE_MAX_UPLOAD_BYTES=10485760",
   "PLATFORM_FILE_ALLOWED_MIME_TYPES=application/pdf,image/jpeg,image/png,text/plain",
@@ -211,6 +212,45 @@ describe("validate-platform-production-env", () => {
 
       assert.notEqual(result.status, 0, result.stdout);
       assert.match(result.stderr, /PLATFORM_ADMIN_PROXY_IP must be contained in PLATFORM_TRUSTED_PROXIES/);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects missing, invalid, CIDR, non-canonical, non-routable, or out-of-subnet edge peers", () => {
+    for (const source of [
+      validStrictEnv.replace("PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1\n", ""),
+      validStrictEnv.replace("PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1", "PLATFORM_EDGE_TRUSTED_PROXY=edge.internal"),
+      validStrictEnv.replace("PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1", "PLATFORM_EDGE_TRUSTED_PROXY=0.0.0.0"),
+      validStrictEnv.replace("PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1", "PLATFORM_EDGE_TRUSTED_PROXY=127.0.0.1"),
+      validStrictEnv.replace("PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1", "PLATFORM_EDGE_TRUSTED_PROXY=224.0.0.1"),
+      validStrictEnv.replace("PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1", "PLATFORM_EDGE_TRUSTED_PROXY=ff02::1"),
+      validStrictEnv.replace("PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1", "PLATFORM_EDGE_TRUSTED_PROXY=0.0.0.0/0"),
+      validStrictEnv.replace("PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1", "PLATFORM_EDGE_TRUSTED_PROXY=128.0.0.0/1"),
+      validStrictEnv.replace("PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1", "PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1/24"),
+      validStrictEnv.replace("PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1", "PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1/32"),
+      validStrictEnv.replace("PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1", "PLATFORM_EDGE_TRUSTED_PROXY=2001:DB8::1"),
+      validStrictEnv.replace("PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1", "PLATFORM_EDGE_TRUSTED_PROXY=2001:db8::/64"),
+      validStrictEnv.replace("PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1", "PLATFORM_EDGE_TRUSTED_PROXY=2001:db8::1/128"),
+      validStrictEnv.replace("PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1", "PLATFORM_EDGE_TRUSTED_PROXY=192.0.2.1"),
+    ]) {
+      const { tempDir, filePath } = tempEnv(source);
+      try {
+        const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+        assert.notEqual(result.status, 0, result.stdout);
+        assert.match(result.stderr, /PLATFORM_EDGE_TRUSTED_PROXY/);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("accepts a canonical IPv6 edge peer outside the Compose profile", () => {
+    const source = validStrictEnv.replace("PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1", "PLATFORM_EDGE_TRUSTED_PROXY=2001:db8::1");
+    const { tempDir, filePath } = tempEnv(source);
+    try {
+      const result = runValidator(["--env-file", filePath, "--strict-secrets", "--no-compose"]);
+      assert.equal(result.status, 0, result.stderr);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }

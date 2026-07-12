@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"net"
 	"net/http"
 	"path"
 	"strconv"
@@ -289,7 +290,11 @@ func (s *Server) enforceRateLimit(ctx *gin.Context, operation ratelimit.Operatio
 		writeAuthError(ctx, http.StatusServiceUnavailable, "RATE_LIMIT_UNAVAILABLE", "rate limit service is unavailable")
 		return false
 	}
-	key := s.rateLimitKeyBuilder.Build(operation, dimensions...)
+	key, err := s.rateLimitKeyBuilder.Build(operation, dimensions...)
+	if err != nil {
+		writeAuthError(ctx, http.StatusServiceUnavailable, "RATE_LIMIT_UNAVAILABLE", "rate limit service is unavailable")
+		return false
+	}
 	decision, err := s.rateLimiter.Allow(ctx.Request.Context(), key, policy.Limit, policy.Window)
 	if err != nil {
 		writeAuthError(ctx, http.StatusServiceUnavailable, "RATE_LIMIT_UNAVAILABLE", "rate limit service is unavailable")
@@ -305,6 +310,17 @@ func (s *Server) enforceRateLimit(ctx *gin.Context, operation ratelimit.Operatio
 	ctx.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
 	writeAuthError(ctx, http.StatusTooManyRequests, "RATE_LIMITED", "request rate limit exceeded")
 	return false
+}
+
+func rateLimitClientIP(ctx *gin.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	address := net.ParseIP(strings.TrimSpace(ctx.ClientIP()))
+	if address == nil {
+		return ""
+	}
+	return address.String()
 }
 
 func (s *Server) openapi(ctx *gin.Context) {
@@ -482,7 +498,7 @@ func (s *Server) authProviderStart(ctx *gin.Context) {
 		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_START_INVALID", "invalid auth provider start request")
 		return
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminOIDCStart, ctx.ClientIP(), ctx.Param("provider")) {
+	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminOIDCStart, rateLimitClientIP(ctx), strings.ToLower(strings.TrimSpace(ctx.Param("provider")))) {
 		return
 	}
 	provider, ok := s.findAuthProvider(ctx.Param("provider"), capability.AuthProviderAudienceAdmin)
@@ -527,7 +543,15 @@ func (s *Server) authLogin(ctx *gin.Context) {
 		writeAuthError(ctx, http.StatusBadRequest, "AUTH_INVALID_REQUEST", "invalid auth login request")
 		return
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminLogin, ctx.ClientIP(), input.Provider, input.Username) {
+	usernameDimension := strings.TrimSpace(input.Username)
+	if usernameDimension == "" {
+		usernameDimension = "provider-flow"
+	}
+	providerDimension := strings.ToLower(strings.TrimSpace(input.Provider))
+	if providerDimension == "" {
+		providerDimension = "unknown"
+	}
+	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminLogin, rateLimitClientIP(ctx), providerDimension, usernameDimension) {
 		return
 	}
 	provider, ok := s.findAuthProvider(input.Provider, capability.AuthProviderAudienceAdmin)
@@ -726,7 +750,11 @@ func (s *Server) appAuthLogin(ctx *gin.Context) {
 		writeAuthError(ctx, http.StatusBadRequest, "APP_AUTH_INVALID_REQUEST", "invalid app auth login request")
 		return
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationAppLogin, ctx.ClientIP(), input.Provider, input.Username) {
+	providerDimension := strings.ToLower(strings.TrimSpace(input.Provider))
+	if providerDimension == "" {
+		providerDimension = "local"
+	}
+	if !s.enforceRateLimit(ctx, ratelimit.OperationAppLogin, rateLimitClientIP(ctx), providerDimension, appUsername(input.Username)) {
 		return
 	}
 	username, providerID, ok := s.resolveAppLoginIdentity(ctx, input)
@@ -1233,7 +1261,7 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 	if !s.authorizeAdminResource(ctx, "files", "create") {
 		return
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminUpload, ctx.ClientIP(), s.currentActor(ctx)) {
+	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminUpload, rateLimitClientIP(ctx), s.currentActor(ctx)) {
 		return
 	}
 	upload, err := readValidatedUpload(ctx, s.uploadPolicy, "ADMIN_FILE")
@@ -1338,7 +1366,7 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 		return
 	}
 	username := appUsername(appSession.Username)
-	if !s.enforceRateLimit(ctx, ratelimit.OperationAppUpload, ctx.ClientIP(), username) {
+	if !s.enforceRateLimit(ctx, ratelimit.OperationAppUpload, rateLimitClientIP(ctx), username) {
 		return
 	}
 	upload, err := readValidatedUpload(ctx, s.uploadPolicy, "APP_FILE")

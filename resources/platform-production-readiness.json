@@ -34,7 +34,8 @@
       "production runtime requires PLATFORM_PUBLIC_BASE_URL to be an absolute HTTPS origin",
       "production runtime requires a non-empty PLATFORM_TRUSTED_PROXIES policy",
       "PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv4 addresses",
-      "PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv6 addresses"
+      "PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv6 addresses",
+      "production runtime requires PLATFORM_EDGE_TRUSTED_PROXY to be one canonical IP address"
     ]
   },
   "requiredEnv": [
@@ -60,6 +61,15 @@
       "docs": [
         "README.md",
         "docs/platform-capability-development.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_EDGE_TRUSTED_PROXY",
+      "purpose": "Single canonical direct peer IP for the reviewed external TLS edge; the standard Compose adapter keeps it inside PLATFORM_INTERNAL_SUBNET.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md",
+        "docs/platform-deployment.md"
       ]
     },
     {

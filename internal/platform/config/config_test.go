@@ -13,6 +13,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_HTTP_ADDR", "")
 	t.Setenv("PLATFORM_PUBLIC_BASE_URL", "")
 	t.Setenv("PLATFORM_TRUSTED_PROXIES", "")
+	t.Setenv("PLATFORM_EDGE_TRUSTED_PROXY", "")
 	t.Setenv("PLATFORM_HTTP_MAX_BODY_BYTES", "")
 	t.Setenv("PLATFORM_CAPABILITIES", "")
 	t.Setenv("PLATFORM_ADMIN_RESOURCE_FILE", "")
@@ -69,6 +70,9 @@ func TestLoadUsesDefaults(t *testing.T) {
 	}
 	if len(cfg.TrustedProxies) != 0 {
 		t.Fatalf("TrustedProxies = %#v, want none by default", cfg.TrustedProxies)
+	}
+	if cfg.EdgeTrustedProxy != "" {
+		t.Fatalf("EdgeTrustedProxy = %q, want empty by default", cfg.EdgeTrustedProxy)
 	}
 	if cfg.HTTPMaxBodyBytes != 1<<20 {
 		t.Fatalf("HTTPMaxBodyBytes = %d, want 1 MiB", cfg.HTTPMaxBodyBytes)
@@ -174,6 +178,7 @@ func TestLoadParsesRuntimeEnvironment(t *testing.T) {
 func TestLoadParsesTransportSecurityConfiguration(t *testing.T) {
 	t.Setenv("PLATFORM_PUBLIC_BASE_URL", "https://platform.example.test")
 	t.Setenv("PLATFORM_TRUSTED_PROXIES", "10.20.0.0/16,192.0.2.10")
+	t.Setenv("PLATFORM_EDGE_TRUSTED_PROXY", "172.30.0.1")
 	t.Setenv("PLATFORM_HTTP_MAX_BODY_BYTES", "2097152")
 
 	cfg := Load()
@@ -182,6 +187,9 @@ func TestLoadParsesTransportSecurityConfiguration(t *testing.T) {
 	}
 	if !reflect.DeepEqual(cfg.TrustedProxies, []string{"10.20.0.0/16", "192.0.2.10"}) {
 		t.Fatalf("TrustedProxies = %#v", cfg.TrustedProxies)
+	}
+	if cfg.EdgeTrustedProxy != "172.30.0.1" {
+		t.Fatalf("EdgeTrustedProxy = %q", cfg.EdgeTrustedProxy)
 	}
 	if cfg.HTTPMaxBodyBytes != 2<<20 {
 		t.Fatalf("HTTPMaxBodyBytes = %d", cfg.HTTPMaxBodyBytes)
@@ -654,6 +662,37 @@ func TestValidateRuntimeAllowsMultipleNarrowTrustedProxyCIDRs(t *testing.T) {
 	}
 }
 
+func TestValidateRuntimeRejectsInvalidProductionEdgeTrustedProxy(t *testing.T) {
+	for _, value := range []string{
+		"", "edge.internal", "0.0.0.0", "::", "127.0.0.1", "::1", "224.0.0.1", "ff02::1",
+		"0.0.0.0/0", "128.0.0.0/1", "172.30.0.1/24", "172.30.0.1/32",
+		"8000::/1", "2001:db8::/64", "2001:db8::1/128", "10.0.0.0/99",
+		"2001:DB8::1", " 172.30.0.1 ",
+	} {
+		t.Run(value, func(t *testing.T) {
+			cfg := validProductionRuntimeConfig()
+			cfg.EdgeTrustedProxy = value
+
+			err := cfg.ValidateRuntime()
+			if err == nil || !strings.Contains(err.Error(), "PLATFORM_EDGE_TRUSTED_PROXY") {
+				t.Fatalf("ValidateRuntime() error = %v, want edge trusted proxy rejection", err)
+			}
+		})
+	}
+}
+
+func TestValidateRuntimeAllowsCanonicalProductionEdgeTrustedProxy(t *testing.T) {
+	for _, value := range []string{"172.30.0.1", "2001:db8::1"} {
+		t.Run(value, func(t *testing.T) {
+			cfg := validProductionRuntimeConfig()
+			cfg.EdgeTrustedProxy = value
+			if err := cfg.ValidateRuntime(); err != nil {
+				t.Fatalf("ValidateRuntime() error = %v", err)
+			}
+		})
+	}
+}
+
 func TestValidateRuntimeRejectsInvalidHTTPMaxBodyBytes(t *testing.T) {
 	for _, maxBytes := range []int64{0, -1, 101 << 20} {
 		t.Run(strconv.FormatInt(maxBytes, 10), func(t *testing.T) {
@@ -1037,6 +1076,7 @@ func validProductionRuntimeConfig() Config {
 		HTTPAddr:                          "0.0.0.0:9200",
 		PublicBaseURL:                     "https://platform.example.test",
 		TrustedProxies:                    []string{"10.20.0.0/16"},
+		EdgeTrustedProxy:                  "172.30.0.1",
 		HTTPMaxBodyBytes:                  1 << 20,
 		AdminResourceDriver:               "postgres",
 		AdminResourceDSN:                  "postgres://platform:secret@localhost:5432/platform",
@@ -1100,6 +1140,7 @@ func setValidProductionLoadEnvironment(t *testing.T) {
 		"PLATFORM_HTTP_ADDR":                              "0.0.0.0:9200",
 		"PLATFORM_PUBLIC_BASE_URL":                        "https://platform.example.test",
 		"PLATFORM_TRUSTED_PROXIES":                        "10.20.0.0/16",
+		"PLATFORM_EDGE_TRUSTED_PROXY":                     "172.30.0.1",
 		"PLATFORM_HTTP_MAX_BODY_BYTES":                    "1048576",
 		"PLATFORM_CAPABILITIES":                           "tenant,identity,session,rbac,menu,audit,dictionary,parameter,file-storage,admin-shell,admin-oidc",
 		"PLATFORM_JWT_SECRET":                             "0123456789abcdef0123456789abcdef",

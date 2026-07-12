@@ -221,6 +221,7 @@ type rateLimitTestStub struct {
 	err        error
 	calls      map[ratelimit.Operation]int
 	keys       map[ratelimit.Operation]string
+	keyHistory map[ratelimit.Operation][]string
 	retryAfter time.Duration
 }
 
@@ -228,6 +229,7 @@ func (s *rateLimitTestStub) Allow(_ context.Context, key string, _ int, _ time.D
 	if s.calls == nil {
 		s.calls = map[ratelimit.Operation]int{}
 		s.keys = map[ratelimit.Operation]string{}
+		s.keyHistory = map[ratelimit.Operation][]string{}
 	}
 	for _, operation := range []ratelimit.Operation{
 		ratelimit.OperationAdminLogin,
@@ -241,6 +243,7 @@ func (s *rateLimitTestStub) Allow(_ context.Context, key string, _ int, _ time.D
 		if strings.Contains(key, ":"+string(operation)+":") {
 			s.calls[operation]++
 			s.keys[operation] = key
+			s.keyHistory[operation] = append(s.keyHistory[operation], key)
 			if operation == s.deny {
 				if s.err != nil {
 					return ratelimit.Decision{}, s.err
@@ -2280,6 +2283,60 @@ func TestRateLimitBackendErrorsReturnStableServiceUnavailable(t *testing.T) {
 	}
 	if strings.Contains(recorder.Body.String(), "Sensitive.Redis.Detail") || strings.Contains(recorder.Body.String(), "Sensitive.User") {
 		t.Fatalf("backend error response leaked sensitive detail: %s", recorder.Body.String())
+	}
+}
+
+func TestOIDCStartRateLimitUsesCanonicalTrustedClientIP(t *testing.T) {
+	builder, err := ratelimit.NewKeyBuilder([]byte(strings.Repeat("r", 32)))
+	if err != nil {
+		t.Fatalf("NewKeyBuilder() error = %v", err)
+	}
+	limiter := &rateLimitTestStub{}
+	server := newTestServer(ServerOptions{
+		Capabilities:        []capability.Manifest{adminOIDCProviderManifest(true, true)},
+		RateLimiter:         limiter,
+		RateLimitKeyBuilder: builder,
+		Security: SecurityOptions{
+			TrustedProxies: []string{"172.30.0.10"},
+		},
+	})
+
+	post := func(peer string, forwardedFor string, provider string) {
+		t.Helper()
+		request := httptest.NewRequest(http.MethodPost, "/api/auth/providers/"+provider+"/start", bytes.NewBufferString(`{"codeChallenge":"challenge"}`))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("X-Forwarded-For", forwardedFor)
+		request.RemoteAddr = peer
+		recorder := httptest.NewRecorder()
+		server.Router().ServeHTTP(recorder, request)
+		if recorder.Code == http.StatusTooManyRequests || recorder.Code == http.StatusServiceUnavailable {
+			t.Fatalf("POST OIDC start peer=%s XFF=%s status=%d body=%s", peer, forwardedFor, recorder.Code, recorder.Body.String())
+		}
+	}
+
+	post("172.30.0.10:443", "203.0.113.10", "oidc")
+	post("172.30.0.10:443", "203.0.113.11", "oidc")
+	post("172.30.0.10:443", "2001:0db8::1", "oidc")
+	post("172.30.0.10:443", "2001:db8::1", "oidc")
+	post("198.51.100.7:443", "203.0.113.250", "oidc")
+	post("198.51.100.7:443", "192.0.2.250", "oidc")
+	post("172.30.0.10:443", "203.0.113.10", "OIDC")
+
+	keys := limiter.keyHistory[ratelimit.OperationAdminOIDCStart]
+	if len(keys) != 7 {
+		t.Fatalf("OIDC rate limit keys = %d, want 7", len(keys))
+	}
+	if keys[0] == keys[1] {
+		t.Fatalf("different clients behind the trusted edge shared key %q", keys[0])
+	}
+	if keys[2] != keys[3] {
+		t.Fatalf("equivalent IPv6 clients produced different keys: %q != %q", keys[2], keys[3])
+	}
+	if keys[4] != keys[5] {
+		t.Fatalf("untrusted direct peer controlled key through XFF: %q != %q", keys[4], keys[5])
+	}
+	if keys[0] != keys[6] {
+		t.Fatalf("case-insensitive provider IDs produced different keys: %q != %q", keys[0], keys[6])
 	}
 }
 

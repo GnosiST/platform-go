@@ -97,14 +97,20 @@ func TestRedisRateLimitFailsClosedOnBackendError(t *testing.T) {
 	}
 }
 
-func TestRateLimitKeyBuilderNormalizesAndRedactsDimensions(t *testing.T) {
+func TestRateLimitKeyBuilderTrimsAndRedactsDimensions(t *testing.T) {
 	builder, err := NewKeyBuilder([]byte(strings.Repeat("k", 32)))
 	if err != nil {
 		t.Fatalf("NewKeyBuilder() error = %v", err)
 	}
 	rawMarkers := []string{"Sensitive.User", "+8613800138000", "203.0.113.25"}
-	first := builder.Build(OperationPhoneVerificationRequest, " Sensitive.User ", " +8613800138000 ", " 203.0.113.25 ")
-	second := builder.Build(OperationPhoneVerificationRequest, "sensitive.user", "+8613800138000", "203.0.113.25")
+	first, err := builder.Build(OperationPhoneVerificationRequest, " Sensitive.User ", " +8613800138000 ", " 203.0.113.25 ")
+	if err != nil {
+		t.Fatalf("Build(first) error = %v", err)
+	}
+	second, err := builder.Build(OperationPhoneVerificationRequest, "Sensitive.User", "+8613800138000", "203.0.113.25")
+	if err != nil {
+		t.Fatalf("Build(second) error = %v", err)
+	}
 	if first != second {
 		t.Fatalf("normalized keys differ: %q != %q", first, second)
 	}
@@ -116,8 +122,53 @@ func TestRateLimitKeyBuilderNormalizesAndRedactsDimensions(t *testing.T) {
 			t.Fatalf("key %q leaked raw marker %q", first, marker)
 		}
 	}
-	if other := builder.Build(OperationPhoneVerificationRequest, "other.user", "+8613800138000", "203.0.113.25"); other == first {
+	other, err := builder.Build(OperationPhoneVerificationRequest, "other.user", "+8613800138000", "203.0.113.25")
+	if err != nil {
+		t.Fatalf("Build(other) error = %v", err)
+	}
+	if other == first {
 		t.Fatalf("different normalized dimensions produced the same key %q", first)
+	}
+}
+
+func TestRateLimitKeyBuilderPreservesCaseSensitiveDimensions(t *testing.T) {
+	builder, err := NewKeyBuilder([]byte(strings.Repeat("k", 32)))
+	if err != nil {
+		t.Fatalf("NewKeyBuilder() error = %v", err)
+	}
+	admin, err := builder.Build(OperationAdminLogin, "Admin", "203.0.113.25")
+	if err != nil {
+		t.Fatalf("Build(Admin) error = %v", err)
+	}
+	lower, err := builder.Build(OperationAdminLogin, "admin", "203.0.113.25")
+	if err != nil {
+		t.Fatalf("Build(admin) error = %v", err)
+	}
+	if admin == lower {
+		t.Fatalf("case-sensitive usernames collided: %q", admin)
+	}
+}
+
+func TestRateLimitKeyBuilderRejectsInvalidDimensions(t *testing.T) {
+	builder, err := NewKeyBuilder([]byte(strings.Repeat("k", 32)))
+	if err != nil {
+		t.Fatalf("NewKeyBuilder() error = %v", err)
+	}
+	for _, tt := range []struct {
+		name       string
+		operation  Operation
+		dimensions []string
+	}{
+		{name: "unknown operation", operation: Operation("unknown"), dimensions: []string{"value"}},
+		{name: "empty", operation: OperationAdminLogin, dimensions: []string{" "}},
+		{name: "control character", operation: OperationAdminLogin, dimensions: []string{"admin\nother"}},
+		{name: "invalid utf8", operation: OperationAdminLogin, dimensions: []string{string([]byte{0xff})}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if key, err := builder.Build(tt.operation, tt.dimensions...); err == nil || key != "" {
+				t.Fatalf("Build() = %q, %v; want fail-closed error", key, err)
+			}
+		})
 	}
 }
 

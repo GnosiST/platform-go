@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { createRequire } from "node:module";
+import { isIP } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -83,6 +84,24 @@ function hasAdminFileStorageVolume(volumes) {
     return volumes.some(isFileStorageVolume);
   }
   return isFileStorageVolume(volumes);
+}
+
+function parseIPv4Network(value) {
+  const parts = String(value ?? "").split("/");
+  if (parts.length > 2) return null;
+  const [address, bitsText = "32"] = parts;
+  if (isIP(address) !== 4 || !/^[0-9]+$/.test(bitsText)) return null;
+  const bits = Number(bitsText);
+  if (bits < 1 || bits > 32) return null;
+  const octets = address.split(".").map(Number);
+  const numeric = octets.reduce((result, octet) => ((result << 8) | octet) >>> 0, 0);
+  const mask = bits === 32 ? 0xffffffff : (0xffffffff << (32 - bits)) >>> 0;
+  if (((numeric & mask) >>> 0) !== numeric && bitsText !== "32") return null;
+  return { numeric, bits, mask };
+}
+
+function networkContains(parent, child) {
+  return parent && child && child.bits >= parent.bits && ((child.numeric & parent.mask) >>> 0) === parent.numeric;
 }
 
 function validateDecision(contract, errors) {
@@ -289,6 +308,7 @@ function validateProductionRequirements(contract, errors) {
       "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER",
       "PLATFORM_PUBLIC_BASE_URL",
       "PLATFORM_TRUSTED_PROXIES",
+      "PLATFORM_EDGE_TRUSTED_PROXY",
       "PLATFORM_HTTP_MAX_BODY_BYTES",
       "PLATFORM_RATE_LIMIT_HMAC_KEY",
       "PLATFORM_FILE_MAX_UPLOAD_BYTES",
@@ -399,6 +419,15 @@ function validateDeploymentPackage(contract, errors) {
     if (!adminProxy.includes("proxy_set_header X-Forwarded-Proto $platform_forwarded_proto;")) {
       errors.push("admin proxy must forward only the normalized HTTPS edge signal");
     }
+    if (!adminProxy.includes("set_real_ip_from ${PLATFORM_EDGE_TRUSTED_PROXY};") || !adminProxy.includes("real_ip_header X-Forwarded-For;") || !adminProxy.includes("real_ip_recursive on;")) {
+      errors.push("admin proxy must trust only PLATFORM_EDGE_TRUSTED_PROXY for real client IP");
+    }
+    if (!adminProxy.includes("proxy_set_header X-Forwarded-For $remote_addr;") || adminProxy.includes("$proxy_add_x_forwarded_for")) {
+      errors.push("admin proxy must overwrite X-Forwarded-For with one canonical client IP");
+    }
+    if (!adminProxy.includes("geo $realip_remote_addr $platform_edge_peer_trusted {") || !adminProxy.includes("${PLATFORM_EDGE_TRUSTED_PROXY} 1;") || !adminProxy.includes('map "$platform_edge_peer_trusted:$platform_canonical_forwarded_proto" $platform_forwarded_proto {')) {
+      errors.push("admin proxy must accept forwarded protocol only from PLATFORM_EDGE_TRUSTED_PROXY");
+    }
     if (!adminProxy.includes('~^https$ "https";') || !adminProxy.includes('~^http$ "http";') || adminProxy.includes("~*^https$") || adminProxy.includes('  https "https";') || adminProxy.includes('  http "http";')) {
       errors.push("admin proxy must use case-sensitive canonical http and https edge signal regexes");
     }
@@ -433,6 +462,9 @@ function validateDeploymentPackage(contract, errors) {
     if (!/^PLATFORM_TRUSTED_PROXIES=.+$/m.test(envTemplate)) {
       errors.push("production env must configure PLATFORM_TRUSTED_PROXIES");
     }
+    if (!/^PLATFORM_EDGE_TRUSTED_PROXY=.+$/m.test(envTemplate)) {
+      errors.push("production env must configure PLATFORM_EDGE_TRUSTED_PROXY");
+    }
     if (!/^PLATFORM_INTERNAL_SUBNET=.+$/m.test(envTemplate) || !/^PLATFORM_ADMIN_PROXY_IP=.+$/m.test(envTemplate)) {
       errors.push("production env must align PLATFORM_INTERNAL_SUBNET and PLATFORM_ADMIN_PROXY_IP with trusted proxies");
     }
@@ -440,6 +472,12 @@ function validateDeploymentPackage(contract, errors) {
     const trustedProxyValues = (envTemplate.match(/^PLATFORM_TRUSTED_PROXIES=(.+)$/m)?.[1] ?? "").split(",").map((item) => item.trim());
     if (!adminProxyIP || !trustedProxyValues.includes(adminProxyIP)) {
       errors.push("standard production env must trust PLATFORM_ADMIN_PROXY_IP");
+    }
+    const internalSubnet = parseIPv4Network(envTemplate.match(/^PLATFORM_INTERNAL_SUBNET=(.+)$/m)?.[1]?.trim());
+    const edgeTrustedProxyValue = envTemplate.match(/^PLATFORM_EDGE_TRUSTED_PROXY=(.+)$/m)?.[1]?.trim() ?? "";
+    const edgeTrustedProxy = edgeTrustedProxyValue.includes("/") ? null : parseIPv4Network(edgeTrustedProxyValue);
+    if (!networkContains(internalSubnet, edgeTrustedProxy)) {
+      errors.push("standard production edge peer must be one IP contained in PLATFORM_INTERNAL_SUBNET");
     }
     if (!/^PLATFORM_HTTP_MAX_BODY_BYTES=[1-9][0-9]*$/m.test(envTemplate)) {
       errors.push("production env must configure PLATFORM_HTTP_MAX_BODY_BYTES");
@@ -500,8 +538,14 @@ function validateDeploymentPackage(contract, errors) {
         if (!hasComposeEnvironment(adminService.environment, "PLATFORM_PUBLIC_BASE_URL")) {
           errors.push("platform-admin must receive PLATFORM_PUBLIC_BASE_URL for Nginx envsubst");
         }
+        if (!hasComposeEnvironment(adminService.environment, "PLATFORM_EDGE_TRUSTED_PROXY")) {
+          errors.push("platform-admin must receive PLATFORM_EDGE_TRUSTED_PROXY");
+        }
       }
       const apiService = services["platform-api"];
+      if (!hasComposeEnvironment(apiService?.environment, "PLATFORM_EDGE_TRUSTED_PROXY")) {
+        errors.push("platform-api must receive PLATFORM_EDGE_TRUSTED_PROXY");
+      }
       if (!hasComposeEnvironment(apiService?.environment, "PLATFORM_RATE_LIMIT_HMAC_KEY")) {
         errors.push("platform-api must receive PLATFORM_RATE_LIMIT_HMAC_KEY");
       }

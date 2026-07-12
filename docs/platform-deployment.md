@@ -36,7 +36,7 @@ Use this for the simplest production-like deployment:
 
 This avoids browser CORS complexity and keeps the admin/API auth boundary same-origin.
 
-The standard adapter is an origin behind a reviewed external TLS edge. It binds the Admin proxy to loopback by default, installs `platform.conf` through the official Nginx `/etc/nginx/templates` envsubst entrypoint, redirects to `PLATFORM_PUBLIC_BASE_URL` rather than the request Host, and emits HSTS only after the reviewed edge supplies one canonical `https` signal. Configure `PLATFORM_TRUSTED_PROXIES` so `PLATFORM_ADMIN_PROXY_IP` is contained by the policy, reject policies that cumulatively cover all IPv4 or IPv6 addresses, and set a positive bounded `PLATFORM_HTTP_MAX_BODY_BYTES`. The API container healthcheck is the sole HTTP exception: direct loopback `GET /api/health`, with no forwarded-header trust and no HSTS. Never expose port 8080 as an unreviewed public HTTP origin.
+The standard adapter is an origin behind a reviewed external TLS edge. It binds the Admin proxy to loopback by default, installs `platform.conf` through the official Nginx `/etc/nginx/templates` envsubst entrypoint, redirects to `PLATFORM_PUBLIC_BASE_URL` rather than the request Host, and emits HSTS only after the reviewed edge supplies one canonical `https` signal. Configure `PLATFORM_TRUSTED_PROXIES` so `PLATFORM_ADMIN_PROXY_IP` is contained by the API policy. Configure `PLATFORM_EDGE_TRUSTED_PROXY` as one canonical direct edge peer IP inside `PLATFORM_INTERNAL_SUBNET`; CIDRs, loopback, unspecified and multicast addresses are rejected. Nginx accepts real IP and forwarded protocol only from that peer, then overwrites `X-Forwarded-For` instead of appending caller-controlled chain state. Reject API trusted-proxy policies that cumulatively cover all IPv4 or IPv6 addresses, and set a positive bounded `PLATFORM_HTTP_MAX_BODY_BYTES`. The API container healthcheck is the sole HTTP exception: direct loopback `GET /api/health`, with no forwarded-header trust and no HSTS. Never expose port 8080 as an unreviewed public HTTP origin.
 
 The repository includes a standard adapter package for this topology:
 
@@ -109,6 +109,7 @@ PLATFORM_PUBLIC_BASE_URL=https://platform.example.test
 PLATFORM_INTERNAL_SUBNET=172.30.0.0/24
 PLATFORM_ADMIN_PROXY_IP=172.30.0.10
 PLATFORM_TRUSTED_PROXIES=172.30.0.10
+PLATFORM_EDGE_TRUSTED_PROXY=172.30.0.1
 PLATFORM_HTTP_MAX_BODY_BYTES=1048576
 PLATFORM_CAPABILITIES=tenant,identity,session,rbac,menu,api-resource,audit,admin-oidc,dictionary,parameter,file-storage,admin-shell,system-admin
 PLATFORM_JWT_SECRET=<at-least-32-characters-and-not-the-dev-default>

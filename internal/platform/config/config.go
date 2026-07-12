@@ -18,6 +18,7 @@ type Config struct {
 	HTTPAddr                          string
 	PublicBaseURL                     string
 	TrustedProxies                    []string
+	EdgeTrustedProxy                  string
 	HTTPMaxBodyBytes                  int64
 	Capabilities                      []string
 	AdminResourceFile                 string
@@ -130,6 +131,7 @@ func Load() Config {
 		HTTPAddr:                          env("PLATFORM_HTTP_ADDR", "127.0.0.1:9200"),
 		PublicBaseURL:                     env("PLATFORM_PUBLIC_BASE_URL", ""),
 		TrustedProxies:                    csvEnv("PLATFORM_TRUSTED_PROXIES", nil),
+		EdgeTrustedProxy:                  env("PLATFORM_EDGE_TRUSTED_PROXY", ""),
 		HTTPMaxBodyBytes:                  httpMaxBodyBytes,
 		Capabilities:                      csvEnv("PLATFORM_CAPABILITIES", defaultCapabilities),
 		AdminResourceFile:                 env("PLATFORM_ADMIN_RESOURCE_FILE", ""),
@@ -349,6 +351,9 @@ func (c Config) validateProductionRuntime() []error {
 	if c.CacheDriver != "redis" {
 		errs = append(errs, errors.New("production runtime requires PLATFORM_CACHE_DRIVER=redis"))
 	}
+	if err := validateEdgeTrustedProxy(c.EdgeTrustedProxy); err != nil {
+		errs = append(errs, err)
+	}
 	if len([]byte(c.RateLimitHMACKey)) < 32 {
 		errs = append(errs, errors.New("production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY to be at least 32 bytes"))
 	}
@@ -368,6 +373,18 @@ func (c Config) validateProductionRuntime() []error {
 		errs = append(errs, errors.New("production runtime requires a configured admin auth provider"))
 	}
 	return errs
+}
+
+func validateEdgeTrustedProxy(raw string) error {
+	value := strings.TrimSpace(raw)
+	if value == "" || value != raw {
+		return errors.New("production runtime requires PLATFORM_EDGE_TRUSTED_PROXY to be one canonical IP address")
+	}
+	address, err := netip.ParseAddr(value)
+	if err != nil || address.String() != value || address.IsUnspecified() || address.IsLoopback() || address.IsMulticast() {
+		return errors.New("production runtime requires PLATFORM_EDGE_TRUSTED_PROXY to be one canonical IP address")
+	}
+	return nil
 }
 
 func validateFileUploadPolicy(maxBytes int64, allowedMIMETypes []string, production bool) []error {

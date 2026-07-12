@@ -73,7 +73,7 @@ func (s *Server) appPhoneCreateVerification(ctx *gin.Context) {
 		return
 	}
 	username := appUsername(appSession.Username)
-	if !s.enforceRateLimit(ctx, ratelimit.OperationPhoneVerificationRequest, ctx.ClientIP(), username, phone, purpose) {
+	if !s.enforceRateLimit(ctx, ratelimit.OperationPhoneVerificationRequest, rateLimitClientIP(ctx), username, phone, purpose) {
 		return
 	}
 	if s.phoneProtector == nil || s.phoneVerificationSender == nil {
@@ -157,7 +157,7 @@ func (s *Server) appPhoneCreateBinding(ctx *gin.Context) {
 		return
 	}
 	username := appUsername(appSession.Username)
-	if !s.enforceRateLimit(ctx, ratelimit.OperationPhoneBindingVerification, ctx.ClientIP(), username, phone) {
+	if !s.enforceRateLimit(ctx, ratelimit.OperationPhoneBindingVerification, rateLimitClientIP(ctx), username, phone) {
 		return
 	}
 
