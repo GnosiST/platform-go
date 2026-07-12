@@ -12,11 +12,11 @@ It does not mark the proposed capabilities as implemented and does not change th
 
 | Area | Current implementation | Important limitation |
 | --- | --- | --- |
-| Sensitive display | Field contracts support sensitivity, storage, response and export modes. App phone bindings store a hash plus a fixed masked value. | The Admin frontend renders returned values directly. There is no generic mask strategy, reveal API, reveal grant or step-up flow. |
+| Sensitive display | Field contracts support sensitivity, storage, response and export modes. The `masked` projection returns the stored value unchanged; current App phone bindings therefore persist a hash plus an already-masked value. | The Admin frontend renders returned values directly. There is no generic mask strategy, reveal API, reveal grant or step-up flow. |
 | Passwords and transport | The default platform has no local-password provider or password repository. Production configuration requires HTTPS and HSTS. | A future local-password capability still needs a dedicated Argon2id repository and must never use generic resource values or reversible encryption. |
 | Deletion | Generic resources use physical deletion. Sessions and API tokens use domain-specific expiration or revocation. Files use tombstone, object deletion and purge in one request path. | There is no platform-wide deletion policy, recycle bin, restore window, retention runner or historical purge strategy. |
-| Databases | GORM adapters are wired for MySQL, PostgreSQL and SQLite. Admin resources, sessions and lifecycle history can use separate DSNs. | This is subsystem separation, not named business datasources or tenant/capability routing. Oracle and KingbaseES are not implemented or certified. |
-| Messaging and search | Redis Pub/Sub is used only for cache invalidation. Notification and job profiles provide resource contracts. | There is no general message bus, transactional outbox, worker engine, Kafka/RabbitMQ/NATS adapter, Elasticsearch/OpenSearch adapter or replay/DLQ runtime. |
+| Databases | GORM openers are wired for MySQL, PostgreSQL and SQLite. Admin resources, sessions and lifecycle history can use separate DSNs. | This is subsystem separation, not named business datasources or tenant/capability routing. The three wired drivers do not yet have a full-platform certification matrix; `PLATFORM_DATABASE_DRIVER` and `PLATFORM_DATABASE_DSN` are not wired into process composition. Oracle and KingbaseES are not implemented or certified. |
+| Messaging and search | Redis Pub/Sub distributes cache invalidation and triggers resource/session reload paths. Notification and job profiles provide resource contracts only. | This is best-effort cache coherence, not a durable message bus. There is no transactional outbox, worker engine, Kafka/RabbitMQ/NATS adapter, Elasticsearch/OpenSearch adapter or replay/DLQ runtime. |
 
 ## Recommended Architecture Decisions
 
@@ -38,6 +38,19 @@ The recommended model separates masking from revealing:
 - A slider or CAPTCHA is a risk and anti-automation condition, not an identity factor. It may precede step-up but cannot satisfy reveal by itself.
 - Revealed values automatically return to the masked state and must not enter browser storage, URLs, logs, analytics or client-generated exports.
 
+There are currently zero reveal-capable step-up factors. Existing Admin OIDC is a login flow, and existing SMS verification is scoped to App phone binding. They are reusable implementation primitives, not evidence of an Admin reveal flow. Email OTP, TOTP, WebAuthn and slider/CAPTCHA adapters do not exist today.
+
+The first supported step-up set should be small and evidence-based:
+
+- OIDC re-authentication and SMS OTP are the recommended first identity factors;
+- policy supports one factor through `anyOf` or a required combination through `allOf`;
+- email OTP, TOTP and WebAuthn remain adapter milestones with their own recovery and enrollment rules;
+- slider/CAPTCHA may be a required risk gate before an identity factor, but never satisfies identity verification alone.
+
+Admin UI uses a read-only `MaskedField` component and a server-driven verification dialog rather than local security decisions. The reveal trigger keeps a minimum 44px target, the dialog traps and restores focus, async and error states are announced, OTP inputs request the appropriate mobile keyboard, `allOf` policies show factor progress, and expiry automatically restores the masked projection. Plaintext never enters `localStorage`, `sessionStorage`, route state, query strings, telemetry or generic client-side export code.
+
+Configuration is split by risk. Field classification, storage mode, normalization and encryption envelope rules become immutable after protected data exists. Mask presentation and step-up policy may be versioned and changed with audit, but there is no global runtime switch that makes all sensitive fields render plaintext.
+
 ### Deletion And Retention
 
 Three approaches were considered:
@@ -56,6 +69,8 @@ The recommended deletion contract supports explicit modes:
 - `hard-delete` only for explicitly approved low-risk records or final purge.
 
 Soft-deleted records use `deletedAt`, `deletedBy`, `deleteReason` and optional `purgeAfter`. Normal queries exclude them. Restore and purge use separate permissions and audit actions. The maintenance runner is disabled by default, supports dry-run, bounded batches, resumable cursors, a lease, retries and per-policy retention windows.
+
+Retention changes are audited. Shortening a policy cannot immediately purge existing records: it first produces a dry-run impact report and requires an explicit promotion decision. Audit and immutable evidence resources remain append-only even when other resources use recovery windows.
 
 Default policy should be conservative: master data is recoverable and not auto-purged, sessions and verification records have bounded retention, files have a configurable recovery window, and audit data follows hot storage, archive and compliance purge stages.
 
@@ -88,9 +103,11 @@ The platform should define `MessageBus`, `SearchIndexer` and `SearchReader` port
 
 Only one MQ adapter should be implemented for the first real workload. RabbitMQ is the better first candidate for task and notification delivery; Kafka is the better first candidate for durable event streams. NATS remains an optional later adapter. Elasticsearch and OpenSearch are asynchronous search projections; the relational database remains the source of truth for authorization, deletion, restore and audit semantics.
 
-## Proposed Delivery Order
+## Feasibility And Implementation Plan
 
-The work should be decomposed into four independent specifications and implementation plans:
+All four requested capability groups are feasible within the current Gin/GORM/capability-manifest architecture, but none is a one-file switch. The work crosses shared contracts, persistence, authorization, operations and Admin UI. Each stage must be independently testable and must not claim vendor support before its runtime and compatibility matrix pass.
+
+The work should be decomposed into four independent specifications and detailed implementation plans:
 
 1. `sensitive-data-reveal-step-up`
    - Depends on the pending `sensitive-data-protection-runtime` node delivering approved field, encryption, key-provider and persistence contracts before reveal work begins.
@@ -102,18 +119,35 @@ The work should be decomposed into four independent specifications and implement
 4. `optional-messaging-search-integrations`
    - Adds disabled ports first, then transactional outbox, one MQ adapter and Elasticsearch/OpenSearch projections.
 
-Recommended sequence:
+Recommended execution sequence:
 
 ```text
 sensitive-data-protection-runtime
   -> sensitive-data-historical-migration
+  -> mask-strategy-runtime
   -> sensitive-data-reveal-step-up
   -> data-lifecycle-retention
-  -> multi-datasource-database-portability
-  -> optional-messaging-search-integrations
+  -> multi-datasource-contract-and-runtime
+  -> database-certification-matrix
+  -> integration-ports-disabled-default
+  -> transactional-outbox-and-one-mq-adapter
+  -> asynchronous-search-projection
+  -> open-source-docs-and-release
 ```
 
-The first two nodes already belong to the completion program. The four proposed capabilities should not silently reuse existing nodes. If approved, the task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation must be expanded together.
+Stage gates:
+
+1. Finish the existing `sensitive-data-protection-runtime` node with versioned encryption, key-provider and protected persistence contracts.
+2. Finish `sensitive-data-historical-migration` with inventory, dry-run, resumable batches, verification and rollback evidence.
+3. Add `mask-strategy-runtime`; prove list, detail, Tooltip and export projections use the same backend-owned strategies.
+4. Add `sensitive-data-reveal-step-up`; start with OIDC re-authentication and SMS OTP, short-lived single-use grants, rate limits and append-only audit. Add other factors only through registered adapters.
+5. Add `data-lifecycle-retention`; declare deletion semantics per resource, then implement restore, final purge and a disabled-by-default maintenance runner.
+6. Add `multi-datasource-contract-and-runtime`; provide named sources, capability binding, health checks and one-datasource transaction boundaries without XA.
+7. Add `database-certification-matrix`; certify MySQL, PostgreSQL and SQLite across repositories, migrations, transactions, pagination and locking. Run separate KingbaseES and Oracle milestones before labeling either supported.
+8. Add disabled/no-op messaging and search ports, then a transactional outbox. Promote exactly one MQ adapter for the first real workload and build search as an asynchronous projection with rebuild and replay paths.
+9. Synchronize the open-source manuals, operator runbook, compatibility matrix and public docs site before GitHub publication. Experimental adapters must remain clearly labeled.
+
+The first two nodes already belong to the completion program. The newly proposed nodes must not silently reuse existing closeouts. If approved, the task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation expand together. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
 
 ## Release Recommendation
 
@@ -128,4 +162,4 @@ Before a public v0.1 release, complete sensitive-data encryption and historical 
 - Generic deletion and file tombstones: `internal/platform/adminresource/store.go`, `internal/platform/adminresource/audit.go`, `internal/platform/httpapi/server.go`.
 - Session and token revocation: `internal/platform/session/store.go`, `internal/platform/httpapi/server.go`.
 - Database openers and configuration: `internal/platform/storage/gorm.go`, `internal/platform/config/config.go`, `internal/platform/bootstrap/`.
-- Cache-only Pub/Sub and optional profiles: `internal/platform/cache/invalidation.go`, `internal/platform/cache/redis_invalidation.go`, `resources/platform-capability-profiles.json`.
+- Cache-coherence Pub/Sub and optional profiles: `internal/platform/cache/invalidation.go`, `internal/platform/cache/redis_invalidation.go`, `internal/platform/httpapi/server.go`, `resources/platform-capability-profiles.json`.
