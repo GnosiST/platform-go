@@ -3,6 +3,7 @@ package sensitivemigration
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -39,6 +40,12 @@ func (r *Runner) Run(ctx context.Context, options Options) (Report, error) {
 	if r == nil || r.runtime == nil || r.store == nil || len(r.plan.Resources) == 0 {
 		return report, ErrInvalidOptions
 	}
+	if nilInterface(r.store) {
+		return report, ErrInvalidOptions
+	}
+	if nilInterface(r.runtime) {
+		return report, ErrReadFailed
+	}
 	readiness, ok := r.runtime.(dataprotection.RuntimeReadiness)
 	if !ok || readiness.Ready(ctx) != nil {
 		return report, ErrReadFailed
@@ -49,7 +56,7 @@ func (r *Runner) Run(ctx context.Context, options Options) (Report, error) {
 			return report, ErrReadFailed
 		}
 		scopes, scopeErr := r.store.TenantScopes(ctx, resource)
-		if scopeErr != nil {
+		if scopeErr != nil || ctx.Err() != nil {
 			return report, ErrReadFailed
 		}
 		slices.Sort(scopes)
@@ -65,6 +72,19 @@ func (r *Runner) Run(ctx context.Context, options Options) (Report, error) {
 
 	report.Status = StatusCompleted
 	return report, nil
+}
+
+func nilInterface(value any) bool {
+	if value == nil {
+		return true
+	}
+	reflected := reflect.ValueOf(value)
+	switch reflected.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return reflected.IsNil()
+	default:
+		return false
+	}
 }
 
 func readOnlyBatchSize(options Options) (int, error) {

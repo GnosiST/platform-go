@@ -317,6 +317,38 @@ func TestInventoryRequiresReadyRuntimeBeforePlaintextTraversal(t *testing.T) {
 	}
 }
 
+func TestInventoryRejectsGenericTypedNilDependenciesBeforeDispatch(t *testing.T) {
+	plan := Plan{Resources: []ResourcePlan{{Resource: "fixture-resources", Scope: "global", SchemaVersion: 1}}}
+
+	t.Run("read store", func(t *testing.T) {
+		var store *memoryReadStore
+		report, err := NewRunner(plan, migrationTestRuntime(t), store).Run(context.Background(), Options{Mode: ModeInventory})
+		if !errors.Is(err, ErrInvalidOptions) || report.Status != StatusFailed {
+			t.Fatalf("Run() report = %+v error = %v, want sanitized typed-nil store failure", report, err)
+		}
+	})
+
+	t.Run("runtime readiness wrapper", func(t *testing.T) {
+		var runtime *typedNilReadyRuntime
+		store := newMemoryReadStore(nil)
+		report, err := NewRunner(plan, runtime, store).Run(context.Background(), Options{Mode: ModeInventory})
+		if !errors.Is(err, ErrReadFailed) || report.Status != StatusFailed || store.scopeCalls != 0 {
+			t.Fatalf("Run() report = %+v error = %v scope calls = %d, want failure before runtime/store dispatch", report, err, store.scopeCalls)
+		}
+	})
+}
+
+func TestInventoryRejectsCancellationReturnedWithEmptyTenantScopes(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	store := &cancelingScopeStore{cancel: cancel}
+	plan := Plan{Resources: []ResourcePlan{{Resource: "fixture-resources", Scope: "global", SchemaVersion: 1}}}
+
+	report, err := NewRunner(plan, migrationTestRuntime(t), store).Run(ctx, Options{Mode: ModeInventory})
+	if !errors.Is(err, ErrReadFailed) || report.Status != StatusFailed || report.Counts != (Counts{}) {
+		t.Fatalf("Run() report = %+v error = %v, want canceled scope read failure", report, err)
+	}
+}
+
 func TestDryRunIsIdempotentForTargetEnvelopesAndNeverProtectsOrReveals(t *testing.T) {
 	service := migrationTestRuntime(t)
 	runtime := &trackingRuntime{Runtime: service}
@@ -461,6 +493,14 @@ type runtimeWithoutReadiness struct {
 	dataprotection.Runtime
 }
 
+type typedNilReadyRuntime struct {
+	dataprotection.Runtime
+}
+
+func (*typedNilReadyRuntime) Ready(context.Context) error {
+	panic("typed-nil runtime readiness was dispatched")
+}
+
 func (r *validationRuntime) Validate(context.Context, string, dataprotection.FieldPolicy, dataprotection.FieldContext) error {
 	if r.cancel != nil {
 		r.cancel()
@@ -517,6 +557,19 @@ type scriptedReadStore struct {
 	pages  [][]Row
 	calls  int
 	onRows func()
+}
+
+type cancelingScopeStore struct {
+	cancel context.CancelFunc
+}
+
+func (s *cancelingScopeStore) TenantScopes(context.Context, ResourcePlan) ([]string, error) {
+	s.cancel()
+	return nil, nil
+}
+
+func (*cancelingScopeStore) Rows(context.Context, ResourcePlan, string, string, int) ([]Row, error) {
+	panic("Rows called after tenant-scope cancellation")
 }
 
 func (s *scriptedReadStore) TenantScopes(context.Context, ResourcePlan) ([]string, error) {
