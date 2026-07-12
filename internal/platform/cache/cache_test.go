@@ -2,9 +2,32 @@ package cache
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 )
+
+type failingStore struct {
+	err error
+}
+
+func (s failingStore) Get(context.Context, string) ([]byte, bool, error) {
+	return nil, false, s.err
+}
+
+func (s failingStore) Set(context.Context, string, []byte, time.Duration) error {
+	return s.err
+}
+
+func (s failingStore) Delete(context.Context, ...string) error {
+	return s.err
+}
+
+func (s failingStore) DeletePrefix(context.Context, string) error {
+	return s.err
+}
 
 func TestMemoryStoreCachesUntilTTLExpires(t *testing.T) {
 	now := time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC)
@@ -114,5 +137,62 @@ func TestMeteredStoreRecordsCacheStats(t *testing.T) {
 	}
 	if stats.Hits != 1 || stats.Misses != 1 || stats.Sets != 2 || stats.Deletes != 1 || stats.DeletePrefixes != 1 || stats.Errors != 0 {
 		t.Fatalf("Stats() = %+v, want hit/miss/set/delete counts", stats)
+	}
+}
+
+func TestMeteredStoreReportsBoundedErrorCodesWithoutAdapterDetails(t *testing.T) {
+	adapterError := errors.New("redis://cache.internal:6379 authentication failed password=super-secret")
+	tests := []struct {
+		name     string
+		operate  func(*MeteredStore)
+		wantCode string
+	}{
+		{
+			name: "get",
+			operate: func(store *MeteredStore) {
+				_, _, _ = store.Get(context.Background(), "secret")
+			},
+			wantCode: "CACHE_GET_FAILED",
+		},
+		{
+			name: "set",
+			operate: func(store *MeteredStore) {
+				_ = store.Set(context.Background(), "secret", []byte("value"), time.Minute)
+			},
+			wantCode: "CACHE_SET_FAILED",
+		},
+		{
+			name: "delete",
+			operate: func(store *MeteredStore) {
+				_ = store.Delete(context.Background(), "secret")
+			},
+			wantCode: "CACHE_DELETE_FAILED",
+		},
+		{
+			name: "delete prefix",
+			operate: func(store *MeteredStore) {
+				_ = store.DeletePrefix(context.Background(), "secret:")
+			},
+			wantCode: "CACHE_DELETE_PREFIX_FAILED",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			store := NewMeteredStore("redis", failingStore{err: adapterError})
+			test.operate(store)
+
+			stats := store.Stats()
+			if stats.Errors != 1 || stats.LastError != test.wantCode {
+				t.Fatalf("Stats() = %+v, want one error with code %q", stats, test.wantCode)
+			}
+			encoded, err := json.Marshal(stats)
+			if err != nil {
+				t.Fatalf("json.Marshal(Stats()) error = %v", err)
+			}
+			if strings.Contains(string(encoded), adapterError.Error()) || strings.Contains(string(encoded), "super-secret") {
+				t.Fatalf("public stats JSON leaked adapter error details: %s", encoded)
+			}
+		})
 	}
 }

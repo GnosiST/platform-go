@@ -119,7 +119,7 @@ Single-process policy refresh is local to the API server. Redis cache mode adds 
 - `deletes`;
 - `deletePrefixes`;
 - `errors`;
-- `lastError`.
+- `lastError`: the latest bounded operation code (`CACHE_GET_FAILED`, `CACHE_SET_FAILED`, `CACHE_DELETE_FAILED` or `CACHE_DELETE_PREFIX_FAILED`); adapter error text is never exposed.
 
 The endpoint requires `admin:monitoring:read`.
 

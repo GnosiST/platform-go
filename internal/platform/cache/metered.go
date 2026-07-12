@@ -6,6 +6,13 @@ import (
 	"time"
 )
 
+const (
+	cacheGetFailed          = "CACHE_GET_FAILED"
+	cacheSetFailed          = "CACHE_SET_FAILED"
+	cacheDeleteFailed       = "CACHE_DELETE_FAILED"
+	cacheDeletePrefixFailed = "CACHE_DELETE_PREFIX_FAILED"
+)
+
 type Stats struct {
 	Driver         string `json:"driver"`
 	Hits           uint64 `json:"hits"`
@@ -44,7 +51,7 @@ func (s *MeteredStore) Get(ctx context.Context, key string) ([]byte, bool, error
 	defer s.mu.Unlock()
 	if err != nil {
 		s.stats.Errors++
-		s.stats.LastError = err.Error()
+		s.stats.LastError = cacheGetFailed
 		return value, ok, err
 	}
 	if ok {
@@ -61,7 +68,7 @@ func (s *MeteredStore) Set(ctx context.Context, key string, value []byte, ttl ti
 	defer s.mu.Unlock()
 	if err != nil {
 		s.stats.Errors++
-		s.stats.LastError = err.Error()
+		s.stats.LastError = cacheSetFailed
 		return err
 	}
 	s.stats.Sets++
@@ -74,7 +81,7 @@ func (s *MeteredStore) Delete(ctx context.Context, keys ...string) error {
 	defer s.mu.Unlock()
 	if err != nil {
 		s.stats.Errors++
-		s.stats.LastError = err.Error()
+		s.stats.LastError = cacheDeleteFailed
 		return err
 	}
 	if len(keys) > 0 {
@@ -89,7 +96,7 @@ func (s *MeteredStore) DeletePrefix(ctx context.Context, prefix string) error {
 	defer s.mu.Unlock()
 	if err != nil {
 		s.stats.Errors++
-		s.stats.LastError = err.Error()
+		s.stats.LastError = cacheDeletePrefixFailed
 		return err
 	}
 	if prefix != "" {
