@@ -57,7 +57,7 @@ func (r *Runner) Run(ctx context.Context, options Options) (Report, error) {
 	switch options.Mode {
 	case ModeInventory, ModeDryRun:
 		return r.runReadOnly(ctx, options.Mode, batchSize, report)
-	case ModePrepare, ModeApply, ModeVerify:
+	case ModePrepare, ModeApply, ModeVerify, ModeRehearseRestore, ModeRollback:
 		return r.runPrepared(ctx, options, batchSize, report)
 	default:
 		return Report{Status: StatusFailed}, ErrInvalidOptions
@@ -134,6 +134,34 @@ func (r *Runner) runPrepared(ctx context.Context, options Options, batchSize int
 			return report, ErrVerifyFailed
 		}
 		return r.runVerify(ctx, store, request, batchSize, state, report)
+	case ModeRehearseRestore:
+		if !validRunIdentity(request) {
+			return report, ErrInvalidOptions
+		}
+		restoreStore, ok := store.(RestoreStore)
+		if !ok || nilInterface(restoreStore) {
+			return report, ErrInvalidOptions
+		}
+		report.RunID = request.RunID
+		state, err := store.StartOrResume(ctx, request)
+		if err != nil {
+			return report, ErrVerifyFailed
+		}
+		return r.runRehearsal(ctx, restoreStore, request, state, report)
+	case ModeRollback:
+		if !validMutationRequest(request) {
+			return report, ErrInvalidOptions
+		}
+		restoreStore, ok := store.(RestoreStore)
+		if !ok || nilInterface(restoreStore) {
+			return report, ErrInvalidOptions
+		}
+		report.RunID = request.RunID
+		state, err := store.StartOrResume(ctx, request)
+		if err != nil {
+			return report, ErrMutationFailed
+		}
+		return r.runRollback(ctx, restoreStore, request, batchSize, state, report)
 	default:
 		return Report{Status: StatusFailed}, ErrInvalidOptions
 	}
@@ -173,7 +201,7 @@ func (r *Runner) runApply(ctx context.Context, store MutatingStore, request RunR
 				if len(rows) == 0 {
 					break
 				}
-				mutationRows, counts, err := r.protectRows(ctx, resource, tenant, after, rows)
+				mutationRows, counts, err := r.protectRows(ctx, request.RunID, resource, tenant, after, rows)
 				if err != nil {
 					return report, err
 				}
@@ -203,7 +231,7 @@ func (r *Runner) runApply(ctx context.Context, store MutatingStore, request RunR
 	return report, nil
 }
 
-func (r *Runner) protectRows(ctx context.Context, resource ResourcePlan, tenant string, after string, rows []Row) ([]RowMutation, Counts, error) {
+func (r *Runner) protectRows(ctx context.Context, runID string, resource ResourcePlan, tenant string, after string, rows []Row) ([]RowMutation, Counts, error) {
 	mutations := make([]RowMutation, 0, len(rows))
 	counts := Counts{}
 	for _, row := range rows {
@@ -214,6 +242,7 @@ func (r *Runner) protectRows(ctx context.Context, resource ResourcePlan, tenant 
 		if err != nil {
 			return nil, Counts{}, ErrMutationFailed
 		}
+		rowEscrow := make([]EscrowEntry, 0, len(resource.Fields))
 		for _, field := range resource.Fields {
 			raw, exists := values[field.Key]
 			if !exists || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
@@ -246,16 +275,181 @@ func (r *Runner) protectRows(ctx context.Context, resource ResourcePlan, tenant 
 					return nil, Counts{}, ErrMutationFailed
 				}
 				values[field.Key] = encoded
+				escrowPolicy, escrowContext := EscrowContext(runID, tenant, resource.Resource, row.RecordID, field.Key)
+				protectedOriginal, err := r.runtime.Protect(ctx, value, escrowPolicy, escrowContext)
+				if err != nil || ctx.Err() != nil {
+					return nil, Counts{}, ErrMutationFailed
+				}
+				rowEscrow = append(rowEscrow, EscrowEntry{
+					RunID: runID, Resource: resource.Resource, RecordID: row.RecordID, FieldKey: field.Key,
+					TenantID: tenant, ProtectedOriginal: protectedOriginal, MigratedValueHash: HashMigratedValue(protected),
+				})
 			}
 		}
 		updated, err := json.Marshal(values)
 		if err != nil {
 			return nil, Counts{}, ErrMutationFailed
 		}
-		mutations = append(mutations, RowMutation{RecordID: row.RecordID, OriginalValuesJSON: row.ValuesJSON, UpdatedValuesJSON: string(updated)})
+		mutations = append(mutations, RowMutation{RecordID: row.RecordID, OriginalValuesJSON: row.ValuesJSON, UpdatedValuesJSON: string(updated), Escrow: rowEscrow})
 		after = row.RecordID
 	}
 	return mutations, counts, nil
+}
+
+func (r *Runner) runRehearsal(ctx context.Context, store RestoreStore, request RunRequest, state RunState, report Report) (Report, error) {
+	if state.RunID != request.RunID || state.PlanHash != request.PlanHash || state.Status != StatusCompleted || state.EscrowCount < 0 {
+		return report, ErrVerifyFailed
+	}
+	report.EventChainHead = state.EventChainHead
+	report.Counts.Plaintext = state.EscrowCount
+	if state.RestoreRehearsed {
+		report.Status = StatusCompleted
+		return report, nil
+	}
+	entries, err := store.EscrowEntries(ctx, request.RunID)
+	if err != nil || ctx.Err() != nil || len(entries) != state.EscrowCount {
+		return report, ErrVerifyFailed
+	}
+	for _, entry := range entries {
+		if ctx.Err() != nil || !validEscrowEntry(entry, request.RunID) {
+			return report, ErrVerifyFailed
+		}
+		policy, fieldContext := EscrowContext(entry.RunID, entry.TenantID, entry.Resource, entry.RecordID, entry.FieldKey)
+		if _, err := r.runtime.Reveal(ctx, entry.ProtectedOriginal, policy, fieldContext); err != nil || ctx.Err() != nil {
+			return report, ErrVerifyFailed
+		}
+	}
+	commit, err := store.CommitRehearsal(ctx, request.RunID, len(entries))
+	if err != nil || commit.Rows != len(entries) || commit.EventHash == "" {
+		return report, ErrVerifyFailed
+	}
+	report.Checkpoints = 1
+	report.EventChainHead = commit.EventHash
+	report.Status = StatusCompleted
+	return report, nil
+}
+
+func (r *Runner) runRollback(ctx context.Context, store RestoreStore, request RunRequest, batchSize int, state RunState, report Report) (Report, error) {
+	if state.RunID != request.RunID || state.PlanHash != request.PlanHash || state.Status != StatusCompleted || !state.RestoreRehearsed || state.EscrowCount < 0 {
+		return report, ErrMutationFailed
+	}
+	report.Counts = state.RollbackCounts
+	report.Checkpoints = checkpointBatches(state.RollbackCheckpoints)
+	report.EventChainHead = state.EventChainHead
+	if state.RollbackStatus == StatusCompleted {
+		if report.Counts.Plaintext != state.EscrowCount {
+			return report, ErrMutationFailed
+		}
+		report.Status = StatusCompleted
+		return report, nil
+	}
+	if state.RollbackStatus != StatusNone {
+		return report, ErrMutationFailed
+	}
+	revision := state.ExpectedRevision
+	for _, resource := range r.plan.Resources {
+		scopes, err := store.RollbackScopes(ctx, request.RunID, resource)
+		if err != nil || ctx.Err() != nil {
+			return report, ErrMutationFailed
+		}
+		slices.Sort(scopes)
+		for _, tenant := range scopes {
+			if tenant == "" {
+				return report, ErrMutationFailed
+			}
+			after := checkpointCursor(state.RollbackCheckpoints, resource.Resource, tenant)
+			for {
+				rows, err := store.RollbackRows(ctx, request.RunID, resource, tenant, after, batchSize)
+				if err != nil || ctx.Err() != nil || len(rows) > batchSize {
+					return report, ErrMutationFailed
+				}
+				if len(rows) == 0 {
+					break
+				}
+				mutations, counts, err := r.restoreRows(ctx, request.RunID, resource, tenant, after, rows)
+				if err != nil {
+					return report, err
+				}
+				lastRecordID := rows[len(rows)-1].RecordID
+				commit, err := store.RollbackBatch(ctx, BatchMutation{
+					RunID: request.RunID, Mode: ModeRollback, Resource: resource, TenantID: tenant,
+					ExpectedRevision: revision, LastRecordID: lastRecordID, Rows: mutations, Counts: counts,
+				})
+				if err != nil || commit.LastRecordID != lastRecordID || commit.EventHash == "" {
+					return report, ErrMutationFailed
+				}
+				revision = commit.Revision
+				after = commit.LastRecordID
+				report.Counts = report.Counts.plus(counts)
+				report.Checkpoints++
+				report.EventChainHead = commit.EventHash
+			}
+		}
+	}
+	if report.Counts.Plaintext != state.EscrowCount || report.Counts.total() != report.Counts.Plaintext {
+		return report, ErrMutationFailed
+	}
+	if err := store.FinishRollback(ctx, request.RunID); err != nil {
+		return report, ErrMutationFailed
+	}
+	report.Status = StatusCompleted
+	return report, nil
+}
+
+func (r *Runner) restoreRows(ctx context.Context, runID string, resource ResourcePlan, tenant string, after string, rows []RollbackRow) ([]RowMutation, Counts, error) {
+	mutations := make([]RowMutation, 0, len(rows))
+	counts := Counts{}
+	for _, row := range rows {
+		if ctx.Err() != nil || row.RecordID == "" || row.RecordID <= after || row.Resource != "" && row.Resource != resource.Resource || len(row.Escrow) == 0 {
+			return nil, Counts{}, ErrMutationFailed
+		}
+		values, err := DecodeUniqueObject(row.ValuesJSON)
+		if err != nil {
+			return nil, Counts{}, ErrMutationFailed
+		}
+		slices.SortFunc(row.Escrow, func(left, right EscrowEntry) int { return strings.Compare(left.FieldKey, right.FieldKey) })
+		previousField := ""
+		for _, entry := range row.Escrow {
+			if !validEscrowEntry(entry, runID) || entry.Resource != resource.Resource || entry.RecordID != row.RecordID || entry.TenantID != tenant || entry.FieldKey <= previousField {
+				return nil, Counts{}, ErrMutationFailed
+			}
+			raw, ok := values[entry.FieldKey]
+			if !ok {
+				return nil, Counts{}, ErrMutationFailed
+			}
+			var migrated string
+			if err := json.Unmarshal(raw, &migrated); err != nil || HashMigratedValue(migrated) != entry.MigratedValueHash {
+				return nil, Counts{}, ErrMutationFailed
+			}
+			policy, fieldContext := EscrowContext(entry.RunID, entry.TenantID, entry.Resource, entry.RecordID, entry.FieldKey)
+			original, err := r.runtime.Reveal(ctx, entry.ProtectedOriginal, policy, fieldContext)
+			if err != nil || ctx.Err() != nil {
+				return nil, Counts{}, ErrMutationFailed
+			}
+			encoded, err := json.Marshal(original)
+			if err != nil {
+				return nil, Counts{}, ErrMutationFailed
+			}
+			values[entry.FieldKey] = encoded
+			counts.Plaintext++
+			previousField = entry.FieldKey
+		}
+		updated, err := json.Marshal(values)
+		if err != nil {
+			return nil, Counts{}, ErrMutationFailed
+		}
+		mutations = append(mutations, RowMutation{
+			RecordID: row.RecordID, OriginalValuesJSON: row.ValuesJSON, UpdatedValuesJSON: string(updated),
+			Escrow: append([]EscrowEntry(nil), row.Escrow...),
+		})
+		after = row.RecordID
+	}
+	return mutations, counts, nil
+}
+
+func validEscrowEntry(entry EscrowEntry, runID string) bool {
+	return entry.RunID == runID && entry.Resource != "" && entry.RecordID != "" && entry.FieldKey != "" && entry.TenantID != "" &&
+		entry.ProtectedOriginal != "" && canonicalSHA256(entry.MigratedValueHash)
 }
 
 func (r *Runner) runVerify(ctx context.Context, store MutatingStore, request RunRequest, batchSize int, state RunState, report Report) (Report, error) {
@@ -337,7 +531,7 @@ func nilInterface(value any) bool {
 }
 
 func batchSizeForMode(options Options) (int, error) {
-	if options.Mode != ModeInventory && options.Mode != ModeDryRun && options.Mode != ModePrepare && options.Mode != ModeApply && options.Mode != ModeVerify {
+	if options.Mode != ModeInventory && options.Mode != ModeDryRun && options.Mode != ModePrepare && options.Mode != ModeApply && options.Mode != ModeVerify && options.Mode != ModeRehearseRestore && options.Mode != ModeRollback {
 		return 0, ErrInvalidOptions
 	}
 	if options.BatchSize == 0 {

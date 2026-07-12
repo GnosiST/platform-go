@@ -19,6 +19,7 @@ const (
 	StatusCompleted          = "completed"
 	StatusFailed             = "failed"
 	StatusPrepared           = "prepared"
+	StatusNone               = "none"
 	DefaultBatchSize         = 100
 	MaximumBatchSize         = 1000
 )
@@ -62,14 +63,19 @@ type RunRequest struct {
 }
 
 type RunState struct {
-	RunID            string
-	PlanHash         string
-	Status           string
-	ExpectedRevision uint64
-	TargetCount      int
-	Counts           Counts
-	Checkpoints      []CheckpointState
-	EventChainHead   string
+	RunID               string
+	PlanHash            string
+	Status              string
+	ExpectedRevision    uint64
+	TargetCount         int
+	Counts              Counts
+	Checkpoints         []CheckpointState
+	EventChainHead      string
+	EscrowCount         int
+	RestoreRehearsed    bool
+	RollbackStatus      string
+	RollbackCounts      Counts
+	RollbackCheckpoints []CheckpointState
 }
 
 type CheckpointState struct {
@@ -85,6 +91,22 @@ type RowMutation struct {
 	RecordID           string
 	OriginalValuesJSON string
 	UpdatedValuesJSON  string
+	Escrow             []EscrowEntry
+}
+
+type EscrowEntry struct {
+	RunID             string
+	Resource          string
+	RecordID          string
+	FieldKey          string
+	TenantID          string
+	ProtectedOriginal string
+	MigratedValueHash string
+}
+
+type RollbackRow struct {
+	Row
+	Escrow []EscrowEntry
 }
 
 type BatchMutation struct {
@@ -114,6 +136,16 @@ type MutatingStore interface {
 	TargetRows(context.Context, string, ResourcePlan, string, string, int) ([]Row, error)
 	ApplyBatch(context.Context, BatchMutation) (BatchCommit, error)
 	FinishRun(context.Context, string, string) error
+}
+
+type RestoreStore interface {
+	MutatingStore
+	EscrowEntries(context.Context, string) ([]EscrowEntry, error)
+	CommitRehearsal(context.Context, string, int) (BatchCommit, error)
+	RollbackScopes(context.Context, string, ResourcePlan) ([]string, error)
+	RollbackRows(context.Context, string, ResourcePlan, string, string, int) ([]RollbackRow, error)
+	RollbackBatch(context.Context, BatchMutation) (BatchCommit, error)
+	FinishRollback(context.Context, string) error
 }
 
 type Options struct {

@@ -2,9 +2,11 @@ package adminresource
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"platform-go/internal/platform/dataprotection"
@@ -718,6 +720,11 @@ func TestGORMProtectedValueMigrationApplyBatchUsesSnapshotAndRevisionCAS(t *test
 		Rows: []sensitivemigration.RowMutation{{
 			RecordID: "record-1", OriginalValuesJSON: `{"secretNote":"plain-one"}`,
 			UpdatedValuesJSON: `{"secretNote":"pgo:enc:v1:migrated"}`,
+			Escrow: []sensitivemigration.EscrowEntry{{
+				RunID: "run-apply", Resource: "customer-records", RecordID: "record-1", FieldKey: "secretNote",
+				TenantID: dataprotection.GlobalTenantID, ProtectedOriginal: migrationEscrowEnvelope(),
+				MigratedValueHash: sensitivemigration.HashMigratedValue("pgo:enc:v1:migrated"),
+			}},
 		}},
 	}
 	commit, err := store.ApplyBatch(context.Background(), mutation)
@@ -733,7 +740,7 @@ func TestGORMProtectedValueMigrationApplyBatchUsesSnapshotAndRevisionCAS(t *test
 	}
 	assertGORMCount(t, db, &gormSensitiveMigrationCheckpoint{}, 1)
 	assertGORMCount(t, db, &gormSensitiveMigrationEvent{}, 1)
-	assertGORMCount(t, db, &gormSensitiveMigrationEscrow{}, 0)
+	assertGORMCount(t, db, &gormSensitiveMigrationEscrow{}, 1)
 	var run gormSensitiveMigrationRun
 	if err := db.Where("run_id = ?", "run-apply").First(&run).Error; err != nil {
 		t.Fatalf("read run error = %v", err)
@@ -982,6 +989,196 @@ func TestGORMProtectedValueMigrationCheckpointRejectsOrderReplayAndCASConflicts(
 	})
 }
 
+func TestGORMProtectedValueMigrationEscrowCommitsAtomicallyWithApply(t *testing.T) {
+	db, store := preparedMigrationStore(t, map[string]string{"record-1": `{"displayName":"kept","secretNote":"plain-one"}`})
+	mutation := migrationBatch("record-1", `{"displayName":"kept","secretNote":"plain-one"}`, `{"displayName":"kept","secretNote":"pgo:enc:v1:migrated"}`, 7)
+	mutation.Rows[0].Escrow = []sensitivemigration.EscrowEntry{{
+		RunID: "run-apply", Resource: "customer-records", RecordID: "record-1", FieldKey: "secretNote",
+		TenantID: dataprotection.GlobalTenantID, ProtectedOriginal: migrationEscrowEnvelope(),
+		MigratedValueHash: sensitivemigration.HashMigratedValue("pgo:enc:v1:migrated"),
+	}}
+	if _, err := store.ApplyBatch(context.Background(), mutation); err != nil {
+		t.Fatalf("ApplyBatch() error = %v", err)
+	}
+	var escrow gormSensitiveMigrationEscrow
+	if err := db.Where("run_id = ?", "run-apply").First(&escrow).Error; err != nil {
+		t.Fatalf("read escrow error = %v", err)
+	}
+	if escrow.ProtectedOriginal != migrationEscrowEnvelope() || escrow.MigratedValueHash != sensitivemigration.HashMigratedValue("pgo:enc:v1:migrated") {
+		t.Fatalf("persisted escrow = %+v", escrow)
+	}
+	if strings.Contains(escrow.ProtectedOriginal, "plain-one") {
+		t.Fatal("escrow persisted plaintext")
+	}
+}
+
+func TestGORMProtectedValueMigrationEscrowRollsBackWithRowConflict(t *testing.T) {
+	db, store := preparedMigrationStore(t, map[string]string{"record-1": `{"secretNote":"plain-one"}`})
+	mutation := migrationBatch("record-1", `{"secretNote":"stale"}`, `{"secretNote":"pgo:enc:v1:migrated"}`, 7)
+	mutation.Rows[0].Escrow = []sensitivemigration.EscrowEntry{{
+		RunID: "run-apply", Resource: "customer-records", RecordID: "record-1", FieldKey: "secretNote",
+		TenantID: dataprotection.GlobalTenantID, ProtectedOriginal: migrationEscrowEnvelope(),
+		MigratedValueHash: sensitivemigration.HashMigratedValue("pgo:enc:v1:migrated"),
+	}}
+	if _, err := store.ApplyBatch(context.Background(), mutation); !errors.Is(err, ErrMigrationConflict) {
+		t.Fatalf("ApplyBatch(stale) error = %v, want ErrMigrationConflict", err)
+	}
+	assertGORMCount(t, db, &gormSensitiveMigrationEscrow{}, 0)
+	assertGORMCount(t, db, &gormSensitiveMigrationEvent{}, 0)
+	assertGORMCount(t, db, &gormSensitiveMigrationCheckpoint{}, 0)
+}
+
+func TestGORMProtectedValueMigrationEscrowRejectsPlaintextOriginal(t *testing.T) {
+	db, store := preparedMigrationStore(t, map[string]string{"record-1": `{"secretNote":"plain-one"}`})
+	mutation := migrationBatch("record-1", `{"secretNote":"plain-one"}`, `{"secretNote":"pgo:enc:v1:migrated"}`, 7)
+	mutation.Rows[0].Escrow[0].ProtectedOriginal = "plain-one"
+	if _, err := store.ApplyBatch(context.Background(), mutation); !errors.Is(err, ErrMigrationConflict) {
+		t.Fatalf("ApplyBatch(plaintext escrow) error = %v, want ErrMigrationConflict", err)
+	}
+	assertMigrationRecordJSON(t, db, "record-1", `{"secretNote":"plain-one"}`)
+	assertGORMCount(t, db, &gormSensitiveMigrationEscrow{}, 0)
+}
+
+func TestGORMProtectedValueMigrationRollbackRefusesPostMigrationEdit(t *testing.T) {
+	db, store := appliedEscrowMigrationStore(t)
+	if result := db.Model(&gormAdminResourceRecord{}).Where("resource = ? AND id = ?", "customer-records", "record-1").
+		Update("values_json", `{"displayName":"kept","secretNote":"pgo:enc:v1:post-migration-edit"}`); result.Error != nil || result.RowsAffected != 1 {
+		t.Fatalf("edit migrated row = %d, %v", result.RowsAffected, result.Error)
+	}
+	mutation := migrationRollbackBatch(`{"displayName":"kept","secretNote":"pgo:enc:v1:post-migration-edit"}`, `{"displayName":"kept","secretNote":"plain-one"}`, 8)
+	if _, err := store.RollbackBatch(context.Background(), mutation); !errors.Is(err, ErrMigrationConflict) {
+		t.Fatalf("RollbackBatch(post-edit) error = %v, want ErrMigrationConflict", err)
+	}
+	assertMigrationRecordJSON(t, db, "record-1", `{"displayName":"kept","secretNote":"pgo:enc:v1:post-migration-edit"}`)
+	assertGORMCount(t, db, &gormSensitiveMigrationCheckpoint{}, 1)
+	assertGORMCount(t, db, &gormSensitiveMigrationEvent{}, 2)
+}
+
+func TestGORMProtectedValueMigrationRollbackRestoresOnlyTargetAndCommitsJournalAtomically(t *testing.T) {
+	db, store := appliedEscrowMigrationStore(t)
+	mutation := migrationRollbackBatch(`{"displayName":"kept","secretNote":"pgo:enc:v1:migrated"}`, `{"displayName":"kept","secretNote":"plain-one"}`, 8)
+	commit, err := store.RollbackBatch(context.Background(), mutation)
+	if err != nil {
+		t.Fatalf("RollbackBatch() error = %v", err)
+	}
+	if commit.Revision != 9 || commit.EventHash == "" || commit.LastRecordID != "record-1" {
+		t.Fatalf("RollbackBatch() commit = %+v", commit)
+	}
+	assertMigrationRecordJSON(t, db, "record-1", `{"displayName":"kept","secretNote":"plain-one"}`)
+	if err := store.FinishRollback(context.Background(), "run-apply"); err != nil {
+		t.Fatalf("FinishRollback() error = %v", err)
+	}
+	var run gormSensitiveMigrationRun
+	if err := db.Where("run_id = ?", "run-apply").First(&run).Error; err != nil {
+		t.Fatal(err)
+	}
+	if run.RollbackStatus != sensitivemigration.StatusCompleted || run.ExpectedRevision != 9 {
+		t.Fatalf("rollback run = %+v", run)
+	}
+	var rollbackCheckpoint gormSensitiveMigrationCheckpoint
+	if err := db.Where("run_id = ? AND mode = ?", "run-apply", sensitivemigration.ModeRollback).First(&rollbackCheckpoint).Error; err != nil {
+		t.Fatal(err)
+	}
+	if rollbackCheckpoint.Rows != 1 || rollbackCheckpoint.EventHash != commit.EventHash {
+		t.Fatalf("rollback checkpoint = %+v", rollbackCheckpoint)
+	}
+}
+
+func TestGORMProtectedValueMigrationRunnerRehearsesAndRollsBackIdempotently(t *testing.T) {
+	const original = `{"displayName":"kept","secretNote":"plain-one"}`
+	db := migrationOrdinaryDB(t, map[string]string{"record-1": original})
+	store, err := NewGORMProtectedValueMigrationStore(db, "sqlite")
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := migrationRunRequest("run-apply")
+	runner := sensitivemigration.NewRunner(request.Plan, migrationStoreRuntime(), store)
+	if _, err := runner.Run(context.Background(), sensitivemigration.Options{Mode: sensitivemigration.ModePrepare, Request: request}); err != nil {
+		t.Fatalf("Run(prepare) error = %v", err)
+	}
+	if _, err := runner.Run(context.Background(), sensitivemigration.Options{Mode: sensitivemigration.ModeApply, BatchSize: 1, Request: request}); err != nil {
+		t.Fatalf("Run(apply) error = %v", err)
+	}
+	var migrated gormAdminResourceRecord
+	if err := db.Where("resource = ? AND id = ?", "customer-records", "record-1").First(&migrated).Error; err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(migrated.ValuesJSON, "plain-one") || !strings.Contains(migrated.ValuesJSON, "pgo:enc:v1:") {
+		t.Fatal("apply did not replace plaintext with target envelope")
+	}
+
+	rehearsal, err := runner.Run(context.Background(), sensitivemigration.Options{Mode: sensitivemigration.ModeRehearseRestore, Request: request})
+	if err != nil {
+		t.Fatalf("Run(rehearse) error = %v", err)
+	}
+	serialized, err := json.Marshal(rehearsal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(serialized), "plain-one") || strings.Contains(string(serialized), "pgo:enc:") || strings.Contains(string(serialized), "record-1") {
+		t.Fatal("rehearsal report exposed protected data or coordinates")
+	}
+	if rehearsal.Status != sensitivemigration.StatusCompleted || rehearsal.Counts.Plaintext != 1 {
+		t.Fatalf("rehearsal report = %+v", rehearsal)
+	}
+
+	rollback, err := runner.Run(context.Background(), sensitivemigration.Options{Mode: sensitivemigration.ModeRollback, BatchSize: 1, Request: request})
+	if err != nil {
+		t.Fatalf("Run(rollback) error = %v", err)
+	}
+	if rollback.Status != sensitivemigration.StatusCompleted || rollback.Counts.Plaintext != 1 {
+		t.Fatalf("rollback report = %+v", rollback)
+	}
+	assertMigrationRecordJSON(t, db, "record-1", original)
+	if revision, err := loadGORMRevision(db); err != nil || revision != 9 {
+		t.Fatalf("revision = %d, %v; want 9", revision, err)
+	}
+	assertGORMCount(t, db, &gormSensitiveMigrationEvent{}, 3)
+	assertGORMCount(t, db, &gormSensitiveMigrationEscrow{}, 1)
+
+	second, err := runner.Run(context.Background(), sensitivemigration.Options{Mode: sensitivemigration.ModeRollback, BatchSize: 1, Request: request})
+	if err != nil || second.Status != sensitivemigration.StatusCompleted {
+		t.Fatalf("Run(rollback resume) report = %+v error = %v", second, err)
+	}
+	if revision, err := loadGORMRevision(db); err != nil || revision != 9 {
+		t.Fatalf("revision after idempotent rollback = %d, %v; want 9", revision, err)
+	}
+	assertGORMCount(t, db, &gormSensitiveMigrationEvent{}, 3)
+}
+
+func appliedEscrowMigrationStore(t *testing.T) (*gorm.DB, *GORMProtectedValueMigrationStore) {
+	t.Helper()
+	db, store := preparedMigrationStore(t, map[string]string{"record-1": `{"displayName":"kept","secretNote":"plain-one"}`})
+	apply := migrationBatch("record-1", `{"displayName":"kept","secretNote":"plain-one"}`, `{"displayName":"kept","secretNote":"pgo:enc:v1:migrated"}`, 7)
+	apply.Rows[0].Escrow = []sensitivemigration.EscrowEntry{{
+		RunID: "run-apply", Resource: "customer-records", RecordID: "record-1", FieldKey: "secretNote",
+		TenantID: dataprotection.GlobalTenantID, ProtectedOriginal: migrationEscrowEnvelope(),
+		MigratedValueHash: sensitivemigration.HashMigratedValue("pgo:enc:v1:migrated"),
+	}}
+	if _, err := store.ApplyBatch(context.Background(), apply); err != nil {
+		t.Fatalf("ApplyBatch() error = %v", err)
+	}
+	if err := store.FinishRun(context.Background(), "run-apply", sensitivemigration.StatusCompleted); err != nil {
+		t.Fatalf("FinishRun() error = %v", err)
+	}
+	if _, err := store.CommitRehearsal(context.Background(), "run-apply", 1); err != nil {
+		t.Fatalf("CommitRehearsal() error = %v", err)
+	}
+	return db, store
+}
+
+func migrationRollbackBatch(original string, updated string, revision uint64) sensitivemigration.BatchMutation {
+	mutation := migrationBatch("record-1", original, updated, revision)
+	mutation.Mode = sensitivemigration.ModeRollback
+	mutation.Counts = sensitivemigration.Counts{Plaintext: 1}
+	mutation.Rows[0].Escrow = []sensitivemigration.EscrowEntry{{
+		RunID: "run-apply", Resource: "customer-records", RecordID: "record-1", FieldKey: "secretNote",
+		TenantID: dataprotection.GlobalTenantID, ProtectedOriginal: migrationEscrowEnvelope(),
+		MigratedValueHash: sensitivemigration.HashMigratedValue("pgo:enc:v1:migrated"),
+	}}
+	return mutation
+}
+
 func migrationResourcePlan(resource string, scope string, tenantField string, fields ...string) sensitivemigration.ResourcePlan {
 	plan := sensitivemigration.ResourcePlan{Resource: resource, Scope: scope, TenantField: tenantField, SchemaVersion: 1}
 	for _, field := range fields {
@@ -1008,22 +1205,43 @@ func migrationRunRequest(runID string) sensitivemigration.RunRequest {
 }
 
 func migrationBatch(recordID string, original string, updated string, revision uint64) sensitivemigration.BatchMutation {
-	return sensitivemigration.BatchMutation{
+	mutation := sensitivemigration.BatchMutation{
 		RunID: "run-apply", Mode: sensitivemigration.ModeApply,
 		Resource: migrationResourcePlan("customer-records", "global", "", "secretNote"),
 		TenantID: dataprotection.GlobalTenantID, ExpectedRevision: revision, LastRecordID: recordID,
 		Counts: sensitivemigration.Counts{Plaintext: 1},
 		Rows:   []sensitivemigration.RowMutation{{RecordID: recordID, OriginalValuesJSON: original, UpdatedValuesJSON: updated}},
 	}
+	if original != updated {
+		migrated, err := migrationStringField(updated, "secretNote")
+		if err == nil {
+			mutation.Rows[0].Escrow = []sensitivemigration.EscrowEntry{{
+				RunID: mutation.RunID, Resource: mutation.Resource.Resource, RecordID: recordID, FieldKey: "secretNote",
+				TenantID: mutation.TenantID, ProtectedOriginal: migrationEscrowEnvelope(),
+				MigratedValueHash: sensitivemigration.HashMigratedValue(migrated),
+			}}
+		}
+	}
+	return mutation
 }
 
 func tenantMigrationBatch(plan sensitivemigration.ResourcePlan, tenant string, recordID string, original string, updated string, revision uint64) sensitivemigration.BatchMutation {
-	return sensitivemigration.BatchMutation{
+	mutation := sensitivemigration.BatchMutation{
 		RunID: "run-interleaved", Mode: sensitivemigration.ModeApply, Resource: plan,
 		TenantID: tenant, ExpectedRevision: revision, LastRecordID: recordID,
 		Counts: sensitivemigration.Counts{Plaintext: 1},
 		Rows:   []sensitivemigration.RowMutation{{RecordID: recordID, OriginalValuesJSON: original, UpdatedValuesJSON: updated}},
 	}
+	if original != updated {
+		migrated, err := migrationStringField(updated, "secretNote")
+		if err == nil {
+			mutation.Rows[0].Escrow = []sensitivemigration.EscrowEntry{{
+				RunID: mutation.RunID, Resource: plan.Resource, RecordID: recordID, FieldKey: "secretNote", TenantID: tenant,
+				ProtectedOriginal: migrationEscrowEnvelope(), MigratedValueHash: sensitivemigration.HashMigratedValue(migrated),
+			}}
+		}
+	}
+	return mutation
 }
 
 func migrationOrdinaryDB(t *testing.T, rows map[string]string) *gorm.DB {
@@ -1104,4 +1322,46 @@ func assertMigrationRecordJSON(t *testing.T, db *gorm.DB, id string, want string
 	if row.ValuesJSON != want {
 		t.Fatalf("resource row %s values_json = %q, want %q", id, row.ValuesJSON, want)
 	}
+}
+
+var (
+	migrationEscrowEnvelopeOnce  sync.Once
+	migrationEscrowEnvelopeValue string
+)
+
+func migrationEscrowEnvelope() string {
+	migrationEscrowEnvelopeOnce.Do(func() {
+		provider, err := dataprotection.NewStaticKeyProvider(dataprotection.StaticKeyProviderConfig{
+			Kind:                  dataprotection.ProviderEnvAES256,
+			ActiveEncryptionKeyID: "migration-escrow-v1",
+			EncryptionKeys:        map[string][]byte{"migration-escrow-v1": []byte(strings.Repeat("e", 32))},
+			ActiveBlindIndexKeyID: "migration-index-v1",
+			BlindIndexKeys:        map[string][]byte{"migration-index-v1": []byte(strings.Repeat("i", 32))},
+		})
+		if err != nil {
+			panic(err)
+		}
+		policy, fieldContext := sensitivemigration.EscrowContext(
+			"run-apply", dataprotection.GlobalTenantID, "customer-records", "record-1", "secretNote",
+		)
+		migrationEscrowEnvelopeValue, err = dataprotection.NewRuntime(provider).Protect(context.Background(), "protected-fixture", policy, fieldContext)
+		if err != nil {
+			panic(err)
+		}
+	})
+	return migrationEscrowEnvelopeValue
+}
+
+func migrationStoreRuntime() *dataprotection.Service {
+	provider, err := dataprotection.NewStaticKeyProvider(dataprotection.StaticKeyProviderConfig{
+		Kind:                  dataprotection.ProviderEnvAES256,
+		ActiveEncryptionKeyID: "migration-runtime-v1",
+		EncryptionKeys:        map[string][]byte{"migration-runtime-v1": []byte(strings.Repeat("r", 32))},
+		ActiveBlindIndexKeyID: "migration-runtime-index-v1",
+		BlindIndexKeys:        map[string][]byte{"migration-runtime-index-v1": []byte(strings.Repeat("j", 32))},
+	})
+	if err != nil {
+		panic(err)
+	}
+	return dataprotection.NewRuntime(provider)
 }

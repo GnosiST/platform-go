@@ -589,8 +589,8 @@ func TestApplyResumeAndVerifyUsePersistedCheckpointAndNeverReveal(t *testing.T) 
 	if !strings.HasPrefix(applyReport.EventChainHead, "sha256:") {
 		t.Fatalf("event chain head = %q, want canonical SHA-256", applyReport.EventChainHead)
 	}
-	if runtime.protectCalls != 1 || runtime.revealCalls != 0 {
-		t.Fatalf("runtime calls protect=%d reveal=%d, want 1/0", runtime.protectCalls, runtime.revealCalls)
+	if runtime.protectCalls != 2 || runtime.revealCalls != 0 {
+		t.Fatalf("runtime calls protect=%d reveal=%d, want target+escrow protection and no reveal", runtime.protectCalls, runtime.revealCalls)
 	}
 	if !strings.Contains(store.rows[0].ValuesJSON, `"displayName":"kept"`) || strings.Contains(store.rows[0].ValuesJSON, "plain-one") {
 		t.Fatalf("whole JSON mutation did not preserve non-target fields")
@@ -708,6 +708,123 @@ func TestVerifyRejectsPreparedProcessedCountMismatch(t *testing.T) {
 	}
 }
 
+func TestEscrowContextUsesReservedAADAndCannotValidateAsTargetField(t *testing.T) {
+	service := migrationTestRuntime(t)
+	policy, escrowContext := EscrowContext("run-resume", fixtureTenant, "customer-records", fixtureRecord, "secretNote")
+	if policy != (dataprotection.FieldPolicy{Format: dataprotection.FormatAES256GCMV1, Normalization: dataprotection.NormalizationRawV1}) {
+		t.Fatalf("EscrowContext() policy = %+v", policy)
+	}
+	if escrowContext.TenantID != fixtureTenant || escrowContext.Resource != "migration-rollback" || escrowContext.FieldKey != "original-value" || escrowContext.SchemaVersion != 1 {
+		t.Fatalf("EscrowContext() context = %+v", escrowContext)
+	}
+	if strings.Contains(escrowContext.RecordID, "customer-records") || strings.Contains(escrowContext.RecordID, fixtureRecord) || strings.Contains(escrowContext.RecordID, "secretNote") {
+		t.Fatalf("EscrowContext() record ID exposes target coordinates")
+	}
+	protected, err := service.Protect(context.Background(), fixturePlaintext, policy, escrowContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetPolicy := migrationApplyPlan().Resources[0].Fields[0].Policy
+	targetContext := dataprotection.FieldContext{
+		TenantID: fixtureTenant, Resource: "customer-records", RecordID: fixtureRecord, FieldKey: "secretNote", SchemaVersion: 1,
+	}
+	if err := service.Validate(context.Background(), protected, targetPolicy, targetContext); err == nil {
+		t.Fatal("escrow envelope validated under target field context")
+	}
+}
+
+func TestApplyProtectsOriginalIntoEscrowBeforeMutation(t *testing.T) {
+	plan := migrationApplyPlan()
+	store := newMemoryMutatingStore(plan, []Row{{
+		Resource: "customer-records", RecordID: "record-1", ValuesJSON: `{"displayName":"kept","secretNote":"` + fixturePlaintext + `"}`,
+	}})
+	runtime := &trackingRuntime{Runtime: migrationTestRuntime(t)}
+	request := approvedMigrationRequest("run-resume")
+
+	report, err := NewRunner(plan, runtime, store).Run(context.Background(), Options{Mode: ModeApply, BatchSize: 10, Request: request})
+	if err != nil {
+		t.Fatalf("Run(apply) error = %v", err)
+	}
+	if report.Status != StatusCompleted || len(store.escrow) != 1 {
+		t.Fatalf("Run(apply) report = %+v escrow count = %d", report, len(store.escrow))
+	}
+	entry := store.escrow[0]
+	if entry.RunID != request.RunID || entry.Resource != "customer-records" || entry.RecordID != "record-1" || entry.FieldKey != "secretNote" || entry.TenantID != dataprotection.GlobalTenantID {
+		t.Fatalf("escrow entry coordinates = %+v", entry)
+	}
+	if entry.ProtectedOriginal == fixturePlaintext || !dataprotection.IsEnvelope(entry.ProtectedOriginal) || !canonicalSHA256(entry.MigratedValueHash) {
+		t.Fatal("escrow entry does not contain protected original and migrated hash")
+	}
+	policy, fieldContext := EscrowContext(entry.RunID, entry.TenantID, entry.Resource, entry.RecordID, entry.FieldKey)
+	revealed, err := runtime.Runtime.Reveal(context.Background(), entry.ProtectedOriginal, policy, fieldContext)
+	if err != nil || revealed != fixturePlaintext {
+		t.Fatalf("escrow reveal = %q, %v", revealed, err)
+	}
+}
+
+func TestRehearseRestoreRevealsEveryEscrowWithoutOutputAndIsIdempotent(t *testing.T) {
+	plan := migrationApplyPlan()
+	service := migrationTestRuntime(t)
+	store := newMemoryMutatingStore(plan, nil)
+	store.state.Status = StatusCompleted
+	for _, recordID := range []string{"record-1", "record-2"} {
+		policy, fieldContext := EscrowContext("run-resume", dataprotection.GlobalTenantID, "customer-records", recordID, "secretNote")
+		protected, err := service.Protect(context.Background(), fixturePlaintext, policy, fieldContext)
+		if err != nil {
+			t.Fatal(err)
+		}
+		store.escrow = append(store.escrow, EscrowEntry{
+			RunID: "run-resume", Resource: "customer-records", RecordID: recordID, FieldKey: "secretNote",
+			TenantID: dataprotection.GlobalTenantID, ProtectedOriginal: protected, MigratedValueHash: HashMigratedValue("target-envelope-" + recordID),
+		})
+	}
+	runtime := &revealingTrackingRuntime{Runtime: service}
+	request := approvedMigrationRequest("run-resume")
+
+	report, err := NewRunner(plan, runtime, store).Run(context.Background(), Options{Mode: ModeRehearseRestore, Request: request})
+	if err != nil {
+		t.Fatalf("Run(rehearse) error = %v", err)
+	}
+	encodedReport, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serialized := string(encodedReport)
+	assertSanitized(t, serialized)
+	if report.Status != StatusCompleted || report.Counts.Plaintext != 2 || runtime.revealCalls != 2 || store.rehearsalCalls != 1 {
+		t.Fatalf("rehearsal report = %+v reveal calls = %d commit calls = %d", report, runtime.revealCalls, store.rehearsalCalls)
+	}
+	if _, err := NewRunner(plan, runtime, store).Run(context.Background(), Options{Mode: ModeRehearseRestore, Request: request}); err != nil {
+		t.Fatalf("Run(rehearse resume) error = %v", err)
+	}
+	if runtime.revealCalls != 2 || store.rehearsalCalls != 1 {
+		t.Fatalf("idempotent rehearsal reveal calls = %d commit calls = %d", runtime.revealCalls, store.rehearsalCalls)
+	}
+}
+
+func TestRehearseRestoreRejectsTamperedEscrowAndCancellationWithoutStatus(t *testing.T) {
+	plan := migrationApplyPlan()
+	store := newMemoryMutatingStore(plan, nil)
+	store.state.Status = StatusCompleted
+	store.escrow = []EscrowEntry{{
+		RunID: "run-resume", Resource: "customer-records", RecordID: "record-1", FieldKey: "secretNote",
+		TenantID: dataprotection.GlobalTenantID, ProtectedOriginal: "pgo:enc:v1:tampered", MigratedValueHash: HashMigratedValue("target-envelope"),
+	}}
+	request := approvedMigrationRequest("run-resume")
+	if report, err := NewRunner(plan, migrationTestRuntime(t), store).Run(context.Background(), Options{Mode: ModeRehearseRestore, Request: request}); !errors.Is(err, ErrVerifyFailed) {
+		t.Fatalf("Run(tampered rehearsal) report = %+v error = %v", report, err)
+	}
+	if store.rehearsalCalls != 0 || store.state.RestoreRehearsed {
+		t.Fatal("tampered rehearsal persisted status")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := NewRunner(plan, migrationTestRuntime(t), store).Run(ctx, Options{Mode: ModeRehearseRestore, Request: request}); !errors.Is(err, ErrReadFailed) {
+		t.Fatalf("Run(cancelled rehearsal) error = %v", err)
+	}
+}
+
 func mustJSON(t *testing.T, value string) string {
 	t.Helper()
 	encoded, err := json.Marshal(value)
@@ -746,6 +863,8 @@ type memoryMutatingStore struct {
 	applyCalls                int
 	interruptAfterFirstCommit bool
 	interrupted               bool
+	escrow                    []EscrowEntry
+	rehearsalCalls            int
 }
 
 func newMemoryMutatingStore(plan Plan, rows []Row) *memoryMutatingStore {
@@ -777,6 +896,7 @@ func (s *memoryMutatingStore) StartOrResume(_ context.Context, request RunReques
 		return RunState{}, ErrRunConflict
 	}
 	state := s.state
+	state.EscrowCount = len(s.escrow)
 	if s.checkpoint.LastRecordID != "" {
 		state.Checkpoints = []CheckpointState{s.checkpoint}
 		state.Counts = s.checkpoint.Counts
@@ -809,6 +929,7 @@ func (s *memoryMutatingStore) targetRows(plan ResourcePlan, tenant string, after
 func (s *memoryMutatingStore) ApplyBatch(_ context.Context, mutation BatchMutation) (BatchCommit, error) {
 	s.applyCalls++
 	for _, changed := range mutation.Rows {
+		s.escrow = append(s.escrow, changed.Escrow...)
 		for index := range s.rows {
 			if s.rows[index].RecordID == changed.RecordID {
 				s.rows[index].ValuesJSON = changed.UpdatedValuesJSON
@@ -825,6 +946,36 @@ func (s *memoryMutatingStore) ApplyBatch(_ context.Context, mutation BatchMutati
 		Revision: s.state.ExpectedRevision, Rows: len(mutation.Rows), LastRecordID: mutation.LastRecordID,
 		EventSequence: uint64(s.checkpoint.Counts.total()), EventHash: s.checkpoint.EventHash,
 	}, nil
+}
+
+func (s *memoryMutatingStore) EscrowEntries(context.Context, string) ([]EscrowEntry, error) {
+	return append([]EscrowEntry(nil), s.escrow...), nil
+}
+
+func (s *memoryMutatingStore) CommitRehearsal(_ context.Context, runID string, count int) (BatchCommit, error) {
+	s.rehearsalCalls++
+	if runID != s.state.RunID || count != len(s.escrow) {
+		return BatchCommit{}, ErrRunConflict
+	}
+	s.state.RestoreRehearsed = true
+	s.state.EventChainHead = "sha256:" + strings.Repeat("r", 64)
+	return BatchCommit{Rows: count, EventSequence: 1, EventHash: s.state.EventChainHead}, nil
+}
+
+func (s *memoryMutatingStore) RollbackScopes(context.Context, string, ResourcePlan) ([]string, error) {
+	return []string{dataprotection.GlobalTenantID}, nil
+}
+
+func (s *memoryMutatingStore) RollbackRows(context.Context, string, ResourcePlan, string, string, int) ([]RollbackRow, error) {
+	return nil, nil
+}
+
+func (s *memoryMutatingStore) RollbackBatch(context.Context, BatchMutation) (BatchCommit, error) {
+	return BatchCommit{}, ErrRunConflict
+}
+
+func (s *memoryMutatingStore) FinishRollback(context.Context, string) error {
+	return ErrRunConflict
 }
 
 func (s *memoryMutatingStore) FinishRun(_ context.Context, runID string, status string) error {
@@ -850,6 +1001,23 @@ type trackingRuntime struct {
 	dataprotection.Runtime
 	protectCalls int
 	revealCalls  int
+}
+
+type revealingTrackingRuntime struct {
+	dataprotection.Runtime
+	revealCalls int
+}
+
+func (r *revealingTrackingRuntime) Ready(ctx context.Context) error {
+	return r.Runtime.(dataprotection.RuntimeReadiness).Ready(ctx)
+}
+
+func (r *revealingTrackingRuntime) Reveal(ctx context.Context, value string, policy dataprotection.FieldPolicy, fieldContext dataprotection.FieldContext) (string, error) {
+	r.revealCalls++
+	if fieldContext.Resource != "migration-rollback" || fieldContext.FieldKey != "original-value" || fieldContext.SchemaVersion != 1 {
+		return "", errors.New("unexpected escrow context")
+	}
+	return r.Runtime.Reveal(ctx, value, policy, fieldContext)
 }
 
 func (r *trackingRuntime) Ready(ctx context.Context) error {
