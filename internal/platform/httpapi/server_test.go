@@ -1889,6 +1889,24 @@ func TestAppAuthLoginIssuesAppTokenAndCurrentSession(t *testing.T) {
 	}
 }
 
+func TestDisabledDemoAuthProviderRejectsProviderlessAppLogin(t *testing.T) {
+	const forgedUsername = "caller-selected-admin"
+	server := newTestServer(ServerOptions{
+		Capabilities:            []capability.Manifest{authProviderTestManifest()},
+		DisableDemoAuthProvider: true,
+	})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/app/auth/login", bytes.NewBufferString(`{"username":"`+forgedUsername+`"}`))
+	request.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(recorder, request)
+
+	assertAuthErrorResponse(t, recorder, http.StatusBadRequest, "APP_AUTH_PROVIDER_NOT_FOUND")
+	if strings.Contains(recorder.Body.String(), forgedUsername) {
+		t.Fatalf("providerless app login response leaked caller-selected username: %s", recorder.Body.String())
+	}
+}
+
 func TestAppAuthLoginWithConfiguredWechatProviderUsesIdentityResolver(t *testing.T) {
 	var captured AppIdentityResolveInput
 	server := newTestServer(ServerOptions{
@@ -4502,6 +4520,80 @@ func TestDistributedInvalidationReloadsIndependentGORMAdminResourceStore(t *test
 	reader.Router().ServeHTTP(afterRecorder, afterRequest)
 	if afterRecorder.Code != http.StatusForbidden {
 		t.Fatalf("reader tenant query after peer role update status = %d body = %s, want 403", afterRecorder.Code, afterRecorder.Body.String())
+	}
+}
+
+func TestAuthorizationRefreshesRepositoryStateWhenInvalidationIsMissed(t *testing.T) {
+	capabilities := []capability.Manifest{authProviderTestManifest(), {ID: "tenant"}}
+	databasePath := filepath.Join(t.TempDir(), "admin-resources.db")
+	writerResources := openGORMAdminResourceStoreForHTTPTest(t, databasePath, capabilities)
+	readerResources := openGORMAdminResourceStoreForHTTPTest(t, databasePath, capabilities)
+	writer := newTestServer(ServerOptions{Capabilities: capabilities, Resources: writerResources})
+	reader := newTestServer(ServerOptions{Capabilities: capabilities, Resources: readerResources})
+	login := loginForTest(t, reader, "ops")
+
+	beforeRecorder := httptest.NewRecorder()
+	beforeRequest := httptest.NewRequest(http.MethodPost, "/api/admin/resources/tenants/query", bytes.NewBufferString(`{"page":1,"pageSize":10}`))
+	beforeRequest.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	beforeRequest.Header.Set("Content-Type", "application/json")
+	reader.Router().ServeHTTP(beforeRecorder, beforeRequest)
+	if beforeRecorder.Code != http.StatusOK {
+		t.Fatalf("reader tenant query before missed invalidation status = %d body = %s, want 200", beforeRecorder.Code, beforeRecorder.Body.String())
+	}
+
+	updateRecorder := httptest.NewRecorder()
+	updateRequest := httptest.NewRequest(http.MethodPut, "/api/admin/resources/roles/role-operator", bytes.NewBufferString(`{"name":"Operator","status":"enabled","description":"Updated operator","values":{"groupCode":"operations","dataScope":"current_org","permissions":"admin:user:read"}}`))
+	updateRequest.Header.Set("Content-Type", "application/json")
+	writer.Router().ServeHTTP(updateRecorder, updateRequest)
+	if updateRecorder.Code != http.StatusOK {
+		t.Fatalf("writer role update status = %d body = %s", updateRecorder.Code, updateRecorder.Body.String())
+	}
+
+	afterRecorder := httptest.NewRecorder()
+	afterRequest := httptest.NewRequest(http.MethodPost, "/api/admin/resources/tenants/query", bytes.NewBufferString(`{"page":1,"pageSize":10}`))
+	afterRequest.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	afterRequest.Header.Set("Content-Type", "application/json")
+	reader.Router().ServeHTTP(afterRecorder, afterRequest)
+	if afterRecorder.Code != http.StatusForbidden {
+		t.Fatalf("reader tenant query after missed invalidation status = %d body = %s, want 403", afterRecorder.Code, afterRecorder.Body.String())
+	}
+}
+
+func TestAppFileContentRefreshesRepositoryStateWhenInvalidationIsMissed(t *testing.T) {
+	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"})
+	databasePath := filepath.Join(t.TempDir(), "admin-resources.db")
+	writerResources := openGORMAdminResourceStoreForHTTPTest(t, databasePath, capabilities)
+	readerResources := openGORMAdminResourceStoreForHTTPTest(t, databasePath, capabilities)
+	fileStore := storage.NewLocalObjectStore(storage.LocalObjectStoreOptions{BaseDir: t.TempDir()})
+	reader := newTestServer(ServerOptions{Capabilities: capabilities, Resources: readerResources, FileStorage: fileStore})
+	login := appLoginForTest(t, reader, "guest-alpha")
+
+	body, contentType := multipartUploadBodyWithMediaType(t, "private.txt", "text/plain", "private")
+	uploadRecorder := httptest.NewRecorder()
+	uploadRequest := httptest.NewRequest(http.MethodPost, "/api/app/files", body)
+	uploadRequest.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	uploadRequest.Header.Set("Content-Type", contentType)
+	reader.Router().ServeHTTP(uploadRecorder, uploadRequest)
+	if uploadRecorder.Code != http.StatusCreated {
+		t.Fatalf("app file upload status = %d body = %s", uploadRecorder.Code, uploadRecorder.Body.String())
+	}
+	var uploaded adminResourceRecordTestPayload
+	if err := json.Unmarshal(uploadRecorder.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decode app file upload: %v body = %s", err, uploadRecorder.Body.String())
+	}
+
+	if _, err := writerResources.TombstoneFileWithAudit(uploaded.Data.Record.ID, adminresource.AuditEvent{
+		Actor: "user-admin", Action: "file.delete.request", Resource: "files", Result: "success", ReasonCode: "cleanup-pending",
+	}); err != nil {
+		t.Fatalf("TombstoneFileWithAudit() error = %v", err)
+	}
+
+	contentRecorder := httptest.NewRecorder()
+	contentRequest := httptest.NewRequest(http.MethodGet, "/api/app/files/"+uploaded.Data.Record.ID+"/content", nil)
+	contentRequest.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	reader.Router().ServeHTTP(contentRecorder, contentRequest)
+	if contentRecorder.Code != http.StatusNotFound {
+		t.Fatalf("app file content after missed tombstone invalidation status = %d body = %s, want 404", contentRecorder.Code, contentRecorder.Body.String())
 	}
 }
 

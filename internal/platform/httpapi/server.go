@@ -815,6 +815,15 @@ func (s *Server) appAuthLogin(ctx *gin.Context) {
 func (s *Server) resolveAppLoginIdentity(ctx *gin.Context, input appLoginRequest) (string, string, bool) {
 	providerID := strings.TrimSpace(input.Provider)
 	if providerID == "" {
+		provider, ok := s.findAuthProvider("demo", capability.AuthProviderAudienceApp)
+		if !ok {
+			writeAuthError(ctx, http.StatusBadRequest, "APP_AUTH_PROVIDER_NOT_FOUND", "app auth provider not found")
+			return "", "", false
+		}
+		if !provider.Configured {
+			writeAuthError(ctx, http.StatusBadRequest, "APP_AUTH_PROVIDER_NOT_CONFIGURED", "app auth provider is not configured")
+			return "", "", false
+		}
 		return appUsername(input.Username), "", true
 	}
 	provider, ok := s.findAuthProvider(providerID, capability.AuthProviderAudienceApp)
