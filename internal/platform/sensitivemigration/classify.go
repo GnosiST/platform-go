@@ -17,28 +17,40 @@ const (
 	ClassificationMalformedEnvelope Classification = "malformed-envelope"
 )
 
-func classifyValue(ctx context.Context, runtime dataprotection.Runtime, value string, policy dataprotection.FieldPolicy, fieldContext dataprotection.FieldContext) Classification {
+func classifyValue(ctx context.Context, runtime dataprotection.Runtime, value string, policy dataprotection.FieldPolicy, fieldContext dataprotection.FieldContext) (Classification, error) {
+	if ctx.Err() != nil {
+		return "", ErrReadFailed
+	}
 	if value == "" {
-		return ClassificationMissing
+		return ClassificationMissing, nil
 	}
 	switch dataprotection.ClassifyEnvelopeShape(value) {
 	case dataprotection.EnvelopeShapeNone:
-		return ClassificationPlaintext
+		return ClassificationPlaintext, nil
 	case dataprotection.EnvelopeShapeForeign:
-		return ClassificationForeignEnvelope
+		return ClassificationForeignEnvelope, nil
 	case dataprotection.EnvelopeShapeMalformed:
-		return ClassificationMalformedEnvelope
+		return ClassificationMalformedEnvelope, nil
 	}
 	if !dataprotection.IsEnvelope(value) {
-		return ClassificationMalformedEnvelope
+		return ClassificationMalformedEnvelope, nil
 	}
 	if err := runtime.Validate(ctx, value, policy, fieldContext); err != nil {
-		if errors.Is(err, dataprotection.ErrPolicyMismatch) || errors.Is(err, dataprotection.ErrKeyUnavailable) || errors.Is(err, dataprotection.ErrKeyMismatch) {
-			return ClassificationForeignEnvelope
+		if ctx.Err() != nil || errors.Is(err, dataprotection.ErrKeyUnavailable) {
+			return "", ErrReadFailed
 		}
-		return ClassificationMalformedEnvelope
+		if errors.Is(err, dataprotection.ErrPolicyMismatch) || errors.Is(err, dataprotection.ErrKeyMismatch) {
+			return ClassificationForeignEnvelope, nil
+		}
+		if errors.Is(err, dataprotection.ErrInvalidEnvelope) {
+			return ClassificationMalformedEnvelope, nil
+		}
+		return "", ErrReadFailed
 	}
-	return ClassificationTargetEnvelope
+	if ctx.Err() != nil {
+		return "", ErrReadFailed
+	}
+	return ClassificationTargetEnvelope, nil
 }
 
 func (c *Counts) add(classification Classification) {

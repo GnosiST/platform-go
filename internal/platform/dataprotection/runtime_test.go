@@ -247,6 +247,20 @@ func TestRuntimeValidationDetectsMissingAndReplacedHistoricalKeys(t *testing.T) 
 	}
 }
 
+func TestRuntimeReadinessRequiresAvailableActiveKeys(t *testing.T) {
+	if err := newTestRuntime(t, "enc-v1", "idx-v1").Ready(context.Background()); err != nil {
+		t.Fatalf("Ready() error = %v", err)
+	}
+
+	var nilRuntime *Service
+	if err := nilRuntime.Ready(context.Background()); !errors.Is(err, ErrKeyUnavailable) {
+		t.Fatalf("nil Ready() error = %v, want ErrKeyUnavailable", err)
+	}
+	if err := NewRuntime(nil).Ready(context.Background()); !errors.Is(err, ErrKeyUnavailable) {
+		t.Fatalf("provider-less Ready() error = %v, want ErrKeyUnavailable", err)
+	}
+}
+
 func newTestRuntime(t *testing.T, encryptionKeyID string, indexKeyID string) *Service {
 	t.Helper()
 	provider, err := NewStaticKeyProvider(StaticKeyProviderConfig{

@@ -20,12 +20,28 @@ type Runtime interface {
 	MatchExact(context.Context, string, string, FieldPolicy, FieldContext) (bool, error)
 }
 
+type RuntimeReadiness interface {
+	Ready(context.Context) error
+}
+
 type Service struct {
 	provider KeyProvider
 }
 
 func NewRuntime(provider KeyProvider) *Service {
 	return &Service{provider: provider}
+}
+
+func (s *Service) Ready(ctx context.Context) error {
+	if s == nil || s.provider == nil || ctx.Err() != nil {
+		return ErrKeyUnavailable
+	}
+	for _, purpose := range []KeyPurpose{KeyPurposeEncryption, KeyPurposeBlindIndex} {
+		if _, err := s.provider.ActiveKey(ctx, purpose); err != nil {
+			return ErrKeyUnavailable
+		}
+	}
+	return nil
 }
 
 func (s *Service) Protect(ctx context.Context, plaintext string, policy FieldPolicy, fieldContext FieldContext) (string, error) {

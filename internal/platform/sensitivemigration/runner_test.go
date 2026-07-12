@@ -140,6 +140,29 @@ func TestInventoryTraversesTenantScopesInBoundedBatchesWithDeterministicCounts(t
 	}
 }
 
+func TestInventoryContinuesAfterShortPagesUntilEmpty(t *testing.T) {
+	policy := dataprotection.FieldPolicy{Format: dataprotection.FormatAES256GCMV1, Normalization: dataprotection.NormalizationRawV1}
+	row := func(recordID string) Row {
+		return Row{Resource: "fixture-resources", RecordID: recordID, ValuesJSON: `{"secretValue":"` + fixturePlaintext + `"}`}
+	}
+	store := &scriptedReadStore{pages: [][]Row{{row("record-1")}, {row("record-2")}, {}}}
+	plan := Plan{Resources: []ResourcePlan{{
+		Resource: "fixture-resources", Scope: "global", SchemaVersion: 1,
+		Fields: []FieldPlan{{Key: "secretValue", Policy: policy}},
+	}}}
+
+	report, err := NewRunner(plan, migrationTestRuntime(t), store).Run(context.Background(), Options{Mode: ModeInventory, BatchSize: 2})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if report.Counts != (Counts{Plaintext: 2}) || report.Checkpoints != 2 {
+		t.Fatalf("Run() report = %+v, want both short pages counted", report)
+	}
+	if store.calls != 3 {
+		t.Fatalf("Rows() calls = %d, want two short pages plus empty page", store.calls)
+	}
+}
+
 func TestInventoryRejectsOutOfRangeBatchSizesWithoutReading(t *testing.T) {
 	store := newMemoryReadStore(nil)
 	runner := NewRunner(Plan{Resources: []ResourcePlan{{Resource: "fixture-resources"}}}, migrationTestRuntime(t), store)
@@ -151,6 +174,146 @@ func TestInventoryRejectsOutOfRangeBatchSizesWithoutReading(t *testing.T) {
 		if report.Status != StatusFailed || len(store.rowCalls) != 0 {
 			t.Fatalf("Run(BatchSize=%d) report = %+v calls = %+v", batchSize, report, store.rowCalls)
 		}
+	}
+}
+
+func TestSanitizedInvalidModeIsNotCopiedIntoFailedReport(t *testing.T) {
+	mode := Mode(fixturePlaintext)
+	report, err := NewRunner(Plan{}, migrationTestRuntime(t), newMemoryReadStore(nil)).Run(context.Background(), Options{Mode: mode})
+	if !errors.Is(err, ErrInvalidOptions) {
+		t.Fatalf("Run() error = %v, want ErrInvalidOptions", err)
+	}
+	if report.Mode != "" || report.Status != StatusFailed {
+		t.Fatalf("Run() report = %+v, want failed report with empty mode", report)
+	}
+	encoded, marshalErr := json.Marshal(report)
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
+	assertSanitized(t, string(encoded), err.Error())
+}
+
+func TestInventoryPropagatesRuntimeValidationFailuresAsSanitizedReadErrors(t *testing.T) {
+	service := migrationTestRuntime(t)
+	policy := dataprotection.FieldPolicy{Format: dataprotection.FormatAES256GCMV1, Normalization: dataprotection.NormalizationRawV1}
+	fieldContext := dataprotection.FieldContext{
+		TenantID: dataprotection.GlobalTenantID, Resource: "fixture-resources", RecordID: fixtureRecord,
+		FieldKey: "secretValue", SchemaVersion: 1,
+	}
+	envelope, err := service.Protect(context.Background(), fixturePlaintext, policy, fieldContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	values, err := json.Marshal(map[string]string{"secretValue": envelope})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := Plan{Resources: []ResourcePlan{{
+		Resource: "fixture-resources", Scope: "global", SchemaVersion: 1,
+		Fields: []FieldPlan{{Key: "secretValue", Policy: policy}},
+	}}}
+
+	for _, tt := range []struct {
+		name        string
+		validateErr error
+	}{
+		{name: "unexpected runtime failure", validateErr: errors.New("runtime failed: " + fixturePlaintext + " " + fixtureRecord)},
+		{name: "key unavailable", validateErr: dataprotection.ErrKeyUnavailable},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			store := newMemoryReadStore(map[string]map[string][]Row{
+				"fixture-resources": {dataprotection.GlobalTenantID: {{Resource: "fixture-resources", RecordID: fixtureRecord, ValuesJSON: string(values)}}},
+			})
+			runtime := &validationRuntime{Service: service, validateErr: tt.validateErr}
+			report, runErr := NewRunner(plan, runtime, store).Run(context.Background(), Options{Mode: ModeInventory})
+			if !errors.Is(runErr, ErrReadFailed) {
+				t.Fatalf("Run() error = %v, want ErrReadFailed", runErr)
+			}
+			if report.Counts != (Counts{}) {
+				t.Fatalf("Run() counts = %+v, want no malformed classification", report.Counts)
+			}
+			encoded, marshalErr := json.Marshal(report)
+			if marshalErr != nil {
+				t.Fatal(marshalErr)
+			}
+			assertSanitized(t, string(encoded), runErr.Error())
+		})
+	}
+}
+
+func TestInventoryStopsOnCancellationDuringRowAndFieldTraversal(t *testing.T) {
+	policy := dataprotection.FieldPolicy{Format: dataprotection.FormatAES256GCMV1, Normalization: dataprotection.NormalizationRawV1}
+	plan := Plan{Resources: []ResourcePlan{{
+		Resource: "fixture-resources", Scope: "global", SchemaVersion: 1,
+		Fields: []FieldPlan{{Key: "alphaSecret", Policy: policy}, {Key: "zetaSecret", Policy: policy}},
+	}}}
+
+	t.Run("rows", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		store := &scriptedReadStore{
+			pages:  [][]Row{{{Resource: "fixture-resources", RecordID: fixtureRecord, ValuesJSON: `{"alphaSecret":"` + fixturePlaintext + `"}`}}},
+			onRows: cancel,
+		}
+		report, err := NewRunner(plan, migrationTestRuntime(t), store).Run(ctx, Options{Mode: ModeInventory})
+		if !errors.Is(err, ErrReadFailed) || report.Counts != (Counts{}) {
+			t.Fatalf("Run() report = %+v error = %v, want canceled read failure before row classification", report, err)
+		}
+	})
+
+	t.Run("fields", func(t *testing.T) {
+		service := migrationTestRuntime(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		fieldContext := dataprotection.FieldContext{
+			TenantID: dataprotection.GlobalTenantID, Resource: "fixture-resources", RecordID: fixtureRecord,
+			FieldKey: "alphaSecret", SchemaVersion: 1,
+		}
+		envelope, err := service.Protect(ctx, fixturePlaintext, policy, fieldContext)
+		if err != nil {
+			t.Fatal(err)
+		}
+		values, err := json.Marshal(map[string]string{"alphaSecret": envelope, "zetaSecret": fixturePlaintext})
+		if err != nil {
+			t.Fatal(err)
+		}
+		store := newMemoryReadStore(map[string]map[string][]Row{
+			"fixture-resources": {dataprotection.GlobalTenantID: {{Resource: "fixture-resources", RecordID: fixtureRecord, ValuesJSON: string(values)}}},
+		})
+		runtime := &validationRuntime{Service: service, cancel: cancel}
+		report, runErr := NewRunner(plan, runtime, store).Run(ctx, Options{Mode: ModeInventory})
+		if !errors.Is(runErr, ErrReadFailed) || report.Counts != (Counts{}) {
+			t.Fatalf("Run() report = %+v error = %v, want canceled read failure before later fields", report, runErr)
+		}
+	})
+}
+
+func TestInventoryRequiresReadyRuntimeBeforePlaintextTraversal(t *testing.T) {
+	policy := dataprotection.FieldPolicy{Format: dataprotection.FormatAES256GCMV1, Normalization: dataprotection.NormalizationRawV1}
+	plan := Plan{Resources: []ResourcePlan{{
+		Resource: "fixture-resources", Scope: "global", SchemaVersion: 1,
+		Fields: []FieldPlan{{Key: "secretValue", Policy: policy}},
+	}}}
+	rows := map[string]map[string][]Row{
+		"fixture-resources": {dataprotection.GlobalTenantID: {{Resource: "fixture-resources", RecordID: fixtureRecord, ValuesJSON: `{"secretValue":"` + fixturePlaintext + `"}`}}},
+	}
+	var typedNil *dataprotection.Service
+	for _, tt := range []struct {
+		name    string
+		runtime dataprotection.Runtime
+	}{
+		{name: "typed nil runtime", runtime: typedNil},
+		{name: "provider unavailable", runtime: dataprotection.NewRuntime(nil)},
+		{name: "readiness contract missing", runtime: runtimeWithoutReadiness{Runtime: migrationTestRuntime(t)}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			store := newMemoryReadStore(rows)
+			report, err := NewRunner(plan, tt.runtime, store).Run(context.Background(), Options{Mode: ModeInventory})
+			if !errors.Is(err, ErrReadFailed) {
+				t.Fatalf("Run() error = %v, want ErrReadFailed", err)
+			}
+			if report.Status != StatusFailed || report.Counts != (Counts{}) || store.scopeCalls != 0 {
+				t.Fatalf("Run() report = %+v scope calls = %d, want readiness failure before reads", report, store.scopeCalls)
+			}
+		})
 	}
 }
 
@@ -280,6 +443,31 @@ type trackingRuntime struct {
 	revealCalls  int
 }
 
+func (r *trackingRuntime) Ready(ctx context.Context) error {
+	readiness, ok := r.Runtime.(dataprotection.RuntimeReadiness)
+	if !ok {
+		return dataprotection.ErrKeyUnavailable
+	}
+	return readiness.Ready(ctx)
+}
+
+type validationRuntime struct {
+	*dataprotection.Service
+	validateErr error
+	cancel      context.CancelFunc
+}
+
+type runtimeWithoutReadiness struct {
+	dataprotection.Runtime
+}
+
+func (r *validationRuntime) Validate(context.Context, string, dataprotection.FieldPolicy, dataprotection.FieldContext) error {
+	if r.cancel != nil {
+		r.cancel()
+	}
+	return r.validateErr
+}
+
 func (r *trackingRuntime) Protect(ctx context.Context, value string, policy dataprotection.FieldPolicy, fieldContext dataprotection.FieldContext) (string, error) {
 	r.protectCalls++
 	return r.Runtime.Protect(ctx, value, policy, fieldContext)
@@ -302,6 +490,7 @@ type memoryReadStore struct {
 	scopeOrder map[string][]string
 	tenantErr  error
 	rowsErr    error
+	scopeCalls int
 	rowCalls   []readCall
 }
 
@@ -317,10 +506,34 @@ func newMemoryReadStore(rows map[string]map[string][]Row) *memoryReadStore {
 }
 
 func (s *memoryReadStore) TenantScopes(_ context.Context, plan ResourcePlan) ([]string, error) {
+	s.scopeCalls++
 	if s.tenantErr != nil {
 		return nil, s.tenantErr
 	}
 	return append([]string(nil), s.scopeOrder[plan.Resource]...), nil
+}
+
+type scriptedReadStore struct {
+	pages  [][]Row
+	calls  int
+	onRows func()
+}
+
+func (s *scriptedReadStore) TenantScopes(context.Context, ResourcePlan) ([]string, error) {
+	return []string{dataprotection.GlobalTenantID}, nil
+}
+
+func (s *scriptedReadStore) Rows(context.Context, ResourcePlan, string, string, int) ([]Row, error) {
+	if s.onRows != nil {
+		s.onRows()
+	}
+	if s.calls >= len(s.pages) {
+		s.calls++
+		return nil, nil
+	}
+	page := append([]Row(nil), s.pages[s.calls]...)
+	s.calls++
+	return page, nil
 }
 
 func (s *memoryReadStore) Rows(_ context.Context, plan ResourcePlan, tenant string, after string, limit int) ([]Row, error) {

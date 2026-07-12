@@ -30,10 +30,18 @@ func NewRunner(plan Plan, runtime dataprotection.Runtime, store ReadStore) *Runn
 }
 
 func (r *Runner) Run(ctx context.Context, options Options) (Report, error) {
-	report := Report{Mode: options.Mode, Status: StatusFailed}
+	report := Report{Status: StatusFailed}
 	batchSize, err := readOnlyBatchSize(options)
-	if err != nil || r == nil || r.runtime == nil || r.store == nil || len(r.plan.Resources) == 0 {
+	if err != nil {
 		return report, ErrInvalidOptions
+	}
+	report.Mode = options.Mode
+	if r == nil || r.runtime == nil || r.store == nil || len(r.plan.Resources) == 0 {
+		return report, ErrInvalidOptions
+	}
+	readiness, ok := r.runtime.(dataprotection.RuntimeReadiness)
+	if !ok || readiness.Ready(ctx) != nil {
+		return report, ErrReadFailed
 	}
 
 	for _, resource := range r.plan.Resources {
@@ -79,14 +87,14 @@ func (r *Runner) runScope(ctx context.Context, resource ResourcePlan, tenant str
 			return ErrReadFailed
 		}
 		rows, err := r.store.Rows(ctx, resource, tenant, after, batchSize)
-		if err != nil || len(rows) > batchSize {
+		if err != nil || ctx.Err() != nil || len(rows) > batchSize {
 			return ErrReadFailed
 		}
 		if len(rows) == 0 {
 			return nil
 		}
 		for _, row := range rows {
-			if row.RecordID == "" || row.RecordID <= after || row.Resource != "" && row.Resource != resource.Resource {
+			if ctx.Err() != nil || row.RecordID == "" || row.RecordID <= after || row.Resource != "" && row.Resource != resource.Resource {
 				return ErrReadFailed
 			}
 			if err := r.classifyRow(ctx, resource, tenant, row, &report.Counts); err != nil {
@@ -95,18 +103,21 @@ func (r *Runner) runScope(ctx context.Context, resource ResourcePlan, tenant str
 			after = row.RecordID
 		}
 		report.Checkpoints++
-		if len(rows) < batchSize {
-			return nil
-		}
 	}
 }
 
 func (r *Runner) classifyRow(ctx context.Context, resource ResourcePlan, tenant string, row Row, counts *Counts) error {
+	if ctx.Err() != nil {
+		return ErrReadFailed
+	}
 	values := map[string]any{}
 	if err := json.Unmarshal([]byte(row.ValuesJSON), &values); err != nil {
 		return ErrReadFailed
 	}
 	for _, field := range resource.Fields {
+		if ctx.Err() != nil {
+			return ErrReadFailed
+		}
 		raw, exists := values[field.Key]
 		if !exists || raw == nil {
 			counts.add(ClassificationMissing)
@@ -117,10 +128,14 @@ func (r *Runner) classifyRow(ctx context.Context, resource ResourcePlan, tenant 
 			counts.add(ClassificationMalformedEnvelope)
 			continue
 		}
-		counts.add(classifyValue(ctx, r.runtime, value, field.Policy, dataprotection.FieldContext{
+		classification, err := classifyValue(ctx, r.runtime, value, field.Policy, dataprotection.FieldContext{
 			TenantID: tenant, Resource: resource.Resource, RecordID: row.RecordID,
 			FieldKey: field.Key, SchemaVersion: resource.SchemaVersion,
-		}))
+		})
+		if err != nil {
+			return err
+		}
+		counts.add(classification)
 	}
 	return nil
 }
