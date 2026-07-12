@@ -85,6 +85,7 @@ type gormSensitiveMigrationEvent struct {
 	Resource        string `gorm:"column:resource;size:128;not null"`
 	TenantScopeHash string `gorm:"column:tenant_scope_hash;size:71;not null"`
 	Rows            int    `gorm:"column:row_count;not null"`
+	Revision        uint64 `gorm:"column:revision;not null"`
 	PriorEventHash  string `gorm:"column:prior_event_hash;size:71;not null"`
 	EventHash       string `gorm:"column:event_hash;size:71;not null"`
 	CreatedAt       string `gorm:"column:created_at;size:35;not null"`
@@ -365,7 +366,16 @@ func (s *GORMProtectedValueMigrationStore) ApplyBatch(ctx context.Context, mutat
 		checkpointErr := checkpointQuery.First(&checkpoint).Error
 		checkpointFound := checkpointErr == nil
 		if checkpointFound {
-			if checkpoint.ExpectedRevision != mutation.ExpectedRevision || mutation.Rows[0].RecordID <= checkpoint.LastRecordID {
+			if checkpoint.ExpectedRevision > mutation.ExpectedRevision || mutation.Rows[0].RecordID <= checkpoint.LastRecordID {
+				return ErrMigrationConflict
+			}
+			var checkpointEvent gormSensitiveMigrationEvent
+			if err := tx.Where("run_id = ? AND sequence = ?", mutation.RunID, checkpoint.EventSequence).First(&checkpointEvent).Error; err != nil {
+				return ErrMigrationConflict
+			}
+			if checkpointEvent.Revision != checkpoint.ExpectedRevision ||
+				checkpointEvent.Mode != string(mutation.Mode) || checkpointEvent.Resource != mutation.Resource.Resource ||
+				checkpointEvent.TenantScopeHash != tenantHash {
 				return ErrMigrationConflict
 			}
 		} else if !errors.Is(checkpointErr, gorm.ErrRecordNotFound) {
@@ -414,7 +424,7 @@ func (s *GORMProtectedValueMigrationStore) ApplyBatch(ctx context.Context, mutat
 		event := gormSensitiveMigrationEvent{
 			EventID: migrationSurrogateID("event", mutation.RunID, strconv.FormatUint(sequence, 10)),
 			RunID:   mutation.RunID, Sequence: sequence, Mode: string(mutation.Mode), Resource: mutation.Resource.Resource,
-			TenantScopeHash: tenantHash, Rows: len(mutation.Rows), CreatedAt: now,
+			TenantScopeHash: tenantHash, Rows: len(mutation.Rows), Revision: nextRevision, CreatedAt: now,
 		}
 		if err := tx.Create(&event).Error; err != nil {
 			return ErrMigrationStore
@@ -423,7 +433,7 @@ func (s *GORMProtectedValueMigrationStore) ApplyBatch(ctx context.Context, mutat
 		if checkpointFound {
 			cumulativeRows += checkpoint.Rows
 			updated := tx.Model(&gormSensitiveMigrationCheckpoint{}).
-				Where("checkpoint_id = ? AND expected_revision = ? AND last_record_id = ?", checkpointID, mutation.ExpectedRevision, checkpoint.LastRecordID).
+				Where("checkpoint_id = ? AND expected_revision = ? AND last_record_id = ? AND event_sequence = ?", checkpointID, checkpoint.ExpectedRevision, checkpoint.LastRecordID, checkpoint.EventSequence).
 				Updates(map[string]any{
 					"tenant_scope": tenant, "last_record_id": mutation.LastRecordID, "expected_revision": nextRevision,
 					"row_count": cumulativeRows, "status": sensitivemigration.StatusCompleted,

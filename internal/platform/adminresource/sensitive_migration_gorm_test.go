@@ -526,6 +526,67 @@ func TestGORMProtectedValueMigrationCheckpointIsMonotonicAndCumulative(t *testin
 	}
 }
 
+func TestGORMProtectedValueMigrationCheckpointAllowsInterleavedTenantScopes(t *testing.T) {
+	db := migrationOrdinaryDB(t, map[string]string{
+		"a-1": `{"tenantCode":"tenant-a","secretNote":"plain-a1"}`,
+		"a-2": `{"tenantCode":"tenant-a","secretNote":"plain-a2"}`,
+		"b-1": `{"tenantCode":"tenant-b","secretNote":"plain-b1"}`,
+	})
+	store, err := NewGORMProtectedValueMigrationStore(db, "sqlite")
+	if err != nil {
+		t.Fatalf("NewGORMProtectedValueMigrationStore() error = %v", err)
+	}
+	plan := migrationResourcePlan("customer-records", "tenant-field", "tenantCode", "secretNote")
+	if _, err := store.Prepare(context.Background(), sensitivemigration.RunRequest{
+		RunID: "run-interleaved", PlanHash: "sha256:interleaved-plan",
+		Plan: sensitivemigration.Plan{Resources: []sensitivemigration.ResourcePlan{plan}},
+	}); err != nil {
+		t.Fatalf("Prepare() error = %v", err)
+	}
+
+	for _, mutation := range []sensitivemigration.BatchMutation{
+		tenantMigrationBatch(plan, "tenant-a", "a-1", `{"tenantCode":"tenant-a","secretNote":"plain-a1"}`, `{"tenantCode":"tenant-a","secretNote":"pgo:enc:v1:a1"}`, 7),
+		tenantMigrationBatch(plan, "tenant-b", "b-1", `{"tenantCode":"tenant-b","secretNote":"plain-b1"}`, `{"tenantCode":"tenant-b","secretNote":"pgo:enc:v1:b1"}`, 8),
+		tenantMigrationBatch(plan, "tenant-a", "a-2", `{"tenantCode":"tenant-a","secretNote":"plain-a2"}`, `{"tenantCode":"tenant-a","secretNote":"pgo:enc:v1:a2"}`, 9),
+	} {
+		if _, err := store.ApplyBatch(context.Background(), mutation); err != nil {
+			t.Fatalf("ApplyBatch(%s %s) error = %v", mutation.TenantID, mutation.LastRecordID, err)
+		}
+	}
+
+	var checkpoints []gormSensitiveMigrationCheckpoint
+	if err := db.Order("tenant_scope").Find(&checkpoints).Error; err != nil {
+		t.Fatalf("read checkpoints error = %v", err)
+	}
+	if len(checkpoints) != 2 {
+		t.Fatalf("checkpoint count = %d, want 2", len(checkpoints))
+	}
+	if checkpoints[0].TenantScope != "tenant-a" || checkpoints[0].LastRecordID != "a-2" || checkpoints[0].ExpectedRevision != 10 || checkpoints[0].Rows != 2 {
+		t.Fatalf("tenant-a checkpoint = %+v", checkpoints[0])
+	}
+	if checkpoints[1].TenantScope != "tenant-b" || checkpoints[1].LastRecordID != "b-1" || checkpoints[1].ExpectedRevision != 9 || checkpoints[1].Rows != 1 {
+		t.Fatalf("tenant-b checkpoint = %+v", checkpoints[1])
+	}
+	type eventRevision struct {
+		Sequence uint64 `gorm:"column:sequence"`
+		Revision uint64 `gorm:"column:revision"`
+	}
+	var events []eventRevision
+	if err := db.Table(sensitiveMigrationEventsTable).Select("sequence, revision").Order("sequence").Scan(&events).Error; err != nil {
+		t.Fatalf("read events error = %v", err)
+	}
+	if len(events) != 3 || events[0].Revision != 8 || events[1].Revision != 9 || events[2].Revision != 10 {
+		t.Fatalf("event revisions = %+v, want 8, 9, 10", events)
+	}
+	if revision, err := loadGORMRevision(db); err != nil || revision != 10 {
+		t.Fatalf("global revision = %d, %v; want 10", revision, err)
+	}
+	var run gormSensitiveMigrationRun
+	if err := db.Where("run_id = ?", "run-interleaved").First(&run).Error; err != nil || run.ExpectedRevision != 10 {
+		t.Fatalf("run revision = %d, %v; want 10", run.ExpectedRevision, err)
+	}
+}
+
 func TestGORMProtectedValueMigrationCheckpointRejectsOrderReplayAndCASConflicts(t *testing.T) {
 	t.Run("rows must be strictly ascending", func(t *testing.T) {
 		_, store := preparedMigrationStore(t, map[string]string{
@@ -564,15 +625,15 @@ func TestGORMProtectedValueMigrationCheckpointRejectsOrderReplayAndCASConflicts(
 		}
 	})
 
-	t.Run("checkpoint revision is compare-and-swap", func(t *testing.T) {
+	t.Run("checkpoint referenced event revision is verified", func(t *testing.T) {
 		db, store := preparedMigrationStore(t, map[string]string{
 			"record-1": `{"secretNote":"plain-one"}`, "record-2": `{"secretNote":"plain-two"}`,
 		})
 		if _, err := store.ApplyBatch(context.Background(), migrationBatch("record-1", `{"secretNote":"plain-one"}`, `{"secretNote":"pgo:enc:v1:one"}`, 7)); err != nil {
 			t.Fatalf("ApplyBatch(first) error = %v", err)
 		}
-		if result := db.Model(&gormSensitiveMigrationCheckpoint{}).Where("run_id = ?", "run-apply").Update("expected_revision", 7); result.Error != nil || result.RowsAffected != 1 {
-			t.Fatalf("stale checkpoint = %d, %v", result.RowsAffected, result.Error)
+		if result := db.Model(&gormSensitiveMigrationEvent{}).Where("run_id = ? AND sequence = ?", "run-apply", 1).Update("revision", 7); result.Error != nil || result.RowsAffected != 1 {
+			t.Fatalf("corrupt checkpoint event = %d, %v", result.RowsAffected, result.Error)
 		}
 		if _, err := store.ApplyBatch(context.Background(), migrationBatch("record-2", `{"secretNote":"plain-two"}`, `{"secretNote":"pgo:enc:v1:two"}`, 8)); !errors.Is(err, ErrMigrationConflict) {
 			t.Fatalf("ApplyBatch(stale checkpoint) error = %v, want ErrMigrationConflict", err)
@@ -602,6 +663,14 @@ func migrationBatch(recordID string, original string, updated string, revision u
 		RunID: "run-apply", Mode: sensitivemigration.ModeApply,
 		Resource: migrationResourcePlan("customer-records", "global", "", "secretNote"),
 		TenantID: dataprotection.GlobalTenantID, ExpectedRevision: revision, LastRecordID: recordID,
+		Rows: []sensitivemigration.RowMutation{{RecordID: recordID, OriginalValuesJSON: original, UpdatedValuesJSON: updated}},
+	}
+}
+
+func tenantMigrationBatch(plan sensitivemigration.ResourcePlan, tenant string, recordID string, original string, updated string, revision uint64) sensitivemigration.BatchMutation {
+	return sensitivemigration.BatchMutation{
+		RunID: "run-interleaved", Mode: sensitivemigration.ModeApply, Resource: plan,
+		TenantID: tenant, ExpectedRevision: revision, LastRecordID: recordID,
 		Rows: []sensitivemigration.RowMutation{{RecordID: recordID, OriginalValuesJSON: original, UpdatedValuesJSON: updated}},
 	}
 }
