@@ -825,7 +825,7 @@ func (s *Server) resolveAppLoginIdentity(ctx *gin.Context, input appLoginRequest
 	providerID := strings.TrimSpace(input.Provider)
 	if providerID == "" {
 		provider, ok := s.findAuthProvider("demo", capability.AuthProviderAudienceApp)
-		if !ok {
+		if !ok || provider.Kind != "demo" {
 			writeAuthError(ctx, http.StatusBadRequest, "APP_AUTH_PROVIDER_NOT_FOUND", "app auth provider not found")
 			return "", "", false
 		}

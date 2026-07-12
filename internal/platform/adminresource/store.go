@@ -110,7 +110,8 @@ func (s *Store) RefreshContext(ctx context.Context) (bool, error) {
 	if s.repository == nil {
 		return false, nil
 	}
-	if revisionReader, ok := s.repository.(AdminResourceRevisionReader); ok {
+	revisionReader, revisionAware := s.repository.(AdminResourceRevisionReader)
+	if revisionAware {
 		current, err := revisionReader.CurrentRevision(ctx)
 		if err != nil {
 			return false, err
@@ -122,6 +123,9 @@ func (s *Store) RefreshContext(ctx context.Context) (bool, error) {
 	previousRevision := s.revision
 	if err := s.reloadContextLocked(ctx); err != nil {
 		return false, err
+	}
+	if !revisionAware {
+		return true, nil
 	}
 	return s.revision != previousRevision, nil
 }

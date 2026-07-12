@@ -1940,6 +1940,30 @@ func TestDisabledDemoAuthProviderRejectsProviderlessAppLogin(t *testing.T) {
 	}
 }
 
+func TestProviderlessAppLoginRejectsNonDemoProviderUsingDemoID(t *testing.T) {
+	manifest := authProviderTestManifest()
+	for index := range manifest.AuthProviders {
+		if manifest.AuthProviders[index].ID == "demo" {
+			manifest.AuthProviders[index].Kind = "wechat"
+		}
+	}
+	server := newTestServer(ServerOptions{Capabilities: []capability.Manifest{manifest}})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/app/auth/login", bytes.NewBufferString(`{"username":"provider-user"}`))
+	request.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("providerless app login with non-demo kind status = %d body = %s, want 400", recorder.Code, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), "APP_AUTH_PROVIDER_NOT_FOUND") {
+		t.Fatalf("providerless app login with non-demo kind body = %s, want provider rejection", recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), "provider-user") {
+		t.Fatalf("providerless app login response leaked caller-selected username: %s", recorder.Body.String())
+	}
+}
+
 func TestAppAuthLoginWithConfiguredWechatProviderUsesIdentityResolver(t *testing.T) {
 	var captured AppIdentityResolveInput
 	server := newTestServer(ServerOptions{

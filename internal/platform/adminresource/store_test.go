@@ -1556,6 +1556,36 @@ func TestRepositoryBackedStoreReloadsBeforeMutationAndPreservesConcurrentRecord(
 	}
 }
 
+func TestRefreshContextTreatsFallbackRepositoryLoadAsChanged(t *testing.T) {
+	repository := &recordingRepository{}
+	store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	if err != nil {
+		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+	}
+	repository.snapshot = store.snapshotLocked()
+	repository.snapshot.Resources = cloneResourceMap(repository.snapshot.Resources)
+	for index := range repository.snapshot.Resources["roles"] {
+		role := &repository.snapshot.Resources["roles"][index]
+		if role.Code != "operator" {
+			continue
+		}
+		role.Values = cloneValues(role.Values)
+		role.Values["permissions"] = "admin:user:read"
+	}
+
+	changed, err := store.RefreshContext(context.Background())
+	if err != nil {
+		t.Fatalf("RefreshContext() error = %v", err)
+	}
+	if !changed {
+		t.Fatal("RefreshContext() changed = false for fallback repository load")
+	}
+	principal := store.CurrentPrincipal("ops")
+	if slices.Contains(principal.Permissions, "admin:tenant:read") {
+		t.Fatalf("CurrentPrincipal(ops).Permissions = %+v, want refreshed role permissions", principal.Permissions)
+	}
+}
+
 type recordingRepository struct {
 	snapshot  ResourceSnapshot
 	saveCount int
