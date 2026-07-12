@@ -345,6 +345,10 @@ function validateDeploymentPackage(contract, errors) {
       contains: 'ENTRYPOINT ["platform-api"]',
       error: "deploymentPackage.requiredSourceSnippets must preserve platform-api as the default entrypoint",
     },
+    {
+      contains: "COPY deploy/nginx/platform.conf /etc/nginx/templates/default.conf.template",
+      error: "Admin image must install the Nginx config as an envsubst template",
+    },
   ];
   for (const required of requiredOperatorSnippets) {
     if (!values(deploymentPackage.requiredSourceSnippets).some((snippet) => snippet.path === "Dockerfile" && snippet.contains === required.contains)) {
@@ -385,14 +389,23 @@ function validateDeploymentPackage(contract, errors) {
     if (exposesUploadLocation || exposesUploadDirectory) {
       errors.push("admin proxy must not expose upload storage");
     }
-    if (!adminProxy.includes('if ($platform_edge_https = 0) { return 308 https://$host$request_uri; }')) {
+    if (!adminProxy.includes('if ($platform_edge_https = 0) { return 308 ${PLATFORM_PUBLIC_BASE_URL}$request_uri; }')) {
       errors.push("admin proxy must redirect requests without the reviewed HTTPS edge signal");
+    }
+    if (/\breturn\s+308\s+https:\/\/\$host/i.test(adminProxy)) {
+      errors.push("admin proxy redirect must use PLATFORM_PUBLIC_BASE_URL instead of request Host");
     }
     if (!adminProxy.includes("proxy_set_header X-Forwarded-Proto $platform_forwarded_proto;")) {
       errors.push("admin proxy must forward only the normalized HTTPS edge signal");
     }
+    if (!adminProxy.includes('https "https";') || !adminProxy.includes('http "http";') || adminProxy.includes("~*^https$")) {
+      errors.push("admin proxy must accept only canonical single-value http or https edge signals");
+    }
     if (!adminProxy.includes("add_header Strict-Transport-Security") || !adminProxy.includes("add_header Content-Security-Policy")) {
       errors.push("admin proxy must emit HSTS and Content-Security-Policy");
+    }
+    if (!adminProxy.includes("add_header Strict-Transport-Security $platform_hsts always;") || !adminProxy.includes("map $platform_edge_https $platform_hsts")) {
+      errors.push("admin proxy HSTS must be conditional on the trusted HTTPS edge signal");
     }
   }
 
@@ -421,6 +434,11 @@ function validateDeploymentPackage(contract, errors) {
     }
     if (!/^PLATFORM_INTERNAL_SUBNET=.+$/m.test(envTemplate) || !/^PLATFORM_ADMIN_PROXY_IP=.+$/m.test(envTemplate)) {
       errors.push("production env must align PLATFORM_INTERNAL_SUBNET and PLATFORM_ADMIN_PROXY_IP with trusted proxies");
+    }
+    const adminProxyIP = envTemplate.match(/^PLATFORM_ADMIN_PROXY_IP=(.+)$/m)?.[1]?.trim() ?? "";
+    const trustedProxyValues = (envTemplate.match(/^PLATFORM_TRUSTED_PROXIES=(.+)$/m)?.[1] ?? "").split(",").map((item) => item.trim());
+    if (!adminProxyIP || !trustedProxyValues.includes(adminProxyIP)) {
+      errors.push("standard production env must trust PLATFORM_ADMIN_PROXY_IP");
     }
     if (!/^PLATFORM_HTTP_MAX_BODY_BYTES=[1-9][0-9]*$/m.test(envTemplate)) {
       errors.push("production env must configure PLATFORM_HTTP_MAX_BODY_BYTES");
@@ -475,6 +493,14 @@ function validateDeploymentPackage(contract, errors) {
         if (adminService.networks?.default?.ipv4_address !== "${PLATFORM_ADMIN_PROXY_IP:-172.30.0.10}") {
           errors.push("platform-admin must use the reviewed PLATFORM_ADMIN_PROXY_IP");
         }
+        if (!hasComposeEnvironment(adminService.environment, "PLATFORM_PUBLIC_BASE_URL")) {
+          errors.push("platform-admin must receive PLATFORM_PUBLIC_BASE_URL for Nginx envsubst");
+        }
+      }
+      const apiService = services["platform-api"];
+      const healthcheck = Array.isArray(apiService?.healthcheck?.test) ? apiService.healthcheck.test : [];
+      if (!healthcheck.includes("http://127.0.0.1:9200/api/health")) {
+        errors.push("platform-api healthcheck must use the direct loopback HTTP exception");
       }
       const defaultSubnet = compose.networks?.default?.ipam?.config?.[0]?.subnet;
       if (defaultSubnet !== "${PLATFORM_INTERNAL_SUBNET:-172.30.0.0/24}") {

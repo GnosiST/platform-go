@@ -564,7 +564,7 @@ func TestValidateRuntimeAcceptsDevelopmentDefaults(t *testing.T) {
 }
 
 func TestValidateRuntimeRejectsProductionNonHTTPSPublicBaseURL(t *testing.T) {
-	for _, publicBaseURL := range []string{"", "http://platform.example.test", "https://platform.example.test/path", "https://user@platform.example.test", "https://:443"} {
+	for _, publicBaseURL := range []string{"", "http://platform.example.test", "https://platform.example.test/", "https://platform.example.test/path", "https://user@platform.example.test", "https://:443"} {
 		t.Run(publicBaseURL, func(t *testing.T) {
 			cfg := validProductionRuntimeConfig()
 			cfg.PublicBaseURL = publicBaseURL
@@ -587,6 +587,8 @@ func TestValidateRuntimeRejectsInvalidOrEmptyProductionTrustedProxyPolicy(t *tes
 		{name: "hostname", proxies: []string{"edge.internal"}},
 		{name: "invalid cidr", proxies: []string{"10.0.0.0/99"}},
 		{name: "trust all", proxies: []string{"0.0.0.0/0"}},
+		{name: "cumulative ipv4 trust all", proxies: []string{"0.0.0.0/1", "128.0.0.0/1"}},
+		{name: "cumulative ipv6 trust all", proxies: []string{"::/1", "8000::/1"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -598,6 +600,15 @@ func TestValidateRuntimeRejectsInvalidOrEmptyProductionTrustedProxyPolicy(t *tes
 				t.Fatalf("ValidateRuntime() error = %v, want trusted proxy policy error", err)
 			}
 		})
+	}
+}
+
+func TestValidateRuntimeAllowsMultipleNarrowTrustedProxyCIDRs(t *testing.T) {
+	cfg := validProductionRuntimeConfig()
+	cfg.TrustedProxies = []string{"10.0.0.0/8", "192.168.0.0/16", "2001:db8::/32"}
+
+	if err := cfg.ValidateRuntime(); err != nil {
+		t.Fatalf("ValidateRuntime() error = %v", err)
 	}
 }
 

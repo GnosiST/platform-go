@@ -451,7 +451,7 @@ func (c Config) validateAdminOIDC(environment string) []error {
 func validateProductionPublicBaseURL(raw string) []error {
 	value := strings.TrimSpace(raw)
 	parsed, err := url.Parse(value)
-	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.Opaque != "" || (parsed.Path != "" && parsed.Path != "/") {
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.Opaque != "" || parsed.Path != "" {
 		return []error{errors.New("production runtime requires PLATFORM_PUBLIC_BASE_URL to be an absolute HTTPS origin")}
 	}
 	return nil
@@ -463,6 +463,10 @@ func validateTrustedProxies(values []string, production bool) []error {
 	}
 	var errs []error
 	seen := map[netip.Prefix]struct{}{}
+	coverage := map[int]*prefixCoverageNode{
+		32:  {},
+		128: {},
+	}
 	for _, raw := range values {
 		value := strings.TrimSpace(raw)
 		var prefix netip.Prefix
@@ -482,8 +486,53 @@ func validateTrustedProxies(values []string, production bool) []error {
 			errs = append(errs, fmt.Errorf("PLATFORM_TRUSTED_PROXIES contains duplicate %q", prefix.String()))
 		}
 		seen[prefix] = struct{}{}
+		coverage[prefix.Addr().BitLen()].insert(prefix)
+	}
+	if coverage[32].covered {
+		errs = append(errs, errors.New("PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv4 addresses"))
+	}
+	if coverage[128].covered {
+		errs = append(errs, errors.New("PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv6 addresses"))
 	}
 	return errs
+}
+
+type prefixCoverageNode struct {
+	covered bool
+	child   [2]*prefixCoverageNode
+}
+
+func (n *prefixCoverageNode) insert(prefix netip.Prefix) {
+	address := prefix.Addr()
+	var raw []byte
+	if address.Is4() {
+		value := address.As4()
+		raw = value[:]
+	} else {
+		value := address.As16()
+		raw = value[:]
+	}
+	n.insertBits(raw, prefix.Bits(), 0)
+}
+
+func (n *prefixCoverageNode) insertBits(address []byte, bits int, depth int) {
+	if n.covered {
+		return
+	}
+	if depth == bits {
+		n.covered = true
+		n.child = [2]*prefixCoverageNode{}
+		return
+	}
+	bit := int((address[depth/8] >> (7 - depth%8)) & 1)
+	if n.child[bit] == nil {
+		n.child[bit] = &prefixCoverageNode{}
+	}
+	n.child[bit].insertBits(address, bits, depth+1)
+	if n.child[0] != nil && n.child[0].covered && n.child[1] != nil && n.child[1].covered {
+		n.covered = true
+		n.child = [2]*prefixCoverageNode{}
+	}
 }
 
 func containsString(values []string, target string) bool {

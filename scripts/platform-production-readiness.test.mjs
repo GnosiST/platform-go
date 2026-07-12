@@ -106,6 +106,7 @@ describe("validate-platform-production-readiness", () => {
     assert.match(result.stderr, /requiredEnv must include PLATFORM_HTTP_MAX_BODY_BYTES/);
     assert.match(result.stderr, /runtimeGate\.requiredSnippets must include production runtime requires PLATFORM_PUBLIC_BASE_URL/);
     assert.match(result.stderr, /runtimeGate\.requiredSnippets must include production runtime requires a non-empty PLATFORM_TRUSTED_PROXIES policy/);
+    assert.match(result.stderr, /runtimeGate\.requiredSnippets must include PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv4 addresses/);
   });
 
   it("rejects readiness commands whose executable script is missing", () => {

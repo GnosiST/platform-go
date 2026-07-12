@@ -138,7 +138,7 @@ func New(options ServerOptions) *Server {
 	router := gin.New()
 	configureTrustedProxies(router, options.Security.TrustedProxies)
 	router.Use(securityHeaders(options.Security))
-	router.Use(jsonRequestBodyLimit(options.Security.MaxJSONBodyBytes))
+	router.Use(jsonRequestBodyLimit(options.Security.MaxBodyBytes))
 	router.Use(gin.Recovery())
 	resources := options.Resources
 	if resources == nil {

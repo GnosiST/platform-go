@@ -15,10 +15,10 @@ import (
 const defaultHTTPMaxBodyBytes = int64(1 << 20)
 
 type SecurityOptions struct {
-	RequireHTTPS     bool
-	PublicBaseURL    string
-	TrustedProxies   []string
-	MaxJSONBodyBytes int64
+	RequireHTTPS   bool
+	PublicBaseURL  string
+	TrustedProxies []string
+	MaxBodyBytes   int64
 }
 
 func securityHeaders(options SecurityOptions) gin.HandlerFunc {
@@ -30,8 +30,9 @@ func securityHeaders(options SecurityOptions) gin.HandlerFunc {
 		ctx.Header("X-Frame-Options", "DENY")
 		ctx.Header("Referrer-Policy", "no-referrer")
 
-		secure := requestUsesHTTPS(ctx.Request, trusted)
-		if options.RequireHTTPS && !secure {
+		loopbackHealth := isLoopbackHealthRequest(ctx.Request)
+		secure := !loopbackHealth && requestUsesHTTPS(ctx.Request, trusted)
+		if options.RequireHTTPS && !secure && !loopbackHealth {
 			ctx.Redirect(http.StatusPermanentRedirect, publicBaseURL+ctx.Request.URL.RequestURI())
 			ctx.Abort()
 			return
@@ -48,7 +49,7 @@ func jsonRequestBodyLimit(maxBytes int64) gin.HandlerFunc {
 		maxBytes = defaultHTTPMaxBodyBytes
 	}
 	return func(ctx *gin.Context) {
-		if ctx.Request.Body == nil || !isJSONContentType(ctx.GetHeader("Content-Type")) {
+		if !requestHasBody(ctx.Request) || usesUploadBodyLimit(ctx.Request) {
 			ctx.Next()
 			return
 		}
@@ -76,9 +77,28 @@ func writeRequestBodyTooLarge(ctx *gin.Context) {
 	ctx.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, Response[any]{Error: &ErrorBody{Code: "REQUEST_BODY_TOO_LARGE", Message: "request body exceeds configured limit"}})
 }
 
-func isJSONContentType(raw string) bool {
+func isMultipartContentType(raw string) bool {
 	mediaType, _, err := mime.ParseMediaType(raw)
-	return err == nil && (mediaType == "application/json" || strings.HasSuffix(mediaType, "+json"))
+	return err == nil && strings.HasPrefix(mediaType, "multipart/")
+}
+
+func usesUploadBodyLimit(request *http.Request) bool {
+	if request.Method != http.MethodPost || !isMultipartContentType(request.Header.Get("Content-Type")) {
+		return false
+	}
+	return request.URL.Path == "/api/admin/files/upload" || request.URL.Path == "/api/app/files"
+}
+
+func requestHasBody(request *http.Request) bool {
+	return request.Body != nil && request.Body != http.NoBody && request.ContentLength != 0
+}
+
+func isLoopbackHealthRequest(request *http.Request) bool {
+	if request.TLS != nil || request.Method != http.MethodGet || request.URL.Path != "/api/health" {
+		return false
+	}
+	peer, ok := directPeerAddress(request.RemoteAddr)
+	return ok && peer.IsLoopback()
 }
 
 func requestUsesHTTPS(request *http.Request, trusted []netip.Prefix) bool {
@@ -89,7 +109,8 @@ func requestUsesHTTPS(request *http.Request, trusted []netip.Prefix) bool {
 	if !ok || !prefixesContain(trusted, peer) {
 		return false
 	}
-	return strings.EqualFold(strings.TrimSpace(request.Header.Get("X-Forwarded-Proto")), "https")
+	values := request.Header.Values("X-Forwarded-Proto")
+	return len(values) == 1 && values[0] == "https"
 }
 
 func directPeerAddress(remoteAddr string) (netip.Addr, bool) {

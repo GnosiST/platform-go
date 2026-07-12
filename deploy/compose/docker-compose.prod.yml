@@ -63,6 +63,8 @@ services:
     depends_on:
       platform-api:
         condition: service_healthy
+    environment:
+      PLATFORM_PUBLIC_BASE_URL: ${PLATFORM_PUBLIC_BASE_URL:?required}
     ports:
       - "127.0.0.1:8080:8080"
     networks:

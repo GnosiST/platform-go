@@ -36,6 +36,8 @@ const requiredRuntimeGateSnippets = [
   "production runtime requires PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
   "production runtime requires PLATFORM_PUBLIC_BASE_URL to be an absolute HTTPS origin",
   "production runtime requires a non-empty PLATFORM_TRUSTED_PROXIES policy",
+  "PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv4 addresses",
+  "PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv6 addresses",
 ];
 const requiredProductionEnv = [
   "PLATFORM_PUBLIC_BASE_URL",

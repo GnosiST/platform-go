@@ -109,19 +109,86 @@ function validateDriverPair(env, driverKey, dsnKey, errors) {
   }
 }
 
-function isValidTrustedProxy(value) {
-  const slash = value.lastIndexOf("/");
-  if (slash === -1) {
-    return isIP(value) !== 0;
+function parseIPv4(address) {
+  return Uint8Array.from(address.split(".").map(Number));
+}
+
+function parseIPv6(address) {
+  let value = address;
+  if (value.includes(".")) {
+    const split = value.lastIndexOf(":");
+    const ipv4 = parseIPv4(value.slice(split + 1));
+    value = `${value.slice(0, split)}:${((ipv4[0] << 8) | ipv4[1]).toString(16)}:${((ipv4[2] << 8) | ipv4[3]).toString(16)}`;
   }
-  const address = value.slice(0, slash);
-  const bitsText = value.slice(slash + 1);
+  const halves = value.split("::");
+  const left = halves[0] ? halves[0].split(":") : [];
+  const right = halves.length > 1 && halves[1] ? halves[1].split(":") : [];
+  const missing = 8 - left.length - right.length;
+  const groups = halves.length === 1 ? left : [...left, ...Array(missing).fill("0"), ...right];
+  const bytes = new Uint8Array(16);
+  groups.forEach((group, index) => {
+    const value = Number.parseInt(group || "0", 16);
+    bytes[index * 2] = value >> 8;
+    bytes[index * 2 + 1] = value & 0xff;
+  });
+  return bytes;
+}
+
+function parseTrustedProxy(value) {
+  const slash = value.lastIndexOf("/");
+  const address = slash === -1 ? value : value.slice(0, slash);
   const family = isIP(address);
-  if (family === 0 || !/^[0-9]+$/.test(bitsText)) {
-    return false;
+  if (family === 0 || address.includes("%")) {
+    return null;
+  }
+  const maxBits = family === 4 ? 32 : 128;
+  const bitsText = slash === -1 ? String(maxBits) : value.slice(slash + 1);
+  if (!/^[0-9]+$/.test(bitsText)) {
+    return null;
   }
   const bits = Number(bitsText);
-  return bits >= 1 && bits <= (family === 4 ? 32 : 128);
+  if (bits < 0 || bits > maxBits) {
+    return null;
+  }
+  return { family, bytes: family === 4 ? parseIPv4(address) : parseIPv6(address), bits };
+}
+
+function newCoverageNode() {
+  return { covered: false, children: [null, null] };
+}
+
+function insertCoverage(root, proxy) {
+  let node = root;
+  if (node.covered) return;
+  for (let depth = 0; depth < proxy.bits; depth += 1) {
+    const bit = (proxy.bytes[Math.floor(depth / 8)] >> (7 - (depth % 8))) & 1;
+    node.children[bit] ??= newCoverageNode();
+    node = node.children[bit];
+    if (node.covered) return;
+  }
+  node.covered = true;
+  node.children = [null, null];
+  collapseCoverage(root, proxy.bytes, proxy.bits, 0);
+}
+
+function collapseCoverage(node, bytes, bits, depth) {
+  if (depth < bits) {
+    const bit = (bytes[Math.floor(depth / 8)] >> (7 - (depth % 8))) & 1;
+    collapseCoverage(node.children[bit], bytes, bits, depth + 1);
+  }
+  if (node.children[0]?.covered && node.children[1]?.covered) {
+    node.covered = true;
+    node.children = [null, null];
+  }
+}
+
+function addressInPrefix(address, proxy) {
+  if (!address || address.family !== proxy.family) return false;
+  for (let bit = 0; bit < proxy.bits; bit += 1) {
+    const mask = 1 << (7 - (bit % 8));
+    if ((address.bytes[Math.floor(bit / 8)] & mask) !== (proxy.bytes[Math.floor(bit / 8)] & mask)) return false;
+  }
+  return true;
 }
 
 function validateRequiredReadinessEnv(env, readiness, errors) {
@@ -163,7 +230,7 @@ function validatePlatformEnv(env, errors) {
   const publicBaseURL = requireKey(env, "PLATFORM_PUBLIC_BASE_URL", errors).trim();
   try {
     const parsed = new URL(publicBaseURL);
-    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.search || parsed.hash || parsed.pathname !== "/") {
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.search || parsed.hash || parsed.pathname !== "/" || publicBaseURL.endsWith("/")) {
       errors.push("PLATFORM_PUBLIC_BASE_URL must be an absolute HTTPS origin");
     }
   } catch {
@@ -175,11 +242,36 @@ function validatePlatformEnv(env, errors) {
   if (trustedProxies.length === 0 || trustedProxies.some((item) => item === "")) {
     errors.push("PLATFORM_TRUSTED_PROXIES must not be empty");
   }
+  const parsedTrustedProxies = [];
+  const coverage = { 4: newCoverageNode(), 6: newCoverageNode() };
+  const directTrustAll = new Set();
   for (const proxy of trustedProxies) {
-    if (proxy === "0.0.0.0/0" || proxy === "::/0") {
-      errors.push("PLATFORM_TRUSTED_PROXIES must not trust all addresses");
-    } else if (!isValidTrustedProxy(proxy)) {
+    const parsed = parseTrustedProxy(proxy);
+    if (!parsed) {
       errors.push(`PLATFORM_TRUSTED_PROXIES contains invalid IP or CIDR ${proxy}`);
+    } else if (parsed.bits === 0) {
+      errors.push("PLATFORM_TRUSTED_PROXIES must not trust all addresses");
+      directTrustAll.add(parsed.family);
+    } else {
+      parsedTrustedProxies.push(parsed);
+      insertCoverage(coverage[parsed.family], parsed);
+    }
+  }
+  if (coverage[4].covered && !directTrustAll.has(4)) {
+    errors.push("PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv4 addresses");
+  }
+  if (coverage[6].covered && !directTrustAll.has(6)) {
+    errors.push("PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv6 addresses");
+  }
+  if (composeProfile) {
+    const adminProxyValue = requireKey(env, "PLATFORM_ADMIN_PROXY_IP", errors).trim();
+    const adminProxyFamily = isIP(adminProxyValue);
+    const adminProxy = adminProxyFamily === 0 ? null : {
+      family: adminProxyFamily,
+      bytes: adminProxyFamily === 4 ? parseIPv4(adminProxyValue) : parseIPv6(adminProxyValue),
+    };
+    if (!adminProxy || !parsedTrustedProxies.some((proxy) => addressInPrefix(adminProxy, proxy))) {
+      errors.push("PLATFORM_ADMIN_PROXY_IP must be contained in PLATFORM_TRUSTED_PROXIES");
     }
   }
   const maxBodyBytes = Number(requireKey(env, "PLATFORM_HTTP_MAX_BODY_BYTES", errors));

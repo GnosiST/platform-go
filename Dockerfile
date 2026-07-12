@@ -34,4 +34,4 @@ ENTRYPOINT ["platform-api"]
 
 FROM nginx:1.29-alpine AS admin-static
 COPY --from=admin-builder /src/admin/dist /usr/share/nginx/html
-COPY deploy/nginx/platform.conf /etc/nginx/conf.d/default.conf
+COPY deploy/nginx/platform.conf /etc/nginx/templates/default.conf.template

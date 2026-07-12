@@ -26,6 +26,8 @@ const validStrictEnv = [
   "PLATFORM_HTTP_ADDR=0.0.0.0:9200",
   "PLATFORM_PUBLIC_BASE_URL=https://platform.example.test",
   "PLATFORM_TRUSTED_PROXIES=10.20.0.0/16",
+  "PLATFORM_INTERNAL_SUBNET=10.20.0.0/16",
+  "PLATFORM_ADMIN_PROXY_IP=10.20.1.4",
   "PLATFORM_HTTP_MAX_BODY_BYTES=1048576",
   "PLATFORM_JWT_SECRET=prod-jwt-signing-value-with-strong-length-001",
   "PLATFORM_CAPABILITIES=tenant,identity,session,rbac,menu,api-resource,audit,wechat-login,dictionary,parameter,file-storage,admin-shell,system-admin",
@@ -138,7 +140,7 @@ describe("validate-platform-production-env", () => {
 
   it("rejects unsafe production transport security settings", () => {
     const source = validStrictEnv
-      .replace("PLATFORM_PUBLIC_BASE_URL=https://platform.example.test", "PLATFORM_PUBLIC_BASE_URL=http://platform.example.test/path")
+      .replace("PLATFORM_PUBLIC_BASE_URL=https://platform.example.test", "PLATFORM_PUBLIC_BASE_URL=https://platform.example.test/")
       .replace("PLATFORM_TRUSTED_PROXIES=10.20.0.0/16", "PLATFORM_TRUSTED_PROXIES=0.0.0.0/0,999.999.999.999/24")
       .replace("PLATFORM_HTTP_MAX_BODY_BYTES=1048576", "PLATFORM_HTTP_MAX_BODY_BYTES=1073741824");
     const { tempDir, filePath } = tempEnv(source);
@@ -150,6 +152,36 @@ describe("validate-platform-production-env", () => {
       assert.match(result.stderr, /PLATFORM_TRUSTED_PROXIES must not trust all addresses/);
       assert.match(result.stderr, /PLATFORM_TRUSTED_PROXIES contains invalid IP or CIDR 999\.999\.999\.999\/24/);
       assert.match(result.stderr, /PLATFORM_HTTP_MAX_BODY_BYTES must be between 1 and 104857600/);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects cumulative trust-all proxy policies", () => {
+    const source = validStrictEnv.replace(
+      "PLATFORM_TRUSTED_PROXIES=10.20.0.0/16",
+      "PLATFORM_TRUSTED_PROXIES=0.0.0.0/1,128.0.0.0/1,::/1,8000::/1",
+    );
+    const { tempDir, filePath } = tempEnv(source);
+    try {
+      const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv4 addresses/);
+      assert.match(result.stderr, /PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv6 addresses/);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an Admin proxy outside the trusted proxy policy", () => {
+    const source = validStrictEnv.replace("PLATFORM_ADMIN_PROXY_IP=10.20.1.4", "PLATFORM_ADMIN_PROXY_IP=192.0.2.10");
+    const { tempDir, filePath } = tempEnv(source);
+    try {
+      const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /PLATFORM_ADMIN_PROXY_IP must be contained in PLATFORM_TRUSTED_PROXIES/);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }

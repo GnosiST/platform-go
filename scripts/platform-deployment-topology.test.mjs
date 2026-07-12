@@ -140,9 +140,9 @@ describe("validate-platform-deployment-topology", () => {
   it("rejects an Admin proxy without reviewed TLS edge controls", () => {
     const current = fs.readFileSync(path.join(repoRoot, "deploy/nginx/platform.conf"), "utf8");
     const unsafe = current
-      .replace('  if ($platform_edge_https = 0) { return 308 https://$host$request_uri; }\n', "")
+      .replace('  if ($platform_edge_https = 0) { return 308 ${PLATFORM_PUBLIC_BASE_URL}$request_uri; }\n', "")
       .replace('    proxy_set_header X-Forwarded-Proto $platform_forwarded_proto;\n', "")
-      .replace('  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;\n', "")
+      .replace('  add_header Strict-Transport-Security $platform_hsts always;\n', "")
       .replace(/  add_header Content-Security-Policy .*\n/, "");
     const nginxPath = tempText("platform.conf", unsafe);
 
@@ -152,6 +152,55 @@ describe("validate-platform-deployment-topology", () => {
     assert.match(result.stderr, /admin proxy must redirect requests without the reviewed HTTPS edge signal/);
     assert.match(result.stderr, /admin proxy must forward only the normalized HTTPS edge signal/);
     assert.match(result.stderr, /admin proxy must emit HSTS and Content-Security-Policy/);
+  });
+
+  it("rejects Host-derived redirects and unconditional HSTS", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/nginx/platform.conf"), "utf8");
+    const unsafe = current
+      .replace("return 308 ${PLATFORM_PUBLIC_BASE_URL}$request_uri;", "return 308 https://$host$request_uri;")
+      .replace('add_header Strict-Transport-Security $platform_hsts always;', 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;');
+    const nginxPath = tempText("platform.conf", unsafe);
+
+    const result = runValidator(["--admin-proxy", nginxPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /admin proxy redirect must use PLATFORM_PUBLIC_BASE_URL instead of request Host/);
+    assert.match(result.stderr, /admin proxy HSTS must be conditional on the trusted HTTPS edge signal/);
+  });
+
+  it("rejects bypassing the official Nginx template entrypoint", () => {
+    const contract = readJSON("resources/platform-deployment-topology.json");
+    contract.deploymentPackage.requiredSourceSnippets = contract.deploymentPackage.requiredSourceSnippets.filter(
+      (item) => item.contains !== "COPY deploy/nginx/platform.conf /etc/nginx/templates/default.conf.template",
+    );
+    const contractPath = tempJSON("platform-deployment-topology.json", contract);
+
+    const result = runValidator(["--contract", contractPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Admin image must install the Nginx config as an envsubst template/);
+  });
+
+  it("rejects a production API healthcheck outside the loopback exception", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
+    const unsafe = current.replace("http://127.0.0.1:9200/api/health", "http://platform-api:9200/api/health");
+    const composePath = tempText("docker-compose.prod.yml", unsafe);
+
+    const result = runValidator(["--compose", composePath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /platform-api healthcheck must use the direct loopback HTTP exception/);
+  });
+
+  it("rejects a standard env template whose Admin proxy is outside trusted proxies", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/env/production.example.env"), "utf8");
+    const unsafe = current.replace("PLATFORM_TRUSTED_PROXIES=172.30.0.10", "PLATFORM_TRUSTED_PROXIES=172.30.0.11");
+    const envPath = tempText("production.example.env", unsafe);
+
+    const result = runValidator(["--env-template", envPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /standard production env must trust PLATFORM_ADMIN_PROXY_IP/);
   });
 
   it("rejects active Admin file-storage volume mounts in Compose", () => {

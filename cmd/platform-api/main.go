@@ -103,10 +103,10 @@ func main() {
 
 func securityOptionsFromConfig(cfg config.Config) httpapi.SecurityOptions {
 	return httpapi.SecurityOptions{
-		RequireHTTPS:     cfg.RuntimeEnvironment == config.RuntimeEnvironmentProduction,
-		PublicBaseURL:    cfg.PublicBaseURL,
-		TrustedProxies:   append([]string(nil), cfg.TrustedProxies...),
-		MaxJSONBodyBytes: cfg.HTTPMaxBodyBytes,
+		RequireHTTPS:   cfg.RuntimeEnvironment == config.RuntimeEnvironmentProduction,
+		PublicBaseURL:  cfg.PublicBaseURL,
+		TrustedProxies: append([]string(nil), cfg.TrustedProxies...),
+		MaxBodyBytes:   cfg.HTTPMaxBodyBytes,
 	}
 }
 

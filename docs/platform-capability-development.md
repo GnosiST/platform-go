@@ -505,6 +505,8 @@ PLATFORM_FILE_MAX_UPLOAD_BYTES=10485760
 PLATFORM_FILE_ALLOWED_MIME_TYPES=application/pdf,image/jpeg,image/png,text/plain
 ```
 
+In the standard Compose adapter, `PLATFORM_ADMIN_PROXY_IP` must be contained by `PLATFORM_TRUSTED_PROXIES`. Complementary CIDRs that cumulatively trust an entire IPv4 or IPv6 address family are rejected. The HTTP body limit applies to non-upload request bodies; valid multipart requests are exempt only on `POST /api/admin/files/upload` and `POST /api/app/files`, where the upload-specific limit remains authoritative.
+
 S3-compatible object storage uses the same `storage.ObjectStore` port:
 
 ```bash

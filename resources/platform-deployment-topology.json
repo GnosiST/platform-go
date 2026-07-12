@@ -179,7 +179,9 @@
       "fileDelivery": "authenticated-api-only",
       "tlsEdge": "external-reviewed-edge-required",
       "adminOriginExposure": "loopback-only-by-default",
-      "forwardedHTTPS": "normalized-x-forwarded-proto-from-reviewed-edge-only"
+      "forwardedHTTPS": "single-canonical-x-forwarded-proto-from-reviewed-edge-only",
+      "apiHealthcheck": "direct-loopback-http-get-only",
+      "hsts": "trusted-https-edge-only"
     },
     "requiredSourceSnippets": [
       {
@@ -207,6 +209,10 @@
         "contains": "ENTRYPOINT [\"platform-api\"]"
       },
       {
+        "path": "Dockerfile",
+        "contains": "COPY deploy/nginx/platform.conf /etc/nginx/templates/default.conf.template"
+      },
+      {
         "path": "deploy/compose/docker-compose.prod.yml",
         "contains": "target: api"
       },
@@ -228,6 +234,14 @@
       },
       {
         "path": "deploy/compose/docker-compose.prod.yml",
+        "contains": "http://127.0.0.1:9200/api/health"
+      },
+      {
+        "path": "deploy/compose/docker-compose.prod.yml",
+        "contains": "PLATFORM_PUBLIC_BASE_URL: ${PLATFORM_PUBLIC_BASE_URL:?required}"
+      },
+      {
+        "path": "deploy/compose/docker-compose.prod.yml",
         "contains": "MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?required}"
       },
       {
@@ -236,7 +250,7 @@
       },
       {
         "path": "deploy/nginx/platform.conf",
-        "contains": "if ($platform_edge_https = 0) { return 308 https://$host$request_uri; }"
+        "contains": "if ($platform_edge_https = 0) { return 308 ${PLATFORM_PUBLIC_BASE_URL}$request_uri; }"
       },
       {
         "path": "deploy/nginx/platform.conf",
@@ -244,7 +258,11 @@
       },
       {
         "path": "deploy/nginx/platform.conf",
-        "contains": "add_header Strict-Transport-Security"
+        "contains": "add_header Strict-Transport-Security $platform_hsts always;"
+      },
+      {
+        "path": "deploy/nginx/platform.conf",
+        "contains": "map $platform_edge_https $platform_hsts"
       },
       {
         "path": "deploy/nginx/platform.conf",
