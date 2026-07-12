@@ -37,10 +37,12 @@ func TestStaticKeyProviderRejectsInvalidAndReusedKeyMaterial(t *testing.T) {
 
 func TestParseEncodedKeyringRejectsMalformedInputWithoutEchoingSecret(t *testing.T) {
 	secretMarker := "raw-secret-marker"
+	validMaterial := base64.StdEncoding.EncodeToString(keyBytes('e'))
 	for name, raw := range map[string]string{
 		"invalid json":   "{\"enc-v1\":\"raw-secret-marker\"",
 		"invalid base64": "{\"enc-v1\":\"raw-secret-marker\"}",
 		"wrong length":   "{\"enc-v1\":\"" + base64.StdEncoding.EncodeToString([]byte("short")) + "\"}",
+		"duplicate id":   "{\"enc-v1\":\"" + validMaterial + "\",\"enc-v1\":\"" + validMaterial + "\"}",
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := ParseEncodedKeyring(raw)

@@ -120,26 +120,36 @@ func validateKeyring(source map[string][]byte, reserved map[string]struct{}) (ma
 
 func ParseEncodedKeyring(raw string) (map[string][]byte, error) {
 	decoder := json.NewDecoder(strings.NewReader(raw))
-	var encoded map[string]string
-	if err := decoder.Decode(&encoded); err != nil {
+	start, err := decoder.Token()
+	if err != nil || start != json.Delim('{') {
 		return nil, fmt.Errorf("%w: keyring JSON is invalid", ErrInvalidKeyConfig)
 	}
-	if err := ensureJSONEOF(decoder); err != nil {
-		return nil, fmt.Errorf("%w: keyring JSON is invalid", ErrInvalidKeyConfig)
-	}
-	if len(encoded) == 0 {
-		return nil, fmt.Errorf("%w: keyring is required", ErrInvalidKeyConfig)
-	}
-	decoded := make(map[string][]byte, len(encoded))
-	for id, value := range encoded {
-		if !canonicalIdentifier(id) {
+	decoded := map[string][]byte{}
+	for decoder.More() {
+		token, tokenErr := decoder.Token()
+		id, ok := token.(string)
+		if tokenErr != nil || !ok || !canonicalIdentifier(id) {
 			return nil, fmt.Errorf("%w: key ID must be canonical", ErrInvalidKeyConfig)
+		}
+		if _, exists := decoded[id]; exists {
+			return nil, fmt.Errorf("%w: key IDs must be unique", ErrInvalidKeyConfig)
+		}
+		var value string
+		if err := decoder.Decode(&value); err != nil {
+			return nil, fmt.Errorf("%w: keyring JSON is invalid", ErrInvalidKeyConfig)
 		}
 		material, err := base64.StdEncoding.Strict().DecodeString(value)
 		if err != nil || len(material) != 32 {
 			return nil, fmt.Errorf("%w: key material must be base64-encoded 32-byte values", ErrInvalidKeyConfig)
 		}
 		decoded[id] = material
+	}
+	end, err := decoder.Token()
+	if err != nil || end != json.Delim('}') || ensureJSONEOF(decoder) != nil {
+		return nil, fmt.Errorf("%w: keyring JSON is invalid", ErrInvalidKeyConfig)
+	}
+	if len(decoded) == 0 {
+		return nil, fmt.Errorf("%w: keyring is required", ErrInvalidKeyConfig)
 	}
 	return decoded, nil
 }
