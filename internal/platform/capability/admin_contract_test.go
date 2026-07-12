@@ -338,6 +338,17 @@ func TestValidateAdminSurfaceAcceptsCustomSensitiveEncryptedFieldProtection(t *t
 	}
 }
 
+func TestValidateAdminSurfaceRejectsEncryptedSourceOutsideValues(t *testing.T) {
+	resource := validEncryptedAdminResource()
+	resource.Fields[1].Source = "record"
+	resource.Fields[1].Sensitivity = FieldSensitivityInternal
+
+	err := ValidateAdminSurface([]Manifest{{ID: "custom", Admin: AdminSurface{Resources: []AdminResource{resource}}}})
+	if err == nil || !strings.Contains(err.Error(), "encrypted storage requires values source") {
+		t.Fatalf("ValidateAdminSurface() error = %v, want encrypted values source error", err)
+	}
+}
+
 func TestValidateAdminSurfaceRejectsIncompleteEncryptedProtection(t *testing.T) {
 	tests := []struct {
 		name    string

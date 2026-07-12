@@ -658,6 +658,9 @@ func validateAdminFieldPolicy(owner ID, resource string, field AdminField) error
 	if !slices.Contains(adminFieldProjectionModes, exportMode) {
 		return fmt.Errorf("capability %q admin resource %q field %q exportMode is unsupported", owner, resource, field.Key)
 	}
+	if storageMode == FieldStorageEncrypted && field.Source != "values" {
+		return fmt.Errorf("capability %q admin resource %q field %q encrypted storage requires values source", owner, resource, field.Key)
+	}
 	if (sensitivity == FieldSensitivitySensitive || sensitivity == FieldSensitivitySecret) && field.Source == "record" {
 		return fmt.Errorf("capability %q admin resource %q field %q sensitive or secret values cannot use record storage", owner, resource, field.Key)
 	}
