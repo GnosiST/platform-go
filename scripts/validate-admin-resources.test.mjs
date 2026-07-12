@@ -203,6 +203,65 @@ describe("validate-admin-resources field security policies", () => {
 
     assert.equal(result.status, 0, result.stderr);
   });
+
+  function mutateEncryptedField(mutator = () => {}) {
+    return writeBrokenManifest((manifest) => {
+      const identities = manifest.resources.find((resource) => resource.code === "app-identities");
+      identities.schema.protection = { schemaVersion: 1, scope: "tenant-field", tenantField: "tenantCode" };
+      identities.schema.fields.push(
+        { key: "tenantCode", label: { zh: "租户", en: "Tenant" }, type: "text", source: "values", required: true },
+        {
+          key: "governmentReference",
+          label: { zh: "政府引用", en: "Government Reference" },
+          type: "text",
+          source: "values",
+          sensitivity: "sensitive",
+          storageMode: "encrypted",
+          responseMode: "privileged",
+          exportMode: "omitted",
+          filterable: true,
+          protection: {
+            format: "aes-256-gcm-v1",
+            normalization: "trim-v1",
+            blindIndexNamespace: "custom-government-reference",
+          },
+        },
+      );
+      mutator(identities, identities.schema.fields.at(-1));
+    });
+  }
+
+  it("accepts arbitrary custom encrypted fields with explicit protection", () => {
+    const result = runValidator(["--manifest", mutateEncryptedField()]);
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  for (const [name, mutate, pattern] of [
+    ["missing field protection", (_resource, field) => delete field.protection, /encrypted storage requires protection metadata/],
+    ["missing format", (_resource, field) => delete field.protection.format, /protection format is required/],
+    ["missing normalization", (_resource, field) => delete field.protection.normalization, /protection normalization is required/],
+    ["missing resource protection", (resource) => delete resource.schema.protection, /encrypted fields require resource protection metadata/],
+    ["missing resource scope", (resource) => delete resource.schema.protection.scope, /protection scope is required/],
+    ["missing tenant field", (resource) => delete resource.schema.protection.tenantField, /tenantField is required/],
+    ["undeclared tenant field", (resource) => (resource.schema.protection.tenantField = "accountCode"), /tenantField accountCode is not declared/],
+    ["protected tenant field", (resource) => (resource.schema.fields.at(-2).storageMode = "masked"), /tenantField tenantCode must use plain storage/],
+    ["optional tenant field", (resource) => (resource.schema.fields.at(-2).required = false), /tenantField tenantCode must be required/],
+    ["non canonical namespace", (_resource, field) => (field.protection.blindIndexNamespace = "Custom Reference"), /blindIndexNamespace must be canonical/],
+    [
+      "duplicate namespace",
+      (resource, field) => resource.schema.fields.push({ ...field, key: "secondaryReference", label: { zh: "次级引用", en: "Secondary Reference" } }),
+      /duplicate blindIndexNamespace custom-government-reference/,
+    ],
+    ["keyword search", (_resource, field) => (field.searchable = true), /encrypted fields cannot use keyword search/],
+    ["range filtering without blind index", (_resource, field) => delete field.protection.blindIndexNamespace, /encrypted filtering requires a blindIndexNamespace/],
+    ["sorting", (_resource, field) => (field.sortable = true), /encrypted fields cannot be sorted/],
+  ]) {
+    it(`rejects encrypted protection with ${name}`, () => {
+      const result = runValidator(["--manifest", mutateEncryptedField(mutate)]);
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, pattern);
+    });
+  }
 });
 
 describe("validate-admin-resources relation contracts", () => {

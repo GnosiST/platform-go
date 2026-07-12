@@ -4,13 +4,25 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
-const contractPath = path.join(repoRoot, "resources", "generated", "admin-resource-contract.json");
+const contractPath = optionValue("--contract")
+  ? path.resolve(repoRoot, optionValue("--contract"))
+  : path.join(repoRoot, "resources", "generated", "admin-resource-contract.json");
 const generatedDir = path.join(repoRoot, "resources", "generated");
 const generatedPath = path.join(generatedDir, "admin-codegen-preview.json");
 
 const contract = JSON.parse(fs.readFileSync(contractPath, "utf8"));
 const resources = contract.resources ?? [];
 const writeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+function optionValue(name) {
+  const index = process.argv.indexOf(name);
+  if (index >= 0 && process.argv[index + 1]) {
+    return process.argv[index + 1];
+  }
+  const prefix = `${name}=`;
+  const value = process.argv.find((arg) => arg.startsWith(prefix));
+  return value ? value.slice(prefix.length) : "";
+}
 
 function uniqueSorted(values) {
   return Array.from(new Set(values.filter(Boolean))).sort();
@@ -55,6 +67,9 @@ const previewResources = resources
   .map((resource) => {
     const routes = resource.routes.map((route) => routeTarget(resource, route));
     const writeRoutes = routes.filter((route) => route.mutates);
+    const protectedFields = resource.schema.fields
+      .filter((field) => field.protection)
+      .map((field) => ({ key: field.key, ...field.protection }));
     return {
       resource: resource.name,
       code: resource.code,
@@ -80,6 +95,8 @@ const previewResources = resources
       },
       schema: {
         fieldCount: resource.schema.fields.length,
+        ...(resource.schema.protection ? { protection: resource.schema.protection } : {}),
+        ...(protectedFields.length > 0 ? { protectedFields } : {}),
         search: resource.schema.search,
         filter: resource.schema.filter,
         sort: resource.schema.sort,

@@ -257,7 +257,10 @@ func TestValidateAdminSurfaceValidatesFieldSecurityPolicies(t *testing.T) {
 		{name: "masked full response", field: AdminField{Sensitivity: FieldSensitivityPersonal, StorageMode: FieldStorageMasked, ResponseMode: FieldProjectionFull, ExportMode: FieldProjectionMasked}, wantErr: "masked storage must use masked or omitted response and export"},
 		{name: "masked privileged export", field: AdminField{Sensitivity: FieldSensitivityPersonal, StorageMode: FieldStorageMasked, ResponseMode: FieldProjectionMasked, ExportMode: FieldProjectionPrivileged}, wantErr: "masked storage must use masked or omitted response and export"},
 		{name: "hashed response", field: AdminField{Sensitivity: FieldSensitivitySecret, StorageMode: FieldStorageHashed, ResponseMode: FieldProjectionFull, ExportMode: FieldProjectionOmitted}, wantErr: "must be omitted from response and export"},
-		{name: "encrypted export", field: AdminField{Sensitivity: FieldSensitivitySensitive, StorageMode: FieldStorageEncrypted, ResponseMode: FieldProjectionOmitted, ExportMode: FieldProjectionPrivileged}, wantErr: "must be omitted from response and export"},
+		{name: "encrypted full response", field: AdminField{
+			Sensitivity: FieldSensitivitySensitive, StorageMode: FieldStorageEncrypted, ResponseMode: FieldProjectionFull, ExportMode: FieldProjectionOmitted,
+			Protection: &AdminFieldProtection{Format: "aes-256-gcm-v1", Normalization: "raw-v1"},
+		}, wantErr: "must use privileged or omitted response and export"},
 		{name: "masked credential disguise", key: "maskedToken", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
 		{name: "masked personal disguise", key: "maskedPhone", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
 		{name: "compound token", key: "apiToken", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
@@ -310,6 +313,147 @@ func TestValidateAdminSurfaceAcceptsDefaultAndProtectedFieldSecurityPolicies(t *
 	if err := ValidateAdminSurface([]Manifest{{ID: "demo", Admin: AdminSurface{Resources: []AdminResource{resource}}}}); err != nil {
 		t.Fatalf("ValidateAdminSurface() error = %v", err)
 	}
+}
+
+func TestValidateAdminSurfaceAcceptsCustomSensitiveEncryptedFieldProtection(t *testing.T) {
+	resource := validAdminResource("custom-records", "/custom-records", "admin:custom-record")
+	resource.Protection = &AdminResourceProtection{SchemaVersion: 1, Scope: "global"}
+	resource.Fields = []AdminField{
+		{
+			Key: "governmentReference", Label: Text("政府引用", "Government Reference"), Type: "text", Source: "values",
+			Sensitivity: FieldSensitivitySensitive, StorageMode: FieldStorageEncrypted,
+			ResponseMode: FieldProjectionPrivileged, ExportMode: FieldProjectionOmitted, Filterable: true,
+			Protection: &AdminFieldProtection{
+				Format: "aes-256-gcm-v1", Normalization: "trim-v1", BlindIndexNamespace: "custom-government-reference",
+			},
+		},
+	}
+
+	if err := ValidateAdminSurface([]Manifest{{ID: "custom", Admin: AdminSurface{Resources: []AdminResource{resource}}}}); err != nil {
+		t.Fatalf("ValidateAdminSurface() error = %v", err)
+	}
+}
+
+func TestValidateAdminSurfaceRejectsIncompleteEncryptedProtection(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*AdminResource, *AdminField)
+		wantErr string
+	}{
+		{name: "missing field protection", mutate: func(_ *AdminResource, field *AdminField) { field.Protection = nil }, wantErr: "encrypted storage requires protection metadata"},
+		{name: "missing format", mutate: func(_ *AdminResource, field *AdminField) { field.Protection.Format = "" }, wantErr: "protection format is required"},
+		{name: "unsupported format", mutate: func(_ *AdminResource, field *AdminField) { field.Protection.Format = "aes-cbc-v1" }, wantErr: "protection format is unsupported"},
+		{name: "missing normalization", mutate: func(_ *AdminResource, field *AdminField) { field.Protection.Normalization = "" }, wantErr: "protection normalization is required"},
+		{name: "unsupported normalization", mutate: func(_ *AdminResource, field *AdminField) { field.Protection.Normalization = "email" }, wantErr: "protection normalization is unsupported"},
+		{name: "missing resource protection", mutate: func(resource *AdminResource, _ *AdminField) { resource.Protection = nil }, wantErr: "encrypted fields require resource protection metadata"},
+		{name: "missing schema version", mutate: func(resource *AdminResource, _ *AdminField) { resource.Protection.SchemaVersion = 0 }, wantErr: "protection schemaVersion is required"},
+		{name: "missing scope", mutate: func(resource *AdminResource, _ *AdminField) { resource.Protection.Scope = "" }, wantErr: "protection scope is required"},
+		{name: "unsupported scope", mutate: func(resource *AdminResource, _ *AdminField) { resource.Protection.Scope = "user" }, wantErr: "protection scope is unsupported"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resource := validEncryptedAdminResource()
+			tt.mutate(&resource, &resource.Fields[1])
+			err := ValidateAdminSurface([]Manifest{{ID: "custom", Admin: AdminSurface{Resources: []AdminResource{resource}}}})
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("ValidateAdminSurface() error = %v, want %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateAdminSurfaceRejectsInvalidTenantFieldProtectionScope(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*AdminResource)
+		wantErr string
+	}{
+		{name: "missing tenant field", mutate: func(resource *AdminResource) { resource.Protection.TenantField = "" }, wantErr: "tenantField is required"},
+		{name: "undeclared tenant field", mutate: func(resource *AdminResource) { resource.Protection.TenantField = "accountCode" }, wantErr: "tenantField \"accountCode\" is not declared"},
+		{name: "protected tenant field", mutate: func(resource *AdminResource) {
+			resource.Fields[0].StorageMode = FieldStorageHashed
+			resource.Fields[0].ResponseMode = FieldProjectionOmitted
+			resource.Fields[0].ExportMode = FieldProjectionOmitted
+		}, wantErr: "tenantField \"tenantCode\" must use plain storage"},
+		{name: "optional tenant field", mutate: func(resource *AdminResource) { resource.Fields[0].Required = false }, wantErr: "tenantField \"tenantCode\" must be required"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resource := validEncryptedAdminResource()
+			tt.mutate(&resource)
+			err := ValidateAdminSurface([]Manifest{{ID: "custom", Admin: AdminSurface{Resources: []AdminResource{resource}}}})
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("ValidateAdminSurface() error = %v, want %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateAdminSurfaceRejectsInvalidBlindIndexNamespace(t *testing.T) {
+	t.Run("non canonical", func(t *testing.T) {
+		resource := validEncryptedAdminResource()
+		resource.Fields[1].Protection.BlindIndexNamespace = "Custom Government Reference"
+		err := ValidateAdminSurface([]Manifest{{ID: "custom", Admin: AdminSurface{Resources: []AdminResource{resource}}}})
+		if err == nil || !strings.Contains(err.Error(), "blindIndexNamespace must be canonical") {
+			t.Fatalf("ValidateAdminSurface() error = %v, want canonical namespace error", err)
+		}
+	})
+
+	t.Run("duplicate", func(t *testing.T) {
+		resource := validEncryptedAdminResource()
+		resource.Fields = append(resource.Fields, AdminField{
+			Key: "secondaryReference", Label: Text("次级引用", "Secondary Reference"), Type: "text", Source: "values",
+			Sensitivity: FieldSensitivitySensitive, StorageMode: FieldStorageEncrypted,
+			ResponseMode: FieldProjectionOmitted, ExportMode: FieldProjectionOmitted,
+			Protection: &AdminFieldProtection{Format: "aes-256-gcm-v1", Normalization: "raw-v1", BlindIndexNamespace: "custom-government-reference"},
+		})
+		err := ValidateAdminSurface([]Manifest{{ID: "custom", Admin: AdminSurface{Resources: []AdminResource{resource}}}})
+		if err == nil || !strings.Contains(err.Error(), "duplicate blindIndexNamespace") {
+			t.Fatalf("ValidateAdminSurface() error = %v, want duplicate namespace error", err)
+		}
+	})
+}
+
+func TestValidateAdminSurfaceRejectsEncryptedKeywordRangeAndSortConfiguration(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*AdminResource)
+		wantErr string
+	}{
+		{name: "keyword field", mutate: func(resource *AdminResource) { resource.Fields[1].Searchable = true }, wantErr: "encrypted fields cannot use keyword search"},
+		{name: "keyword search list", mutate: func(resource *AdminResource) { resource.SearchFields = []string{"governmentReference"} }, wantErr: "encrypted fields cannot use keyword search"},
+		{name: "range filtering without blind index", mutate: func(resource *AdminResource) { resource.Fields[1].Protection.BlindIndexNamespace = "" }, wantErr: "encrypted filtering requires a blindIndexNamespace"},
+		{name: "sortable field", mutate: func(resource *AdminResource) { resource.Fields[1].Sortable = true }, wantErr: "encrypted fields cannot be sorted"},
+		{name: "default sort", mutate: func(resource *AdminResource) { resource.DefaultSortKey = "governmentReference" }, wantErr: "encrypted fields cannot be sorted"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resource := validEncryptedAdminResource()
+			tt.mutate(&resource)
+			err := ValidateAdminSurface([]Manifest{{ID: "custom", Admin: AdminSurface{Resources: []AdminResource{resource}}}})
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("ValidateAdminSurface() error = %v, want %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func validEncryptedAdminResource() AdminResource {
+	resource := validAdminResource("custom-records", "/custom-records", "admin:custom-record")
+	resource.Protection = &AdminResourceProtection{SchemaVersion: 1, Scope: "tenant-field", TenantField: "tenantCode"}
+	resource.Fields = []AdminField{
+		{Key: "tenantCode", Label: Text("租户", "Tenant"), Type: "text", Source: "values", Required: true},
+		{
+			Key: "governmentReference", Label: Text("政府引用", "Government Reference"), Type: "text", Source: "values",
+			Sensitivity: FieldSensitivitySensitive, StorageMode: FieldStorageEncrypted,
+			ResponseMode: FieldProjectionPrivileged, ExportMode: FieldProjectionOmitted, Filterable: true,
+			Protection: &AdminFieldProtection{Format: "aes-256-gcm-v1", Normalization: "trim-v1", BlindIndexNamespace: "custom-government-reference"},
+		},
+	}
+	return resource
 }
 
 func TestValidateAdminSurfaceRejectsDuplicateFieldKeys(t *testing.T) {

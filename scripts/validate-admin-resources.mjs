@@ -24,6 +24,9 @@ const allowedPanelKinds = new Set(["fields", "permissions", "audit", "approval",
 const allowedFieldSensitivities = new Set(["public", "internal", "personal", "sensitive", "secret"]);
 const allowedFieldStorageModes = new Set(["plain", "masked", "hashed", "encrypted"]);
 const allowedFieldProjectionModes = new Set(["full", "masked", "privileged", "omitted"]);
+const allowedFieldProtectionFormats = new Set(["aes-256-gcm-v1"]);
+const allowedFieldProtectionNormalizations = new Set(["raw-v1", "trim-v1", "email-v1", "phone-e164-cn-v1", "identity-cn-v1"]);
+const allowedResourceProtectionScopes = new Set(["global", "tenant-field"]);
 const recordFieldKeys = new Set(["id", "code", "name", "status", "description", "updatedAt"]);
 const permissionPattern = /^admin:[a-z0-9-]+:[a-z0-9-]+$/;
 const requiredOrgUnitTypeOptions = ["group", "company", "branch", "organization", "department", "team", "store", "custom"];
@@ -85,7 +88,14 @@ function validSecurityFieldPolicy(sensitivity, storageMode, responseMode, export
   if (sensitivity === "public" || !["hashed", "encrypted"].includes(storageMode)) {
     return false;
   }
+  if (storageMode === "encrypted") {
+    return ["privileged", "omitted"].includes(responseMode) && ["privileged", "omitted"].includes(exportMode);
+  }
   return responseMode === "omitted" && exportMode === "omitted";
+}
+
+function isCanonicalProtectionName(value) {
+  return typeof value === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
 }
 
 function isSecurityFieldName(key) {
@@ -361,6 +371,37 @@ function validateManifest() {
     }
     const fields = schema.fields ?? [];
     errors.push(...assertUnique(fields.map((field) => field.key), `${prefix} schema.fields.key`));
+    const encryptedFields = fields.filter((field) => (field.storageMode ?? "plain") === "encrypted");
+    const resourceProtection = schema.protection;
+    if (encryptedFields.length > 0 && !resourceProtection) {
+      errors.push(`${prefix} encrypted fields require resource protection metadata`);
+    }
+    if (resourceProtection) {
+      if (!Number.isInteger(resourceProtection.schemaVersion) || resourceProtection.schemaVersion <= 0) {
+        errors.push(`${prefix} protection schemaVersion is required`);
+      }
+      if (!resourceProtection.scope) {
+        errors.push(`${prefix} protection scope is required`);
+      } else if (!allowedResourceProtectionScopes.has(resourceProtection.scope)) {
+        errors.push(`${prefix} protection scope is unsupported`);
+      } else if (resourceProtection.scope === "global" && resourceProtection.tenantField) {
+        errors.push(`${prefix} global protection scope cannot declare tenantField`);
+      } else if (resourceProtection.scope === "tenant-field") {
+        if (!resourceProtection.tenantField) {
+          errors.push(`${prefix} protection tenantField is required for tenant-field scope`);
+        } else {
+          const tenantField = fields.find((field) => field.key === resourceProtection.tenantField);
+          if (!tenantField) {
+            errors.push(`${prefix} protection tenantField ${resourceProtection.tenantField} is not declared`);
+          } else if ((tenantField.storageMode ?? "plain") !== "plain" || tenantField.protection) {
+            errors.push(`${prefix} protection tenantField ${resourceProtection.tenantField} must use plain storage`);
+          } else if (tenantField.required !== true) {
+            errors.push(`${prefix} protection tenantField ${resourceProtection.tenantField} must be required`);
+          }
+        }
+      }
+    }
+    const blindIndexNamespaces = new Map();
     for (const field of fields) {
       if (!field.label?.zh || !field.label?.en) {
         errors.push(`${prefix} field ${field.key} must declare zh/en labels`);
@@ -406,8 +447,50 @@ function validateManifest() {
       if (storageMode === "masked" && (!isMaskedProjection(responseMode) || !isMaskedProjection(exportMode))) {
         errors.push(`${prefix} field ${field.key} masked storage must use masked or omitted response and export`);
       }
-      if (["hashed", "encrypted"].includes(storageMode) && (responseMode !== "omitted" || exportMode !== "omitted")) {
-        errors.push(`${prefix} field ${field.key} protected storage must be omitted from response and export`);
+      if (storageMode === "hashed" && (responseMode !== "omitted" || exportMode !== "omitted")) {
+        errors.push(`${prefix} field ${field.key} hashed storage must be omitted from response and export`);
+      }
+      if (storageMode === "encrypted" && (!["privileged", "omitted"].includes(responseMode) || !["privileged", "omitted"].includes(exportMode))) {
+        errors.push(`${prefix} field ${field.key} encrypted storage must use privileged or omitted response and export`);
+      }
+      if (storageMode !== "encrypted" && field.protection) {
+        errors.push(`${prefix} field ${field.key} protection metadata requires encrypted storage`);
+      }
+      if (storageMode === "encrypted") {
+        const protection = field.protection;
+        if (!protection) {
+          errors.push(`${prefix} field ${field.key} encrypted storage requires protection metadata`);
+        } else {
+          if (!protection.format) {
+            errors.push(`${prefix} field ${field.key} protection format is required`);
+          } else if (!allowedFieldProtectionFormats.has(protection.format)) {
+            errors.push(`${prefix} field ${field.key} protection format is unsupported`);
+          }
+          if (!protection.normalization) {
+            errors.push(`${prefix} field ${field.key} protection normalization is required`);
+          } else if (!allowedFieldProtectionNormalizations.has(protection.normalization)) {
+            errors.push(`${prefix} field ${field.key} protection normalization is unsupported`);
+          }
+          const namespace = protection.blindIndexNamespace ?? "";
+          if (namespace && !isCanonicalProtectionName(namespace)) {
+            errors.push(`${prefix} field ${field.key} blindIndexNamespace must be canonical lowercase kebab-case`);
+          }
+          if (namespace) {
+            if (blindIndexNamespaces.has(namespace)) {
+              errors.push(`${prefix} duplicate blindIndexNamespace ${namespace}`);
+            }
+            blindIndexNamespaces.set(namespace, field.key);
+          }
+          if ((field.filterable === true || field.filter === true || (schema.filter ?? []).includes(field.key)) && !namespace) {
+            errors.push(`${prefix} field ${field.key} encrypted filtering requires a blindIndexNamespace`);
+          }
+        }
+        if (field.searchable === true || field.search === true || (schema.search ?? []).includes(field.key)) {
+          errors.push(`${prefix} field ${field.key} encrypted fields cannot use keyword search`);
+        }
+        if (field.sortable === true || field.sort === true || (schema.sort ?? []).includes(field.key)) {
+          errors.push(`${prefix} field ${field.key} encrypted fields cannot be sorted`);
+        }
       }
       if (isSecurityFieldName(field.key) && !validSecurityFieldPolicy(sensitivity, storageMode, responseMode, exportMode)) {
         errors.push(`${prefix} field ${field.key} security field names require masked personal or protected non-public storage`);

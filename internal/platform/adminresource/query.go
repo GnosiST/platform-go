@@ -2,12 +2,14 @@ package adminresource
 
 import (
 	"fmt"
-	"platform-go/internal/platform/rbac"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"platform-go/internal/platform/capability"
+	"platform-go/internal/platform/rbac"
 )
 
 const (
@@ -234,6 +236,9 @@ func normalizeCondition(condition QueryCondition, fields map[string]FieldDefinit
 	if !ok {
 		return normalizedCondition{}, QueryValidationError{Field: fieldKey, Reason: "query field is not declared by resource schema"}
 	}
+	if field.StorageMode == capability.FieldStorageEncrypted {
+		return normalizedCondition{}, QueryValidationError{Field: fieldKey, Reason: "encrypted field query requires the data protection runtime"}
+	}
 	if !field.Filterable && !field.Searchable {
 		return normalizedCondition{}, QueryValidationError{Field: fieldKey, Reason: "query field is not filterable"}
 	}
@@ -259,6 +264,9 @@ func normalizeSort(sorter QuerySort, fields map[string]FieldDefinition) (normali
 	field, ok := fields[fieldKey]
 	if !ok {
 		return normalizedSort{}, QueryValidationError{Field: fieldKey, Reason: "sort field is not declared by resource schema"}
+	}
+	if field.StorageMode == capability.FieldStorageEncrypted {
+		return normalizedSort{}, QueryValidationError{Field: fieldKey, Reason: "encrypted field cannot be sorted"}
 	}
 	if !field.Sortable {
 		return normalizedSort{}, QueryValidationError{Field: fieldKey, Reason: "sort field is not sortable"}

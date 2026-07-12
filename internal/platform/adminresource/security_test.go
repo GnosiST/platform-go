@@ -77,6 +77,99 @@ func TestStoreExternalWriteRejectsProtectedRecordFields(t *testing.T) {
 	}
 }
 
+func TestCustomSensitiveEncryptedProtectionPropagatesAndAcceptsExternalPlaintext(t *testing.T) {
+	resource := capability.AdminResource{
+		Resource: "custom-records", Title: capability.Text("自定义记录", "Custom Records"), Description: capability.Text("自定义记录。", "Custom records."),
+		PermissionPrefix: "admin:custom-record",
+		Protection:       &capability.AdminResourceProtection{SchemaVersion: 3, Scope: "tenant-field", TenantField: "tenantCode"},
+		Fields: []capability.AdminField{
+			{Key: "tenantCode", Label: capability.Text("租户", "Tenant"), Type: "text", Source: "values", Required: true},
+			{
+				Key: "governmentReference", Label: capability.Text("政府引用", "Government Reference"), Type: "text", Source: "values", InForm: true,
+				Sensitivity: capability.FieldSensitivitySensitive, StorageMode: capability.FieldStorageEncrypted,
+				ResponseMode: capability.FieldProjectionPrivileged, ExportMode: capability.FieldProjectionOmitted, Filterable: true,
+				Protection: &capability.AdminFieldProtection{Format: "aes-256-gcm-v1", Normalization: "trim-v1", BlindIndexNamespace: "custom-government-reference"},
+			},
+		},
+	}
+	store := NewStoreFromCapabilities([]capability.Manifest{{ID: "custom", Admin: capability.AdminSurface{Resources: []capability.AdminResource{resource}}}})
+	schema, err := store.Schema("custom-records")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if schema.Protection == nil || schema.Protection.SchemaVersion != 3 || schema.Protection.Scope != "tenant-field" || schema.Protection.TenantField != "tenantCode" {
+		t.Fatalf("schema protection = %+v", schema.Protection)
+	}
+	field := schema.Fields[1]
+	if field.Key != "governmentReference" || field.Protection == nil {
+		t.Fatalf("encrypted field = %+v", field)
+	}
+	if got := *field.Protection; got.Format != "aes-256-gcm-v1" || got.Normalization != "trim-v1" || got.BlindIndexNamespace != "custom-government-reference" {
+		t.Fatalf("field protection = %+v", got)
+	}
+	if err := store.validateWriteValues("custom-records", map[string]string{"governmentReference": "  REF-1001  "}, WriteOriginExternal); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("validateWriteValues(encrypted plaintext without runtime) error = %v, want ErrInvalidRecord", err)
+	}
+}
+
+func TestEncryptedProjectionMayBePrivilegedWhileHashedRemainsOmitted(t *testing.T) {
+	encrypted := FieldDefinition{
+		Key: "customSecret", Source: "values", Sensitivity: capability.FieldSensitivitySensitive, StorageMode: capability.FieldStorageEncrypted,
+		ResponseMode: capability.FieldProjectionPrivileged, ExportMode: capability.FieldProjectionOmitted,
+		Protection: &FieldProtection{Format: "aes-256-gcm-v1", Normalization: "raw-v1"},
+	}
+	if err := validateFieldWrite(encrypted.Key, "plaintext", encrypted, WriteOriginInternal); err != nil {
+		t.Fatalf("validateFieldWrite(internal encrypted privileged) error = %v", err)
+	}
+	if err := validateFieldWrite(encrypted.Key, "plaintext", encrypted, WriteOriginExternal); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("validateFieldWrite(external encrypted without runtime) error = %v, want ErrInvalidRecord", err)
+	}
+
+	hashed := encrypted
+	hashed.StorageMode = capability.FieldStorageHashed
+	hashed.Protection = nil
+	if err := validateFieldWrite(hashed.Key, "derived-hash", hashed, WriteOriginInternal); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("validateFieldWrite(hashed privileged) error = %v, want ErrInvalidRecord", err)
+	}
+}
+
+func TestEncryptedFieldQueryIsRejectedUntilProtectionRuntimeIsInstalled(t *testing.T) {
+	schema := Schema{Fields: []FieldDefinition{{
+		Key: "governmentReference", Source: "values", Filterable: true,
+		Sensitivity: capability.FieldSensitivitySensitive, StorageMode: capability.FieldStorageEncrypted,
+		ResponseMode: capability.FieldProjectionPrivileged, ExportMode: capability.FieldProjectionOmitted,
+		Protection: &FieldProtection{Format: "aes-256-gcm-v1", Normalization: "trim-v1", BlindIndexNamespace: "custom-government-reference"},
+	}}}
+	if _, err := buildQueryPlan(schema, QueryInput{Conditions: []QueryCondition{{Field: "governmentReference", Operator: "=", Value: "REF-1001"}}}); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("buildQueryPlan(encrypted field without runtime) error = %v, want ErrInvalidRecord", err)
+	}
+}
+
+func TestSpecializedResourceSchemaPreservesDeclaredProtectionMetadata(t *testing.T) {
+	resource := capability.AdminResource{
+		Resource: "users", Protection: &capability.AdminResourceProtection{SchemaVersion: 2, Scope: "global"},
+		Fields: []capability.AdminField{{
+			Key: "governmentReference", Label: capability.Text("政府引用", "Government Reference"), Type: "text", Source: "values",
+			Sensitivity: capability.FieldSensitivitySensitive, StorageMode: capability.FieldStorageEncrypted,
+			ResponseMode: capability.FieldProjectionPrivileged, ExportMode: capability.FieldProjectionOmitted,
+			Protection: &capability.AdminFieldProtection{Format: "aes-256-gcm-v1", Normalization: "trim-v1"},
+		}},
+	}
+	schema := schemaFromCapabilityResource(resource)
+	if schema.Protection == nil || schema.Protection.SchemaVersion != 2 || schema.Protection.Scope != "global" {
+		t.Fatalf("users schema protection = %+v", schema.Protection)
+	}
+	for _, field := range schema.Fields {
+		if field.Key == "governmentReference" {
+			if field.Protection == nil || field.StorageMode != capability.FieldStorageEncrypted {
+				t.Fatalf("governmentReference = %+v", field)
+			}
+			return
+		}
+	}
+	t.Fatal("specialized users schema dropped custom encrypted field")
+}
+
 func TestStoreRejectsHashNamedFieldWithoutProtectedPolicy(t *testing.T) {
 	store := NewStoreFromCapabilities(core.DefaultManifests())
 	schema := store.schemas["api-tokens"]

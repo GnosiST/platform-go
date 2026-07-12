@@ -242,6 +242,18 @@ export type AdminResourceFieldRelation = {
   rootValue?: string;
 };
 
+export type AdminResourceFieldProtection = {
+  format: "aes-256-gcm-v1";
+  normalization: "raw-v1" | "trim-v1" | "email-v1" | "phone-e164-cn-v1" | "identity-cn-v1";
+  blindIndexNamespace?: string;
+};
+
+export type AdminResourceProtection = {
+  schemaVersion: number;
+  scope: "global" | "tenant-field";
+  tenantField?: string;
+};
+
 export type AdminResourceField = {
   key: string;
   label: LocalizedText;
@@ -266,6 +278,7 @@ export type AdminResourceField = {
   storageMode: "plain" | "masked" | "hashed" | "encrypted";
   responseMode: "full" | "masked" | "privileged" | "omitted";
   exportMode: "full" | "masked" | "privileged" | "omitted";
+  protection?: AdminResourceFieldProtection;
 };
 
 export type AdminResourcePermissions = {
@@ -318,6 +331,7 @@ export type AdminResourceSchema = {
   runtimeSlots?: AdminResourceRuntimeSlot[];
   searchFields: string[];
   defaultSortKey?: string;
+  protection?: AdminResourceProtection;
 };
 
 export type AdminResourceList = {

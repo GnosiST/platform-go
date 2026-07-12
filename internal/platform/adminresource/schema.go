@@ -1,6 +1,7 @@
 package adminresource
 
 import (
+	"slices"
 	"strings"
 
 	"platform-go/internal/platform/capability"
@@ -74,6 +75,19 @@ type FieldDefinition struct {
 	StorageMode  string           `json:"storageMode"`
 	ResponseMode string           `json:"responseMode"`
 	ExportMode   string           `json:"exportMode"`
+	Protection   *FieldProtection `json:"protection,omitempty"`
+}
+
+type FieldProtection struct {
+	Format              string `json:"format"`
+	Normalization       string `json:"normalization"`
+	BlindIndexNamespace string `json:"blindIndexNamespace,omitempty"`
+}
+
+type ResourceProtection struct {
+	SchemaVersion uint32 `json:"schemaVersion"`
+	Scope         string `json:"scope"`
+	TenantField   string `json:"tenantField,omitempty"`
 }
 
 type ActionPermissions struct {
@@ -145,6 +159,7 @@ type Schema struct {
 	RuntimeSlots   []RuntimeSlotDefinition    `json:"runtimeSlots,omitempty"`
 	SearchFields   []string                   `json:"searchFields"`
 	DefaultSortKey string                     `json:"defaultSortKey,omitempty"`
+	Protection     *ResourceProtection        `json:"protection,omitempty"`
 }
 
 func (s *Store) Schema(resource string) (Schema, error) {
@@ -164,6 +179,10 @@ func cloneSchema(schema Schema) Schema {
 	schema.Panels = append([]ResourcePanelDefinition(nil), schema.Panels...)
 	schema.RuntimeSlots = append([]RuntimeSlotDefinition(nil), schema.RuntimeSlots...)
 	schema.SearchFields = append([]string(nil), schema.SearchFields...)
+	if schema.Protection != nil {
+		protection := *schema.Protection
+		schema.Protection = &protection
+	}
 	for index := range schema.Actions {
 		if schema.Actions[index].Confirm != nil {
 			confirm := *schema.Actions[index].Confirm
@@ -184,6 +203,10 @@ func cloneSchema(schema Schema) Schema {
 			relation := *schema.Fields[index].Relation
 			relation.Filters = append([]FieldRelationFilter(nil), schema.Fields[index].Relation.Filters...)
 			schema.Fields[index].Relation = &relation
+		}
+		if schema.Fields[index].Protection != nil {
+			protection := *schema.Fields[index].Protection
+			schema.Fields[index].Protection = &protection
 		}
 	}
 	for index := range schema.RuntimeSlots {
@@ -234,7 +257,7 @@ func seedResourceSchemasFromCapabilities(manifests []capability.Manifest) map[st
 			}
 			registered = true
 			if resource.Resource == "roles" {
-				schemas[resource.Resource] = roleResourceSchema(permissionOptions)
+				schemas[resource.Resource] = mergeCapabilityProtection(roleResourceSchema(permissionOptions), resource)
 				continue
 			}
 			schemas[resource.Resource] = schemaFromCapabilityResource(resource)
@@ -247,39 +270,43 @@ func seedResourceSchemasFromCapabilities(manifests []capability.Manifest) map[st
 }
 
 func schemaFromCapabilityResource(resource capability.AdminResource) Schema {
+	var specialized Schema
 	switch resource.Resource {
 	case "tenants":
-		return tenantResourceSchema()
+		specialized = tenantResourceSchema()
 	case "users":
-		return userResourceSchema()
+		specialized = userResourceSchema()
 	case "org-units":
-		return orgUnitResourceSchema()
+		specialized = orgUnitResourceSchema()
 	case "role-groups":
-		return roleGroupResourceSchema()
+		specialized = roleGroupResourceSchema()
 	case "area-codes":
-		return areaCodeResourceSchema()
+		specialized = areaCodeResourceSchema()
 	case "api-resources":
-		return apiResourceSchema()
+		specialized = apiResourceSchema()
 	case "dictionaries":
-		return dictionaryResourceSchema()
+		specialized = dictionaryResourceSchema()
 	case "parameters":
-		return parameterResourceSchema()
+		specialized = parameterResourceSchema()
 	case "dictionary-parameters":
-		return dictionaryParameterSchema()
+		specialized = dictionaryParameterSchema()
 	case "menus":
-		return menuResourceSchema()
+		specialized = menuResourceSchema()
 	case "permissions":
-		return permissionResourceSchema()
+		specialized = permissionResourceSchema()
 	case "settings":
-		return settingsResourceSchema()
+		specialized = settingsResourceSchema()
 	case "audit-logs":
-		return auditLogResourceSchema()
+		specialized = auditLogResourceSchema()
 	case "branding":
-		return brandingResourceSchema()
+		specialized = brandingResourceSchema()
 	case "monitoring":
-		return monitoringResourceSchema()
+		specialized = monitoringResourceSchema()
 	case "overview":
-		return overviewResourceSchema()
+		specialized = overviewResourceSchema()
+	}
+	if specialized.Resource != "" {
+		return mergeCapabilityProtection(specialized, resource)
 	}
 	if len(resource.Fields) == 0 {
 		schema := defaultSchema(
@@ -292,6 +319,7 @@ func schemaFromCapabilityResource(resource capability.AdminResource) Schema {
 		schema.Panels = panelsFromCapability(resource.Panels)
 		schema.RuntimeSlots = runtimeSlotsFromCapability(resource.RuntimeSlots)
 		schema.FormLayout = formLayoutFromCapability(resource.FormLayout, schema.Fields)
+		schema.Protection = resourceProtectionFromCapability(resource.Protection)
 		return schema
 	}
 	fields := fieldsFromCapability(resource.Fields)
@@ -308,7 +336,70 @@ func schemaFromCapabilityResource(resource capability.AdminResource) Schema {
 		RuntimeSlots:   runtimeSlotsFromCapability(resource.RuntimeSlots),
 		SearchFields:   append([]string(nil), resource.SearchFields...),
 		DefaultSortKey: resource.DefaultSortKey,
+		Protection:     resourceProtectionFromCapability(resource.Protection),
 	}
+}
+
+func mergeCapabilityProtection(schema Schema, resource capability.AdminResource) Schema {
+	schema.Protection = resourceProtectionFromCapability(resource.Protection)
+	declaredFields := fieldsFromCapability(resource.Fields)
+	declaredByKey := make(map[string]FieldDefinition, len(declaredFields))
+	for _, field := range declaredFields {
+		declaredByKey[field.Key] = field
+	}
+	existing := make(map[string]struct{}, len(schema.Fields))
+	for index := range schema.Fields {
+		key := schema.Fields[index].Key
+		existing[key] = struct{}{}
+		declared, ok := declaredByKey[key]
+		if !ok || declared.StorageMode != capability.FieldStorageEncrypted {
+			continue
+		}
+		schema.Fields[index].Required = declared.Required
+		schema.Fields[index].ReadOnly = declared.ReadOnly
+		schema.Fields[index].Searchable = declared.Searchable
+		schema.Fields[index].Filterable = declared.Filterable
+		schema.Fields[index].Sortable = declared.Sortable
+		schema.Fields[index].Sensitivity = declared.Sensitivity
+		schema.Fields[index].StorageMode = declared.StorageMode
+		schema.Fields[index].ResponseMode = declared.ResponseMode
+		schema.Fields[index].ExportMode = declared.ExportMode
+		schema.Fields[index].Protection = declared.Protection
+	}
+	for _, declared := range resource.Fields {
+		if _, ok := existing[declared.Key]; ok {
+			continue
+		}
+		field, ok := declaredByKey[declared.Key]
+		if !ok {
+			continue
+		}
+		schema.Fields = append(schema.Fields, field)
+		existing[declared.Key] = struct{}{}
+	}
+	for _, key := range resource.SearchFields {
+		if !slices.Contains(schema.SearchFields, key) {
+			schema.SearchFields = append(schema.SearchFields, key)
+		}
+	}
+	if resource.DefaultSortKey != "" {
+		schema.DefaultSortKey = resource.DefaultSortKey
+	}
+	return schema
+}
+
+func resourceProtectionFromCapability(protection *capability.AdminResourceProtection) *ResourceProtection {
+	if protection == nil {
+		return nil
+	}
+	return &ResourceProtection{SchemaVersion: protection.SchemaVersion, Scope: protection.Scope, TenantField: protection.TenantField}
+}
+
+func fieldProtectionFromCapability(protection *capability.AdminFieldProtection) *FieldProtection {
+	if protection == nil {
+		return nil
+	}
+	return &FieldProtection{Format: protection.Format, Normalization: protection.Normalization, BlindIndexNamespace: protection.BlindIndexNamespace}
 }
 
 func actionsFromCapability(actions []capability.AdminResourceAction) []ResourceActionDefinition {
@@ -982,6 +1073,7 @@ func fieldsFromCapability(fields []capability.AdminField) []FieldDefinition {
 			StorageMode:  defaultString(field.StorageMode, capability.FieldStoragePlain),
 			ResponseMode: defaultString(field.ResponseMode, capability.FieldProjectionFull),
 			ExportMode:   defaultString(field.ExportMode, capability.FieldProjectionFull),
+			Protection:   fieldProtectionFromCapability(field.Protection),
 		})
 	}
 	return withLocalizedValueFields(withStandardRecordFields(definitions))

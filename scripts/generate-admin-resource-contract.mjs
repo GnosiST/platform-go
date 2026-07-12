@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
-const manifestPath = path.join(repoRoot, "resources", "admin-resources.json");
+const manifestPath = optionValue("--manifest")
+  ? path.resolve(repoRoot, optionValue("--manifest"))
+  : path.join(repoRoot, "resources", "admin-resources.json");
 const generatedDir = path.join(repoRoot, "resources", "generated");
 const generatedPath = path.join(generatedDir, "admin-resource-contract.json");
 
@@ -13,6 +15,10 @@ const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 const resources = manifest.resources ?? [];
 
 function loadCapabilityResourceContract() {
+  const contractPath = optionValue("--capability-contract");
+  if (contractPath) {
+    return JSON.parse(fs.readFileSync(path.resolve(repoRoot, contractPath), "utf8"));
+  }
   const result = spawnSync("go", ["run", "./cmd/platform-contracts", "admin-resources", "--stdout"], {
     cwd: repoRoot,
     encoding: "utf8",
@@ -22,6 +28,16 @@ function loadCapabilityResourceContract() {
     throw new Error(`go run ./cmd/platform-contracts admin-resources --stdout failed\n${result.stdout}${result.stderr}`);
   }
   return JSON.parse(result.stdout);
+}
+
+function optionValue(name) {
+  const index = process.argv.indexOf(name);
+  if (index >= 0 && process.argv[index + 1]) {
+    return process.argv[index + 1];
+  }
+  const prefix = `${name}=`;
+  const value = process.argv.find((arg) => arg.startsWith(prefix));
+  return value ? value.slice(prefix.length) : "";
 }
 
 function uniqueSorted(values) {
@@ -69,6 +85,7 @@ function normalizedFieldPolicy(field) {
     storageMode: field.storageMode ?? "plain",
     responseMode: field.responseMode ?? "full",
     exportMode: field.exportMode ?? "full",
+    ...(field.protection ? { protection: { ...field.protection } } : {}),
   };
 }
 
@@ -214,6 +231,7 @@ function capabilityResourceToManifestResource(resource) {
     schema: {
       formGroups: resource.formGroups ?? [],
       formLayout: resource.formLayout ?? defaultFormLayout(fields),
+      ...(resource.protection ? { protection: { ...resource.protection } } : {}),
       fields,
       search: resource.searchFields ?? fields.filter((field) => field.search).map((field) => field.key),
       table: fields.filter((field) => field.table).map((field) => field.key),
@@ -280,6 +298,7 @@ function normalizeResource(resource) {
     schema: {
       formGroups: resource.schema?.formGroups ?? [],
       formLayout: normalizeFormLayout(resource.schema?.formLayout, resource.schema?.fields ?? []),
+      ...(resource.schema?.protection ? { protection: { ...resource.schema.protection } } : {}),
       fields: [...(resource.schema?.fields ?? [])].map(normalizeField).sort((a, b) => a.key.localeCompare(b.key)),
       search: [...(resource.schema?.search ?? [])].sort(),
       filter: schemaKeys(resource, "filter", defaultFilterableField).sort(),

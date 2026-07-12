@@ -5,14 +5,75 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { describe, it } from "node:test";
 
-function runAdminResourceContract(env = {}) {
-  const result = spawnSync(process.execPath, ["scripts/generate-admin-resource-contract.mjs", "--stdout"], {
+function runAdminResourceContract(env = {}, args = []) {
+  const result = spawnSync(process.execPath, ["scripts/generate-admin-resource-contract.mjs", "--stdout", ...args], {
     cwd: new URL("..", import.meta.url),
     encoding: "utf8",
     env: { ...process.env, ...env },
   });
   assert.equal(result.status, 0, `generate-admin-resource-contract.mjs failed\n${result.stdout}${result.stderr}`);
   return JSON.parse(result.stdout);
+}
+
+function runAdminCodegenPreviewForContract(contract) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-admin-contract-"));
+  const contractPath = path.join(tempDir, "admin-resource-contract.json");
+  fs.writeFileSync(contractPath, JSON.stringify(contract, null, 2));
+  const result = spawnSync(process.execPath, ["scripts/generate-admin-codegen-preview.mjs", "--stdout", "--contract", contractPath], {
+    cwd: new URL("..", import.meta.url),
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, `generate-admin-codegen-preview.mjs failed\n${result.stdout}${result.stderr}`);
+  return JSON.parse(result.stdout);
+}
+
+function writeSensitiveManifest() {
+  const sourcePath = path.resolve(import.meta.dirname, "..", "resources", "admin-resources.json");
+  const manifest = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
+  manifest.resources.push({
+    name: "custom-sensitive-records",
+    code: "custom-sensitive-records",
+    label: { zh: "自定义敏感记录", en: "Custom Sensitive Records" },
+    group: "foundation",
+    menu: { path: "/custom-sensitive-records", icon: "lock", sortOrder: 999 },
+    refine: { resource: "custom-sensitive-records", list: "/custom-sensitive-records", component: "ResourceTablePage" },
+    apiBase: "/api/admin/custom-sensitive-records",
+    permissions: { read: "admin:custom-sensitive-record:read" },
+    routes: [],
+    schema: {
+      protection: { schemaVersion: 7, scope: "tenant-field", tenantField: "tenantCode" },
+      fields: [
+        { key: "tenantCode", label: { zh: "租户", en: "Tenant" }, type: "text", source: "values", required: true },
+        {
+          key: "governmentReference",
+          label: { zh: "政府引用", en: "Government Reference" },
+          type: "text",
+          source: "values",
+          sensitivity: "sensitive",
+          storageMode: "encrypted",
+          responseMode: "privileged",
+          exportMode: "omitted",
+          filter: true,
+          protection: {
+            format: "aes-256-gcm-v1",
+            normalization: "trim-v1",
+            blindIndexNamespace: "custom-government-reference",
+          },
+        },
+      ],
+      search: [],
+      filter: ["governmentReference"],
+      sort: [],
+      table: ["tenantCode"],
+      form: ["tenantCode", "governmentReference"],
+      localizedFields: [],
+    },
+    codegen: { mode: "custom" },
+  });
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-sensitive-manifest-"));
+  const manifestPath = path.join(tempDir, "admin-resources.json");
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  return manifestPath;
 }
 
 function runAdminOpenAPIForContract(contract) {
@@ -118,6 +179,37 @@ describe("admin resource contract generators", () => {
     assert.equal(staticIdentityProperty["x-platform-storage-mode"], "hashed");
     assert.equal(staticIdentityProperty["x-platform-response-mode"], "omitted");
     assert.equal(staticIdentityProperty["x-platform-export-mode"], "omitted");
+  });
+
+  it("preserves configurable resource and field protection through Admin, OpenAPI, codegen and TypeScript contracts", () => {
+    const manifestPath = writeSensitiveManifest();
+    const contract = runAdminResourceContract({}, ["--manifest", manifestPath]);
+    const resource = contract.resources.find((candidate) => candidate.name === "custom-sensitive-records");
+    assert.ok(resource, "expected custom sensitive resource");
+    assert.deepEqual(resource.schema.protection, { schemaVersion: 7, scope: "tenant-field", tenantField: "tenantCode" });
+    const field = resource.schema.fields.find((candidate) => candidate.key === "governmentReference");
+    assert.deepEqual(field.protection, {
+      format: "aes-256-gcm-v1",
+      normalization: "trim-v1",
+      blindIndexNamespace: "custom-government-reference",
+    });
+
+    const openapi = runAdminOpenAPIForContract(contract);
+    const recordSchema = openapi.components.schemas.CustomSensitiveRecordsRecord;
+    assert.deepEqual(recordSchema["x-platform-protection"], resource.schema.protection);
+    assert.deepEqual(recordSchema.properties.governmentReference["x-platform-protection"], field.protection);
+    assert.deepEqual(recordSchema.properties.governmentReference["x-platform-query-operators"], ["="]);
+
+    const preview = runAdminCodegenPreviewForContract(contract);
+    const previewResource = preview.resources.find((candidate) => candidate.resource === "custom-sensitive-records");
+    assert.deepEqual(previewResource.schema.protection, resource.schema.protection);
+    assert.deepEqual(previewResource.schema.protectedFields, [{ key: "governmentReference", ...field.protection }]);
+
+    const clientSource = fs.readFileSync(path.resolve(import.meta.dirname, "..", "admin", "src", "platform", "api", "client.ts"), "utf8");
+    assert.match(clientSource, /export type AdminResourceFieldProtection/);
+    assert.match(clientSource, /export type AdminResourceProtection/);
+    assert.match(clientSource, /protection\?: AdminResourceFieldProtection/);
+    assert.match(clientSource, /protection\?: AdminResourceProtection/);
   });
 
   it("keeps optional notification resources out of the default generated contract", () => {

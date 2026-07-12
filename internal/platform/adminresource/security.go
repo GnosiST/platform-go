@@ -130,12 +130,40 @@ func validateFieldWrite(key string, value string, field FieldDefinition, origin 
 			return invalidSecurityField(key, "masked storage requires an actually masked value")
 		}
 	}
-	if (field.StorageMode == capability.FieldStorageHashed || field.StorageMode == capability.FieldStorageEncrypted) &&
+	if field.StorageMode == capability.FieldStorageHashed &&
 		(field.ResponseMode != capability.FieldProjectionOmitted || field.ExportMode != capability.FieldProjectionOmitted) {
-		return invalidSecurityField(key, "protected storage must be omitted from response and export")
+		return invalidSecurityField(key, "hashed storage must be omitted from response and export")
+	}
+	if field.StorageMode == capability.FieldStorageEncrypted &&
+		(!allowsEncryptedProjection(field.ResponseMode) || !allowsEncryptedProjection(field.ExportMode)) {
+		return invalidSecurityField(key, "encrypted storage must use privileged or omitted response and export")
+	}
+	if err := validateFieldProtection(key, field); err != nil {
+		return err
 	}
 	if prohibitedRawField(key) && !allowsProtectedField(field) {
 		return invalidSecurityField(key, "is a prohibited raw credential or personal field")
+	}
+	return nil
+}
+
+func validateFieldProtection(key string, field FieldDefinition) error {
+	if field.StorageMode != capability.FieldStorageEncrypted {
+		if field.Protection != nil {
+			return invalidSecurityField(key, "protection metadata requires encrypted storage")
+		}
+		return nil
+	}
+	if field.Protection == nil {
+		return invalidSecurityField(key, "encrypted storage requires protection metadata")
+	}
+	if field.Protection.Format != "aes-256-gcm-v1" {
+		return invalidSecurityField(key, "has unsupported protection format")
+	}
+	switch field.Protection.Normalization {
+	case "raw-v1", "trim-v1", "email-v1", "phone-e164-cn-v1", "identity-cn-v1":
+	default:
+		return invalidSecurityField(key, "has unsupported protection normalization")
 	}
 	return nil
 }
@@ -224,14 +252,21 @@ func allowsMaskedProjection(mode string) bool {
 	return mode == capability.FieldProjectionMasked || mode == capability.FieldProjectionOmitted
 }
 
+func allowsEncryptedProjection(mode string) bool {
+	return mode == capability.FieldProjectionPrivileged || mode == capability.FieldProjectionOmitted
+}
+
 func allowsProtectedField(field FieldDefinition) bool {
 	switch field.StorageMode {
 	case capability.FieldStorageMasked:
 		return field.Sensitivity == capability.FieldSensitivityPersonal &&
 			allowsMaskedProjection(field.ResponseMode) && allowsMaskedProjection(field.ExportMode)
-	case capability.FieldStorageHashed, capability.FieldStorageEncrypted:
+	case capability.FieldStorageHashed:
 		return field.Sensitivity != capability.FieldSensitivityPublic &&
 			field.ResponseMode == capability.FieldProjectionOmitted && field.ExportMode == capability.FieldProjectionOmitted
+	case capability.FieldStorageEncrypted:
+		return field.Sensitivity != capability.FieldSensitivityPublic &&
+			allowsEncryptedProjection(field.ResponseMode) && allowsEncryptedProjection(field.ExportMode)
 	default:
 		return false
 	}

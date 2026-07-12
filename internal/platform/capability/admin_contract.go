@@ -15,6 +15,9 @@ var adminRuntimeSlotVariants = []string{"compact", "info", "warning", "preview",
 var adminFieldSensitivities = []string{FieldSensitivityPublic, FieldSensitivityInternal, FieldSensitivityPersonal, FieldSensitivitySensitive, FieldSensitivitySecret}
 var adminFieldStorageModes = []string{FieldStoragePlain, FieldStorageMasked, FieldStorageHashed, FieldStorageEncrypted}
 var adminFieldProjectionModes = []string{FieldProjectionFull, FieldProjectionMasked, FieldProjectionPrivileged, FieldProjectionOmitted}
+var adminFieldProtectionFormats = []string{"aes-256-gcm-v1"}
+var adminFieldProtectionNormalizations = []string{"raw-v1", "trim-v1", "email-v1", "phone-e164-cn-v1", "identity-cn-v1"}
+var adminResourceProtectionScopes = []string{"global", "tenant-field"}
 
 func ValidateAdminSurface(manifests []Manifest) error {
 	resources := map[string]ID{}
@@ -192,6 +195,8 @@ func validateAdminFormGroups(owner ID, resource AdminResource) error {
 
 func validateAdminResourceFields(owner ID, resource AdminResource) error {
 	seen := map[string]struct{}{}
+	blindIndexNamespaces := map[string]string{}
+	hasEncryptedField := false
 	groupKeys := declaredAdminFormGroupKeys(resource)
 	for _, field := range resource.Fields {
 		key := strings.TrimSpace(field.Key)
@@ -212,12 +217,35 @@ func validateAdminResourceFields(owner ID, resource AdminResource) error {
 		if err := validateAdminField(owner, resource.Resource, field); err != nil {
 			return err
 		}
+		if defaultAdminFieldPolicy(field.StorageMode, FieldStoragePlain) == FieldStorageEncrypted {
+			hasEncryptedField = true
+			if field.Searchable {
+				return fmt.Errorf("capability %q admin resource %q field %q encrypted fields cannot use keyword search", owner, resource.Resource, field.Key)
+			}
+			if field.Sortable {
+				return fmt.Errorf("capability %q admin resource %q field %q encrypted fields cannot be sorted", owner, resource.Resource, field.Key)
+			}
+			namespace := strings.TrimSpace(field.Protection.BlindIndexNamespace)
+			if field.Filterable && namespace == "" {
+				return fmt.Errorf("capability %q admin resource %q field %q encrypted filtering requires a blindIndexNamespace", owner, resource.Resource, field.Key)
+			}
+			if namespace != "" {
+				if previous, exists := blindIndexNamespaces[namespace]; exists {
+					return fmt.Errorf("capability %q admin resource %q duplicate blindIndexNamespace %q on fields %q and %q", owner, resource.Resource, namespace, previous, field.Key)
+				}
+				blindIndexNamespaces[namespace] = field.Key
+			}
+		}
 	}
-	return nil
+	return validateAdminResourceProtection(owner, resource, hasEncryptedField)
 }
 
 func validateAdminResourceFieldReferences(owner ID, resource AdminResource) error {
 	fieldKeys := adminResourceFieldKeys(resource)
+	fields := make(map[string]AdminField, len(resource.Fields))
+	for _, field := range resource.Fields {
+		fields[strings.TrimSpace(field.Key)] = field
+	}
 	for _, field := range resource.SearchFields {
 		field = strings.TrimSpace(field)
 		if field == "" {
@@ -226,14 +254,63 @@ func validateAdminResourceFieldReferences(owner ID, resource AdminResource) erro
 		if _, ok := fieldKeys[field]; !ok {
 			return fmt.Errorf("capability %q admin resource %q search field %s is not declared", owner, resource.Resource, field)
 		}
+		if candidate, ok := fields[field]; ok && defaultAdminFieldPolicy(candidate.StorageMode, FieldStoragePlain) == FieldStorageEncrypted {
+			return fmt.Errorf("capability %q admin resource %q field %q encrypted fields cannot use keyword search", owner, resource.Resource, field)
+		}
 	}
 	defaultSortKey := strings.TrimSpace(resource.DefaultSortKey)
 	if defaultSortKey != "" {
 		if _, ok := fieldKeys[defaultSortKey]; !ok {
 			return fmt.Errorf("capability %q admin resource %q default sort key %s is not declared", owner, resource.Resource, defaultSortKey)
 		}
+		if candidate, ok := fields[defaultSortKey]; ok && defaultAdminFieldPolicy(candidate.StorageMode, FieldStoragePlain) == FieldStorageEncrypted {
+			return fmt.Errorf("capability %q admin resource %q field %q encrypted fields cannot be sorted", owner, resource.Resource, defaultSortKey)
+		}
 	}
 	return nil
+}
+
+func validateAdminResourceProtection(owner ID, resource AdminResource, hasEncryptedField bool) error {
+	protection := resource.Protection
+	if protection == nil {
+		if hasEncryptedField {
+			return fmt.Errorf("capability %q admin resource %q encrypted fields require resource protection metadata", owner, resource.Resource)
+		}
+		return nil
+	}
+	if protection.SchemaVersion == 0 {
+		return fmt.Errorf("capability %q admin resource %q protection schemaVersion is required", owner, resource.Resource)
+	}
+	scope := strings.TrimSpace(protection.Scope)
+	if scope == "" {
+		return fmt.Errorf("capability %q admin resource %q protection scope is required", owner, resource.Resource)
+	}
+	if !slices.Contains(adminResourceProtectionScopes, scope) {
+		return fmt.Errorf("capability %q admin resource %q protection scope is unsupported", owner, resource.Resource)
+	}
+	tenantField := strings.TrimSpace(protection.TenantField)
+	if scope == "global" {
+		if tenantField != "" {
+			return fmt.Errorf("capability %q admin resource %q global protection scope cannot declare tenantField", owner, resource.Resource)
+		}
+		return nil
+	}
+	if tenantField == "" {
+		return fmt.Errorf("capability %q admin resource %q protection tenantField is required for tenant-field scope", owner, resource.Resource)
+	}
+	for _, field := range resource.Fields {
+		if strings.TrimSpace(field.Key) != tenantField {
+			continue
+		}
+		if defaultAdminFieldPolicy(field.StorageMode, FieldStoragePlain) != FieldStoragePlain || field.Protection != nil {
+			return fmt.Errorf("capability %q admin resource %q protection tenantField %q must use plain storage", owner, resource.Resource, tenantField)
+		}
+		if !field.Required {
+			return fmt.Errorf("capability %q admin resource %q protection tenantField %q must be required", owner, resource.Resource, tenantField)
+		}
+		return nil
+	}
+	return fmt.Errorf("capability %q admin resource %q protection tenantField %q is not declared", owner, resource.Resource, tenantField)
 }
 
 func validateAdminResourceActions(owner ID, resource AdminResource) error {
@@ -596,13 +673,61 @@ func validateAdminFieldPolicy(owner ID, resource string, field AdminField) error
 	if storageMode == FieldStorageMasked && (!isAdminMaskedProjection(responseMode) || !isAdminMaskedProjection(exportMode)) {
 		return fmt.Errorf("capability %q admin resource %q field %q masked storage must use masked or omitted response and export", owner, resource, field.Key)
 	}
-	if (storageMode == FieldStorageHashed || storageMode == FieldStorageEncrypted) && (responseMode != FieldProjectionOmitted || exportMode != FieldProjectionOmitted) {
-		return fmt.Errorf("capability %q admin resource %q field %q protected storage must be omitted from response and export", owner, resource, field.Key)
+	if storageMode == FieldStorageHashed && (responseMode != FieldProjectionOmitted || exportMode != FieldProjectionOmitted) {
+		return fmt.Errorf("capability %q admin resource %q field %q hashed storage must be omitted from response and export", owner, resource, field.Key)
+	}
+	if storageMode == FieldStorageEncrypted && (!isAdminEncryptedProjection(responseMode) || !isAdminEncryptedProjection(exportMode)) {
+		return fmt.Errorf("capability %q admin resource %q field %q encrypted storage must use privileged or omitted response and export", owner, resource, field.Key)
+	}
+	if err := validateAdminFieldProtection(owner, resource, field, storageMode); err != nil {
+		return err
 	}
 	if adminSecurityFieldName(field.Key) && !validAdminSecurityFieldPolicy(sensitivity, storageMode, responseMode, exportMode) {
 		return fmt.Errorf("capability %q admin resource %q field %q security field names require masked personal or protected non-public storage", owner, resource, field.Key)
 	}
 	return nil
+}
+
+func validateAdminFieldProtection(owner ID, resource string, field AdminField, storageMode string) error {
+	if storageMode != FieldStorageEncrypted {
+		if field.Protection != nil {
+			return fmt.Errorf("capability %q admin resource %q field %q protection metadata requires encrypted storage", owner, resource, field.Key)
+		}
+		return nil
+	}
+	if field.Protection == nil {
+		return fmt.Errorf("capability %q admin resource %q field %q encrypted storage requires protection metadata", owner, resource, field.Key)
+	}
+	format := strings.TrimSpace(field.Protection.Format)
+	if format == "" {
+		return fmt.Errorf("capability %q admin resource %q field %q protection format is required", owner, resource, field.Key)
+	}
+	if !slices.Contains(adminFieldProtectionFormats, format) {
+		return fmt.Errorf("capability %q admin resource %q field %q protection format is unsupported", owner, resource, field.Key)
+	}
+	normalization := strings.TrimSpace(field.Protection.Normalization)
+	if normalization == "" {
+		return fmt.Errorf("capability %q admin resource %q field %q protection normalization is required", owner, resource, field.Key)
+	}
+	if !slices.Contains(adminFieldProtectionNormalizations, normalization) {
+		return fmt.Errorf("capability %q admin resource %q field %q protection normalization is unsupported", owner, resource, field.Key)
+	}
+	namespace := strings.TrimSpace(field.Protection.BlindIndexNamespace)
+	if namespace != "" && !validAdminProtectionName(namespace) {
+		return fmt.Errorf("capability %q admin resource %q field %q blindIndexNamespace must be canonical lowercase kebab-case", owner, resource, field.Key)
+	}
+	return nil
+}
+
+func isAdminEncryptedProjection(mode string) bool {
+	return mode == FieldProjectionPrivileged || mode == FieldProjectionOmitted
+}
+
+func validAdminProtectionName(value string) bool {
+	if value == "" || strings.Trim(value, " ") != value || strings.HasPrefix(value, "-") || strings.HasSuffix(value, "-") || strings.Contains(value, "--") {
+		return false
+	}
+	return validAdminPermissionSegment(value)
 }
 
 func isAdminMaskedProjection(mode string) bool {
@@ -615,6 +740,9 @@ func validAdminSecurityFieldPolicy(sensitivity string, storageMode string, respo
 	}
 	if sensitivity == FieldSensitivityPublic || (storageMode != FieldStorageHashed && storageMode != FieldStorageEncrypted) {
 		return false
+	}
+	if storageMode == FieldStorageEncrypted {
+		return isAdminEncryptedProjection(responseMode) && isAdminEncryptedProjection(exportMode)
 	}
 	return responseMode == FieldProjectionOmitted && exportMode == FieldProjectionOmitted
 }

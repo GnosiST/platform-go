@@ -44,6 +44,7 @@ type AdminResource struct {
 	RuntimeSlots     []AdminRuntimeSlot
 	SearchFields     []string
 	DefaultSortKey   string
+	Protection       *AdminResourceProtection
 }
 
 type AdminMenu struct {
@@ -80,6 +81,19 @@ type AdminField struct {
 	StorageMode  string
 	ResponseMode string
 	ExportMode   string
+	Protection   *AdminFieldProtection
+}
+
+type AdminFieldProtection struct {
+	Format              string `json:"format"`
+	Normalization       string `json:"normalization"`
+	BlindIndexNamespace string `json:"blindIndexNamespace,omitempty"`
+}
+
+type AdminResourceProtection struct {
+	SchemaVersion uint32 `json:"schemaVersion"`
+	Scope         string `json:"scope"`
+	TenantField   string `json:"tenantField,omitempty"`
 }
 
 const (

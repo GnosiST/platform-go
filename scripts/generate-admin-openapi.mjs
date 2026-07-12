@@ -117,6 +117,10 @@ function fieldSchema(field) {
     "x-platform-storage-mode": field.storageMode ?? "plain",
     "x-platform-response-mode": field.responseMode ?? "full",
     "x-platform-export-mode": field.exportMode ?? "full",
+    ...(field.protection ? { "x-platform-protection": field.protection } : {}),
+    ...(field.storageMode === "encrypted"
+      ? { "x-platform-query-operators": field.protection?.blindIndexNamespace ? ["="] : [] }
+      : {}),
     ...(field.relation ? { "x-platform-relation": field.relation } : {}),
   };
 
@@ -179,6 +183,7 @@ function resourceRecordSchema(resource) {
     properties,
     "x-platform-resource": resource.name,
     "x-platform-codegen-mode": resource.codegen?.mode ?? "unknown",
+    ...(resource.schema?.protection ? { "x-platform-protection": resource.schema.protection } : {}),
   };
 }
 

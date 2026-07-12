@@ -57,17 +57,18 @@ type adminResourceContractDocument struct {
 }
 
 type adminResourceContractEntry struct {
-	CapabilityID     string                   `json:"capabilityId"`
-	Resource         string                   `json:"resource"`
-	Title            capability.LocalizedText `json:"title"`
-	Description      capability.LocalizedText `json:"description"`
-	PermissionPrefix string                   `json:"permissionPrefix"`
-	Permissions      map[string]string        `json:"permissions"`
-	Menu             adminMenuContract        `json:"menu"`
-	FormGroups       []adminFormGroupContract `json:"formGroups,omitempty"`
-	Fields           []adminFieldContract     `json:"fields,omitempty"`
-	SearchFields     []string                 `json:"searchFields,omitempty"`
-	DefaultSortKey   string                   `json:"defaultSortKey,omitempty"`
+	CapabilityID     string                              `json:"capabilityId"`
+	Resource         string                              `json:"resource"`
+	Title            capability.LocalizedText            `json:"title"`
+	Description      capability.LocalizedText            `json:"description"`
+	PermissionPrefix string                              `json:"permissionPrefix"`
+	Permissions      map[string]string                   `json:"permissions"`
+	Menu             adminMenuContract                   `json:"menu"`
+	FormGroups       []adminFormGroupContract            `json:"formGroups,omitempty"`
+	Fields           []adminFieldContract                `json:"fields,omitempty"`
+	SearchFields     []string                            `json:"searchFields,omitempty"`
+	DefaultSortKey   string                              `json:"defaultSortKey,omitempty"`
+	Protection       *capability.AdminResourceProtection `json:"protection,omitempty"`
 }
 
 type adminMenuContract struct {
@@ -87,29 +88,30 @@ type adminFormGroupContract struct {
 }
 
 type adminFieldContract struct {
-	Key          string                       `json:"key"`
-	Label        capability.LocalizedText     `json:"label"`
-	Type         string                       `json:"type"`
-	Source       string                       `json:"source,omitempty"`
-	Group        string                       `json:"group,omitempty"`
-	Help         capability.LocalizedText     `json:"help"`
-	Required     bool                         `json:"required,omitempty"`
-	ReadOnly     bool                         `json:"readOnly,omitempty"`
-	Searchable   bool                         `json:"searchable,omitempty"`
-	Filterable   bool                         `json:"filterable,omitempty"`
-	Sortable     bool                         `json:"sortable,omitempty"`
-	Localizable  bool                         `json:"localizable,omitempty"`
-	InTable      bool                         `json:"inTable,omitempty"`
-	InForm       bool                         `json:"inForm,omitempty"`
-	InDetail     bool                         `json:"inDetail,omitempty"`
-	Width        int                          `json:"width,omitempty"`
-	Options      []adminFieldOptionContract   `json:"options,omitempty"`
-	Relation     *adminFieldRelationContract  `json:"relation,omitempty"`
-	Validation   adminFieldValidationContract `json:"validation,omitempty"`
-	Sensitivity  string                       `json:"sensitivity"`
-	StorageMode  string                       `json:"storageMode"`
-	ResponseMode string                       `json:"responseMode"`
-	ExportMode   string                       `json:"exportMode"`
+	Key          string                           `json:"key"`
+	Label        capability.LocalizedText         `json:"label"`
+	Type         string                           `json:"type"`
+	Source       string                           `json:"source,omitempty"`
+	Group        string                           `json:"group,omitempty"`
+	Help         capability.LocalizedText         `json:"help"`
+	Required     bool                             `json:"required,omitempty"`
+	ReadOnly     bool                             `json:"readOnly,omitempty"`
+	Searchable   bool                             `json:"searchable,omitempty"`
+	Filterable   bool                             `json:"filterable,omitempty"`
+	Sortable     bool                             `json:"sortable,omitempty"`
+	Localizable  bool                             `json:"localizable,omitempty"`
+	InTable      bool                             `json:"inTable,omitempty"`
+	InForm       bool                             `json:"inForm,omitempty"`
+	InDetail     bool                             `json:"inDetail,omitempty"`
+	Width        int                              `json:"width,omitempty"`
+	Options      []adminFieldOptionContract       `json:"options,omitempty"`
+	Relation     *adminFieldRelationContract      `json:"relation,omitempty"`
+	Validation   adminFieldValidationContract     `json:"validation,omitempty"`
+	Sensitivity  string                           `json:"sensitivity"`
+	StorageMode  string                           `json:"storageMode"`
+	ResponseMode string                           `json:"responseMode"`
+	ExportMode   string                           `json:"exportMode"`
+	Protection   *capability.AdminFieldProtection `json:"protection,omitempty"`
 }
 
 type adminFieldOptionContract struct {
@@ -361,6 +363,7 @@ func buildAdminResourceContractDocument(manifests []capability.Manifest) (adminR
 				Fields:           adminFieldsFromCapability(resource.Fields),
 				SearchFields:     append([]string(nil), resource.SearchFields...),
 				DefaultSortKey:   resource.DefaultSortKey,
+				Protection:       resource.Protection,
 			})
 		}
 	}
@@ -511,6 +514,7 @@ func adminFieldsFromCapability(fields []capability.AdminField) []adminFieldContr
 			StorageMode:  defaultCapabilityFieldPolicy(field.StorageMode, capability.FieldStoragePlain),
 			ResponseMode: defaultCapabilityFieldPolicy(field.ResponseMode, capability.FieldProjectionFull),
 			ExportMode:   defaultCapabilityFieldPolicy(field.ExportMode, capability.FieldProjectionFull),
+			Protection:   field.Protection,
 		})
 	}
 	return contracts
