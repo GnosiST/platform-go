@@ -290,6 +290,7 @@ function validateProductionRequirements(contract, errors) {
       "PLATFORM_PUBLIC_BASE_URL",
       "PLATFORM_TRUSTED_PROXIES",
       "PLATFORM_HTTP_MAX_BODY_BYTES",
+      "PLATFORM_RATE_LIMIT_HMAC_KEY",
       "PLATFORM_FILE_MAX_UPLOAD_BYTES",
       "PLATFORM_FILE_ALLOWED_MIME_TYPES",
       "PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION",
@@ -443,6 +444,9 @@ function validateDeploymentPackage(contract, errors) {
     if (!/^PLATFORM_HTTP_MAX_BODY_BYTES=[1-9][0-9]*$/m.test(envTemplate)) {
       errors.push("production env must configure PLATFORM_HTTP_MAX_BODY_BYTES");
     }
+    if (!/^PLATFORM_RATE_LIMIT_HMAC_KEY=.+$/m.test(envTemplate)) {
+      errors.push("production env must configure PLATFORM_RATE_LIMIT_HMAC_KEY");
+    }
     if (!/^PLATFORM_FILE_MAX_UPLOAD_BYTES=[1-9][0-9]*$/m.test(envTemplate)) {
       errors.push("production env must configure PLATFORM_FILE_MAX_UPLOAD_BYTES");
     }
@@ -498,6 +502,9 @@ function validateDeploymentPackage(contract, errors) {
         }
       }
       const apiService = services["platform-api"];
+      if (!hasComposeEnvironment(apiService?.environment, "PLATFORM_RATE_LIMIT_HMAC_KEY")) {
+        errors.push("platform-api must receive PLATFORM_RATE_LIMIT_HMAC_KEY");
+      }
       const healthcheck = Array.isArray(apiService?.healthcheck?.test) ? apiService.healthcheck.test : [];
       if (!healthcheck.includes("http://127.0.0.1:9200/api/health")) {
         errors.push("platform-api healthcheck must use the direct loopback HTTP exception");

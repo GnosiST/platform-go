@@ -236,6 +236,18 @@ function validatePlatformEnv(env, errors) {
   if (requireKey(env, "PLATFORM_REDIS_ADDR", errors).trim() === "") {
     errors.push("PLATFORM_REDIS_ADDR must not be empty");
   }
+  const rateLimitHMACKey = requireKey(env, "PLATFORM_RATE_LIMIT_HMAC_KEY", errors);
+  if (Buffer.byteLength(rateLimitHMACKey, "utf8") < 32) {
+    errors.push("PLATFORM_RATE_LIMIT_HMAC_KEY must be at least 32 bytes");
+  }
+  if (strictSecrets && isPlaceholderSecret(rateLimitHMACKey)) {
+    errors.push("PLATFORM_RATE_LIMIT_HMAC_KEY must not be a placeholder when --strict-secrets is used");
+  }
+  const phoneHMACKey = env.get("PLATFORM_PHONE_HMAC_KEY") ?? "";
+  const phoneCodeHMACKey = env.get("PLATFORM_PHONE_CODE_HMAC_KEY") ?? "";
+  if (rateLimitHMACKey && (rateLimitHMACKey === phoneHMACKey || rateLimitHMACKey === phoneCodeHMACKey)) {
+    errors.push("PLATFORM_RATE_LIMIT_HMAC_KEY must be distinct from phone and code HMAC keys");
+  }
   if (!isTruthy(requireKey(env, "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER", errors))) {
     errors.push("PLATFORM_DISABLE_DEMO_AUTH_PROVIDER must be true");
   }

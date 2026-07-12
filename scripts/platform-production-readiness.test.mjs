@@ -109,6 +109,22 @@ describe("validate-platform-production-readiness", () => {
     assert.match(result.stderr, /runtimeGate\.requiredSnippets must include PLATFORM_TRUSTED_PROXIES must not cumulatively trust all IPv4 addresses/);
   });
 
+	it("rejects readiness contracts that omit shared rate-limit key configuration", () => {
+		const readiness = readJSON("resources/platform-production-readiness.json");
+		readiness.requiredEnv = readiness.requiredEnv.filter((item) => item.name !== "PLATFORM_RATE_LIMIT_HMAC_KEY");
+		readiness.runtimeGate.requiredSnippets = readiness.runtimeGate.requiredSnippets.filter(
+			(snippet) => !snippet.includes("PLATFORM_RATE_LIMIT_HMAC_KEY"),
+		);
+		const readinessPath = tempJSON("platform-production-readiness.json", readiness);
+
+		const result = runValidator(["--readiness", readinessPath]);
+
+		assert.notEqual(result.status, 0, result.stdout);
+		assert.match(result.stderr, /requiredEnv must include PLATFORM_RATE_LIMIT_HMAC_KEY/);
+		assert.match(result.stderr, /runtimeGate\.requiredSnippets must include production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY/);
+		assert.match(result.stderr, /runtimeGate\.requiredSnippets must include production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY to be distinct/);
+	});
+
   it("rejects readiness commands whose executable script is missing", () => {
     const readiness = readJSON("resources/platform-production-readiness.json");
     readiness.preflightCommands.push({

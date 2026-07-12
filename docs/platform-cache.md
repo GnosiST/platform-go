@@ -35,6 +35,7 @@ PLATFORM_CACHE_DRIVER=redis
 PLATFORM_REDIS_ADDR=127.0.0.1:6379
 PLATFORM_REDIS_PASSWORD=
 PLATFORM_REDIS_DB=0
+PLATFORM_RATE_LIMIT_HMAC_KEY=replace-with-dedicated-rate-limit-key
 PLATFORM_CACHE_DEFAULT_TTL=300s
 ```
 
@@ -43,6 +44,7 @@ Current behavior:
 - empty `PLATFORM_CACHE_DRIVER`: use noop cache;
 - `PLATFORM_CACHE_DRIVER=memory`: use process-local TTL cache;
 - `PLATFORM_CACHE_DRIVER=redis`: use Redis through `github.com/redis/go-redis/v9`;
+- `PLATFORM_RATE_LIMIT_HMAC_KEY`: dedicated key that HMACs normalized abuse-control dimensions before Redis storage; production requires at least 32 bytes and it must differ from phone and verification-code HMAC keys;
 - `PLATFORM_CACHE_DRIVER=redis`: also enables Redis pub/sub invalidation events on `platform:cache:invalidations` so peer API instances refresh local policy, principal and menu caches after resource writes, and reload repository-backed session stores after session issue/renew/revoke writes;
 - cache read/write/delete errors fall back to the source of truth and do not fail the HTTP request.
 

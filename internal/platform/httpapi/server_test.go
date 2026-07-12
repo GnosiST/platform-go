@@ -25,6 +25,7 @@ import (
 	"platform-go/internal/platform/cache"
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/core"
+	"platform-go/internal/platform/ratelimit"
 	"platform-go/internal/platform/session"
 	"platform-go/internal/platform/storage"
 )
@@ -213,6 +214,43 @@ type adminIdentityResolverFunc struct {
 type phoneVerificationSenderTestStub struct {
 	kind string
 	send func(context.Context, string, string, string) error
+}
+
+type rateLimitTestStub struct {
+	deny       ratelimit.Operation
+	err        error
+	calls      map[ratelimit.Operation]int
+	keys       map[ratelimit.Operation]string
+	retryAfter time.Duration
+}
+
+func (s *rateLimitTestStub) Allow(_ context.Context, key string, _ int, _ time.Duration) (ratelimit.Decision, error) {
+	if s.calls == nil {
+		s.calls = map[ratelimit.Operation]int{}
+		s.keys = map[ratelimit.Operation]string{}
+	}
+	for _, operation := range []ratelimit.Operation{
+		ratelimit.OperationAdminLogin,
+		ratelimit.OperationAppLogin,
+		ratelimit.OperationAdminOIDCStart,
+		ratelimit.OperationPhoneVerificationRequest,
+		ratelimit.OperationPhoneBindingVerification,
+		ratelimit.OperationAdminUpload,
+		ratelimit.OperationAppUpload,
+	} {
+		if strings.Contains(key, ":"+string(operation)+":") {
+			s.calls[operation]++
+			s.keys[operation] = key
+			if operation == s.deny {
+				if s.err != nil {
+					return ratelimit.Decision{}, s.err
+				}
+				return ratelimit.Decision{RetryAfter: s.retryAfter}, nil
+			}
+			return ratelimit.Decision{Allowed: true}, nil
+		}
+	}
+	return ratelimit.Decision{}, errors.New("unknown rate limit operation")
 }
 
 type mutablePhoneVerificationSenderTestStub struct {
@@ -2061,7 +2099,11 @@ func TestAppPhoneVerificationRateLimitUsesUserAndPhoneWindow(t *testing.T) {
 	login := appLoginForTest(t, server, "guest-alpha")
 	rawPhone := "13800138000"
 
-	for attempt := 0; attempt < 3; attempt++ {
+	policy, ok := ratelimit.PolicyFor(ratelimit.OperationPhoneVerificationRequest)
+	if !ok {
+		t.Fatal("missing phone verification rate limit policy")
+	}
+	for attempt := 0; attempt < policy.Limit; attempt++ {
 		recorder := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodPost, "/api/app/identity/phone-verifications", bytes.NewBufferString(`{"phone":"`+rawPhone+`","purpose":"bind"}`))
 		request.Header.Set("Content-Type", "application/json")
@@ -2081,14 +2123,14 @@ func TestAppPhoneVerificationRateLimitUsesUserAndPhoneWindow(t *testing.T) {
 	if limitedRecorder.Code != http.StatusTooManyRequests {
 		t.Fatalf("POST app phone verification over limit status = %d body = %s, want 429", limitedRecorder.Code, limitedRecorder.Body.String())
 	}
-	if !strings.Contains(limitedRecorder.Body.String(), "APP_PHONE_VERIFICATION_RATE_LIMITED") {
+	if !strings.Contains(limitedRecorder.Body.String(), "RATE_LIMITED") {
 		t.Fatalf("POST app phone verification over limit body = %s, want rate limit error", limitedRecorder.Body.String())
 	}
 	if strings.Contains(limitedRecorder.Body.String(), rawPhone) {
 		t.Fatalf("rate limit response leaked raw phone: %s", limitedRecorder.Body.String())
 	}
-	if senderCalls != appPhoneVerificationRateLimit {
-		t.Fatalf("sender calls after rate limit = %d, want %d", senderCalls, appPhoneVerificationRateLimit)
+	if senderCalls != policy.Limit {
+		t.Fatalf("sender calls after rate limit = %d, want %d", senderCalls, policy.Limit)
 	}
 
 	now = now.Add(11 * time.Minute)
@@ -2101,8 +2143,143 @@ func TestAppPhoneVerificationRateLimitUsesUserAndPhoneWindow(t *testing.T) {
 	if nextRecorder.Code != http.StatusCreated {
 		t.Fatalf("POST app phone verification after window status = %d body = %s, want 201", nextRecorder.Code, nextRecorder.Body.String())
 	}
-	if senderCalls != appPhoneVerificationRateLimit+1 {
-		t.Fatalf("sender calls after next window = %d, want %d", senderCalls, appPhoneVerificationRateLimit+1)
+	if senderCalls != policy.Limit+1 {
+		t.Fatalf("sender calls after next window = %d, want %d", senderCalls, policy.Limit+1)
+	}
+}
+
+func TestCredentialEndpointsApplyRateLimitPolicies(t *testing.T) {
+	tests := []struct {
+		name      string
+		operation ratelimit.Operation
+		build     func(*testing.T, *rateLimitTestStub, *ratelimit.KeyBuilder) (*Server, *http.Request)
+		markers   []string
+	}{
+		{
+			name: "admin login", operation: ratelimit.OperationAdminLogin,
+			build: func(t *testing.T, limiter *rateLimitTestStub, builder *ratelimit.KeyBuilder) (*Server, *http.Request) {
+				server := newTestServer(ServerOptions{Capabilities: []capability.Manifest{authProviderTestManifest()}, RateLimiter: limiter, RateLimitKeyBuilder: builder})
+				request := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"provider":"demo","username":"Sensitive.User"}`))
+				request.Header.Set("Content-Type", "application/json")
+				return server, request
+			},
+			markers: []string{"Sensitive.User", "203.0.113.25"},
+		},
+		{
+			name: "app login", operation: ratelimit.OperationAppLogin,
+			build: func(t *testing.T, limiter *rateLimitTestStub, builder *ratelimit.KeyBuilder) (*Server, *http.Request) {
+				server := newTestServer(ServerOptions{Capabilities: []capability.Manifest{authProviderTestManifest()}, RateLimiter: limiter, RateLimitKeyBuilder: builder})
+				request := httptest.NewRequest(http.MethodPost, "/api/app/auth/login", bytes.NewBufferString(`{"username":"Sensitive.App"}`))
+				request.Header.Set("Content-Type", "application/json")
+				return server, request
+			},
+			markers: []string{"Sensitive.App", "203.0.113.25"},
+		},
+		{
+			name: "OIDC provider start", operation: ratelimit.OperationAdminOIDCStart,
+			build: func(t *testing.T, limiter *rateLimitTestStub, builder *ratelimit.KeyBuilder) (*Server, *http.Request) {
+				server := newTestServer(ServerOptions{Capabilities: []capability.Manifest{adminOIDCProviderManifest(true, true)}, RateLimiter: limiter, RateLimitKeyBuilder: builder})
+				request := httptest.NewRequest(http.MethodPost, "/api/auth/providers/oidc/start", bytes.NewBufferString(`{"codeChallenge":"Sensitive.Challenge"}`))
+				request.Header.Set("Content-Type", "application/json")
+				return server, request
+			},
+			markers: []string{"Sensitive.Challenge", "203.0.113.25"},
+		},
+		{
+			name: "phone verification request", operation: ratelimit.OperationPhoneVerificationRequest,
+			build: func(t *testing.T, limiter *rateLimitTestStub, builder *ratelimit.KeyBuilder) (*Server, *http.Request) {
+				server := newTestServer(ServerOptions{Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit", "app-phone"}), RateLimiter: limiter, RateLimitKeyBuilder: builder})
+				login := appLoginForTest(t, server, "Sensitive.Phone.User")
+				request := httptest.NewRequest(http.MethodPost, "/api/app/identity/phone-verifications", bytes.NewBufferString(`{"phone":"+8613800138000","purpose":"bind"}`))
+				request.Header.Set("Content-Type", "application/json")
+				request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+				return server, request
+			},
+			markers: []string{"Sensitive.Phone.User", "+8613800138000", "203.0.113.25"},
+		},
+		{
+			name: "phone binding verification", operation: ratelimit.OperationPhoneBindingVerification,
+			build: func(t *testing.T, limiter *rateLimitTestStub, builder *ratelimit.KeyBuilder) (*Server, *http.Request) {
+				server := newTestServer(ServerOptions{Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit", "app-phone"}), RateLimiter: limiter, RateLimitKeyBuilder: builder})
+				login := appLoginForTest(t, server, "Sensitive.Bind.User")
+				request := httptest.NewRequest(http.MethodPost, "/api/app/identity/phone-bindings", bytes.NewBufferString(`{"phone":"+8613800138000","code":"Secret.Code.123"}`))
+				request.Header.Set("Content-Type", "application/json")
+				request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+				return server, request
+			},
+			markers: []string{"Sensitive.Bind.User", "+8613800138000", "Secret.Code.123", "203.0.113.25"},
+		},
+		{
+			name: "admin upload", operation: ratelimit.OperationAdminUpload,
+			build: func(t *testing.T, limiter *rateLimitTestStub, builder *ratelimit.KeyBuilder) (*Server, *http.Request) {
+				server := newTestServer(ServerOptions{Capabilities: capabilitiesFromConfigForTest(t, []string{"tenant", "identity", "session", "rbac", "menu", "audit", "dictionary", "parameter", "file-storage", "admin-shell"}), RateLimiter: limiter, RateLimitKeyBuilder: builder})
+				body, contentType := multipartUploadBody(t, "Sensitive.Report.txt", "content")
+				request := httptest.NewRequest(http.MethodPost, "/api/admin/files/upload", body)
+				request.Header.Set("Content-Type", contentType)
+				return server, request
+			},
+			markers: []string{"Sensitive.Report.txt", "203.0.113.25"},
+		},
+		{
+			name: "app upload", operation: ratelimit.OperationAppUpload,
+			build: func(t *testing.T, limiter *rateLimitTestStub, builder *ratelimit.KeyBuilder) (*Server, *http.Request) {
+				server := newTestServer(ServerOptions{Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"}), RateLimiter: limiter, RateLimitKeyBuilder: builder})
+				login := appLoginForTest(t, server, "Sensitive.Upload.User")
+				body, contentType := multipartUploadBody(t, "Sensitive.Avatar.png", "content")
+				request := httptest.NewRequest(http.MethodPost, "/api/app/files", body)
+				request.Header.Set("Content-Type", contentType)
+				request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+				return server, request
+			},
+			markers: []string{"Sensitive.Upload.User", "Sensitive.Avatar.png", "203.0.113.25"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			builder, err := ratelimit.NewKeyBuilder([]byte(strings.Repeat("r", 32)))
+			if err != nil {
+				t.Fatalf("NewKeyBuilder() error = %v", err)
+			}
+			limiter := &rateLimitTestStub{deny: tt.operation, retryAfter: 90 * time.Second}
+			server, request := tt.build(t, limiter, builder)
+			request.RemoteAddr = "203.0.113.25:4567"
+			recorder := httptest.NewRecorder()
+			server.Router().ServeHTTP(recorder, request)
+
+			if recorder.Code != http.StatusTooManyRequests || recorder.Header().Get("Retry-After") != "90" {
+				t.Fatalf("rate limited response = %d Retry-After=%q body=%s", recorder.Code, recorder.Header().Get("Retry-After"), recorder.Body.String())
+			}
+			if !strings.Contains(recorder.Body.String(), "RATE_LIMITED") || limiter.calls[tt.operation] != 1 {
+				t.Fatalf("rate limit coverage operation=%q calls=%d body=%s", tt.operation, limiter.calls[tt.operation], recorder.Body.String())
+			}
+			key := limiter.keys[tt.operation]
+			for _, marker := range tt.markers {
+				if strings.Contains(strings.ToLower(key), strings.ToLower(marker)) || strings.Contains(strings.ToLower(recorder.Body.String()), strings.ToLower(marker)) {
+					t.Fatalf("operation %q leaked marker %q in key=%q body=%s", tt.operation, marker, key, recorder.Body.String())
+				}
+			}
+		})
+	}
+}
+
+func TestRateLimitBackendErrorsReturnStableServiceUnavailable(t *testing.T) {
+	builder, err := ratelimit.NewKeyBuilder([]byte(strings.Repeat("r", 32)))
+	if err != nil {
+		t.Fatalf("NewKeyBuilder() error = %v", err)
+	}
+	limiter := &rateLimitTestStub{deny: ratelimit.OperationAdminLogin, err: errors.New("Sensitive.Redis.Detail")}
+	server := newTestServer(ServerOptions{Capabilities: []capability.Manifest{authProviderTestManifest()}, RateLimiter: limiter, RateLimitKeyBuilder: builder})
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"provider":"demo","username":"Sensitive.User"}`))
+	request.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusServiceUnavailable || !strings.Contains(recorder.Body.String(), "RATE_LIMIT_UNAVAILABLE") {
+		t.Fatalf("backend error response = %d body=%s, want stable 503", recorder.Code, recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), "Sensitive.Redis.Detail") || strings.Contains(recorder.Body.String(), "Sensitive.User") {
+		t.Fatalf("backend error response leaked sensitive detail: %s", recorder.Body.String())
 	}
 }
 

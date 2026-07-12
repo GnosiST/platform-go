@@ -40,6 +40,7 @@ const validStrictEnv = [
   "PLATFORM_LIFECYCLE_HISTORY_DSN=platform:strong-db-pass@tcp(platform-mysql:3306)/platform?charset=utf8mb4&parseTime=True&loc=Local",
   "PLATFORM_CACHE_DRIVER=redis",
   "PLATFORM_REDIS_ADDR=platform-redis:6379",
+	"PLATFORM_RATE_LIMIT_HMAC_KEY=rate-limit-production-key-value-0001",
   "PLATFORM_FILE_STORAGE_DRIVER=s3",
   "PLATFORM_FILE_MAX_UPLOAD_BYTES=10485760",
   "PLATFORM_FILE_ALLOWED_MIME_TYPES=application/pdf,image/jpeg,image/png,text/plain",
@@ -117,6 +118,34 @@ describe("validate-platform-production-env", () => {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+	it("rejects missing, short, or duplicated rate-limit HMAC keys", () => {
+		for (const source of [
+			validStrictEnv.replace("PLATFORM_RATE_LIMIT_HMAC_KEY=rate-limit-production-key-value-0001\n", ""),
+			validStrictEnv.replace("rate-limit-production-key-value-0001", "short"),
+			validStrictEnv
+				.replace("system-admin", "system-admin,app-phone")
+				.replace(
+					"PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+					[
+						"PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+						"PLATFORM_PHONE_HMAC_KEY=phone-production-key-material-000001",
+						"PLATFORM_PHONE_CODE_HMAC_KEY=code-production-key-material-000002",
+						"PLATFORM_PHONE_VERIFICATION_PROVIDER=sms-vendor",
+					].join("\n"),
+				)
+				.replace("rate-limit-production-key-value-0001", "phone-production-key-material-000001"),
+		]) {
+			const { tempDir, filePath } = tempEnv(source);
+			try {
+				const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+				assert.notEqual(result.status, 0, result.stdout);
+				assert.match(result.stderr, /PLATFORM_RATE_LIMIT_HMAC_KEY/);
+			} finally {
+				fs.rmSync(tempDir, { recursive: true, force: true });
+			}
+		}
+	});
 
   it("rejects unsafe production file upload and S3 settings", () => {
     const source = validStrictEnv

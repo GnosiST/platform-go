@@ -10,6 +10,7 @@ import (
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/config"
 	"platform-go/internal/platform/httpapi"
+	"platform-go/internal/platform/ratelimit"
 )
 
 type phoneVerificationSenderStub struct {
@@ -54,6 +55,62 @@ func TestCapabilitiesFromConfigResolvesOnlyConfiguredCapabilities(t *testing.T) 
 	}
 	if containsCapabilityID(ids, "wechat-login") || containsCapabilityID(ids, "demo-data") || containsCapabilityID(ids, "system-admin") {
 		t.Fatalf("capabilities = %+v, want optional capabilities disabled", ids)
+	}
+}
+
+func TestRateLimitRuntimeFromConfigUsesRedisInProduction(t *testing.T) {
+	runtime, err := RateLimitRuntimeFromConfig(config.Config{
+		RuntimeEnvironment: config.RuntimeEnvironmentProduction,
+		CacheDriver:        "redis",
+		RedisAddr:          "127.0.0.1:6379",
+		RateLimitHMACKey:   strings.Repeat("r", 32),
+	})
+	if err != nil {
+		t.Fatalf("RateLimitRuntimeFromConfig() error = %v", err)
+	}
+	if _, ok := runtime.Limiter.(*ratelimit.RedisLimiter); !ok || runtime.KeyBuilder == nil {
+		t.Fatalf("rate limit runtime = %+v, want Redis limiter and key builder", runtime)
+	}
+}
+
+func TestRateLimitRuntimeFromConfigRejectsProcessLocalProductionLimiter(t *testing.T) {
+	for _, driver := range []string{"", "memory"} {
+		t.Run(driver, func(t *testing.T) {
+			_, err := RateLimitRuntimeFromConfig(config.Config{
+				RuntimeEnvironment: config.RuntimeEnvironmentProduction,
+				CacheDriver:        driver,
+				RateLimitHMACKey:   strings.Repeat("r", 32),
+			})
+			if err == nil || !strings.Contains(err.Error(), "production rate limiting requires Redis") {
+				t.Fatalf("RateLimitRuntimeFromConfig(%q) error = %v, want Redis requirement", driver, err)
+			}
+		})
+	}
+}
+
+func TestRateLimitRuntimeFromConfigRejectsUnsafeProductionHMACKey(t *testing.T) {
+	tests := []struct {
+		name string
+		key  string
+	}{
+		{name: "missing", key: ""},
+		{name: "short", key: "short"},
+		{name: "phone duplicate", key: strings.Repeat("p", 32)},
+		{name: "code duplicate", key: strings.Repeat("c", 32)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := RateLimitRuntimeFromConfig(config.Config{
+				RuntimeEnvironment: config.RuntimeEnvironmentProduction,
+				CacheDriver:        "redis",
+				RateLimitHMACKey:   tt.key,
+				PhoneHMACKey:       strings.Repeat("p", 32),
+				PhoneCodeHMACKey:   strings.Repeat("c", 32),
+			})
+			if err == nil {
+				t.Fatal("RateLimitRuntimeFromConfig() error = nil, want unsafe production key rejection")
+			}
+		})
 	}
 }
 

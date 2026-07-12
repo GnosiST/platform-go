@@ -9,6 +9,7 @@ import (
 	"platform-go/internal/platform/config"
 	"platform-go/internal/platform/core"
 	"platform-go/internal/platform/httpapi"
+	"platform-go/internal/platform/ratelimit"
 )
 
 type PhoneVerificationRuntime struct {
@@ -16,6 +17,13 @@ type PhoneVerificationRuntime struct {
 	Sender           httpapi.PhoneVerificationSender
 	DebugCodeEnabled bool
 }
+
+type RateLimitRuntime struct {
+	Limiter    ratelimit.Limiter
+	KeyBuilder *ratelimit.KeyBuilder
+}
+
+const developmentRateLimitHMACKey = "dev-platform-rate-limit-key-00001"
 
 func CapabilitiesFromConfig(cfg config.Config, additionalManifests ...capability.Manifest) ([]capability.Manifest, error) {
 	registry := capability.NewRegistry()
@@ -35,6 +43,48 @@ func CapabilitiesFromConfig(cfg config.Config, additionalManifests ...capability
 		enabled = append(enabled, capability.ID(id))
 	}
 	return registry.ResolveEnabled(enabled)
+}
+
+func RateLimitRuntimeFromConfig(cfg config.Config) (RateLimitRuntime, error) {
+	environment := strings.ToLower(strings.TrimSpace(cfg.RuntimeEnvironment))
+	if environment == "" {
+		environment = config.RuntimeEnvironmentDevelopment
+	}
+	key := cfg.RateLimitHMACKey
+	if key == "" && (environment == config.RuntimeEnvironmentDevelopment || environment == config.RuntimeEnvironmentTest) {
+		key = developmentRateLimitHMACKey
+	}
+	if environment == config.RuntimeEnvironmentProduction {
+		if len([]byte(key)) < 32 {
+			return RateLimitRuntime{}, fmt.Errorf("production rate limit HMAC key must be at least 32 bytes")
+		}
+		if key == cfg.PhoneHMACKey || key == cfg.PhoneCodeHMACKey {
+			return RateLimitRuntime{}, fmt.Errorf("production rate limit HMAC key must be distinct from phone and code HMAC keys")
+		}
+	}
+	keyBuilder, err := ratelimit.NewKeyBuilder([]byte(key))
+	if err != nil {
+		return RateLimitRuntime{}, fmt.Errorf("build rate limit key builder: %w", err)
+	}
+	switch cfg.CacheDriver {
+	case "redis":
+		options := redisOptionsFromConfig(cfg)
+		return RateLimitRuntime{
+			Limiter: ratelimit.NewRedisLimiter(ratelimit.RedisOptions{
+				Addr:     options.Addr,
+				Password: options.Password,
+				DB:       options.DB,
+			}),
+			KeyBuilder: keyBuilder,
+		}, nil
+	case "", "memory":
+		if environment == config.RuntimeEnvironmentProduction {
+			return RateLimitRuntime{}, fmt.Errorf("production rate limiting requires Redis")
+		}
+		return RateLimitRuntime{Limiter: ratelimit.NewMemoryLimiter(ratelimit.MemoryOptions{}), KeyBuilder: keyBuilder}, nil
+	default:
+		return RateLimitRuntime{}, fmt.Errorf("unsupported rate limit backend %q", cfg.CacheDriver)
+	}
 }
 
 func configureAuthProvidersFromConfig(manifest capability.Manifest, cfg config.Config) capability.Manifest {

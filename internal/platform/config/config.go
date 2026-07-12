@@ -38,6 +38,7 @@ type Config struct {
 	RedisAddr                         string
 	RedisPassword                     string
 	RedisDB                           int
+	RateLimitHMACKey                  string
 	FileStorageDriver                 string
 	FileStorageLocalDir               string
 	FileMaxUploadBytes                int64
@@ -149,6 +150,7 @@ func Load() Config {
 		RedisAddr:                         env("PLATFORM_REDIS_ADDR", "127.0.0.1:6379"),
 		RedisPassword:                     env("PLATFORM_REDIS_PASSWORD", ""),
 		RedisDB:                           intEnv("PLATFORM_REDIS_DB", 0),
+		RateLimitHMACKey:                  env("PLATFORM_RATE_LIMIT_HMAC_KEY", ""),
 		FileStorageDriver:                 env("PLATFORM_FILE_STORAGE_DRIVER", "local"),
 		FileStorageLocalDir:               env("PLATFORM_FILE_STORAGE_LOCAL_DIR", ".platform/uploads"),
 		FileMaxUploadBytes:                fileMaxUploadBytes,
@@ -346,6 +348,12 @@ func (c Config) validateProductionRuntime() []error {
 	}
 	if c.CacheDriver != "redis" {
 		errs = append(errs, errors.New("production runtime requires PLATFORM_CACHE_DRIVER=redis"))
+	}
+	if len([]byte(c.RateLimitHMACKey)) < 32 {
+		errs = append(errs, errors.New("production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY to be at least 32 bytes"))
+	}
+	if c.RateLimitHMACKey != "" && (c.RateLimitHMACKey == c.PhoneHMACKey || c.RateLimitHMACKey == c.PhoneCodeHMACKey) {
+		errs = append(errs, errors.New("production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY to be distinct from phone and code HMAC keys"))
 	}
 	if hasCapability(c.Capabilities, "demo-data") {
 		errs = append(errs, errors.New("production runtime must not enable demo-data capability"))

@@ -25,6 +25,7 @@ import (
 	"platform-go/internal/platform/authjwt"
 	"platform-go/internal/platform/cache"
 	"platform-go/internal/platform/capability"
+	"platform-go/internal/platform/ratelimit"
 	"platform-go/internal/platform/rbac"
 	"platform-go/internal/platform/session"
 	"platform-go/internal/platform/storage"
@@ -59,6 +60,8 @@ type ServerOptions struct {
 	AllowInsecureHeaderAuth bool
 	DisableDemoAuthProvider bool
 	Security                SecurityOptions
+	RateLimiter             ratelimit.Limiter
+	RateLimitKeyBuilder     *ratelimit.KeyBuilder
 }
 
 type Authorizer interface {
@@ -114,6 +117,8 @@ type Server struct {
 	policyAuthorizer        Authorizer
 	allowInsecureHeaderAuth bool
 	disableDemoAuthProvider bool
+	rateLimiter             ratelimit.Limiter
+	rateLimitKeyBuilder     *ratelimit.KeyBuilder
 }
 
 const (
@@ -125,6 +130,7 @@ const (
 	cacheKeyPermissionsList     = "admin:permissions:list"
 	defaultPlatformCacheTTL     = 5 * time.Minute
 	defaultJWTSecret            = "dev-platform-go-secret"
+	defaultRateLimitHMACKey     = "dev-platform-rate-limit-key-00001"
 	platformTenant              = "platform"
 	appTenant                   = "app"
 	apiTokensResource           = "api-tokens"
@@ -189,6 +195,14 @@ func New(options ServerOptions) *Server {
 	if appIdentityBindings == nil {
 		appIdentityBindings = newResourceAppIdentityBindingStore(resources, now)
 	}
+	rateLimiter := options.RateLimiter
+	if rateLimiter == nil {
+		rateLimiter = ratelimit.NewMemoryLimiter(ratelimit.MemoryOptions{Now: options.Now})
+	}
+	rateLimitKeyBuilder := options.RateLimitKeyBuilder
+	if rateLimitKeyBuilder == nil {
+		rateLimitKeyBuilder, _ = ratelimit.NewKeyBuilder([]byte(defaultRateLimitHMACKey))
+	}
 	server := &Server{
 		router:                  router,
 		capabilities:            options.Capabilities,
@@ -215,6 +229,8 @@ func New(options ServerOptions) *Server {
 		authorizer:              options.Authorizer,
 		allowInsecureHeaderAuth: options.AllowInsecureHeaderAuth,
 		disableDemoAuthProvider: options.DisableDemoAuthProvider,
+		rateLimiter:             rateLimiter,
+		rateLimitKeyBuilder:     rateLimitKeyBuilder,
 	}
 	server.appRoutes = server.defaultAppRouteHandlers(options.AppRoutes)
 	server.subscribeInvalidations()
@@ -265,6 +281,30 @@ func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 
 func (s *Server) health(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, Response[gin.H]{Data: gin.H{"ok": true, "service": "platform-go"}})
+}
+
+func (s *Server) enforceRateLimit(ctx *gin.Context, operation ratelimit.Operation, dimensions ...string) bool {
+	policy, ok := ratelimit.PolicyFor(operation)
+	if !ok || s.rateLimiter == nil || s.rateLimitKeyBuilder == nil {
+		writeAuthError(ctx, http.StatusServiceUnavailable, "RATE_LIMIT_UNAVAILABLE", "rate limit service is unavailable")
+		return false
+	}
+	key := s.rateLimitKeyBuilder.Build(operation, dimensions...)
+	decision, err := s.rateLimiter.Allow(ctx.Request.Context(), key, policy.Limit, policy.Window)
+	if err != nil {
+		writeAuthError(ctx, http.StatusServiceUnavailable, "RATE_LIMIT_UNAVAILABLE", "rate limit service is unavailable")
+		return false
+	}
+	if decision.Allowed {
+		return true
+	}
+	retryAfter := int64((decision.RetryAfter + time.Second - 1) / time.Second)
+	if retryAfter < 1 {
+		retryAfter = 1
+	}
+	ctx.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
+	writeAuthError(ctx, http.StatusTooManyRequests, "RATE_LIMITED", "request rate limit exceeded")
+	return false
 }
 
 func (s *Server) openapi(ctx *gin.Context) {
@@ -442,6 +482,9 @@ func (s *Server) authProviderStart(ctx *gin.Context) {
 		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_START_INVALID", "invalid auth provider start request")
 		return
 	}
+	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminOIDCStart, ctx.ClientIP(), ctx.Param("provider")) {
+		return
+	}
 	provider, ok := s.findAuthProvider(ctx.Param("provider"), capability.AuthProviderAudienceAdmin)
 	if !ok {
 		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_NOT_FOUND", "auth provider not found")
@@ -482,6 +525,9 @@ func (s *Server) authLogin(ctx *gin.Context) {
 	var input authLoginRequest
 	if err := ctx.ShouldBindJSON(&input); err != nil {
 		writeAuthError(ctx, http.StatusBadRequest, "AUTH_INVALID_REQUEST", "invalid auth login request")
+		return
+	}
+	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminLogin, ctx.ClientIP(), input.Provider, input.Username) {
 		return
 	}
 	provider, ok := s.findAuthProvider(input.Provider, capability.AuthProviderAudienceAdmin)
@@ -678,6 +724,9 @@ func (s *Server) appAuthLogin(ctx *gin.Context) {
 	var input appLoginRequest
 	if err := ctx.ShouldBindJSON(&input); err != nil {
 		writeAuthError(ctx, http.StatusBadRequest, "APP_AUTH_INVALID_REQUEST", "invalid app auth login request")
+		return
+	}
+	if !s.enforceRateLimit(ctx, ratelimit.OperationAppLogin, ctx.ClientIP(), input.Provider, input.Username) {
 		return
 	}
 	username, providerID, ok := s.resolveAppLoginIdentity(ctx, input)
@@ -1184,6 +1233,9 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 	if !s.authorizeAdminResource(ctx, "files", "create") {
 		return
 	}
+	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminUpload, ctx.ClientIP(), s.currentActor(ctx)) {
+		return
+	}
 	upload, err := readValidatedUpload(ctx, s.uploadPolicy, "ADMIN_FILE")
 	if err != nil {
 		writeUploadPolicyError(ctx, err)
@@ -1285,6 +1337,10 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 		writeUnauthorized(ctx)
 		return
 	}
+	username := appUsername(appSession.Username)
+	if !s.enforceRateLimit(ctx, ratelimit.OperationAppUpload, ctx.ClientIP(), username) {
+		return
+	}
 	upload, err := readValidatedUpload(ctx, s.uploadPolicy, "APP_FILE")
 	if err != nil {
 		writeUploadPolicyError(ctx, err)
@@ -1302,7 +1358,6 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 		writeFileError(ctx, http.StatusInternalServerError, "APP_FILE_SAVE_FAILED", "file save failed")
 		return
 	}
-	username := appUsername(appSession.Username)
 	record, err := s.resources.CreateInternal("files", adminresource.WriteInput{
 		Code:        fmt.Sprintf("file-%d", s.now().UTC().UnixNano()),
 		Name:        upload.FileName,

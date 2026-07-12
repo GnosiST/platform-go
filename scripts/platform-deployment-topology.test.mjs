@@ -90,7 +90,8 @@ describe("validate-platform-deployment-topology", () => {
         item !== "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER" &&
         item !== "PLATFORM_PUBLIC_BASE_URL" &&
         item !== "PLATFORM_TRUSTED_PROXIES" &&
-        item !== "PLATFORM_HTTP_MAX_BODY_BYTES",
+        item !== "PLATFORM_HTTP_MAX_BODY_BYTES" &&
+        item !== "PLATFORM_RATE_LIMIT_HMAC_KEY",
     );
     contract.productionApiRequirements.forbiddenProductionCapabilities = [];
     const contractPath = tempJSON("platform-deployment-topology.json", contract);
@@ -103,6 +104,7 @@ describe("validate-platform-deployment-topology", () => {
     assert.match(result.stderr, /productionApiRequirements\.requiredEnv must include PLATFORM_PUBLIC_BASE_URL/);
     assert.match(result.stderr, /productionApiRequirements\.requiredEnv must include PLATFORM_TRUSTED_PROXIES/);
     assert.match(result.stderr, /productionApiRequirements\.requiredEnv must include PLATFORM_HTTP_MAX_BODY_BYTES/);
+    assert.match(result.stderr, /productionApiRequirements\.requiredEnv must include PLATFORM_RATE_LIMIT_HMAC_KEY/);
     assert.match(result.stderr, /productionApiRequirements\.forbiddenProductionCapabilities must include demo-data/);
   });
 
@@ -285,6 +287,17 @@ describe("validate-platform-deployment-topology", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /compose file must not configure PLATFORM_FILE_STORAGE_PUBLIC_URL/);
+  });
+
+  it("rejects production Compose without the shared rate-limit HMAC key", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
+    const compose = current.replace("      PLATFORM_RATE_LIMIT_HMAC_KEY: ${PLATFORM_RATE_LIMIT_HMAC_KEY:?required}\n", "");
+    const composePath = tempText("docker-compose.prod.yml", compose);
+
+    const result = runValidator(["--compose", composePath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /platform-api must receive PLATFORM_RATE_LIMIT_HMAC_KEY/);
   });
 
   it("ignores commented Nginx and Compose upload examples", () => {

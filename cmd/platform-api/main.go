@@ -74,6 +74,10 @@ func main() {
 	if err := httpapi.ValidatePhoneProtectionHistory(resources, phoneVerification.Protector); err != nil {
 		log.Fatalf("validate phone protection history: %v", err)
 	}
+	rateLimitRuntime, err := bootstrap.RateLimitRuntimeFromConfig(cfg)
+	if err != nil {
+		log.Fatalf("build rate limit runtime: %v", err)
+	}
 	server := httpapi.New(httpapi.ServerOptions{
 		Capabilities:            ordered,
 		Resources:               resources,
@@ -95,6 +99,8 @@ func main() {
 		OpenAPIDocument:         openAPIDocument,
 		DisableDemoAuthProvider: cfg.DisableDemoAuthProvider,
 		Security:                securityOptionsFromConfig(cfg),
+		RateLimiter:             rateLimitRuntime.Limiter,
+		RateLimitKeyBuilder:     rateLimitRuntime.KeyBuilder,
 	})
 	if err := server.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("run platform api: %v", err)

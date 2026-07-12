@@ -32,6 +32,8 @@ const requiredRuntimeGateSnippets = [
   "production runtime requires PLATFORM_SESSION_DRIVER to be mysql, postgres, or sqlite",
   "production runtime requires PLATFORM_LIFECYCLE_HISTORY_DRIVER to be mysql, postgres, or sqlite",
   "production runtime requires PLATFORM_CACHE_DRIVER=redis",
+  "production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY to be at least 32 bytes",
+  "production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY to be distinct from phone and code HMAC keys",
   "production runtime must not enable demo-data capability",
   "production runtime requires PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
   "production runtime requires PLATFORM_PUBLIC_BASE_URL to be an absolute HTTPS origin",
@@ -43,6 +45,7 @@ const requiredProductionEnv = [
   "PLATFORM_PUBLIC_BASE_URL",
   "PLATFORM_TRUSTED_PROXIES",
   "PLATFORM_HTTP_MAX_BODY_BYTES",
+  "PLATFORM_RATE_LIMIT_HMAC_KEY",
 ];
 const requiredPreflightCommands = [
   "production-runtime-tests",

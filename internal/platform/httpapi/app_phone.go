@@ -13,15 +13,14 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"platform-go/internal/platform/adminresource"
+	"platform-go/internal/platform/ratelimit"
 )
 
 const (
-	appPhoneVerificationsResource  = "app-phone-verifications"
-	appPhoneBindingsResource       = "app-phone-bindings"
-	appPhoneVerificationPurpose    = "bind"
-	appPhoneVerificationTTL        = 10 * time.Minute
-	appPhoneVerificationRateLimit  = 3
-	appPhoneVerificationRateWindow = 10 * time.Minute
+	appPhoneVerificationsResource = "app-phone-verifications"
+	appPhoneBindingsResource      = "app-phone-bindings"
+	appPhoneVerificationPurpose   = "bind"
+	appPhoneVerificationTTL       = 10 * time.Minute
 )
 
 type appPhoneVerificationRequest struct {
@@ -73,6 +72,10 @@ func (s *Server) appPhoneCreateVerification(ctx *gin.Context) {
 		writeAuthError(ctx, http.StatusBadRequest, "APP_PHONE_PURPOSE_UNSUPPORTED", "app phone purpose is unsupported")
 		return
 	}
+	username := appUsername(appSession.Username)
+	if !s.enforceRateLimit(ctx, ratelimit.OperationPhoneVerificationRequest, ctx.ClientIP(), username, phone, purpose) {
+		return
+	}
 	if s.phoneProtector == nil || s.phoneVerificationSender == nil {
 		writeAuthError(ctx, http.StatusServiceUnavailable, "APP_PHONE_VERIFICATION_UNAVAILABLE", "app phone verification is unavailable")
 		return
@@ -84,12 +87,7 @@ func (s *Server) appPhoneCreateVerification(ctx *gin.Context) {
 	}
 	now := s.now().UTC()
 	expiresAt := now.Add(appPhoneVerificationTTL)
-	username := appUsername(appSession.Username)
 	maskedPhone := maskAppPhone(phone)
-	if s.appPhoneVerificationRateLimited(username, phoneDigest, purpose, now) {
-		writeAuthError(ctx, http.StatusTooManyRequests, "APP_PHONE_VERIFICATION_RATE_LIMITED", "app phone verification rate limited")
-		return
-	}
 	verificationCode, err := newAppPhoneDebugCode()
 	if err != nil {
 		writeAuthError(ctx, http.StatusInternalServerError, "APP_PHONE_CODE_GENERATION_FAILED", "app phone code generation failed")
@@ -158,6 +156,10 @@ func (s *Server) appPhoneCreateBinding(ctx *gin.Context) {
 		writeAuthError(ctx, http.StatusBadRequest, "APP_PHONE_CODE_REQUIRED", "app phone verification code is required")
 		return
 	}
+	username := appUsername(appSession.Username)
+	if !s.enforceRateLimit(ctx, ratelimit.OperationPhoneBindingVerification, ctx.ClientIP(), username, phone) {
+		return
+	}
 
 	if s.phoneProtector == nil {
 		writeAuthError(ctx, http.StatusServiceUnavailable, "APP_PHONE_VERIFICATION_UNAVAILABLE", "app phone verification is unavailable")
@@ -173,7 +175,6 @@ func (s *Server) appPhoneCreateBinding(ctx *gin.Context) {
 		writeAuthError(ctx, http.StatusServiceUnavailable, "APP_PHONE_VERIFICATION_UNAVAILABLE", "app phone verification is unavailable")
 		return
 	}
-	username := appUsername(appSession.Username)
 	maskedPhone := maskAppPhone(phone)
 	if s.appPhoneBindingExists(phoneDigest) {
 		writeAuthError(ctx, http.StatusConflict, "APP_PHONE_ALREADY_BOUND", "app phone is already bound")
@@ -234,29 +235,6 @@ func (s *Server) appPhoneBindingExists(phoneHash string) bool {
 			continue
 		}
 		if record.Values["phoneHash"] == phoneHash {
-			return true
-		}
-	}
-	return false
-}
-
-func (s *Server) appPhoneVerificationRateLimited(username string, phoneHash string, purpose string, now time.Time) bool {
-	records, err := s.resources.List(appPhoneVerificationsResource)
-	if err != nil {
-		return false
-	}
-	windowStart := now.UTC().Add(-appPhoneVerificationRateWindow)
-	count := 0
-	for _, record := range records {
-		if record.Values["appUsername"] != username || record.Values["phoneHash"] != phoneHash || record.Values["purpose"] != purpose {
-			continue
-		}
-		requestedAt, err := time.Parse(time.RFC3339, record.Values["requestedAt"])
-		if err != nil || requestedAt.Before(windowStart) {
-			continue
-		}
-		count++
-		if count >= appPhoneVerificationRateLimit {
 			return true
 		}
 	}

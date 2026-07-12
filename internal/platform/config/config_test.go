@@ -33,6 +33,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_REDIS_ADDR", "")
 	t.Setenv("PLATFORM_REDIS_PASSWORD", "")
 	t.Setenv("PLATFORM_REDIS_DB", "")
+	t.Setenv("PLATFORM_RATE_LIMIT_HMAC_KEY", "")
 	t.Setenv("PLATFORM_FILE_STORAGE_DRIVER", "")
 	t.Setenv("PLATFORM_FILE_STORAGE_LOCAL_DIR", "")
 	t.Setenv("PLATFORM_FILE_MAX_UPLOAD_BYTES", "")
@@ -128,6 +129,9 @@ func TestLoadUsesDefaults(t *testing.T) {
 	}
 	if cfg.RedisDB != 0 {
 		t.Fatalf("RedisDB = %d, want 0", cfg.RedisDB)
+	}
+	if cfg.RateLimitHMACKey != "" {
+		t.Fatalf("RateLimitHMACKey = %q, want empty by default", cfg.RateLimitHMACKey)
 	}
 	if cfg.FileStorageDriver != "local" {
 		t.Fatalf("FileStorageDriver = %q, want local", cfg.FileStorageDriver)
@@ -316,6 +320,7 @@ func TestLoadParsesCacheConfig(t *testing.T) {
 	t.Setenv("PLATFORM_REDIS_ADDR", "127.0.0.1:6380")
 	t.Setenv("PLATFORM_REDIS_PASSWORD", "secret")
 	t.Setenv("PLATFORM_REDIS_DB", "2")
+	t.Setenv("PLATFORM_RATE_LIMIT_HMAC_KEY", strings.Repeat("r", 32))
 
 	cfg := Load()
 	if cfg.CacheDriver != "redis" {
@@ -332,6 +337,43 @@ func TestLoadParsesCacheConfig(t *testing.T) {
 	}
 	if cfg.RedisDB != 2 {
 		t.Fatalf("RedisDB = %d", cfg.RedisDB)
+	}
+	if cfg.RateLimitHMACKey != strings.Repeat("r", 32) {
+		t.Fatalf("RateLimitHMACKey = %q", cfg.RateLimitHMACKey)
+	}
+}
+
+func TestValidateRuntimeRejectsUnsafeProductionRateLimitHMACKey(t *testing.T) {
+	tests := []struct {
+		name string
+		key  string
+	}{
+		{name: "missing", key: ""},
+		{name: "short", key: "short-rate-limit-key"},
+		{name: "same as phone", key: strings.Repeat("p", 32)},
+		{name: "same as code", key: strings.Repeat("c", 32)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := validProductionRuntimeConfig()
+			cfg.Capabilities = append(cfg.Capabilities, "app-phone")
+			cfg.PhoneHMACKey = strings.Repeat("p", 32)
+			cfg.PhoneCodeHMACKey = strings.Repeat("c", 32)
+			cfg.PhoneVerificationProvider = "sms-vendor"
+			cfg.RateLimitHMACKey = tt.key
+
+			err := cfg.ValidateRuntime()
+			if err == nil {
+				t.Fatalf("ValidateRuntime() error = nil, want rate limit key rejection")
+			}
+			if tt.name == "missing" || tt.name == "short" {
+				if !strings.Contains(err.Error(), "PLATFORM_RATE_LIMIT_HMAC_KEY to be at least 32 bytes") {
+					t.Fatalf("ValidateRuntime() error = %v, want key length rejection", err)
+				}
+			} else if !strings.Contains(err.Error(), "distinct from phone and code HMAC keys") {
+				t.Fatalf("ValidateRuntime() error = %v, want key separation rejection", err)
+			}
+		})
 	}
 }
 
@@ -1006,6 +1048,7 @@ func validProductionRuntimeConfig() Config {
 		CacheDriver:                       "redis",
 		CacheDefaultTTL:                   1,
 		RedisAddr:                         "127.0.0.1:6379",
+		RateLimitHMACKey:                  strings.Repeat("r", 32),
 		FileStorageDriver:                 "s3",
 		FileMaxUploadBytes:                10 << 20,
 		FileAllowedMIMETypes:              []string{"application/pdf", "image/jpeg", "image/png", "text/plain"},
@@ -1068,6 +1111,7 @@ func setValidProductionLoadEnvironment(t *testing.T) {
 		"PLATFORM_LIFECYCLE_HISTORY_DSN":                  "postgres://platform:secret@localhost:5432/platform",
 		"PLATFORM_CACHE_DRIVER":                           "redis",
 		"PLATFORM_REDIS_ADDR":                             "127.0.0.1:6379",
+		"PLATFORM_RATE_LIMIT_HMAC_KEY":                    "rate-limit-production-key-value-0001",
 		"PLATFORM_DISABLE_DEMO_AUTH_PROVIDER":             "true",
 		"PLATFORM_FILE_STORAGE_DRIVER":                    "s3",
 		"PLATFORM_FILE_MAX_UPLOAD_BYTES":                  "10485760",
