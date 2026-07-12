@@ -318,6 +318,9 @@ requireIncludes(files.resourceConsole, "width={formModalWidth(formLayoutPreset)}
 requireIncludes(files.resourceConsole, "buildRuntimeFormSlots", "GenericResourceConsole must build runtime form slots from schema descriptors.");
 requireIncludes(files.resourceConsole, "schema.runtimeSlots", "GenericResourceConsole must consume schema-declared runtime slots.");
 requireIncludes(files.resourceConsole, "defaultAdminFormSlotRegistry", "GenericResourceConsole must use the default platform runtime slot registry.");
+requireIncludes(files.resourceConsole, "operator: isEncryptedExactMatchField(field)", "Encrypted resource filters must submit exact-match conditions.");
+requireIncludes(files.resourceConsole, 'isEncryptedExactMatchField(field) && match[2] !== "="', "Encrypted resource query syntax must allow equality only.");
+requireIncludes(files.resourceConsole, 'field.storageMode === "encrypted" && Boolean(field.protection?.blindIndexNamespace)', "Encrypted resource filters must be driven by declared blind-index metadata.");
 requireIncludes(files.treeSelect, "export function PlatformTreeSelect", "PlatformTreeSelect must exist as the shared tree relation control.");
 requireIncludes(files.treeSelect, "platformPopupContainer", "PlatformTreeSelect dropdowns must render inside the platform popup container.");
 requireIncludes(files.treeSelect, "treeDataFromOptions", "PlatformTreeSelect must build nested tree data from parentValue metadata.");

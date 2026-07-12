@@ -729,6 +729,36 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /Resource modals must invoke the shared first-field focus helper/);
   });
 
+  it("rejects encrypted resource filters that are not constrained to exact match", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "operator: isEncryptedExactMatchField(field)",
+      "operator: field.type === \"text\"",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Encrypted resource filters must submit exact-match conditions/);
+  });
+
+  it("rejects query parsing that accepts non-equality operators for encrypted fields", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      'isEncryptedExactMatchField(field) && match[2] !== "="',
+      "false",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Encrypted resource query syntax must allow equality only/);
+  });
+
   it("rejects resource modal fallback focus without current-visible-modal scoping", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(

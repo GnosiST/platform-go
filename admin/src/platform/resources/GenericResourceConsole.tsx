@@ -1728,6 +1728,14 @@ function resourceFilterFields(fields: AdminResourceField[], language: Language, 
     .filter(isFilterableResourceField)
     .slice(0, 8)
     .map((field) => {
+      if (isEncryptedExactMatchField(field)) {
+        return {
+          key: field.key,
+          label: localizedText(field.label, language),
+          type: "text",
+          placeholder: dictionary.filterKeyword,
+        };
+      }
       if (field.type === "select" || field.type === "multiselect" || field.key === "status") {
         return {
           key: field.key,
@@ -1803,7 +1811,8 @@ function buildResourceQuery(
 }
 
 function parseSafeQuery(query: string, fields: AdminResourceField[]) {
-  const fieldKeys = new Set(["id", ...fields.filter(isQueryableResourceField).map((field) => field.key)]);
+  const queryFields = new Map(fields.filter(isQueryableResourceField).map((field) => [field.key, field] as const));
+  const fieldKeys = new Set(["id", ...queryFields.keys()]);
   const tokens = query.match(/"[^"]+"|'[^']+'|\S+/g) ?? [];
   const conditions: ParsedQueryCondition[] = [];
   const terms: string[] = [];
@@ -1815,6 +1824,10 @@ function parseSafeQuery(query: string, fields: AdminResourceField[]) {
       if (normalized) {
         terms.push(normalized);
       }
+      continue;
+    }
+    const field = queryFields.get(match[1]);
+    if (field && isEncryptedExactMatchField(field) && match[2] !== "=") {
       continue;
     }
     conditions.push({
@@ -1857,7 +1870,11 @@ function filterConditionsFromValues(
       return [
         {
           field: field.key,
-          operator: field.type === "select" || field.type === "multiselect" || field.type === "switch" || field.key === "status" ? "=" : "contains",
+          operator: isEncryptedExactMatchField(field)
+            ? "="
+            : field.type === "select" || field.type === "multiselect" || field.type === "switch" || field.key === "status"
+              ? "="
+              : "contains",
           value: filterValue,
         },
       ];
@@ -2133,10 +2150,16 @@ function canToggleStatusField(field: AdminResourceField, record: AdminResourceRe
 }
 
 function isQueryableResourceField(field: AdminResourceField) {
+  if (field.storageMode === "encrypted") {
+    return isEncryptedExactMatchField(field);
+  }
   return Boolean(field.searchable || isFilterableResourceField(field));
 }
 
 function isFilterableResourceField(field: AdminResourceField) {
+  if (field.storageMode === "encrypted") {
+    return isEncryptedExactMatchField(field);
+  }
   return Boolean(
     field.filterable ||
       field.searchable ||
@@ -2150,6 +2173,9 @@ function isFilterableResourceField(field: AdminResourceField) {
 }
 
 function isSortableResourceField(field: AdminResourceField) {
+  if (field.storageMode === "encrypted") {
+    return false;
+  }
   if (field.sortable) {
     return true;
   }
@@ -2157,6 +2183,10 @@ function isSortableResourceField(field: AdminResourceField) {
     return true;
   }
   return Boolean(field.inTable && field.type !== "textarea" && field.type !== "multiselect");
+}
+
+function isEncryptedExactMatchField(field: AdminResourceField) {
+  return field.storageMode === "encrypted" && Boolean(field.protection?.blindIndexNamespace);
 }
 
 function splitList(value: string) {
