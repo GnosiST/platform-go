@@ -110,7 +110,7 @@ All four requested capability groups are feasible within the current Gin/GORM/ca
 The work should be decomposed into four independent specifications and detailed implementation plans:
 
 1. `sensitive-data-reveal-step-up`
-   - Depends on the pending `sensitive-data-protection-runtime` node delivering approved field, encryption, key-provider and persistence contracts before reveal work begins.
+   - Depends on the implemented `sensitive-data-protection-runtime` node, which now provides configurable field policy, encryption, key-provider and persistence contracts; reveal work still requires its own authorization and verification design.
    - Adds mask strategies, reveal policy, step-up registry, grants, audit and Admin masked-field components.
 2. `data-lifecycle-retention`
    - Adds deletion policy contracts, reference guards, soft-delete/recycle-bin runtime, file recovery, session/token linkage and the maintenance retention runner.
@@ -137,7 +137,7 @@ sensitive-data-protection-runtime
 
 Stage gates:
 
-1. Finish the existing `sensitive-data-protection-runtime` node with versioned encryption, key-provider and protected persistence contracts.
+1. Keep the implemented `sensitive-data-protection-runtime` contract stable: versioned encryption, explicit normalizers, key-provider configuration, protected persistence and authorized internal projection are now available.
 2. Finish `sensitive-data-historical-migration` with inventory, dry-run, resumable batches, verification and rollback evidence.
 3. Add `mask-strategy-runtime`; prove list, detail, Tooltip and export projections use the same backend-owned strategies.
 4. Add `sensitive-data-reveal-step-up`; start with OIDC re-authentication and SMS OTP, short-lived single-use grants, rate limits and append-only audit. Add other factors only through registered adapters.
@@ -151,7 +151,7 @@ The first two nodes already belong to the completion program. The newly proposed
 
 ## Release Recommendation
 
-Before a public v0.1 release, complete sensitive-data encryption and historical migration, publish honest deletion semantics, and avoid claiming database or integration support without a passing matrix. Controlled reveal, named datasources and disabled integration ports are strong foundation capabilities, but vendor-specific Oracle, KingbaseES, MQ and search adapters may ship in staged releases if their experimental status and verification limits are explicit.
+Before a public v0.1 release, complete sensitive-data historical migration, publish honest deletion semantics, and avoid claiming database or integration support without a passing matrix. The configurable encryption runtime is implemented, but controlled reveal, named datasources and disabled integration ports remain future foundation capabilities. Vendor-specific Oracle, KingbaseES, MQ and search adapters may ship in staged releases only when their experimental status and verification limits are explicit.
 
 ## Source Evidence
 

@@ -7,10 +7,9 @@ import { describe, it } from "node:test";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
-const completedProgramTaskIDs = ["runtime-security-containment", "admin-watermark-export-governance"];
+const completedProgramTaskIDs = ["runtime-security-containment", "admin-watermark-export-governance", "sensitive-data-protection-runtime"];
 
 const remainingCompletionProgramTaskIDs = [
-  "sensitive-data-protection-runtime",
   "sensitive-data-historical-migration",
   "open-source-portability",
   "public-docs-community",
@@ -37,7 +36,7 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
-  it("migrates runtime security and watermark governance to required work and tracks six future nodes", () => {
+  it("migrates three completed program nodes to required work and tracks five future nodes", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
 
     assert.ok(audit.requiredTaskNodes.includes("production-admin-oidc-auth"));
@@ -329,7 +328,9 @@ describe("validate-platform-foundation-alignment", () => {
     audit.requiredValidators = audit.requiredValidators.filter((validator) => validator !== "scripts/validate-platform-admin-api-boundary.mjs");
     const boundary = readJSON("resources/platform-admin-api-boundary.json");
     boundary.querySecurity.rawSQLAllowed = true;
-    boundary.querySecurity.sensitiveFieldsAllowed = true;
+    boundary.querySecurity.sensitivityPolicySource = "field-name-list";
+    boundary.querySecurity.fieldNameInferenceAllowed = true;
+    boundary.querySecurity.encryptedFieldQueryPolicy = "all-operators";
     const auditPath = tempJSON("platform-foundation-alignment-audit.json", audit);
     const boundaryPath = tempJSON("platform-admin-api-boundary.json", boundary);
 
@@ -338,7 +339,9 @@ describe("validate-platform-foundation-alignment", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /requiredEngineeringCapabilities is missing required goal capability admin-api-boundary-query-security/);
     assert.match(result.stderr, /admin API boundary must forbid raw SQL/);
-    assert.match(result.stderr, /admin API boundary must forbid sensitive query fields/);
+    assert.match(result.stderr, /admin API boundary sensitivityPolicySource must stay capability manifest/);
+    assert.match(result.stderr, /admin API boundary must forbid field-name sensitivity inference/);
+    assert.match(result.stderr, /admin API boundary encrypted field query policy must stay declared-blind-index-exact-match-only/);
     assert.match(result.stderr, /admin API boundary requiredValidators must include scripts\/validate-platform-admin-api-boundary\.mjs|objective conflict policy validator scripts\/validate-platform-admin-api-boundary\.mjs must be listed in requiredValidators/);
   });
 

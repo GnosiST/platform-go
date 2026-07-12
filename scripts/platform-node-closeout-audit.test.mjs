@@ -9,7 +9,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "sensitive-data-protection-runtime",
   "sensitive-data-historical-migration",
   "open-source-portability",
   "public-docs-community",
@@ -85,7 +84,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("preserves 37 baseline closeouts, closes runtime security and watermark governance, and tracks six pending nodes", () => {
+  it("preserves 37 baseline closeouts, closes three completion nodes, and tracks five pending nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -93,7 +92,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(task, "task graph must include production-admin-oidc-auth");
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
-    assert.equal(audit.nodeCloseouts.length, 39);
+    assert.equal(audit.nodeCloseouts.length, 40);
     assert.deepEqual(audit.nodeCloseouts.slice(0, 37).map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
     assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts.slice(0, 37))).digest("hex"), foundationBaselineCloseoutDigest);
     const runtimeSecurityCloseout = audit.nodeCloseouts[37];
@@ -109,6 +108,11 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(watermarkCloseout.visualEvidence.includes("product-design"));
     assert.ok(watermarkCloseout.visualEvidence.includes("ui-ux-pro-max"));
     assert.ok(watermarkCloseout.visualEvidence.includes("browser:control-in-app-browser"));
+    const sensitiveDataCloseout = audit.nodeCloseouts[39];
+    assert.equal(sensitiveDataCloseout.taskId, "sensitive-data-protection-runtime");
+    assert.equal(sensitiveDataCloseout.status, "closed");
+    assert.equal(sensitiveDataCloseout.neatFreak, true);
+    assert.ok(sensitiveDataCloseout.cleanupEvidence.includes("internal/platform/adminresource/protection_test.go"));
     assert.deepEqual(audit.pendingNodeEvidence, completionProgramTaskIDs);
   });
 

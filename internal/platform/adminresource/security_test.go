@@ -170,26 +170,6 @@ func TestSpecializedResourceSchemaPreservesDeclaredProtectionMetadata(t *testing
 	t.Fatal("specialized users schema dropped custom encrypted field")
 }
 
-func TestStoreRejectsHashNamedFieldWithoutProtectedPolicy(t *testing.T) {
-	store := NewStoreFromCapabilities(core.DefaultManifests())
-	schema := store.schemas["api-tokens"]
-	for index := range schema.Fields {
-		if schema.Fields[index].Key == "tokenHash" {
-			schema.Fields[index].Sensitivity = capability.FieldSensitivityPublic
-			schema.Fields[index].StorageMode = capability.FieldStoragePlain
-			schema.Fields[index].ResponseMode = capability.FieldProjectionFull
-			schema.Fields[index].ExportMode = capability.FieldProjectionFull
-		}
-	}
-	store.schemas["api-tokens"] = schema
-	_, err := store.CreateInternal("api-tokens", WriteInput{
-		Name: "Invalid Token", Values: map[string]string{"scope": "admin:tenant:read", "tokenHash": "marker-token-hash"},
-	})
-	if !errors.Is(err, ErrInvalidRecord) {
-		t.Fatalf("CreateInternal(api-tokens) error = %v, want ErrInvalidRecord", err)
-	}
-}
-
 func TestStoreRejectsPlainPersonalAndMalformedMaskedValues(t *testing.T) {
 	store := NewStoreFromCapabilities(core.DefaultManifests())
 	schema := store.schemas["tenants"]
@@ -237,34 +217,28 @@ func TestStoreRejectsPlainPersonalAndMalformedMaskedValues(t *testing.T) {
 	}
 }
 
-func TestStoreRejectsCredentialLikeCompoundNamesWithoutProtectedPolicy(t *testing.T) {
-	store := NewStoreFromCapabilities(core.DefaultManifests())
-	schema := store.schemas["tenants"]
-	schema.Fields = append(schema.Fields,
-		FieldDefinition{Key: "apiToken", Source: "values", Sensitivity: capability.FieldSensitivityPublic, StorageMode: capability.FieldStoragePlain, ResponseMode: capability.FieldProjectionFull, ExportMode: capability.FieldProjectionFull},
-		FieldDefinition{Key: "authSecret", Source: "values", Sensitivity: capability.FieldSensitivityPublic, StorageMode: capability.FieldStoragePlain, ResponseMode: capability.FieldProjectionFull, ExportMode: capability.FieldProjectionFull},
-		FieldDefinition{Key: "adminSessionId", Source: "values", Sensitivity: capability.FieldSensitivityPublic, StorageMode: capability.FieldStoragePlain, ResponseMode: capability.FieldProjectionFull, ExportMode: capability.FieldProjectionFull},
-		FieldDefinition{Key: "maskedPassword", Source: "values", Sensitivity: capability.FieldSensitivityPublic, StorageMode: capability.FieldStoragePlain, ResponseMode: capability.FieldProjectionFull, ExportMode: capability.FieldProjectionFull},
-	)
-	store.schemas["tenants"] = schema
-	for key, value := range map[string]string{
-		"apiToken": "raw-token-marker", "authSecret": "raw-secret-marker",
-		"adminSessionId": "raw-session-marker", "maskedPassword": "not-actually-masked",
-	} {
-		if err := store.validateWriteValues("tenants", map[string]string{key: value}, WriteOriginInternal); !errors.Is(err, ErrInvalidRecord) {
-			t.Fatalf("validateWriteValues(%s) error = %v, want ErrInvalidRecord", key, err)
-		}
+func TestStoreAllowsExplicitPublicPlainSecurityLikeFieldNames(t *testing.T) {
+	schema := defaultSchema("contacts", text("联系人", "Contacts"), text("联系人记录", "Contact records"), "admin:contact")
+	values := map[string]string{}
+	for _, key := range []string{"contactPhone", "email", "address", "apiToken"} {
+		field := valueField(key, text("公开字段", "Public Field"), "text", false, true, true, true, true, 180, nil)
+		field.Sensitivity = capability.FieldSensitivityPublic
+		field.StorageMode = capability.FieldStoragePlain
+		field.ResponseMode = capability.FieldProjectionFull
+		field.ExportMode = capability.FieldProjectionFull
+		schema.Fields = append(schema.Fields, field)
+		values[key] = "public-" + key
 	}
-	for index := range schema.Fields {
-		if schema.Fields[index].Key == "apiToken" {
-			schema.Fields[index].StorageMode = capability.FieldStorageHashed
-			schema.Fields[index].ResponseMode = capability.FieldProjectionOmitted
-			schema.Fields[index].ExportMode = capability.FieldProjectionOmitted
-		}
+	store := newStore(map[string][]Record{"contacts": {}}, map[string]Schema{"contacts": schema})
+
+	record, err := store.CreateInternal("contacts", WriteInput{Code: "contact-1", Name: "Contact One", Values: values})
+	if err != nil {
+		t.Fatalf("CreateInternal(contacts) error = %v", err)
 	}
-	store.schemas["tenants"] = schema
-	if err := store.validateWriteValues("tenants", map[string]string{"apiToken": "derived-token-hash"}, WriteOriginInternal); !errors.Is(err, ErrInvalidRecord) {
-		t.Fatalf("validateWriteValues(public hashed apiToken) error = %v, want ErrInvalidRecord", err)
+	for key, want := range values {
+		if got := record.Values[key]; got != want {
+			t.Fatalf("record.Values[%q] = %q, want %q", key, got, want)
+		}
 	}
 }
 
@@ -306,19 +280,6 @@ func TestStoreRejectsUnsupportedPoliciesAndSensitiveRecordStorage(t *testing.T) 
 	store.schemas["tenants"] = schema
 	if err := store.validateWriteInput("tenants", WriteInput{Name: "derived-name-hash"}, WriteOriginInternal); !errors.Is(err, ErrInvalidRecord) {
 		t.Fatalf("validateWriteInput(sensitive record field) error = %v, want ErrInvalidRecord", err)
-	}
-}
-
-func TestStoreRejectsCredentialNamesWithRepeatedDerivedSuffixes(t *testing.T) {
-	store := NewStoreFromCapabilities(core.DefaultManifests())
-	schema := store.schemas["tenants"]
-	schema.Fields = append(schema.Fields, FieldDefinition{
-		Key: "apiTokenHashDigest", Source: "values", Sensitivity: capability.FieldSensitivityPublic,
-		StorageMode: capability.FieldStoragePlain, ResponseMode: capability.FieldProjectionFull, ExportMode: capability.FieldProjectionFull,
-	})
-	store.schemas["tenants"] = schema
-	if err := store.validateWriteValues("tenants", map[string]string{"apiTokenHashDigest": "raw-token-marker"}, WriteOriginInternal); !errors.Is(err, ErrInvalidRecord) {
-		t.Fatalf("validateWriteValues(apiTokenHashDigest) error = %v, want ErrInvalidRecord", err)
 	}
 }
 

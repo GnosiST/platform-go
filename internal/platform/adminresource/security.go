@@ -162,9 +162,6 @@ func validateFieldWrite(key string, value string, field FieldDefinition, origin 
 	if err := validateFieldProtection(key, field); err != nil {
 		return err
 	}
-	if prohibitedRawField(key) && !allowsProtectedField(field) {
-		return invalidSecurityField(key, "is a prohibited raw credential or personal field")
-	}
 	return nil
 }
 
@@ -220,77 +217,12 @@ func validFieldProjectionMode(value string) bool {
 	}
 }
 
-func prohibitedRawField(key string) bool {
-	normalized := strings.ToLower(strings.NewReplacer("_", "", "-", "", ".", "").Replace(strings.TrimSpace(key)))
-	base := normalized
-	for {
-		previous := base
-		for _, suffix := range []string{"hash", "digest"} {
-			base = strings.TrimSuffix(base, suffix)
-		}
-		if base == previous {
-			break
-		}
-	}
-	if (base == "code" || base == "session") && base != normalized {
-		return true
-	}
-	normalized = base
-	switch base {
-	case "verificationcode", "debugcode", "providersubject", "phone", "phonenumber", "identitynumber", "idnumber", "email", "address", "detailedaddress", "sessionid", "sessionhandle", "sessiontoken":
-		return true
-	}
-	for _, marker := range []string{"password", "passwd", "token", "secret", "credential", "credentials", "sessionid", "sessionhandle", "sessiontoken", "session"} {
-		if protectedNameMatch(base, marker) {
-			return true
-		}
-	}
-	return strings.HasSuffix(base, "email") ||
-		strings.HasSuffix(base, "phone") ||
-		strings.HasSuffix(base, "phonenumber") ||
-		strings.HasSuffix(base, "address") ||
-		strings.HasSuffix(base, "identitynumber") ||
-		strings.HasSuffix(base, "idnumber") ||
-		strings.HasSuffix(base, "providersubject")
-}
-
-func protectedNameMatch(normalized string, marker string) bool {
-	if normalized == marker || strings.HasSuffix(normalized, marker) {
-		return true
-	}
-	if !strings.HasPrefix(normalized, marker) {
-		return false
-	}
-	for _, suffix := range []string{"prefix", "type", "count", "status", "expiresat", "issuedat", "createdat", "updatedat", "revokedat", "lastusedat"} {
-		if strings.HasSuffix(normalized, suffix) {
-			return false
-		}
-	}
-	return true
-}
-
 func allowsMaskedProjection(mode string) bool {
 	return mode == capability.FieldProjectionMasked || mode == capability.FieldProjectionOmitted
 }
 
 func allowsEncryptedProjection(mode string) bool {
 	return mode == capability.FieldProjectionPrivileged || mode == capability.FieldProjectionOmitted
-}
-
-func allowsProtectedField(field FieldDefinition) bool {
-	switch field.StorageMode {
-	case capability.FieldStorageMasked:
-		return field.Sensitivity == capability.FieldSensitivityPersonal &&
-			allowsMaskedProjection(field.ResponseMode) && allowsMaskedProjection(field.ExportMode)
-	case capability.FieldStorageHashed:
-		return field.Sensitivity != capability.FieldSensitivityPublic &&
-			field.ResponseMode == capability.FieldProjectionOmitted && field.ExportMode == capability.FieldProjectionOmitted
-	case capability.FieldStorageEncrypted:
-		return field.Sensitivity != capability.FieldSensitivityPublic &&
-			allowsEncryptedProjection(field.ResponseMode) && allowsEncryptedProjection(field.ExportMode)
-	default:
-		return false
-	}
 }
 
 func (s *Store) validateSnapshot(snapshot ResourceSnapshot) error {

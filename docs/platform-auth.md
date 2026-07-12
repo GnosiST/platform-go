@@ -24,7 +24,7 @@ Provider ids must be unique across enabled capabilities after trimming whitespac
 
 ## Credential Boundary
 
-The current platform has no local-password provider, password repository or generic password field. `cmd/platform-api` rejects startup when an enabled provider uses the local `password` kind or when any generic Admin resource schema declares `password` or `passwd`. The generic resource write boundary also rejects undeclared and prohibited password, token, secret, credential, verification-code, provider-subject and raw-session keys before persistence.
+The current platform has no local-password provider or password repository. `cmd/platform-api` rejects startup when an enabled provider uses the local `password` kind. Generic Admin field names have no credential semantics: each capability must explicitly declare sensitivity, storage and projection policy, and undeclared or policy-invalid values are rejected before persistence.
 
 Do not add password hashes to `Record.Values`. A future local-password capability requires a separately approved authentication and migration design with an Argon2id password-hashing boundary, dedicated storage, upgrade parameters, reset/rotation behavior, breach response and historical-data migration. Passwords are not reversibly encrypted, and changing hashing policy cannot be treated as an ordinary runtime configuration toggle.
 

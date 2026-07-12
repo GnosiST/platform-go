@@ -1,5 +1,7 @@
 # Sensitive Data Protection Runtime Implementation Plan
 
+> **Status:** Completed.
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task, with test-first RED/GREEN checkpoints and review after each task.
 
 **Goal:** Provide configurable, versioned application-layer encryption and exact-match blind indexes for any declared admin-resource value field, while keeping plaintext out of Store snapshots and decrypting only after an explicit authorization callback succeeds.
@@ -82,7 +84,7 @@ PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON={"idx-v1":"<base64-32-byte-key>"}
 - Produces `AdminFieldProtection`, `AdminResourceProtection` and matching generated JSON/TypeScript contracts.
 - Preserves defaults for existing public/plain, personal/masked and secret/hashed fields.
 
-- [ ] **Step 1: Write failing contract tests**
+- [x] **Step 1: Write failing contract tests**
 
 Cover:
 
@@ -93,7 +95,7 @@ Cover:
 - encrypted field cannot use keyword search, range operators or sorting;
 - generated Admin/OpenAPI/TypeScript contracts retain every protection property.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 rtk go test ./internal/platform/capability ./internal/platform/adminresource -run 'Test.*(Protection|Encrypted|BlindIndex|CustomSensitive)' -count=1
@@ -102,11 +104,11 @@ rtk node --test scripts/validate-admin-resources.test.mjs scripts/admin-resource
 
 Expected: FAIL because protection metadata and validation do not exist.
 
-- [ ] **Step 3: Implement manifest, runtime-schema and generator support**
+- [x] **Step 3: Implement manifest, runtime-schema and generator support**
 
 Keep protection metadata nested and explicit. Defaults must not silently enable encryption or indexing. Change protected-field validation so encrypted fields may use `privileged` or `omitted` projection, while hashed fields remain permanently omitted. Generic resource input may contain plaintext for a declared writable encrypted field; ciphertext-shaped input is rejected later by the Store protection boundary.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 ```bash
 rtk go test ./internal/platform/capability ./internal/platform/adminresource -run 'Test.*(Protection|Encrypted|BlindIndex|CustomSensitive)' -count=1
@@ -159,7 +161,7 @@ type Runtime interface {
 
 The concrete runtime depends on a `KeyProvider` that returns the active AEAD and blind-index key plus historical keys by ID. The env provider parses canonical key IDs and base64-encoded 32-byte keys, rejects duplicate material across purposes, and exposes no raw configuration in errors.
 
-- [ ] **Step 1: Write failing crypto tests**
+- [x] **Step 1: Write failing crypto tests**
 
 Cover:
 
@@ -172,7 +174,7 @@ Cover:
 - missing historical key and same key ID with replacement material fail validation;
 - encryption and blind-index keys cannot reuse material.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 rtk go test ./internal/platform/dataprotection -count=1
@@ -180,11 +182,11 @@ rtk go test ./internal/platform/dataprotection -count=1
 
 Expected: FAIL because the package does not exist.
 
-- [ ] **Step 3: Implement the runtime**
+- [x] **Step 3: Implement the runtime**
 
 Use AES-256-GCM with `crypto/rand` nonces. Encode the envelope as a versioned, opaque string with a stable prefix and base64url JSON payload. Build deterministic AAD from a fixed Go struct, not delimiter concatenation. Store blind-index metadata inside the envelope. Use domain-separated HMAC-SHA-256 over the versioned normalized value. Return typed, value-free errors.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 ```bash
 rtk go test ./internal/platform/dataprotection -count=1
@@ -223,7 +225,7 @@ func (s *Store) ValidateProtectedData(context.Context) error
 
 Existing constructors remain compatible for manifests with no encrypted fields and fail clearly when encrypted fields are declared without a runtime.
 
-- [ ] **Step 1: Write failing Store and repository tests**
+- [x] **Step 1: Write failing Store and repository tests**
 
 Use a test-only manifest containing arbitrary encrypted fields, including one exact-match field. Cover:
 
@@ -239,23 +241,23 @@ Use a test-only manifest containing arbitrary encrypted fields, including one ex
 - changed format, normalization, namespace, tenant scope or schema version fails startup;
 - missing runtime for an encrypted manifest fails constructor startup.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 rtk go test ./internal/platform/adminresource -run 'Test.*(Encrypted|Protected|Privileged|BlindIndex|Ciphertext|HistoricalKey)' -count=1
 ```
 
-- [ ] **Step 3: Integrate protection at the Store boundary**
+- [x] **Step 3: Integrate protection at the Store boundary**
 
 Add a narrow runtime dependency to `Store`. In all four create/update paths, assign or retain the record ID first, derive the declared tenant context, convert submitted plaintext fields to envelopes, then place the record in `s.resources`. Keep stored records encrypted. `scrubSnapshot` validates declared envelopes and removes invalid legacy values; it never reveals them.
 
 Ordinary `ProjectRecord` continues to omit `privileged` and `omitted` fields. `ProjectRecordPrivileged` invokes the authorizer for each privileged field before calling `Reveal`. Hashed fields are never revealed. This node exposes no HTTP route for privileged projection.
 
-- [ ] **Step 4: Implement exact-match query without decryption**
+- [x] **Step 4: Implement exact-match query without decryption**
 
 Encrypted fields are excluded from keyword search and sorting. A condition is accepted only when the field has a blind-index namespace and operator `=`. Match the caller value against the envelope index through the data-protection runtime. Keep the query value and digest out of errors and logs.
 
-- [ ] **Step 5: Verify GREEN and commit**
+- [x] **Step 5: Verify GREEN and commit**
 
 ```bash
 rtk go test ./internal/platform/adminresource -count=1
@@ -288,7 +290,7 @@ rtk git commit -m "feat: protect admin resource sensitive values"
 - Produces `bootstrap.DataProtectionRuntimeFromConfig`.
 - Injects the runtime before `AdminResourcesFromConfig` loads persistent records.
 
-- [ ] **Step 1: Write failing config/bootstrap tests**
+- [x] **Step 1: Write failing config/bootstrap tests**
 
 Cover:
 
@@ -300,18 +302,18 @@ Cover:
 - manifests without encrypted fields remain compatible with an unconfigured development/test runtime;
 - bootstrap loads persistent envelopes and fails when a historical key is missing or replaced.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 rtk go test ./internal/platform/config ./internal/platform/bootstrap ./cmd/platform-api -run 'Test.*(DataProtection|EncryptionKeyring|HistoricalKey)' -count=1
 rtk node --test scripts/platform-production-env.test.mjs scripts/platform-deployment-topology.test.mjs
 ```
 
-- [ ] **Step 3: Implement fail-closed composition**
+- [x] **Step 3: Implement fail-closed composition**
 
 Track whether production key settings came explicitly from environment, following existing file/transport policy-source conventions. Build the provider before loading admin resources. After repository load, call `ValidateProtectedData` so missing, replaced or incompatible historical keys stop startup before the HTTP server is created.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 ```bash
 rtk go test ./internal/platform/config ./internal/platform/bootstrap ./cmd/platform-api -count=1
@@ -342,19 +344,19 @@ rtk git commit -m "feat: wire sensitive data production keys"
 - Modify: matching governance validators and mutation tests
 - Create/Update: `.superpowers/sdd/sensitive-data-progress.md`
 
-- [ ] **Step 1: Document the actual boundary**
+- [x] **Step 1: Document the actual boundary**
 
 Document manifest examples for arbitrary custom encrypted fields, supported normalizers, exact-match-only indexing, privileged projection, TLS transport expectations, env key injection, rotation procedure and startup failure modes. Explicitly state that KMS/HSM, historical migration and reveal verification flows are not implemented by this node.
 
-- [ ] **Step 2: Run neat-freak closeout review**
+- [x] **Step 2: Run neat-freak closeout review**
 
 Reconcile README, schema/deployment/capability docs, generated contracts, environment examples and task records against code. Remove obsolete statements that encrypted fields must always be omitted, but retain the rule that hashed fields are never recoverable.
 
-- [ ] **Step 3: Mark the node implemented only after evidence exists**
+- [x] **Step 3: Mark the node implemented only after evidence exists**
 
 Move `sensitive-data-protection-runtime` from pending to implemented with source, tests and checks. Update the execution, goal, closeout, objective, alignment and engineering-capability artifacts consistently. Keep `sensitive-data-historical-migration` pending.
 
-- [ ] **Step 4: Run full verification**
+- [x] **Step 4: Run full verification**
 
 ```bash
 rtk go test ./...
@@ -379,7 +381,7 @@ rtk codegraph sync .
 rtk codegraph status
 ```
 
-- [ ] **Step 5: Independent review and final commit**
+- [x] **Step 5: Independent review and final commit**
 
 Request a read-only code review focused on plaintext leakage, authorization-before-decryption, key rotation, configurable-field behavior, manifest drift and governance consistency. Fix accepted findings, rerun affected checks, then commit the closeout.
 

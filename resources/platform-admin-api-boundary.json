@@ -37,7 +37,10 @@
     "rawSQLAllowed": false,
     "sqlLikeInputPolicy": "parse-to-structured-conditions-or-treat-as-literal-value",
     "fieldWhitelistSource": "resource schema",
-    "sensitiveFieldsAllowed": false,
+    "sensitivityPolicySource": "capability manifest",
+    "fieldNameInferenceAllowed": false,
+    "encryptedFieldQueryPolicy": "declared-blind-index-exact-match-only",
+    "encryptedFieldSortAllowed": false,
     "sortWhitelistRequired": true,
     "maxValueLength": 256,
     "operators": [
@@ -89,11 +92,11 @@
     },
     {
       "path": "internal/platform/adminresource/query.go",
-      "contains": "sensitive field cannot be queried"
+      "contains": "encrypted field supports only exact-match queries"
     },
     {
       "path": "internal/platform/adminresource/query.go",
-      "contains": "sensitive field cannot be sorted"
+      "contains": "encrypted field cannot be sorted"
     },
     {
       "path": "internal/platform/adminresource/query.go",

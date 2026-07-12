@@ -372,8 +372,17 @@ function validateAdminAPIBoundary(audit, boundary, engineering, errors) {
   if (boundary.querySecurity?.rawSQLAllowed !== false) {
     errors.push("admin API boundary must forbid raw SQL");
   }
-  if (boundary.querySecurity?.sensitiveFieldsAllowed !== false) {
-    errors.push("admin API boundary must forbid sensitive query fields");
+  if (boundary.querySecurity?.sensitivityPolicySource !== "capability manifest") {
+    errors.push("admin API boundary sensitivityPolicySource must stay capability manifest");
+  }
+  if (boundary.querySecurity?.fieldNameInferenceAllowed !== false) {
+    errors.push("admin API boundary must forbid field-name sensitivity inference");
+  }
+  if (boundary.querySecurity?.encryptedFieldQueryPolicy !== "declared-blind-index-exact-match-only") {
+    errors.push("admin API boundary encrypted field query policy must stay declared-blind-index-exact-match-only");
+  }
+  if (boundary.querySecurity?.encryptedFieldSortAllowed !== false) {
+    errors.push("admin API boundary must forbid encrypted field sorting");
   }
   if (boundary.querySecurity?.fieldWhitelistSource !== "resource schema") {
     errors.push("admin API boundary fieldWhitelistSource must stay resource schema");

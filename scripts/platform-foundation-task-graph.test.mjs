@@ -58,7 +58,7 @@ const completionProgramTaskIDs = [
   "github-release-publication",
 ];
 
-const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(2);
+const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(3);
 
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-foundation-task-graph.mjs", ...args], {
@@ -301,7 +301,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /task production-auth-provider-hardening must declare at least one evidence\.docs path/);
   });
 
-  it("preserves the closed 37-node baseline, closes runtime security and watermark governance, and tracks six pending program nodes", () => {
+  it("preserves the closed 37-node baseline, closes three completion nodes, and tracks five pending program nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
@@ -334,11 +334,23 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
     assert.equal(graph.tasks.length, 45);
-    assert.equal(implemented.length, 39);
+    assert.equal(implemented.length, 40);
     assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "admin-watermark-export-governance")?.status, "implemented");
+    assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-protection-runtime")?.status, "implemented");
     assert.deepEqual(pending.map((item) => item.id), pendingCompletionProgramTaskIDs);
     assert.equal(blocked.length, 0);
+  });
+
+  it("rejects regressing sensitive data protection after closeout", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    graph.tasks.find((item) => item.id === "sensitive-data-protection-runtime").status = "pending";
+    const graphPath = tempJSON("pending-sensitive-data-protection.json", graph);
+
+    const result = runValidator(["--graph", graphPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /sensitive-data-protection-runtime must stay implemented after closeout/);
   });
 
   it("rejects watermark closeout without UI UX and browser evidence", () => {

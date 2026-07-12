@@ -319,6 +319,23 @@ function validateTask(task, context, errors) {
       errors,
     );
   }
+  if (task.id === "sensitive-data-protection-runtime") {
+    if (task.status !== "implemented") {
+      errors.push("sensitive-data-protection-runtime must stay implemented after closeout");
+    }
+    requireIncludes(
+      task.evidence?.tests,
+      ["internal/platform/adminresource/protection_test.go", "internal/platform/dataprotection/runtime_test.go"],
+      `${task.id} evidence.tests`,
+      errors,
+    );
+    requireIncludes(
+      task.evidence?.validators,
+      ["scripts/validate-platform-production-env.mjs", "scripts/validate-platform-node-closeout-audit.mjs"],
+      `${task.id} evidence.validators`,
+      errors,
+    );
+  }
   if (task.status === "implemented" || task.status === "preview") {
     const evidence = task.evidence ?? {};
     const evidencePaths = evidencePathKeys.flatMap((key) => values(evidence[key]));

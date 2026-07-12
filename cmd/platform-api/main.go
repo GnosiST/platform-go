@@ -123,17 +123,8 @@ func validateCredentialBoundary(manifests []capability.Manifest) error {
 	for _, manifest := range manifests {
 		for _, provider := range manifest.AuthProviders {
 			kind := strings.ToLower(strings.TrimSpace(provider.Kind))
-			id := strings.ToLower(strings.TrimSpace(provider.ID))
-			if strings.Contains(kind, "password") || strings.Contains(id, "password") {
+			if kind == "password" {
 				return fmt.Errorf("local password provider requires a separately approved Argon2id capability")
-			}
-		}
-		for _, resource := range manifest.Admin.Resources {
-			for _, field := range resource.Fields {
-				key := strings.ToLower(strings.TrimSpace(field.Key))
-				if strings.Contains(key, "password") || strings.Contains(key, "passwd") {
-					return fmt.Errorf("password fields cannot use generic admin resource persistence")
-				}
 			}
 		}
 	}

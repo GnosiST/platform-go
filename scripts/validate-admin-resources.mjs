@@ -81,57 +81,8 @@ function isMaskedProjection(mode) {
   return mode === "masked" || mode === "omitted";
 }
 
-function validSecurityFieldPolicy(sensitivity, storageMode, responseMode, exportMode) {
-  if (sensitivity === "personal" && storageMode === "masked") {
-    return isMaskedProjection(responseMode) && isMaskedProjection(exportMode);
-  }
-  if (sensitivity === "public" || !["hashed", "encrypted"].includes(storageMode)) {
-    return false;
-  }
-  if (storageMode === "encrypted") {
-    return ["privileged", "omitted"].includes(responseMode) && ["privileged", "omitted"].includes(exportMode);
-  }
-  return responseMode === "omitted" && exportMode === "omitted";
-}
-
 function isCanonicalProtectionName(value) {
   return typeof value === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
-}
-
-function isSecurityFieldName(key) {
-  const normalized = String(key ?? "").trim().toLowerCase().replaceAll(/[_\-.]/g, "");
-  let base = normalized;
-  for (;;) {
-    const previous = base;
-    for (const suffix of ["hash", "digest"]) {
-      if (base.endsWith(suffix)) {
-        base = base.slice(0, -suffix.length);
-      }
-    }
-    if (base === previous) {
-      break;
-    }
-  }
-  if (["code", "session"].includes(base) && base !== normalized) {
-    return true;
-  }
-  if (["verificationcode", "debugcode", "providersubject", "phone", "phonenumber", "identitynumber", "idnumber", "email", "address", "detailedaddress", "sessionid", "sessionhandle", "sessiontoken"].includes(base)) {
-    return true;
-  }
-  if (["password", "passwd", "token", "secret", "credential", "credentials", "sessionid", "sessionhandle", "sessiontoken", "session"].some((marker) => protectedNameMatch(base, marker))) {
-    return true;
-  }
-  return ["email", "phone", "phonenumber", "address", "identitynumber", "idnumber", "providersubject"].some((suffix) => base.endsWith(suffix));
-}
-
-function protectedNameMatch(normalized, marker) {
-  if (normalized === marker || normalized.endsWith(marker)) {
-    return true;
-  }
-  if (!normalized.startsWith(marker)) {
-    return false;
-  }
-  return !["prefix", "type", "count", "status", "expiresat", "issuedat", "createdat", "updatedat", "revokedat", "lastusedat"].some((suffix) => normalized.endsWith(suffix));
 }
 
 function runCommand(label, command, args = []) {
@@ -491,9 +442,6 @@ function validateManifest() {
         if (field.sortable === true || field.sort === true || (schema.sort ?? []).includes(field.key)) {
           errors.push(`${prefix} field ${field.key} encrypted fields cannot be sorted`);
         }
-      }
-      if (isSecurityFieldName(field.key) && !validSecurityFieldPolicy(sensitivity, storageMode, responseMode, exportMode)) {
-        errors.push(`${prefix} field ${field.key} security field names require masked personal or protected non-public storage`);
       }
       if (field.relation) {
         const relation = field.relation;

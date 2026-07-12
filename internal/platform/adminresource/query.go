@@ -234,7 +234,7 @@ func queryableSearchFields(schema Schema, fields map[string]FieldDefinition) []F
 	result = append(result, fields["id"])
 	for _, key := range searchKeys {
 		field, ok := fields[key]
-		if !ok || field.StorageMode == capability.FieldStorageEncrypted || isSensitiveQueryField(key) {
+		if !ok || field.StorageMode == capability.FieldStorageEncrypted {
 			continue
 		}
 		result = append(result, field)
@@ -272,9 +272,6 @@ func normalizeConditionWithProtection(condition QueryCondition, fields map[strin
 		}
 		return normalizedCondition{field: field, operator: operator, value: value}, nil
 	}
-	if isSensitiveQueryField(fieldKey) {
-		return normalizedCondition{}, QueryValidationError{Field: fieldKey, Reason: "sensitive field cannot be queried"}
-	}
 	if !field.Filterable && !field.Searchable {
 		return normalizedCondition{}, QueryValidationError{Field: fieldKey, Reason: "query field is not filterable"}
 	}
@@ -293,9 +290,6 @@ func normalizeSort(sorter QuerySort, fields map[string]FieldDefinition) (normali
 	fieldKey := strings.TrimSpace(sorter.Field)
 	if fieldKey == "" {
 		return normalizedSort{}, nil
-	}
-	if isSensitiveQueryField(fieldKey) {
-		return normalizedSort{}, QueryValidationError{Field: fieldKey, Reason: "sensitive field cannot be sorted"}
 	}
 	field, ok := fields[fieldKey]
 	if !ok {
@@ -552,42 +546,4 @@ func uniqueStrings(values ...string) []string {
 		result = append(result, value)
 	}
 	return result
-}
-
-func isSensitiveQueryField(field string) bool {
-	normalized := strings.ToLower(strings.Map(func(r rune) rune {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
-			return r
-		}
-		return -1
-	}, field))
-	keywords := []string{
-		"password",
-		"token",
-		"secret",
-		"credential",
-		"verificationcode",
-		"smscode",
-		"authcode",
-		"wechatcode",
-		"refresh",
-		"openid",
-		"unionid",
-		"deviceid",
-		"sessionid",
-		"phone",
-		"mobile",
-		"idcard",
-		"identitycard",
-		"identitynumber",
-		"realname",
-		"reviewnote",
-		"auditnote",
-		"privateprice",
-		"priceamount",
-		"amountcents",
-	}
-	return slices.ContainsFunc(keywords, func(keyword string) bool {
-		return strings.Contains(normalized, keyword)
-	})
 }

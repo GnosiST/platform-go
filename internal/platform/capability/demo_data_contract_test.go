@@ -122,27 +122,21 @@ func TestValidateDemoDataDeclarationsRejectsDuplicateRecordCodes(t *testing.T) {
 	}
 }
 
-func TestValidateDemoDataDeclarationsRejectsSensitiveRecordValueFields(t *testing.T) {
-	for _, field := range []string{"password", "apiToken", "wechatOpenID", "verificationCode"} {
-		t.Run(field, func(t *testing.T) {
-			dataset := validDemoDataSet("platform-demo-tenants", "tenants")
-			dataset.Records[0].Values = map[string]string{field: "demo-secret"}
-			manifests := []Manifest{
-				{
-					ID:       "tenant",
-					Admin:    AdminSurface{Resources: []AdminResource{validAdminResource("tenants", "/tenants", "admin:tenant")}},
-					DemoData: []DemoDataSet{dataset},
-				},
-			}
+func TestValidateDemoDataDeclarationsDoesNotInferSensitivityFromFieldName(t *testing.T) {
+	resource := validAdminResource("tenants", "/tenants", "admin:tenant")
+	resource.Fields = []AdminField{{
+		Key: "apiToken", Label: Text("公开标记", "Public Marker"), Type: "text", Source: "values",
+		Sensitivity: FieldSensitivityPublic, StorageMode: FieldStoragePlain,
+		ResponseMode: FieldProjectionFull, ExportMode: FieldProjectionFull,
+	}}
+	dataset := validDemoDataSet("platform-demo-tenants", "tenants")
+	dataset.Records[0].Values = map[string]string{"apiToken": "demo-public-marker"}
+	manifests := []Manifest{{
+		ID: "tenant", Admin: AdminSurface{Resources: []AdminResource{resource}}, DemoData: []DemoDataSet{dataset},
+	}}
 
-			err := ValidateDemoDataDeclarations(manifests)
-			if err == nil {
-				t.Fatalf("ValidateDemoDataDeclarations() error = nil, want sensitive field error")
-			}
-			if !strings.Contains(err.Error(), "must not include sensitive field") {
-				t.Fatalf("ValidateDemoDataDeclarations() error = %v, want sensitive field error", err)
-			}
-		})
+	if err := ValidateDemoDataDeclarations(manifests); err != nil {
+		t.Fatalf("ValidateDemoDataDeclarations() error = %v", err)
 	}
 }
 

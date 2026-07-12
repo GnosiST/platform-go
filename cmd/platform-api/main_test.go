@@ -1,10 +1,10 @@
 package main
 
 import (
-	"strings"
 	"testing"
 
 	"platform-go/internal/apps"
+	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/config"
 	"platform-go/internal/platform/httpapi"
 )
@@ -21,22 +21,33 @@ func TestPhoneVerificationSenderFromConfigCreatesOnlyCanonicalDebugSender(t *tes
 	}
 }
 
-func TestPlatformHasNoLocalPasswordProviderOrPasswordPersistencePath(t *testing.T) {
+func TestPlatformRejectsLocalPasswordProviderWithoutInferringFieldSemanticsFromNames(t *testing.T) {
 	if err := validateCredentialBoundary(apps.DefaultManifests()); err != nil {
 		t.Fatalf("validateCredentialBoundary() error = %v", err)
 	}
-	for _, manifest := range apps.DefaultManifests() {
-		for _, provider := range manifest.AuthProviders {
-			if strings.Contains(strings.ToLower(provider.Kind), "password") || strings.Contains(strings.ToLower(provider.ID), "password") {
-				t.Fatalf("default manifest %q exposes local password provider %+v", manifest.ID, provider)
-			}
-		}
-		for _, resource := range manifest.Admin.Resources {
-			for _, field := range resource.Fields {
-				if strings.Contains(strings.ToLower(field.Key), "password") {
-					t.Fatalf("default resource %q persists password-like field %q", resource.Resource, field.Key)
-				}
-			}
-		}
+	customFieldManifest := capability.Manifest{
+		ID: "custom-fields",
+		Admin: capability.AdminSurface{Resources: []capability.AdminResource{{
+			Resource: "custom-records",
+			Fields: []capability.AdminField{{
+				Key: "passwordHint", Source: "values", Sensitivity: capability.FieldSensitivityPublic,
+				StorageMode: capability.FieldStoragePlain, ResponseMode: capability.FieldProjectionFull, ExportMode: capability.FieldProjectionFull,
+			}},
+		}}},
+	}
+	if err := validateCredentialBoundary([]capability.Manifest{customFieldManifest}); err != nil {
+		t.Fatalf("validateCredentialBoundary(custom field) error = %v", err)
+	}
+	passwordlessProviderManifest := capability.Manifest{
+		ID: "passwordless-auth", AuthProviders: []capability.AuthProvider{{ID: "passwordless-oidc", Kind: "oidc"}},
+	}
+	if err := validateCredentialBoundary([]capability.Manifest{passwordlessProviderManifest}); err != nil {
+		t.Fatalf("validateCredentialBoundary(passwordless provider) error = %v", err)
+	}
+	passwordProviderManifest := capability.Manifest{
+		ID: "local-password", AuthProviders: []capability.AuthProvider{{ID: "custom-login", Kind: " PASSWORD "}},
+	}
+	if err := validateCredentialBoundary([]capability.Manifest{passwordProviderManifest}); err == nil {
+		t.Fatal("validateCredentialBoundary(password provider) error = nil")
 	}
 }

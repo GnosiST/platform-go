@@ -261,18 +261,6 @@ func TestValidateAdminSurfaceValidatesFieldSecurityPolicies(t *testing.T) {
 			Sensitivity: FieldSensitivitySensitive, StorageMode: FieldStorageEncrypted, ResponseMode: FieldProjectionFull, ExportMode: FieldProjectionOmitted,
 			Protection: &AdminFieldProtection{Format: "aes-256-gcm-v1", Normalization: "raw-v1"},
 		}, wantErr: "must use privileged or omitted response and export"},
-		{name: "masked credential disguise", key: "maskedToken", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
-		{name: "masked personal disguise", key: "maskedPhone", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
-		{name: "compound token", key: "apiToken", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
-		{name: "multi suffix token", key: "apiTokenHashDigest", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
-		{name: "token value", key: "tokenValue", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
-		{name: "compound secret", key: "authSecret", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
-		{name: "masked password", key: "maskedPassword", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
-		{name: "compound credential", key: "serviceCredential", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
-		{name: "compound session id", key: "adminSessionId", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
-		{name: "compound session handle", key: "authSessionHandle", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
-		{name: "compound session token", key: "serviceSessionToken", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
-		{name: "masked provider subject", key: "maskedProviderSubject", field: AdminField{}, wantErr: "security field names require masked personal or protected non-public storage"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -294,6 +282,22 @@ func TestValidateAdminSurfaceValidatesFieldSecurityPolicies(t *testing.T) {
 				t.Fatalf("ValidateAdminSurface() error = %v, want %q", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestValidateAdminSurfaceUsesExplicitPolicyForSecurityLikeFieldNames(t *testing.T) {
+	resource := validAdminResource("contact-records", "/contact-records", "admin:contact-record")
+	for _, key := range []string{"contactPhone", "email", "address", "apiToken"} {
+		resource.Fields = append(resource.Fields, AdminField{
+			Key: key, Label: Text("公开字段", "Public Field"), Type: "text", Source: "values",
+			Sensitivity: FieldSensitivityPublic, StorageMode: FieldStoragePlain,
+			ResponseMode: FieldProjectionFull, ExportMode: FieldProjectionFull,
+			Searchable: true, Filterable: true, Sortable: true,
+		})
+	}
+
+	if err := ValidateAdminSurface([]Manifest{{ID: "contacts", Admin: AdminSurface{Resources: []AdminResource{resource}}}}); err != nil {
+		t.Fatalf("ValidateAdminSurface() error = %v", err)
 	}
 }
 

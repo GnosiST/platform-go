@@ -631,7 +631,7 @@
         "en": "Admin API Boundary And Query Security"
       },
       "status": "implemented",
-      "purpose": "Keep admin requests behind the platform API client and keep list queries as structured, schema-whitelisted POST payloads instead of raw SQL or query-string filters.",
+      "purpose": "Keep admin requests behind the platform API client and keep list queries as structured, schema-whitelisted POST payloads instead of raw SQL or query-string filters. Sensitivity comes only from capability manifests; encrypted fields allow only declared blind-index exact matches and cannot be sorted.",
       "dependsOn": [
         "dynamic-admin-resources",
         "openapi-api-docs",
@@ -679,7 +679,7 @@
           },
           {
             "path": "internal/platform/adminresource/query.go",
-            "contains": "sensitive field cannot be queried"
+            "contains": "encrypted field supports only exact-match queries"
           },
           {
             "path": "internal/platform/adminresource/query.go",
@@ -2693,7 +2693,30 @@
       "evidence": {
         "sourcePaths": [
           "docs/superpowers/specs/2026-07-12-sensitive-data-encryption-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
+          "docs/superpowers/plans/2026-07-12-sensitive-data-protection-runtime.md",
+          "internal/platform/capability/manifest.go",
+          "internal/platform/adminresource/security.go",
+          "internal/platform/adminresource/query.go",
+          "internal/platform/adminresource/store.go",
+          "internal/platform/dataprotection/runtime.go",
+          "internal/platform/bootstrap/data_protection.go",
+          "cmd/platform-api/main.go"
+        ],
+        "tests": [
+          "internal/platform/capability/admin_contract_test.go",
+          "internal/platform/adminresource/protection_test.go",
+          "internal/platform/dataprotection/runtime_test.go",
+          "internal/platform/bootstrap/admin_resources_test.go",
+          "internal/platform/httpapi/data_protection_test.go",
+          "scripts/platform-production-env.test.mjs"
+        ],
+        "validators": [
+          "scripts/validate-admin-resources.mjs",
+          "scripts/validate-platform-production-env.mjs",
+          "scripts/validate-platform-production-readiness.mjs",
+          "scripts/validate-platform-deployment-topology.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs"
         ],
         "taskIds": [
           "sensitive-data-protection-runtime",

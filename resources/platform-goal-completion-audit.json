@@ -8,7 +8,6 @@
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "businessReferenceMode": "reference-only",
     "requiredControlledUnfinishedNodes": [
-      "sensitive-data-protection-runtime",
       "sensitive-data-historical-migration",
       "open-source-portability",
       "public-docs-community",
@@ -22,8 +21,8 @@
   },
   "taskSummary": {
     "expectedTotal": 45,
-    "expectedImplemented": 39,
-    "expectedControlledUnfinished": 6
+    "expectedImplemented": 40,
+    "expectedControlledUnfinished": 5
   },
   "requirements": [
     {

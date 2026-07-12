@@ -134,13 +134,19 @@ describe("validate-platform-admin-api-boundary", () => {
   it("rejects weakening the structured query policy", () => {
     const boundary = readJSON("resources/platform-admin-api-boundary.json");
     boundary.querySecurity.rawSQLAllowed = true;
-    boundary.querySecurity.sensitiveFieldsAllowed = true;
+    boundary.querySecurity.sensitivityPolicySource = "field-name-list";
+    boundary.querySecurity.fieldNameInferenceAllowed = true;
+    boundary.querySecurity.encryptedFieldQueryPolicy = "all-operators";
+    boundary.querySecurity.encryptedFieldSortAllowed = true;
     const boundaryPath = tempJSON("platform-admin-api-boundary.json", boundary);
 
     const result = runValidator(["--boundary", boundaryPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /querySecurity\.rawSQLAllowed must stay false/);
-    assert.match(result.stderr, /querySecurity\.sensitiveFieldsAllowed must stay false/);
+    assert.match(result.stderr, /querySecurity\.sensitivityPolicySource must stay capability manifest/);
+    assert.match(result.stderr, /querySecurity\.fieldNameInferenceAllowed must stay false/);
+    assert.match(result.stderr, /querySecurity\.encryptedFieldQueryPolicy must stay declared-blind-index-exact-match-only/);
+    assert.match(result.stderr, /querySecurity\.encryptedFieldSortAllowed must stay false/);
   });
 });

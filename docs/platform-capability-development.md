@@ -122,6 +122,32 @@ func Manifest() capability.Manifest {
 }
 ```
 
+Recoverable sensitive fields are capability configuration, not platform field-name conventions. Add resource-level AAD scope and field-level protection explicitly:
+
+```go
+resource.Protection = &capability.AdminResourceProtection{
+    SchemaVersion: 1,
+    Scope:         "tenant-field",
+    TenantField:   "tenantCode",
+}
+resource.Fields = append(resource.Fields, capability.AdminField{
+    Key: "governmentReference", Source: "values", Type: "text", InForm: true,
+    Sensitivity: capability.FieldSensitivitySensitive,
+    StorageMode: capability.FieldStorageEncrypted,
+    ResponseMode: capability.FieldProjectionPrivileged,
+    ExportMode: capability.FieldProjectionOmitted,
+    Protection: &capability.AdminFieldProtection{
+        Format: "aes-256-gcm-v1",
+        Normalization: "trim-v1",
+        BlindIndexNamespace: "feedback-government-reference",
+    },
+})
+```
+
+Use `raw-v1`, `trim-v1`, `email-v1`, `phone-e164-cn-v1` or `identity-cn-v1` according to the value contract. Do not infer the normalizer from the key. Omit `BlindIndexNamespace` when lookup is unnecessary; otherwise only exact `=` queries are available. A `tenant-field` must be declared, required, plain and stable. Ordinary API and export projection omit encrypted values. No generic reveal HTTP route exists; authorized reveal, step-up verification and historical plaintext migration require separate approved capabilities.
+
+The platform does not infer sensitivity from names such as `phone`, `email`, `address`, `password` or `token`. Manifest authors must classify every non-public value explicitly; contract validation enforces the declared policy but does not replace that ownership decision with a built-in name list.
+
 ## Manifest Registration Rules
 
 `Registry.Register` is the runtime entry gate for every capability manifest. It normalizes leading and trailing whitespace, then rejects manifests that do not meet the shared plugin contract:
@@ -220,7 +246,7 @@ Provider declarations may be visible but unconfigured. The UI should render unco
 
 Each provider manifest must use stable lowercase id and kind values with only letters, numbers and hyphens. `Title` and `Description` are required localized text. `ConfigKeys` lists environment-style configuration keys, using uppercase letters, numbers and underscores, and duplicate or empty keys are rejected. This keeps WeChat, SSO and future provider plugins discoverable without adding provider-specific fields to the shell.
 
-The current platform intentionally has no local-password provider or password repository. The API composition root rejects a provider with kind `password`, and generic resource schemas/writes reject password/passwd and other credential fields. A future local-password plugin must be a separately approved capability with dedicated Argon2id hashing and migration/reset/rotation contracts; it must not persist password hashes in generic `Record.Values` or make hashing policy a mutable project-initialization switch.
+The current platform intentionally has no local-password provider or password repository. The API composition root rejects the explicit provider kind `password`; provider IDs and generic field names do not select authentication semantics. A future local-password plugin must be a separately approved capability with dedicated Argon2id hashing and migration/reset/rotation contracts; it must not persist password hashes in generic `Record.Values` or make hashing policy a mutable project-initialization switch.
 
 Every provider declares an explicit `admin` or `app` audience. Admin discovery and login must not expose App-only providers, App login must reject Admin-only providers, and the two security domains must not share identity resolvers, binding stores or token types. Admin OIDC uses `POST /api/auth/providers/:provider/start` plus the existing login exchange, then resolves only an enabled `admin-identities` binding to an existing enabled Admin user with effective permissions.
 
@@ -386,7 +412,7 @@ Do not use demo data for:
 
 Demo records should be idempotent through stable IDs or codes.
 
-Manifest validation rejects demo datasets whose target resource is not provided by the enabled admin resource manifest set. It also rejects malformed or duplicate dataset IDs, duplicate record IDs or codes within the same dataset, and record `Values` that include sensitive fields such as password, token, secret, credential, verification code, OpenID, UnionID or session id material. A capability that ships demo data for `tasks`, for example, must also enable the capability that contributes the `tasks` admin resource.
+Manifest validation rejects demo datasets whose target resource is not provided by the enabled admin resource manifest set. It also rejects malformed or duplicate dataset IDs and duplicate record IDs or codes within the same dataset. Demo `Values` are interpreted only through the target resource's declared field policy; key names do not infer sensitivity, and undeclared keys or policy-invalid writes fail when the dataset is applied. A capability that ships demo data for `tasks`, for example, must also enable the capability that contributes the `tasks` admin resource.
 
 ## Disable Behavior
 

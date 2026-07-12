@@ -40,7 +40,7 @@ describe("platform foundation documentation drift", () => {
       "docs/platform-roadmap.md",
       "docs/platform-ui-optimization-assessment.md",
     ]) {
-      assert.match(read(relativePath), /`admin-watermark-export-governance` is `implemented`/);
+      assert.match(read(relativePath), /`admin-watermark-export-governance`[^.\n]*`implemented`/);
     }
   });
 
@@ -81,9 +81,17 @@ describe("platform foundation documentation drift", () => {
       "docs/platform-roadmap.md",
       "docs/platform-ui-optimization-assessment.md",
     ]) {
-      assert.match(read(relativePath), /`runtime-security-containment` is `implemented`/);
+      assert.match(read(relativePath), /`runtime-security-containment`[^.\n]*`implemented`/);
     }
     assert.match(read(".superpowers/sdd/runtime-security-progress.md"), /Task 7: complete/);
+  });
+
+  it("records configurable sensitive data protection as implemented", () => {
+    for (const relativePath of ["README.md", "docs/platform-foundation-task-map.md", "docs/platform-roadmap.md"]) {
+      assert.match(read(relativePath), /`sensitive-data-protection-runtime`[^.\n]*`implemented`/);
+    }
+    assert.match(read("docs/admin-resource-schema.md"), /Sensitive fields are not identified by a built-in list of names/);
+    assert.match(read(".superpowers/sdd/sensitive-data-progress.md"), /Task 4: complete/);
   });
 
   it("documents the policy review workflow routes", () => {

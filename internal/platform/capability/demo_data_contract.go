@@ -78,11 +78,6 @@ func validateDemoDataSet(owner ID, dataset DemoDataSet, resources map[string]ID)
 		if strings.TrimSpace(record.Name) == "" {
 			return fmt.Errorf("capability %q demo data %q record %q name is required", owner, dataset.ID, record.ID)
 		}
-		for field := range record.Values {
-			if isSensitiveDemoDataField(field) {
-				return fmt.Errorf("capability %q demo data %q record %q must not include sensitive field %q", owner, dataset.ID, record.ID, field)
-			}
-		}
 	}
 	return nil
 }
@@ -104,31 +99,4 @@ func validDemoDataIdentifier(value string) bool {
 		return false
 	}
 	return true
-}
-
-func isSensitiveDemoDataField(field string) bool {
-	normalized := strings.ToLower(strings.Map(func(char rune) rune {
-		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') {
-			return char
-		}
-		return -1
-	}, field))
-	for _, keyword := range []string{
-		"password",
-		"token",
-		"secret",
-		"credential",
-		"verificationcode",
-		"smscode",
-		"authcode",
-		"wechatcode",
-		"openid",
-		"unionid",
-		"sessionid",
-	} {
-		if strings.Contains(normalized, keyword) {
-			return true
-		}
-	}
-	return false
 }

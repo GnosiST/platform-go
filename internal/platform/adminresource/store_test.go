@@ -594,6 +594,37 @@ func TestStoreQuerySearchesLocalizableValues(t *testing.T) {
 	}
 }
 
+func TestStoreQueryUsesDeclaredCapabilitiesForSecurityLikeFieldNames(t *testing.T) {
+	schema := defaultSchema("contacts", text("联系人", "Contacts"), text("联系人记录", "Contact records"), "admin:contact")
+	values := map[string]string{}
+	for _, key := range []string{"contactPhone", "email", "address", "apiToken"} {
+		field := valueField(key, text("公开字段", "Public Field"), "text", false, true, true, true, true, 180, nil)
+		field.Sensitivity = capability.FieldSensitivityPublic
+		field.StorageMode = capability.FieldStoragePlain
+		field.ResponseMode = capability.FieldProjectionFull
+		field.ExportMode = capability.FieldProjectionFull
+		schema.Fields = append(schema.Fields, field)
+		schema.SearchFields = append(schema.SearchFields, key)
+		values[key] = "public-" + key
+	}
+	store := newStore(map[string][]Record{"contacts": {{
+		ID: "contact-1", Code: "contact-1", Name: "Contact One", Status: "enabled", Values: values,
+	}}}, map[string]Schema{"contacts": schema})
+
+	for key, value := range values {
+		result, err := store.Query("contacts", QueryInput{
+			Conditions: []QueryCondition{{Field: key, Operator: "=", Value: value}},
+			Sort:       []QuerySort{{Field: key, Order: "asc"}},
+		})
+		if err != nil {
+			t.Fatalf("Query(%s) error = %v", key, err)
+		}
+		if result.Total != 1 || len(result.Items) != 1 || result.Items[0].ID != "contact-1" {
+			t.Fatalf("Query(%s) = %+v, want contact-1", key, result)
+		}
+	}
+}
+
 func TestStoreQueryRejectsUnsafeConditions(t *testing.T) {
 	store := NewStoreFromCapabilities(core.DefaultManifests())
 	tests := []struct {
@@ -603,10 +634,6 @@ func TestStoreQueryRejectsUnsafeConditions(t *testing.T) {
 		{
 			name:  "unknown field",
 			input: QueryInput{Conditions: []QueryCondition{{Field: "missing", Operator: "=", Value: "x"}}},
-		},
-		{
-			name:  "sensitive field",
-			input: QueryInput{Conditions: []QueryCondition{{Field: "password", Operator: "=", Value: "x"}}},
 		},
 		{
 			name:  "invalid operator",

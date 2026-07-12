@@ -235,8 +235,17 @@ function validateBoundaryPolicy(boundary, errors) {
   if (boundary.querySecurity?.fieldWhitelistSource !== "resource schema") {
     errors.push("querySecurity.fieldWhitelistSource must stay resource schema");
   }
-  if (boundary.querySecurity?.sensitiveFieldsAllowed !== false) {
-    errors.push("querySecurity.sensitiveFieldsAllowed must stay false");
+  if (boundary.querySecurity?.sensitivityPolicySource !== "capability manifest") {
+    errors.push("querySecurity.sensitivityPolicySource must stay capability manifest");
+  }
+  if (boundary.querySecurity?.fieldNameInferenceAllowed !== false) {
+    errors.push("querySecurity.fieldNameInferenceAllowed must stay false");
+  }
+  if (boundary.querySecurity?.encryptedFieldQueryPolicy !== "declared-blind-index-exact-match-only") {
+    errors.push("querySecurity.encryptedFieldQueryPolicy must stay declared-blind-index-exact-match-only");
+  }
+  if (boundary.querySecurity?.encryptedFieldSortAllowed !== false) {
+    errors.push("querySecurity.encryptedFieldSortAllowed must stay false");
   }
   if (boundary.querySecurity?.sortWhitelistRequired !== true) {
     errors.push("querySecurity.sortWhitelistRequired must stay true");

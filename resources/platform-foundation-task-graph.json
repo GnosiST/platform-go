@@ -1908,15 +1908,7 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
-      "statusReason": {
-        "zh": "字段策略、AES-256-GCM 信封和盲索引设计已批准，密钥提供器和持久化边界尚未实现。",
-        "en": "Field policies, AES-256-GCM envelopes and blind indexes are approved, but key providers and persistence boundaries are not implemented."
-      },
-      "completionGate": {
-        "zh": "完成版本化加密、授权后解密、精确匹配盲索引、不可变格式门禁和密钥轮换测试。",
-        "en": "Complete versioned encryption, post-authorization decryption, exact-match blind indexes, immutable-format gates and key-rotation tests."
-      },
+      "status": "implemented",
       "resourceLocks": [
         "data-protection",
         "admin-resource-contract",
@@ -1932,7 +1924,45 @@
         "docs": [
           "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
           "docs/superpowers/specs/2026-07-12-sensitive-data-encryption-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
+          "docs/superpowers/plans/2026-07-12-sensitive-data-protection-runtime.md",
+          "docs/admin-resource-schema.md",
+          "docs/platform-capability-development.md",
+          "docs/platform-deployment.md"
+        ],
+        "sourcePaths": [
+          "internal/platform/capability/manifest.go",
+          "internal/platform/adminresource/security.go",
+          "internal/platform/adminresource/query.go",
+          "internal/platform/adminresource/store.go",
+          "internal/platform/dataprotection/runtime.go",
+          "internal/platform/bootstrap/data_protection.go",
+          "cmd/platform-api/main.go"
+        ],
+        "validators": [
+          "scripts/validate-admin-resources.mjs",
+          "scripts/validate-platform-production-env.mjs",
+          "scripts/validate-platform-production-readiness.mjs",
+          "scripts/validate-platform-deployment-topology.mjs",
+          "scripts/validate-platform-foundation-task-graph.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs"
+        ],
+        "tests": [
+          "internal/platform/capability/admin_contract_test.go",
+          "internal/platform/adminresource/protection_test.go",
+          "internal/platform/dataprotection/runtime_test.go",
+          "internal/platform/dataprotection/provider_test.go",
+          "internal/platform/bootstrap/data_protection_test.go",
+          "internal/platform/bootstrap/admin_resources_test.go",
+          "internal/platform/httpapi/data_protection_test.go",
+          "scripts/platform-production-env.test.mjs",
+          "scripts/platform-deployment-topology.test.mjs"
+        ],
+        "checks": [
+          "rtk go test ./...",
+          "rtk go vet ./...",
+          "rtk node --test scripts/*.test.mjs",
+          "rtk npm --prefix admin run build"
         ]
       }
     },

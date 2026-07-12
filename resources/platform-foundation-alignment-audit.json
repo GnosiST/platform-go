@@ -63,10 +63,10 @@
     "admin-ui-system-quality-hardening",
     "production-admin-oidc-auth",
     "runtime-security-containment",
-    "admin-watermark-export-governance"
+    "admin-watermark-export-governance",
+    "sensitive-data-protection-runtime"
   ],
   "requiredFutureTaskNodes": [
-    "sensitive-data-protection-runtime",
     "sensitive-data-historical-migration",
     "open-source-portability",
     "public-docs-community",

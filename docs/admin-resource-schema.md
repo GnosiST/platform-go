@@ -70,12 +70,48 @@ Each field declares:
 - `validation`: optional form validation metadata. Supported keys are `minLength`, `maxLength`, `min`, `max` and `pattern`.
 - `sensitivity`: `public`, `internal`, `personal`, `sensitive` or `secret` classification;
 - `storageMode`: `plain`, `masked`, `hashed` or `encrypted` storage contract;
-- `responseMode` and `exportMode`: `full`, `masked`, `hashed` or `omitted` projections applied before values leave the Store.
+- `responseMode` and `exportMode`: `full`, `masked`, `privileged` or `omitted` projections applied before values leave the Store;
+- `protection`: required only for `storageMode=encrypted`; declares `format`, `normalization` and optional `blindIndexNamespace`.
+
+## Configurable Encrypted Fields
+
+Sensitive fields are not identified by a built-in list of names. Any capability-owned `values` field can opt into recoverable protection by declaring `storageMode=encrypted`, field protection metadata and a resource protection context. Names such as `phone`, `email`, `identityNumber`, `address` and `governmentReference` have no runtime meaning.
+
+```go
+capability.AdminResource{
+    Resource: "customer-profiles",
+    Protection: &capability.AdminResourceProtection{
+        SchemaVersion: 1,
+        Scope:         "tenant-field",
+        TenantField:   "tenantCode",
+    },
+    Fields: []capability.AdminField{
+        {
+            Key: "governmentReference", Source: "values",
+            Sensitivity: capability.FieldSensitivitySensitive,
+            StorageMode: capability.FieldStorageEncrypted,
+            ResponseMode: capability.FieldProjectionPrivileged,
+            ExportMode: capability.FieldProjectionOmitted,
+            Protection: &capability.AdminFieldProtection{
+                Format: "aes-256-gcm-v1",
+                Normalization: "trim-v1",
+                BlindIndexNamespace: "customer-government-reference",
+            },
+        },
+    },
+}
+```
+
+Supported normalizers are `raw-v1`, `trim-v1`, `email-v1`, `phone-e164-cn-v1` and `identity-cn-v1`. The manifest selects the rule explicitly; the field name never selects it. An empty `blindIndexNamespace` disables querying. A declared namespace enables only structured `=` conditions; encrypted fields cannot participate in keyword search, range conditions or sorting. `Scope=global` uses the stable platform sentinel. `Scope=tenant-field` requires a declared, required, plain tenant field whose value cannot change after encrypted data exists.
+
+The Store assigns the record ID before encryption, creates an AES-256-GCM envelope, and persists the blind-index metadata inside that envelope. Ordinary response and export projection omit encrypted values and never decrypt. `ProjectRecordPrivileged` authorizes each field before calling `Reveal`; this runtime does not expose a privileged HTTP endpoint. Hashed fields remain one-way and are never revealable. File, SQL and GORM repositories persist opaque envelopes without understanding the field policy.
+
+Format, normalization, namespace, tenant scope and schema version are compatibility contracts once data exists. Startup authenticates stored envelopes and fails when policy drifts or a referenced historical key is missing or replaced. Historical plaintext migration remains a separate pending node.
 
 ## Current Behavior
 
 - Backend validates required fields before creating or updating records.
-- Backend rejects unknown `values` keys and globally prohibited password, token, secret, credential, verification-code, provider-subject and raw-session keys before persistence. External writes cannot populate internal/personal/sensitive/secret or read-only fields.
+- Backend rejects unknown `values` keys and validates every declared field against its explicit `sensitivity`, `storageMode`, `responseMode`, `exportMode` and `protection` policy before persistence. Field names never change write, query, storage or projection behavior. External writes cannot populate internal/personal/sensitive/secret or read-only fields unless a writable field explicitly declares encrypted storage and the Store has a protection runtime.
 - List, query, detail and export responses are rebuilt from declared schema fields. Internal and protected values do not leak through a cloned `Record.Values` map, and any projection failure aborts the response rather than falling back to raw values.
 - Generic create, update and delete persist the business record and redacted audit record in one repository snapshot. A repository or audit validation failure restores the previous snapshot.
 - Backend checks resource action permissions before schema, query, list, create, update and delete responses.
@@ -128,7 +164,7 @@ Rules:
 
 - field names must exist in the backend schema and be declared searchable/filterable before the backend executes a condition;
 - sort fields must exist in the backend schema and be declared sortable;
-- sensitive fields such as password, token, secret, phone and identity fields are rejected before matching;
+- encrypted fields are excluded from keyword matching and sorting; they support only `=` when the manifest declares a `blindIndexNamespace` and the data-protection runtime is available;
 - allowed operators are `contains`, `=`, `!=`, `>`, `<`, `>=` and `<=`; the UI maps `:` and `~` to `contains`;
 - plain tokens become `keywords`; field expressions become structured `conditions`;
 - UI parsing and backend parsing must convert tokens into structured conditions before filtering;

@@ -39,7 +39,8 @@ The platform validates enabled demo data declarations during capability resoluti
 - at least one record is required;
 - each record requires stable `id`, `code` and `name`;
 - record IDs and record codes must be unique inside the same dataset.
-- record `Values` must not include sensitive field names such as password, token, secret, credential, verification code, OpenID, UnionID or session id material.
+
+Field-policy validation happens when the dataset is applied to the Store, not during capability declaration resolution. At apply time, every `Values` key must exist in the target resource schema and follow that field's explicit security policy. The Store does not infer sensitivity from a key name; demo writes use the same write and protection rules as other internal mutations.
 
 This makes demo datasets plugin-safe: disabling the capability that owns a resource also disables demo data that would write to that resource, instead of failing later at apply time or silently creating orphaned fixtures.
 
