@@ -34,6 +34,13 @@ const requiredRuntimeGateSnippets = [
   "production runtime requires PLATFORM_CACHE_DRIVER=redis",
   "production runtime must not enable demo-data capability",
   "production runtime requires PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+  "production runtime requires PLATFORM_PUBLIC_BASE_URL to be an absolute HTTPS origin",
+  "production runtime requires a non-empty PLATFORM_TRUSTED_PROXIES policy",
+];
+const requiredProductionEnv = [
+  "PLATFORM_PUBLIC_BASE_URL",
+  "PLATFORM_TRUSTED_PROXIES",
+  "PLATFORM_HTTP_MAX_BODY_BYTES",
 ];
 const requiredPreflightCommands = [
   "production-runtime-tests",
@@ -142,6 +149,7 @@ function validateRequiredEnv(readiness, configSource, errors) {
       }
     }
   }
+  requireIncludes(values(readiness.requiredEnv).map((item) => item.name), requiredProductionEnv, "requiredEnv", errors);
 }
 
 function expectedOperationPlanOutput(readinessFilePath) {

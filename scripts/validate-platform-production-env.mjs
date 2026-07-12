@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { isIP } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -108,6 +109,21 @@ function validateDriverPair(env, driverKey, dsnKey, errors) {
   }
 }
 
+function isValidTrustedProxy(value) {
+  const slash = value.lastIndexOf("/");
+  if (slash === -1) {
+    return isIP(value) !== 0;
+  }
+  const address = value.slice(0, slash);
+  const bitsText = value.slice(slash + 1);
+  const family = isIP(address);
+  if (family === 0 || !/^[0-9]+$/.test(bitsText)) {
+    return false;
+  }
+  const bits = Number(bitsText);
+  return bits >= 1 && bits <= (family === 4 ? 32 : 128);
+}
+
 function validateRequiredReadinessEnv(env, readiness, errors) {
   for (const item of values(readiness.requiredEnv)) {
     requireKey(env, item.name, errors);
@@ -142,6 +158,33 @@ function validatePlatformEnv(env, errors) {
   }
   if (!isTruthy(requireKey(env, "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER", errors))) {
     errors.push("PLATFORM_DISABLE_DEMO_AUTH_PROVIDER must be true");
+  }
+
+  const publicBaseURL = requireKey(env, "PLATFORM_PUBLIC_BASE_URL", errors).trim();
+  try {
+    const parsed = new URL(publicBaseURL);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.search || parsed.hash || parsed.pathname !== "/") {
+      errors.push("PLATFORM_PUBLIC_BASE_URL must be an absolute HTTPS origin");
+    }
+  } catch {
+    errors.push("PLATFORM_PUBLIC_BASE_URL must be an absolute HTTPS origin");
+  }
+  const trustedProxies = requireKey(env, "PLATFORM_TRUSTED_PROXIES", errors)
+    .split(",")
+    .map((item) => item.trim());
+  if (trustedProxies.length === 0 || trustedProxies.some((item) => item === "")) {
+    errors.push("PLATFORM_TRUSTED_PROXIES must not be empty");
+  }
+  for (const proxy of trustedProxies) {
+    if (proxy === "0.0.0.0/0" || proxy === "::/0") {
+      errors.push("PLATFORM_TRUSTED_PROXIES must not trust all addresses");
+    } else if (!isValidTrustedProxy(proxy)) {
+      errors.push(`PLATFORM_TRUSTED_PROXIES contains invalid IP or CIDR ${proxy}`);
+    }
+  }
+  const maxBodyBytes = Number(requireKey(env, "PLATFORM_HTTP_MAX_BODY_BYTES", errors));
+  if (!Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1 || maxBodyBytes > 100 * 1024 * 1024) {
+    errors.push("PLATFORM_HTTP_MAX_BODY_BYTES must be between 1 and 104857600");
   }
 
   const maxUploadBytes = Number(requireKey(env, "PLATFORM_FILE_MAX_UPLOAD_BYTES", errors));

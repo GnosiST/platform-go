@@ -85,7 +85,12 @@ describe("validate-platform-deployment-topology", () => {
   it("rejects deployment contracts that omit production runtime requirements", () => {
     const contract = readJSON("resources/platform-deployment-topology.json");
     contract.productionApiRequirements.requiredEnv = contract.productionApiRequirements.requiredEnv.filter(
-      (item) => item !== "PLATFORM_CACHE_DRIVER" && item !== "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER",
+      (item) =>
+        item !== "PLATFORM_CACHE_DRIVER" &&
+        item !== "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER" &&
+        item !== "PLATFORM_PUBLIC_BASE_URL" &&
+        item !== "PLATFORM_TRUSTED_PROXIES" &&
+        item !== "PLATFORM_HTTP_MAX_BODY_BYTES",
     );
     contract.productionApiRequirements.forbiddenProductionCapabilities = [];
     const contractPath = tempJSON("platform-deployment-topology.json", contract);
@@ -95,6 +100,9 @@ describe("validate-platform-deployment-topology", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /productionApiRequirements\.requiredEnv must include PLATFORM_CACHE_DRIVER/);
     assert.match(result.stderr, /productionApiRequirements\.requiredEnv must include PLATFORM_DISABLE_DEMO_AUTH_PROVIDER/);
+    assert.match(result.stderr, /productionApiRequirements\.requiredEnv must include PLATFORM_PUBLIC_BASE_URL/);
+    assert.match(result.stderr, /productionApiRequirements\.requiredEnv must include PLATFORM_TRUSTED_PROXIES/);
+    assert.match(result.stderr, /productionApiRequirements\.requiredEnv must include PLATFORM_HTTP_MAX_BODY_BYTES/);
     assert.match(result.stderr, /productionApiRequirements\.forbiddenProductionCapabilities must include demo-data/);
   });
 
@@ -129,6 +137,23 @@ describe("validate-platform-deployment-topology", () => {
     }
   });
 
+  it("rejects an Admin proxy without reviewed TLS edge controls", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/nginx/platform.conf"), "utf8");
+    const unsafe = current
+      .replace('  if ($platform_edge_https = 0) { return 308 https://$host$request_uri; }\n', "")
+      .replace('    proxy_set_header X-Forwarded-Proto $platform_forwarded_proto;\n', "")
+      .replace('  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;\n', "")
+      .replace(/  add_header Content-Security-Policy .*\n/, "");
+    const nginxPath = tempText("platform.conf", unsafe);
+
+    const result = runValidator(["--admin-proxy", nginxPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /admin proxy must redirect requests without the reviewed HTTPS edge signal/);
+    assert.match(result.stderr, /admin proxy must forward only the normalized HTTPS edge signal/);
+    assert.match(result.stderr, /admin proxy must emit HSTS and Content-Security-Policy/);
+  });
+
   it("rejects active Admin file-storage volume mounts in Compose", () => {
     const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
     const mounts = ["platform_uploads:/var/lib/platform-go/uploads:ro", "private_assets:/app/.platform/uploads:ro"];
@@ -151,6 +176,17 @@ describe("validate-platform-deployment-topology", () => {
     const result = runValidator(["--compose", composePath]);
 
     assert.equal(result.status, 0, result.stderr);
+  });
+
+  it("rejects Compose without a deterministic trusted-proxy network", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
+    const compose = current.replace(/\nnetworks:\n[\s\S]*$/, "\n");
+    const composePath = tempText("docker-compose.prod.yml", compose);
+
+    const result = runValidator(["--compose", composePath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /compose default network must declare the reviewed PLATFORM_INTERNAL_SUBNET/);
   });
 
   it("rejects public upload environment mappings in any Compose service", () => {

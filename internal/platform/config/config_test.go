@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -10,6 +11,9 @@ import (
 func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_RUNTIME_ENV", "")
 	t.Setenv("PLATFORM_HTTP_ADDR", "")
+	t.Setenv("PLATFORM_PUBLIC_BASE_URL", "")
+	t.Setenv("PLATFORM_TRUSTED_PROXIES", "")
+	t.Setenv("PLATFORM_HTTP_MAX_BODY_BYTES", "")
 	t.Setenv("PLATFORM_CAPABILITIES", "")
 	t.Setenv("PLATFORM_ADMIN_RESOURCE_FILE", "")
 	t.Setenv("PLATFORM_ADMIN_RESOURCE_DRIVER", "")
@@ -58,6 +62,15 @@ func TestLoadUsesDefaults(t *testing.T) {
 	}
 	if cfg.HTTPAddr != "127.0.0.1:9200" {
 		t.Fatalf("HTTPAddr = %q", cfg.HTTPAddr)
+	}
+	if cfg.PublicBaseURL != "" {
+		t.Fatalf("PublicBaseURL = %q, want empty by default", cfg.PublicBaseURL)
+	}
+	if len(cfg.TrustedProxies) != 0 {
+		t.Fatalf("TrustedProxies = %#v, want none by default", cfg.TrustedProxies)
+	}
+	if cfg.HTTPMaxBodyBytes != 1<<20 {
+		t.Fatalf("HTTPMaxBodyBytes = %d, want 1 MiB", cfg.HTTPMaxBodyBytes)
 	}
 	if len(cfg.Capabilities) == 0 {
 		t.Fatalf("Capabilities is empty")
@@ -151,6 +164,23 @@ func TestLoadParsesRuntimeEnvironment(t *testing.T) {
 	cfg := Load()
 	if cfg.RuntimeEnvironment != "production" {
 		t.Fatalf("RuntimeEnvironment = %q", cfg.RuntimeEnvironment)
+	}
+}
+
+func TestLoadParsesTransportSecurityConfiguration(t *testing.T) {
+	t.Setenv("PLATFORM_PUBLIC_BASE_URL", "https://platform.example.test")
+	t.Setenv("PLATFORM_TRUSTED_PROXIES", "10.20.0.0/16,192.0.2.10")
+	t.Setenv("PLATFORM_HTTP_MAX_BODY_BYTES", "2097152")
+
+	cfg := Load()
+	if cfg.PublicBaseURL != "https://platform.example.test" {
+		t.Fatalf("PublicBaseURL = %q", cfg.PublicBaseURL)
+	}
+	if !reflect.DeepEqual(cfg.TrustedProxies, []string{"10.20.0.0/16", "192.0.2.10"}) {
+		t.Fatalf("TrustedProxies = %#v", cfg.TrustedProxies)
+	}
+	if cfg.HTTPMaxBodyBytes != 2<<20 {
+		t.Fatalf("HTTPMaxBodyBytes = %d", cfg.HTTPMaxBodyBytes)
 	}
 }
 
@@ -533,6 +563,78 @@ func TestValidateRuntimeAcceptsDevelopmentDefaults(t *testing.T) {
 	}
 }
 
+func TestValidateRuntimeRejectsProductionNonHTTPSPublicBaseURL(t *testing.T) {
+	for _, publicBaseURL := range []string{"", "http://platform.example.test", "https://platform.example.test/path", "https://user@platform.example.test", "https://:443"} {
+		t.Run(publicBaseURL, func(t *testing.T) {
+			cfg := validProductionRuntimeConfig()
+			cfg.PublicBaseURL = publicBaseURL
+
+			err := cfg.ValidateRuntime()
+			if err == nil || !strings.Contains(err.Error(), "production runtime requires PLATFORM_PUBLIC_BASE_URL to be an absolute HTTPS origin") {
+				t.Fatalf("ValidateRuntime() error = %v, want public HTTPS origin error", err)
+			}
+		})
+	}
+}
+
+func TestValidateRuntimeRejectsInvalidOrEmptyProductionTrustedProxyPolicy(t *testing.T) {
+	tests := []struct {
+		name    string
+		proxies []string
+	}{
+		{name: "empty", proxies: nil},
+		{name: "empty item", proxies: []string{"10.0.0.0/8", ""}},
+		{name: "hostname", proxies: []string{"edge.internal"}},
+		{name: "invalid cidr", proxies: []string{"10.0.0.0/99"}},
+		{name: "trust all", proxies: []string{"0.0.0.0/0"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := validProductionRuntimeConfig()
+			cfg.TrustedProxies = tt.proxies
+
+			err := cfg.ValidateRuntime()
+			if err == nil || !strings.Contains(err.Error(), "PLATFORM_TRUSTED_PROXIES") {
+				t.Fatalf("ValidateRuntime() error = %v, want trusted proxy policy error", err)
+			}
+		})
+	}
+}
+
+func TestValidateRuntimeRejectsInvalidHTTPMaxBodyBytes(t *testing.T) {
+	for _, maxBytes := range []int64{0, -1, 101 << 20} {
+		t.Run(strconv.FormatInt(maxBytes, 10), func(t *testing.T) {
+			cfg := validProductionRuntimeConfig()
+			cfg.HTTPMaxBodyBytes = maxBytes
+
+			err := cfg.ValidateRuntime()
+			if err == nil || !strings.Contains(err.Error(), "PLATFORM_HTTP_MAX_BODY_BYTES") {
+				t.Fatalf("ValidateRuntime() error = %v, want HTTP body limit error", err)
+			}
+		})
+	}
+}
+
+func TestStagingRejectsNonLoopbackHTTPProviderAndStorageEndpoints(t *testing.T) {
+	cfg := validProductionRuntimeConfig()
+	cfg.RuntimeEnvironment = RuntimeEnvironmentStaging
+	cfg.AdminOIDCIssuerURL = "http://id.example.test/realms/platform"
+	cfg.WechatMiniAppID = "wx-app"
+	cfg.WechatMiniAppSecret = "wx-secret"
+	cfg.WechatMiniAppCode2SessionEndpoint = "http://wechat.example.test/sns/jscode2session"
+	cfg.FileStorageS3Endpoint = "http://s3.example.test"
+
+	err := cfg.ValidateRuntime()
+	if err == nil {
+		t.Fatal("ValidateRuntime() error = nil, want HTTPS endpoint errors")
+	}
+	for _, want := range []string{"admin oidc issuer url must use https", "wechat miniapp code2session endpoint must use https", "file storage s3 endpoint must use https"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("ValidateRuntime() error = %q, missing %q", err, want)
+		}
+	}
+}
+
 func TestValidateRuntimeRejectsDriverWithoutDSN(t *testing.T) {
 	cfg := Config{RuntimeEnvironment: "development", AdminResourceDriver: "sqlite"}
 
@@ -880,6 +982,9 @@ func validProductionRuntimeConfig() Config {
 	return Config{
 		RuntimeEnvironment:                "production",
 		HTTPAddr:                          "0.0.0.0:9200",
+		PublicBaseURL:                     "https://platform.example.test",
+		TrustedProxies:                    []string{"10.20.0.0/16"},
+		HTTPMaxBodyBytes:                  1 << 20,
 		AdminResourceDriver:               "postgres",
 		AdminResourceDSN:                  "postgres://platform:secret@localhost:5432/platform",
 		SessionDriver:                     "postgres",
@@ -939,6 +1044,9 @@ func setValidProductionLoadEnvironment(t *testing.T) {
 	values := map[string]string{
 		"PLATFORM_RUNTIME_ENV":                            "production",
 		"PLATFORM_HTTP_ADDR":                              "0.0.0.0:9200",
+		"PLATFORM_PUBLIC_BASE_URL":                        "https://platform.example.test",
+		"PLATFORM_TRUSTED_PROXIES":                        "10.20.0.0/16",
+		"PLATFORM_HTTP_MAX_BODY_BYTES":                    "1048576",
 		"PLATFORM_CAPABILITIES":                           "tenant,identity,session,rbac,menu,audit,dictionary,parameter,file-storage,admin-shell,admin-oidc",
 		"PLATFORM_JWT_SECRET":                             "0123456789abcdef0123456789abcdef",
 		"PLATFORM_ADMIN_RESOURCE_DRIVER":                  "postgres",

@@ -58,6 +58,7 @@ type ServerOptions struct {
 	Authorizer              Authorizer
 	AllowInsecureHeaderAuth bool
 	DisableDemoAuthProvider bool
+	Security                SecurityOptions
 }
 
 type Authorizer interface {
@@ -135,6 +136,9 @@ const (
 func New(options ServerOptions) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
+	configureTrustedProxies(router, options.Security.TrustedProxies)
+	router.Use(securityHeaders(options.Security))
+	router.Use(jsonRequestBodyLimit(options.Security.MaxJSONBodyBytes))
 	router.Use(gin.Recovery())
 	resources := options.Resources
 	if resources == nil {

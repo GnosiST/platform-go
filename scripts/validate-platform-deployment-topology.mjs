@@ -287,6 +287,9 @@ function validateProductionRequirements(contract, errors) {
       "PLATFORM_CACHE_DRIVER",
       "PLATFORM_REDIS_ADDR",
       "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER",
+      "PLATFORM_PUBLIC_BASE_URL",
+      "PLATFORM_TRUSTED_PROXIES",
+      "PLATFORM_HTTP_MAX_BODY_BYTES",
       "PLATFORM_FILE_MAX_UPLOAD_BYTES",
       "PLATFORM_FILE_ALLOWED_MIME_TYPES",
       "PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION",
@@ -382,6 +385,15 @@ function validateDeploymentPackage(contract, errors) {
     if (exposesUploadLocation || exposesUploadDirectory) {
       errors.push("admin proxy must not expose upload storage");
     }
+    if (!adminProxy.includes('if ($platform_edge_https = 0) { return 308 https://$host$request_uri; }')) {
+      errors.push("admin proxy must redirect requests without the reviewed HTTPS edge signal");
+    }
+    if (!adminProxy.includes("proxy_set_header X-Forwarded-Proto $platform_forwarded_proto;")) {
+      errors.push("admin proxy must forward only the normalized HTTPS edge signal");
+    }
+    if (!adminProxy.includes("add_header Strict-Transport-Security") || !adminProxy.includes("add_header Content-Security-Policy")) {
+      errors.push("admin proxy must emit HSTS and Content-Security-Policy");
+    }
   }
 
   const envTemplatePath = path.resolve(repoRoot, envTemplateOverride || deploymentPackage.envTemplate || "");
@@ -398,10 +410,20 @@ function validateDeploymentPackage(contract, errors) {
       "PLATFORM_RUNTIME_ENV=production",
       "PLATFORM_CACHE_DRIVER=redis",
       "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+      "PLATFORM_PUBLIC_BASE_URL=https://",
     ]) {
       if (!envTemplate.includes(requiredEnv)) {
         errors.push(`deploymentPackage.envTemplate must include ${requiredEnv}`);
       }
+    }
+    if (!/^PLATFORM_TRUSTED_PROXIES=.+$/m.test(envTemplate)) {
+      errors.push("production env must configure PLATFORM_TRUSTED_PROXIES");
+    }
+    if (!/^PLATFORM_INTERNAL_SUBNET=.+$/m.test(envTemplate) || !/^PLATFORM_ADMIN_PROXY_IP=.+$/m.test(envTemplate)) {
+      errors.push("production env must align PLATFORM_INTERNAL_SUBNET and PLATFORM_ADMIN_PROXY_IP with trusted proxies");
+    }
+    if (!/^PLATFORM_HTTP_MAX_BODY_BYTES=[1-9][0-9]*$/m.test(envTemplate)) {
+      errors.push("production env must configure PLATFORM_HTTP_MAX_BODY_BYTES");
     }
     if (!/^PLATFORM_FILE_MAX_UPLOAD_BYTES=[1-9][0-9]*$/m.test(envTemplate)) {
       errors.push("production env must configure PLATFORM_FILE_MAX_UPLOAD_BYTES");
@@ -450,6 +472,13 @@ function validateDeploymentPackage(contract, errors) {
         if (hasAdminFileStorageVolume(adminService.volumes)) {
           errors.push("Admin service must not mount file storage");
         }
+        if (adminService.networks?.default?.ipv4_address !== "${PLATFORM_ADMIN_PROXY_IP:-172.30.0.10}") {
+          errors.push("platform-admin must use the reviewed PLATFORM_ADMIN_PROXY_IP");
+        }
+      }
+      const defaultSubnet = compose.networks?.default?.ipam?.config?.[0]?.subnet;
+      if (defaultSubnet !== "${PLATFORM_INTERNAL_SUBNET:-172.30.0.0/24}") {
+        errors.push("compose default network must declare the reviewed PLATFORM_INTERNAL_SUBNET");
       }
     }
   }

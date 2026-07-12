@@ -24,6 +24,9 @@ function tempEnv(source) {
 const validStrictEnv = [
   "PLATFORM_RUNTIME_ENV=production",
   "PLATFORM_HTTP_ADDR=0.0.0.0:9200",
+  "PLATFORM_PUBLIC_BASE_URL=https://platform.example.test",
+  "PLATFORM_TRUSTED_PROXIES=10.20.0.0/16",
+  "PLATFORM_HTTP_MAX_BODY_BYTES=1048576",
   "PLATFORM_JWT_SECRET=prod-jwt-signing-value-with-strong-length-001",
   "PLATFORM_CAPABILITIES=tenant,identity,session,rbac,menu,api-resource,audit,wechat-login,dictionary,parameter,file-storage,admin-shell,system-admin",
   "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
@@ -128,6 +131,25 @@ describe("validate-platform-production-env", () => {
       assert.match(result.stderr, /PLATFORM_FILE_ALLOWED_MIME_TYPES is required/);
       assert.match(result.stderr, /PLATFORM_FILE_STORAGE_S3_ENDPOINT must use https/);
       assert.match(result.stderr, /PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION is required/);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects unsafe production transport security settings", () => {
+    const source = validStrictEnv
+      .replace("PLATFORM_PUBLIC_BASE_URL=https://platform.example.test", "PLATFORM_PUBLIC_BASE_URL=http://platform.example.test/path")
+      .replace("PLATFORM_TRUSTED_PROXIES=10.20.0.0/16", "PLATFORM_TRUSTED_PROXIES=0.0.0.0/0,999.999.999.999/24")
+      .replace("PLATFORM_HTTP_MAX_BODY_BYTES=1048576", "PLATFORM_HTTP_MAX_BODY_BYTES=1073741824");
+    const { tempDir, filePath } = tempEnv(source);
+    try {
+      const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /PLATFORM_PUBLIC_BASE_URL must be an absolute HTTPS origin/);
+      assert.match(result.stderr, /PLATFORM_TRUSTED_PROXIES must not trust all addresses/);
+      assert.match(result.stderr, /PLATFORM_TRUSTED_PROXIES contains invalid IP or CIDR 999\.999\.999\.999\/24/);
+      assert.match(result.stderr, /PLATFORM_HTTP_MAX_BODY_BYTES must be between 1 and 104857600/);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }

@@ -496,6 +496,9 @@ Admin experience is implemented as a generic resource-console extension and gate
 Configuration:
 
 ```bash
+PLATFORM_PUBLIC_BASE_URL=https://platform.example.test
+PLATFORM_TRUSTED_PROXIES=172.30.0.10
+PLATFORM_HTTP_MAX_BODY_BYTES=1048576
 PLATFORM_FILE_STORAGE_DRIVER=local
 PLATFORM_FILE_STORAGE_LOCAL_DIR=.platform/uploads
 PLATFORM_FILE_MAX_UPLOAD_BYTES=10485760

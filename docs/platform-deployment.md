@@ -36,6 +36,8 @@ Use this for the simplest production-like deployment:
 
 This avoids browser CORS complexity and keeps the admin/API auth boundary same-origin.
 
+The standard adapter is an origin behind a reviewed external TLS edge. It binds the Admin proxy to loopback by default, redirects requests that do not carry the normalized edge HTTPS signal, and forwards that signal to the API. Configure `PLATFORM_PUBLIC_BASE_URL` as the canonical HTTPS origin, restrict `PLATFORM_TRUSTED_PROXIES` to the direct proxy IP or narrow network, and set a positive bounded `PLATFORM_HTTP_MAX_BODY_BYTES`. Never expose port 8080 as an unreviewed public HTTP origin or trust `0.0.0.0/0` / `::/0`.
+
 The repository includes a standard adapter package for this topology:
 
 - `Dockerfile`: multi-stage build with `api` and `admin-static` targets;
@@ -103,6 +105,11 @@ Production runtime must set:
 
 ```bash
 PLATFORM_RUNTIME_ENV=production
+PLATFORM_PUBLIC_BASE_URL=https://platform.example.test
+PLATFORM_INTERNAL_SUBNET=172.30.0.0/24
+PLATFORM_ADMIN_PROXY_IP=172.30.0.10
+PLATFORM_TRUSTED_PROXIES=172.30.0.10
+PLATFORM_HTTP_MAX_BODY_BYTES=1048576
 PLATFORM_CAPABILITIES=tenant,identity,session,rbac,menu,api-resource,audit,admin-oidc,dictionary,parameter,file-storage,admin-shell,system-admin
 PLATFORM_JWT_SECRET=<at-least-32-characters-and-not-the-dev-default>
 PLATFORM_ADMIN_RESOURCE_DRIVER=mysql

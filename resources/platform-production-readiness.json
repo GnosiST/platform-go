@@ -14,6 +14,8 @@
           "TestValidateRuntimeRejectsProductionNonGORMDrivers",
           "TestValidateRuntimeRejectsProductionRedisWithoutAddress",
           "TestValidateRuntimeRejectsProductionDemoAuthProvider",
+          "TestValidateRuntimeRejectsProductionNonHTTPSPublicBaseURL",
+          "TestValidateRuntimeRejectsInvalidOrEmptyProductionTrustedProxyPolicy",
           "TestValidateRuntimeAcceptsProductionBaseline"
         ]
       }
@@ -26,13 +28,39 @@
       "production runtime requires PLATFORM_LIFECYCLE_HISTORY_DRIVER to be mysql, postgres, or sqlite",
       "production runtime requires PLATFORM_CACHE_DRIVER=redis",
       "production runtime must not enable demo-data capability",
-      "production runtime requires PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true"
+      "production runtime requires PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+      "production runtime requires PLATFORM_PUBLIC_BASE_URL to be an absolute HTTPS origin",
+      "production runtime requires a non-empty PLATFORM_TRUSTED_PROXIES policy"
     ]
   },
   "requiredEnv": [
     {
       "name": "PLATFORM_RUNTIME_ENV",
       "purpose": "Selects production mode so startup runs the strict runtime gate.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_PUBLIC_BASE_URL",
+      "purpose": "Canonical public HTTPS origin used for fail-closed API redirects without trusting request Host headers.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_TRUSTED_PROXIES",
+      "purpose": "Exact IP and narrow CIDR allowlist for reverse proxies whose forwarded HTTPS signal may be honored.",
+      "docs": [
+        "README.md",
+        "docs/platform-capability-development.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_HTTP_MAX_BODY_BYTES",
+      "purpose": "Positive bounded limit applied before JSON handlers and binders run.",
       "docs": [
         "README.md",
         "docs/platform-capability-development.md"
@@ -522,6 +550,10 @@
       {
         "path": "scripts/platform-production-env.test.mjs",
         "contains": "rejects the standard template when strict secret checks are enabled"
+      },
+      {
+        "path": "scripts/platform-production-env.test.mjs",
+        "contains": "rejects unsafe production transport security settings"
       },
       {
         "path": "deploy/env/production.example.env",

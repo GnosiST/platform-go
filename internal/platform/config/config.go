@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"mime"
 	"net"
+	"net/netip"
 	"net/url"
 	"os"
 	"strconv"
@@ -15,6 +16,9 @@ import (
 type Config struct {
 	RuntimeEnvironment                string
 	HTTPAddr                          string
+	PublicBaseURL                     string
+	TrustedProxies                    []string
+	HTTPMaxBodyBytes                  int64
 	Capabilities                      []string
 	AdminResourceFile                 string
 	AdminResourceDriver               string
@@ -60,6 +64,7 @@ type Config struct {
 	PhoneCodeHMACKey                  string
 	PhoneVerificationProvider         string
 	filePolicySource                  filePolicySource
+	transportPolicySource             transportPolicySource
 }
 
 type envConfigState uint8
@@ -77,6 +82,11 @@ type filePolicySource struct {
 	maxUploadBytes        envConfigState
 	allowedMIMETypes      envConfigState
 	s3Encryption          envConfigState
+}
+
+type transportPolicySource struct {
+	loadedFromEnvironment bool
+	maxBodyBytes          envConfigState
 }
 
 var defaultCapabilities = []string{
@@ -104,6 +114,7 @@ const (
 
 	defaultJWTSecret   = "dev-platform-go-secret"
 	maxFileUploadBytes = int64(100 << 20)
+	maxHTTPBodyBytes   = int64(100 << 20)
 )
 
 var defaultFileAllowedMIMETypes = []string{"application/pdf", "image/jpeg", "image/png", "text/plain"}
@@ -112,9 +123,13 @@ func Load() Config {
 	fileMaxUploadBytes, fileMaxUploadBytesState := int64EnvWithState("PLATFORM_FILE_MAX_UPLOAD_BYTES", 10<<20)
 	fileAllowedMIMETypes, fileAllowedMIMETypesState := csvEnvWithState("PLATFORM_FILE_ALLOWED_MIME_TYPES", defaultFileAllowedMIMETypes)
 	fileS3Encryption, fileS3EncryptionState := envWithState("PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION", "AES256")
+	httpMaxBodyBytes, httpMaxBodyBytesState := int64EnvWithState("PLATFORM_HTTP_MAX_BODY_BYTES", 1<<20)
 	return Config{
 		RuntimeEnvironment:                strings.ToLower(env("PLATFORM_RUNTIME_ENV", RuntimeEnvironmentDevelopment)),
 		HTTPAddr:                          env("PLATFORM_HTTP_ADDR", "127.0.0.1:9200"),
+		PublicBaseURL:                     env("PLATFORM_PUBLIC_BASE_URL", ""),
+		TrustedProxies:                    csvEnv("PLATFORM_TRUSTED_PROXIES", nil),
+		HTTPMaxBodyBytes:                  httpMaxBodyBytes,
 		Capabilities:                      csvEnv("PLATFORM_CAPABILITIES", defaultCapabilities),
 		AdminResourceFile:                 env("PLATFORM_ADMIN_RESOURCE_FILE", ""),
 		AdminResourceDriver:               env("PLATFORM_ADMIN_RESOURCE_DRIVER", ""),
@@ -165,6 +180,10 @@ func Load() Config {
 			allowedMIMETypes:      fileAllowedMIMETypesState,
 			s3Encryption:          fileS3EncryptionState,
 		},
+		transportPolicySource: transportPolicySource{
+			loadedFromEnvironment: true,
+			maxBodyBytes:          httpMaxBodyBytesState,
+		},
 	}
 }
 
@@ -190,6 +209,10 @@ func (c Config) ValidateRuntime() error {
 	if strings.TrimSpace(c.HTTPAddr) == "" {
 		errs = append(errs, errors.New("http address is required"))
 	}
+	if c.HTTPMaxBodyBytes < 0 || c.HTTPMaxBodyBytes > maxHTTPBodyBytes || (environment == RuntimeEnvironmentProduction && c.HTTPMaxBodyBytes == 0) {
+		errs = append(errs, errors.New("PLATFORM_HTTP_MAX_BODY_BYTES must be between 1 and 104857600 bytes"))
+	}
+	errs = append(errs, validateTrustedProxies(c.TrustedProxies, environment == RuntimeEnvironmentProduction)...)
 	if strings.TrimSpace(c.JWTSecret) == "" {
 		errs = append(errs, errors.New("jwt secret is required"))
 	}
@@ -239,6 +262,7 @@ func (c Config) ValidateRuntime() error {
 		}
 		errs = append(errs, validateObjectStorageEndpoint(environment, c.FileStorageS3Endpoint)...)
 	}
+	errs = append(errs, validateSecureEndpoint("wechat miniapp code2session endpoint", environment, c.WechatMiniAppCode2SessionEndpoint)...)
 	errs = append(errs, validateFileUploadPolicy(c.FileMaxUploadBytes, c.FileAllowedMIMETypes, environment == RuntimeEnvironmentProduction)...)
 	if (strings.TrimSpace(c.WechatMiniAppID) == "") != (strings.TrimSpace(c.WechatMiniAppSecret) == "") {
 		errs = append(errs, errors.New("wechat miniapp app id and secret must be configured together"))
@@ -247,6 +271,10 @@ func (c Config) ValidateRuntime() error {
 	errs = append(errs, c.validateAppPhone(environment)...)
 
 	if environment == RuntimeEnvironmentProduction {
+		errs = append(errs, validateProductionPublicBaseURL(c.PublicBaseURL)...)
+		if c.transportPolicySource.loadedFromEnvironment && (c.transportPolicySource.maxBodyBytes == envConfigMissing || c.transportPolicySource.maxBodyBytes == envConfigEmpty) {
+			errs = append(errs, errors.New("production runtime requires PLATFORM_HTTP_MAX_BODY_BYTES to be explicitly configured"))
+		}
 		if c.filePolicySource.loadedFromEnvironment {
 			if c.filePolicySource.maxUploadBytes == envConfigMissing || c.filePolicySource.maxUploadBytes == envConfigEmpty {
 				errs = append(errs, errors.New("production runtime requires PLATFORM_FILE_MAX_UPLOAD_BYTES to be explicitly configured"))
@@ -363,13 +391,17 @@ func validateFileUploadPolicy(maxBytes int64, allowedMIMETypes []string, product
 }
 
 func validateObjectStorageEndpoint(environment string, raw string) []error {
+	return validateSecureEndpoint("file storage s3 endpoint", environment, raw)
+}
+
+func validateSecureEndpoint(label string, environment string, raw string) []error {
 	value := strings.TrimSpace(raw)
 	if value == "" {
 		return nil
 	}
 	endpoint, err := url.Parse(value)
 	if err != nil || endpoint.Hostname() == "" {
-		return []error{errors.New("file storage s3 endpoint must be an absolute URL")}
+		return []error{fmt.Errorf("%s must be an absolute URL", label)}
 	}
 	if endpoint.Scheme == "https" {
 		return nil
@@ -377,7 +409,7 @@ func validateObjectStorageEndpoint(environment string, raw string) []error {
 	if endpoint.Scheme == "http" && (environment == RuntimeEnvironmentDevelopment || environment == RuntimeEnvironmentTest) && isLoopbackHost(endpoint.Hostname()) {
 		return nil
 	}
-	return []error{errors.New("file storage s3 endpoint must use https outside loopback development and test")}
+	return []error{fmt.Errorf("%s must use https outside loopback development and test", label)}
 }
 
 func (c Config) validateAdminOIDC(environment string) []error {
@@ -396,6 +428,7 @@ func (c Config) validateAdminOIDC(environment string) []error {
 	}
 
 	var errs []error
+	errs = append(errs, validateSecureEndpoint("admin oidc issuer url", environment, c.AdminOIDCIssuerURL)...)
 	if !containsString(c.AdminOIDCScopes, "openid") {
 		errs = append(errs, errors.New("admin oidc scopes must include openid"))
 	}
@@ -413,6 +446,44 @@ func (c Config) validateAdminOIDC(environment string) []error {
 		return append(errs, errors.New("production admin oidc redirect url must use https"))
 	}
 	return append(errs, errors.New("admin oidc redirect url must use https except for loopback development or test redirects"))
+}
+
+func validateProductionPublicBaseURL(raw string) []error {
+	value := strings.TrimSpace(raw)
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.Opaque != "" || (parsed.Path != "" && parsed.Path != "/") {
+		return []error{errors.New("production runtime requires PLATFORM_PUBLIC_BASE_URL to be an absolute HTTPS origin")}
+	}
+	return nil
+}
+
+func validateTrustedProxies(values []string, production bool) []error {
+	if production && len(values) == 0 {
+		return []error{errors.New("production runtime requires a non-empty PLATFORM_TRUSTED_PROXIES policy")}
+	}
+	var errs []error
+	seen := map[netip.Prefix]struct{}{}
+	for _, raw := range values {
+		value := strings.TrimSpace(raw)
+		var prefix netip.Prefix
+		if parsed, err := netip.ParsePrefix(value); err == nil {
+			prefix = parsed.Masked()
+		} else if address, addressErr := netip.ParseAddr(value); addressErr == nil {
+			prefix = netip.PrefixFrom(address, address.BitLen())
+		} else {
+			errs = append(errs, fmt.Errorf("PLATFORM_TRUSTED_PROXIES entry %q must be an IP address or CIDR", raw))
+			continue
+		}
+		if prefix.Bits() == 0 {
+			errs = append(errs, errors.New("PLATFORM_TRUSTED_PROXIES must not trust all addresses"))
+			continue
+		}
+		if _, exists := seen[prefix]; exists {
+			errs = append(errs, fmt.Errorf("PLATFORM_TRUSTED_PROXIES contains duplicate %q", prefix.String()))
+		}
+		seen[prefix] = struct{}{}
+	}
+	return errs
 }
 
 func containsString(values []string, target string) bool {

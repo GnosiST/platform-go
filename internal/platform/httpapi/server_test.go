@@ -4208,6 +4208,9 @@ func TestAdminFileUploadContentAndDelete(t *testing.T) {
 	if contentRecorder.Body.String() != "hello file storage" {
 		t.Fatalf("file content = %q", contentRecorder.Body.String())
 	}
+	if got := contentRecorder.Header().Get("Content-Security-Policy"); !strings.Contains(got, "sandbox") {
+		t.Fatalf("file content CSP = %q, want sandbox protection", got)
+	}
 
 	deleteRecorder := httptest.NewRecorder()
 	deleteRequest := httptest.NewRequest(http.MethodDelete, "/api/admin/resources/files/"+record.ID, nil)

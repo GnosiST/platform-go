@@ -151,6 +151,9 @@
       "PLATFORM_CACHE_DRIVER",
       "PLATFORM_REDIS_ADDR",
       "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER",
+      "PLATFORM_PUBLIC_BASE_URL",
+      "PLATFORM_TRUSTED_PROXIES",
+      "PLATFORM_HTTP_MAX_BODY_BYTES",
       "PLATFORM_FILE_MAX_UPLOAD_BYTES",
       "PLATFORM_FILE_ALLOWED_MIME_TYPES",
       "PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION"
@@ -173,7 +176,10 @@
     "sameOrigin": {
       "adminPort": "8080",
       "apiProxy": "/api/",
-      "fileDelivery": "authenticated-api-only"
+      "fileDelivery": "authenticated-api-only",
+      "tlsEdge": "external-reviewed-edge-required",
+      "adminOriginExposure": "loopback-only-by-default",
+      "forwardedHTTPS": "normalized-x-forwarded-proto-from-reviewed-edge-only"
     },
     "requiredSourceSnippets": [
       {
@@ -214,11 +220,31 @@
       },
       {
         "path": "deploy/compose/docker-compose.prod.yml",
+        "contains": "ipv4_address: ${PLATFORM_ADMIN_PROXY_IP:-172.30.0.10}"
+      },
+      {
+        "path": "deploy/compose/docker-compose.prod.yml",
+        "contains": "subnet: ${PLATFORM_INTERNAL_SUBNET:-172.30.0.0/24}"
+      },
+      {
+        "path": "deploy/compose/docker-compose.prod.yml",
         "contains": "MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?required}"
       },
       {
         "path": "deploy/nginx/platform.conf",
         "contains": "proxy_pass http://platform_api"
+      },
+      {
+        "path": "deploy/nginx/platform.conf",
+        "contains": "if ($platform_edge_https = 0) { return 308 https://$host$request_uri; }"
+      },
+      {
+        "path": "deploy/nginx/platform.conf",
+        "contains": "proxy_set_header X-Forwarded-Proto $platform_forwarded_proto;"
+      },
+      {
+        "path": "deploy/nginx/platform.conf",
+        "contains": "add_header Strict-Transport-Security"
       },
       {
         "path": "deploy/nginx/platform.conf",

@@ -88,6 +88,26 @@ describe("validate-platform-production-readiness", () => {
     assert.match(result.stderr, /runtimeGate\.requiredSnippets must include production runtime requires PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true/);
   });
 
+  it("rejects readiness contracts that omit transport security configuration", () => {
+    const readiness = readJSON("resources/platform-production-readiness.json");
+    readiness.requiredEnv = readiness.requiredEnv.filter(
+      (item) => !["PLATFORM_PUBLIC_BASE_URL", "PLATFORM_TRUSTED_PROXIES", "PLATFORM_HTTP_MAX_BODY_BYTES"].includes(item.name),
+    );
+    readiness.runtimeGate.requiredSnippets = readiness.runtimeGate.requiredSnippets.filter(
+      (snippet) => !snippet.includes("PLATFORM_PUBLIC_BASE_URL") && !snippet.includes("PLATFORM_TRUSTED_PROXIES"),
+    );
+    const readinessPath = tempJSON("platform-production-readiness.json", readiness);
+
+    const result = runValidator(["--readiness", readinessPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /requiredEnv must include PLATFORM_PUBLIC_BASE_URL/);
+    assert.match(result.stderr, /requiredEnv must include PLATFORM_TRUSTED_PROXIES/);
+    assert.match(result.stderr, /requiredEnv must include PLATFORM_HTTP_MAX_BODY_BYTES/);
+    assert.match(result.stderr, /runtimeGate\.requiredSnippets must include production runtime requires PLATFORM_PUBLIC_BASE_URL/);
+    assert.match(result.stderr, /runtimeGate\.requiredSnippets must include production runtime requires a non-empty PLATFORM_TRUSTED_PROXIES policy/);
+  });
+
   it("rejects readiness commands whose executable script is missing", () => {
     const readiness = readJSON("resources/platform-production-readiness.json");
     readiness.preflightCommands.push({

@@ -94,9 +94,19 @@ func main() {
 		JWTSecret:               cfg.JWTSecret,
 		OpenAPIDocument:         openAPIDocument,
 		DisableDemoAuthProvider: cfg.DisableDemoAuthProvider,
+		Security:                securityOptionsFromConfig(cfg),
 	})
 	if err := server.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("run platform api: %v", err)
+	}
+}
+
+func securityOptionsFromConfig(cfg config.Config) httpapi.SecurityOptions {
+	return httpapi.SecurityOptions{
+		RequireHTTPS:     cfg.RuntimeEnvironment == config.RuntimeEnvironmentProduction,
+		PublicBaseURL:    cfg.PublicBaseURL,
+		TrustedProxies:   append([]string(nil), cfg.TrustedProxies...),
+		MaxJSONBodyBytes: cfg.HTTPMaxBodyBytes,
 	}
 }
 
