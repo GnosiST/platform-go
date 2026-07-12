@@ -458,6 +458,340 @@ func TestSanitizedSuccessfulReportContainsCountsOnly(t *testing.T) {
 	assertSanitized(t, string(encoded))
 }
 
+func TestApplyRequiresCanonicalApprovalsAndPreparedPlan(t *testing.T) {
+	plan := migrationApplyPlan()
+	store := newMemoryMutatingStore(plan, nil)
+	runner := NewRunner(plan, migrationTestRuntime(t), store)
+	request := approvedMigrationRequest("run-approval-gate")
+	request.ActorID = ""
+
+	if _, err := runner.Run(context.Background(), Options{Mode: ModeApply, BatchSize: 1, Request: request}); !errors.Is(err, ErrInvalidOptions) {
+		t.Fatalf("Run(apply without actor) error = %v, want ErrInvalidOptions", err)
+	}
+	if store.startCalls != 0 {
+		t.Fatalf("StartOrResume() calls = %d, want zero before approval validation", store.startCalls)
+	}
+
+	request = approvedMigrationRequest("run-approval-gate")
+	store.startErr = ErrRunConflict
+	if _, err := runner.Run(context.Background(), Options{Mode: ModeApply, BatchSize: 1, Request: request}); !errors.Is(err, ErrMutationFailed) {
+		t.Fatalf("Run(apply without matching prepared plan) error = %v, want ErrMutationFailed", err)
+	}
+}
+
+func TestApplyRequiresEveryApprovalFieldAndCanonicalBackupHash(t *testing.T) {
+	mutations := []struct {
+		name   string
+		mutate func(*RunRequest)
+	}{
+		{name: "canonical run id", mutate: func(request *RunRequest) { request.RunID = " run-id" }},
+		{name: "actor", mutate: func(request *RunRequest) { request.ActorID = "" }},
+		{name: "reason", mutate: func(request *RunRequest) { request.Reason = "" }},
+		{name: "approval ref", mutate: func(request *RunRequest) { request.ApprovalRef = "" }},
+		{name: "backup URI", mutate: func(request *RunRequest) { request.BackupURI = "" }},
+		{name: "backup hash", mutate: func(request *RunRequest) { request.BackupHash = "sha256:not-canonical" }},
+		{name: "restore evidence", mutate: func(request *RunRequest) { request.RestoreEvidence = "" }},
+		{name: "maintenance confirmation", mutate: func(request *RunRequest) { request.MaintenanceConfirmed = false }},
+	}
+	for _, testCase := range mutations {
+		t.Run(testCase.name, func(t *testing.T) {
+			plan := migrationApplyPlan()
+			store := newMemoryMutatingStore(plan, nil)
+			request := approvedMigrationRequest("run-resume")
+			testCase.mutate(&request)
+			if _, err := NewRunner(plan, migrationTestRuntime(t), store).Run(context.Background(), Options{
+				Mode: ModeApply, BatchSize: 1, Request: request,
+			}); !errors.Is(err, ErrInvalidOptions) {
+				t.Fatalf("Run(invalid %s) error = %v, want ErrInvalidOptions", testCase.name, err)
+			}
+			if store.startCalls != 0 {
+				t.Fatalf("StartOrResume() calls = %d, want zero", store.startCalls)
+			}
+		})
+	}
+}
+
+func TestApplyDoesNotCopyInvalidRunIDIntoFailedReport(t *testing.T) {
+	plan := migrationApplyPlan()
+	store := newMemoryMutatingStore(plan, nil)
+	request := approvedMigrationRequest(fixturePlaintext)
+	request.RunID = " " + fixturePlaintext
+	report, err := NewRunner(plan, migrationTestRuntime(t), store).Run(context.Background(), Options{
+		Mode: ModeApply, BatchSize: 1, Request: request,
+	})
+	if !errors.Is(err, ErrInvalidOptions) {
+		t.Fatalf("Run(invalid run ID) error = %v, want ErrInvalidOptions", err)
+	}
+	encoded, marshalErr := json.Marshal(report)
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
+	assertSanitized(t, string(encoded), err.Error())
+}
+
+func TestApplyResumeAndVerifyUsePersistedCheckpointAndNeverReveal(t *testing.T) {
+	ctx := context.Background()
+	service := migrationTestRuntime(t)
+	runtime := &trackingRuntime{Runtime: service}
+	plan := migrationApplyPlan()
+	target, err := service.Protect(ctx, "already-protected", plan.Resources[0].Fields[0].Policy, dataprotection.FieldContext{
+		TenantID: dataprotection.GlobalTenantID, Resource: "customer-records", RecordID: "record-2",
+		FieldKey: "secretNote", SchemaVersion: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := newMemoryMutatingStore(plan, []Row{
+		{Resource: "customer-records", RecordID: "record-1", ValuesJSON: `{"displayName":"kept","secretNote":"plain-one"}`},
+		{Resource: "customer-records", RecordID: "record-2", ValuesJSON: `{"displayName":"also-kept","secretNote":` + mustJSON(t, target) + `}`},
+	})
+	store.interruptAfterFirstCommit = true
+	runner := NewRunner(plan, runtime, store)
+	request := approvedMigrationRequest("run-resume")
+
+	if _, err := runner.Run(ctx, Options{Mode: ModeApply, BatchSize: 1, Request: request}); !errors.Is(err, ErrMutationFailed) {
+		t.Fatalf("first Run(apply) error = %v, want ErrMutationFailed", err)
+	}
+	if got := store.checkpoint.LastRecordID; got != "record-1" {
+		t.Fatalf("persisted cursor after interrupted apply = %q, want record-1", got)
+	}
+
+	applyReport, err := runner.Run(ctx, Options{Mode: ModeApply, BatchSize: 1, Request: request})
+	if err != nil {
+		t.Fatalf("resumed Run(apply) error = %v", err)
+	}
+	if applyReport.Status != StatusCompleted || applyReport.Counts.Plaintext != 1 || applyReport.Counts.TargetEnvelope != 1 || applyReport.Checkpoints != 2 {
+		t.Fatalf("resumed apply report = %+v", applyReport)
+	}
+	if !strings.HasPrefix(applyReport.EventChainHead, "sha256:") {
+		t.Fatalf("event chain head = %q, want canonical SHA-256", applyReport.EventChainHead)
+	}
+	if runtime.protectCalls != 1 || runtime.revealCalls != 0 {
+		t.Fatalf("runtime calls protect=%d reveal=%d, want 1/0", runtime.protectCalls, runtime.revealCalls)
+	}
+	if !strings.Contains(store.rows[0].ValuesJSON, `"displayName":"kept"`) || strings.Contains(store.rows[0].ValuesJSON, "plain-one") {
+		t.Fatalf("whole JSON mutation did not preserve non-target fields")
+	}
+
+	verifyReport, err := runner.Run(ctx, Options{Mode: ModeVerify, BatchSize: 1, Request: RunRequest{
+		RunID: request.RunID, PlanHash: request.PlanHash,
+	}})
+	if err != nil {
+		t.Fatalf("Run(verify) error = %v", err)
+	}
+	if verifyReport.Status != StatusCompleted || verifyReport.Counts.TargetEnvelope != 2 || verifyReport.Counts.Plaintext != 0 || verifyReport.Checkpoints != 2 {
+		t.Fatalf("verify report = %+v", verifyReport)
+	}
+	if runtime.revealCalls != 0 {
+		t.Fatalf("Reveal() calls after verify = %d, want zero", runtime.revealCalls)
+	}
+}
+
+func TestApplyRejectsCompletedRunWithUnreconciledProcessedCount(t *testing.T) {
+	plan := migrationApplyPlan()
+	store := newMemoryMutatingStore(plan, []Row{
+		{Resource: "customer-records", RecordID: "record-1", ValuesJSON: `{"secretNote":"plain-one"}`},
+		{Resource: "customer-records", RecordID: "record-2", ValuesJSON: `{"secretNote":"plain-two"}`},
+	})
+	store.state.Status = StatusCompleted
+	store.state.Counts = Counts{Plaintext: 1}
+	store.checkpoint = CheckpointState{
+		Resource: "customer-records", TenantID: dataprotection.GlobalTenantID, LastRecordID: "record-1",
+		Counts: Counts{Plaintext: 1}, Batches: 1, EventHash: "sha256:" + strings.Repeat("c", 64),
+	}
+
+	if _, err := NewRunner(plan, migrationTestRuntime(t), store).Run(context.Background(), Options{
+		Mode: ModeApply, BatchSize: 1, Request: approvedMigrationRequest("run-resume"),
+	}); !errors.Is(err, ErrMutationFailed) {
+		t.Fatalf("Run(completed with unreconciled count) error = %v, want ErrMutationFailed", err)
+	}
+}
+
+func TestApplyFailsClosedOnForeignAndMalformedEnvelopesWithoutMutation(t *testing.T) {
+	for _, testCase := range []struct {
+		name  string
+		value string
+	}{
+		{name: "foreign", value: "pgo:enc:v2:foreign-payload"},
+		{name: "malformed", value: "pgo:enc:foreign:malformed-payload"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			plan := migrationApplyPlan()
+			store := newMemoryMutatingStore(plan, []Row{{
+				Resource: "customer-records", RecordID: "record-1",
+				ValuesJSON: `{"secretNote":` + mustJSON(t, testCase.value) + `}`,
+			}})
+			runtime := &trackingRuntime{Runtime: migrationTestRuntime(t)}
+			if _, err := NewRunner(plan, runtime, store).Run(context.Background(), Options{
+				Mode: ModeApply, BatchSize: 1, Request: approvedMigrationRequest("run-resume"),
+			}); !errors.Is(err, ErrMutationFailed) {
+				t.Fatalf("Run(%s envelope) error = %v, want ErrMutationFailed", testCase.name, err)
+			}
+			if store.applyCalls != 0 || runtime.protectCalls != 0 || runtime.revealCalls != 0 {
+				t.Fatalf("fail-closed calls apply=%d protect=%d reveal=%d", store.applyCalls, runtime.protectCalls, runtime.revealCalls)
+			}
+		})
+	}
+}
+
+func TestApplyPreservesNonTargetJSONNumberRepresentations(t *testing.T) {
+	plan := migrationApplyPlan()
+	store := newMemoryMutatingStore(plan, []Row{{
+		Resource: "customer-records", RecordID: "record-1",
+		ValuesJSON: `{"decimal":1.0,"large":9007199254740993,"secretNote":"plain-one"}`,
+	}})
+	if _, err := NewRunner(plan, migrationTestRuntime(t), store).Run(context.Background(), Options{
+		Mode: ModeApply, BatchSize: 1, Request: approvedMigrationRequest("run-resume"),
+	}); err != nil {
+		t.Fatalf("Run(apply) error = %v", err)
+	}
+	updated := store.rows[0].ValuesJSON
+	if !strings.Contains(updated, `"decimal":1.0`) || !strings.Contains(updated, `"large":9007199254740993`) {
+		t.Fatalf("non-target JSON representations changed: %s", updated)
+	}
+}
+
+func TestVerifyRejectsPreparedProcessedCountMismatch(t *testing.T) {
+	plan := migrationApplyPlan()
+	store := newMemoryMutatingStore(plan, []Row{
+		{Resource: "customer-records", RecordID: "record-1", ValuesJSON: `{"secretNote":"plain-one"}`},
+		{Resource: "customer-records", RecordID: "record-2", ValuesJSON: `{"secretNote":"plain-two"}`},
+	})
+	store.state.Status = StatusCompleted
+	store.state.Counts = Counts{Plaintext: 1}
+
+	if _, err := NewRunner(plan, migrationTestRuntime(t), store).Run(context.Background(), Options{
+		Mode: ModeVerify, BatchSize: 1, Request: RunRequest{RunID: "run-resume", PlanHash: store.state.PlanHash},
+	}); !errors.Is(err, ErrVerifyFailed) {
+		t.Fatalf("Run(verify mismatched processed count) error = %v, want ErrVerifyFailed", err)
+	}
+}
+
+func mustJSON(t *testing.T, value string) string {
+	t.Helper()
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(encoded)
+}
+
+func migrationApplyPlan() Plan {
+	return Plan{Resources: []ResourcePlan{{
+		Resource: "customer-records", Scope: "global", SchemaVersion: 1,
+		Fields: []FieldPlan{{Key: "secretNote", Policy: dataprotection.FieldPolicy{
+			Format: dataprotection.FormatAES256GCMV1, Normalization: dataprotection.NormalizationRawV1,
+		}}},
+	}}}
+}
+
+func approvedMigrationRequest(runID string) RunRequest {
+	return RunRequest{
+		RunID: runID, PlanHash: "sha256:" + strings.Repeat("a", 64), ActorID: "operator-1",
+		Reason: "approved maintenance", ApprovalRef: "approval-1", BackupURI: "s3://backup/location",
+		BackupHash: "sha256:" + strings.Repeat("b", 64), RestoreEvidence: "restore-evidence-1",
+		MaintenanceConfirmed: true,
+	}
+}
+
+type memoryMutatingStore struct {
+	plan                      Plan
+	rows                      []Row
+	state                     RunState
+	checkpoint                CheckpointState
+	startErr                  error
+	startCalls                int
+	applyCalls                int
+	interruptAfterFirstCommit bool
+	interrupted               bool
+}
+
+func newMemoryMutatingStore(plan Plan, rows []Row) *memoryMutatingStore {
+	return &memoryMutatingStore{
+		plan: plan, rows: append([]Row(nil), rows...),
+		state: RunState{RunID: "run-resume", PlanHash: "sha256:" + strings.Repeat("a", 64), Status: StatusPrepared, ExpectedRevision: 7, TargetCount: len(rows)},
+	}
+}
+
+func (s *memoryMutatingStore) TenantScopes(context.Context, ResourcePlan) ([]string, error) {
+	return []string{dataprotection.GlobalTenantID}, nil
+}
+
+func (s *memoryMutatingStore) Rows(_ context.Context, plan ResourcePlan, tenant string, after string, limit int) ([]Row, error) {
+	return s.targetRows(plan, tenant, after, limit)
+}
+
+func (s *memoryMutatingStore) Prepare(context.Context, RunRequest) (RunState, error) {
+	return s.state, nil
+}
+
+func (s *memoryMutatingStore) StartOrResume(_ context.Context, request RunRequest) (RunState, error) {
+	s.startCalls++
+	if s.startErr != nil {
+		return RunState{}, s.startErr
+	}
+	if request.RunID != s.state.RunID || request.PlanHash != s.state.PlanHash {
+		return RunState{}, ErrRunConflict
+	}
+	state := s.state
+	if s.checkpoint.LastRecordID != "" {
+		state.Checkpoints = []CheckpointState{s.checkpoint}
+		state.Counts = s.checkpoint.Counts
+		state.EventChainHead = s.checkpoint.EventHash
+	}
+	return state, nil
+}
+
+func (s *memoryMutatingStore) TargetScopes(context.Context, string, ResourcePlan) ([]string, error) {
+	return []string{dataprotection.GlobalTenantID}, nil
+}
+
+func (s *memoryMutatingStore) TargetRows(_ context.Context, _ string, plan ResourcePlan, tenant string, after string, limit int) ([]Row, error) {
+	if s.interruptAfterFirstCommit && !s.interrupted && s.checkpoint.LastRecordID == "record-1" {
+		s.interrupted = true
+		return nil, errors.New("fixture interruption")
+	}
+	return s.targetRows(plan, tenant, after, limit)
+}
+
+func (s *memoryMutatingStore) targetRows(plan ResourcePlan, tenant string, after string, limit int) ([]Row, error) {
+	if plan.Resource != s.plan.Resources[0].Resource || tenant != dataprotection.GlobalTenantID {
+		return nil, errors.New("unexpected target query")
+	}
+	start := sort.Search(len(s.rows), func(index int) bool { return s.rows[index].RecordID > after })
+	end := min(start+limit, len(s.rows))
+	return append([]Row(nil), s.rows[start:end]...), nil
+}
+
+func (s *memoryMutatingStore) ApplyBatch(_ context.Context, mutation BatchMutation) (BatchCommit, error) {
+	s.applyCalls++
+	for _, changed := range mutation.Rows {
+		for index := range s.rows {
+			if s.rows[index].RecordID == changed.RecordID {
+				s.rows[index].ValuesJSON = changed.UpdatedValuesJSON
+			}
+		}
+	}
+	s.state.ExpectedRevision++
+	s.checkpoint = CheckpointState{
+		Resource: mutation.Resource.Resource, TenantID: mutation.TenantID, LastRecordID: mutation.LastRecordID,
+		Counts: s.checkpoint.Counts.plus(mutation.Counts), Batches: s.checkpoint.Batches + 1,
+		EventHash: "sha256:" + strings.Repeat("c", 64),
+	}
+	return BatchCommit{
+		Revision: s.state.ExpectedRevision, Rows: len(mutation.Rows), LastRecordID: mutation.LastRecordID,
+		EventSequence: uint64(s.checkpoint.Counts.total()), EventHash: s.checkpoint.EventHash,
+	}, nil
+}
+
+func (s *memoryMutatingStore) FinishRun(_ context.Context, runID string, status string) error {
+	if runID != s.state.RunID {
+		return ErrRunConflict
+	}
+	s.state.Status = status
+	return nil
+}
+
 func assertSanitized(t *testing.T, values ...string) {
 	t.Helper()
 	for _, value := range values {

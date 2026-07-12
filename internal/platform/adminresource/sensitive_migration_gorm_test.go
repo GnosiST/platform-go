@@ -248,12 +248,9 @@ func TestGORMProtectedValueMigrationPrepareCreatesOnlyValueFreeJournalTables(t *
 		t.Fatalf("NewGORMProtectedValueMigrationStore() error = %v", err)
 	}
 	before := migrationTableNames(t, db)
-	state, err := store.Prepare(context.Background(), sensitivemigration.RunRequest{
-		RunID: "run-prepare", PlanHash: "sha256:prepare-plan",
-		Plan: sensitivemigration.Plan{Resources: []sensitivemigration.ResourcePlan{
-			migrationResourcePlan("customer-records", "global", "", "secretNote"),
-		}},
-	})
+	request := migrationRunRequest("run-prepare")
+	request.PlanHash = "sha256:prepare-plan"
+	state, err := store.Prepare(context.Background(), request)
 	if err != nil {
 		t.Fatalf("Prepare() error = %v", err)
 	}
@@ -344,8 +341,8 @@ func TestGORMProtectedValueMigrationPrepareReloadsConcurrentIdenticalWinner(t *t
 			return
 		}
 		injected = true
-		result := tx.Exec("INSERT INTO "+sensitiveMigrationRunsTable+" (run_id, plan_hash, status, expected_revision, target_count, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-			"run-race", "sha256:apply-plan", sensitivemigration.StatusPrepared, 7, 1, "2026-07-12T00:00:00Z")
+		result := tx.Exec("INSERT INTO "+sensitiveMigrationRunsTable+" (run_id, plan_hash, actor_id, reason, approval_ref, backup_uri, backup_hash, restore_evidence, maintenance_confirmed, status, expected_revision, target_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			"run-race", "sha256:apply-plan", "operator-1", "approved maintenance", "approval-1", "s3://backup/location", "sha256:"+strings.Repeat("b", 64), "restore-evidence-1", true, sensitivemigration.StatusPrepared, 7, 1, "2026-07-12T00:00:00Z")
 		if result.Error != nil {
 			t.Errorf("inject prepare winner error = %v", result.Error)
 		}
@@ -375,8 +372,8 @@ func TestGORMProtectedValueMigrationPrepareRejectsConcurrentConflictingWinner(t 
 			return
 		}
 		injected = true
-		result := tx.Exec("INSERT INTO "+sensitiveMigrationRunsTable+" (run_id, plan_hash, status, expected_revision, target_count, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-			"run-race-conflict", "sha256:other-plan", sensitivemigration.StatusPrepared, 7, 1, "2026-07-12T00:00:00Z")
+		result := tx.Exec("INSERT INTO "+sensitiveMigrationRunsTable+" (run_id, plan_hash, actor_id, reason, approval_ref, backup_uri, backup_hash, restore_evidence, maintenance_confirmed, status, expected_revision, target_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			"run-race-conflict", "sha256:other-plan", "operator-1", "approved maintenance", "approval-1", "s3://backup/location", "sha256:"+strings.Repeat("b", 64), "restore-evidence-1", true, sensitivemigration.StatusPrepared, 7, 1, "2026-07-12T00:00:00Z")
 		if result.Error != nil {
 			t.Errorf("inject conflicting prepare winner error = %v", result.Error)
 		}
@@ -393,6 +390,163 @@ func TestGORMProtectedValueMigrationPrepareRejectsConcurrentConflictingWinner(t 
 	}
 }
 
+func TestGORMProtectedValueMigrationPrepareRequiresMutationApprovals(t *testing.T) {
+	db := migrationOrdinaryDB(t, map[string]string{"record-1": `{"secretNote":"plain-one"}`})
+	store, err := NewGORMProtectedValueMigrationStore(db, "sqlite")
+	if err != nil {
+		t.Fatalf("NewGORMProtectedValueMigrationStore() error = %v", err)
+	}
+
+	request := migrationRunRequest("run-without-approvals")
+	request.ActorID = ""
+	if _, err := store.Prepare(context.Background(), request); !errors.Is(err, ErrMigrationInvalidOptions) {
+		t.Fatalf("Prepare(without approvals) error = %v, want ErrMigrationInvalidOptions", err)
+	}
+}
+
+func TestGORMProtectedValueMigrationApplyRefusesMissingPreparedRun(t *testing.T) {
+	_, store := preparedMigrationStore(t, map[string]string{"record-1": `{"secretNote":"plain-one"}`})
+	mutation := migrationBatch("record-1", `{"secretNote":"plain-one"}`, `{"secretNote":"pgo:enc:v1:one"}`, 7)
+	mutation.RunID = "missing-prepared-run"
+
+	if _, err := store.ApplyBatch(context.Background(), mutation); !errors.Is(err, ErrMigrationConflict) {
+		t.Fatalf("ApplyBatch(missing prepared run) error = %v, want ErrMigrationConflict", err)
+	}
+}
+
+func TestGORMProtectedValueMigrationEventChainPersistsCanonicalHashes(t *testing.T) {
+	db, store := preparedMigrationStore(t, map[string]string{
+		"record-1": `{"secretNote":"plain-one"}`,
+		"record-2": `{"secretNote":"plain-two"}`,
+	})
+	if _, err := store.ApplyBatch(context.Background(), migrationBatch("record-1", `{"secretNote":"plain-one"}`, `{"secretNote":"pgo:enc:v1:one"}`, 7)); err != nil {
+		t.Fatalf("ApplyBatch(first) error = %v", err)
+	}
+	if _, err := store.ApplyBatch(context.Background(), migrationBatch("record-2", `{"secretNote":"plain-two"}`, `{"secretNote":"pgo:enc:v1:two"}`, 8)); err != nil {
+		t.Fatalf("ApplyBatch(second) error = %v", err)
+	}
+
+	var events []gormSensitiveMigrationEvent
+	if err := db.Order("sequence").Find(&events).Error; err != nil {
+		t.Fatalf("read events error = %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("event count = %d, want 2", len(events))
+	}
+	for index, event := range events {
+		if !strings.HasPrefix(event.PriorEventHash, "sha256:") || len(event.PriorEventHash) != 71 {
+			t.Fatalf("event %d prior hash = %q, want canonical SHA-256", index+1, event.PriorEventHash)
+		}
+		if !strings.HasPrefix(event.EventHash, "sha256:") || len(event.EventHash) != 71 {
+			t.Fatalf("event %d hash = %q, want canonical SHA-256", index+1, event.EventHash)
+		}
+	}
+	if events[1].PriorEventHash != events[0].EventHash {
+		t.Fatalf("event chain prior hash does not reference previous event")
+	}
+}
+
+func TestGORMProtectedValueMigrationResumeRejectsPreparedPlanHashMismatch(t *testing.T) {
+	_, store := preparedMigrationStore(t, map[string]string{"record-1": `{"secretNote":"plain-one"}`})
+	request := migrationRunRequest("run-apply")
+	request.Mode = sensitivemigration.ModeApply
+	request.PlanHash = "sha256:different-plan"
+
+	if _, err := store.StartOrResume(context.Background(), request); !errors.Is(err, ErrMigrationConflict) {
+		t.Fatalf("StartOrResume(plan mismatch) error = %v, want ErrMigrationConflict", err)
+	}
+}
+
+func TestGORMProtectedValueMigrationTargetRowsUseSealedPreparedCoordinates(t *testing.T) {
+	db, store := preparedMigrationStore(t, map[string]string{"record-1": `{"secretNote":"plain-one"}`})
+	if err := db.Create(&gormAdminResourceRecord{
+		Resource: "customer-records", ID: "record-2", Code: "record-2", Name: "record-2", Status: "enabled",
+		UpdatedAt: "2026-07-12T00:00:00Z", ValuesJSON: `{"secretNote":"added-after-prepare"}`,
+	}).Error; err != nil {
+		t.Fatalf("create post-prepare row error = %v", err)
+	}
+
+	rows, err := store.TargetRows(context.Background(), "run-apply", migrationResourcePlan("customer-records", "global", "", "secretNote"), dataprotection.GlobalTenantID, "", 10)
+	if err != nil {
+		t.Fatalf("TargetRows() error = %v", err)
+	}
+	if len(rows) != 1 || rows[0].RecordID != "record-1" {
+		t.Fatalf("TargetRows() = %+v, want only sealed record-1", rows)
+	}
+}
+
+func TestGORMProtectedValueMigrationApplyTargetEnvelopeNoOpCommitsCursor(t *testing.T) {
+	const valuesJSON = `{"displayName":"kept","secretNote":"pgo:enc:v1:existing"}`
+	db, store := preparedMigrationStore(t, map[string]string{"record-1": valuesJSON})
+	mutation := migrationBatch("record-1", valuesJSON, valuesJSON, 7)
+	mutation.Counts = sensitivemigration.Counts{TargetEnvelope: 1}
+
+	commit, err := store.ApplyBatch(context.Background(), mutation)
+	if err != nil {
+		t.Fatalf("ApplyBatch(target no-op) error = %v", err)
+	}
+	if commit.LastRecordID != "record-1" || commit.EventHash == "" {
+		t.Fatalf("ApplyBatch(target no-op) commit = %+v", commit)
+	}
+	assertMigrationRecordJSON(t, db, "record-1", valuesJSON)
+	var checkpoint gormSensitiveMigrationCheckpoint
+	if err := db.Where("run_id = ?", "run-apply").First(&checkpoint).Error; err != nil {
+		t.Fatalf("read checkpoint error = %v", err)
+	}
+	if checkpoint.LastRecordID != "record-1" || checkpoint.TargetEnvelope != 1 || checkpoint.Batches != 1 || checkpoint.EventHash != commit.EventHash {
+		t.Fatalf("target no-op checkpoint = %+v", checkpoint)
+	}
+}
+
+func TestGORMProtectedValueMigrationResumeLoadsCommittedCursorRevisionAndChain(t *testing.T) {
+	_, store := preparedMigrationStore(t, map[string]string{
+		"record-1": `{"secretNote":"plain-one"}`,
+		"record-2": `{"secretNote":"plain-two"}`,
+	})
+	commit, err := store.ApplyBatch(context.Background(), migrationBatch("record-1", `{"secretNote":"plain-one"}`, `{"secretNote":"pgo:enc:v1:one"}`, 7))
+	if err != nil {
+		t.Fatalf("ApplyBatch(first) error = %v", err)
+	}
+	request := migrationRunRequest("run-apply")
+	request.Mode = sensitivemigration.ModeApply
+	state, err := store.StartOrResume(context.Background(), request)
+	if err != nil {
+		t.Fatalf("StartOrResume() error = %v", err)
+	}
+	if state.ExpectedRevision != 8 || state.Counts.Plaintext != 1 || len(state.Checkpoints) != 1 {
+		t.Fatalf("resumed state = %+v", state)
+	}
+	checkpoint := state.Checkpoints[0]
+	if checkpoint.LastRecordID != "record-1" || checkpoint.Batches != 1 || checkpoint.EventHash != commit.EventHash || state.EventChainHead != commit.EventHash {
+		t.Fatalf("resumed checkpoint = %+v state head = %q", checkpoint, state.EventChainHead)
+	}
+}
+
+func TestGORMProtectedValueMigrationEventChainTamperRollsBackNextBatch(t *testing.T) {
+	db, store := preparedMigrationStore(t, map[string]string{
+		"record-1": `{"secretNote":"plain-one"}`,
+		"record-2": `{"secretNote":"plain-two"}`,
+	})
+	if _, err := store.ApplyBatch(context.Background(), migrationBatch("record-1", `{"secretNote":"plain-one"}`, `{"secretNote":"pgo:enc:v1:one"}`, 7)); err != nil {
+		t.Fatalf("ApplyBatch(first) error = %v", err)
+	}
+	tampered := "sha256:" + strings.Repeat("d", 64)
+	if result := db.Model(&gormSensitiveMigrationEvent{}).Where("run_id = ? AND sequence = ?", "run-apply", 1).Update("event_hash", tampered); result.Error != nil || result.RowsAffected != 1 {
+		t.Fatalf("tamper event hash = %d, %v", result.RowsAffected, result.Error)
+	}
+	if result := db.Model(&gormSensitiveMigrationCheckpoint{}).Where("run_id = ?", "run-apply").Update("event_hash", tampered); result.Error != nil || result.RowsAffected != 1 {
+		t.Fatalf("tamper checkpoint hash = %d, %v", result.RowsAffected, result.Error)
+	}
+
+	if _, err := store.ApplyBatch(context.Background(), migrationBatch("record-2", `{"secretNote":"plain-two"}`, `{"secretNote":"pgo:enc:v1:two"}`, 8)); !errors.Is(err, ErrMigrationConflict) {
+		t.Fatalf("ApplyBatch(after chain tamper) error = %v, want ErrMigrationConflict", err)
+	}
+	assertMigrationRecordJSON(t, db, "record-2", `{"secretNote":"plain-two"}`)
+	if revision, err := loadGORMRevision(db); err != nil || revision != 8 {
+		t.Fatalf("revision after rejected tampered batch = %d, %v; want 8", revision, err)
+	}
+}
+
 func TestGORMProtectedValueMigrationApplyBatchUsesSnapshotAndRevisionCAS(t *testing.T) {
 	db, store := preparedMigrationStore(t, map[string]string{
 		"record-1": `{"secretNote":"plain-one"}`,
@@ -401,6 +555,7 @@ func TestGORMProtectedValueMigrationApplyBatchUsesSnapshotAndRevisionCAS(t *test
 		RunID: "run-apply", Mode: sensitivemigration.ModeApply,
 		Resource: migrationResourcePlan("customer-records", "global", "", "secretNote"),
 		TenantID: dataprotection.GlobalTenantID, ExpectedRevision: 7, LastRecordID: "record-1",
+		Counts: sensitivemigration.Counts{Plaintext: 1},
 		Rows: []sensitivemigration.RowMutation{{
 			RecordID: "record-1", OriginalValuesJSON: `{"secretNote":"plain-one"}`,
 			UpdatedValuesJSON: `{"secretNote":"pgo:enc:v1:migrated"}`,
@@ -438,6 +593,7 @@ func TestGORMProtectedValueMigrationApplyBatchRollsBackJournalOnRowConflict(t *t
 		RunID: "run-apply", Mode: sensitivemigration.ModeApply,
 		Resource: migrationResourcePlan("customer-records", "global", "", "secretNote"),
 		TenantID: dataprotection.GlobalTenantID, ExpectedRevision: 7, LastRecordID: "record-2",
+		Counts: sensitivemigration.Counts{Plaintext: 2},
 		Rows: []sensitivemigration.RowMutation{
 			{RecordID: "record-1", OriginalValuesJSON: `{"secretNote":"plain-one"}`, UpdatedValuesJSON: `{"secretNote":"pgo:enc:v1:one"}`},
 			{RecordID: "record-2", OriginalValuesJSON: `{"secretNote":"stale"}`, UpdatedValuesJSON: `{"secretNote":"pgo:enc:v1:two"}`},
@@ -464,6 +620,7 @@ func TestGORMProtectedValueMigrationApplyBatchRejectsNonTargetJSONChanges(t *tes
 		RunID: "run-apply", Mode: sensitivemigration.ModeApply,
 		Resource: migrationResourcePlan("customer-records", "global", "", "secretNote"),
 		TenantID: dataprotection.GlobalTenantID, ExpectedRevision: 7, LastRecordID: "record-1",
+		Counts: sensitivemigration.Counts{Plaintext: 1},
 		Rows: []sensitivemigration.RowMutation{{
 			RecordID: "record-1", OriginalValuesJSON: `{"displayName":"Original","secretNote":"plain-one"}`,
 			UpdatedValuesJSON: `{"displayName":"Changed","secretNote":"pgo:enc:v1:one"}`,
@@ -537,10 +694,10 @@ func TestGORMProtectedValueMigrationCheckpointAllowsInterleavedTenantScopes(t *t
 		t.Fatalf("NewGORMProtectedValueMigrationStore() error = %v", err)
 	}
 	plan := migrationResourcePlan("customer-records", "tenant-field", "tenantCode", "secretNote")
-	if _, err := store.Prepare(context.Background(), sensitivemigration.RunRequest{
-		RunID: "run-interleaved", PlanHash: "sha256:interleaved-plan",
-		Plan: sensitivemigration.Plan{Resources: []sensitivemigration.ResourcePlan{plan}},
-	}); err != nil {
+	request := migrationRunRequest("run-interleaved")
+	request.PlanHash = "sha256:interleaved-plan"
+	request.Plan = sensitivemigration.Plan{Resources: []sensitivemigration.ResourcePlan{plan}}
+	if _, err := store.Prepare(context.Background(), request); err != nil {
 		t.Fatalf("Prepare() error = %v", err)
 	}
 
@@ -596,6 +753,7 @@ func TestGORMProtectedValueMigrationCheckpointRejectsOrderReplayAndCASConflicts(
 			RunID: "run-apply", Mode: sensitivemigration.ModeApply,
 			Resource: migrationResourcePlan("customer-records", "global", "", "secretNote"),
 			TenantID: dataprotection.GlobalTenantID, ExpectedRevision: 7, LastRecordID: "record-1",
+			Counts: sensitivemigration.Counts{Plaintext: 2},
 			Rows: []sensitivemigration.RowMutation{
 				{RecordID: "record-2", OriginalValuesJSON: `{"secretNote":"plain-two"}`, UpdatedValuesJSON: `{"secretNote":"pgo:enc:v1:two"}`},
 				{RecordID: "record-1", OriginalValuesJSON: `{"secretNote":"plain-one"}`, UpdatedValuesJSON: `{"secretNote":"pgo:enc:v1:one"}`},
@@ -652,6 +810,9 @@ func migrationResourcePlan(resource string, scope string, tenantField string, fi
 func migrationRunRequest(runID string) sensitivemigration.RunRequest {
 	return sensitivemigration.RunRequest{
 		RunID: runID, PlanHash: "sha256:apply-plan",
+		ActorID: "operator-1", Reason: "approved maintenance", ApprovalRef: "approval-1",
+		BackupURI: "s3://backup/location", BackupHash: "sha256:" + strings.Repeat("b", 64),
+		RestoreEvidence: "restore-evidence-1", MaintenanceConfirmed: true,
 		Plan: sensitivemigration.Plan{Resources: []sensitivemigration.ResourcePlan{
 			migrationResourcePlan("customer-records", "global", "", "secretNote"),
 		}},
@@ -663,7 +824,8 @@ func migrationBatch(recordID string, original string, updated string, revision u
 		RunID: "run-apply", Mode: sensitivemigration.ModeApply,
 		Resource: migrationResourcePlan("customer-records", "global", "", "secretNote"),
 		TenantID: dataprotection.GlobalTenantID, ExpectedRevision: revision, LastRecordID: recordID,
-		Rows: []sensitivemigration.RowMutation{{RecordID: recordID, OriginalValuesJSON: original, UpdatedValuesJSON: updated}},
+		Counts: sensitivemigration.Counts{Plaintext: 1},
+		Rows:   []sensitivemigration.RowMutation{{RecordID: recordID, OriginalValuesJSON: original, UpdatedValuesJSON: updated}},
 	}
 }
 
@@ -671,7 +833,8 @@ func tenantMigrationBatch(plan sensitivemigration.ResourcePlan, tenant string, r
 	return sensitivemigration.BatchMutation{
 		RunID: "run-interleaved", Mode: sensitivemigration.ModeApply, Resource: plan,
 		TenantID: tenant, ExpectedRevision: revision, LastRecordID: recordID,
-		Rows: []sensitivemigration.RowMutation{{RecordID: recordID, OriginalValuesJSON: original, UpdatedValuesJSON: updated}},
+		Counts: sensitivemigration.Counts{Plaintext: 1},
+		Rows:   []sensitivemigration.RowMutation{{RecordID: recordID, OriginalValuesJSON: original, UpdatedValuesJSON: updated}},
 	}
 }
 

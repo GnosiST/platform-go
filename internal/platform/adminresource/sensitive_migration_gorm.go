@@ -45,6 +45,13 @@ type GORMProtectedValueMigrationStore struct {
 type gormSensitiveMigrationRun struct {
 	RunID            string `gorm:"column:run_id;size:64;primaryKey"`
 	PlanHash         string `gorm:"column:plan_hash;size:71;not null"`
+	ActorID          string `gorm:"column:actor_id;size:128;not null"`
+	Reason           string `gorm:"column:reason;size:191;not null"`
+	ApprovalRef      string `gorm:"column:approval_ref;size:191;not null"`
+	BackupURI        string `gorm:"column:backup_uri;size:191;not null"`
+	BackupHash       string `gorm:"column:backup_hash;size:71;not null"`
+	RestoreEvidence  string `gorm:"column:restore_evidence;size:191;not null"`
+	MaintenanceOK    bool   `gorm:"column:maintenance_confirmed;not null"`
 	Status           string `gorm:"column:status;size:32;not null"`
 	ExpectedRevision uint64 `gorm:"column:expected_revision;not null"`
 	TargetCount      int    `gorm:"column:target_count;not null"`
@@ -72,8 +79,15 @@ type gormSensitiveMigrationCheckpoint struct {
 	LastRecordID     string `gorm:"column:last_record_id;size:191;not null"`
 	ExpectedRevision uint64 `gorm:"column:expected_revision;not null"`
 	Rows             int    `gorm:"column:row_count;not null"`
+	Missing          int    `gorm:"column:missing_count;not null"`
+	Plaintext        int    `gorm:"column:plaintext_count;not null"`
+	TargetEnvelope   int    `gorm:"column:target_envelope_count;not null"`
+	ForeignEnvelope  int    `gorm:"column:foreign_envelope_count;not null"`
+	Malformed        int    `gorm:"column:malformed_envelope_count;not null"`
+	Batches          int    `gorm:"column:batch_count;not null"`
 	Status           string `gorm:"column:status;size:32;not null"`
 	EventSequence    uint64 `gorm:"column:event_sequence;not null"`
+	EventHash        string `gorm:"column:event_hash;size:71;not null"`
 	UpdatedAt        string `gorm:"column:updated_at;size:35;not null"`
 }
 
@@ -85,6 +99,11 @@ type gormSensitiveMigrationEvent struct {
 	Resource        string `gorm:"column:resource;size:128;not null"`
 	TenantScopeHash string `gorm:"column:tenant_scope_hash;size:71;not null"`
 	Rows            int    `gorm:"column:row_count;not null"`
+	Missing         int    `gorm:"column:missing_count;not null"`
+	Plaintext       int    `gorm:"column:plaintext_count;not null"`
+	TargetEnvelope  int    `gorm:"column:target_envelope_count;not null"`
+	ForeignEnvelope int    `gorm:"column:foreign_envelope_count;not null"`
+	Malformed       int    `gorm:"column:malformed_envelope_count;not null"`
 	Revision        uint64 `gorm:"column:revision;not null"`
 	PriorEventHash  string `gorm:"column:prior_event_hash;size:71;not null"`
 	EventHash       string `gorm:"column:event_hash;size:71;not null"`
@@ -213,7 +232,7 @@ func (s *GORMProtectedValueMigrationStore) Rows(ctx context.Context, plan sensit
 }
 
 func (s *GORMProtectedValueMigrationStore) Prepare(ctx context.Context, request sensitivemigration.RunRequest) (sensitivemigration.RunState, error) {
-	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil || strings.TrimSpace(request.RunID) == "" || strings.TrimSpace(request.PlanHash) == "" || len(request.Plan.Resources) == 0 {
+	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil || !sensitivemigration.ValidMutationRequest(request) || len(request.Plan.Resources) == 0 {
 		return sensitivemigration.RunState{}, ErrMigrationInvalidOptions
 	}
 	for _, plan := range request.Plan.Resources {
@@ -230,7 +249,7 @@ func (s *GORMProtectedValueMigrationStore) Prepare(ctx context.Context, request 
 	if existing, found, err := s.preparedRun(s.db.WithContext(ctx), request.RunID); err != nil {
 		return sensitivemigration.RunState{}, err
 	} else if found {
-		if existing.PlanHash != request.PlanHash {
+		if !runMatchesRequest(existing, request) {
 			return sensitivemigration.RunState{}, ErrMigrationConflict
 		}
 		return runState(existing), nil
@@ -255,7 +274,9 @@ func (s *GORMProtectedValueMigrationStore) Prepare(ctx context.Context, request 
 			return ErrMigrationConflict
 		}
 		run := gormSensitiveMigrationRun{
-			RunID: request.RunID, PlanHash: request.PlanHash, Status: sensitivemigration.StatusPrepared,
+			RunID: request.RunID, PlanHash: request.PlanHash, ActorID: request.ActorID, Reason: request.Reason,
+			ApprovalRef: request.ApprovalRef, BackupURI: request.BackupURI, BackupHash: request.BackupHash,
+			RestoreEvidence: request.RestoreEvidence, MaintenanceOK: request.MaintenanceConfirmed, Status: sensitivemigration.StatusPrepared,
 			ExpectedRevision: revision, TargetCount: len(targets), CreatedAt: migrationTimestamp(),
 		}
 		created := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "run_id"}}, DoNothing: true}).Create(&run)
@@ -267,7 +288,7 @@ func (s *GORMProtectedValueMigrationStore) Prepare(ctx context.Context, request 
 			if err != nil || !found {
 				return ErrMigrationStore
 			}
-			if existing.PlanHash != request.PlanHash {
+			if !runMatchesRequest(existing, request) {
 				return ErrMigrationConflict
 			}
 			state = runState(existing)
@@ -299,6 +320,161 @@ func (s *GORMProtectedValueMigrationStore) preparedRun(db *gorm.DB, runID string
 	return run, true, nil
 }
 
+func (s *GORMProtectedValueMigrationStore) StartOrResume(ctx context.Context, request sensitivemigration.RunRequest) (sensitivemigration.RunState, error) {
+	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil || !sensitivemigration.ValidRunIdentity(request) {
+		return sensitivemigration.RunState{}, ErrMigrationInvalidOptions
+	}
+	if request.Mode == sensitivemigration.ModeApply && !sensitivemigration.ValidMutationRequest(request) || request.Mode != sensitivemigration.ModeApply && request.Mode != sensitivemigration.ModeVerify {
+		return sensitivemigration.RunState{}, ErrMigrationInvalidOptions
+	}
+	var state sensitivemigration.RunState
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var run gormSensitiveMigrationRun
+		query := tx.Where("run_id = ?", request.RunID)
+		if s.driver != "sqlite" {
+			query = query.Clauses(clause.Locking{Strength: "UPDATE"})
+		}
+		if err := query.First(&run).Error; err != nil {
+			return ErrMigrationConflict
+		}
+		if run.PlanHash != request.PlanHash || run.Status != sensitivemigration.StatusPrepared && run.Status != sensitivemigration.StatusCompleted {
+			return ErrMigrationConflict
+		}
+		if request.Mode == sensitivemigration.ModeApply && !runMatchesRequest(run, request) {
+			return ErrMigrationConflict
+		}
+		head, err := verifyEventChain(tx, request.RunID)
+		if err != nil {
+			return err
+		}
+		var checkpoints []gormSensitiveMigrationCheckpoint
+		if err := tx.Where("run_id = ? AND mode = ?", request.RunID, string(sensitivemigration.ModeApply)).
+			Order("resource, tenant_scope_hash").Find(&checkpoints).Error; err != nil {
+			return ErrMigrationStore
+		}
+		state = runState(run)
+		state.EventChainHead = head
+		for _, checkpoint := range checkpoints {
+			if checkpoint.EventHash == "" || checkpoint.EventSequence == 0 {
+				return ErrMigrationConflict
+			}
+			counts := checkpointCounts(checkpoint)
+			state.Counts = addMigrationCounts(state.Counts, counts)
+			state.Checkpoints = append(state.Checkpoints, sensitivemigration.CheckpointState{
+				Resource: checkpoint.Resource, TenantID: checkpoint.TenantScope, LastRecordID: checkpoint.LastRecordID,
+				Counts: counts, Batches: checkpoint.Batches, EventHash: checkpoint.EventHash,
+			})
+		}
+		if migrationCountsTotal(state.Counts) > state.TargetCount {
+			return ErrMigrationConflict
+		}
+		return nil
+	})
+	if err != nil {
+		return sensitivemigration.RunState{}, err
+	}
+	return state, nil
+}
+
+func (s *GORMProtectedValueMigrationStore) TargetScopes(ctx context.Context, runID string, plan sensitivemigration.ResourcePlan) ([]string, error) {
+	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil || !canonicalMigrationRunID(runID) {
+		return nil, ErrMigrationInvalidOptions
+	}
+	if _, _, err := migrationLayout(plan); err != nil {
+		return nil, err
+	}
+	var scopes []string
+	if err := s.db.WithContext(ctx).Model(&gormSensitiveMigrationTarget{}).
+		Where("run_id = ? AND resource = ?", runID, plan.Resource).
+		Distinct("tenant_scope").Order("tenant_scope").Pluck("tenant_scope", &scopes).Error; err != nil {
+		return nil, ErrMigrationStore
+	}
+	for _, scope := range scopes {
+		if strings.TrimSpace(scope) == "" {
+			return nil, ErrMigrationConflict
+		}
+	}
+	return scopes, nil
+}
+
+func (s *GORMProtectedValueMigrationStore) TargetRows(ctx context.Context, runID string, plan sensitivemigration.ResourcePlan, tenant string, after string, limit int) ([]sensitivemigration.Row, error) {
+	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil || !canonicalMigrationRunID(runID) || strings.TrimSpace(tenant) == "" || limit < 1 || limit > sensitivemigration.MaximumBatchSize {
+		return nil, ErrMigrationInvalidOptions
+	}
+	layout, generic, err := migrationLayout(plan)
+	if err != nil {
+		return nil, err
+	}
+	tenantHash := migrationHash("tenant-scope", tenant)
+	var recordIDs []string
+	query := s.db.WithContext(ctx).Model(&gormSensitiveMigrationTarget{}).
+		Where("run_id = ? AND resource = ? AND tenant_scope = ? AND tenant_scope_hash = ?", runID, plan.Resource, tenant, tenantHash)
+	if after != "" {
+		query = query.Where("record_id > ?", after)
+	}
+	if err := query.Distinct("record_id").Order("record_id").Limit(limit).Pluck("record_id", &recordIDs).Error; err != nil {
+		return nil, ErrMigrationStore
+	}
+	rows := make([]sensitivemigration.Row, 0, len(recordIDs))
+	for _, recordID := range recordIDs {
+		var targets []gormSensitiveMigrationTarget
+		if err := s.db.WithContext(ctx).Where(
+			"run_id = ? AND resource = ? AND tenant_scope_hash = ? AND record_id = ?", runID, plan.Resource, tenantHash, recordID,
+		).Order("field_key").Find(&targets).Error; err != nil || !targetsMatchPlan(targets, plan) {
+			return nil, ErrMigrationConflict
+		}
+		var physical migrationPhysicalRow
+		physicalQuery := s.db.WithContext(ctx).Table(layout.Table).Select("id, values_json").Where("id = ?", recordID)
+		if generic {
+			physicalQuery = physicalQuery.Where("resource = ?", plan.Resource)
+		}
+		if err := physicalQuery.Take(&physical).Error; err != nil || physical.ID != recordID || physical.ValuesJSON == "" {
+			return nil, ErrMigrationConflict
+		}
+		rows = append(rows, sensitivemigration.Row{Resource: plan.Resource, RecordID: recordID, ValuesJSON: physical.ValuesJSON})
+	}
+	return rows, nil
+}
+
+func (s *GORMProtectedValueMigrationStore) FinishRun(ctx context.Context, runID string, status string) error {
+	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil || !canonicalMigrationRunID(runID) || status != sensitivemigration.StatusCompleted {
+		return ErrMigrationInvalidOptions
+	}
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var run gormSensitiveMigrationRun
+		if err := tx.Where("run_id = ?", runID).First(&run).Error; err != nil {
+			return ErrMigrationConflict
+		}
+		if run.Status == sensitivemigration.StatusCompleted {
+			return nil
+		}
+		if run.Status != sensitivemigration.StatusPrepared {
+			return ErrMigrationConflict
+		}
+		var checkpoints []gormSensitiveMigrationCheckpoint
+		if err := tx.Where("run_id = ? AND mode = ?", runID, string(sensitivemigration.ModeApply)).Find(&checkpoints).Error; err != nil {
+			return ErrMigrationStore
+		}
+		processed := 0
+		for _, checkpoint := range checkpoints {
+			processed += migrationCountsTotal(checkpointCounts(checkpoint))
+		}
+		if processed != run.TargetCount {
+			return ErrMigrationConflict
+		}
+		if _, err := verifyEventChain(tx, runID); err != nil {
+			return err
+		}
+		updated := tx.Model(&gormSensitiveMigrationRun{}).
+			Where("run_id = ? AND status = ?", runID, sensitivemigration.StatusPrepared).
+			Update("status", status)
+		if updated.Error != nil || updated.RowsAffected != 1 {
+			return ErrMigrationConflict
+		}
+		return nil
+	})
+}
+
 func (s *GORMProtectedValueMigrationStore) lockedRevision(tx *gorm.DB) (uint64, error) {
 	query := tx.Where("key = ?", "revision")
 	if s.driver != "sqlite" {
@@ -316,7 +492,7 @@ func (s *GORMProtectedValueMigrationStore) lockedRevision(tx *gorm.DB) (uint64, 
 }
 
 func (s *GORMProtectedValueMigrationStore) ApplyBatch(ctx context.Context, mutation sensitivemigration.BatchMutation) (sensitivemigration.BatchCommit, error) {
-	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil || strings.TrimSpace(mutation.RunID) == "" || mutation.Mode != sensitivemigration.ModeApply || len(mutation.Rows) == 0 || mutation.ExpectedRevision == ^uint64(0) {
+	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil || !canonicalMigrationRunID(mutation.RunID) || mutation.Mode != sensitivemigration.ModeApply || len(mutation.Rows) == 0 || mutation.ExpectedRevision == ^uint64(0) || migrationCountsTotal(mutation.Counts) == 0 {
 		return sensitivemigration.BatchCommit{}, ErrMigrationInvalidOptions
 	}
 	layout, generic, err := migrationLayout(mutation.Resource)
@@ -375,13 +551,14 @@ func (s *GORMProtectedValueMigrationStore) ApplyBatch(ctx context.Context, mutat
 			}
 			if checkpointEvent.Revision != checkpoint.ExpectedRevision ||
 				checkpointEvent.Mode != string(mutation.Mode) || checkpointEvent.Resource != mutation.Resource.Resource ||
-				checkpointEvent.TenantScopeHash != tenantHash {
+				checkpointEvent.TenantScopeHash != tenantHash || checkpointEvent.EventHash != checkpoint.EventHash {
 				return ErrMigrationConflict
 			}
 		} else if !errors.Is(checkpointErr, gorm.ErrRecordNotFound) {
 			return ErrMigrationStore
 		}
 
+		processedTargets := 0
 		for _, row := range mutation.Rows {
 			var targets []gormSensitiveMigrationTarget
 			if err := tx.Model(&gormSensitiveMigrationTarget{}).
@@ -397,9 +574,13 @@ func (s *GORMProtectedValueMigrationStore) ApplyBatch(ctx context.Context, mutat
 				}
 				targetFields = append(targetFields, target.FieldKey)
 			}
+			processedTargets += len(targets)
 			changedFields, err := migrationChangedFields(row.OriginalValuesJSON, row.UpdatedValuesJSON)
 			if err != nil || !migrationFieldsAreTargets(changedFields, targetFields) {
 				return ErrMigrationConflict
+			}
+			if len(changedFields) == 0 {
+				continue
 			}
 			query := tx.Table(layout.Table).Where("id = ? AND values_json = ?", row.RecordID, row.OriginalValuesJSON)
 			if generic {
@@ -413,10 +594,16 @@ func (s *GORMProtectedValueMigrationStore) ApplyBatch(ctx context.Context, mutat
 				return ErrMigrationConflict
 			}
 		}
+		if processedTargets != migrationCountsTotal(mutation.Counts) {
+			return ErrMigrationConflict
+		}
 
+		priorHash, err := verifyEventChain(tx, mutation.RunID)
+		if err != nil {
+			return err
+		}
 		var sequence uint64
-		if err := tx.Model(&gormSensitiveMigrationEvent{}).Where("run_id = ?", mutation.RunID).
-			Select("COALESCE(MAX(sequence), 0)").Scan(&sequence).Error; err != nil {
+		if err := tx.Model(&gormSensitiveMigrationEvent{}).Where("run_id = ?", mutation.RunID).Select("COALESCE(MAX(sequence), 0)").Scan(&sequence).Error; err != nil {
 			return ErrMigrationStore
 		}
 		sequence++
@@ -424,20 +611,28 @@ func (s *GORMProtectedValueMigrationStore) ApplyBatch(ctx context.Context, mutat
 		event := gormSensitiveMigrationEvent{
 			EventID: migrationSurrogateID("event", mutation.RunID, strconv.FormatUint(sequence, 10)),
 			RunID:   mutation.RunID, Sequence: sequence, Mode: string(mutation.Mode), Resource: mutation.Resource.Resource,
-			TenantScopeHash: tenantHash, Rows: len(mutation.Rows), Revision: nextRevision, CreatedAt: now,
+			TenantScopeHash: tenantHash, Rows: len(mutation.Rows), Missing: mutation.Counts.Missing,
+			Plaintext: mutation.Counts.Plaintext, TargetEnvelope: mutation.Counts.TargetEnvelope,
+			ForeignEnvelope: mutation.Counts.ForeignEnvelope, Malformed: mutation.Counts.MalformedEnvelope,
+			Revision: nextRevision, PriorEventHash: priorHash, CreatedAt: now,
 		}
+		event.EventHash = migrationEventHash(event)
 		if err := tx.Create(&event).Error; err != nil {
 			return ErrMigrationStore
 		}
 		cumulativeRows := len(mutation.Rows)
 		if checkpointFound {
 			cumulativeRows += checkpoint.Rows
+			cumulativeCounts := addMigrationCounts(checkpointCounts(checkpoint), mutation.Counts)
 			updated := tx.Model(&gormSensitiveMigrationCheckpoint{}).
 				Where("checkpoint_id = ? AND expected_revision = ? AND last_record_id = ? AND event_sequence = ?", checkpointID, checkpoint.ExpectedRevision, checkpoint.LastRecordID, checkpoint.EventSequence).
 				Updates(map[string]any{
 					"tenant_scope": tenant, "last_record_id": mutation.LastRecordID, "expected_revision": nextRevision,
 					"row_count": cumulativeRows, "status": sensitivemigration.StatusCompleted,
-					"event_sequence": sequence, "updated_at": now,
+					"missing_count": cumulativeCounts.Missing, "plaintext_count": cumulativeCounts.Plaintext,
+					"target_envelope_count": cumulativeCounts.TargetEnvelope, "foreign_envelope_count": cumulativeCounts.ForeignEnvelope,
+					"malformed_envelope_count": cumulativeCounts.MalformedEnvelope, "batch_count": checkpoint.Batches + 1,
+					"event_sequence": sequence, "event_hash": event.EventHash, "updated_at": now,
 				})
 			if updated.Error != nil || updated.RowsAffected != 1 {
 				return ErrMigrationConflict
@@ -446,8 +641,11 @@ func (s *GORMProtectedValueMigrationStore) ApplyBatch(ctx context.Context, mutat
 			checkpoint = gormSensitiveMigrationCheckpoint{
 				CheckpointID: checkpointID, RunID: mutation.RunID, Resource: mutation.Resource.Resource, TenantScope: tenant,
 				TenantScopeHash: tenantHash, Mode: string(mutation.Mode), LastRecordID: mutation.LastRecordID,
-				ExpectedRevision: nextRevision, Rows: cumulativeRows, Status: sensitivemigration.StatusCompleted,
-				EventSequence: sequence, UpdatedAt: now,
+				ExpectedRevision: nextRevision, Rows: cumulativeRows, Missing: mutation.Counts.Missing,
+				Plaintext: mutation.Counts.Plaintext, TargetEnvelope: mutation.Counts.TargetEnvelope,
+				ForeignEnvelope: mutation.Counts.ForeignEnvelope, Malformed: mutation.Counts.MalformedEnvelope,
+				Batches: 1, Status: sensitivemigration.StatusCompleted,
+				EventSequence: sequence, EventHash: event.EventHash, UpdatedAt: now,
 			}
 			if err := tx.Create(&checkpoint).Error; err != nil {
 				return ErrMigrationStore
@@ -468,7 +666,7 @@ func (s *GORMProtectedValueMigrationStore) ApplyBatch(ctx context.Context, mutat
 		if runCAS.Error != nil || runCAS.RowsAffected != 1 {
 			return ErrMigrationConflict
 		}
-		commit = sensitivemigration.BatchCommit{Revision: nextRevision, Rows: len(mutation.Rows), LastRecordID: mutation.LastRecordID, EventSequence: sequence}
+		commit = sensitivemigration.BatchCommit{Revision: nextRevision, Rows: len(mutation.Rows), LastRecordID: mutation.LastRecordID, EventSequence: sequence, EventHash: event.EventHash}
 		return nil
 	})
 	if err != nil {
@@ -594,9 +792,6 @@ func migrationChangedFields(original string, updated string) ([]string, error) {
 		}
 	}
 	slices.Sort(changed)
-	if len(changed) == 0 {
-		return nil, ErrMigrationConflict
-	}
 	return changed, nil
 }
 
@@ -632,6 +827,72 @@ func migrationSurrogateID(domain string, values ...string) string {
 
 func migrationTimestamp() string {
 	return time.Now().UTC().Format(time.RFC3339Nano)
+}
+
+func runMatchesRequest(run gormSensitiveMigrationRun, request sensitivemigration.RunRequest) bool {
+	return run.PlanHash == request.PlanHash && run.ActorID == request.ActorID && run.Reason == request.Reason &&
+		run.ApprovalRef == request.ApprovalRef && run.BackupURI == request.BackupURI && run.BackupHash == request.BackupHash &&
+		run.RestoreEvidence == request.RestoreEvidence && run.MaintenanceOK && request.MaintenanceConfirmed
+}
+
+func canonicalMigrationRunID(runID string) bool {
+	return sensitivemigration.ValidRunIdentity(sensitivemigration.RunRequest{RunID: runID, PlanHash: "present"})
+}
+
+func targetsMatchPlan(targets []gormSensitiveMigrationTarget, plan sensitivemigration.ResourcePlan) bool {
+	if len(targets) != len(plan.Fields) {
+		return false
+	}
+	for index, field := range plan.Fields {
+		if targets[index].FieldKey != field.Key {
+			return false
+		}
+	}
+	return true
+}
+
+func checkpointCounts(checkpoint gormSensitiveMigrationCheckpoint) sensitivemigration.Counts {
+	return sensitivemigration.Counts{
+		Missing: checkpoint.Missing, Plaintext: checkpoint.Plaintext, TargetEnvelope: checkpoint.TargetEnvelope,
+		ForeignEnvelope: checkpoint.ForeignEnvelope, MalformedEnvelope: checkpoint.Malformed,
+	}
+}
+
+func addMigrationCounts(left sensitivemigration.Counts, right sensitivemigration.Counts) sensitivemigration.Counts {
+	return sensitivemigration.Counts{
+		Missing: left.Missing + right.Missing, Plaintext: left.Plaintext + right.Plaintext,
+		TargetEnvelope:    left.TargetEnvelope + right.TargetEnvelope,
+		ForeignEnvelope:   left.ForeignEnvelope + right.ForeignEnvelope,
+		MalformedEnvelope: left.MalformedEnvelope + right.MalformedEnvelope,
+	}
+}
+
+func migrationCountsTotal(counts sensitivemigration.Counts) int {
+	return counts.Missing + counts.Plaintext + counts.TargetEnvelope + counts.ForeignEnvelope + counts.MalformedEnvelope
+}
+
+func verifyEventChain(tx *gorm.DB, runID string) (string, error) {
+	var events []gormSensitiveMigrationEvent
+	if err := tx.Where("run_id = ?", runID).Order("sequence").Find(&events).Error; err != nil {
+		return "", ErrMigrationStore
+	}
+	prior := migrationHash("event-genesis", runID)
+	for index, event := range events {
+		if event.Sequence != uint64(index+1) || event.PriorEventHash != prior || event.EventHash == "" || event.EventHash != migrationEventHash(event) {
+			return "", ErrMigrationConflict
+		}
+		prior = event.EventHash
+	}
+	return prior, nil
+}
+
+func migrationEventHash(event gormSensitiveMigrationEvent) string {
+	return migrationHash(
+		"event", event.RunID, strconv.FormatUint(event.Sequence, 10), event.Mode, event.Resource,
+		event.TenantScopeHash, strconv.Itoa(event.Rows), strconv.Itoa(event.Missing), strconv.Itoa(event.Plaintext),
+		strconv.Itoa(event.TargetEnvelope), strconv.Itoa(event.ForeignEnvelope), strconv.Itoa(event.Malformed),
+		strconv.FormatUint(event.Revision, 10), event.PriorEventHash, event.CreatedAt,
+	)
 }
 
 func runState(run gormSensitiveMigrationRun) sensitivemigration.RunState {
