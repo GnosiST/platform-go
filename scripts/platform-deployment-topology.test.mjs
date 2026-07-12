@@ -348,6 +348,17 @@ describe("validate-platform-deployment-topology", () => {
     assert.match(result.stderr, /platform-api must receive PLATFORM_RATE_LIMIT_HMAC_KEY/);
   });
 
+  it("rejects production Compose without data protection mappings", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
+    const mapping = "      PLATFORM_DATA_ENCRYPTION_KEYRING_JSON: ${PLATFORM_DATA_ENCRYPTION_KEYRING_JSON:?required}\n";
+    const composePath = tempText("docker-compose.prod.yml", current.replace(mapping, ""));
+
+    const result = runValidator(["--compose", composePath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /platform-api must receive PLATFORM_DATA_ENCRYPTION_KEYRING_JSON/);
+  });
+
   it("rejects production Compose without API or Admin edge trust mappings", () => {
     const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
     const mapping = "      PLATFORM_EDGE_TRUSTED_PROXY: ${PLATFORM_EDGE_TRUSTED_PROXY:?required}\n";

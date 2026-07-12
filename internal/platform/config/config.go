@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"platform-go/internal/platform/dataprotection"
 )
 
 type Config struct {
@@ -40,6 +42,11 @@ type Config struct {
 	RedisPassword                     string
 	RedisDB                           int
 	RateLimitHMACKey                  string
+	DataKeyProvider                   string
+	DataEncryptionActiveKeyID         string
+	DataEncryptionKeyringJSON         string
+	DataBlindIndexActiveKeyID         string
+	DataBlindIndexKeyringJSON         string
 	FileStorageDriver                 string
 	FileStorageLocalDir               string
 	FileMaxUploadBytes                int64
@@ -153,6 +160,11 @@ func Load() Config {
 		RedisPassword:                     env("PLATFORM_REDIS_PASSWORD", ""),
 		RedisDB:                           intEnv("PLATFORM_REDIS_DB", 0),
 		RateLimitHMACKey:                  env("PLATFORM_RATE_LIMIT_HMAC_KEY", ""),
+		DataKeyProvider:                   env("PLATFORM_DATA_KEY_PROVIDER", ""),
+		DataEncryptionActiveKeyID:         env("PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID", ""),
+		DataEncryptionKeyringJSON:         env("PLATFORM_DATA_ENCRYPTION_KEYRING_JSON", ""),
+		DataBlindIndexActiveKeyID:         env("PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID", ""),
+		DataBlindIndexKeyringJSON:         env("PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON", ""),
 		FileStorageDriver:                 env("PLATFORM_FILE_STORAGE_DRIVER", "local"),
 		FileStorageLocalDir:               env("PLATFORM_FILE_STORAGE_LOCAL_DIR", ".platform/uploads"),
 		FileMaxUploadBytes:                fileMaxUploadBytes,
@@ -273,6 +285,7 @@ func (c Config) ValidateRuntime() error {
 	}
 	errs = append(errs, c.validateAdminOIDC(environment)...)
 	errs = append(errs, c.validateAppPhone(environment)...)
+	errs = append(errs, c.validateDataProtection(environment)...)
 
 	if environment == RuntimeEnvironmentProduction {
 		errs = append(errs, validateProductionPublicBaseURL(c.PublicBaseURL)...)
@@ -294,6 +307,58 @@ func (c Config) ValidateRuntime() error {
 	}
 
 	return errors.Join(errs...)
+}
+
+func (c Config) validateDataProtection(environment string) []error {
+	rawProvider := c.DataKeyProvider
+	provider := strings.ToLower(strings.TrimSpace(rawProvider))
+	configuredKeys := strings.TrimSpace(c.DataEncryptionActiveKeyID) != "" || strings.TrimSpace(c.DataEncryptionKeyringJSON) != "" ||
+		strings.TrimSpace(c.DataBlindIndexActiveKeyID) != "" || strings.TrimSpace(c.DataBlindIndexKeyringJSON) != ""
+	if provider == "" {
+		if environment == RuntimeEnvironmentProduction {
+			return []error{errors.New("production runtime requires PLATFORM_DATA_KEY_PROVIDER=env-aes256")}
+		}
+		if configuredKeys {
+			return []error{errors.New("data protection keys require PLATFORM_DATA_KEY_PROVIDER")}
+		}
+		return nil
+	}
+	var errs []error
+	if rawProvider != provider {
+		errs = append(errs, errors.New("PLATFORM_DATA_KEY_PROVIDER must be canonical trimmed lowercase"))
+	}
+	switch provider {
+	case dataprotection.ProviderEnvAES256:
+	case dataprotection.ProviderLocalTest:
+		if environment != RuntimeEnvironmentDevelopment && environment != RuntimeEnvironmentTest {
+			errs = append(errs, fmt.Errorf("data key provider local-test is not allowed in %s", environment))
+		}
+	default:
+		errs = append(errs, fmt.Errorf("unsupported data key provider %q", provider))
+		return errs
+	}
+	if environment == RuntimeEnvironmentProduction && provider != dataprotection.ProviderEnvAES256 {
+		errs = append(errs, errors.New("production runtime requires PLATFORM_DATA_KEY_PROVIDER=env-aes256"))
+	}
+	encryptionKeys, err := dataprotection.ParseEncodedKeyring(c.DataEncryptionKeyringJSON)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("data encryption keyring: %w", err))
+		return errs
+	}
+	blindIndexKeys, err := dataprotection.ParseEncodedKeyring(c.DataBlindIndexKeyringJSON)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("data blind-index keyring: %w", err))
+		return errs
+	}
+	_, err = dataprotection.NewStaticKeyProvider(dataprotection.StaticKeyProviderConfig{
+		Kind:                  provider,
+		ActiveEncryptionKeyID: c.DataEncryptionActiveKeyID, EncryptionKeys: encryptionKeys,
+		ActiveBlindIndexKeyID: c.DataBlindIndexActiveKeyID, BlindIndexKeys: blindIndexKeys,
+	})
+	if err != nil {
+		errs = append(errs, fmt.Errorf("data protection provider: %w", err))
+	}
+	return errs
 }
 
 func (c Config) validateAppPhone(environment string) []error {

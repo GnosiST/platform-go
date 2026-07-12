@@ -17,6 +17,7 @@ import (
 	"platform-go/internal/platform/bootstrap"
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/config"
+	"platform-go/internal/platform/dataprotection"
 )
 
 const (
@@ -203,8 +204,8 @@ func TestRunBindAdminOIDCRejectsConflictingBindingWithoutRawIdentityLeak(t *test
 func TestRunBindAdminOIDCAuditFailureCanRetryWithoutDuplicates(t *testing.T) {
 	cfg := testConfig(t)
 	repository := newCLIAuditRepository()
-	loader := func(_ config.Config, manifests []capability.Manifest) (*adminresource.Store, error) {
-		return adminresource.NewRepositoryBackedStoreFromCapabilities(repository, manifests)
+	loader := func(_ config.Config, manifests []capability.Manifest, protection dataprotection.Runtime) (*adminresource.Store, error) {
+		return adminresource.NewRepositoryBackedStoreFromCapabilitiesWithProtection(repository, manifests, protection)
 	}
 	repository.failSaveNumber(2, errors.New("sensitive audit failure "+testSubject))
 
@@ -233,7 +234,7 @@ func TestRunBindAdminOIDCAuditFailureCanRetryWithoutDuplicates(t *testing.T) {
 		t.Fatalf("conflict retry error = %q, want normalized rejection", conflictRetried.err)
 	}
 
-	store, err := loader(cfg, testManifests(t, cfg))
+	store, err := loader(cfg, testManifests(t, cfg), nil)
 	if err != nil {
 		t.Fatalf("load store after retries error = %v", err)
 	}
@@ -318,7 +319,7 @@ func updateUser(t *testing.T, cfg config.Config, username string, mutate func(*a
 func loadStore(t *testing.T, cfg config.Config) *adminresource.Store {
 	t.Helper()
 	manifests := testManifests(t, cfg)
-	store, err := bootstrap.AdminResourcesFromConfig(cfg, manifests)
+	store, err := bootstrap.AdminResourcesFromConfig(cfg, manifests, nil)
 	if err != nil {
 		t.Fatalf("AdminResourcesFromConfig() error = %v", err)
 	}

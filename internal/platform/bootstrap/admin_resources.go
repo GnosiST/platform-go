@@ -8,10 +8,11 @@ import (
 	"platform-go/internal/platform/adminresource"
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/config"
+	"platform-go/internal/platform/dataprotection"
 	"platform-go/internal/platform/storage"
 )
 
-func AdminResourcesFromConfig(cfg config.Config, manifests []capability.Manifest) (*adminresource.Store, error) {
+func AdminResourcesFromConfig(cfg config.Config, manifests []capability.Manifest, protection dataprotection.Runtime) (*adminresource.Store, error) {
 	if cfg.AdminResourceDriver != "" {
 		if cfg.AdminResourceDSN == "" {
 			return nil, errors.New("admin resource dsn is required")
@@ -29,7 +30,7 @@ func AdminResourcesFromConfig(cfg config.Config, manifests []capability.Manifest
 				}
 				return nil, err
 			}
-			return adminresource.NewRepositoryBackedStoreFromCapabilities(repository, manifests)
+			return adminresource.NewRepositoryBackedStoreFromCapabilitiesWithProtection(repository, manifests, protection)
 		}
 		db, err := sql.Open(cfg.AdminResourceDriver, cfg.AdminResourceDSN)
 		if err != nil {
@@ -40,12 +41,12 @@ func AdminResourcesFromConfig(cfg config.Config, manifests []capability.Manifest
 			_ = db.Close()
 			return nil, err
 		}
-		return adminresource.NewRepositoryBackedStoreFromCapabilities(repository, manifests)
+		return adminresource.NewRepositoryBackedStoreFromCapabilitiesWithProtection(repository, manifests, protection)
 	}
 	if cfg.AdminResourceFile == "" {
-		return adminresource.NewStoreFromCapabilities(manifests), nil
+		return adminresource.NewStoreFromCapabilitiesWithProtection(manifests, protection)
 	}
-	return adminresource.NewFileBackedStoreFromCapabilities(cfg.AdminResourceFile, manifests)
+	return adminresource.NewRepositoryBackedStoreFromCapabilitiesWithProtection(adminresource.NewFileAdminResourceRepository(cfg.AdminResourceFile), manifests, protection)
 }
 
 func isGORMAdminResourceDriver(driver string) bool {

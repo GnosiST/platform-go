@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"os"
 	"reflect"
 	"strconv"
@@ -35,6 +36,11 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_REDIS_PASSWORD", "")
 	t.Setenv("PLATFORM_REDIS_DB", "")
 	t.Setenv("PLATFORM_RATE_LIMIT_HMAC_KEY", "")
+	t.Setenv("PLATFORM_DATA_KEY_PROVIDER", "")
+	t.Setenv("PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID", "")
+	t.Setenv("PLATFORM_DATA_ENCRYPTION_KEYRING_JSON", "")
+	t.Setenv("PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID", "")
+	t.Setenv("PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON", "")
 	t.Setenv("PLATFORM_FILE_STORAGE_DRIVER", "")
 	t.Setenv("PLATFORM_FILE_STORAGE_LOCAL_DIR", "")
 	t.Setenv("PLATFORM_FILE_MAX_UPLOAD_BYTES", "")
@@ -137,6 +143,9 @@ func TestLoadUsesDefaults(t *testing.T) {
 	if cfg.RateLimitHMACKey != "" {
 		t.Fatalf("RateLimitHMACKey = %q, want empty by default", cfg.RateLimitHMACKey)
 	}
+	if cfg.DataKeyProvider != "" || cfg.DataEncryptionActiveKeyID != "" || cfg.DataEncryptionKeyringJSON != "" || cfg.DataBlindIndexActiveKeyID != "" || cfg.DataBlindIndexKeyringJSON != "" {
+		t.Fatal("data protection configuration must be empty by default")
+	}
 	if cfg.FileStorageDriver != "local" {
 		t.Fatalf("FileStorageDriver = %q, want local", cfg.FileStorageDriver)
 	}
@@ -172,6 +181,66 @@ func TestLoadParsesRuntimeEnvironment(t *testing.T) {
 	cfg := Load()
 	if cfg.RuntimeEnvironment != "production" {
 		t.Fatalf("RuntimeEnvironment = %q", cfg.RuntimeEnvironment)
+	}
+}
+
+func TestLoadParsesDataProtectionConfiguration(t *testing.T) {
+	t.Setenv("PLATFORM_DATA_KEY_PROVIDER", "env-aes256")
+	t.Setenv("PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID", "enc-v2")
+	t.Setenv("PLATFORM_DATA_ENCRYPTION_KEYRING_JSON", "{\"enc-v1\":\"first\",\"enc-v2\":\"second\"}")
+	t.Setenv("PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID", "idx-v2")
+	t.Setenv("PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON", "{\"idx-v1\":\"first\",\"idx-v2\":\"second\"}")
+
+	cfg := Load()
+	if cfg.DataKeyProvider != "env-aes256" || cfg.DataEncryptionActiveKeyID != "enc-v2" || cfg.DataBlindIndexActiveKeyID != "idx-v2" {
+		t.Fatalf("data protection IDs = %q/%q/%q", cfg.DataKeyProvider, cfg.DataEncryptionActiveKeyID, cfg.DataBlindIndexActiveKeyID)
+	}
+	if !strings.Contains(cfg.DataEncryptionKeyringJSON, "enc-v1") || !strings.Contains(cfg.DataBlindIndexKeyringJSON, "idx-v1") {
+		t.Fatal("Load() dropped data protection keyrings")
+	}
+}
+
+func TestValidateRuntimeRejectsUnsafeDataProtectionConfiguration(t *testing.T) {
+	secretMarker := "raw-keyring-secret-marker"
+	tests := []struct {
+		name   string
+		mutate func(*Config)
+		want   string
+	}{
+		{name: "missing provider", mutate: func(cfg *Config) { cfg.DataKeyProvider = "" }, want: "production runtime requires PLATFORM_DATA_KEY_PROVIDER=env-aes256"},
+		{name: "local test provider", mutate: func(cfg *Config) { cfg.DataKeyProvider = "local-test" }, want: "not allowed"},
+		{name: "unknown provider", mutate: func(cfg *Config) { cfg.DataKeyProvider = "kms" }, want: "unsupported data key provider"},
+		{name: "missing active encryption key", mutate: func(cfg *Config) { cfg.DataEncryptionActiveKeyID = "enc-v2" }, want: "active encryption key is unavailable"},
+		{name: "malformed encryption keyring", mutate: func(cfg *Config) { cfg.DataEncryptionKeyringJSON = "{\"enc-v1\":\"" + secretMarker + "\"" }, want: "keyring JSON is invalid"},
+		{name: "reused key material", mutate: func(cfg *Config) { cfg.DataBlindIndexKeyringJSON = cfg.DataEncryptionKeyringJSON }, want: "key material must not be reused"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := validProductionRuntimeConfig()
+			tt.mutate(&cfg)
+			err := cfg.ValidateRuntime()
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("ValidateRuntime() error = %v, want %q", err, tt.want)
+			}
+			if strings.Contains(err.Error(), secretMarker) || strings.Contains(err.Error(), cfg.DataEncryptionKeyringJSON) {
+				t.Fatalf("ValidateRuntime() exposed keyring material: %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateRuntimeAllowsExplicitLocalTestDataKeysOnlyInDevelopmentAndTest(t *testing.T) {
+	for _, environment := range []string{RuntimeEnvironmentDevelopment, RuntimeEnvironmentTest} {
+		t.Run(environment, func(t *testing.T) {
+			cfg := validDataProtectionConfig(environment, "local-test")
+			if err := cfg.ValidateRuntime(); err != nil {
+				t.Fatalf("ValidateRuntime() error = %v", err)
+			}
+		})
+	}
+	cfg := validDataProtectionConfig(RuntimeEnvironmentStaging, "local-test")
+	if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "not allowed") {
+		t.Fatalf("ValidateRuntime(staging local-test) error = %v", err)
 	}
 }
 
@@ -1071,7 +1140,7 @@ func TestValidateRuntimeAcceptsProductionBaseline(t *testing.T) {
 }
 
 func validProductionRuntimeConfig() Config {
-	return Config{
+	cfg := Config{
 		RuntimeEnvironment:                "production",
 		HTTPAddr:                          "0.0.0.0:9200",
 		PublicBaseURL:                     "https://platform.example.test",
@@ -1114,6 +1183,32 @@ func validProductionRuntimeConfig() Config {
 			"admin-oidc",
 		},
 	}
+	dataProtection := validDataProtectionConfig(RuntimeEnvironmentProduction, "env-aes256")
+	cfg.DataKeyProvider = dataProtection.DataKeyProvider
+	cfg.DataEncryptionActiveKeyID = dataProtection.DataEncryptionActiveKeyID
+	cfg.DataEncryptionKeyringJSON = dataProtection.DataEncryptionKeyringJSON
+	cfg.DataBlindIndexActiveKeyID = dataProtection.DataBlindIndexActiveKeyID
+	cfg.DataBlindIndexKeyringJSON = dataProtection.DataBlindIndexKeyringJSON
+	return cfg
+}
+
+func validDataProtectionConfig(environment string, provider string) Config {
+	encodedEncryption := base64.StdEncoding.EncodeToString([]byte(strings.Repeat("e", 32)))
+	encodedIndex := base64.StdEncoding.EncodeToString([]byte(strings.Repeat("i", 32)))
+	return Config{
+		RuntimeEnvironment:        environment,
+		HTTPAddr:                  "127.0.0.1:9200",
+		JWTSecret:                 "development-secret",
+		CacheDefaultTTL:           1,
+		FileStorageDriver:         "local",
+		FileStorageLocalDir:       ".platform/uploads",
+		DataKeyProvider:           provider,
+		DataEncryptionActiveKeyID: "enc-v1",
+		DataEncryptionKeyringJSON: "{\"enc-v1\":\"" + encodedEncryption + "\"}",
+		DataBlindIndexActiveKeyID: "idx-v1",
+		DataBlindIndexKeyringJSON: "{\"idx-v1\":\"" + encodedIndex + "\"}",
+		Capabilities:              []string{"tenant"},
+	}
 }
 
 func validDevelopmentOIDCConfig(redirectURL string) Config {
@@ -1135,6 +1230,8 @@ func validDevelopmentOIDCConfig(redirectURL string) Config {
 
 func setValidProductionLoadEnvironment(t *testing.T) {
 	t.Helper()
+	encodedEncryption := base64.StdEncoding.EncodeToString([]byte(strings.Repeat("e", 32)))
+	encodedIndex := base64.StdEncoding.EncodeToString([]byte(strings.Repeat("i", 32)))
 	values := map[string]string{
 		"PLATFORM_RUNTIME_ENV":                            "production",
 		"PLATFORM_HTTP_ADDR":                              "0.0.0.0:9200",
@@ -1153,6 +1250,11 @@ func setValidProductionLoadEnvironment(t *testing.T) {
 		"PLATFORM_CACHE_DRIVER":                           "redis",
 		"PLATFORM_REDIS_ADDR":                             "127.0.0.1:6379",
 		"PLATFORM_RATE_LIMIT_HMAC_KEY":                    "rate-limit-production-key-value-0001",
+		"PLATFORM_DATA_KEY_PROVIDER":                      "env-aes256",
+		"PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID":          "enc-v1",
+		"PLATFORM_DATA_ENCRYPTION_KEYRING_JSON":           "{\"enc-v1\":\"" + encodedEncryption + "\"}",
+		"PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID":         "idx-v1",
+		"PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON":          "{\"idx-v1\":\"" + encodedIndex + "\"}",
 		"PLATFORM_DISABLE_DEMO_AUTH_PROVIDER":             "true",
 		"PLATFORM_FILE_STORAGE_DRIVER":                    "s3",
 		"PLATFORM_FILE_MAX_UPLOAD_BYTES":                  "10485760",

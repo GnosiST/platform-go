@@ -23,6 +23,7 @@
     "requiredSnippets": [
       "production runtime requires PLATFORM_JWT_SECRET to be changed from the development default",
       "production runtime requires PLATFORM_JWT_SECRET to be at least 32 characters",
+      "production runtime requires PLATFORM_DATA_KEY_PROVIDER=env-aes256",
       "production runtime requires PLATFORM_ADMIN_RESOURCE_DRIVER to be mysql, postgres, or sqlite",
       "production runtime requires PLATFORM_SESSION_DRIVER to be mysql, postgres, or sqlite",
       "production runtime requires PLATFORM_LIFECYCLE_HISTORY_DRIVER to be mysql, postgres, or sqlite",
@@ -86,6 +87,42 @@
       "docs": [
         "README.md",
         "docs/platform-capability-development.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_DATA_KEY_PROVIDER",
+      "purpose": "Selects the explicit env-aes256 data-protection provider; local-test, KMS and HSM adapters are not accepted by production startup.",
+      "docs": [
+        "README.md",
+        "docs/platform-deployment.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID",
+      "purpose": "Selects the active AES-256-GCM write key ID while historical IDs remain configured for reads.",
+      "docs": [
+        "docs/platform-deployment.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_DATA_ENCRYPTION_KEYRING_JSON",
+      "purpose": "Provides base64-encoded 32-byte encryption keys by canonical version ID without committing real key material.",
+      "docs": [
+        "docs/platform-deployment.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID",
+      "purpose": "Selects the active exact-match blind-index key ID independently from encryption keys.",
+      "docs": [
+        "docs/platform-deployment.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON",
+      "purpose": "Provides distinct base64-encoded 32-byte blind-index keys by canonical version ID.",
+      "docs": [
+        "docs/platform-deployment.md"
       ]
     },
     {

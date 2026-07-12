@@ -3,20 +3,24 @@ package bootstrap
 import (
 	"database/sql"
 	"database/sql/driver"
+	"encoding/base64"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
 	"platform-go/internal/platform/adminresource"
+	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/config"
 	"platform-go/internal/platform/core"
+	"platform-go/internal/platform/dataprotection"
 )
 
 func TestAdminResourcesFromConfigUsesMemoryStoreByDefault(t *testing.T) {
-	store, err := AdminResourcesFromConfig(config.Config{}, core.DefaultManifests())
+	store, err := AdminResourcesFromConfig(config.Config{}, core.DefaultManifests(), nil)
 	if err != nil {
 		t.Fatalf("AdminResourcesFromConfig() error = %v", err)
 	}
@@ -28,7 +32,7 @@ func TestAdminResourcesFromConfigUsesMemoryStoreByDefault(t *testing.T) {
 
 func TestAdminResourcesFromConfigUsesFileBackedStore(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "admin-resources.json")
-	store, err := AdminResourcesFromConfig(config.Config{AdminResourceFile: path}, core.DefaultManifests())
+	store, err := AdminResourcesFromConfig(config.Config{AdminResourceFile: path}, core.DefaultManifests(), nil)
 	if err != nil {
 		t.Fatalf("AdminResourcesFromConfig() error = %v", err)
 	}
@@ -42,7 +46,7 @@ func TestAdminResourcesFromConfigUsesFileBackedStore(t *testing.T) {
 		t.Fatalf("Create(tenants) error = %v", err)
 	}
 
-	reloaded, err := AdminResourcesFromConfig(config.Config{AdminResourceFile: path}, core.DefaultManifests())
+	reloaded, err := AdminResourcesFromConfig(config.Config{AdminResourceFile: path}, core.DefaultManifests(), nil)
 	if err != nil {
 		t.Fatalf("reload AdminResourcesFromConfig() error = %v", err)
 	}
@@ -63,7 +67,7 @@ func TestAdminResourcesFromConfigUsesSQLStore(t *testing.T) {
 		AdminResourceDriver: "platform_admin_resource_test",
 		AdminResourceDSN:    "bootstrap-admin-resources",
 	}
-	store, err := AdminResourcesFromConfig(cfg, core.DefaultManifests())
+	store, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), nil)
 	if err != nil {
 		t.Fatalf("AdminResourcesFromConfig() error = %v", err)
 	}
@@ -75,7 +79,7 @@ func TestAdminResourcesFromConfigUsesSQLStore(t *testing.T) {
 		t.Fatalf("Update(role-operator) error = %v", err)
 	}
 
-	reloaded, err := AdminResourcesFromConfig(cfg, core.DefaultManifests())
+	reloaded, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), nil)
 	if err != nil {
 		t.Fatalf("reload AdminResourcesFromConfig() error = %v", err)
 	}
@@ -94,7 +98,7 @@ func TestAdminResourcesFromConfigUsesGORMStoreForSupportedDrivers(t *testing.T) 
 		AdminResourceDriver: "sqlite",
 		AdminResourceDSN:    dsn,
 	}
-	store, err := AdminResourcesFromConfig(cfg, core.DefaultManifests())
+	store, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), nil)
 	if err != nil {
 		t.Fatalf("AdminResourcesFromConfig() error = %v", err)
 	}
@@ -106,7 +110,7 @@ func TestAdminResourcesFromConfigUsesGORMStoreForSupportedDrivers(t *testing.T) 
 		t.Fatalf("Update(role-operator) error = %v", err)
 	}
 
-	reloaded, err := AdminResourcesFromConfig(cfg, core.DefaultManifests())
+	reloaded, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), nil)
 	if err != nil {
 		t.Fatalf("reload AdminResourcesFromConfig() error = %v", err)
 	}
@@ -120,13 +124,74 @@ func TestAdminResourcesFromConfigUsesGORMStoreForSupportedDrivers(t *testing.T) 
 }
 
 func TestAdminResourcesFromConfigRejectsSQLStoreWithoutDSN(t *testing.T) {
-	_, err := AdminResourcesFromConfig(config.Config{AdminResourceDriver: "platform_admin_resource_test"}, core.DefaultManifests())
+	_, err := AdminResourcesFromConfig(config.Config{AdminResourceDriver: "platform_admin_resource_test"}, core.DefaultManifests(), nil)
 	if err == nil {
 		t.Fatalf("AdminResourcesFromConfig() error = nil, want missing DSN")
 	}
 	if !strings.Contains(err.Error(), "admin resource dsn is required") {
 		t.Fatalf("AdminResourcesFromConfig() error = %v, want missing DSN", err)
 	}
+}
+
+func TestAdminResourcesFromConfigInjectsProtectionBeforePersistentLoad(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "protected-admin-resources.json")
+	cfg := config.Config{AdminResourceFile: path}
+	manifests := bootstrapProtectedManifests()
+	runtime, err := DataProtectionRuntimeFromConfig(dataProtectionConfigForTest(config.RuntimeEnvironmentTest, dataprotection.ProviderLocalTest))
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := AdminResourcesFromConfig(cfg, manifests, runtime)
+	if err != nil {
+		t.Fatalf("AdminResourcesFromConfig() error = %v", err)
+	}
+	if _, err := store.Create("protected-bootstrap-records", adminresource.WriteInput{
+		Code: "protected-1", Name: "Protected", Values: map[string]string{"governmentReference": "bootstrap-secret-marker"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(content), "bootstrap-secret-marker") || !strings.Contains(string(content), "pgo:enc:v1:") {
+		t.Fatalf("protected repository content = %s", content)
+	}
+	if _, err := AdminResourcesFromConfig(cfg, manifests, runtime); err != nil {
+		t.Fatalf("reload with historical keys error = %v", err)
+	}
+	replaced, err := DataProtectionRuntimeFromConfig(replacedDataProtectionConfigForTest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AdminResourcesFromConfig(cfg, manifests, replaced); err == nil {
+		t.Fatal("reload with replaced historical key error = nil")
+	}
+}
+
+func bootstrapProtectedManifests() []capability.Manifest {
+	return append(core.DefaultManifests(), capability.Manifest{
+		ID: "protected-bootstrap-test",
+		Admin: capability.AdminSurface{Resources: []capability.AdminResource{{
+			Resource: "protected-bootstrap-records", Title: capability.Text("受保护记录", "Protected Records"), Description: capability.Text("测试。", "Test."),
+			PermissionPrefix: "admin:protected-bootstrap", Protection: &capability.AdminResourceProtection{SchemaVersion: 1, Scope: "global"},
+			Fields: []capability.AdminField{
+				{Key: "code", Label: capability.Text("编码", "Code"), Type: "text", Source: "record", Required: true, InForm: true},
+				{Key: "name", Label: capability.Text("名称", "Name"), Type: "text", Source: "record", Required: true, InForm: true},
+				{Key: "governmentReference", Label: capability.Text("政府引用", "Government Reference"), Type: "text", Source: "values", InForm: true,
+					Sensitivity: capability.FieldSensitivitySensitive, StorageMode: capability.FieldStorageEncrypted,
+					ResponseMode: capability.FieldProjectionPrivileged, ExportMode: capability.FieldProjectionOmitted,
+					Protection: &capability.AdminFieldProtection{Format: dataprotection.FormatAES256GCMV1, Normalization: dataprotection.NormalizationRawV1}},
+			},
+		}}},
+	})
+}
+
+func replacedDataProtectionConfigForTest() config.Config {
+	cfg := dataProtectionConfigForTest(config.RuntimeEnvironmentTest, dataprotection.ProviderLocalTest)
+	encoded := base64.StdEncoding.EncodeToString([]byte(strings.Repeat("x", 32)))
+	cfg.DataEncryptionKeyringJSON = "{\"enc-v1\":\"" + encoded + "\"}"
+	return cfg
 }
 
 var bootstrapAdminResourceDriverState sync.Map

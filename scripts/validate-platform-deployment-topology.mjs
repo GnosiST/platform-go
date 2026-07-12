@@ -297,6 +297,11 @@ function validateProductionRequirements(contract, errors) {
     requirements.requiredEnv,
     [
       "PLATFORM_JWT_SECRET",
+      "PLATFORM_DATA_KEY_PROVIDER",
+      "PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID",
+      "PLATFORM_DATA_ENCRYPTION_KEYRING_JSON",
+      "PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID",
+      "PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON",
       "PLATFORM_ADMIN_RESOURCE_DRIVER",
       "PLATFORM_ADMIN_RESOURCE_DSN",
       "PLATFORM_SESSION_DRIVER",
@@ -548,6 +553,17 @@ function validateDeploymentPackage(contract, errors) {
       }
       if (!hasComposeEnvironment(apiService?.environment, "PLATFORM_RATE_LIMIT_HMAC_KEY")) {
         errors.push("platform-api must receive PLATFORM_RATE_LIMIT_HMAC_KEY");
+      }
+      for (const name of [
+        "PLATFORM_DATA_KEY_PROVIDER",
+        "PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID",
+        "PLATFORM_DATA_ENCRYPTION_KEYRING_JSON",
+        "PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID",
+        "PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON",
+      ]) {
+        if (!hasComposeEnvironment(apiService?.environment, name)) {
+          errors.push(`platform-api must receive ${name}`);
+        }
       }
       const healthcheck = Array.isArray(apiService?.healthcheck?.test) ? apiService.healthcheck.test : [];
       if (!healthcheck.includes("http://127.0.0.1:9200/api/health")) {

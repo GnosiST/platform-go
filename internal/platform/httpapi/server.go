@@ -27,6 +27,7 @@ import (
 	"platform-go/internal/platform/authjwt"
 	"platform-go/internal/platform/cache"
 	"platform-go/internal/platform/capability"
+	"platform-go/internal/platform/dataprotection"
 	"platform-go/internal/platform/ratelimit"
 	"platform-go/internal/platform/rbac"
 	"platform-go/internal/platform/session"
@@ -36,6 +37,7 @@ import (
 type ServerOptions struct {
 	Capabilities            []capability.Manifest
 	Resources               *adminresource.Store
+	DataProtection          dataprotection.Runtime
 	Sessions                *session.Store
 	Cache                   cache.Store
 	InvalidationBus         cache.InvalidationBus
@@ -153,7 +155,11 @@ func New(options ServerOptions) *Server {
 	router.Use(gin.Recovery())
 	resources := options.Resources
 	if resources == nil {
-		resources = adminresource.NewStoreFromCapabilities(options.Capabilities)
+		var err error
+		resources, err = adminresource.NewStoreFromCapabilitiesWithProtection(options.Capabilities, options.DataProtection)
+		if err != nil {
+			panic("httpapi: build admin resources: " + err.Error())
+		}
 	}
 	sessions := options.Sessions
 	if sessions == nil {

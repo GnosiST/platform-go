@@ -15,12 +15,13 @@ import (
 	"platform-go/internal/platform/bootstrap"
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/config"
+	"platform-go/internal/platform/dataprotection"
 	"platform-go/internal/platform/httpapi"
 )
 
 const bindAdminOIDCCommand = "bind-admin-oidc"
 
-type adminResourcesLoader func(config.Config, []capability.Manifest) (*adminresource.Store, error)
+type adminResourcesLoader func(config.Config, []capability.Manifest, dataprotection.Runtime) (*adminresource.Store, error)
 
 func main() {
 	if err := run(context.Background(), os.Args[1:], os.Stdin, os.Stdout, os.Stderr, config.Load); err != nil {
@@ -80,7 +81,11 @@ func runWithAdminResources(ctx context.Context, args []string, stdin io.Reader, 
 		return errors.New("configured Admin OIDC provider is unavailable")
 	}
 
-	resources, err := loadAdminResources(cfg, manifests)
+	dataProtection, err := bootstrap.DataProtectionRuntimeFromConfig(cfg)
+	if err != nil {
+		return fmt.Errorf("build data protection runtime: %w", err)
+	}
+	resources, err := loadAdminResources(cfg, manifests, dataProtection)
 	if err != nil {
 		return fmt.Errorf("open persistent Admin resource store: %w", err)
 	}

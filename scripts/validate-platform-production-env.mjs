@@ -95,6 +95,71 @@ function requireKey(env, key, errors) {
   return env.get(key) ?? "";
 }
 
+function isCanonicalDataKeyID(value) {
+  const normalized = String(value ?? "");
+  if (normalized === "" || normalized !== normalized.trim().toLowerCase()) {
+    return false;
+  }
+  return /^[a-z0-9](?:[a-z0-9.:-]*[a-z0-9])?$/.test(normalized);
+}
+
+function duplicateJSONKeys(raw) {
+  const seen = new Set();
+  const duplicates = new Set();
+  const keyPattern = /"((?:\\.|[^"\\])*)"\s*:/gu;
+  for (const match of String(raw ?? "").matchAll(keyPattern)) {
+    let key;
+    try {
+      key = JSON.parse(`"${match[1]}"`);
+    } catch {
+      continue;
+    }
+    if (seen.has(key)) {
+      duplicates.add(key);
+    }
+    seen.add(key);
+  }
+  return duplicates;
+}
+
+function parseDataKeyring(raw, label, errors) {
+  if (duplicateJSONKeys(raw).size > 0) {
+    errors.push(`${label} key IDs must be unique`);
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    errors.push(`${label} keyring JSON is invalid`);
+    return new Map();
+  }
+  if (parsed === null || Array.isArray(parsed) || typeof parsed !== "object" || Object.keys(parsed).length === 0) {
+    errors.push(`${label} keyring must be a non-empty object`);
+    return new Map();
+  }
+  const result = new Map();
+  for (const [id, encoded] of Object.entries(parsed)) {
+    if (!isCanonicalDataKeyID(id)) {
+      errors.push(`${label} key ID must be canonical`);
+      continue;
+    }
+    if (typeof encoded !== "string" || !/^[A-Za-z0-9+/]{43}=$/.test(encoded)) {
+      errors.push(`${label} key material must be base64-encoded 32-byte values`);
+      continue;
+    }
+    const material = Buffer.from(encoded, "base64");
+    if (material.length !== 32 || material.toString("base64") !== encoded) {
+      errors.push(`${label} key material must be base64-encoded 32-byte values`);
+      continue;
+    }
+    if (strictSecrets && isPlaceholderSecret(material.toString("utf8"))) {
+      errors.push(`${label} key material must not be a placeholder when --strict-secrets is used`);
+    }
+    result.set(id, encoded);
+  }
+  return result;
+}
+
 function validateDriverPair(env, driverKey, dsnKey, errors) {
   const driver = requireKey(env, driverKey, errors);
   const dsn = requireKey(env, dsnKey, errors);
@@ -268,6 +333,31 @@ function validatePlatformEnv(env, errors) {
   }
   if (strictSecrets && isPlaceholderSecret(jwtSecret)) {
     errors.push("PLATFORM_JWT_SECRET must not be a placeholder when --strict-secrets is used");
+  }
+
+  const dataKeyProvider = requireKey(env, "PLATFORM_DATA_KEY_PROVIDER", errors);
+  if (dataKeyProvider && dataKeyProvider !== "env-aes256") {
+    errors.push("PLATFORM_DATA_KEY_PROVIDER must be env-aes256 in production");
+  }
+  const activeEncryptionKeyID = requireKey(env, "PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID", errors);
+  const activeBlindIndexKeyID = requireKey(env, "PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID", errors);
+  if (activeEncryptionKeyID && !isCanonicalDataKeyID(activeEncryptionKeyID)) {
+    errors.push("PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID must be canonical");
+  }
+  if (activeBlindIndexKeyID && !isCanonicalDataKeyID(activeBlindIndexKeyID)) {
+    errors.push("PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID must be canonical");
+  }
+  const encryptionKeys = parseDataKeyring(requireKey(env, "PLATFORM_DATA_ENCRYPTION_KEYRING_JSON", errors), "data encryption", errors);
+  const blindIndexKeys = parseDataKeyring(requireKey(env, "PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON", errors), "data blind-index", errors);
+  if (activeEncryptionKeyID && !encryptionKeys.has(activeEncryptionKeyID)) {
+    errors.push("active encryption key is unavailable");
+  }
+  if (activeBlindIndexKeyID && !blindIndexKeys.has(activeBlindIndexKeyID)) {
+    errors.push("active blind-index key is unavailable");
+  }
+  const encryptionMaterial = new Set(encryptionKeys.values());
+  if ([...blindIndexKeys.values()].some((material) => encryptionMaterial.has(material))) {
+    errors.push("data encryption and blind-index key material must be distinct");
   }
 
   validateDriverPair(env, "PLATFORM_ADMIN_RESOURCE_DRIVER", "PLATFORM_ADMIN_RESOURCE_DSN", errors);

@@ -117,6 +117,11 @@ PLATFORM_EDGE_TRUSTED_PROXY=172.30.0.1
 PLATFORM_HTTP_MAX_BODY_BYTES=1048576
 PLATFORM_CAPABILITIES=tenant,identity,session,rbac,menu,api-resource,audit,admin-oidc,dictionary,parameter,file-storage,admin-shell,system-admin
 PLATFORM_JWT_SECRET=<at-least-32-characters-and-not-the-dev-default>
+PLATFORM_DATA_KEY_PROVIDER=env-aes256
+PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID=enc-v1
+PLATFORM_DATA_ENCRYPTION_KEYRING_JSON={"enc-v1":"<base64-32-byte-key>"}
+PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID=idx-v1
+PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON={"idx-v1":"<different-base64-32-byte-key>"}
 PLATFORM_ADMIN_RESOURCE_DRIVER=mysql
 PLATFORM_ADMIN_RESOURCE_DSN=<dsn>
 PLATFORM_SESSION_DRIVER=mysql
@@ -135,6 +140,10 @@ PLATFORM_ADMIN_OIDC_CLIENT_SECRET=<redacted-secret>
 PLATFORM_ADMIN_OIDC_REDIRECT_URL=https://admin.example/login
 PLATFORM_ADMIN_OIDC_SCOPES=openid,profile,email
 ```
+
+Data-protection settings are initialization-time compatibility contracts. `PLATFORM_DATA_KEY_PROVIDER` must be `env-aes256` in production. Both keyrings are JSON objects keyed by canonical version IDs, and every value is a standard-base64-encoded 32-byte key. Encryption and blind-index key material must be distinct. The active IDs select new writes only; startup still requires every historical key referenced by stored envelopes. To rotate, add the new material under a new ID, deploy with the old and new entries present, change the active ID, verify reads and backups, and retire an old entry only after a separately approved migration proves no envelope references it. Replacing material under an existing ID fails startup.
+
+The standard env template contains recognizable placeholder material and passes only the non-strict shape check. Private production files must pass `--strict-secrets`. Do not commit real keyrings or print them in logs, traces, errors or audit records. `local-test` is limited to development/test. KMS/HSM providers, historical plaintext migration and an authorized reveal HTTP flow are not implemented by this runtime.
 
 Production `PLATFORM_CAPABILITIES` must not be empty and must not include `demo-data`. Capability IDs are trimmed, must use lowercase letters, numbers and hyphens, and must not contain empty or duplicate comma-separated entries. Use `minimal-admin` for the smallest supported admin foundation, or include `admin-oidc` with complete OIDC configuration when OIDC is the Admin provider. The OIDC subject must enter only through `platform-admin bind-admin-oidc --subject-stdin`; API startup does not provision accounts or authorization relationships.
 

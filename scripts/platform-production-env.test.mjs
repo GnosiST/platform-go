@@ -31,6 +31,11 @@ const validStrictEnv = [
   "PLATFORM_EDGE_TRUSTED_PROXY=10.20.0.1",
   "PLATFORM_HTTP_MAX_BODY_BYTES=1048576",
   "PLATFORM_JWT_SECRET=prod-jwt-signing-value-with-strong-length-001",
+  "PLATFORM_DATA_KEY_PROVIDER=env-aes256",
+  "PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID=enc-v1",
+  'PLATFORM_DATA_ENCRYPTION_KEYRING_JSON={"enc-v1":"ZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWU="}',
+  "PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID=idx-v1",
+  'PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON={"idx-v1":"aWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWk="}',
   "PLATFORM_CAPABILITIES=tenant,identity,session,rbac,menu,api-resource,audit,wechat-login,dictionary,parameter,file-storage,admin-shell,system-admin",
   "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
   "PLATFORM_ADMIN_RESOURCE_DRIVER=mysql",
@@ -81,6 +86,58 @@ describe("validate-platform-production-env", () => {
 
       assert.equal(result.status, 0, result.stderr);
       assert.match(result.stdout, /strict-secrets/);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects missing or unsupported data protection configuration", () => {
+    const source = validStrictEnv
+      .replace("PLATFORM_DATA_KEY_PROVIDER=env-aes256\n", "")
+      .replace("PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID=enc-v1", "PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID=ENC V1");
+    const { tempDir, filePath } = tempEnv(source);
+    try {
+      const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /PLATFORM_DATA_KEY_PROVIDER is required/);
+      assert.match(result.stderr, /PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID must be canonical/);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects invalid, missing-active, reused, and placeholder data keys", () => {
+    const placeholder = "cmVwbGFjZS13aXRoLWVuY3J5cHRpb24ta2V5LTAwMDE=";
+    const source = validStrictEnv
+      .replace("PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID=enc-v1", "PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID=enc-v2")
+      .replace('PLATFORM_DATA_ENCRYPTION_KEYRING_JSON={"enc-v1":"ZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWU="}', `PLATFORM_DATA_ENCRYPTION_KEYRING_JSON={"enc-v1":"${placeholder}"}`)
+      .replace('PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON={"idx-v1":"aWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWk="}', `PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON={"idx-v1":"${placeholder}"}`);
+    const { tempDir, filePath } = tempEnv(source);
+    try {
+      const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /active encryption key is unavailable/);
+      assert.match(result.stderr, /data encryption and blind-index key material must be distinct/);
+      assert.match(result.stderr, /data encryption key material must not be a placeholder/);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects duplicate data key IDs before JSON parsing collapses them", () => {
+    const duplicateKeyring = '{"enc-v1":"ZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWU=","enc-v1":"eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg="}';
+    const source = validStrictEnv.replace(
+      'PLATFORM_DATA_ENCRYPTION_KEYRING_JSON={"enc-v1":"ZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWU="}',
+      `PLATFORM_DATA_ENCRYPTION_KEYRING_JSON=${duplicateKeyring}`,
+    );
+    const { tempDir, filePath } = tempEnv(source);
+    try {
+      const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /data encryption key IDs must be unique/);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }

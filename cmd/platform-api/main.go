@@ -34,9 +34,16 @@ func main() {
 	if err := capability.RunLifecycle(context.Background(), ordered, runtime); err != nil {
 		log.Fatalf("run capability lifecycle: %v", err)
 	}
-	resources, err := bootstrap.AdminResourcesFromConfig(cfg, ordered)
+	dataProtection, err := bootstrap.DataProtectionRuntimeFromConfig(cfg)
+	if err != nil {
+		log.Fatalf("build data protection runtime: %v", err)
+	}
+	resources, err := bootstrap.AdminResourcesFromConfig(cfg, ordered, dataProtection)
 	if err != nil {
 		log.Fatalf("build admin resources: %v", err)
+	}
+	if err := resources.ValidateProtectedData(context.Background()); err != nil {
+		log.Fatalf("validate protected admin resources: %v", err)
 	}
 	adminIdentityResolver, err := authprovider.AdminIdentityResolverFromConfig(cfg)
 	if err != nil {
