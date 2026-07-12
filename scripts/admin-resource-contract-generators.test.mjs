@@ -27,6 +27,16 @@ function runAdminOpenAPIForContract(contract) {
   return JSON.parse(result.stdout);
 }
 
+function validateAdminResourceContract(contract) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-admin-contract-"));
+  const contractPath = path.join(tempDir, "admin-resource-contract.json");
+  fs.writeFileSync(contractPath, JSON.stringify(contract, null, 2));
+  return spawnSync(process.execPath, ["scripts/validate-admin-resources.mjs", "--contract", contractPath], {
+    cwd: new URL("..", import.meta.url),
+    encoding: "utf8",
+  });
+}
+
 describe("admin resource contract generators", () => {
   it("keeps optional policy-review routes out of the default generated contract", () => {
     const contract = runAdminResourceContract();
@@ -148,6 +158,8 @@ describe("admin resource contract generators", () => {
 
     const policyReviews = contract.resources.find((resource) => resource.name === "policy-reviews");
     assert.ok(policyReviews, "expected enterprise governance to include policy-reviews");
+    assert.ok(policyReviews.permissionCodes.includes("admin:policy-review:export"));
+    assert.ok(contract.permissions.includes("admin:policy-review:export"));
     for (const action of ["request", "approve", "reject"]) {
       assert.ok(
         policyReviews.routes.some(
@@ -174,6 +186,8 @@ describe("admin resource contract generators", () => {
     assert.ok(contract.routes.some((route) => route.path === "/api/admin/policy-reviews/:id/request"));
     assert.ok(contract.routes.some((route) => route.path === "/api/admin/policy-reviews/:id/reject"));
     assert.ok(contract.routes.some((route) => route.path === "/api/admin/policy-reviews/export"));
+    const validation = validateAdminResourceContract(contract);
+    assert.equal(validation.status, 0, `enterprise admin resource contract validation failed\n${validation.stdout}${validation.stderr}`);
   });
 
   it("documents policy-review custom actions in enterprise OpenAPI", () => {

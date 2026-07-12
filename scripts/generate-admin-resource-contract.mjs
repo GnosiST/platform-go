@@ -239,6 +239,11 @@ function mergedResources() {
 
 function normalizeResource(resource) {
   const routes = [...(resource.routes ?? [])].map((route) => runtimeRoute(resource, route));
+  const permissionCodes = uniqueSorted([
+    ...permissionValues(resource),
+    ...routes.map((route) => route.permission),
+    ...(resource.actions ?? []).map((action) => action.permission),
+  ]);
   return {
     name: resource.name,
     code: resource.code,
@@ -261,7 +266,7 @@ function normalizeResource(resource) {
     },
     apiBase: resource.apiBase,
     permissions: resource.permissions ?? {},
-    permissionCodes: permissionValues(resource),
+    permissionCodes,
     actions: resource.actions ?? [],
     panels: resource.panels ?? [],
     routes: routes
