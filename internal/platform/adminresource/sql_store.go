@@ -69,6 +69,14 @@ func (r *SQLAdminResourceRepository) Load(ctx context.Context) (ResourceSnapshot
 	return snapshot, nil
 }
 
+func (r *SQLAdminResourceRepository) CurrentRevision(ctx context.Context) (uint64, error) {
+	value, err := r.loadStateValue(ctx, "revision")
+	if err != nil || value == "" {
+		return 0, err
+	}
+	return strconv.ParseUint(value, 10, 64)
+}
+
 func (r *SQLAdminResourceRepository) Save(ctx context.Context, snapshot ResourceSnapshot) (uint64, error) {
 	nextRevision := snapshot.Revision + 1
 	if _, err := r.db.ExecContext(ctx, `DELETE FROM `+adminResourceRecordsTable); err != nil {

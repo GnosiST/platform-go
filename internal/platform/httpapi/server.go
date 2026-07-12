@@ -557,6 +557,9 @@ func (s *Server) authLogin(ctx *gin.Context) {
 	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminLogin, rateLimitClientIP(ctx), providerDimension, usernameDimension) {
 		return
 	}
+	if !s.refreshAdminResourceState(ctx, "AUTH_STATE_REFRESH_FAILED", "auth state is unavailable") {
+		return
+	}
 	provider, ok := s.findAuthProvider(input.Provider, capability.AuthProviderAudienceAdmin)
 	if !ok {
 		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_NOT_FOUND", "auth provider not found")
@@ -686,6 +689,9 @@ func (s *Server) authRefresh(ctx *gin.Context) {
 		writeUnauthorized(ctx)
 		return
 	}
+	if !s.refreshAdminResourceState(ctx, "AUTH_STATE_REFRESH_FAILED", "auth state is unavailable") {
+		return
+	}
 	principal := s.currentPrincipalForUsername(ctx.Request.Context(), authSession.Username)
 	if principal.User.ID == "" || len(principal.Permissions) == 0 {
 		writeUnauthorized(ctx)
@@ -730,6 +736,9 @@ func (s *Server) authLogout(ctx *gin.Context) {
 	}
 	if !ok {
 		writeUnauthorized(ctx)
+		return
+	}
+	if !s.refreshAdminResourceState(ctx, "AUTH_STATE_REFRESH_FAILED", "auth state is unavailable") {
 		return
 	}
 	principal := s.currentPrincipalForUsername(ctx.Request.Context(), authSession.Username)
@@ -1464,6 +1473,9 @@ func (s *Server) appFileContent(ctx *gin.Context) {
 		writeUnauthorized(ctx)
 		return
 	}
+	if !s.refreshAdminResourceState(ctx, "APP_FILE_STATE_REFRESH_FAILED", "file authorization state is unavailable") {
+		return
+	}
 	record, err := s.adminResourceRecordByID("files", ctx.Param("id"))
 	if err != nil {
 		writeFileError(ctx, http.StatusNotFound, "APP_FILE_NOT_FOUND", "file not found")
@@ -1872,6 +1884,9 @@ func (s *Server) businessUserCode(ctx *gin.Context) string {
 }
 
 func (s *Server) adminCurrentSession(ctx *gin.Context) {
+	if !s.refreshAdminResourceState(ctx, "ADMIN_AUTH_STATE_REFRESH_FAILED", "authorization state is unavailable") {
+		return
+	}
 	principal, ok := s.currentPrincipal(ctx)
 	if !ok {
 		writeUnauthorized(ctx)
@@ -1881,6 +1896,9 @@ func (s *Server) adminCurrentSession(ctx *gin.Context) {
 }
 
 func (s *Server) adminMenus(ctx *gin.Context) {
+	if !s.refreshAdminResourceState(ctx, "ADMIN_AUTH_STATE_REFRESH_FAILED", "authorization state is unavailable") {
+		return
+	}
 	principal, ok := s.currentPrincipal(ctx)
 	if !ok {
 		writeUnauthorized(ctx)
@@ -2117,6 +2135,9 @@ func appSessionResponseFromSession(appSession session.Session) appSessionRespons
 }
 
 func (s *Server) authorize(ctx *gin.Context, permission string) bool {
+	if !s.refreshAdminResourceState(ctx, "ADMIN_AUTH_STATE_REFRESH_FAILED", "authorization state is unavailable") {
+		return false
+	}
 	if token, ok := bearerToken(ctx.GetHeader("Authorization")); ok && strings.HasPrefix(token, apiTokenPrefix) {
 		allowed, valid := s.authorizeAPIToken(token, permission)
 		if !valid {
@@ -2172,6 +2193,9 @@ func (s *Server) authorizeAdminResource(ctx *gin.Context, resource string, actio
 }
 
 func (s *Server) authorizeAdminResourcePrincipal(ctx *gin.Context, resource string, action string) (rbac.Principal, bool, bool) {
+	if !s.refreshAdminResourceState(ctx, "ADMIN_AUTH_STATE_REFRESH_FAILED", "authorization state is unavailable") {
+		return rbac.Principal{}, false, false
+	}
 	schema, err := s.resources.Schema(resource)
 	if err != nil {
 		writeAdminResourceError(ctx, err)
@@ -2270,9 +2294,29 @@ func (s *Server) currentPrincipalForUsername(ctx context.Context, username strin
 	if username == "" {
 		username = "admin"
 	}
+	if s.resources.RepositoryBacked() {
+		return s.resources.CurrentPrincipal(username)
+	}
 	return cachedJSONValue(ctx, s.cache, cacheKeyPrincipalPrefix+username, s.cacheTTL, func() rbac.Principal {
 		return s.resources.CurrentPrincipal(username)
 	})
+}
+
+func (s *Server) refreshAdminResourceState(ctx *gin.Context, code string, message string) bool {
+	changed, err := s.resources.RefreshContext(ctx.Request.Context())
+	if err != nil {
+		s.recordInternalError(ctx, code, err)
+		ctx.JSON(http.StatusServiceUnavailable, Response[gin.H]{
+			Error: &ErrorBody{Code: code, Message: message},
+		})
+		return false
+	}
+	if changed {
+		s.invalidatePolicyAuthorizer()
+		_ = s.cache.DeletePrefix(ctx.Request.Context(), cacheKeyPrincipalPrefix)
+		_ = s.cache.DeletePrefix(ctx.Request.Context(), cacheKeyMenusPrefix)
+	}
+	return true
 }
 
 func adminMenusCacheKey(principal rbac.Principal) string {
@@ -2458,7 +2502,7 @@ func (s *Server) mutationAuditEvent(ctx *gin.Context, action string, resource st
 		Action:     action,
 		Resource:   resource,
 		Result:     "success",
-		EventID:    strings.TrimSpace(ctx.GetHeader("X-Request-ID")),
+		EventID:    internalErrorEventID(ctx),
 		ReasonCode: reasonCode,
 	}
 }

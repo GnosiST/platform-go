@@ -104,6 +104,34 @@ func (s *Store) Reload() error {
 	return s.reloadLocked()
 }
 
+func (s *Store) RefreshContext(ctx context.Context) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.repository == nil {
+		return false, nil
+	}
+	if revisionReader, ok := s.repository.(AdminResourceRevisionReader); ok {
+		current, err := revisionReader.CurrentRevision(ctx)
+		if err != nil {
+			return false, err
+		}
+		if current == s.revision {
+			return false, nil
+		}
+	}
+	previousRevision := s.revision
+	if err := s.reloadContextLocked(ctx); err != nil {
+		return false, err
+	}
+	return s.revision != previousRevision, nil
+}
+
+func (s *Store) RepositoryBacked() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.repository != nil
+}
+
 func (s *Store) reloadLocked() error {
 	return s.reloadContextLocked(context.Background())
 }

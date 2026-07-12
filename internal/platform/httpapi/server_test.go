@@ -1632,6 +1632,39 @@ func TestRuntimeInternalErrorsAttachStructuredSafeGinMetadata(t *testing.T) {
 	}
 }
 
+func TestMutationAuditHashesSensitiveRequestID(t *testing.T) {
+	const marker = "request-email@example.test/private/object?token=secret"
+	server := newTestServer(ServerOptions{Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit"})})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/resources/tenants", bytes.NewBufferString(`{"code":"audit-request-id","name":"Audit Request ID","status":"enabled","description":"request id audit test","values":{"isolation":"shared"}}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Request-ID", marker)
+	server.Router().ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("POST tenant status = %d body = %s, want 201", recorder.Code, recorder.Body.String())
+	}
+
+	audits, err := server.resources.List("audit-logs")
+	if err != nil {
+		t.Fatalf("List(audit-logs) error = %v", err)
+	}
+	for _, audit := range audits {
+		if audit.Values["action"] != "admin_resource.create" || audit.Values["resource"] != "tenants" {
+			continue
+		}
+		eventID := audit.Values["eventId"]
+		if !strings.HasPrefix(eventID, "request:v1:") || strings.Contains(eventID, marker) {
+			t.Fatalf("mutation audit eventId = %q, want domain-separated request digest", eventID)
+		}
+		serialized := fmt.Sprintf("%+v", audit)
+		if strings.Contains(serialized, marker) {
+			t.Fatalf("mutation audit leaked request marker: %s", serialized)
+		}
+		return
+	}
+	t.Fatalf("missing admin_resource.create audit for audit-request-id: %+v", audits)
+}
+
 func TestInternalErrorCauseClassUsesStableSpecificPriority(t *testing.T) {
 	tests := map[string]string{
 		"PROVIDER_UNAVAILABLE":         "provider",

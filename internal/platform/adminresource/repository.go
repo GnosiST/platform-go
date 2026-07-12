@@ -34,6 +34,10 @@ type AdminResourceRepository interface {
 	Save(context.Context, ResourceSnapshot) (uint64, error)
 }
 
+type AdminResourceRevisionReader interface {
+	CurrentRevision(context.Context) (uint64, error)
+}
+
 func NewRepositoryBackedStoreFromCapabilities(repository AdminResourceRepository, manifests []capability.Manifest) (*Store, error) {
 	baseResources := seedResourcesFromCapabilities(manifests)
 	schemas := seedResourceSchemasFromCapabilities(manifests)

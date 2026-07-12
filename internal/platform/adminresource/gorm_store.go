@@ -360,6 +360,10 @@ func (r *GORMAdminResourceRepository) Load(ctx context.Context) (ResourceSnapsho
 	return snapshot, nil
 }
 
+func (r *GORMAdminResourceRepository) CurrentRevision(ctx context.Context) (uint64, error) {
+	return loadGORMRevision(r.db.WithContext(ctx))
+}
+
 func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot ResourceSnapshot) (uint64, error) {
 	var committed uint64
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
