@@ -76,12 +76,21 @@ type FieldDefinition struct {
 	ResponseMode string           `json:"responseMode"`
 	ExportMode   string           `json:"exportMode"`
 	Protection   *FieldProtection `json:"protection,omitempty"`
+	Masking      *FieldMasking    `json:"masking,omitempty"`
 }
 
 type FieldProtection struct {
 	Format              string `json:"format"`
 	Normalization       string `json:"normalization"`
 	BlindIndexNamespace string `json:"blindIndexNamespace,omitempty"`
+}
+
+type FieldMasking struct {
+	Strategy       string `json:"strategy"`
+	PreservePrefix int    `json:"preservePrefix,omitempty"`
+	PreserveSuffix int    `json:"preserveSuffix,omitempty"`
+	MaskLength     int    `json:"maskLength,omitempty"`
+	Replacement    string `json:"replacement,omitempty"`
 }
 
 type ResourceProtection struct {
@@ -207,6 +216,10 @@ func cloneSchema(schema Schema) Schema {
 		if schema.Fields[index].Protection != nil {
 			protection := *schema.Fields[index].Protection
 			schema.Fields[index].Protection = &protection
+		}
+		if schema.Fields[index].Masking != nil {
+			masking := *schema.Fields[index].Masking
+			schema.Fields[index].Masking = &masking
 		}
 	}
 	for index := range schema.RuntimeSlots {
@@ -365,6 +378,7 @@ func mergeCapabilityProtection(schema Schema, resource capability.AdminResource)
 		schema.Fields[index].ResponseMode = declared.ResponseMode
 		schema.Fields[index].ExportMode = declared.ExportMode
 		schema.Fields[index].Protection = declared.Protection
+		schema.Fields[index].Masking = declared.Masking
 	}
 	for _, declared := range resource.Fields {
 		if _, ok := existing[declared.Key]; ok {
@@ -400,6 +414,16 @@ func fieldProtectionFromCapability(protection *capability.AdminFieldProtection) 
 		return nil
 	}
 	return &FieldProtection{Format: protection.Format, Normalization: protection.Normalization, BlindIndexNamespace: protection.BlindIndexNamespace}
+}
+
+func fieldMaskingFromCapability(masking *capability.AdminFieldMasking) *FieldMasking {
+	if masking == nil {
+		return nil
+	}
+	return &FieldMasking{
+		Strategy: masking.Strategy, PreservePrefix: masking.PreservePrefix, PreserveSuffix: masking.PreserveSuffix,
+		MaskLength: masking.MaskLength, Replacement: masking.Replacement,
+	}
 }
 
 func actionsFromCapability(actions []capability.AdminResourceAction) []ResourceActionDefinition {
@@ -1074,6 +1098,7 @@ func fieldsFromCapability(fields []capability.AdminField) []FieldDefinition {
 			ResponseMode: defaultString(field.ResponseMode, capability.FieldProjectionFull),
 			ExportMode:   defaultString(field.ExportMode, capability.FieldProjectionFull),
 			Protection:   fieldProtectionFromCapability(field.Protection),
+			Masking:      fieldMaskingFromCapability(field.Masking),
 		})
 	}
 	return withLocalizedValueFields(withStandardRecordFields(definitions))

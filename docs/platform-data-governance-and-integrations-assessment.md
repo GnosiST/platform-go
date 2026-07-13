@@ -7,15 +7,15 @@ Governance updated: 2026-07-13
 
 This assessment records the current implementation truth and a proposed delivery order for sensitive-data display and controlled reveal, deletion and retention, multi-datasource portability, and optional messaging/search integrations.
 
-It does not mark the assessed capabilities as implemented. Governance approval has expanded the completion task graph to `53 total / 41 implemented / 12 controlled unfinished`, while implementation and closeout remain pending.
+It does not mark every assessed capability as implemented. Governance approval has expanded the completion task graph to `53 total / 42 implemented / 11 controlled unfinished`; `mask-strategy-runtime` is now implemented and closed, while reveal, lifecycle, datasource, database certification and optional integration work remain pending.
 
-The eight newly governed pending nodes are `mask-strategy-runtime`, `sensitive-data-reveal-step-up`, `data-lifecycle-retention`, `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`.
+The seven newly governed pending nodes are `sensitive-data-reveal-step-up`, `data-lifecycle-retention`, `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`.
 
 ## Current-State Summary
 
 | Area | Current implementation | Important limitation |
 | --- | --- | --- |
-| Sensitive display | Field contracts support sensitivity, storage, response and export modes. The `masked` projection returns the stored value unchanged; current App phone bindings therefore persist a hash plus an already-masked value. | The Admin frontend renders returned values directly. There is no generic mask strategy, reveal API, reveal grant or step-up flow. |
+| Sensitive display | Field contracts now support versioned field-configurable masking. Encrypted `masked` response/export projection decrypts only inside the backend, applies one of five strategies and returns only the masked value; legacy pre-masked storage remains pass-through. The Admin frontend renders the server projection, hydrates encrypted edits blank and excludes projected encrypted values from status updates. | There is no reveal API, reveal grant or step-up flow. Existing pre-masked records cannot be revealed because the original plaintext was never stored. |
 | Passwords and transport | The default platform has no local-password provider or password repository. Production configuration requires HTTPS and HSTS. | A future local-password capability still needs a dedicated Argon2id repository and must never use generic resource values or reversible encryption. |
 | Deletion | Generic resources use physical deletion. Sessions and API tokens use domain-specific expiration or revocation. Files use tombstone, object deletion and purge in one request path. | There is no platform-wide deletion policy, recycle bin, restore window, retention runner or historical purge strategy. |
 | Databases | GORM openers are wired for MySQL, PostgreSQL and SQLite. Admin resources, sessions and lifecycle history can use separate DSNs. | This is subsystem separation, not named business datasources or tenant/capability routing. The three wired drivers do not yet have a full-platform certification matrix; `PLATFORM_DATABASE_DRIVER` and `PLATFORM_DATABASE_DSN` are not wired into process composition. Oracle and KingbaseES are not implemented or certified. |
@@ -144,7 +144,7 @@ Stage gates:
 
 1. Keep the implemented `sensitive-data-protection-runtime` contract stable: versioned encryption, explicit normalizers, key-provider configuration, protected persistence and authorized internal projection are now available.
 2. Keep the implemented `sensitive-data-historical-migration` contract stable: no HTTP route or plaintext dual-read, prepare-only journal creation, bounded resumable batches, verification, encrypted escrow and hash-guarded rollback. Require external backup/restore evidence and real MySQL/PostgreSQL integration certification before production promotion.
-3. Add `mask-strategy-runtime`; prove list, detail, Tooltip and export projections use the same backend-owned strategies.
+3. Keep the implemented `mask-strategy-runtime` contract stable: arbitrary sensitive fields remain manifest-driven; response, query, detail, Tooltip and export consume the same backend-owned projection; duplicate projection and plaintext fallback remain forbidden.
 4. Add `sensitive-data-reveal-step-up`; start with OIDC re-authentication and SMS OTP, short-lived single-use grants, rate limits and append-only audit. Add other factors only through registered adapters.
 5. Add `data-lifecycle-retention`; declare deletion semantics per resource, then implement restore, final purge and a disabled-by-default maintenance runner.
 6. Add `multi-datasource-contract-and-runtime`; provide named sources, capability binding, health checks and one-datasource transaction boundaries without XA.

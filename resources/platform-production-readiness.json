@@ -305,7 +305,7 @@
     {
       "id": "node-closeout-audit",
       "command": "rtk node scripts/validate-platform-node-closeout-audit.mjs",
-      "purpose": "Verifies every implemented task node has neat-freak cleanup, closeout evidence, resource-lock review, objective-conflict review and visual design-gate evidence where required."
+      "purpose": "Verifies every implemented task node has focused cleanup evidence, resource-lock review, objective-conflict review and visual design-gate evidence where required, while reserving neat-freak for phase, major-task and release closeout."
     },
     {
       "id": "objective-conformance",

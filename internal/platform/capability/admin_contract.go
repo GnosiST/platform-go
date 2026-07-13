@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"platform-go/internal/platform/masking"
 )
 
 var adminRelationRecordFields = []string{"id", "code", "name", "status", "description", "updatedAt"}
@@ -679,11 +681,41 @@ func validateAdminFieldPolicy(owner ID, resource string, field AdminField) error
 	if storageMode == FieldStorageHashed && (responseMode != FieldProjectionOmitted || exportMode != FieldProjectionOmitted) {
 		return fmt.Errorf("capability %q admin resource %q field %q hashed storage must be omitted from response and export", owner, resource, field.Key)
 	}
+	if (responseMode == FieldProjectionMasked || exportMode == FieldProjectionMasked) && storageMode != FieldStorageMasked && storageMode != FieldStorageEncrypted {
+		return fmt.Errorf("capability %q admin resource %q field %q masked projection requires masked or encrypted storage", owner, resource, field.Key)
+	}
 	if storageMode == FieldStorageEncrypted && (!isAdminEncryptedProjection(responseMode) || !isAdminEncryptedProjection(exportMode)) {
-		return fmt.Errorf("capability %q admin resource %q field %q encrypted storage must use privileged or omitted response and export", owner, resource, field.Key)
+		return fmt.Errorf("capability %q admin resource %q field %q encrypted storage must use masked, privileged or omitted response and export", owner, resource, field.Key)
 	}
 	if err := validateAdminFieldProtection(owner, resource, field, storageMode); err != nil {
 		return err
+	}
+	if err := validateAdminFieldMasking(owner, resource, field, storageMode, responseMode, exportMode); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateAdminFieldMasking(owner ID, resource string, field AdminField, storageMode string, responseMode string, exportMode string) error {
+	maskedProjection := responseMode == FieldProjectionMasked || exportMode == FieldProjectionMasked
+	if field.Masking == nil {
+		if storageMode == FieldStorageEncrypted && maskedProjection {
+			return fmt.Errorf("capability %q admin resource %q field %q encrypted masked projection requires masking metadata", owner, resource, field.Key)
+		}
+		return nil
+	}
+	if storageMode != FieldStorageEncrypted {
+		return fmt.Errorf("capability %q admin resource %q field %q masking metadata requires encrypted storage", owner, resource, field.Key)
+	}
+	if !maskedProjection {
+		return fmt.Errorf("capability %q admin resource %q field %q masking metadata requires a masked response or export", owner, resource, field.Key)
+	}
+	policy := masking.Policy{
+		Strategy: field.Masking.Strategy, PreservePrefix: field.Masking.PreservePrefix, PreserveSuffix: field.Masking.PreserveSuffix,
+		MaskLength: field.Masking.MaskLength, Replacement: field.Masking.Replacement,
+	}
+	if err := masking.NewRuntime().Validate(policy); err != nil {
+		return fmt.Errorf("capability %q admin resource %q field %q %v", owner, resource, field.Key, err)
 	}
 	return nil
 }
@@ -720,7 +752,7 @@ func validateAdminFieldProtection(owner ID, resource string, field AdminField, s
 }
 
 func isAdminEncryptedProjection(mode string) bool {
-	return mode == FieldProjectionPrivileged || mode == FieldProjectionOmitted
+	return mode == FieldProjectionMasked || mode == FieldProjectionPrivileged || mode == FieldProjectionOmitted
 }
 
 func validAdminProtectionName(value string) bool {

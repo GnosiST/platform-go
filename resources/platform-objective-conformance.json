@@ -28,7 +28,6 @@
     "requiresDependencyConflictChecks": true,
     "requiresTaskGraphBeforeNewNode": true,
     "requiredUnfinishedNodes": [
-      "mask-strategy-runtime",
       "sensitive-data-reveal-step-up",
       "data-lifecycle-retention",
       "multi-datasource-contract-and-runtime",
@@ -57,7 +56,11 @@
     "i18nRequiredForSharedAdminComponents": true
   },
   "closeoutPolicy": {
-    "neatFreakRequiredForNodeCloseout": true,
+    "neatFreakRequiredForEveryNodeCloseout": false,
+    "neatFreakInvocationPolicy": {
+      "requiredFor": ["phase-closeout", "major-cross-module-task", "release-preparation"],
+      "notRequiredFor": ["small-node", "routine-sub-agent-task"]
+    },
     "knowledgeCleanupBeforeNodeCloseout": true,
     "nodeCloseoutAudit": "resources/platform-node-closeout-audit.json",
     "docsRoots": ["README.md", "AGENTS.md", "docs/"]
@@ -74,7 +77,6 @@
     "mustNotMarkCompleteWhileBlockersActive": true,
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "controlledBlockers": [
-      "mask-strategy-runtime",
       "sensitive-data-reveal-step-up",
       "data-lifecycle-retention",
       "multi-datasource-contract-and-runtime",

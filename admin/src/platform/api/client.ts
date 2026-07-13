@@ -248,6 +248,14 @@ export type AdminResourceFieldProtection = {
   blindIndexNamespace?: string;
 };
 
+export type AdminResourceFieldMasking = {
+  strategy: "partial-v1" | "phone-v1" | "email-v1" | "identity-cn-v1" | "address-cn-v1";
+  preservePrefix?: number;
+  preserveSuffix?: number;
+  maskLength?: number;
+  replacement?: string;
+};
+
 export type AdminResourceProtection = {
   schemaVersion: number;
   scope: "global" | "tenant-field";
@@ -279,6 +287,7 @@ export type AdminResourceField = {
   responseMode: "full" | "masked" | "privileged" | "omitted";
   exportMode: "full" | "masked" | "privileged" | "omitted";
   protection?: AdminResourceFieldProtection;
+  masking?: AdminResourceFieldMasking;
 };
 
 export type AdminResourcePermissions = {

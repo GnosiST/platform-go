@@ -277,6 +277,17 @@ requireIncludes(files.resourceConsole, "fieldControl?.focus({ preventScroll: tru
 requireNotIncludes(files.resourceConsole, "document.getElementById(firstField.key)", "Resource modal fallback focus must not depend on a global field id.");
 
 requireIncludes(files.client, "export type AdminResourceFieldRelation", "Admin API client must expose resource field relation metadata.");
+requireIncludes(files.client, "export type AdminResourceFieldMasking", "Admin API client must expose field masking metadata.");
+requireIncludes(
+  files.client,
+  'strategy: "partial-v1" | "phone-v1" | "email-v1" | "identity-cn-v1" | "address-cn-v1";',
+  "Admin field masking metadata must expose every supported versioned strategy.",
+);
+for (const key of ["preservePrefix", "preserveSuffix", "maskLength"]) {
+  requireIncludes(files.client, `${key}?: number;`, `Admin field masking metadata must expose optional ${key}.`);
+}
+requireIncludes(files.client, "replacement?: string;", "Admin field masking metadata must expose an optional replacement rune.");
+requireIncludes(files.client, "masking?: AdminResourceFieldMasking;", "AdminResourceField must carry optional masking metadata.");
 requireIncludes(files.client, "relation?: AdminResourceFieldRelation", "AdminResourceField must carry optional relation metadata.");
 requireIncludes(files.client, 'display?: "select" | "tree"', "AdminResourceFieldRelation must expose tree relation display metadata.");
 requireIncludes(files.client, "parentField?: string", "AdminResourceFieldRelation must expose tree relation parent fields.");
@@ -353,6 +364,38 @@ requireIncludes(files.resourceConsole, 'getValuePropName={(field) => (field.type
 requireIncludes(files.resourceConsole, "if (!modalOpen)", "GenericResourceConsole must only reset or set form values when the form modal is open.");
 requireIncludes(files.resourceConsole, "form.setFieldsValue(formValuesFromRecord(editingRecord, formFields))", "Editing a resource must hydrate form values from the selected record.");
 requireIncludes(files.resourceConsole, "field.type === \"multiselect\"", "Form hydration must preserve multiselect arrays for relation fields.");
+requireRegex(
+  files.resourceConsole,
+  /function formValueFromRecord\(record: AdminResourceRecord, field: AdminResourceField\) \{\s*if \(field\.storageMode === "encrypted"\) \{\s*return undefined;\s*\}/,
+  "Encrypted edit fields must hydrate blank instead of reusing projected values or create defaults.",
+);
+requireIncludes(
+  files.resourceConsole,
+  'field.required && !(editing && field.storageMode === "encrypted")',
+  "Encrypted edit fields must allow a blank value to preserve the current secret.",
+);
+requireIncludes(files.resourceConsole, "parts.push(dictionary.encryptedFieldEditHint);", "Encrypted edit fields must expose the localized blank-preserves-current-value hint.");
+requireCountExactly(files.i18n, "encryptedFieldEditHint:", 2, "Encrypted edit field guidance must exist in matching Chinese and English dictionaries.");
+requireIncludes(
+  files.resourceConsole,
+  'schema.fields.filter((field) => field.inTable && field.responseMode !== "omitted")',
+  "Generic resource tables must not render omitted response fields.",
+);
+requireIncludes(
+  files.resourceConsole,
+  'schema.fields.filter((field) => field.inDetail && field.responseMode !== "omitted")',
+  "Generic resource details must not render omitted response fields.",
+);
+requireIncludes(
+  files.resourceConsole,
+  "inputFromRecord(record, schema.fields, { status: nextStatus })",
+  "Status updates must use schema-aware record input filtering.",
+);
+requireRegex(
+  files.resourceConsole,
+  /function inputFromRecord\([\s\S]*?fields\s*\.filter\(\(field\) => field\.source === "values" && !field\.readOnly && field\.sensitivity === "public" && field\.storageMode !== "encrypted" && field\.responseMode !== "omitted" && field\.responseMode !== "privileged"\)[\s\S]*?values: \{ \.\.\.safeValues, \.\.\.\(overrides\.values \?\? \{\}\) \}/,
+  "Status updates must exclude encrypted, hidden and non-writable values from mutation payloads.",
+);
 requireIncludes(files.resourceConsole, "field.localizable", "GenericResourceConsole must render any schema-declared localizable field using the active language.");
 requireIncludes(files.resourceConsole, "localizedRecordValue(record, field.key, language)", "GenericResourceConsole must not limit localized display to name/description fields.");
 requireIncludes(files.resourceConsole, "uniqueResourceFields(schema.fields)", "GenericResourceConsole must normalize duplicate schema field keys before rendering forms.");

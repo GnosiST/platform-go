@@ -82,12 +82,21 @@ type AdminField struct {
 	ResponseMode string
 	ExportMode   string
 	Protection   *AdminFieldProtection
+	Masking      *AdminFieldMasking
 }
 
 type AdminFieldProtection struct {
 	Format              string `json:"format"`
 	Normalization       string `json:"normalization"`
 	BlindIndexNamespace string `json:"blindIndexNamespace,omitempty"`
+}
+
+type AdminFieldMasking struct {
+	Strategy       string `json:"strategy"`
+	PreservePrefix int    `json:"preservePrefix,omitempty"`
+	PreserveSuffix int    `json:"preserveSuffix,omitempty"`
+	MaskLength     int    `json:"maskLength,omitempty"`
+	Replacement    string `json:"replacement,omitempty"`
 }
 
 type AdminResourceProtection struct {

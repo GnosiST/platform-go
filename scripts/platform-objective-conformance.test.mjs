@@ -8,7 +8,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "mask-strategy-runtime",
   "sensitive-data-reveal-step-up",
   "data-lifecycle-retention",
   "multi-datasource-contract-and-runtime",
@@ -203,15 +202,15 @@ describe("validate-platform-objective-conformance", () => {
     assert.match(result.stderr, /objective conformance evidence must include scripts\/admin-ui-contracts\.test\.mjs/);
   });
 
-  it("rejects node closeout without the neat-freak knowledge cleanup gate", () => {
+  it("rejects requiring neat-freak for every node closeout", () => {
     const audit = readJSON("resources/platform-objective-conformance.json");
-    audit.closeoutPolicy.neatFreakRequiredForNodeCloseout = false;
+    audit.closeoutPolicy.neatFreakRequiredForEveryNodeCloseout = true;
     const auditPath = tempJSON("platform-objective-conformance.json", audit);
 
     const result = runValidator(["--audit", auditPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /closeoutPolicy\.neatFreakRequiredForNodeCloseout must stay true/);
+    assert.match(result.stderr, /closeoutPolicy\.neatFreakRequiredForEveryNodeCloseout must stay false/);
   });
 
   it("rejects closeout policies without the node closeout audit contract", () => {

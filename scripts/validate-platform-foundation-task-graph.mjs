@@ -367,6 +367,23 @@ function validateTask(task, context, errors) {
       errors,
     );
   }
+  if (task.id === "mask-strategy-runtime") {
+    if (task.status !== "implemented") {
+      errors.push("approved implemented task mask-strategy-runtime must stay implemented");
+    }
+    requireIncludes(
+      task.evidence?.tests,
+      ["internal/platform/masking/runtime_test.go", "internal/platform/httpapi/projection_test.go", "scripts/admin-ui-contracts.test.mjs"],
+      `${task.id} evidence.tests`,
+      errors,
+    );
+    requireIncludes(
+      task.evidence?.validators,
+      ["scripts/validate-admin-resources.mjs", "scripts/validate-admin-ui-contracts.mjs"],
+      `${task.id} evidence.validators`,
+      errors,
+    );
+  }
   if (task.status === "implemented" || task.status === "preview") {
     const evidence = task.evidence ?? {};
     const evidencePaths = evidencePathKeys.flatMap((key) => values(evidence[key]));

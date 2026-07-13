@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/core"
 	"platform-go/internal/platform/dataprotection"
+	"platform-go/internal/platform/masking"
 )
 
 func TestProtectedCreateAndUpdatePathsKeepOnlyEnvelopes(t *testing.T) {
@@ -274,6 +276,156 @@ func TestProtectedDataValidationAuthenticatesWithoutRevealAndRejectsPolicyOrKeyC
 	}
 }
 
+func TestEncryptedMaskedProjectionUsesOneBackendStrategyAcrossResponseQueryAndExport(t *testing.T) {
+	manifests := protectedMaskedTestManifests(t, masking.StrategyIdentityCNV1)
+	runtime := newTrackingProtectionRuntime(t, 'e', 'i')
+	store, err := NewStoreFromCapabilitiesWithProtection(manifests, runtime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	maskRuntime := &trackingMaskingRuntime{delegate: masking.NewRuntime()}
+	store.masking = maskRuntime
+
+	created, err := store.Create(protectedTestResource, protectedWriteInput("tenant-a", "170101199001011204"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := created.Values[protectedTestField]; got != "17******04" {
+		t.Fatalf("Create() masked value = %q, want 17******04", got)
+	}
+	internal, err := store.InternalRecord(protectedTestResource, created.ID)
+	if err != nil || !dataprotection.IsEnvelope(internal.Values[protectedTestField]) || strings.Contains(internal.Values[protectedTestField], "170101199001011204") {
+		t.Fatalf("internal record does not contain only an encrypted envelope: %+v", internal)
+	}
+
+	queried, err := store.Query(protectedTestResource, QueryInput{PageSize: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := queried.Items[0].Values[protectedTestField]; got != "17******04" {
+		t.Fatalf("Query() masked value = %q, want 17******04", got)
+	}
+	exported, err := store.ProjectRecord(protectedTestResource, internal, ProjectionExport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := exported.Values[protectedTestField]; got != "17******04" {
+		t.Fatalf("ProjectionExport masked value = %q, want 17******04", got)
+	}
+	if runtime.revealCalls != 3 {
+		t.Fatalf("Reveal calls = %d, want one per response/query/export projection", runtime.revealCalls)
+	}
+	if maskRuntime.maskCalls != 3 {
+		t.Fatalf("Mask calls = %d, want one per response/query/export projection", maskRuntime.maskCalls)
+	}
+	store.masking = nil
+	if _, err := store.ProjectRecord(protectedTestResource, internal, ProjectionExport); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("ProjectRecord() without masking runtime error = %v, want ErrInvalidRecord", err)
+	}
+}
+
+func TestProtectedMutationProjectionFailureDoesNotCommit(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		create func(*Store, WriteInput) (Record, error)
+		update func(*Store, string, WriteInput) (Record, error)
+	}{
+		{
+			name: "ordinary",
+			create: func(store *Store, input WriteInput) (Record, error) {
+				return store.Create(protectedTestResource, input)
+			},
+			update: func(store *Store, id string, input WriteInput) (Record, error) {
+				return store.Update(protectedTestResource, id, input)
+			},
+		},
+		{
+			name: "audited",
+			create: func(store *Store, input WriteInput) (Record, error) {
+				result, err := store.CreateWithAudit(protectedTestResource, input, AuditEvent{Actor: "tester", Action: "protected.create"})
+				return result.Record, err
+			},
+			update: func(store *Store, id string, input WriteInput) (Record, error) {
+				result, err := store.UpdateWithAudit(protectedTestResource, id, input, AuditEvent{Actor: "tester", Action: "protected.update"})
+				return result.Record, err
+			},
+		},
+	} {
+		t.Run(test.name+" create", func(t *testing.T) {
+			store, err := NewStoreFromCapabilitiesWithProtection(protectedMaskedTestManifests(t, masking.StrategyIdentityCNV1), newTrackingProtectionRuntime(t, 'e', 'i'))
+			if err != nil {
+				t.Fatal(err)
+			}
+			beforeID := store.nextID
+			beforeSnapshot := store.snapshotLocked()
+			store.masking = nil
+			if _, err := test.create(store, protectedWriteInput("tenant-a", "170101199001011204")); !errors.Is(err, ErrInvalidRecord) {
+				t.Fatalf("create projection error = %v, want ErrInvalidRecord", err)
+			}
+			afterSnapshot := store.snapshotLocked()
+			if len(afterSnapshot.Resources[protectedTestResource]) != len(beforeSnapshot.Resources[protectedTestResource]) ||
+				len(afterSnapshot.Resources["audit-logs"]) != len(beforeSnapshot.Resources["audit-logs"]) || store.nextID != beforeID {
+				t.Fatalf("failed create committed state: records=%d audits=%d nextID=%d", len(afterSnapshot.Resources[protectedTestResource]), len(afterSnapshot.Resources["audit-logs"]), store.nextID)
+			}
+		})
+
+		t.Run(test.name+" update", func(t *testing.T) {
+			store, err := NewStoreFromCapabilitiesWithProtection(protectedMaskedTestManifests(t, masking.StrategyIdentityCNV1), newTrackingProtectionRuntime(t, 'e', 'i'))
+			if err != nil {
+				t.Fatal(err)
+			}
+			created, err := test.create(store, protectedWriteInput("tenant-a", "170101199001011204"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			before, err := store.InternalRecord(protectedTestResource, created.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			beforeID := store.nextID
+			beforeAuditCount := len(store.snapshotLocked().Resources["audit-logs"])
+			store.masking = nil
+			if _, err := test.update(store, created.ID, protectedWriteInput("tenant-a", "110101199001011234")); !errors.Is(err, ErrInvalidRecord) {
+				t.Fatalf("update projection error = %v, want ErrInvalidRecord", err)
+			}
+			after, err := store.InternalRecord(protectedTestResource, created.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			auditCount := len(store.snapshotLocked().Resources["audit-logs"])
+			if !reflect.DeepEqual(after, before) || auditCount != beforeAuditCount || store.nextID != beforeID {
+				t.Fatalf("failed update committed state: before=%+v after=%+v audits=%d nextID=%d", before, after, auditCount, store.nextID)
+			}
+		})
+	}
+}
+
+func TestSchemaCloneIsolatesMaskingMetadata(t *testing.T) {
+	store, err := NewStoreFromCapabilitiesWithProtection(protectedMaskedTestManifests(t, masking.StrategyIdentityCNV1), newTrackingProtectionRuntime(t, 'e', 'i'))
+	if err != nil {
+		t.Fatal(err)
+	}
+	schema, err := store.Schema(protectedTestResource)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index := range schema.Fields {
+		if schema.Fields[index].Key == protectedTestField {
+			schema.Fields[index].Masking.Strategy = masking.StrategyPartialV1
+			schema.Fields[index].Masking.PreservePrefix = 64
+		}
+	}
+	fresh, err := store.Schema(protectedTestResource)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range fresh.Fields {
+		if field.Key == protectedTestField && (field.Masking == nil || field.Masking.Strategy != masking.StrategyIdentityCNV1 || field.Masking.PreservePrefix != 0) {
+			t.Fatalf("Schema() leaked masking metadata mutation: %+v", field.Masking)
+		}
+	}
+}
+
 func TestProtectedGlobalScopeUsesStableSentinel(t *testing.T) {
 	manifests := protectedTestManifests()
 	resource := &manifests[len(manifests)-1].Admin.Resources[0]
@@ -439,6 +591,24 @@ func protectedTestManifests() []capability.Manifest {
 	})
 }
 
+func protectedMaskedTestManifests(t *testing.T, strategy string) []capability.Manifest {
+	t.Helper()
+	manifests := protectedTestManifests()
+	resource := &manifests[len(manifests)-1].Admin.Resources[0]
+	for index := range resource.Fields {
+		field := &resource.Fields[index]
+		if field.Key != protectedTestField {
+			continue
+		}
+		field.ResponseMode = capability.FieldProjectionMasked
+		field.ExportMode = capability.FieldProjectionMasked
+		field.Masking = &capability.AdminFieldMasking{Strategy: strategy}
+		return manifests
+	}
+	t.Fatal("protected test field was not found")
+	return nil
+}
+
 func protectedSeedManifests(t *testing.T) []capability.Manifest {
 	t.Helper()
 	manifests := core.DefaultManifests()
@@ -492,6 +662,20 @@ func assertProtectedProjection(t *testing.T, record Record) {
 	if _, ok := record.Values[protectedTestField]; ok || strings.Contains(fmt.Sprint(record), "pgo:enc:v1:") {
 		t.Fatalf("ordinary projection exposed protected value: %+v", record)
 	}
+}
+
+type trackingMaskingRuntime struct {
+	delegate  masking.Runtime
+	maskCalls int
+}
+
+func (r *trackingMaskingRuntime) Validate(policy masking.Policy) error {
+	return r.delegate.Validate(policy)
+}
+
+func (r *trackingMaskingRuntime) Mask(ctx context.Context, policy masking.Policy, value string) (string, error) {
+	r.maskCalls++
+	return r.delegate.Mask(ctx, policy, value)
 }
 
 type trackingProtectionRuntime struct {

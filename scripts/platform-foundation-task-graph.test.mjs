@@ -66,7 +66,7 @@ const completionProgramTaskIDs = [
   "github-release-publication",
 ];
 
-const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(4);
+const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(5);
 
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-foundation-task-graph.mjs", ...args], {
@@ -309,7 +309,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /task production-auth-provider-hardening must declare at least one evidence\.docs path/);
   });
 
-  it("preserves the closed 37-node baseline, closes four completion nodes, and tracks twelve pending program nodes", () => {
+  it("preserves the closed 37-node baseline, closes five completion nodes, and tracks eleven pending program nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
@@ -342,15 +342,27 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
     assert.equal(graph.tasks.length, 53);
-    assert.equal(implemented.length, 41);
+    assert.equal(implemented.length, 42);
     assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "admin-watermark-export-governance")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-protection-runtime")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-historical-migration")?.status, "implemented");
-    assert.ok(completionProgramTaskIDs.slice(4, 12).every((taskID) => graph.tasks.find((item) => item.id === taskID)?.status === "pending"));
+    assert.equal(graph.tasks.find((item) => item.id === "mask-strategy-runtime")?.status, "implemented");
+    assert.ok(completionProgramTaskIDs.slice(5, 12).every((taskID) => graph.tasks.find((item) => item.id === taskID)?.status === "pending"));
     assert.ok(graph.tasks.find((item) => item.id === "open-source-portability")?.dependsOn.includes("asynchronous-search-projection"));
     assert.deepEqual(pending.map((item) => item.id), pendingCompletionProgramTaskIDs);
     assert.equal(blocked.length, 0);
+  });
+
+  it("rejects regressing mask strategy runtime after closeout", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    graph.tasks.find((item) => item.id === "mask-strategy-runtime").status = "pending";
+    const graphPath = tempJSON("pending-mask-strategy-runtime.json", graph);
+
+    const result = runValidator(["--graph", graphPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /approved implemented task mask-strategy-runtime must stay implemented/);
   });
 
   it("rejects regressing sensitive data protection after closeout", () => {

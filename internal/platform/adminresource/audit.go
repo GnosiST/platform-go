@@ -81,15 +81,15 @@ func (s *Store) createWithAudit(resource string, input WriteInput, origin WriteO
 	if err != nil {
 		return MutationResult{}, err
 	}
+	resultRecord, err := s.mutationRecordResultLocked(resource, record, origin)
+	if err != nil {
+		return MutationResult{}, err
+	}
 	s.nextID += 2
 	s.resources[resource] = append(items, record)
 	s.resources["audit-logs"] = append(s.resources["audit-logs"], audit)
 	if err := s.persistLocked(); err != nil {
 		s.restoreSnapshotLocked(previous)
-		return MutationResult{}, err
-	}
-	resultRecord, err := s.mutationRecordResultLocked(resource, record, origin)
-	if err != nil {
 		return MutationResult{}, err
 	}
 	return MutationResult{Record: resultRecord, Audit: cloneRecord(audit)}, nil
@@ -134,16 +134,16 @@ func (s *Store) updateWithAudit(resource string, id string, input WriteInput, or
 	if err != nil {
 		return MutationResult{}, err
 	}
+	resultRecord, err := s.mutationRecordResultLocked(resource, record, origin)
+	if err != nil {
+		return MutationResult{}, err
+	}
 	items[index] = record
 	s.nextID++
 	s.resources[resource] = items
 	s.resources["audit-logs"] = append(s.resources["audit-logs"], audit)
 	if err := s.persistLocked(); err != nil {
 		s.restoreSnapshotLocked(previous)
-		return MutationResult{}, err
-	}
-	resultRecord, err := s.mutationRecordResultLocked(resource, record, origin)
-	if err != nil {
 		return MutationResult{}, err
 	}
 	return MutationResult{Record: resultRecord, Audit: cloneRecord(audit)}, nil

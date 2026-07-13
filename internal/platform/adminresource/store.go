@@ -11,6 +11,7 @@ import (
 
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/dataprotection"
+	"platform-go/internal/platform/masking"
 )
 
 var (
@@ -59,6 +60,7 @@ type Store struct {
 	now           func() time.Time
 	repository    AdminResourceRepository
 	protection    dataprotection.Runtime
+	masking       masking.Runtime
 }
 
 func NewStore() *Store {
@@ -108,6 +110,7 @@ func newStore(resources map[string][]Record, schemas map[string]Schema) *Store {
 		schemas:       schemas,
 		nextID:        1000,
 		now:           time.Now,
+		masking:       masking.NewRuntime(),
 	}
 	return store
 }
@@ -221,13 +224,17 @@ func (s *Store) create(resource string, input WriteInput, origin WriteOrigin) (R
 	if err := s.protectRecordForStorage(context.Background(), resource, &record, nil); err != nil {
 		return Record{}, err
 	}
+	result, err := s.mutationRecordResultLocked(resource, record, origin)
+	if err != nil {
+		return Record{}, err
+	}
 	s.nextID = nextID
 	s.resources[resource] = append(items, record)
 	if err := s.persistLocked(); err != nil {
 		s.restoreSnapshotLocked(previous)
 		return Record{}, err
 	}
-	return s.mutationRecordResultLocked(resource, record, origin)
+	return result, nil
 }
 
 func (s *Store) Update(resource string, id string, input WriteInput) (Record, error) {
@@ -265,13 +272,17 @@ func (s *Store) update(resource string, id string, input WriteInput, origin Writ
 	if err := s.protectRecordForStorage(context.Background(), resource, &record, &items[index]); err != nil {
 		return Record{}, err
 	}
+	result, err := s.mutationRecordResultLocked(resource, record, origin)
+	if err != nil {
+		return Record{}, err
+	}
 	items[index] = record
 	s.resources[resource] = items
 	if err := s.persistLocked(); err != nil {
 		s.restoreSnapshotLocked(previous)
 		return Record{}, err
 	}
-	return s.mutationRecordResultLocked(resource, record, origin)
+	return result, nil
 }
 
 func (s *Store) Delete(resource string, id string) error {
@@ -324,6 +335,10 @@ func (s *Store) recordFromInputWithOriginExisting(resource string, id string, in
 		status = "enabled"
 	}
 	code := strings.TrimSpace(input.Code)
+	values := cloneValues(input.Values)
+	if existing != nil {
+		values = s.mergeExistingUpdateValues(resource, values, *existing)
+	}
 	return Record{
 		ID:          id,
 		Code:        code,
@@ -331,8 +346,34 @@ func (s *Store) recordFromInputWithOriginExisting(resource string, id string, in
 		Status:      status,
 		Description: strings.TrimSpace(input.Description),
 		UpdatedAt:   s.now().UTC().Format(time.RFC3339),
-		Values:      cloneValues(input.Values),
+		Values:      values,
 	}, nil
+}
+
+func (s *Store) mergeExistingUpdateValues(resource string, values map[string]string, existing Record) map[string]string {
+	schema := s.schemas[resource]
+	for _, rawField := range schema.Fields {
+		field := defaultFieldPolicy(rawField)
+		if field.Source != "values" || field.StorageMode == capability.FieldStorageEncrypted || !preserveUnsubmittedUpdateField(field) {
+			continue
+		}
+		if _, submitted := values[field.Key]; submitted {
+			continue
+		}
+		if value, exists := existing.Values[field.Key]; exists {
+			if values == nil {
+				values = map[string]string{}
+			}
+			values[field.Key] = value
+		}
+	}
+	return values
+}
+
+func preserveUnsubmittedUpdateField(field FieldDefinition) bool {
+	return field.ReadOnly || !field.InForm || field.Sensitivity != capability.FieldSensitivityPublic ||
+		field.StorageMode == capability.FieldStorageHashed ||
+		field.ResponseMode == capability.FieldProjectionOmitted || field.ResponseMode == capability.FieldProjectionPrivileged
 }
 
 func (s *Store) validateRequiredFields(resource string, input WriteInput) error {
@@ -353,8 +394,10 @@ func (s *Store) validateRequiredFieldsExisting(resource string, input WriteInput
 		case "record":
 			value = recordInputValue(input, field.Key)
 		case "values":
-			value = input.Values[field.Key]
-			if strings.TrimSpace(value) == "" && existing != nil && field.StorageMode == capability.FieldStorageEncrypted {
+			var submitted bool
+			value, submitted = input.Values[field.Key]
+			preserveMissing := !submitted && (field.StorageMode == capability.FieldStorageEncrypted || preserveUnsubmittedUpdateField(field))
+			if existing != nil && (preserveMissing || (field.StorageMode == capability.FieldStorageEncrypted && strings.TrimSpace(value) == "")) {
 				value = existing.Values[field.Key]
 			}
 		}

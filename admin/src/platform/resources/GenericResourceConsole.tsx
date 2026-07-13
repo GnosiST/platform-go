@@ -123,13 +123,13 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
   const dataProvider = useDataProvider();
 
   const relationOptionSignature = useMemo(() => relationSignature(schema.fields), [schema.fields]);
-  const tableFields = useMemo(() => schema.fields.filter((field) => field.inTable), [schema.fields]);
+  const tableFields = useMemo(() => schema.fields.filter((field) => field.inTable && field.responseMode !== "omitted"), [schema.fields]);
   const formFields = useMemo(() => schema.fields.filter((field) => field.inForm && !field.readOnly), [schema.fields]);
   const formSections = useMemo(() => resourceFormSections(formFields, schema.formGroups ?? [], language, dictionary), [dictionary, formFields, language, schema.formGroups]);
   const formLayoutPreset = useMemo(() => normalizeFormLayoutPreset(schema.formLayout, formFields), [formFields, schema.formLayout]);
   const activeFormInitialValues = useMemo(() => (editingRecord ? formValuesFromRecord(editingRecord, formFields) : defaultFormValues(formFields)), [editingRecord, formFields]);
   const runtimeFormValues = useMemo(() => ({ ...activeFormInitialValues, ...(watchedFormValues ?? {}) }), [activeFormInitialValues, watchedFormValues]);
-  const detailFields = useMemo(() => schema.fields.filter((field) => field.inDetail), [schema.fields]);
+  const detailFields = useMemo(() => schema.fields.filter((field) => field.inDetail && field.responseMode !== "omitted"), [schema.fields]);
   const canCreate = useMemo(() => permissionAllows(permissions, schema.permissions.create, deniedPermissions), [deniedPermissions, permissions, schema.permissions.create]);
   const canUpdate = useMemo(() => permissionAllows(permissions, schema.permissions.update, deniedPermissions), [deniedPermissions, permissions, schema.permissions.update]);
   const canDelete = useMemo(() => permissionAllows(permissions, schema.permissions.delete, deniedPermissions), [deniedPermissions, permissions, schema.permissions.delete]);
@@ -485,7 +485,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
     }
     setTogglingRecordID(record.id);
     try {
-      const result = await updateResource.mutateAsync({ resource: resourceKey, id: record.id, values: inputFromRecord(record, { status: nextStatus }) });
+      const result = await updateResource.mutateAsync({ resource: resourceKey, id: record.id, values: inputFromRecord(record, schema.fields, { status: nextStatus }) });
       await refreshResource();
       setSelectedID(String(result.data.id));
       setError("");
@@ -841,9 +841,9 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
           layoutPreset={formLayoutPreset}
           sections={formSections}
           renderField={(field) => <FieldInput field={field} language={language} />}
-          renderFieldExtra={(field) => (field.help ? localizedText(field.help, language) : undefined)}
+          renderFieldExtra={(field) => fieldExtra(field, Boolean(editingRecord), language, dictionary)}
           renderFieldLabel={(field) => localizedText(field.label, language)}
-          rules={(field) => fieldRules(field, language, dictionary)}
+          rules={(field) => fieldRules(field, language, dictionary, Boolean(editingRecord))}
           slots={runtimeFormSlots}
           getValuePropName={(field) => (field.type === "switch" ? "checked" : undefined)}
           onFinish={submitForm}
@@ -1671,10 +1671,10 @@ function resourceFormSections(
   });
 }
 
-function fieldRules(field: AdminResourceField, language: Language, dictionary: Dictionary): Rule[] | undefined {
+function fieldRules(field: AdminResourceField, language: Language, dictionary: Dictionary, editing = false): Rule[] | undefined {
   const label = localizedText(field.label, language);
   const rules: Rule[] = [];
-  if (field.required) {
+  if (field.required && !(editing && field.storageMode === "encrypted")) {
     rules.push({ required: true, message: requiredMessage(field, language) });
   }
   if (field.validation?.minLength) {
@@ -1713,6 +1713,14 @@ function fieldRules(field: AdminResourceField, language: Language, dictionary: D
     }
   }
   return rules.length > 0 ? rules : undefined;
+}
+
+function fieldExtra(field: AdminResourceField, editing: boolean, language: Language, dictionary: Dictionary) {
+  const parts = field.help ? [localizedText(field.help, language)] : [];
+  if (editing && field.storageMode === "encrypted") {
+    parts.push(dictionary.encryptedFieldEditHint);
+  }
+  return parts.length > 0 ? parts.join(" ") : undefined;
 }
 
 function safeRegExp(pattern: string) {
@@ -2065,6 +2073,9 @@ function formValuesFromRecord(record: AdminResourceRecord, fields: AdminResource
 }
 
 function formValueFromRecord(record: AdminResourceRecord, field: AdminResourceField) {
+  if (field.storageMode === "encrypted") {
+    return undefined;
+  }
   const value = getRecordFieldValue(record, field);
   if (field.type === "multiselect") {
     return splitList(value);
@@ -2131,13 +2142,19 @@ function inputFromFormValues(values: ResourceFormValues, fields: AdminResourceFi
   return input;
 }
 
-function inputFromRecord(record: AdminResourceRecord, overrides: Partial<AdminResourceInput> = {}): AdminResourceInput {
+function inputFromRecord(record: AdminResourceRecord, fields: AdminResourceField[], overrides: Partial<AdminResourceInput> = {}): AdminResourceInput {
+  const safeValues = Object.fromEntries(
+    fields
+      .filter((field) => field.source === "values" && !field.readOnly && field.sensitivity === "public" && field.storageMode !== "encrypted" && field.responseMode !== "omitted" && field.responseMode !== "privileged")
+      .map((field) => [field.key, record.values?.[field.key] ?? ""])
+      .filter(([, value]) => value !== ""),
+  );
   return {
     code: overrides.code ?? record.code,
     name: overrides.name ?? record.name,
     status: overrides.status ?? record.status,
     description: overrides.description ?? record.description ?? "",
-    values: { ...(record.values ?? {}), ...(overrides.values ?? {}) },
+    values: { ...safeValues, ...(overrides.values ?? {}) },
   };
 }
 

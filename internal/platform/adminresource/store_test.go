@@ -64,6 +64,84 @@ func TestStoreRegistersAdminResourcesFromEnabledCapabilities(t *testing.T) {
 	}
 }
 
+func TestUpdatePreservesUnsubmittedStoredValuesAcrossMutationPaths(t *testing.T) {
+	resource := capability.AdminResource{
+		Resource: "partial-update-records", Title: capability.Text("部分更新", "Partial Updates"), Description: capability.Text("测试部分更新。", "Tests partial updates."),
+		PermissionPrefix: "admin:partial-update",
+		Fields: []capability.AdminField{
+			{Key: "code", Label: capability.Text("编码", "Code"), Type: "text", Source: "record", Required: true},
+			{Key: "name", Label: capability.Text("名称", "Name"), Type: "text", Source: "record", Required: true},
+			{Key: "status", Label: capability.Text("状态", "Status"), Type: "text", Source: "record"},
+			{Key: "visibleValue", Label: capability.Text("可见值", "Visible Value"), Type: "text", Source: "values", InForm: true},
+			{Key: "requiredVisible", Label: capability.Text("必填可见值", "Required Visible Value"), Type: "text", Source: "values", Required: true, InForm: true},
+			{Key: "serverManaged", Label: capability.Text("服务端值", "Server Managed"), Type: "text", Source: "values", ReadOnly: true},
+			{Key: "internalKey", Label: capability.Text("内部键", "Internal Key"), Type: "text", Source: "values", Required: true, ReadOnly: true,
+				Sensitivity: capability.FieldSensitivityInternal, StorageMode: capability.FieldStoragePlain,
+				ResponseMode: capability.FieldProjectionOmitted, ExportMode: capability.FieldProjectionOmitted},
+			{Key: "subjectHash", Label: capability.Text("标识哈希", "Subject Hash"), Type: "text", Source: "values", Required: true, ReadOnly: true,
+				Sensitivity: capability.FieldSensitivitySecret, StorageMode: capability.FieldStorageHashed,
+				ResponseMode: capability.FieldProjectionOmitted, ExportMode: capability.FieldProjectionOmitted},
+		},
+	}
+	manifests := append(core.DefaultManifests(), capability.Manifest{ID: "partial-update-test", Admin: capability.AdminSurface{Resources: []capability.AdminResource{resource}}})
+
+	for _, test := range []struct {
+		name   string
+		update func(*Store, string, WriteInput) error
+	}{
+		{name: "ordinary", update: func(store *Store, id string, input WriteInput) error {
+			_, err := store.Update(resource.Resource, id, input)
+			return err
+		}},
+		{name: "audited", update: func(store *Store, id string, input WriteInput) error {
+			_, err := store.UpdateWithAudit(resource.Resource, id, input, AuditEvent{Actor: "tester", Action: "partial-update"})
+			return err
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store := NewStoreFromCapabilities(manifests)
+			created, err := store.CreateInternal(resource.Resource, WriteInput{
+				Code: "partial-1", Name: "Partial", Status: "enabled",
+				Values: map[string]string{"visibleValue": "before", "requiredVisible": "required", "serverManaged": "server", "internalKey": "object-key", "subjectHash": "hash-value"},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := test.update(store, created.ID, WriteInput{
+				Code: "partial-1", Name: "Partial", Status: "disabled", Values: map[string]string{"visibleValue": "after", "requiredVisible": "required"},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			stored, err := store.InternalRecord(resource.Resource, created.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for key, want := range map[string]string{
+				"visibleValue": "after", "requiredVisible": "required", "serverManaged": "server", "internalKey": "object-key", "subjectHash": "hash-value",
+			} {
+				if got := stored.Values[key]; got != want {
+					t.Fatalf("stored %s = %q, want %q", key, got, want)
+				}
+			}
+			if err := test.update(store, created.ID, WriteInput{
+				Code: "partial-1", Name: "Partial", Status: "disabled", Values: map[string]string{"requiredVisible": "required"},
+			}); err != nil {
+				t.Fatalf("clear optional visible field: %v", err)
+			}
+			stored, err = store.InternalRecord(resource.Resource, created.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, exists := stored.Values["visibleValue"]; exists {
+				t.Fatalf("optional public form field was not cleared: %+v", stored.Values)
+			}
+			if err := test.update(store, created.ID, WriteInput{Code: "partial-1", Name: "Partial", Status: "disabled"}); err == nil {
+				t.Fatal("update without required public form field succeeded")
+			}
+		})
+	}
+}
+
 func TestStoreSchemaExposesFormMetadataFromCapabilityFields(t *testing.T) {
 	store := NewStoreFromCapabilities([]capability.Manifest{
 		{

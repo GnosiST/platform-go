@@ -118,6 +118,7 @@ function fieldSchema(field) {
     "x-platform-response-mode": field.responseMode ?? "full",
     "x-platform-export-mode": field.exportMode ?? "full",
     ...(field.protection ? { "x-platform-protection": field.protection } : {}),
+    ...(field.masking ? { "x-platform-masking": field.masking } : {}),
     ...(field.storageMode === "encrypted"
       ? { "x-platform-query-operators": field.protection?.blindIndexNamespace ? ["="] : [] }
       : {}),

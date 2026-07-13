@@ -38,7 +38,7 @@ rtk codegraph status
 - Redis/cache is an optimization behind the platform cache port, not a source of truth.
 - Common admin UI must use platform wrappers over Ant Design for repeated surfaces: page, table, modal, drawer, button, alert, dropdown, pagination and settings.
 - i18n is a hard gate for shared admin components. Add Chinese and English dictionary keys in the same change.
-- Implemented task nodes must have a `resources/platform-node-closeout-audit.json` entry with neat-freak cleanup evidence; visual nodes must keep both `superpowers:brainstorming` and product-design evidence.
+- Implemented task nodes must have a `resources/platform-node-closeout-audit.json` entry with cleanup evidence. Do not invoke `neat-freak` for every small node or routine sub-agent task; reserve it for phase closeout, major cross-module work, or release preparation. Visual nodes must keep both `superpowers:brainstorming` and product-design evidence.
 
 ## Resource And Codegen Rules
 

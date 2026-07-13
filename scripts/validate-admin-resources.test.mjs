@@ -181,6 +181,36 @@ describe("validate-admin-resources field security policies", () => {
     assert.equal(result.status, 0, result.stderr);
   });
 
+  function mutateEncryptedMaskedField(mutator = () => {}) {
+    return mutateEncryptedField((_resource, field) => {
+      field.responseMode = "masked";
+      field.exportMode = "masked";
+      field.masking = { strategy: "partial-v1", preservePrefix: 2, preserveSuffix: 2, maskLength: 6 };
+      mutator(_resource, field);
+    });
+  }
+
+  it("accepts arbitrary encrypted masked fields with explicit versioned masking", () => {
+    const result = runValidator(["--manifest", mutateEncryptedMaskedField()]);
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  for (const [name, mutate, pattern] of [
+    ["missing masking", (_resource, field) => delete field.masking, /encrypted masked projection requires masking metadata/],
+    ["unknown masking strategy", (_resource, field) => (field.masking.strategy = "phone"), /masking strategy phone is unsupported/],
+    ["partial mask without length", (_resource, field) => delete field.masking.maskLength, /partial-v1 masking requires maskLength/],
+    ["multiple replacement runes", (_resource, field) => (field.masking.replacement = "**"), /masking replacement must be one rune/],
+    ["padded replacement rune", (_resource, field) => (field.masking.replacement = " * "), /masking replacement must be one rune/],
+    ["zero-width replacement rune", (_resource, field) => (field.masking.replacement = "\u200b"), /masking replacement must be visible/],
+    ["masking without masked projection", (_resource, field) => { field.responseMode = "privileged"; field.exportMode = "omitted"; }, /masking metadata requires a masked response or export/],
+  ]) {
+    it(`rejects encrypted masking with ${name}`, () => {
+      const result = runValidator(["--manifest", mutateEncryptedMaskedField(mutate)]);
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, pattern);
+    });
+  }
+
   for (const [name, mutate, pattern] of [
     ["missing field protection", (_resource, field) => delete field.protection, /encrypted storage requires protection metadata/],
     ["missing format", (_resource, field) => delete field.protection.format, /protection format is required/],

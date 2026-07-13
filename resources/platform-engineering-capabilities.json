@@ -2433,7 +2433,7 @@
         "en": "Node Closeout Audit"
       },
       "status": "implemented",
-      "purpose": "Keep every implemented foundation task node tied to neat-freak cleanup, evidence paths, resource-lock review, objective-conflict review and visual design-gate evidence before the node is treated as closed.",
+      "purpose": "Keep every implemented foundation task node tied to focused cleanup evidence, resource-lock review, objective-conflict review and visual design-gate evidence, while reserving neat-freak for phase, major-task and release closeout.",
       "dependsOn": [
         "task-dependency-governance",
         "goal-completion-audit"
@@ -2457,7 +2457,7 @@
           },
           {
             "path": "resources/platform-node-closeout-audit.json",
-            "contains": "\"neatFreakRequired\": true"
+            "contains": "\"neatFreakRequired\": false"
           },
           {
             "path": "resources/platform-node-closeout-audit.json",
@@ -2540,7 +2540,7 @@
           },
           {
             "path": "resources/platform-objective-conformance.json",
-            "contains": "\"neatFreakRequiredForNodeCloseout\": true"
+            "contains": "\"neatFreakRequiredForEveryNodeCloseout\": false"
           },
           {
             "path": "resources/platform-objective-conformance.json",
@@ -2564,7 +2564,7 @@
           },
           {
             "path": "scripts/validate-platform-objective-conformance.mjs",
-            "contains": "closeoutPolicy.neatFreakRequiredForNodeCloseout must stay true"
+            "contains": "closeoutPolicy.neatFreakRequiredForEveryNodeCloseout must stay false"
           },
           {
             "path": "scripts/validate-platform-objective-conformance.mjs",
@@ -2580,7 +2580,7 @@
           },
           {
             "path": "scripts/platform-objective-conformance.test.mjs",
-            "contains": "rejects node closeout without the neat-freak knowledge cleanup gate"
+            "contains": "rejects requiring neat-freak for every node closeout"
           },
           {
             "path": "scripts/platform-objective-conformance.test.mjs",
@@ -2744,15 +2744,48 @@
         "zh": "可配置脱敏策略运行时",
         "en": "Configurable Mask Strategy Runtime"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Apply versioned, field-configurable masking strategies consistently across admin projections and exports.",
       "dependsOn": [
         "sensitive-data-protection"
       ],
       "evidence": {
         "sourcePaths": [
+          "docs/superpowers/specs/2026-07-13-mask-strategy-runtime-design.md",
+          "docs/superpowers/plans/2026-07-13-mask-strategy-runtime.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/platform-ui-optimization-assessment.md",
+          "docs/platform-roadmap.md",
+          "internal/platform/masking/runtime.go",
+          "internal/platform/adminresource/security.go",
+          "internal/platform/adminresource/store.go",
+          "internal/platform/httpapi/server.go",
+          "internal/platform/capability/manifest.go",
+          "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "admin/src/platform/api/client.ts",
+          "admin/src/platform/i18n.ts"
+        ],
+        "validators": [
+          "scripts/validate-admin-resources.mjs",
+          "scripts/validate-admin-ui-contracts.mjs",
+          "scripts/validate-platform-foundation-task-graph.mjs",
+          "scripts/validate-platform-foundation-alignment.mjs",
+          "scripts/validate-platform-task-execution-audit.mjs",
+          "scripts/validate-platform-goal-completion-audit.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs",
+          "scripts/validate-platform-objective-conformance.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs"
+        ],
+        "tests": [
+          "internal/platform/masking/runtime_test.go",
+          "internal/platform/adminresource/protection_test.go",
+          "internal/platform/adminresource/store_test.go",
+          "internal/platform/httpapi/projection_test.go",
+          "internal/platform/capability/admin_contract_test.go",
+          "scripts/validate-admin-resources.test.mjs",
+          "scripts/admin-resource-contract-generators.test.mjs",
+          "scripts/admin-ui-contracts.test.mjs",
+          "scripts/platform-foundation-docs-drift.test.mjs"
         ],
         "taskIds": [
           "mask-strategy-runtime"

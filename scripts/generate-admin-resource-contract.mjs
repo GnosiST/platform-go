@@ -86,6 +86,7 @@ function normalizedFieldPolicy(field) {
     responseMode: field.responseMode ?? "full",
     exportMode: field.exportMode ?? "full",
     ...(field.protection ? { protection: { ...field.protection } } : {}),
+    ...(field.masking ? { masking: { ...field.masking } } : {}),
   };
 }
 

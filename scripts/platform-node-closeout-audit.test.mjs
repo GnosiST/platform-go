@@ -9,7 +9,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "mask-strategy-runtime",
   "sensitive-data-reveal-step-up",
   "data-lifecycle-retention",
   "multi-datasource-contract-and-runtime",
@@ -91,7 +90,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("preserves 37 baseline closeouts, closes four completion nodes, and tracks twelve pending nodes", () => {
+  it("preserves 37 baseline closeouts, closes five completion nodes, and tracks eleven pending nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -99,7 +98,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(task, "task graph must include production-admin-oidc-auth");
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
-    assert.equal(audit.nodeCloseouts.length, 41);
+    assert.equal(audit.nodeCloseouts.length, 42);
     assert.deepEqual(audit.nodeCloseouts.slice(0, 37).map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
     assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts.slice(0, 37))).digest("hex"), foundationBaselineCloseoutDigest);
     const runtimeSecurityCloseout = audit.nodeCloseouts[37];
@@ -128,6 +127,13 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(migrationCloseout.cleanupEvidence.includes("docs/platform-data-governance-and-integrations-assessment.md"));
     assert.ok(migrationCloseout.cleanupEvidence.includes("scripts/validate-platform-sensitive-data-migration.mjs"));
     assert.ok(migrationCloseout.cleanupEvidence.includes("scripts/platform-foundation-docs-drift.test.mjs"));
+    const maskCloseout = audit.nodeCloseouts.find((item) => item.taskId === "mask-strategy-runtime");
+    assert.equal(maskCloseout.status, "closed");
+    assert.equal(maskCloseout.neatFreak, false);
+    assert.equal(maskCloseout.cleanupMode, "focused");
+    assert.equal("visualEvidence" in maskCloseout, false);
+    assert.ok(maskCloseout.cleanupEvidence.includes("internal/platform/masking/runtime_test.go"));
+    assert.ok(maskCloseout.cleanupEvidence.includes("internal/platform/httpapi/projection_test.go"));
     assert.deepEqual(audit.pendingNodeEvidence, completionProgramTaskIDs);
   });
 
@@ -168,18 +174,29 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stderr, /implemented task resource-schema-contract must declare node closeout evidence/);
   });
 
-  it("rejects closeout entries that omit neat-freak cleanup evidence", () => {
+  it("rejects closeout entries that omit cleanup evidence", () => {
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const closeout = audit.nodeCloseouts.find((node) => node.taskId === "admin-ui-shell-and-list-components");
-    closeout.neatFreak = false;
     closeout.cleanupEvidence = [];
     const auditPath = tempJSON("platform-node-closeout-audit.json", audit);
 
     const result = runValidator(["--audit", auditPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /nodeCloseouts\.admin-ui-shell-and-list-components\.neatFreak must stay true/);
     assert.match(result.stderr, /nodeCloseouts\.admin-ui-shell-and-list-components\.cleanupEvidence must not be empty/);
+  });
+
+  it("allows focused cleanup for a small node and rejects missing cleanup mode", () => {
+    const audit = readJSON("resources/platform-node-closeout-audit.json");
+    const closeout = audit.nodeCloseouts.find((node) => node.taskId === "mask-strategy-runtime");
+    assert.equal(closeout.neatFreak, false);
+    assert.equal(closeout.cleanupMode, "focused");
+
+    delete closeout.cleanupMode;
+    const result = runValidator(["--audit", tempJSON("missing-focused-cleanup-mode.json", audit)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /nodeCloseouts\.mask-strategy-runtime\.cleanupMode must be focused when neat-freak was not invoked/);
   });
 
   it("rejects visual closeouts that lack brainstorming and product-design evidence", () => {

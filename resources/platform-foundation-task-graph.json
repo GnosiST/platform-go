@@ -2036,15 +2036,7 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
-      "statusReason": {
-        "zh": "字段合同已有脱敏投影模式，但后端仍原样返回存储值，尚无版本化、字段可配置的统一脱敏策略运行时。",
-        "en": "Field contracts declare masked projection modes, but the backend still returns stored values unchanged and has no versioned, field-configurable masking runtime."
-      },
-      "completionGate": {
-        "zh": "实现清单驱动的版本化脱敏策略，并证明列表、详情、Tooltip 与导出只使用同一后端投影且不会重复脱敏。",
-        "en": "Implement manifest-driven versioned mask strategies and prove list, detail, tooltip and export use one backend projection without duplicate masking."
-      },
+      "status": "implemented",
       "resourceLocks": [
         "data-protection",
         "admin-resource-contract",
@@ -2057,8 +2049,52 @@
       ],
       "evidence": {
         "docs": [
+          "docs/superpowers/specs/2026-07-13-mask-strategy-runtime-design.md",
+          "docs/superpowers/plans/2026-07-13-mask-strategy-runtime.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/platform-ui-optimization-assessment.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-foundation-task-map.md",
+          "internal/platform/masking/runtime.go",
+          "internal/platform/adminresource/security.go",
+          "internal/platform/adminresource/store.go",
+          "internal/platform/httpapi/server.go",
+          "internal/platform/capability/manifest.go",
+          "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "admin/src/platform/api/client.ts",
+          "admin/src/platform/i18n.ts"
+        ],
+        "validators": [
+          "scripts/validate-admin-resources.mjs",
+          "scripts/validate-admin-ui-contracts.mjs",
+          "scripts/validate-platform-foundation-task-graph.mjs",
+          "scripts/validate-platform-foundation-alignment.mjs",
+          "scripts/validate-platform-task-execution-audit.mjs",
+          "scripts/validate-platform-goal-completion-audit.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs",
+          "scripts/validate-platform-objective-conformance.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs"
+        ],
+        "tests": [
+          "internal/platform/masking/runtime_test.go",
+          "internal/platform/adminresource/protection_test.go",
+          "internal/platform/adminresource/store_test.go",
+          "internal/platform/httpapi/projection_test.go",
+          "internal/platform/capability/admin_contract_test.go",
+          "scripts/validate-admin-resources.test.mjs",
+          "scripts/admin-resource-contract-generators.test.mjs",
+          "scripts/admin-ui-contracts.test.mjs",
+          "scripts/platform-foundation-docs-drift.test.mjs",
+          "scripts/platform-foundation-task-graph.test.mjs",
+          "scripts/platform-engineering-capabilities.test.mjs"
+        ],
+        "checks": [
+          "rtk go test ./internal/platform/masking ./internal/platform/adminresource ./internal/platform/httpapi ./internal/platform/capability -count=1",
+          "rtk node --test scripts/validate-admin-resources.test.mjs scripts/admin-resource-contract-generators.test.mjs scripts/admin-ui-contracts.test.mjs",
+          "rtk node scripts/validate-admin-i18n.mjs",
+          "rtk node scripts/validate-admin-ui-contracts.mjs",
+          "rtk npm --prefix admin run build",
+          "rtk git diff --check"
         ]
       }
     },

@@ -227,10 +227,10 @@ platform-admin sensitive-data-migrate --mode <mode> [flags]
 
 **Interfaces:**
 
-- Produces an implemented `sensitive-data-historical-migration` node, `41/45/4` official graph counts and a neat-freak closeout.
+- Produces an implemented `sensitive-data-historical-migration` node; the current official graph has since advanced to `53/42/11` after `mask-strategy-runtime` closeout.
 - Keeps MySQL/PostgreSQL production certification as an explicit promotion evidence requirement when external integration environments are unavailable.
 
-- [ ] Write failing Node tests for required command modes, driver policy, approval fields, redaction rules, evidence paths, `41/45/4` graph projections and closeout consistency.
+- [ ] Write failing Node tests for required command modes, driver policy, approval fields, redaction rules, evidence paths, current graph projections and closeout consistency.
 - [ ] Run the focused Node tests/validators and confirm RED.
 - [ ] Implement the validator, runbook and governance updates. Document exact backup, prepare, apply, verify, rehearsal, rollback and incident-stop steps without sample secrets.
 - [ ] Run focused Node tests/validators, regenerate affected operations artifacts, and refresh CodeGraph.

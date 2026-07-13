@@ -68,7 +68,11 @@ describe("platform foundation documentation drift", () => {
   it("records verified masking, step-up, database and integration limits", () => {
     const assessment = read("docs/platform-data-governance-and-integrations-assessment.md");
 
-    assert.match(assessment, /`masked` projection returns the stored value unchanged/);
+    assert.match(
+      assessment,
+      /Encrypted `masked` response\/export projection decrypts only inside the backend, applies one of five strategies and returns only the masked value/,
+    );
+    assert.doesNotMatch(assessment, /`masked` projection returns the stored value unchanged/);
     assert.match(assessment, /There are currently zero reveal-capable step-up factors/);
     assert.match(assessment, /`PLATFORM_DATABASE_DRIVER` and `PLATFORM_DATABASE_DSN` are not wired into process composition/);
     assert.doesNotMatch(assessment, /Redis Pub\/Sub is used only for cache invalidation/);

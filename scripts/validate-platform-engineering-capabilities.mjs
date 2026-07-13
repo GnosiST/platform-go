@@ -56,9 +56,9 @@ const requiredImplementedCapabilityIDs = [
   "runtime-security-containment",
   "admin-watermark-export-governance",
   "sensitive-data-protection",
+  "mask-strategy-runtime",
 ];
 const requiredPartialCapabilityIDs = [
-  "mask-strategy-runtime",
   "sensitive-data-reveal-step-up",
   "data-lifecycle-retention",
   "multi-datasource-contract-and-runtime",

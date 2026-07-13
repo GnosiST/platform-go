@@ -759,6 +759,156 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /Encrypted resource query syntax must allow equality only/);
   });
 
+  it("rejects encrypted edit hydration that reuses projected or default values", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      'if (field.storageMode === "encrypted") {\n    return undefined;\n  }',
+      'if (field.storageMode === "encrypted") {\n    return defaultFieldValue(field);\n  }',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Encrypted edit fields must hydrate blank/);
+  });
+
+  it("rejects encrypted edit fields that require resubmitting the current secret", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      'field.required && !(editing && field.storageMode === "encrypted")',
+      "field.required",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Encrypted edit fields must allow a blank value/);
+  });
+
+  it("rejects encrypted edit fields without localized preserve-value guidance", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "parts.push(dictionary.encryptedFieldEditHint);",
+      "void dictionary.encryptedFieldEditHint;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Encrypted edit fields must expose the localized blank-preserves-current-value hint/);
+  });
+
+  it("rejects an incomplete encrypted edit hint dictionary", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/i18n.ts",
+      'encryptedFieldEditHint: "This field is encrypted. Leave it blank while editing to keep the current value.",',
+      'encryptedEditHint: "This field is encrypted. Leave it blank while editing to keep the current value.",',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Encrypted edit field guidance must exist in matching Chinese and English dictionaries/);
+  });
+
+  it("rejects status updates that can resubmit encrypted, hidden or non-writable values", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      '.filter((field) => field.source === "values" && !field.readOnly && field.sensitivity === "public" && field.storageMode !== "encrypted" && field.responseMode !== "omitted" && field.responseMode !== "privileged")',
+      '.filter((field) => field.source === "values" && field.storageMode !== "encrypted")',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Status updates must exclude encrypted, hidden and non-writable values/);
+  });
+
+  it("rejects status updates that bypass schema-aware filtering", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "inputFromRecord(record, schema.fields, { status: nextStatus })",
+      "inputFromRecord(record, [], { status: nextStatus })",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Status updates must use schema-aware record input filtering/);
+  });
+
+  it("rejects generic resource tables that render omitted fields", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      'schema.fields.filter((field) => field.inTable && field.responseMode !== "omitted")',
+      "schema.fields.filter((field) => field.inTable)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Generic resource tables must not render omitted response fields/);
+  });
+
+  it("rejects generic resource details that render omitted fields", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      'schema.fields.filter((field) => field.inDetail && field.responseMode !== "omitted")',
+      "schema.fields.filter((field) => field.inDetail)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Generic resource details must not render omitted response fields/);
+  });
+
+  it("rejects an incomplete TypeScript masking contract", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/api/client.ts",
+      "masking?: AdminResourceFieldMasking;",
+      "masking?: unknown;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /AdminResourceField must carry optional masking metadata/);
+  });
+
+  it("rejects TypeScript masking metadata that drops a supported strategy", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/api/client.ts",
+      'strategy: "partial-v1" | "phone-v1" | "email-v1" | "identity-cn-v1" | "address-cn-v1";',
+      'strategy: "partial-v1" | "phone-v1" | "email-v1" | "identity-cn-v1";',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Admin field masking metadata must expose every supported versioned strategy/);
+  });
+
   it("rejects resource modal fallback focus without current-visible-modal scoping", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(

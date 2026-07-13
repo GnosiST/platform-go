@@ -98,11 +98,27 @@ function validate() {
   if (policy.taskGraph !== "resources/platform-foundation-task-graph.json") {
     errors.push("policy.taskGraph must stay resources/platform-foundation-task-graph.json");
   }
-  for (const key of ["implementedTasksRequireCloseout", "neatFreakRequired", "cleanupEvidenceRequired", "unfinishedTasksMustNotHaveCloseout"]) {
+  for (const key of ["implementedTasksRequireCloseout", "cleanupEvidenceRequired", "unfinishedTasksMustNotHaveCloseout"]) {
     if (policy[key] !== true) {
       errors.push(`policy.${key} must stay true`);
     }
   }
+  if (policy.neatFreakRequired !== false) {
+    errors.push("policy.neatFreakRequired must stay false");
+  }
+  const neatFreakInvocationPolicy = policy.neatFreakInvocationPolicy ?? {};
+  requireIncludes(
+    neatFreakInvocationPolicy.requiredFor,
+    ["phase-closeout", "major-cross-module-task", "release-preparation"],
+    "policy.neatFreakInvocationPolicy.requiredFor",
+    errors,
+  );
+  requireIncludes(
+    neatFreakInvocationPolicy.notRequiredFor,
+    ["small-node", "routine-sub-agent-task"],
+    "policy.neatFreakInvocationPolicy.notRequiredFor",
+    errors,
+  );
 
   const requiredDimensions = ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"];
   requireIncludes(policy.requiredDimensions, requiredDimensions, "policy.requiredDimensions", errors);
@@ -139,8 +155,11 @@ function validate() {
     if (closeout.status !== "closed") {
       errors.push(`${prefix}.status must be closed`);
     }
-    if (policy.neatFreakRequired === true && closeout.neatFreak !== true) {
-      errors.push(`${prefix}.neatFreak must stay true`);
+    if (typeof closeout.neatFreak !== "boolean") {
+      errors.push(`${prefix}.neatFreak must be a boolean`);
+    }
+    if (closeout.neatFreak === false && closeout.cleanupMode !== "focused") {
+      errors.push(`${prefix}.cleanupMode must be focused when neat-freak was not invoked`);
     }
     if (policy.cleanupEvidenceRequired === true && values(closeout.cleanupEvidence).length === 0) {
       errors.push(`${prefix}.cleanupEvidence must not be empty`);

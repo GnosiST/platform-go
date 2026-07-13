@@ -267,9 +267,21 @@ function validateCapabilityPolicy(audit, capabilityContracts, engineering, produ
 
 function validateCloseoutPolicy(audit, errors) {
   const policy = audit.closeoutPolicy ?? {};
-  if (policy.neatFreakRequiredForNodeCloseout !== true) {
-    errors.push("closeoutPolicy.neatFreakRequiredForNodeCloseout must stay true");
+  if (policy.neatFreakRequiredForEveryNodeCloseout !== false) {
+    errors.push("closeoutPolicy.neatFreakRequiredForEveryNodeCloseout must stay false");
   }
+  requireIncludes(
+    policy.neatFreakInvocationPolicy?.requiredFor,
+    ["phase-closeout", "major-cross-module-task", "release-preparation"],
+    "closeoutPolicy.neatFreakInvocationPolicy.requiredFor",
+    errors,
+  );
+  requireIncludes(
+    policy.neatFreakInvocationPolicy?.notRequiredFor,
+    ["small-node", "routine-sub-agent-task"],
+    "closeoutPolicy.neatFreakInvocationPolicy.notRequiredFor",
+    errors,
+  );
   if (policy.knowledgeCleanupBeforeNodeCloseout !== true) {
     errors.push("closeoutPolicy.knowledgeCleanupBeforeNodeCloseout must stay true");
   }

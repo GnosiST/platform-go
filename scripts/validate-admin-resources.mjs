@@ -26,6 +26,7 @@ const allowedFieldStorageModes = new Set(["plain", "masked", "hashed", "encrypte
 const allowedFieldProjectionModes = new Set(["full", "masked", "privileged", "omitted"]);
 const allowedFieldProtectionFormats = new Set(["aes-256-gcm-v1"]);
 const allowedFieldProtectionNormalizations = new Set(["raw-v1", "trim-v1", "email-v1", "phone-e164-cn-v1", "identity-cn-v1"]);
+const allowedFieldMaskingStrategies = new Set(["partial-v1", "phone-v1", "email-v1", "identity-cn-v1", "address-cn-v1"]);
 const allowedResourceProtectionScopes = new Set(["global", "tenant-field"]);
 const recordFieldKeys = new Set(["id", "code", "name", "status", "description", "updatedAt"]);
 const permissionPattern = /^admin:[a-z0-9-]+:[a-z0-9-]+$/;
@@ -51,6 +52,32 @@ function optionValue(name) {
     return "";
   }
   return process.argv[index + 1] ?? "";
+}
+
+function validateFieldMasking(prefix, field, errors) {
+  const masking = field.masking ?? {};
+  const strategy = String(masking.strategy ?? "").trim();
+  if (!allowedFieldMaskingStrategies.has(strategy)) {
+    errors.push(`${prefix} field ${field.key} masking strategy ${strategy || "<missing>"} is unsupported`);
+  }
+  const replacement = String(masking.replacement ?? "*");
+  if (Array.from(replacement).length !== 1) {
+    errors.push(`${prefix} field ${field.key} masking replacement must be one rune`);
+  } else if (!/^[\p{L}\p{N}\p{P}\p{S}]$/u.test(replacement)) {
+    errors.push(`${prefix} field ${field.key} masking replacement must be visible`);
+  }
+  for (const key of ["preservePrefix", "preserveSuffix", "maskLength"]) {
+    const value = masking[key] ?? 0;
+    if (!Number.isInteger(value) || value < 0 || value > 64) {
+      errors.push(`${prefix} field ${field.key} masking ${key} must be an integer between zero and 64`);
+    }
+  }
+  if (strategy === "partial-v1" && !(Number.isInteger(masking.maskLength) && masking.maskLength >= 1 && masking.maskLength <= 64)) {
+    errors.push(`${prefix} field ${field.key} partial-v1 masking requires maskLength between one and 64`);
+  }
+  if (strategy !== "partial-v1" && [masking.preservePrefix ?? 0, masking.preserveSuffix ?? 0, masking.maskLength ?? 0].some((value) => value !== 0)) {
+    errors.push(`${prefix} field ${field.key} preset masking strategy does not accept custom counts`);
+  }
 }
 
 function assertUnique(values, label) {
@@ -401,8 +428,12 @@ function validateManifest() {
       if (storageMode === "hashed" && (responseMode !== "omitted" || exportMode !== "omitted")) {
         errors.push(`${prefix} field ${field.key} hashed storage must be omitted from response and export`);
       }
-      if (storageMode === "encrypted" && (!["privileged", "omitted"].includes(responseMode) || !["privileged", "omitted"].includes(exportMode))) {
-        errors.push(`${prefix} field ${field.key} encrypted storage must use privileged or omitted response and export`);
+      const maskedProjection = responseMode === "masked" || exportMode === "masked";
+      if (maskedProjection && !["masked", "encrypted"].includes(storageMode)) {
+        errors.push(`${prefix} field ${field.key} masked projection requires masked or encrypted storage`);
+      }
+      if (storageMode === "encrypted" && (!["masked", "privileged", "omitted"].includes(responseMode) || !["masked", "privileged", "omitted"].includes(exportMode))) {
+        errors.push(`${prefix} field ${field.key} encrypted storage must use masked, privileged or omitted response and export`);
       }
       if (storageMode !== "encrypted" && field.protection) {
         errors.push(`${prefix} field ${field.key} protection metadata requires encrypted storage`);
@@ -490,6 +521,18 @@ function validateManifest() {
         if (relation.rootValue != null && typeof relation.rootValue !== "string") {
           errors.push(`${prefix} field ${field.key} relation.rootValue must be a string`);
         }
+      }
+      if (!field.masking && storageMode === "encrypted" && maskedProjection) {
+        errors.push(`${prefix} field ${field.key} encrypted masked projection requires masking metadata`);
+      }
+      if (field.masking) {
+        if (storageMode !== "encrypted") {
+          errors.push(`${prefix} field ${field.key} masking metadata requires encrypted storage`);
+        }
+        if (!maskedProjection) {
+          errors.push(`${prefix} field ${field.key} masking metadata requires a masked response or export`);
+        }
+        validateFieldMasking(prefix, field, errors);
       }
       const validation = field.validation;
       if (validation) {

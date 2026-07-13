@@ -1021,15 +1021,10 @@ func (s *Server) adminResourceQuery(ctx *gin.Context) {
 		writeAdminResourceError(ctx, err)
 		return
 	}
-	items, err := s.projectAdminResourceRecords(resource, result.Items, adminresource.ProjectionResponse)
-	if err != nil {
-		writeAdminResourceError(ctx, err)
-		return
-	}
 	ctx.JSON(http.StatusOK, Response[adminResourceQueryResponse]{
 		Data: adminResourceQueryResponse{
 			Resource: result.Resource,
-			Items:    items,
+			Items:    result.Items,
 			Total:    result.Total,
 			Page:     result.Page,
 			PageSize: result.PageSize,
@@ -1071,13 +1066,8 @@ func (s *Server) adminResourceCreate(ctx *gin.Context) {
 	}
 	record := mutation.Record
 	s.invalidateCachesForResource(ctx.Request.Context(), resource)
-	projected, err := s.resources.ProjectRecord(resource, record, adminresource.ProjectionResponse)
-	if err != nil {
-		writeAdminResourceError(ctx, err)
-		return
-	}
 	ctx.JSON(http.StatusCreated, Response[adminResourceRecordResponse]{
-		Data: adminResourceRecordResponse{Resource: resource, Record: projected},
+		Data: adminResourceRecordResponse{Resource: resource, Record: record},
 	})
 }
 
@@ -1116,13 +1106,8 @@ func (s *Server) adminResourceUpdate(ctx *gin.Context) {
 	}
 	record := mutation.Record
 	s.invalidateCachesForResource(ctx.Request.Context(), resource)
-	projected, err := s.resources.ProjectRecord(resource, record, adminresource.ProjectionResponse)
-	if err != nil {
-		writeAdminResourceError(ctx, err)
-		return
-	}
 	ctx.JSON(http.StatusOK, Response[adminResourceRecordResponse]{
-		Data: adminResourceRecordResponse{Resource: resource, Record: projected},
+		Data: adminResourceRecordResponse{Resource: resource, Record: record},
 	})
 }
 
@@ -1274,31 +1259,13 @@ func (s *Server) adminPolicyReviewExport(ctx *gin.Context) {
 		return
 	}
 	s.invalidateCachesForResource(ctx.Request.Context(), "audit-logs")
-	reviews := make([]adminresource.Record, 0, len(result.Reviews))
-	for _, review := range result.Reviews {
-		projected, projectErr := s.resources.ProjectRecord("policy-reviews", review, adminresource.ProjectionExport)
-		if projectErr != nil {
-			writeAdminResourceError(ctx, projectErr)
-			return
-		}
-		reviews = append(reviews, projected)
-	}
-	audits := make([]adminresource.Record, 0, len(result.Audits))
-	for _, audit := range result.Audits {
-		projected, projectErr := s.resources.ProjectRecord("audit-logs", audit, adminresource.ProjectionExport)
-		if projectErr != nil {
-			writeAdminResourceError(ctx, projectErr)
-			return
-		}
-		audits = append(audits, projected)
-	}
 	ctx.JSON(http.StatusOK, Response[policyReviewExportResponse]{
 		Data: policyReviewExportResponse{
 			ExportedBy: result.ExportedBy,
 			ExportedAt: result.ExportedAt,
 			Watermark:  result.Watermark,
-			Reviews:    reviews,
-			Audits:     audits,
+			Reviews:    result.Reviews,
+			Audits:     result.Audits,
 		},
 	})
 }

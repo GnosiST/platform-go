@@ -86,18 +86,20 @@ describe("validate-platform-engineering-capabilities", () => {
     const capabilities = matrix.capabilities.filter((item) => completionProgramCapabilityIDs.includes(item.id));
 
     assert.deepEqual(capabilities.map((item) => item.id), completionProgramCapabilityIDs);
-    for (const capability of capabilities.slice(0, 3)) {
+    for (const capability of capabilities.slice(0, 4)) {
       assert.equal(capability.status, "implemented");
       assert.ok(capability.evidence.sourcePaths.length > 0);
       assert.ok(capability.evidence.tests.length > 0);
       assert.ok(capability.evidence.validators.length > 0);
     }
-    assert.ok(capabilities.slice(3).every((item) => item.status === "partial"));
+    assert.ok(capabilities.slice(4).every((item) => item.status === "partial"));
 
     for (const [index, capabilityID] of newlyGovernedCapabilityIDs.entries()) {
       const capability = capabilities.find((item) => item.id === capabilityID);
       assert.deepEqual(capability.dependsOn, [newlyGovernedCapabilityDependencies[index]]);
-      assert.deepEqual(capability.evidence.sourcePaths, newlyGovernedCapabilityDocs);
+      if (capabilityID !== "mask-strategy-runtime") {
+        assert.deepEqual(capability.evidence.sourcePaths, newlyGovernedCapabilityDocs);
+      }
       assert.deepEqual(capability.evidence.taskIds, [capabilityID]);
     }
 
@@ -126,6 +128,16 @@ describe("validate-platform-engineering-capabilities", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /required implemented capability runtime-security-containment must stay implemented/);
+  });
+
+  it("rejects regressing mask strategy runtime to partial after closeout", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities.find((item) => item.id === "mask-strategy-runtime").status = "partial";
+
+    const result = runValidator(["--matrix", tempJSON("partial-mask-strategy-runtime.json", matrix)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /required implemented capability mask-strategy-runtime must stay implemented/);
   });
 
   it("keeps sensitive data migration evidence implemented after closeout", () => {

@@ -51,13 +51,19 @@ function writeSensitiveManifest() {
           source: "values",
           sensitivity: "sensitive",
           storageMode: "encrypted",
-          responseMode: "privileged",
-          exportMode: "omitted",
+          responseMode: "masked",
+          exportMode: "masked",
           filter: true,
           protection: {
             format: "aes-256-gcm-v1",
             normalization: "trim-v1",
             blindIndexNamespace: "custom-government-reference",
+          },
+          masking: {
+            strategy: "partial-v1",
+            preservePrefix: 2,
+            preserveSuffix: 2,
+            maskLength: 6,
           },
         },
       ],
@@ -193,11 +199,18 @@ describe("admin resource contract generators", () => {
       normalization: "trim-v1",
       blindIndexNamespace: "custom-government-reference",
     });
+    assert.deepEqual(field.masking, {
+      strategy: "partial-v1",
+      preservePrefix: 2,
+      preserveSuffix: 2,
+      maskLength: 6,
+    });
 
     const openapi = runAdminOpenAPIForContract(contract);
     const recordSchema = openapi.components.schemas.CustomSensitiveRecordsRecord;
     assert.deepEqual(recordSchema["x-platform-protection"], resource.schema.protection);
     assert.deepEqual(recordSchema.properties.governmentReference["x-platform-protection"], field.protection);
+    assert.deepEqual(recordSchema.properties.governmentReference["x-platform-masking"], field.masking);
     assert.deepEqual(recordSchema.properties.governmentReference["x-platform-query-operators"], ["="]);
 
     const preview = runAdminCodegenPreviewForContract(contract);
@@ -207,8 +220,10 @@ describe("admin resource contract generators", () => {
 
     const clientSource = fs.readFileSync(path.resolve(import.meta.dirname, "..", "admin", "src", "platform", "api", "client.ts"), "utf8");
     assert.match(clientSource, /export type AdminResourceFieldProtection/);
+    assert.match(clientSource, /export type AdminResourceFieldMasking/);
     assert.match(clientSource, /export type AdminResourceProtection/);
     assert.match(clientSource, /protection\?: AdminResourceFieldProtection/);
+    assert.match(clientSource, /masking\?: AdminResourceFieldMasking/);
     assert.match(clientSource, /protection\?: AdminResourceProtection/);
   });
 

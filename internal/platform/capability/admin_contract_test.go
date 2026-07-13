@@ -260,7 +260,7 @@ func TestValidateAdminSurfaceValidatesFieldSecurityPolicies(t *testing.T) {
 		{name: "encrypted full response", field: AdminField{
 			Sensitivity: FieldSensitivitySensitive, StorageMode: FieldStorageEncrypted, ResponseMode: FieldProjectionFull, ExportMode: FieldProjectionOmitted,
 			Protection: &AdminFieldProtection{Format: "aes-256-gcm-v1", Normalization: "raw-v1"},
-		}, wantErr: "must use privileged or omitted response and export"},
+		}, wantErr: "must use masked, privileged or omitted response and export"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -335,6 +335,68 @@ func TestValidateAdminSurfaceAcceptsCustomSensitiveEncryptedFieldProtection(t *t
 
 	if err := ValidateAdminSurface([]Manifest{{ID: "custom", Admin: AdminSurface{Resources: []AdminResource{resource}}}}); err != nil {
 		t.Fatalf("ValidateAdminSurface() error = %v", err)
+	}
+}
+
+func TestValidateAdminSurfaceAcceptsArbitraryEncryptedMaskedField(t *testing.T) {
+	resource := validAdminResource("custom-records", "/custom-records", "admin:custom-record")
+	resource.Protection = &AdminResourceProtection{SchemaVersion: 1, Scope: "global"}
+	resource.Fields = []AdminField{{
+		Key: "arbitraryPrivateValue", Label: Text("任意敏感字段", "Arbitrary Sensitive Field"), Type: "text", Source: "values",
+		Sensitivity: FieldSensitivitySensitive, StorageMode: FieldStorageEncrypted,
+		ResponseMode: FieldProjectionMasked, ExportMode: FieldProjectionMasked,
+		Protection: &AdminFieldProtection{Format: "aes-256-gcm-v1", Normalization: "trim-v1"},
+		Masking:    &AdminFieldMasking{Strategy: "partial-v1", PreservePrefix: 2, PreserveSuffix: 2, MaskLength: 6},
+	}}
+
+	if err := ValidateAdminSurface([]Manifest{{ID: "custom", Admin: AdminSurface{Resources: []AdminResource{resource}}}}); err != nil {
+		t.Fatalf("ValidateAdminSurface() error = %v", err)
+	}
+}
+
+func TestValidateAdminSurfaceRejectsInvalidMaskingPolicies(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*AdminField)
+		wantErr string
+	}{
+		{name: "missing masking", mutate: func(field *AdminField) { field.Masking = nil }, wantErr: "encrypted masked projection requires masking metadata"},
+		{name: "unknown strategy", mutate: func(field *AdminField) { field.Masking.Strategy = "phone" }, wantErr: "masking strategy is unsupported"},
+		{name: "invalid partial length", mutate: func(field *AdminField) { field.Masking.MaskLength = 0 }, wantErr: "partial-v1 masking requires maskLength"},
+		{name: "masking without masked projection", mutate: func(field *AdminField) {
+			field.ResponseMode = FieldProjectionPrivileged
+			field.ExportMode = FieldProjectionOmitted
+		}, wantErr: "masking metadata requires a masked response or export"},
+		{name: "masking on masked storage", mutate: func(field *AdminField) {
+			field.StorageMode = FieldStorageMasked
+			field.Sensitivity = FieldSensitivityPersonal
+			field.Protection = nil
+		}, wantErr: "masking metadata requires encrypted storage"},
+		{name: "plain masked projection", mutate: func(field *AdminField) {
+			field.StorageMode = FieldStoragePlain
+			field.Sensitivity = FieldSensitivityPublic
+			field.Protection = nil
+			field.Masking = nil
+		}, wantErr: "masked projection requires masked or encrypted storage"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resource := validAdminResource("custom-records", "/custom-records", "admin:custom-record")
+			resource.Protection = &AdminResourceProtection{SchemaVersion: 1, Scope: "global"}
+			resource.Fields = []AdminField{{
+				Key: "arbitraryPrivateValue", Label: Text("任意敏感字段", "Arbitrary Sensitive Field"), Type: "text", Source: "values",
+				Sensitivity: FieldSensitivitySensitive, StorageMode: FieldStorageEncrypted,
+				ResponseMode: FieldProjectionMasked, ExportMode: FieldProjectionMasked,
+				Protection: &AdminFieldProtection{Format: "aes-256-gcm-v1", Normalization: "trim-v1"},
+				Masking:    &AdminFieldMasking{Strategy: "partial-v1", PreservePrefix: 2, PreserveSuffix: 2, MaskLength: 6},
+			}}
+			tt.mutate(&resource.Fields[0])
+			err := ValidateAdminSurface([]Manifest{{ID: "custom", Admin: AdminSurface{Resources: []AdminResource{resource}}}})
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("ValidateAdminSurface() error = %v, want %q", err, tt.wantErr)
+			}
+		})
 	}
 }
 

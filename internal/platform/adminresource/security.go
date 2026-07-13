@@ -7,6 +7,7 @@ import (
 
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/dataprotection"
+	"platform-go/internal/platform/masking"
 )
 
 type WriteOrigin string
@@ -155,12 +156,39 @@ func validateFieldWrite(key string, value string, field FieldDefinition, origin 
 		(field.ResponseMode != capability.FieldProjectionOmitted || field.ExportMode != capability.FieldProjectionOmitted) {
 		return invalidSecurityField(key, "hashed storage must be omitted from response and export")
 	}
+	if (field.ResponseMode == capability.FieldProjectionMasked || field.ExportMode == capability.FieldProjectionMasked) &&
+		field.StorageMode != capability.FieldStorageMasked && field.StorageMode != capability.FieldStorageEncrypted {
+		return invalidSecurityField(key, "masked projection requires masked or encrypted storage")
+	}
 	if field.StorageMode == capability.FieldStorageEncrypted &&
 		(!allowsEncryptedProjection(field.ResponseMode) || !allowsEncryptedProjection(field.ExportMode)) {
-		return invalidSecurityField(key, "encrypted storage must use privileged or omitted response and export")
+		return invalidSecurityField(key, "encrypted storage must use masked, privileged or omitted response and export")
 	}
 	if err := validateFieldProtection(key, field); err != nil {
 		return err
+	}
+	if err := validateFieldMasking(key, field); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateFieldMasking(key string, field FieldDefinition) error {
+	maskedProjection := field.ResponseMode == capability.FieldProjectionMasked || field.ExportMode == capability.FieldProjectionMasked
+	if field.Masking == nil {
+		if field.StorageMode == capability.FieldStorageEncrypted && maskedProjection {
+			return invalidSecurityField(key, "encrypted masked projection requires masking metadata")
+		}
+		return nil
+	}
+	if field.StorageMode != capability.FieldStorageEncrypted {
+		return invalidSecurityField(key, "masking metadata requires encrypted storage")
+	}
+	if !maskedProjection {
+		return invalidSecurityField(key, "masking metadata requires a masked response or export")
+	}
+	if err := masking.NewRuntime().Validate(maskingPolicy(field)); err != nil {
+		return invalidSecurityField(key, err.Error())
 	}
 	return nil
 }
@@ -222,7 +250,7 @@ func allowsMaskedProjection(mode string) bool {
 }
 
 func allowsEncryptedProjection(mode string) bool {
-	return mode == capability.FieldProjectionPrivileged || mode == capability.FieldProjectionOmitted
+	return mode == capability.FieldProjectionMasked || mode == capability.FieldProjectionPrivileged || mode == capability.FieldProjectionOmitted
 }
 
 func (s *Store) validateSnapshot(snapshot ResourceSnapshot) error {
@@ -321,10 +349,10 @@ func (s *Store) projectRecordLocked(resource string, record Record, purpose Proj
 	if !ok {
 		return Record{}, ErrUnknownResource
 	}
-	return projectRecordWithSchema(schema, record, purpose)
+	return projectRecordWithSchema(context.Background(), schema, resource, record, purpose, s.protection, s.masking)
 }
 
-func projectRecordWithSchema(schema Schema, record Record, purpose ProjectionPurpose) (Record, error) {
+func projectRecordWithSchema(ctx context.Context, schema Schema, resource string, record Record, purpose ProjectionPurpose, protection dataprotection.Runtime, maskingRuntime masking.Runtime) (Record, error) {
 	projected := Record{ID: record.ID}
 	projected.Values = map[string]string{}
 	for _, rawField := range schema.Fields {
@@ -338,7 +366,11 @@ func projectRecordWithSchema(schema Schema, record Record, purpose ProjectionPur
 		}
 		if field.Source == "values" {
 			if value, exists := record.Values[field.Key]; exists {
-				projected.Values[field.Key] = value
+				projectedValue, projectErr := projectStoredValue(ctx, schema, resource, record, field, mode, value, protection, maskingRuntime)
+				if projectErr != nil {
+					return Record{}, projectErr
+				}
+				projected.Values[field.Key] = projectedValue
 			}
 			continue
 		}
@@ -352,6 +384,41 @@ func projectRecordWithSchema(schema Schema, record Record, purpose ProjectionPur
 	return projected, nil
 }
 
+func projectStoredValue(ctx context.Context, schema Schema, resource string, record Record, field FieldDefinition, mode string, value string, protection dataprotection.Runtime, maskingRuntime masking.Runtime) (string, error) {
+	if mode != capability.FieldProjectionMasked || field.StorageMode == capability.FieldStorageMasked {
+		return value, nil
+	}
+	if field.StorageMode != capability.FieldStorageEncrypted || field.Masking == nil {
+		return "", invalidSecurityField(field.Key, "masked projection is not configured")
+	}
+	if protection == nil || maskingRuntime == nil || !dataprotection.IsEnvelope(value) {
+		return "", invalidSecurityField(field.Key, "masked projection runtime is unavailable")
+	}
+	policy, fieldContext, err := protectedPolicyAndContext(schema, resource, record, field)
+	if err != nil {
+		return "", err
+	}
+	plaintext, err := protection.Reveal(ctx, value, policy, fieldContext)
+	if err != nil {
+		return "", invalidSecurityField(field.Key, "masked projection decryption failed")
+	}
+	masked, err := maskingRuntime.Mask(ctx, maskingPolicy(field), plaintext)
+	if err != nil {
+		return "", invalidSecurityField(field.Key, "masked projection failed")
+	}
+	return masked, nil
+}
+
+func maskingPolicy(field FieldDefinition) masking.Policy {
+	if field.Masking == nil {
+		return masking.Policy{}
+	}
+	return masking.Policy{
+		Strategy: field.Masking.Strategy, PreservePrefix: field.Masking.PreservePrefix, PreserveSuffix: field.Masking.PreserveSuffix,
+		MaskLength: field.Masking.MaskLength, Replacement: field.Masking.Replacement,
+	}
+}
+
 func (s *Store) ProjectRecordPrivileged(ctx context.Context, resource string, record Record, purpose ProjectionPurpose, authorizer ProtectedFieldAuthorizer) (Record, error) {
 	s.mu.Lock()
 	schema, ok := s.schemas[resource]
@@ -363,7 +430,7 @@ func (s *Store) ProjectRecordPrivileged(ctx context.Context, resource string, re
 	if authorizer == nil {
 		return Record{}, fmt.Errorf("%w: protected field authorizer is required", ErrInvalidRecord)
 	}
-	projected, err := projectRecordWithSchema(schema, record, purpose)
+	projected, err := projectRecordWithSchema(ctx, schema, resource, record, purpose, runtime, s.masking)
 	if err != nil {
 		return Record{}, err
 	}
@@ -434,7 +501,7 @@ func (s *Store) protectRecordForStorage(ctx context.Context, resource string, re
 			continue
 		}
 		value, submitted := record.Values[field.Key]
-		if !submitted && existing != nil {
+		if existing != nil && (!submitted || strings.TrimSpace(value) == "") {
 			if envelope, exists := existing.Values[field.Key]; exists {
 				record.Values[field.Key] = envelope
 			}

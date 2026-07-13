@@ -65,10 +65,10 @@
     "runtime-security-containment",
     "admin-watermark-export-governance",
     "sensitive-data-protection-runtime",
-    "sensitive-data-historical-migration"
+    "sensitive-data-historical-migration",
+    "mask-strategy-runtime"
   ],
   "requiredFutureTaskNodes": [
-    "mask-strategy-runtime",
     "sensitive-data-reveal-step-up",
     "data-lifecycle-retention",
     "multi-datasource-contract-and-runtime",
