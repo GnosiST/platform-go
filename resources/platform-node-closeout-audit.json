@@ -954,6 +954,7 @@
         "resources/platform-objective-conformance.json",
         "resources/platform-task-execution-audit.json",
         "resources/platform-engineering-capabilities.json",
+        "resources/platform-sensitive-data-migration-source-lock.json",
         "scripts/validate-platform-sensitive-data-migration.mjs",
         "scripts/platform-sensitive-data-migration.test.mjs",
         "scripts/platform-foundation-docs-drift.test.mjs"

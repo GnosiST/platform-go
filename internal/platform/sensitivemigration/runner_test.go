@@ -91,27 +91,26 @@ func TestInventoryTraversesTenantScopesInBoundedBatchesWithDeterministicCounts(t
 		{Resource: "zeta-resources", Scope: "global", SchemaVersion: 1, Fields: []FieldPlan{{Key: "secretValue", Policy: policy}}},
 		{Resource: "alpha-resources", Scope: "tenant-field", TenantField: "tenantCode", SchemaVersion: 1, Fields: []FieldPlan{{Key: "secretValue", Policy: policy}}},
 	}}
-	row := func(resource string, recordID string, value string) Row {
+	row := func(resource string, tenantID string, recordID string, value string) Row {
 		encoded, err := json.Marshal(map[string]string{"secretValue": value})
 		if err != nil {
 			t.Fatal(err)
 		}
-		return Row{Resource: resource, RecordID: recordID, ValuesJSON: string(encoded)}
+		return Row{Resource: resource, TenantID: tenantID, RecordID: recordID, ValuesJSON: string(encoded)}
 	}
 	store := newMemoryReadStore(map[string]map[string][]Row{
 		"alpha-resources": {
-			"tenant-b": {row("alpha-resources", "b-1", fixturePlaintext)},
+			"tenant-b": {row("alpha-resources", "tenant-b", "b-1", fixturePlaintext)},
 			"tenant-a": {
-				row("alpha-resources", "a-1", fixturePlaintext),
-				row("alpha-resources", "a-2", ""),
-				row("alpha-resources", "a-3", fixturePlaintext),
+				row("alpha-resources", "tenant-a", "a-1", fixturePlaintext),
+				row("alpha-resources", "tenant-a", "a-2", ""),
+				row("alpha-resources", "tenant-a", "a-3", fixturePlaintext),
 			},
 		},
 		"zeta-resources": {
-			dataprotection.GlobalTenantID: {row("zeta-resources", "g-1", fixturePlaintext)},
+			dataprotection.GlobalTenantID: {row("zeta-resources", dataprotection.GlobalTenantID, "g-1", fixturePlaintext)},
 		},
 	})
-	store.scopeOrder["alpha-resources"] = []string{"tenant-b", "tenant-a"}
 
 	report, err := NewRunner(plan, migrationTestRuntime(t), store).Run(context.Background(), Options{Mode: ModeInventory, BatchSize: 2})
 	if err != nil {
@@ -123,8 +122,8 @@ func TestInventoryTraversesTenantScopesInBoundedBatchesWithDeterministicCounts(t
 	if report.Counts != (Counts{Missing: 1, Plaintext: 4}) {
 		t.Fatalf("Run() counts = %+v, want deterministic aggregate counts", report.Counts)
 	}
-	if report.Checkpoints != 4 {
-		t.Fatalf("Run() checkpoints = %d, want 4 completed batches", report.Checkpoints)
+	if report.Checkpoints != 3 {
+		t.Fatalf("Run() checkpoints = %d, want 3 completed batches", report.Checkpoints)
 	}
 	for _, call := range store.rowCalls {
 		if call.limit != 2 {
@@ -132,8 +131,8 @@ func TestInventoryTraversesTenantScopesInBoundedBatchesWithDeterministicCounts(t
 		}
 	}
 	wantFirstCalls := []readCall{
-		{resource: "alpha-resources", tenant: "tenant-a", after: "", limit: 2},
-		{resource: "alpha-resources", tenant: "tenant-a", after: "a-2", limit: 2},
+		{resource: "alpha-resources", after: "", limit: 2},
+		{resource: "alpha-resources", after: "a-2", limit: 2},
 	}
 	if len(store.rowCalls) < len(wantFirstCalls) || !reflect.DeepEqual(store.rowCalls[:len(wantFirstCalls)], wantFirstCalls) {
 		t.Fatalf("Rows() first calls = %+v, want %+v", store.rowCalls, wantFirstCalls)
@@ -143,7 +142,7 @@ func TestInventoryTraversesTenantScopesInBoundedBatchesWithDeterministicCounts(t
 func TestInventoryContinuesAfterShortPagesUntilEmpty(t *testing.T) {
 	policy := dataprotection.FieldPolicy{Format: dataprotection.FormatAES256GCMV1, Normalization: dataprotection.NormalizationRawV1}
 	row := func(recordID string) Row {
-		return Row{Resource: "fixture-resources", RecordID: recordID, ValuesJSON: `{"secretValue":"` + fixturePlaintext + `"}`}
+		return Row{Resource: "fixture-resources", TenantID: dataprotection.GlobalTenantID, RecordID: recordID, ValuesJSON: `{"secretValue":"` + fixturePlaintext + `"}`}
 	}
 	store := &scriptedReadStore{pages: [][]Row{{row("record-1")}, {row("record-2")}, {}}}
 	plan := Plan{Resources: []ResourcePlan{{
@@ -310,8 +309,8 @@ func TestInventoryRequiresReadyRuntimeBeforePlaintextTraversal(t *testing.T) {
 			if !errors.Is(err, ErrReadFailed) {
 				t.Fatalf("Run() error = %v, want ErrReadFailed", err)
 			}
-			if report.Status != StatusFailed || report.Counts != (Counts{}) || store.scopeCalls != 0 {
-				t.Fatalf("Run() report = %+v scope calls = %d, want readiness failure before reads", report, store.scopeCalls)
+			if report.Status != StatusFailed || report.Counts != (Counts{}) || len(store.rowCalls) != 0 {
+				t.Fatalf("Run() report = %+v row calls = %d, want readiness failure before reads", report, len(store.rowCalls))
 			}
 		})
 	}
@@ -332,8 +331,8 @@ func TestInventoryRejectsGenericTypedNilDependenciesBeforeDispatch(t *testing.T)
 		var runtime *typedNilReadyRuntime
 		store := newMemoryReadStore(nil)
 		report, err := NewRunner(plan, runtime, store).Run(context.Background(), Options{Mode: ModeInventory})
-		if !errors.Is(err, ErrReadFailed) || report.Status != StatusFailed || store.scopeCalls != 0 {
-			t.Fatalf("Run() report = %+v error = %v scope calls = %d, want failure before runtime/store dispatch", report, err, store.scopeCalls)
+		if !errors.Is(err, ErrReadFailed) || report.Status != StatusFailed || len(store.rowCalls) != 0 {
+			t.Fatalf("Run() report = %+v error = %v row calls = %d, want failure before runtime/store dispatch", report, err, len(store.rowCalls))
 		}
 	})
 }
@@ -349,14 +348,14 @@ func TestRunnerRejectsNilContextBeforeRuntimeReadiness(t *testing.T) {
 	}
 }
 
-func TestInventoryRejectsCancellationReturnedWithEmptyTenantScopes(t *testing.T) {
+func TestInventoryRejectsCancellationReturnedWithEmptyRows(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	store := &cancelingScopeStore{cancel: cancel}
+	store := &cancelingReadStore{cancel: cancel}
 	plan := Plan{Resources: []ResourcePlan{{Resource: "fixture-resources", Scope: "global", SchemaVersion: 1}}}
 
 	report, err := NewRunner(plan, migrationTestRuntime(t), store).Run(ctx, Options{Mode: ModeInventory})
 	if !errors.Is(err, ErrReadFailed) || report.Status != StatusFailed || report.Counts != (Counts{}) {
-		t.Fatalf("Run() report = %+v error = %v, want canceled scope read failure", report, err)
+		t.Fatalf("Run() report = %+v error = %v, want canceled row read failure", report, err)
 	}
 }
 
@@ -408,15 +407,8 @@ func TestSanitizedRunnerErrorsAndReportsContainNoStoredValuesOrCoordinates(t *te
 		store *memoryReadStore
 	}{
 		{
-			name:  "tenant scope failure",
-			store: &memoryReadStore{tenantErr: errors.New("read failed: " + fixturePlaintext + " " + fixtureTenant + " " + fixtureRecord + " pgo:enc:v1:fixture")},
-		},
-		{
-			name: "row failure",
-			store: &memoryReadStore{
-				scopeOrder: map[string][]string{"fixture-resources": {fixtureTenant}},
-				rowsErr:    errors.New("read failed: " + fixturePlaintext + " " + fixtureTenant + " " + fixtureRecord + " pgo:enc:v1:fixture"),
-			},
+			name:  "row failure",
+			store: &memoryReadStore{rowsErr: errors.New("read failed: " + fixturePlaintext + " " + fixtureTenant + " " + fixtureRecord + " pgo:enc:v1:fixture")},
 		},
 		{
 			name: "malformed values json",
@@ -604,14 +596,16 @@ func TestApplyResumeAndVerifyUsePersistedCheckpointAndNeverReveal(t *testing.T) 
 		{Resource: "customer-records", RecordID: "record-2", ValuesJSON: `{"displayName":"also-kept","secretNote":` + mustJSON(t, target) + `}`},
 	})
 	store.interruptAfterFirstCommit = true
+	ordered := []string{"record-1", "record-2"}
+	sort.Slice(ordered, func(left, right int) bool { return RecordCursor(ordered[left]) < RecordCursor(ordered[right]) })
 	runner := NewRunner(plan, runtime, store)
 	request := approvedMigrationRequest("run-resume")
 
 	if _, err := runner.Run(ctx, Options{Mode: ModeApply, BatchSize: 1, Request: request}); !errors.Is(err, ErrMutationFailed) {
 		t.Fatalf("first Run(apply) error = %v, want ErrMutationFailed", err)
 	}
-	if got := store.checkpoint.LastRecordID; got != "record-1" {
-		t.Fatalf("persisted cursor after interrupted apply = %q, want record-1", got)
+	if got := store.checkpoint.LastRecordID; got != ordered[0] {
+		t.Fatalf("persisted cursor after interrupted apply = %q, want %q", got, ordered[0])
 	}
 
 	applyReport, err := runner.Run(ctx, Options{Mode: ModeApply, BatchSize: 1, Request: request})
@@ -627,7 +621,13 @@ func TestApplyResumeAndVerifyUsePersistedCheckpointAndNeverReveal(t *testing.T) 
 	if runtime.protectCalls != 2 || runtime.revealCalls != 0 {
 		t.Fatalf("runtime calls protect=%d reveal=%d, want target+escrow protection and no reveal", runtime.protectCalls, runtime.revealCalls)
 	}
-	if !strings.Contains(store.rows[0].ValuesJSON, `"displayName":"kept"`) || strings.Contains(store.rows[0].ValuesJSON, "plain-one") {
+	var recordOne Row
+	for _, row := range store.rows {
+		if row.RecordID == "record-1" {
+			recordOne = row
+		}
+	}
+	if !strings.Contains(recordOne.ValuesJSON, `"displayName":"kept"`) || strings.Contains(recordOne.ValuesJSON, "plain-one") {
 		t.Fatalf("whole JSON mutation did not preserve non-target fields")
 	}
 
@@ -792,6 +792,33 @@ func TestEscrowSetHashIsCanonicalAndBindsProtectedPayloads(t *testing.T) {
 	if changed == first {
 		t.Fatal("escrow-set hash did not bind protected original")
 	}
+	stream := NewEscrowSetHasher()
+	canonical := append([]EscrowEntry(nil), entries...)
+	canonical[0].ProtectedOriginal = "pgo:enc:v1:two"
+	sort.Slice(canonical, func(left, right int) bool {
+		return EscrowCursorKey(EscrowCursorFromEntry(canonical[left])) < EscrowCursorKey(EscrowCursorFromEntry(canonical[right]))
+	})
+	if err := stream.Add(canonical[:1]...); err != nil {
+		t.Fatal(err)
+	}
+	if err := stream.Add(canonical[1:]...); err != nil {
+		t.Fatal(err)
+	}
+	streamHash, count, err := stream.Sum()
+	if err != nil || streamHash != first || count != len(canonical) {
+		t.Fatalf("streamed escrow hash = %q count=%d error=%v; want %q count=%d", streamHash, count, err, first, len(canonical))
+	}
+}
+
+func TestStableMigrationCursorsPreserveCaseDistinctCoordinates(t *testing.T) {
+	for name, pair := range map[string][2]string{
+		"tenant": {TenantCursor("tenant-A"), TenantCursor("tenant-a")},
+		"record": {RecordCursor("record-A"), RecordCursor("record-a")},
+	} {
+		if pair[0] == pair[1] || len(pair[0]) != 64 || len(pair[1]) != 64 {
+			t.Fatalf("%s cursors=%q,%q, want distinct canonical SHA-256 hex", name, pair[0], pair[1])
+		}
+	}
 }
 
 func TestApplyProtectsOriginalIntoEscrowBeforeMutation(t *testing.T) {
@@ -828,7 +855,7 @@ func TestRehearseRestoreRevealsEveryEscrowWithoutOutputAndIsIdempotent(t *testin
 	service := migrationTestRuntime(t)
 	store := newMemoryMutatingStore(plan, nil)
 	store.state.Status = StatusCompleted
-	for _, recordID := range []string{"record-1", "record-2"} {
+	for _, recordID := range []string{"record-1", "record-2", "record-3", "record-4", "record-5"} {
 		policy, fieldContext := EscrowContext("run-resume", dataprotection.GlobalTenantID, "customer-records", recordID, "secretNote")
 		protected, err := service.Protect(context.Background(), fixturePlaintext, policy, fieldContext)
 		if err != nil {
@@ -842,7 +869,7 @@ func TestRehearseRestoreRevealsEveryEscrowWithoutOutputAndIsIdempotent(t *testin
 	runtime := &revealingTrackingRuntime{Runtime: service}
 	request := approvedMigrationRequest("run-resume")
 
-	report, err := NewRunner(plan, runtime, store).Run(context.Background(), Options{Mode: ModeRehearseRestore, Request: request})
+	report, err := NewRunner(plan, runtime, store).Run(context.Background(), Options{Mode: ModeRehearseRestore, BatchSize: 2, Request: request})
 	if err != nil {
 		t.Fatalf("Run(rehearse) error = %v", err)
 	}
@@ -852,13 +879,16 @@ func TestRehearseRestoreRevealsEveryEscrowWithoutOutputAndIsIdempotent(t *testin
 	}
 	serialized := string(encodedReport)
 	assertSanitized(t, serialized)
-	if report.Status != StatusCompleted || report.Counts.Plaintext != 2 || runtime.revealCalls != 2 || store.rehearsalCalls != 1 {
+	if report.Status != StatusCompleted || report.Counts.Plaintext != 5 || runtime.revealCalls != 5 || store.rehearsalCalls != 1 {
 		t.Fatalf("rehearsal report = %+v reveal calls = %d commit calls = %d", report, runtime.revealCalls, store.rehearsalCalls)
 	}
-	if _, err := NewRunner(plan, runtime, store).Run(context.Background(), Options{Mode: ModeRehearseRestore, Request: request}); err != nil {
+	if store.maxEscrowPage != 2 || store.escrowReadCalls != 4 {
+		t.Fatalf("escrow paging max=%d calls=%d, want max=2 calls=4", store.maxEscrowPage, store.escrowReadCalls)
+	}
+	if _, err := NewRunner(plan, runtime, store).Run(context.Background(), Options{Mode: ModeRehearseRestore, BatchSize: 2, Request: request}); err != nil {
 		t.Fatalf("Run(rehearse resume) error = %v", err)
 	}
-	if runtime.revealCalls != 4 || store.rehearsalCalls != 2 {
+	if runtime.revealCalls != 10 || store.rehearsalCalls != 2 || store.maxEscrowPage != 2 || store.escrowReadCalls != 8 {
 		t.Fatalf("idempotent rehearsal reveal calls = %d commit calls = %d, want full revalidation", runtime.revealCalls, store.rehearsalCalls)
 	}
 }
@@ -926,21 +956,27 @@ type memoryMutatingStore struct {
 	interrupted               bool
 	escrow                    []EscrowEntry
 	rehearsalCalls            int
+	escrowReadCalls           int
+	maxEscrowPage             int
 }
 
 func newMemoryMutatingStore(plan Plan, rows []Row) *memoryMutatingStore {
+	rows = append([]Row(nil), rows...)
+	sort.Slice(rows, func(left, right int) bool {
+		return RecordCursor(rows[left].RecordID) < RecordCursor(rows[right].RecordID)
+	})
 	return &memoryMutatingStore{
-		plan: plan, rows: append([]Row(nil), rows...),
+		plan: plan, rows: rows,
 		state: RunState{RunID: "run-resume", PlanHash: PlanHash(plan), Status: StatusPrepared, ExpectedRevision: 7, TargetCount: len(rows)},
 	}
 }
 
-func (s *memoryMutatingStore) TenantScopes(context.Context, ResourcePlan) ([]string, error) {
-	return []string{dataprotection.GlobalTenantID}, nil
-}
-
-func (s *memoryMutatingStore) Rows(_ context.Context, plan ResourcePlan, tenant string, after string, limit int) ([]Row, error) {
-	return s.targetRows(plan, tenant, after, limit)
+func (s *memoryMutatingStore) Rows(_ context.Context, plan ResourcePlan, after string, limit int) ([]Row, error) {
+	rows, err := s.targetRows(plan, dataprotection.GlobalTenantID, after, limit)
+	for index := range rows {
+		rows[index].TenantID = dataprotection.GlobalTenantID
+	}
+	return rows, err
 }
 
 func (s *memoryMutatingStore) Prepare(context.Context, RunRequest) (RunState, error) {
@@ -959,19 +995,32 @@ func (s *memoryMutatingStore) StartOrResume(_ context.Context, request RunReques
 	state := s.state
 	state.EscrowCount = len(s.escrow)
 	if s.checkpoint.LastRecordID != "" {
-		state.Checkpoints = []CheckpointState{s.checkpoint}
 		state.Counts = s.checkpoint.Counts
+		state.CheckpointBatches = s.checkpoint.Batches
 		state.EventChainHead = s.checkpoint.EventHash
 	}
 	return state, nil
 }
 
-func (s *memoryMutatingStore) TargetScopes(context.Context, string, ResourcePlan) ([]string, error) {
+func (s *memoryMutatingStore) Checkpoint(_ context.Context, _ string, plan ResourcePlan, tenant string, mode Mode) (CheckpointState, bool, error) {
+	if mode != ModeApply || s.checkpoint.LastRecordID == "" {
+		return CheckpointState{}, false, nil
+	}
+	if plan.Resource != s.checkpoint.Resource || tenant != s.checkpoint.TenantID {
+		return CheckpointState{}, false, errors.New("unexpected checkpoint query")
+	}
+	return s.checkpoint, true, nil
+}
+
+func (s *memoryMutatingStore) TargetScopes(_ context.Context, _ string, _ ResourcePlan, after string, limit int) ([]string, error) {
+	if limit < 1 || dataprotection.GlobalTenantID <= after {
+		return nil, nil
+	}
 	return []string{dataprotection.GlobalTenantID}, nil
 }
 
 func (s *memoryMutatingStore) TargetRows(_ context.Context, _ string, plan ResourcePlan, tenant string, after string, limit int) ([]Row, error) {
-	if s.interruptAfterFirstCommit && !s.interrupted && s.checkpoint.LastRecordID == "record-1" {
+	if s.interruptAfterFirstCommit && !s.interrupted && s.checkpoint.Batches == 1 {
 		s.interrupted = true
 		return nil, errors.New("fixture interruption")
 	}
@@ -982,7 +1031,11 @@ func (s *memoryMutatingStore) targetRows(plan ResourcePlan, tenant string, after
 	if plan.Resource != s.plan.Resources[0].Resource || tenant != dataprotection.GlobalTenantID {
 		return nil, errors.New("unexpected target query")
 	}
-	start := sort.Search(len(s.rows), func(index int) bool { return s.rows[index].RecordID > after })
+	afterCursor := ""
+	if after != "" {
+		afterCursor = RecordCursor(after)
+	}
+	start := sort.Search(len(s.rows), func(index int) bool { return RecordCursor(s.rows[index].RecordID) > afterCursor })
 	end := min(start+limit, len(s.rows))
 	return append([]Row(nil), s.rows[start:end]...), nil
 }
@@ -1009,8 +1062,23 @@ func (s *memoryMutatingStore) ApplyBatch(_ context.Context, mutation BatchMutati
 	}, nil
 }
 
-func (s *memoryMutatingStore) EscrowEntries(context.Context, string) ([]EscrowEntry, error) {
-	return append([]EscrowEntry(nil), s.escrow...), nil
+func (s *memoryMutatingStore) EscrowEntries(_ context.Context, _ string, after EscrowCursor, limit int) ([]EscrowEntry, error) {
+	s.escrowReadCalls++
+	sort.Slice(s.escrow, func(left, right int) bool {
+		return EscrowCursorKey(EscrowCursorFromEntry(s.escrow[left])) < EscrowCursorKey(EscrowCursorFromEntry(s.escrow[right]))
+	})
+	start := 0
+	if after.RunID != "" {
+		start = sort.Search(len(s.escrow), func(index int) bool {
+			return compareEscrowCursor(EscrowCursorFromEntry(s.escrow[index]), after) > 0
+		})
+	}
+	end := min(start+limit, len(s.escrow))
+	page := append([]EscrowEntry(nil), s.escrow[start:end]...)
+	if len(page) > s.maxEscrowPage {
+		s.maxEscrowPage = len(page)
+	}
+	return page, nil
 }
 
 func (s *memoryMutatingStore) CommitRehearsal(_ context.Context, runID string, count int, escrowHash string) (BatchCommit, error) {
@@ -1024,7 +1092,10 @@ func (s *memoryMutatingStore) CommitRehearsal(_ context.Context, runID string, c
 	return BatchCommit{Rows: count, EventSequence: 1, EventHash: s.state.EventChainHead}, nil
 }
 
-func (s *memoryMutatingStore) RollbackScopes(context.Context, string, ResourcePlan) ([]string, error) {
+func (s *memoryMutatingStore) RollbackScopes(_ context.Context, _ string, _ ResourcePlan, after string, limit int) ([]string, error) {
+	if limit < 1 || dataprotection.GlobalTenantID <= after {
+		return nil, nil
+	}
 	return []string{dataprotection.GlobalTenantID}, nil
 }
 
@@ -1045,6 +1116,13 @@ func (s *memoryMutatingStore) FinishRun(_ context.Context, runID string, status 
 		return ErrRunConflict
 	}
 	s.state.Status = status
+	return nil
+}
+
+func (s *memoryMutatingStore) ValidateRun(_ context.Context, runID string) error {
+	if runID != s.state.RunID {
+		return ErrRunConflict
+	}
 	return nil
 }
 
@@ -1137,37 +1215,35 @@ func (r *trackingRuntime) Reveal(ctx context.Context, value string, policy datap
 
 type readCall struct {
 	resource string
-	tenant   string
 	after    string
 	limit    int
 }
 
 type memoryReadStore struct {
-	rows       map[string]map[string][]Row
-	scopeOrder map[string][]string
-	tenantErr  error
-	rowsErr    error
-	scopeCalls int
-	rowCalls   []readCall
+	rows     map[string][]Row
+	rowsErr  error
+	rowCalls []readCall
 }
 
 func newMemoryReadStore(rows map[string]map[string][]Row) *memoryReadStore {
-	store := &memoryReadStore{rows: rows, scopeOrder: map[string][]string{}}
+	store := &memoryReadStore{rows: map[string][]Row{}}
 	for resource, scopes := range rows {
-		for tenant := range scopes {
-			store.scopeOrder[resource] = append(store.scopeOrder[resource], tenant)
+		for tenant, tenantRows := range scopes {
+			for _, row := range tenantRows {
+				if row.Resource == "" {
+					row.Resource = resource
+				}
+				if row.TenantID == "" {
+					row.TenantID = tenant
+				}
+				store.rows[resource] = append(store.rows[resource], row)
+			}
 		}
-		sort.Sort(sort.Reverse(sort.StringSlice(store.scopeOrder[resource])))
+		sort.Slice(store.rows[resource], func(left, right int) bool {
+			return store.rows[resource][left].RecordID < store.rows[resource][right].RecordID
+		})
 	}
 	return store
-}
-
-func (s *memoryReadStore) TenantScopes(_ context.Context, plan ResourcePlan) ([]string, error) {
-	s.scopeCalls++
-	if s.tenantErr != nil {
-		return nil, s.tenantErr
-	}
-	return append([]string(nil), s.scopeOrder[plan.Resource]...), nil
 }
 
 type scriptedReadStore struct {
@@ -1176,24 +1252,16 @@ type scriptedReadStore struct {
 	onRows func()
 }
 
-type cancelingScopeStore struct {
+type cancelingReadStore struct {
 	cancel context.CancelFunc
 }
 
-func (s *cancelingScopeStore) TenantScopes(context.Context, ResourcePlan) ([]string, error) {
+func (s *cancelingReadStore) Rows(context.Context, ResourcePlan, string, int) ([]Row, error) {
 	s.cancel()
 	return nil, nil
 }
 
-func (*cancelingScopeStore) Rows(context.Context, ResourcePlan, string, string, int) ([]Row, error) {
-	panic("Rows called after tenant-scope cancellation")
-}
-
-func (s *scriptedReadStore) TenantScopes(context.Context, ResourcePlan) ([]string, error) {
-	return []string{dataprotection.GlobalTenantID}, nil
-}
-
-func (s *scriptedReadStore) Rows(context.Context, ResourcePlan, string, string, int) ([]Row, error) {
+func (s *scriptedReadStore) Rows(_ context.Context, plan ResourcePlan, _ string, _ int) ([]Row, error) {
 	if s.onRows != nil {
 		s.onRows()
 	}
@@ -1202,16 +1270,24 @@ func (s *scriptedReadStore) Rows(context.Context, ResourcePlan, string, string, 
 		return nil, nil
 	}
 	page := append([]Row(nil), s.pages[s.calls]...)
+	for index := range page {
+		if page[index].Resource == "" {
+			page[index].Resource = plan.Resource
+		}
+		if page[index].TenantID == "" {
+			page[index].TenantID = dataprotection.GlobalTenantID
+		}
+	}
 	s.calls++
 	return page, nil
 }
 
-func (s *memoryReadStore) Rows(_ context.Context, plan ResourcePlan, tenant string, after string, limit int) ([]Row, error) {
-	s.rowCalls = append(s.rowCalls, readCall{resource: plan.Resource, tenant: tenant, after: after, limit: limit})
+func (s *memoryReadStore) Rows(_ context.Context, plan ResourcePlan, after string, limit int) ([]Row, error) {
+	s.rowCalls = append(s.rowCalls, readCall{resource: plan.Resource, after: after, limit: limit})
 	if s.rowsErr != nil {
 		return nil, s.rowsErr
 	}
-	rows := s.rows[plan.Resource][tenant]
+	rows := s.rows[plan.Resource]
 	start := sort.Search(len(rows), func(index int) bool { return rows[index].RecordID > after })
 	end := min(start+limit, len(rows))
 	return append([]Row(nil), rows[start:end]...), nil

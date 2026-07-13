@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "purpose": "Fail closed when reviewed sensitive migration safety-boundary AST changes without an explicit lock update, tests and review.",
+  "updateCommand": "rtk node scripts/validate-platform-sensitive-data-migration.mjs --print-source-lock",
+  "entries": [
+    {
+      "path": "internal/platform/sensitivemigration/runner.go",
+      "role": "migration-runner",
+      "scope": "file",
+      "symbol": "",
+      "fingerprint": "sha256:6fba707c1eae3638a67257631f51aa9b9121a69a855069ab4ef85e25c836e930"
+    },
+    {
+      "path": "internal/platform/adminresource/sensitive_migration_gorm.go",
+      "role": "migration-gorm-store",
+      "scope": "file",
+      "symbol": "",
+      "fingerprint": "sha256:33255f6b56a218537c1cbcb6191e865e28e90c747d81e791dda15a5b73203267"
+    },
+    {
+      "path": "internal/platform/bootstrap/sensitive_migration.go",
+      "role": "migration-bootstrap",
+      "scope": "file",
+      "symbol": "",
+      "fingerprint": "sha256:aee1ca873d99b9052267e5f0fde0c24ef0a6d114c1836516ea0db0bed8c8d3b6"
+    },
+    {
+      "path": "internal/platform/adminresource/security.go",
+      "role": "ordinary-store-plaintext-rejection",
+      "scope": "function",
+      "symbol": "(*Store).validateProtectedRecord",
+      "fingerprint": "sha256:a5a39c5d05580b06225927d2941ffb616b51dcfe6e20f9b951712cc64d30c880"
+    },
+    {
+      "path": "cmd/platform-admin/main.go",
+      "role": "maintenance-cli",
+      "scope": "function",
+      "symbol": "runSensitiveDataMigration",
+      "fingerprint": "sha256:501c0baf65d7a6bce476fcf281ad0e003ffb77db09b6e9740797cbb19e319f3c"
+    },
+    {
+      "path": "cmd/platform-api/main.go",
+      "role": "api-startup",
+      "scope": "function",
+      "symbol": "main",
+      "fingerprint": "sha256:f8187c1a54fa8dffb0a613eac9bd677bac5267ad4f43b5f16a19d68231614501"
+    }
+  ]
+}

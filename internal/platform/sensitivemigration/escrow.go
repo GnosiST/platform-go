@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"hash"
 	"slices"
 	"strings"
 
@@ -33,37 +34,65 @@ func HashMigratedValue(value string) string {
 func EscrowSetHash(entries []EscrowEntry) (string, error) {
 	canonical := append([]EscrowEntry(nil), entries...)
 	slices.SortFunc(canonical, func(left, right EscrowEntry) int {
-		for _, values := range [][2]string{
-			{left.RunID, right.RunID}, {left.TenantID, right.TenantID}, {left.Resource, right.Resource},
-			{left.RecordID, right.RecordID}, {left.FieldKey, right.FieldKey},
-		} {
-			if comparison := strings.Compare(values[0], values[1]); comparison != 0 {
-				return comparison
-			}
-		}
-		return 0
+		return strings.Compare(EscrowCursorKey(EscrowCursorFromEntry(left)), EscrowCursorKey(EscrowCursorFromEntry(right)))
 	})
-	hash := sha256.New()
-	hash.Write([]byte("platform-go:sensitive-migration:escrow-set:v1"))
-	previousCoordinate := ""
-	for _, entry := range canonical {
+	hasher := NewEscrowSetHasher()
+	if err := hasher.Add(canonical...); err != nil {
+		return "", err
+	}
+	value, _, err := hasher.Sum()
+	return value, err
+}
+
+type EscrowSetHasher struct {
+	hash     hash.Hash
+	previous EscrowCursor
+	count    int
+	failed   bool
+}
+
+func NewEscrowSetHasher() *EscrowSetHasher {
+	digest := sha256.New()
+	_, _ = digest.Write([]byte("platform-go:sensitive-migration:escrow-set:v1"))
+	return &EscrowSetHasher{hash: digest}
+}
+
+func (h *EscrowSetHasher) Add(entries ...EscrowEntry) error {
+	if h == nil || h.hash == nil || h.failed {
+		return ErrInvalidOptions
+	}
+	for _, entry := range entries {
+		cursor := EscrowCursorFromEntry(entry)
 		if entry.RunID == "" || entry.TenantID == "" || entry.Resource == "" || entry.RecordID == "" || entry.FieldKey == "" ||
-			entry.ProtectedOriginal == "" || !canonicalSHA256(entry.MigratedValueHash) {
-			return "", ErrInvalidOptions
-		}
-		coordinate := strings.Join([]string{entry.RunID, entry.TenantID, entry.Resource, entry.RecordID, entry.FieldKey}, "\x00")
-		if coordinate == previousCoordinate {
-			return "", ErrInvalidOptions
+			entry.ProtectedOriginal == "" || !canonicalSHA256(entry.MigratedValueHash) || h.count > 0 && compareEscrowCursor(cursor, h.previous) <= 0 {
+			h.failed = true
+			return ErrInvalidOptions
 		}
 		for _, value := range []string{
 			entry.RunID, entry.TenantID, entry.Resource, entry.RecordID, entry.FieldKey,
 			entry.ProtectedOriginal, entry.MigratedValueHash,
 		} {
-			writeEscrowHashPart(hash, value)
+			writeEscrowHashPart(h.hash, value)
 		}
-		previousCoordinate = coordinate
+		h.previous = cursor
+		h.count++
 	}
-	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), nil
+	return nil
+}
+
+func (h *EscrowSetHasher) Sum() (string, int, error) {
+	if h == nil || h.hash == nil || h.failed {
+		return "", 0, ErrInvalidOptions
+	}
+	return "sha256:" + hex.EncodeToString(h.hash.Sum(nil)), h.count, nil
+}
+
+func EscrowCursorFromEntry(entry EscrowEntry) EscrowCursor {
+	return EscrowCursor{RunID: entry.RunID, TenantID: entry.TenantID, Resource: entry.Resource, RecordID: entry.RecordID, FieldKey: entry.FieldKey}
+}
+
+func compareEscrowCursor(left, right EscrowCursor) int {
+	return strings.Compare(EscrowCursorKey(left), EscrowCursorKey(right))
 }
 
 func escrowCoordinateHash(values ...string) string {

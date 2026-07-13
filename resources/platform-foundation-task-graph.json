@@ -1993,6 +1993,7 @@
           "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
           "docs/superpowers/plans/2026-07-12-sensitive-data-historical-migration.md",
           "docs/platform-sensitive-data-migration.md",
+          "resources/platform-sensitive-data-migration-source-lock.json",
           "docs/admin-resource-schema.md",
           "docs/platform-deployment.md",
           "docs/platform-roadmap.md",

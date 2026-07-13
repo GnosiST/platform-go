@@ -251,6 +251,9 @@ func TestRuntimeReadinessRequiresAvailableActiveKeys(t *testing.T) {
 	if err := newTestRuntime(t, "enc-v1", "idx-v1").Ready(context.Background()); err != nil {
 		t.Fatalf("Ready() error = %v", err)
 	}
+	if err := newTestRuntime(t, "enc-v1", "idx-v1").Ready(nil); !errors.Is(err, ErrKeyUnavailable) {
+		t.Fatalf("Ready(nil) error = %v, want ErrKeyUnavailable", err)
+	}
 
 	var nilRuntime *Service
 	if err := nilRuntime.Ready(context.Background()); !errors.Is(err, ErrKeyUnavailable) {

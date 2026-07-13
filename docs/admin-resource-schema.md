@@ -286,7 +286,7 @@ PLATFORM_ADMIN_RESOURCE_FILE=.platform/admin-resources.json
 
 ```bash
 PLATFORM_ADMIN_RESOURCE_DRIVER=mysql
-PLATFORM_ADMIN_RESOURCE_DSN=user:pass@tcp(localhost:3306)/platform
+PLATFORM_ADMIN_RESOURCE_DSN=$PLATFORM_ADMIN_RESOURCE_DSN_SECRET
 ```
 
 Selection order is GORM driver, file, then memory. The GORM adapter creates `platform_admin_resource_records` and `platform_admin_resource_state`, and persists generic resource snapshots through the shared GORM storage opener. The older `database/sql` adapter remains behind the same repository port for compatibility tests, but the target runtime path is GORM.

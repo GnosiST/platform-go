@@ -70,21 +70,28 @@ func (r *Runner) Run(ctx context.Context, options Options) (Report, error) {
 func (r *Runner) runReadOnly(ctx context.Context, mode Mode, batchSize int, report Report) (Report, error) {
 	report.Mode = mode
 	for _, resource := range r.plan.Resources {
-		if ctx.Err() != nil {
-			return report, ErrReadFailed
-		}
-		scopes, scopeErr := r.store.TenantScopes(ctx, resource)
-		if scopeErr != nil || ctx.Err() != nil {
-			return report, ErrReadFailed
-		}
-		slices.Sort(scopes)
-		for _, tenant := range scopes {
-			if tenant == "" {
+		after := ""
+		for {
+			if ctx.Err() != nil {
 				return report, ErrReadFailed
 			}
-			if err := r.runScope(ctx, resource, tenant, batchSize, &report); err != nil {
-				return report, err
+			rows, err := r.store.Rows(ctx, resource, after, batchSize)
+			if err != nil || ctx.Err() != nil || len(rows) > batchSize {
+				return report, ErrReadFailed
 			}
+			if len(rows) == 0 {
+				break
+			}
+			for _, row := range rows {
+				if ctx.Err() != nil || row.TenantID == "" || row.RecordID == "" || row.RecordID == after || row.Resource != "" && row.Resource != resource.Resource {
+					return report, ErrReadFailed
+				}
+				if err := r.classifyRow(ctx, resource, row.TenantID, row, &report.Counts); err != nil {
+					return report, err
+				}
+				after = row.RecordID
+			}
+			report.Checkpoints++
 		}
 	}
 
@@ -150,7 +157,7 @@ func (r *Runner) runPrepared(ctx context.Context, options Options, batchSize int
 		if err != nil {
 			return report, ErrVerifyFailed
 		}
-		return r.runRehearsal(ctx, restoreStore, request, state, report)
+		return r.runRehearsal(ctx, restoreStore, request, batchSize, state, report)
 	case ModeRollback:
 		if !validMutationRequest(request) {
 			return report, ErrInvalidOptions
@@ -175,7 +182,7 @@ func (r *Runner) runApply(ctx context.Context, store MutatingStore, request RunR
 		return report, ErrMutationFailed
 	}
 	report.Counts = state.Counts
-	report.Checkpoints = checkpointBatches(state.Checkpoints)
+	report.Checkpoints = state.CheckpointBatches
 	report.EventChainHead = state.EventChainHead
 	if state.Status == StatusCompleted {
 		if report.Counts.total() != state.TargetCount {
@@ -186,41 +193,54 @@ func (r *Runner) runApply(ctx context.Context, store MutatingStore, request RunR
 	}
 	revision := state.ExpectedRevision
 	for _, resource := range r.plan.Resources {
-		scopes, err := store.TargetScopes(ctx, request.RunID, resource)
-		if err != nil || ctx.Err() != nil {
-			return report, ErrMutationFailed
-		}
-		slices.Sort(scopes)
-		for _, tenant := range scopes {
-			if tenant == "" {
+		afterScope := ""
+		for {
+			scopes, err := store.TargetScopes(ctx, request.RunID, resource, afterScope, batchSize)
+			if err != nil || ctx.Err() != nil || len(scopes) > batchSize {
 				return report, ErrMutationFailed
 			}
-			after := checkpointCursor(state.Checkpoints, resource.Resource, tenant)
-			for {
-				rows, err := store.TargetRows(ctx, request.RunID, resource, tenant, after, batchSize)
-				if err != nil || ctx.Err() != nil || len(rows) > batchSize {
+			if len(scopes) == 0 {
+				break
+			}
+			for _, tenant := range scopes {
+				if tenant == "" || afterScope != "" && TenantCursor(tenant) <= TenantCursor(afterScope) {
 					return report, ErrMutationFailed
 				}
-				if len(rows) == 0 {
-					break
-				}
-				mutationRows, counts, err := r.protectRows(ctx, request.RunID, resource, tenant, after, rows)
-				if err != nil {
-					return report, err
-				}
-				lastRecordID := rows[len(rows)-1].RecordID
-				commit, err := store.ApplyBatch(ctx, BatchMutation{
-					RunID: request.RunID, Mode: ModeApply, Resource: resource, TenantID: tenant,
-					ExpectedRevision: revision, LastRecordID: lastRecordID, Rows: mutationRows, Counts: counts,
-				})
-				if err != nil || commit.LastRecordID != lastRecordID || commit.EventHash == "" {
+				checkpoint, found, err := store.Checkpoint(ctx, request.RunID, resource, tenant, ModeApply)
+				if err != nil || found && (checkpoint.Resource != resource.Resource || checkpoint.TenantID != tenant) {
 					return report, ErrMutationFailed
 				}
-				revision = commit.Revision
-				after = commit.LastRecordID
-				report.Counts = report.Counts.plus(counts)
-				report.Checkpoints++
-				report.EventChainHead = commit.EventHash
+				after := ""
+				if found {
+					after = checkpoint.LastRecordID
+				}
+				for {
+					rows, err := store.TargetRows(ctx, request.RunID, resource, tenant, after, batchSize)
+					if err != nil || ctx.Err() != nil || len(rows) > batchSize {
+						return report, ErrMutationFailed
+					}
+					if len(rows) == 0 {
+						break
+					}
+					mutationRows, counts, err := r.protectRows(ctx, request.RunID, resource, tenant, after, rows)
+					if err != nil {
+						return report, err
+					}
+					lastRecordID := rows[len(rows)-1].RecordID
+					commit, err := store.ApplyBatch(ctx, BatchMutation{
+						RunID: request.RunID, Mode: ModeApply, Resource: resource, TenantID: tenant,
+						ExpectedRevision: revision, LastRecordID: lastRecordID, Rows: mutationRows, Counts: counts,
+					})
+					if err != nil || commit.LastRecordID != lastRecordID || commit.EventHash == "" {
+						return report, ErrMutationFailed
+					}
+					revision = commit.Revision
+					after = commit.LastRecordID
+					report.Counts = report.Counts.plus(counts)
+					report.Checkpoints++
+					report.EventChainHead = commit.EventHash
+				}
+				afterScope = tenant
 			}
 		}
 	}
@@ -238,7 +258,7 @@ func (r *Runner) protectRows(ctx context.Context, runID string, resource Resourc
 	mutations := make([]RowMutation, 0, len(rows))
 	counts := Counts{}
 	for _, row := range rows {
-		if ctx.Err() != nil || row.RecordID == "" || row.RecordID <= after || row.Resource != "" && row.Resource != resource.Resource {
+		if ctx.Err() != nil || row.RecordID == "" || after != "" && RecordCursor(row.RecordID) <= RecordCursor(after) || row.Resource != "" && row.Resource != resource.Resource {
 			return nil, Counts{}, ErrMutationFailed
 		}
 		values, err := DecodeUniqueObject(row.ValuesJSON)
@@ -299,31 +319,42 @@ func (r *Runner) protectRows(ctx context.Context, runID string, resource Resourc
 	return mutations, counts, nil
 }
 
-func (r *Runner) runRehearsal(ctx context.Context, store RestoreStore, request RunRequest, state RunState, report Report) (Report, error) {
+func (r *Runner) runRehearsal(ctx context.Context, store RestoreStore, request RunRequest, batchSize int, state RunState, report Report) (Report, error) {
 	if state.RunID != request.RunID || state.PlanHash != request.PlanHash || state.Status != StatusCompleted || state.EscrowCount < 0 {
 		return report, ErrVerifyFailed
 	}
 	report.EventChainHead = state.EventChainHead
 	report.Counts.Plaintext = state.EscrowCount
-	entries, err := store.EscrowEntries(ctx, request.RunID)
-	if err != nil || ctx.Err() != nil || len(entries) != state.EscrowCount {
-		return report, ErrVerifyFailed
-	}
-	for _, entry := range entries {
-		if ctx.Err() != nil || !validEscrowEntry(entry, request.RunID) {
+	hasher := NewEscrowSetHasher()
+	cursor := EscrowCursor{}
+	for {
+		entries, err := store.EscrowEntries(ctx, request.RunID, cursor, batchSize)
+		if err != nil || ctx.Err() != nil || len(entries) > batchSize {
 			return report, ErrVerifyFailed
 		}
-		policy, fieldContext := EscrowContext(entry.RunID, entry.TenantID, entry.Resource, entry.RecordID, entry.FieldKey)
-		if _, err := r.runtime.Reveal(ctx, entry.ProtectedOriginal, policy, fieldContext); err != nil || ctx.Err() != nil {
+		if len(entries) == 0 {
+			break
+		}
+		for _, entry := range entries {
+			if ctx.Err() != nil || !validEscrowEntry(entry, request.RunID) {
+				return report, ErrVerifyFailed
+			}
+			policy, fieldContext := EscrowContext(entry.RunID, entry.TenantID, entry.Resource, entry.RecordID, entry.FieldKey)
+			if _, err := r.runtime.Reveal(ctx, entry.ProtectedOriginal, policy, fieldContext); err != nil || ctx.Err() != nil {
+				return report, ErrVerifyFailed
+			}
+		}
+		if err := hasher.Add(entries...); err != nil {
 			return report, ErrVerifyFailed
 		}
+		cursor = EscrowCursorFromEntry(entries[len(entries)-1])
 	}
-	escrowHash, err := EscrowSetHash(entries)
-	if err != nil {
+	escrowHash, count, err := hasher.Sum()
+	if err != nil || count != state.EscrowCount {
 		return report, ErrVerifyFailed
 	}
-	commit, err := store.CommitRehearsal(ctx, request.RunID, len(entries), escrowHash)
-	if err != nil || commit.Rows != len(entries) || commit.EventHash == "" {
+	commit, err := store.CommitRehearsal(ctx, request.RunID, count, escrowHash)
+	if err != nil || commit.Rows != count || commit.EventHash == "" {
 		return report, ErrVerifyFailed
 	}
 	report.Checkpoints = 1
@@ -337,7 +368,7 @@ func (r *Runner) runRollback(ctx context.Context, store RestoreStore, request Ru
 		return report, ErrMutationFailed
 	}
 	report.Counts = state.RollbackCounts
-	report.Checkpoints = checkpointBatches(state.RollbackCheckpoints)
+	report.Checkpoints = state.RollbackBatches
 	report.EventChainHead = state.EventChainHead
 	if state.RollbackStatus == StatusCompleted {
 		if report.Counts.Plaintext != state.EscrowCount {
@@ -351,41 +382,54 @@ func (r *Runner) runRollback(ctx context.Context, store RestoreStore, request Ru
 	}
 	revision := state.ExpectedRevision
 	for _, resource := range r.plan.Resources {
-		scopes, err := store.RollbackScopes(ctx, request.RunID, resource)
-		if err != nil || ctx.Err() != nil {
-			return report, ErrMutationFailed
-		}
-		slices.Sort(scopes)
-		for _, tenant := range scopes {
-			if tenant == "" {
+		afterScope := ""
+		for {
+			scopes, err := store.RollbackScopes(ctx, request.RunID, resource, afterScope, batchSize)
+			if err != nil || ctx.Err() != nil || len(scopes) > batchSize {
 				return report, ErrMutationFailed
 			}
-			after := checkpointCursor(state.RollbackCheckpoints, resource.Resource, tenant)
-			for {
-				rows, err := store.RollbackRows(ctx, request.RunID, resource, tenant, after, batchSize)
-				if err != nil || ctx.Err() != nil || len(rows) > batchSize {
+			if len(scopes) == 0 {
+				break
+			}
+			for _, tenant := range scopes {
+				if tenant == "" || afterScope != "" && TenantCursor(tenant) <= TenantCursor(afterScope) {
 					return report, ErrMutationFailed
 				}
-				if len(rows) == 0 {
-					break
-				}
-				mutations, counts, err := r.restoreRows(ctx, request.RunID, resource, tenant, after, rows)
-				if err != nil {
-					return report, err
-				}
-				lastRecordID := rows[len(rows)-1].RecordID
-				commit, err := store.RollbackBatch(ctx, BatchMutation{
-					RunID: request.RunID, Mode: ModeRollback, Resource: resource, TenantID: tenant,
-					ExpectedRevision: revision, LastRecordID: lastRecordID, Rows: mutations, Counts: counts,
-				})
-				if err != nil || commit.LastRecordID != lastRecordID || commit.EventHash == "" {
+				checkpoint, found, err := store.Checkpoint(ctx, request.RunID, resource, tenant, ModeRollback)
+				if err != nil || found && (checkpoint.Resource != resource.Resource || checkpoint.TenantID != tenant) {
 					return report, ErrMutationFailed
 				}
-				revision = commit.Revision
-				after = commit.LastRecordID
-				report.Counts = report.Counts.plus(counts)
-				report.Checkpoints++
-				report.EventChainHead = commit.EventHash
+				after := ""
+				if found {
+					after = checkpoint.LastRecordID
+				}
+				for {
+					rows, err := store.RollbackRows(ctx, request.RunID, resource, tenant, after, batchSize)
+					if err != nil || ctx.Err() != nil || len(rows) > batchSize {
+						return report, ErrMutationFailed
+					}
+					if len(rows) == 0 {
+						break
+					}
+					mutations, counts, err := r.restoreRows(ctx, request.RunID, resource, tenant, after, rows)
+					if err != nil {
+						return report, err
+					}
+					lastRecordID := rows[len(rows)-1].RecordID
+					commit, err := store.RollbackBatch(ctx, BatchMutation{
+						RunID: request.RunID, Mode: ModeRollback, Resource: resource, TenantID: tenant,
+						ExpectedRevision: revision, LastRecordID: lastRecordID, Rows: mutations, Counts: counts,
+					})
+					if err != nil || commit.LastRecordID != lastRecordID || commit.EventHash == "" {
+						return report, ErrMutationFailed
+					}
+					revision = commit.Revision
+					after = commit.LastRecordID
+					report.Counts = report.Counts.plus(counts)
+					report.Checkpoints++
+					report.EventChainHead = commit.EventHash
+				}
+				afterScope = tenant
 			}
 		}
 	}
@@ -403,7 +447,7 @@ func (r *Runner) restoreRows(ctx context.Context, runID string, resource Resourc
 	mutations := make([]RowMutation, 0, len(rows))
 	counts := Counts{}
 	for _, row := range rows {
-		if ctx.Err() != nil || row.RecordID == "" || row.RecordID <= after || row.Resource != "" && row.Resource != resource.Resource || len(row.Escrow) == 0 {
+		if ctx.Err() != nil || row.RecordID == "" || after != "" && RecordCursor(row.RecordID) <= RecordCursor(after) || row.Resource != "" && row.Resource != resource.Resource || len(row.Escrow) == 0 {
 			return nil, Counts{}, ErrMutationFailed
 		}
 		values, err := DecodeUniqueObject(row.ValuesJSON)
@@ -461,63 +505,58 @@ func (r *Runner) runVerify(ctx context.Context, store MutatingStore, request Run
 	}
 	report.EventChainHead = state.EventChainHead
 	for _, resource := range r.plan.Resources {
-		scopes, err := store.TargetScopes(ctx, request.RunID, resource)
-		if err != nil || ctx.Err() != nil {
-			return report, ErrVerifyFailed
-		}
-		slices.Sort(scopes)
-		for _, tenant := range scopes {
-			after := ""
-			for {
-				rows, err := store.TargetRows(ctx, request.RunID, resource, tenant, after, batchSize)
-				if err != nil || ctx.Err() != nil || len(rows) > batchSize {
+		afterScope := ""
+		for {
+			scopes, err := store.TargetScopes(ctx, request.RunID, resource, afterScope, batchSize)
+			if err != nil || ctx.Err() != nil || len(scopes) > batchSize {
+				return report, ErrVerifyFailed
+			}
+			if len(scopes) == 0 {
+				break
+			}
+			for _, tenant := range scopes {
+				if tenant == "" || afterScope != "" && TenantCursor(tenant) <= TenantCursor(afterScope) {
 					return report, ErrVerifyFailed
 				}
-				if len(rows) == 0 {
-					break
-				}
-				for _, row := range rows {
-					before := report.Counts
-					if err := r.classifyRow(ctx, resource, tenant, row, &report.Counts); err != nil {
+				after := ""
+				for {
+					rows, err := store.TargetRows(ctx, request.RunID, resource, tenant, after, batchSize)
+					if err != nil || ctx.Err() != nil || len(rows) > batchSize {
 						return report, ErrVerifyFailed
 					}
-					delta := Counts{
-						Missing: report.Counts.Missing - before.Missing, Plaintext: report.Counts.Plaintext - before.Plaintext,
-						TargetEnvelope:    report.Counts.TargetEnvelope - before.TargetEnvelope,
-						ForeignEnvelope:   report.Counts.ForeignEnvelope - before.ForeignEnvelope,
-						MalformedEnvelope: report.Counts.MalformedEnvelope - before.MalformedEnvelope,
+					if len(rows) == 0 {
+						break
 					}
-					if delta.Plaintext != 0 || delta.ForeignEnvelope != 0 || delta.MalformedEnvelope != 0 || row.RecordID == "" || row.RecordID <= after {
-						return report, ErrVerifyFailed
+					for _, row := range rows {
+						before := report.Counts
+						if err := r.classifyRow(ctx, resource, tenant, row, &report.Counts); err != nil {
+							return report, ErrVerifyFailed
+						}
+						delta := Counts{
+							Missing: report.Counts.Missing - before.Missing, Plaintext: report.Counts.Plaintext - before.Plaintext,
+							TargetEnvelope:    report.Counts.TargetEnvelope - before.TargetEnvelope,
+							ForeignEnvelope:   report.Counts.ForeignEnvelope - before.ForeignEnvelope,
+							MalformedEnvelope: report.Counts.MalformedEnvelope - before.MalformedEnvelope,
+						}
+						if delta.Plaintext != 0 || delta.ForeignEnvelope != 0 || delta.MalformedEnvelope != 0 || row.RecordID == "" || after != "" && RecordCursor(row.RecordID) <= RecordCursor(after) {
+							return report, ErrVerifyFailed
+						}
+						after = row.RecordID
 					}
-					after = row.RecordID
+					report.Checkpoints++
 				}
-				report.Checkpoints++
+				afterScope = tenant
 			}
 		}
 	}
 	if report.Counts.total() != state.TargetCount {
 		return report, ErrVerifyFailed
 	}
+	if err := store.ValidateRun(ctx, request.RunID); err != nil {
+		return report, ErrVerifyFailed
+	}
 	report.Status = StatusCompleted
 	return report, nil
-}
-
-func checkpointCursor(checkpoints []CheckpointState, resource string, tenant string) string {
-	for _, checkpoint := range checkpoints {
-		if checkpoint.Resource == resource && checkpoint.TenantID == tenant {
-			return checkpoint.LastRecordID
-		}
-	}
-	return ""
-}
-
-func checkpointBatches(checkpoints []CheckpointState) int {
-	total := 0
-	for _, checkpoint := range checkpoints {
-		total += checkpoint.Batches
-	}
-	return total
 }
 
 func nilInterface(value any) bool {
@@ -544,32 +583,6 @@ func batchSizeForMode(options Options) (int, error) {
 		return 0, ErrInvalidOptions
 	}
 	return options.BatchSize, nil
-}
-
-func (r *Runner) runScope(ctx context.Context, resource ResourcePlan, tenant string, batchSize int, report *Report) error {
-	after := ""
-	for {
-		if ctx.Err() != nil {
-			return ErrReadFailed
-		}
-		rows, err := r.store.Rows(ctx, resource, tenant, after, batchSize)
-		if err != nil || ctx.Err() != nil || len(rows) > batchSize {
-			return ErrReadFailed
-		}
-		if len(rows) == 0 {
-			return nil
-		}
-		for _, row := range rows {
-			if ctx.Err() != nil || row.RecordID == "" || row.RecordID <= after || row.Resource != "" && row.Resource != resource.Resource {
-				return ErrReadFailed
-			}
-			if err := r.classifyRow(ctx, resource, tenant, row, &report.Counts); err != nil {
-				return err
-			}
-			after = row.RecordID
-		}
-		report.Checkpoints++
-	}
 }
 
 func (r *Runner) classifyRow(ctx context.Context, resource ResourcePlan, tenant string, row Row, counts *Counts) error {

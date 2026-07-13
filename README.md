@@ -201,11 +201,11 @@ PLATFORM_DATA_ENCRYPTION_KEYRING_JSON={"enc-v1":"<base64-32-byte-key>"}
 PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID=idx-v1
 PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON={"idx-v1":"<different-base64-32-byte-key>"}
 PLATFORM_ADMIN_RESOURCE_DRIVER=mysql
-PLATFORM_ADMIN_RESOURCE_DSN=user:pass@tcp(localhost:3306)/platform
+PLATFORM_ADMIN_RESOURCE_DSN=$PLATFORM_ADMIN_RESOURCE_DSN_SECRET
 PLATFORM_SESSION_DRIVER=mysql
-PLATFORM_SESSION_DSN=user:pass@tcp(localhost:3306)/platform
+PLATFORM_SESSION_DSN=$PLATFORM_SESSION_DSN_SECRET
 PLATFORM_LIFECYCLE_HISTORY_DRIVER=mysql
-PLATFORM_LIFECYCLE_HISTORY_DSN=user:pass@tcp(localhost:3306)/platform
+PLATFORM_LIFECYCLE_HISTORY_DSN=$PLATFORM_LIFECYCLE_HISTORY_DSN_SECRET
 PLATFORM_CACHE_DRIVER=redis
 PLATFORM_REDIS_ADDR=127.0.0.1:6379
 PLATFORM_RATE_LIMIT_HMAC_KEY=replace-with-dedicated-rate-limit-key
@@ -217,7 +217,7 @@ PLATFORM_ADMIN_OIDC_REDIRECT_URL=https://admin.example/login
 PLATFORM_ADMIN_OIDC_SCOPES=openid,profile,email
 ```
 
-Sensitive fields are selected by capability manifest policy, not by fixed field names. Production startup validates every stored envelope against its declared format, normalization, tenant scope and configured historical keys before serving HTTP. Rotate by adding a new key ID and changing the active ID; keep historical entries until all referenced envelopes have been migrated and verified. The current provider is environment-backed AES-256 only. KMS/HSM adapters, historical plaintext migration and step-up reveal endpoints remain separate unfinished work.
+Sensitive fields are selected by capability manifest policy, not by fixed field names. Production startup validates every stored envelope against its declared format, normalization, tenant scope and configured historical keys before serving HTTP. Rotate by adding a new key ID and changing the active ID; keep historical entries until all referenced envelopes have been migrated and verified. The current provider is environment-backed AES-256 only. Historical plaintext migration is implemented as an offline, approval-gated maintenance workflow; see [Sensitive data historical migration](docs/platform-sensitive-data-migration.md). KMS/HSM adapters and step-up reveal endpoints remain unfinished work.
 
 When `admin-oidc` is the production Admin provider, provision an existing enabled Admin user through `platform-admin bind-admin-oidc --subject-stdin` before API startup. OIDC authentication never creates platform users, roles, permissions, tenants, organizations or areas automatically. See `docs/platform-auth.md` for the stdin-only binding procedure and readiness gate.
 

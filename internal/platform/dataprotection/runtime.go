@@ -33,7 +33,7 @@ func NewRuntime(provider KeyProvider) *Service {
 }
 
 func (s *Service) Ready(ctx context.Context) error {
-	if s == nil || s.provider == nil || ctx.Err() != nil {
+	if s == nil || s.provider == nil || ctx == nil || ctx.Err() != nil {
 		return ErrKeyUnavailable
 	}
 	for _, purpose := range []KeyPurpose{KeyPurposeEncryption, KeyPurposeBlindIndex} {

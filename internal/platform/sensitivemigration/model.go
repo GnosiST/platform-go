@@ -39,13 +39,13 @@ type Cursor struct {
 
 type Row struct {
 	Resource   string
+	TenantID   string
 	RecordID   string
 	ValuesJSON string
 }
 
 type ReadStore interface {
-	TenantScopes(context.Context, ResourcePlan) ([]string, error)
-	Rows(context.Context, ResourcePlan, string, string, int) ([]Row, error)
+	Rows(context.Context, ResourcePlan, string, int) ([]Row, error)
 }
 
 type RunRequest struct {
@@ -63,19 +63,20 @@ type RunRequest struct {
 }
 
 type RunState struct {
-	RunID               string
-	PlanHash            string
-	Status              string
-	ExpectedRevision    uint64
-	TargetCount         int
-	Counts              Counts
-	Checkpoints         []CheckpointState
-	EventChainHead      string
-	EscrowCount         int
-	RestoreRehearsed    bool
-	RollbackStatus      string
-	RollbackCounts      Counts
-	RollbackCheckpoints []CheckpointState
+	RunID             string
+	PlanHash          string
+	TargetSetHash     string
+	Status            string
+	ExpectedRevision  uint64
+	TargetCount       int
+	Counts            Counts
+	CheckpointBatches int
+	EventChainHead    string
+	EscrowCount       int
+	RestoreRehearsed  bool
+	RollbackStatus    string
+	RollbackCounts    Counts
+	RollbackBatches   int
 }
 
 type CheckpointState struct {
@@ -102,6 +103,14 @@ type EscrowEntry struct {
 	TenantID          string
 	ProtectedOriginal string
 	MigratedValueHash string
+}
+
+type EscrowCursor struct {
+	RunID    string
+	TenantID string
+	Resource string
+	RecordID string
+	FieldKey string
 }
 
 type RollbackRow struct {
@@ -132,17 +141,19 @@ type MutatingStore interface {
 	ReadStore
 	Prepare(context.Context, RunRequest) (RunState, error)
 	StartOrResume(context.Context, RunRequest) (RunState, error)
-	TargetScopes(context.Context, string, ResourcePlan) ([]string, error)
+	Checkpoint(context.Context, string, ResourcePlan, string, Mode) (CheckpointState, bool, error)
+	TargetScopes(context.Context, string, ResourcePlan, string, int) ([]string, error)
 	TargetRows(context.Context, string, ResourcePlan, string, string, int) ([]Row, error)
 	ApplyBatch(context.Context, BatchMutation) (BatchCommit, error)
 	FinishRun(context.Context, string, string) error
+	ValidateRun(context.Context, string) error
 }
 
 type RestoreStore interface {
 	MutatingStore
-	EscrowEntries(context.Context, string) ([]EscrowEntry, error)
+	EscrowEntries(context.Context, string, EscrowCursor, int) ([]EscrowEntry, error)
 	CommitRehearsal(context.Context, string, int, string) (BatchCommit, error)
-	RollbackScopes(context.Context, string, ResourcePlan) ([]string, error)
+	RollbackScopes(context.Context, string, ResourcePlan, string, int) ([]string, error)
 	RollbackRows(context.Context, string, ResourcePlan, string, string, int) ([]RollbackRow, error)
 	RollbackBatch(context.Context, BatchMutation) (BatchCommit, error)
 	FinishRollback(context.Context, string) error
