@@ -8,7 +8,6 @@
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "businessReferenceMode": "reference-only",
     "requiredControlledUnfinishedNodes": [
-      "sensitive-data-historical-migration",
       "open-source-portability",
       "public-docs-community",
       "public-docs-site",
@@ -21,8 +20,8 @@
   },
   "taskSummary": {
     "expectedTotal": 45,
-    "expectedImplemented": 40,
-    "expectedControlledUnfinished": 5
+    "expectedImplemented": 41,
+    "expectedControlledUnfinished": 4
   },
   "requirements": [
     {
@@ -442,13 +441,18 @@
         "sourcePaths": [
           "AGENTS.md",
           "resources/platform-node-closeout-audit.json",
+          "docs/platform-sensitive-data-migration.md",
           "docs/platform-foundation-task-map.md",
           "docs/platform-roadmap.md"
         ],
         "validators": [
           "scripts/validate-platform-goal-completion-audit.mjs",
           "scripts/validate-platform-task-execution-audit.mjs",
-          "scripts/validate-platform-node-closeout-audit.mjs"
+          "scripts/validate-platform-node-closeout-audit.mjs",
+          "scripts/validate-platform-sensitive-data-migration.mjs"
+        ],
+        "tests": [
+          "scripts/platform-sensitive-data-migration.test.mjs"
         ]
       }
     }

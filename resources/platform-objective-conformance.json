@@ -28,7 +28,6 @@
     "requiresDependencyConflictChecks": true,
     "requiresTaskGraphBeforeNewNode": true,
     "requiredUnfinishedNodes": [
-      "sensitive-data-historical-migration",
       "open-source-portability",
       "public-docs-community",
       "public-docs-site",
@@ -67,7 +66,6 @@
     "mustNotMarkCompleteWhileBlockersActive": true,
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "controlledBlockers": [
-      "sensitive-data-historical-migration",
       "open-source-portability",
       "public-docs-community",
       "public-docs-site",
@@ -124,6 +122,7 @@
       "scripts/validate-platform-task-execution-audit.mjs",
       "scripts/validate-platform-goal-completion-audit.mjs",
       "scripts/validate-platform-node-closeout-audit.mjs",
+      "scripts/validate-platform-sensitive-data-migration.mjs",
       "scripts/validate-platform-engineering-capabilities.mjs",
       "scripts/validate-platform-capability-contracts.mjs",
       "scripts/validate-platform-production-readiness.mjs",
@@ -137,6 +136,7 @@
       "scripts/platform-goal-completion-audit.test.mjs",
       "scripts/platform-task-execution-audit.test.mjs",
       "scripts/platform-node-closeout-audit.test.mjs",
+      "scripts/platform-sensitive-data-migration.test.mjs",
       "scripts/platform-deployment-topology.test.mjs",
       "scripts/platform-engineering-capabilities.test.mjs",
       "scripts/platform-production-readiness.test.mjs",
@@ -148,6 +148,7 @@
       "docs/platform-foundation-task-map.md",
       "docs/platform-roadmap.md",
       "docs/platform-deployment.md",
+      "docs/platform-sensitive-data-migration.md",
       "docs/platform-ui-optimization-assessment.md",
       "docs/admin-ui-foundation.md",
       "design-qa.md"

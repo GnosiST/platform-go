@@ -94,6 +94,18 @@ describe("platform foundation documentation drift", () => {
     assert.match(read(".superpowers/sdd/sensitive-data-progress.md"), /Task 4: complete/);
   });
 
+  it("records sensitive data historical migration as implemented", () => {
+    for (const relativePath of [
+      "README.md",
+      "docs/platform-data-governance-and-integrations-assessment.md",
+      "docs/platform-foundation-task-map.md",
+      "docs/platform-roadmap.md",
+    ]) {
+      assert.match(read(relativePath), /`sensitive-data-historical-migration`[^.\n]*`implemented`/);
+    }
+    assert.match(read("docs/platform-sensitive-data-migration.md"), /platform-admin sensitive-data-migrate/);
+  });
+
   it("documents the policy review workflow routes", () => {
     const source = read("README.md");
 

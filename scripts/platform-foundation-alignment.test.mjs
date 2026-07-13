@@ -7,10 +7,14 @@ import { describe, it } from "node:test";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
-const completedProgramTaskIDs = ["runtime-security-containment", "admin-watermark-export-governance", "sensitive-data-protection-runtime"];
+const completedProgramTaskIDs = [
+  "runtime-security-containment",
+  "admin-watermark-export-governance",
+  "sensitive-data-protection-runtime",
+  "sensitive-data-historical-migration",
+];
 
 const remainingCompletionProgramTaskIDs = [
-  "sensitive-data-historical-migration",
   "open-source-portability",
   "public-docs-community",
   "public-docs-site",
@@ -36,7 +40,7 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
-  it("migrates three completed program nodes to required work and tracks five future nodes", () => {
+  it("migrates four completed program nodes to required work and tracks four future nodes", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
 
     assert.ok(audit.requiredTaskNodes.includes("production-admin-oidc-auth"));

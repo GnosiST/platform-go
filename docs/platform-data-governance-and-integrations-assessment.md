@@ -18,6 +18,8 @@ It does not mark the proposed capabilities as implemented and does not change th
 | Databases | GORM openers are wired for MySQL, PostgreSQL and SQLite. Admin resources, sessions and lifecycle history can use separate DSNs. | This is subsystem separation, not named business datasources or tenant/capability routing. The three wired drivers do not yet have a full-platform certification matrix; `PLATFORM_DATABASE_DRIVER` and `PLATFORM_DATABASE_DSN` are not wired into process composition. Oracle and KingbaseES are not implemented or certified. |
 | Messaging and search | Redis Pub/Sub distributes cache invalidation and triggers resource/session reload paths. Notification and job profiles provide resource contracts only. | This is best-effort cache coherence, not a durable message bus. There is no transactional outbox, worker engine, Kafka/RabbitMQ/NATS adapter, Elasticsearch/OpenSearch adapter or replay/DLQ runtime. |
 
+The `sensitive-data-historical-migration` node is `implemented` as a maintenance-only CLI with manifest-derived targeting, inventory, dry-run, prepare, apply, verify, restore rehearsal and guarded rollback. MySQL and PostgreSQL remain production targets that require real driver/version integration rehearsal and certification evidence before promotion; SQLite is limited to local development/test rehearsal, and Oracle and KingbaseES remain uncertified.
+
 ## Recommended Architecture Decisions
 
 ### Sensitive Data Display And Controlled Reveal
@@ -138,7 +140,7 @@ sensitive-data-protection-runtime
 Stage gates:
 
 1. Keep the implemented `sensitive-data-protection-runtime` contract stable: versioned encryption, explicit normalizers, key-provider configuration, protected persistence and authorized internal projection are now available.
-2. Finish `sensitive-data-historical-migration` with inventory, dry-run, resumable batches, verification and rollback evidence.
+2. Keep the implemented `sensitive-data-historical-migration` contract stable: no HTTP route or plaintext dual-read, prepare-only journal creation, bounded resumable batches, verification, encrypted escrow and hash-guarded rollback. Require external backup/restore evidence and real MySQL/PostgreSQL integration certification before production promotion.
 3. Add `mask-strategy-runtime`; prove list, detail, Tooltip and export projections use the same backend-owned strategies.
 4. Add `sensitive-data-reveal-step-up`; start with OIDC re-authentication and SMS OTP, short-lived single-use grants, rate limits and append-only audit. Add other factors only through registered adapters.
 5. Add `data-lifecycle-retention`; declare deletion semantics per resource, then implement restore, final purge and a disabled-by-default maintenance runner.
@@ -147,15 +149,16 @@ Stage gates:
 8. Add disabled/no-op messaging and search ports, then a transactional outbox. Promote exactly one MQ adapter for the first real workload and build search as an asynchronous projection with rebuild and replay paths.
 9. Synchronize the open-source manuals, operator runbook, compatibility matrix and public docs site before GitHub publication. Experimental adapters must remain clearly labeled.
 
-The first two nodes already belong to the completion program. The newly proposed nodes must not silently reuse existing closeouts. If approved, the task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation expand together. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
+The first two nodes are implemented in the completion program. The newly proposed nodes must not silently reuse existing closeouts. If approved, the task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation expand together. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
 
 ## Release Recommendation
 
-Before a public v0.1 release, complete sensitive-data historical migration, publish honest deletion semantics, and avoid claiming database or integration support without a passing matrix. The configurable encryption runtime is implemented, but controlled reveal, named datasources and disabled integration ports remain future foundation capabilities. Vendor-specific Oracle, KingbaseES, MQ and search adapters may ship in staged releases only when their experimental status and verification limits are explicit.
+Before a public v0.1 release, retain the historical-migration runbook and external promotion evidence boundary, publish honest deletion semantics, and avoid claiming database or integration support without a passing matrix. The configurable encryption runtime and offline historical migration are implemented, but controlled reveal, named datasources and disabled integration ports remain future foundation capabilities. Vendor-specific Oracle, KingbaseES, MQ and search adapters may ship in staged releases only when their experimental status and verification limits are explicit.
 
 ## Source Evidence
 
 - Field and projection policies: `internal/platform/capability/manifest.go`, `internal/platform/adminresource/security.go`.
+- Historical migration: `docs/platform-sensitive-data-migration.md`, `internal/platform/sensitivemigration/`, `internal/platform/adminresource/sensitive_migration_gorm.go`, `internal/platform/bootstrap/sensitive_migration.go`, `cmd/platform-admin/main.go`.
 - Admin value rendering: `admin/src/platform/resources/GenericResourceConsole.tsx`, `admin/src/platform/ui/AdminPrimitives.tsx`.
 - Phone masking and verification: `internal/platform/httpapi/app_phone.go`, `internal/platform/httpapi/phone_protection.go`.
 - Password and transport boundaries: `cmd/platform-api/main.go`, `internal/platform/httpapi/security_headers.go`.

@@ -64,10 +64,10 @@
     "production-admin-oidc-auth",
     "runtime-security-containment",
     "admin-watermark-export-governance",
-    "sensitive-data-protection-runtime"
+    "sensitive-data-protection-runtime",
+    "sensitive-data-historical-migration"
   ],
   "requiredFutureTaskNodes": [
-    "sensitive-data-historical-migration",
     "open-source-portability",
     "public-docs-community",
     "public-docs-site",
@@ -271,6 +271,7 @@
       "scripts/validate-platform-task-execution-audit.mjs",
       "scripts/validate-platform-goal-completion-audit.mjs",
       "scripts/validate-platform-objective-conformance.mjs",
+      "scripts/validate-platform-sensitive-data-migration.mjs",
       "scripts/validate-platform-promotion-evidence-templates.mjs",
       "scripts/validate-platform-file-storage-experience.mjs",
       "scripts/validate-platform-refresh-token-family-promotion.mjs",
@@ -348,6 +349,7 @@
     "scripts/validate-platform-task-execution-audit.mjs",
     "scripts/validate-platform-goal-completion-audit.mjs",
     "scripts/validate-platform-objective-conformance.mjs",
+    "scripts/validate-platform-sensitive-data-migration.mjs",
     "scripts/validate-platform-promotion-evidence-templates.mjs",
     "scripts/validate-admin-i18n.mjs",
     "scripts/validate-admin-ui-contracts.mjs",
@@ -359,6 +361,7 @@
     "docs/platform-foundation-task-map.md",
     "docs/platform-capability-development.md",
     "docs/platform-roadmap.md",
+    "docs/platform-sensitive-data-migration.md",
     "docs/platform-ui-optimization-assessment.md",
     "docs/admin-ui-foundation.md",
     "design-qa.md"

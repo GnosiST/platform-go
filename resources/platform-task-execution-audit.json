@@ -17,7 +17,6 @@
     "parallelBatchesMustAvoidDependencyPaths": true
   },
   "requiredUnfinishedNodes": [
-    "sensitive-data-historical-migration",
     "open-source-portability",
     "public-docs-community",
     "public-docs-site",
@@ -79,11 +78,13 @@
     "scripts/validate-platform-refresh-token-family-promotion.mjs",
     "scripts/validate-platform-goal-completion-audit.mjs",
     "scripts/validate-platform-node-closeout-audit.mjs",
+    "scripts/validate-platform-sensitive-data-migration.mjs",
     "scripts/validate-platform-objective-conformance.mjs",
     "scripts/validate-platform-promotion-evidence-templates.mjs",
     "scripts/validate-platform-promotion-evidence-package.mjs"
   ],
   "requiredTests": [
-    "scripts/platform-task-execution-audit.test.mjs"
+    "scripts/platform-task-execution-audit.test.mjs",
+    "scripts/platform-sensitive-data-migration.test.mjs"
   ]
 }

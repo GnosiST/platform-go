@@ -68,13 +68,13 @@ describe("validate-platform-engineering-capabilities", () => {
     const capabilities = matrix.capabilities.filter((item) => completionProgramCapabilityIDs.includes(item.id));
 
     assert.deepEqual(capabilities.map((item) => item.id), completionProgramCapabilityIDs);
-    for (const capability of capabilities.slice(0, 2)) {
+    for (const capability of capabilities.slice(0, 3)) {
       assert.equal(capability.status, "implemented");
       assert.ok(capability.evidence.sourcePaths.length > 0);
       assert.ok(capability.evidence.tests.length > 0);
       assert.ok(capability.evidence.validators.length > 0);
     }
-    assert.ok(capabilities.slice(2).every((item) => item.status === "partial"));
+    assert.ok(capabilities.slice(3).every((item) => item.status === "partial"));
   });
 
   it("rejects regressing watermark governance to partial after closeout", () => {
@@ -95,6 +95,16 @@ describe("validate-platform-engineering-capabilities", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /required implemented capability runtime-security-containment must stay implemented/);
+  });
+
+  it("keeps sensitive data migration evidence implemented after closeout", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    const capability = matrix.capabilities.find((item) => item.id === "sensitive-data-protection");
+
+    assert.equal(capability.status, "implemented");
+    assert.ok(capability.evidence.sourcePaths.includes("docs/platform-sensitive-data-migration.md"));
+    assert.ok(capability.evidence.tests.includes("scripts/platform-sensitive-data-migration.test.mjs"));
+    assert.ok(capability.evidence.validators.includes("scripts/validate-platform-sensitive-data-migration.mjs"));
   });
 
   it("rejects dropping an approved completion program capability", () => {

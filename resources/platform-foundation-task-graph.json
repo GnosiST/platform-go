@@ -1974,15 +1974,7 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
-      "statusReason": {
-        "zh": "历史明文盘点、批次迁移、校验、恢复和回滚尚未在加密运行时基础上实现。",
-        "en": "Historical plaintext inventory, batch migration, verification, resume and rollback are not yet implemented on the encryption runtime."
-      },
-      "completionGate": {
-        "zh": "实现 dry-run、租户批次游标、幂等迁移、完整性校验、备份恢复演练和可审计回滚。",
-        "en": "Implement dry-run, tenant batch cursors, idempotent migration, integrity verification, backup-restore rehearsal and auditable rollback."
-      },
+      "status": "implemented",
       "resourceLocks": [
         "data-protection",
         "migration-runtime",
@@ -1997,7 +1989,41 @@
         "docs": [
           "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
           "docs/superpowers/specs/2026-07-12-sensitive-data-encryption-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+          "docs/superpowers/specs/2026-07-12-sensitive-data-historical-migration-design.md",
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
+          "docs/superpowers/plans/2026-07-12-sensitive-data-historical-migration.md",
+          "docs/platform-sensitive-data-migration.md",
+          "docs/admin-resource-schema.md",
+          "docs/platform-deployment.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-foundation-task-map.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-sensitive-data-migration.mjs",
+          "scripts/validate-platform-foundation-task-graph.mjs",
+          "scripts/validate-platform-foundation-alignment.mjs",
+          "scripts/validate-platform-task-execution-audit.mjs",
+          "scripts/validate-platform-goal-completion-audit.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs",
+          "scripts/validate-platform-objective-conformance.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs"
+        ],
+        "tests": [
+          "internal/platform/capability/admin_contract_test.go",
+          "internal/platform/sensitivemigration/plan_test.go",
+          "internal/platform/sensitivemigration/runner_test.go",
+          "internal/platform/adminresource/sensitive_migration_gorm_test.go",
+          "cmd/platform-admin/main_test.go",
+          "internal/platform/bootstrap/sensitive_migration_test.go",
+          "internal/platform/storage/gorm_test.go",
+          "scripts/platform-sensitive-data-migration.test.mjs"
+        ],
+        "checks": [
+          "rtk go test ./internal/platform/capability ./internal/platform/sensitivemigration ./internal/platform/adminresource ./cmd/platform-admin ./internal/platform/bootstrap ./internal/platform/storage -count=1",
+          "rtk node scripts/validate-platform-sensitive-data-migration.mjs",
+          "rtk node --test scripts/platform-sensitive-data-migration.test.mjs",
+          "rtk node --test scripts/*.test.mjs",
+          "rtk git diff --check"
         ]
       }
     },

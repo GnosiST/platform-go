@@ -21,7 +21,7 @@ The `zshenmez` project is only external reference evidence for reusable capabili
 
 ## Active Completion Program
 
-The original 37-node foundation baseline remains implemented and closed. The active completion program originally added eight controlled nodes; `runtime-security-containment`, `admin-watermark-export-governance` and `sensitive-data-protection-runtime` are `implemented`, so the current governance state is `45 total / 40 implemented / 5 controlled unfinished` with `completionStatus=not-complete-controlled`. The remaining nodes, in task-graph order, are `sensitive-data-historical-migration`, `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`. This does not reopen the baseline and does not approve production auth promotion, refresh-token-family default runtime, source writing or external publication.
+The original 37-node foundation baseline remains implemented and closed. The active completion program originally added eight controlled nodes; `runtime-security-containment`, `admin-watermark-export-governance`, `sensitive-data-protection-runtime` and `sensitive-data-historical-migration` are `implemented`, so the current governance state is `45 total / 41 implemented / 4 controlled unfinished` with `completionStatus=not-complete-controlled`. The remaining nodes, in task-graph order, are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`. This does not reopen the baseline, certify MySQL/PostgreSQL migration without real integration rehearsal evidence or approve production auth promotion, refresh-token-family default runtime, source writing or external publication.
 
 Admin watermark preferences now use one normalized switch with independent `screen` and `export` scopes. Screen watermarks render exactly `1`, `4`, `9` or `16` inert DOM marks and preserve legacy boolean settings. Export watermarking is intentionally limited to `GET /api/admin/policy-reviews/export?watermark=true|false`: the returned JSON carries structured product, actor and timestamp provenance, while the audit record stores only `watermarkApplied=true|false`. Canonical OpenAPI output, original file bytes and unsupported export formats remain unchanged.
 
@@ -98,7 +98,7 @@ GET /api/app/files/:id/content
 GET /api/app/session/current
 ```
 
-See `docs/platform-auth.md`, `docs/admin-rbac-menu.md`, `docs/admin-resource-schema.md`, `docs/platform-branding.md`, `docs/platform-cache.md` and `docs/platform-capability-development.md` for detailed contracts.
+See `docs/platform-auth.md`, `docs/admin-rbac-menu.md`, `docs/admin-resource-schema.md`, `docs/platform-sensitive-data-migration.md`, `docs/platform-branding.md`, `docs/platform-cache.md` and `docs/platform-capability-development.md` for detailed contracts and the offline migration runbook.
 
 ## Contract Gates
 
@@ -140,6 +140,7 @@ rtk node scripts/validate-platform-task-execution-audit.mjs
 rtk node scripts/validate-platform-goal-completion-audit.mjs
 rtk node scripts/validate-platform-node-closeout-audit.mjs
 rtk node scripts/validate-platform-objective-conformance.mjs
+rtk node scripts/validate-platform-sensitive-data-migration.mjs
 rtk node scripts/validate-platform-promotion-evidence-templates.mjs
 rtk node scripts/validate-platform-promotion-evidence-package.mjs --package <promotion-evidence-package>
 rtk node scripts/validate-platform-file-storage-experience.mjs

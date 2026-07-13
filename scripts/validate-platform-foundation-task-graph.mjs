@@ -336,6 +336,29 @@ function validateTask(task, context, errors) {
       errors,
     );
   }
+  if (task.id === "sensitive-data-historical-migration") {
+    if (task.status !== "implemented") {
+      errors.push("sensitive-data-historical-migration must stay implemented after closeout");
+    }
+    requireIncludes(
+      task.evidence?.docs,
+      ["docs/platform-sensitive-data-migration.md", "docs/superpowers/specs/2026-07-12-sensitive-data-historical-migration-design.md"],
+      `${task.id} evidence.docs`,
+      errors,
+    );
+    requireIncludes(
+      task.evidence?.tests,
+      ["internal/platform/sensitivemigration/runner_test.go", "scripts/platform-sensitive-data-migration.test.mjs"],
+      `${task.id} evidence.tests`,
+      errors,
+    );
+    requireIncludes(
+      task.evidence?.validators,
+      ["scripts/validate-platform-sensitive-data-migration.mjs", "scripts/validate-platform-node-closeout-audit.mjs"],
+      `${task.id} evidence.validators`,
+      errors,
+    );
+  }
   if (task.status === "implemented" || task.status === "preview") {
     const evidence = task.evidence ?? {};
     const evidencePaths = evidencePathKeys.flatMap((key) => values(evidence[key]));

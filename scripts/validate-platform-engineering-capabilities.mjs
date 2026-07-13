@@ -55,9 +55,9 @@ const requiredImplementedCapabilityIDs = [
   "deployment-topology-gate",
   "runtime-security-containment",
   "admin-watermark-export-governance",
+  "sensitive-data-protection",
 ];
 const requiredPartialCapabilityIDs = [
-  "sensitive-data-protection",
   "open-source-portability",
   "public-documentation-and-release",
 ];

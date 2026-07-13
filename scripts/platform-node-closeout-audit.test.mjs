@@ -9,7 +9,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "sensitive-data-historical-migration",
   "open-source-portability",
   "public-docs-community",
   "public-docs-site",
@@ -84,7 +83,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("preserves 37 baseline closeouts, closes three completion nodes, and tracks five pending nodes", () => {
+  it("preserves 37 baseline closeouts, closes four completion nodes, and tracks four pending nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -92,7 +91,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(task, "task graph must include production-admin-oidc-auth");
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
-    assert.equal(audit.nodeCloseouts.length, 40);
+    assert.equal(audit.nodeCloseouts.length, 41);
     assert.deepEqual(audit.nodeCloseouts.slice(0, 37).map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
     assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts.slice(0, 37))).digest("hex"), foundationBaselineCloseoutDigest);
     const runtimeSecurityCloseout = audit.nodeCloseouts[37];
@@ -113,6 +112,14 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.equal(sensitiveDataCloseout.status, "closed");
     assert.equal(sensitiveDataCloseout.neatFreak, true);
     assert.ok(sensitiveDataCloseout.cleanupEvidence.includes("internal/platform/adminresource/protection_test.go"));
+    const migrationCloseout = audit.nodeCloseouts.find((item) => item.taskId === "sensitive-data-historical-migration");
+    assert.equal(migrationCloseout.status, "closed");
+    assert.equal(migrationCloseout.neatFreak, true);
+    assert.equal("visualEvidence" in migrationCloseout, false);
+    assert.ok(migrationCloseout.cleanupEvidence.includes("docs/platform-sensitive-data-migration.md"));
+    assert.ok(migrationCloseout.cleanupEvidence.includes("docs/platform-data-governance-and-integrations-assessment.md"));
+    assert.ok(migrationCloseout.cleanupEvidence.includes("scripts/validate-platform-sensitive-data-migration.mjs"));
+    assert.ok(migrationCloseout.cleanupEvidence.includes("scripts/platform-foundation-docs-drift.test.mjs"));
     assert.deepEqual(audit.pendingNodeEvidence, completionProgramTaskIDs);
   });
 

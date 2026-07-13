@@ -2683,7 +2683,7 @@
         "zh": "敏感数据保护",
         "en": "Sensitive Data Protection"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Provide versioned field policies, application-layer encryption, blind indexes and controlled historical migration for recoverable personal data.",
       "dependsOn": [
         "dynamic-admin-resources",
@@ -2695,13 +2695,20 @@
           "docs/superpowers/specs/2026-07-12-sensitive-data-encryption-design.md",
           "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
           "docs/superpowers/plans/2026-07-12-sensitive-data-protection-runtime.md",
+          "docs/superpowers/specs/2026-07-12-sensitive-data-historical-migration-design.md",
+          "docs/superpowers/plans/2026-07-12-sensitive-data-historical-migration.md",
+          "docs/platform-sensitive-data-migration.md",
           "internal/platform/capability/manifest.go",
           "internal/platform/adminresource/security.go",
           "internal/platform/adminresource/query.go",
           "internal/platform/adminresource/store.go",
           "internal/platform/dataprotection/runtime.go",
           "internal/platform/bootstrap/data_protection.go",
-          "cmd/platform-api/main.go"
+          "internal/platform/sensitivemigration/runner.go",
+          "internal/platform/adminresource/sensitive_migration_gorm.go",
+          "internal/platform/bootstrap/sensitive_migration.go",
+          "cmd/platform-api/main.go",
+          "cmd/platform-admin/main.go"
         ],
         "tests": [
           "internal/platform/capability/admin_contract_test.go",
@@ -2709,13 +2716,19 @@
           "internal/platform/dataprotection/runtime_test.go",
           "internal/platform/bootstrap/admin_resources_test.go",
           "internal/platform/httpapi/data_protection_test.go",
-          "scripts/platform-production-env.test.mjs"
+          "internal/platform/sensitivemigration/runner_test.go",
+          "internal/platform/adminresource/sensitive_migration_gorm_test.go",
+          "cmd/platform-admin/main_test.go",
+          "internal/platform/bootstrap/sensitive_migration_test.go",
+          "scripts/platform-production-env.test.mjs",
+          "scripts/platform-sensitive-data-migration.test.mjs"
         ],
         "validators": [
           "scripts/validate-admin-resources.mjs",
           "scripts/validate-platform-production-env.mjs",
           "scripts/validate-platform-production-readiness.mjs",
           "scripts/validate-platform-deployment-topology.mjs",
+          "scripts/validate-platform-sensitive-data-migration.mjs",
           "scripts/validate-platform-engineering-capabilities.mjs"
         ],
         "taskIds": [

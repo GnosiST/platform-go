@@ -106,7 +106,9 @@ Supported normalizers are `raw-v1`, `trim-v1`, `email-v1`, `phone-e164-cn-v1` an
 
 The Store assigns the record ID before encryption, creates an AES-256-GCM envelope, and persists the blind-index metadata inside that envelope. Ordinary response and export projection omit encrypted values and never decrypt. `ProjectRecordPrivileged` authorizes each field before calling `Reveal`; this runtime does not expose a privileged HTTP endpoint. Hashed fields remain one-way and are never revealable. File, SQL and GORM repositories persist opaque envelopes without understanding the field policy.
 
-Format, normalization, namespace, tenant scope and schema version are compatibility contracts once data exists. Startup authenticates stored envelopes and fails when policy drifts or a referenced historical key is missing or replaced. Historical plaintext migration remains a separate pending node.
+Format, normalization, namespace, tenant scope and schema version are compatibility contracts once data exists. Startup authenticates stored envelopes and fails when policy drifts or a referenced historical key is missing or replaced.
+
+Historical migration is implemented through the offline `platform-admin sensitive-data-migrate` command. The plan includes every encrypted field declared by enabled manifests when `Source="values"`; it never infers sensitivity from field names. Inventory, dry-run and verify are read-only and never create journal tables. `prepare` is the sole journal-creation mode, while apply uses bounded tenant cursors, encrypted escrow, append-only events, checkpoints and global revision compare-and-swap. Encrypted fields duplicated into normalized columns or relation tables fail physical-layout validation. Ordinary Store loading continues to reject plaintext, and no migration HTTP endpoint exists. See [Sensitive Data Historical Migration Runbook](platform-sensitive-data-migration.md).
 
 ## Current Behavior
 
