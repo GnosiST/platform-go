@@ -1,8 +1,11 @@
 package bootstrap
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -108,6 +111,81 @@ func TestSensitiveDataMigrationBuildsManifestPlanAndReadOnlyModesDoNotCreateJour
 	}
 	if err := migration.Close(); err != nil {
 		t.Fatalf("Close() error = %v", err)
+	}
+}
+
+func TestSensitiveDataMigrationSilencesStorageInitializationErrors(t *testing.T) {
+	const (
+		helperEnvironment = "PLATFORM_TEST_SENSITIVE_MIGRATION_OPEN_FAILURE"
+		secretMarker      = "sensitive-bootstrap-dsn-marker"
+	)
+	if os.Getenv(helperEnvironment) == "1" {
+		cfg := dataProtectionConfigForTest(config.RuntimeEnvironmentTest, dataprotection.ProviderLocalTest)
+		cfg.AdminResourceDriver = "postgres"
+		cfg.AdminResourceDSN = "postgres://" + secretMarker + ":password@127.0.0.1:1/platform?sslmode=disable"
+		cfg.Capabilities = []string{"protected-bootstrap-test"}
+		migration, err := OpenSensitiveDataMigration(cfg, sensitiveMigrationTestManifest())
+		if migration != nil {
+			_ = migration.Close()
+			t.Fatal("OpenSensitiveDataMigration() returned a session for an invalid DSN")
+		}
+		if !errors.Is(err, ErrSensitiveDataMigrationStorage) {
+			t.Fatalf("OpenSensitiveDataMigration() error = %v, want storage category", err)
+		}
+		if strings.Contains(err.Error(), secretMarker) {
+			t.Fatalf("OpenSensitiveDataMigration() error exposed DSN marker: %q", err)
+		}
+		return
+	}
+
+	command := exec.Command(os.Args[0], "-test.run=^TestSensitiveDataMigrationSilencesStorageInitializationErrors$")
+	command.Env = append(os.Environ(), helperEnvironment+"=1")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	command.Stdout = &stdout
+	command.Stderr = &stderr
+	if err := command.Run(); err != nil {
+		t.Fatalf("helper test error = %v, stdout=%q stderr=%q", err, stdout.String(), stderr.String())
+	}
+	childOutput := strings.TrimPrefix(stdout.String(), "PASS\n")
+	if childOutput != "" || stderr.Len() != 0 || strings.Contains(stdout.String()+stderr.String(), secretMarker) {
+		t.Fatalf("bootstrap output stdout=%q stderr=%q, want silent initialization failure", stdout.String(), stderr.String())
+	}
+}
+
+func TestSensitiveDataMigrationSQLiteEnvironmentPolicy(t *testing.T) {
+	manifest := sensitiveMigrationTestManifest()
+	for _, environment := range []string{config.RuntimeEnvironmentDevelopment, config.RuntimeEnvironmentTest} {
+		t.Run(environment, func(t *testing.T) {
+			cfg := dataProtectionConfigForTest(environment, dataprotection.ProviderLocalTest)
+			cfg.AdminResourceDriver = "sqlite"
+			cfg.AdminResourceDSN = filepath.Join(t.TempDir(), "sensitive-migration.db")
+			cfg.Capabilities = []string{"protected-bootstrap-test"}
+			migration, err := OpenSensitiveDataMigration(cfg, manifest)
+			if err != nil {
+				t.Fatalf("OpenSensitiveDataMigration() error = %v", err)
+			}
+			if err := migration.Close(); err != nil {
+				t.Fatalf("Close() error = %v", err)
+			}
+		})
+	}
+
+	for _, environment := range []string{config.RuntimeEnvironmentStaging, config.RuntimeEnvironmentProduction} {
+		t.Run(environment, func(t *testing.T) {
+			cfg := dataProtectionConfigForTest(environment, dataprotection.ProviderEnvAES256)
+			cfg.AdminResourceDriver = "sqlite"
+			cfg.AdminResourceDSN = filepath.Join(t.TempDir(), "sensitive-migration.db")
+			cfg.Capabilities = []string{"protected-bootstrap-test"}
+			migration, err := OpenSensitiveDataMigration(cfg, manifest)
+			if migration != nil {
+				_ = migration.Close()
+				t.Fatalf("OpenSensitiveDataMigration() returned a %s SQLite session", environment)
+			}
+			if !errors.Is(err, ErrSensitiveDataMigrationConfig) {
+				t.Fatalf("OpenSensitiveDataMigration() error = %v, want configuration category", err)
+			}
+		})
 	}
 }
 

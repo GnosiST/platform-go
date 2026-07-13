@@ -344,11 +344,40 @@ func TestRunSensitiveDataMigrationClosesSessionAndNormalizesOperationalErrors(t 
 	})
 }
 
+func TestRunSensitiveDataMigrationEmitsReportBeforeNormalizedCloseFailure(t *testing.T) {
+	secret := "sensitive-close-failure-marker"
+	session := &fakeSensitiveMigrationSession{
+		planHash: "sha256:" + strings.Repeat("a", 64),
+		report: sensitivemigration.Report{
+			RunID: "run-close-failure", Mode: sensitivemigration.ModeInventory, Status: sensitivemigration.StatusCompleted,
+		},
+		closeErr: errors.New(secret),
+	}
+	result := executeWithSensitiveMigration(t, []string{"sensitive-data-migrate", "--mode", "inventory"}, session, nil)
+	if result.err == nil || result.err.Error() != "close sensitive data migration storage" {
+		t.Fatalf("run() error = %v, want normalized close failure", result.err)
+	}
+	if strings.Contains(result.err.Error()+result.stdout+result.stderr, secret) {
+		t.Fatalf("result exposed close failure value: %+v", result)
+	}
+	if result.stderr != "" || strings.Count(result.stdout, "\n") != 1 {
+		t.Fatalf("stdout=%q stderr=%q, want one JSON line and empty stderr", result.stdout, result.stderr)
+	}
+	var report sensitivemigration.Report
+	if err := json.Unmarshal([]byte(result.stdout), &report); err != nil {
+		t.Fatalf("stdout is not a JSON Report: %v", err)
+	}
+	if report != session.report || session.closes != 1 {
+		t.Fatalf("report=%+v closes=%d, want %+v and one close", report, session.closes, session.report)
+	}
+}
+
 type fakeSensitiveMigrationSession struct {
 	planHash string
 	options  sensitivemigration.Options
 	report   sensitivemigration.Report
 	err      error
+	closeErr error
 	closes   int
 }
 
@@ -361,7 +390,7 @@ func (s *fakeSensitiveMigrationSession) Run(_ context.Context, options sensitive
 
 func (s *fakeSensitiveMigrationSession) Close() error {
 	s.closes++
-	return nil
+	return s.closeErr
 }
 
 func executeWithSensitiveMigration(t *testing.T, args []string, session sensitiveMigrationSession, openErr error) executionResult {

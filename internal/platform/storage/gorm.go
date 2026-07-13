@@ -18,7 +18,7 @@ type Config struct {
 	DSN    string
 }
 
-func OpenGORM(config Config) (*gorm.DB, error) {
+func OpenGORM(config Config, options ...gorm.Option) (*gorm.DB, error) {
 	driver := strings.TrimSpace(config.Driver)
 	dsn := strings.TrimSpace(config.DSN)
 	if dsn == "" {
@@ -26,11 +26,11 @@ func OpenGORM(config Config) (*gorm.DB, error) {
 	}
 	switch driver {
 	case "mysql":
-		return gorm.Open(mysql.Open(dsn), &gorm.Config{})
+		return gorm.Open(mysql.Open(dsn), options...)
 	case "postgres":
-		return gorm.Open(postgres.Open(dsn), &gorm.Config{})
+		return gorm.Open(postgres.Open(dsn), options...)
 	case "sqlite":
-		return gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+		return gorm.Open(sqlite.Open(dsn), options...)
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnknownDriver, driver)
 	}

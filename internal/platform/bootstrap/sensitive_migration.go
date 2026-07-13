@@ -14,6 +14,7 @@ import (
 	"platform-go/internal/platform/storage"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 var (
@@ -34,7 +35,12 @@ type SensitiveDataMigration struct {
 func OpenSensitiveDataMigration(cfg config.Config, additionalManifests ...capability.Manifest) (*SensitiveDataMigration, error) {
 	driver := strings.TrimSpace(cfg.AdminResourceDriver)
 	dsn := strings.TrimSpace(cfg.AdminResourceDSN)
-	if cfg.AdminResourceDriver != driver || cfg.AdminResourceDSN != dsn || strings.TrimSpace(cfg.AdminResourceFile) != "" || dsn == "" || !sensitiveMigrationGORMDriver(driver) {
+	environment := strings.ToLower(strings.TrimSpace(cfg.RuntimeEnvironment))
+	if environment == "" {
+		environment = config.RuntimeEnvironmentDevelopment
+	}
+	if cfg.AdminResourceDriver != driver || cfg.AdminResourceDSN != dsn || strings.TrimSpace(cfg.AdminResourceFile) != "" || dsn == "" ||
+		!sensitiveMigrationGORMDriver(driver) || driver == "sqlite" && !sensitiveMigrationLocalEnvironment(environment) {
 		return nil, ErrSensitiveDataMigrationConfig
 	}
 
@@ -51,7 +57,7 @@ func OpenSensitiveDataMigration(cfg config.Config, additionalManifests ...capabi
 		return nil, ErrSensitiveDataMigrationRuntime
 	}
 
-	db, err := storage.OpenGORM(storage.Config{Driver: driver, DSN: dsn})
+	db, err := storage.OpenGORM(storage.Config{Driver: driver, DSN: dsn}, &gorm.Config{Logger: logger.Discard})
 	if err != nil {
 		return nil, ErrSensitiveDataMigrationStorage
 	}
@@ -109,4 +115,8 @@ func sensitiveMigrationGORMDriver(driver string) bool {
 	default:
 		return false
 	}
+}
+
+func sensitiveMigrationLocalEnvironment(environment string) bool {
+	return environment == config.RuntimeEnvironmentDevelopment || environment == config.RuntimeEnvironmentTest
 }

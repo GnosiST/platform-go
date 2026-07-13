@@ -215,13 +215,13 @@ func runSensitiveDataMigration(ctx context.Context, args []string, stdout, stder
 	if err != nil {
 		return errors.New("sensitive data migration failed")
 	}
+	if err := json.NewEncoder(stdout).Encode(report); err != nil {
+		return errors.New("write sensitive data migration report")
+	}
 	closeErr := session.Close()
 	closed = true
 	if closeErr != nil {
 		return errors.New("close sensitive data migration storage")
-	}
-	if err := json.NewEncoder(stdout).Encode(report); err != nil {
-		return errors.New("write sensitive data migration report")
 	}
 	return nil
 }
