@@ -154,14 +154,37 @@ function goCaseBlock(source, caseName) {
   return rest.slice(0, end);
 }
 
+function closingBrace(source, openingIndex) {
+  let depth = 0;
+  for (let index = openingIndex; index < source.length; index += 1) {
+    if (source[index] === "{") depth += 1;
+    if (source[index] === "}") {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
 function acceptedDriverCases(source) {
   const gate = goFunction(source, "sensitiveMigrationGORMDriver");
-  if (!gate || /default\s*:\s*return\s+true/.test(gate)) return [];
+  if (!gate || /\b(?:fallthrough|goto)\b/.test(gate) || /default\s*:\s*return\s+true/.test(gate)) return [];
+  const functionOpening = gate.indexOf("{");
+  const functionBody = gate.slice(functionOpening + 1, -1).trim();
+  const switchMatch = /^switch\s+driver\s*\{/.exec(functionBody);
+  if (!switchMatch) return [];
+  const switchOpening = functionBody.indexOf("{", switchMatch.index);
+  const switchClosing = closingBrace(functionBody, switchOpening);
+  if (switchClosing === -1 || functionBody.slice(switchClosing + 1).trim() !== "") return [];
+  const switchBody = functionBody.slice(switchOpening + 1, switchClosing);
   const returns = [...gate.matchAll(/\breturn\b/g)];
   const booleanReturns = [...gate.matchAll(/\breturn\s+(true|false)\b/g)].map((match) => match[1]);
   if (returns.length !== 2 || !sameList(booleanReturns, ["true", "false"])) return [];
+  const allCases = [...switchBody.matchAll(/case\s+([^:]+):/g)].flatMap((match) =>
+    [...match[1].matchAll(/"([^"]+)"/g)].map((item) => item[1]));
+  if (!sameList(allCases.sort(), ["mysql", "postgres", "sqlite"])) return [];
   const accepted = [];
-  for (const match of gate.matchAll(/case\s+([^:]+):([\s\S]*?)(?=\n\s*(?:case\s+|default\s*:|}))/g)) {
+  for (const match of switchBody.matchAll(/case\s+([^:]+):([\s\S]*?)(?=\n\s*(?:case\s+|default\s*:|$))/g)) {
     if (!/\breturn\s+true\b/.test(match[2])) continue;
     accepted.push(...[...match[1].matchAll(/"([^"]+)"/g)].map((item) => item[1]));
   }
@@ -194,14 +217,13 @@ function validateRunbook(runbook, errors) {
   }
 
   const codeBlocks = [...runbook.matchAll(/```(?:bash|text)?\n([\s\S]*?)```/g)].map((match) => match[1]).join("\n");
-  if (/pgo:enc:v\d+:/i.test(codeBlocks) || /\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/.test(codeBlocks) || /\b1\d{10}\b/.test(codeBlocks)) {
-    errors.push("runbook command examples must not contain encrypted values or PII");
+  const operationalValues = [
+    ...codeBlocks.matchAll(/--(?:run-id|actor|reason|approval-ref|backup-uri|backup-sha256|restore-evidence-ref)\s+(?:"([^"]*)"|'([^']*)'|([^\s\\]+))/g),
+    ...codeBlocks.matchAll(/PLATFORM_DATABASE_DSN\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s\\]+))/g),
+  ];
+  if (operationalValues.some((match) => !safeEvidencePlaceholder(match[1] ?? match[2] ?? match[3] ?? ""))) {
+    errors.push("runbook command examples must use environment references or redacted placeholders");
   }
-  if (/PLATFORM_DATABASE_DSN\s*=\s*(?!["']?\$)/.test(codeBlocks)) {
-    errors.push("runbook command examples must not contain a DSN value");
-  }
-  const sensitiveLiteral = /--(?:run-id|actor|reason|approval-ref|backup-uri|backup-sha256|restore-evidence-ref)\s+(?!["']?\$)[^\s\\]+/;
-  if (sensitiveLiteral.test(codeBlocks)) errors.push("runbook command examples must use environment references for operational evidence values");
 }
 
 function validateSourceContract({ model, cli, bootstrap, protectionSource, apiMain, gormStore, runner, escrow, httpAPI, openAPI }, errors) {
@@ -412,10 +434,11 @@ function validateEvidenceText(label, source, errors) {
     if (sensitiveAssignment(source, aliases)) errors.push(`${label} must not contain a concrete ${kind}`);
   }
   if (plainKeyAssignment(source)) errors.push(`${label} must not contain concrete key material`);
-  if (sensitiveAssignment(source, "record[-_ ]?id", { colonRequiresQuoted: true, unquotedColonPattern: /^record[-_]/i })) {
+  const clearIdentifier = /^(?:record[-_]|tenant[-_]|\d+$|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$|(?=[A-Za-z0-9:_-]*\d)[A-Za-z0-9]+(?:[-_:][A-Za-z0-9]+)+$)/i;
+  if (sensitiveAssignment(source, "record[-_ ]?id", { colonRequiresQuoted: true, unquotedColonPattern: clearIdentifier })) {
     errors.push(`${label} must not contain a concrete record ID`);
   }
-  if (sensitiveAssignment(source, "tenant[-_ ]?id(?:entifier)?", { colonRequiresQuoted: true, unquotedColonPattern: /^tenant[-_]/i })) {
+  if (sensitiveAssignment(source, "tenant[-_ ]?id(?:entifier)?", { colonRequiresQuoted: true, unquotedColonPattern: clearIdentifier })) {
     errors.push(`${label} must not contain a concrete tenant ID`);
   }
 

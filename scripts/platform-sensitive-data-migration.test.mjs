@@ -193,6 +193,26 @@ describe("validate-platform-sensitive-data-migration", () => {
     );
   });
 
+  it("allows redacted runbook command placeholders and a bare envelope prefix", () => {
+    const runbook = `${read("docs/platform-sensitive-data-migration.md")}\n\`\`\`text\npgo:enc:v1:\nPLATFORM_DATABASE_DSN=<redacted>\n\`\`\`\n\`\`\`bash\nplatform-admin sensitive-data-migrate --backup-uri <redacted>\n\`\`\`\n`;
+
+    const result = runValidator(["--runbook", tempText("safe-runbook.md", runbook)]);
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  it("rejects a literal runbook operational evidence value", () => {
+    const source = read("docs/platform-sensitive-data-migration.md");
+    for (const runbook of [
+      source.replace('--backup-uri "$MIGRATION_BACKUP_URI"', "--backup-uri backup-reference-1042"),
+      `${source}\n\`\`\`text\nPLATFORM_DATABASE_DSN=opaque-database-target\n\`\`\`\n`,
+    ]) {
+      assertRejected(
+        runValidator(["--runbook", tempText("literal-runbook.md", runbook)]),
+        /runbook command examples must use environment references or redacted placeholders/i,
+      );
+    }
+  });
+
   it("scans the Task 7 report for secret-bearing assignments", () => {
     const report = "# Task 7 Report\nnonce=actual-nonce-value\n";
 
@@ -253,6 +273,28 @@ describe("validate-platform-sensitive-data-migration", () => {
     }
   });
 
+  it("rejects numeric, UUID and compact colon-form identifiers while allowing placeholders", () => {
+    const safeEvidence = [
+      "record ID: $MIGRATION_RECORD_ID",
+      "tenant ID: ${MIGRATION_TENANT_ID}",
+      "record ID: <redacted>",
+    ].join("\n");
+    const safeResult = runValidator(["--evidence-file", tempText("safe-identifiers.md", safeEvidence)]);
+    assert.equal(safeResult.status, 0, safeResult.stderr);
+
+    for (const fixture of [
+      { name: "record-number", value: "record ID: 1042", expected: /record ID/i },
+      { name: "record-uuid", value: "record ID: 550e8400-e29b-41d4-a716-446655440000", expected: /record ID/i },
+      { name: "tenant-number", value: "tenant ID: 42", expected: /tenant ID/i },
+      { name: "tenant-token", value: "tenant ID: north-tenant-7", expected: /tenant ID/i },
+    ]) {
+      assertRejected(
+        runValidator(["--evidence-file", tempText(`${fixture.name}.md`, `${fixture.value}\n`)]),
+        fixture.expected,
+      );
+    }
+  });
+
   it("rejects email, mainland mobile and Chinese identity PII", () => {
     for (const fixture of [
       { name: "email", value: "owner=alice@example.com", expected: /email/i },
@@ -276,6 +318,10 @@ describe("validate-platform-sensitive-data-migration", () => {
       source.replace(
         "func sensitiveMigrationGORMDriver(driver string) bool {",
         'func sensitiveMigrationGORMDriver(driver string) bool {\n\tif driver == "kingbase" {\n\t\treturn true\n\t}',
+      ),
+      source.replace(
+        '\tcase "mysql", "postgres", "sqlite":',
+        '\tcase "oracle":\n\t\tfallthrough\n\tcase "mysql", "postgres", "sqlite":',
       ),
     ]) {
       assertRejected(
