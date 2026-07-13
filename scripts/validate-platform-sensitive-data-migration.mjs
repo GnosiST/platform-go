@@ -418,7 +418,9 @@ function singleTokenColonIdentifier(source, aliases) {
   const pattern = new RegExp(`["']?(?:${aliases})["']?\\s*:\\s*([^\\r\\n]*)`, "gim");
   for (const match of source.matchAll(pattern)) {
     const remainder = match[1].trim();
-    if (!safeEvidencePlaceholder(remainder) && /^\S+$/.test(remainder)) return true;
+    const quoted = /^(["'])(.*?)\1(?=\s*(?:[,}\]]|#|$))/.exec(remainder);
+    const value = quoted?.[2] ?? remainder;
+    if (!safeEvidencePlaceholder(value) && /^\S+$/.test(value)) return true;
   }
   return false;
 }

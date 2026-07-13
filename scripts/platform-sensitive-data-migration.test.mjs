@@ -332,6 +332,27 @@ describe("validate-platform-sensitive-data-migration", () => {
     }
   });
 
+  it("allows quoted identifier placeholders and rejects quoted literal identifiers", () => {
+    const safeEvidence = [
+      'record ID: "$MIGRATION_RECORD_ID"',
+      "tenant ID: '<redacted>'",
+      '{"record ID":"${MIGRATION_RECORD_ID}"}',
+      "tenant ID: '${MIGRATION_TENANT_ID}'",
+    ].join("\n");
+    const safeResult = runValidator(["--evidence-file", tempText("safe-quoted-identifiers.yaml", safeEvidence)]);
+    assert.equal(safeResult.status, 0, safeResult.stderr);
+
+    for (const fixture of [
+      { name: "quoted-record", value: 'record ID: "acme42"', expected: /record ID/i },
+      { name: "quoted-tenant-json", value: '{"tenant ID":"ACME"}', expected: /tenant ID/i },
+    ]) {
+      assertRejected(
+        runValidator(["--evidence-file", tempText(`${fixture.name}.json`, `${fixture.value}\n`)]),
+        fixture.expected,
+      );
+    }
+  });
+
   it("rejects email, mainland mobile and Chinese identity PII", () => {
     for (const fixture of [
       { name: "email", value: "owner=alice@example.com", expected: /email/i },
