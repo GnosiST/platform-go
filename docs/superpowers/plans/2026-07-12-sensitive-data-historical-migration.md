@@ -1,5 +1,7 @@
 # Sensitive Data Historical Migration Implementation Plan
 
+> **Status:** Completed.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Every behavior change uses test-first RED/GREEN checkpoints and each task receives an independent review.
 
 **Goal:** Ship an offline, tenant-batched and auditable migration command that encrypts historical manifest-declared admin-resource values, verifies them, resumes safely and rolls back through encrypted escrow.
