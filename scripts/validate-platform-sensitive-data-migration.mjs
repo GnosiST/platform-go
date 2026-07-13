@@ -78,9 +78,12 @@ function resolveArg(name, fallback) {
 
 const paths = {
   runbook: resolveArg("--runbook", "docs/platform-sensitive-data-migration.md"),
+  taskReport: resolveArg("--task-report", ".superpowers/sdd/sensitive-data-historical-migration-task-7-report.md"),
   model: resolveArg("--model", "internal/platform/sensitivemigration/model.go"),
   cli: resolveArg("--cli", "cmd/platform-admin/main.go"),
   bootstrap: resolveArg("--bootstrap", "internal/platform/bootstrap/sensitive_migration.go"),
+  protectionSource: resolveArg("--protection-source", "internal/platform/adminresource/security.go"),
+  apiMain: resolveArg("--api-main", "cmd/platform-api/main.go"),
   gormStore: resolveArg("--gorm-store", "internal/platform/adminresource/sensitive_migration_gorm.go"),
   runner: resolveArg("--runner", "internal/platform/sensitivemigration/runner.go"),
   escrow: resolveArg("--escrow", "internal/platform/sensitivemigration/escrow.go"),
@@ -142,6 +145,29 @@ function goFunction(source, name) {
   return "";
 }
 
+function goCaseBlock(source, caseName) {
+  const match = new RegExp(`case\\s+${caseName}\\s*:`).exec(source);
+  if (!match) return "";
+  const start = match.index + match[0].length;
+  const rest = source.slice(start);
+  const end = /\n\s*(?:case\s+|default\s*:)/.exec(rest)?.index ?? rest.length;
+  return rest.slice(0, end);
+}
+
+function acceptedDriverCases(source) {
+  const gate = goFunction(source, "sensitiveMigrationGORMDriver");
+  if (!gate || /default\s*:\s*return\s+true/.test(gate)) return [];
+  const returns = [...gate.matchAll(/\breturn\b/g)];
+  const booleanReturns = [...gate.matchAll(/\breturn\s+(true|false)\b/g)].map((match) => match[1]);
+  if (returns.length !== 2 || !sameList(booleanReturns, ["true", "false"])) return [];
+  const accepted = [];
+  for (const match of gate.matchAll(/case\s+([^:]+):([\s\S]*?)(?=\n\s*(?:case\s+|default\s*:|}))/g)) {
+    if (!/\breturn\s+true\b/.test(match[2])) continue;
+    accepted.push(...[...match[1].matchAll(/"([^"]+)"/g)].map((item) => item[1]));
+  }
+  return accepted.sort();
+}
+
 function validateRunbook(runbook, errors) {
   for (const mode of expectedModes) {
     if (!new RegExp(`\\b${mode}\\b`).test(runbook)) errors.push(`runbook must document ${mode}`);
@@ -178,7 +204,7 @@ function validateRunbook(runbook, errors) {
   if (sensitiveLiteral.test(codeBlocks)) errors.push("runbook command examples must use environment references for operational evidence values");
 }
 
-function validateSourceContract({ model, cli, bootstrap, gormStore, runner, escrow, httpAPI, openAPI }, errors) {
+function validateSourceContract({ model, cli, bootstrap, protectionSource, apiMain, gormStore, runner, escrow, httpAPI, openAPI }, errors) {
   const actualModes = [...model.matchAll(/Mode[A-Za-z]+\s+Mode\s*=\s*"([^"]+)"/g)].map((match) => match[1]);
   if (!sameList(actualModes, expectedModes)) errors.push(`migration modes must exactly match ${expectedModes.join(", ")}`);
 
@@ -191,8 +217,9 @@ function validateSourceContract({ model, cli, bootstrap, gormStore, runner, escr
     if (!new RegExp(`\\b${field}\\b`).test(requestBlock)) errors.push(`RunRequest must declare ${field}`);
   }
 
-  const driverMatch = /case\s+"mysql",\s*"postgres",\s*"sqlite":/.test(bootstrap);
-  if (!driverMatch) errors.push("migration bootstrap driver gate must allow exactly mysql, postgres and sqlite");
+  if (!sameList(acceptedDriverCases(bootstrap), ["mysql", "postgres", "sqlite"])) {
+    errors.push("migration bootstrap driver gate must allow exactly mysql, postgres and sqlite");
+  }
   if (!/driver == "sqlite" && !sensitiveMigrationLocalEnvironment\(environment\)/.test(bootstrap)) {
     errors.push("migration bootstrap must reject SQLite outside development/test");
   }
@@ -209,6 +236,30 @@ function validateSourceContract({ model, cli, bootstrap, gormStore, runner, escr
   if (!/case ModeInventory, ModeDryRun:\s*return r\.runReadOnly/.test(run)) errors.push("inventory and dry-run must stay on the read-only runner path");
   if (!/case ModePrepare, ModeApply, ModeVerify, ModeRehearseRestore, ModeRollback:/.test(run)) {
     errors.push("prepared runner path must contain prepare, apply, verify, rehearse-restore and rollback");
+  }
+  const prepared = goFunction(runner, "runPrepared");
+  const verifyDispatch = goCaseBlock(prepared, "ModeVerify");
+  const verify = goFunction(runner, "runVerify");
+  const forbiddenVerifyCall = /\.(?:Prepare|ApplyBatch|FinishRun|AutoMigrate|Protect|Reveal)\s*\(/;
+  const forbiddenVerifyBodyCall = /\.(?:Prepare|StartOrResume|ApplyBatch|FinishRun|AutoMigrate|Protect|Reveal)\s*\(/;
+  if (!verifyDispatch.includes("store.StartOrResume") || !verifyDispatch.includes("return r.runVerify") ||
+      forbiddenVerifyCall.test(verifyDispatch) || !verify || forbiddenVerifyBodyCall.test(verify)) {
+    errors.push("verify path must not call mutation or decryption boundaries");
+  }
+  const verifyStateLoader = goFunction(gormStore, "StartOrResume");
+  if (!verifyStateLoader || /\.(?:AutoMigrate|Create|Delete|Exec|Save|Update|Updates)\s*\(/.test(verifyStateLoader)) {
+    errors.push("verify state loader must stay read-only");
+  }
+
+  const protectedLoad = goFunction(protectionSource, "validateProtectedRecord");
+  if (!protectedLoad || !/if\s+!dataprotection\.IsEnvelope\(envelope\)\s*\{\s*return\s+invalidSecurityField\(/.test(protectedLoad) ||
+      /if\s+!dataprotection\.IsEnvelope\(envelope\)[\s\S]*?\.(?:Protect|Reveal)\s*\(/.test(protectedLoad)) {
+    errors.push("ordinary Store must reject plaintext for encrypted fields");
+  }
+
+  const apiStartup = goFunction(apiMain, "main");
+  if (!apiStartup || /OpenSensitiveDataMigration|NewRunner|sensitive-data-migrate/.test(apiStartup)) {
+    errors.push("API startup must not call sensitive data migration entry points");
   }
   if (!/MigratedValueHash/.test(escrow) || !/migration-rollback/.test(escrow)) errors.push("rollback escrow must retain reserved context and migrated-value hash guards");
 
@@ -288,18 +339,126 @@ function validateGovernance({ graph, alignment, goal, closeout, objective, execu
   requireIncludes(capability?.evidence?.tests, ["scripts/platform-sensitive-data-migration.test.mjs"], "sensitive-data-protection evidence.tests", errors);
 }
 
-function defaultEvidenceFiles() {
-  const result = spawnSync("git", ["ls-files", "resources/evidence", "tmp"], { cwd: repoRoot, encoding: "utf8" });
-  if (result.status !== 0) return [];
-  return result.stdout.split("\n").filter(Boolean).map((relativePath) => path.resolve(repoRoot, relativePath));
+const evidenceTextExtensions = new Set([".json", ".log", ".md", ".text", ".txt", ".yaml", ".yml"]);
+
+function isEvidenceTextPath(relativePath) {
+  return evidenceTextExtensions.has(path.extname(relativePath).toLowerCase());
 }
 
-function validateEvidenceFiles(files, errors) {
-  const unsafeEvidence = /pgo:enc:v\d+:|fixture[-_ ](?:plaintext|secret)|"plaintext"\s*:/i;
-  for (const filePath of files) {
-    const source = readText(path.resolve(repoRoot, filePath));
-    if (unsafeEvidence.test(source)) errors.push(`evidence artifact must not contain fixture plaintext or encrypted values: ${filePath}`);
+function trackedEvidenceFiles() {
+  const result = spawnSync("git", ["ls-files", "resources/evidence", "tmp"], { cwd: repoRoot, encoding: "utf8" });
+  if (result.status !== 0) return [];
+  return result.stdout.split("\n").filter(Boolean).filter(isEvidenceTextPath).sort();
+}
+
+function safeEvidencePlaceholder(value) {
+  const normalized = value.trim().replace(/[.;]+$/, "");
+  return normalized === "" ||
+    /^\$(?:\{[A-Z][A-Z0-9_]*\}|[A-Z][A-Z0-9_]*)$/.test(normalized) ||
+    /^<[^>]+>$/.test(normalized) ||
+    /^\{\{[^}]+\}\}$/.test(normalized) ||
+    /^\[(?:redacted|placeholder)\]$/i.test(normalized) ||
+    /^(?:redacted|placeholder|example|none|not-set|n\/a)$/i.test(normalized);
+}
+
+function sensitiveAssignment(source, aliases, { allowColon = true, colonRequiresQuoted = false, unquotedColonPattern = null } = {}) {
+  const separators = allowColon ? "=|:" : "=";
+  const pattern = new RegExp(
+    `(?:^|[\\s,{;])(?:["']?(?:${aliases})["']?)\\s*(${separators})\\s*(?:"([^"\\r\\n]*)"|'([^'\\r\\n]*)'|(\\$\\{[^}\\r\\n]+\\}|[^\\s,;}\\r\\n]+))`,
+    "gim",
+  );
+  for (const match of source.matchAll(pattern)) {
+    const value = match[2] ?? match[3] ?? match[4] ?? "";
+    if (match[1] === ":" && colonRequiresQuoted && match[2] === undefined && match[3] === undefined &&
+        !(unquotedColonPattern?.test(value))) continue;
+    if (!safeEvidencePlaceholder(value)) return true;
   }
+  return false;
+}
+
+function plainKeyAssignment(source) {
+  if (sensitiveAssignment(source, "key", { allowColon: false })) return true;
+  const patterns = [
+    /(?:^|[{,]\s*)"key"\s*:\s*(?:"([^"\r\n]*)"|'([^'\r\n]*)'|(\$\{[^}\r\n]+\}|[^\s,;}\r\n]+))/gm,
+    /(?:^|\n)\s*key\s*:\s*(?:"([^"\r\n]*)"|'([^'\r\n]*)'|(\$\{[^}\r\n]+\}|[^\s,;}\r\n]+))/gm,
+  ];
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) {
+      const value = match[1] ?? match[2] ?? match[3] ?? "";
+      if (!safeEvidencePlaceholder(value)) return true;
+    }
+  }
+  return false;
+}
+
+function validateEvidenceText(label, source, errors) {
+  if (/\bpgo:enc:v\d+:[A-Za-z0-9+/_=-]{4,}/i.test(source)) errors.push(`${label} must not contain an encrypted value`);
+  if (/\bfixture[-_](?:plaintext|secret)(?:[-_][A-Za-z0-9][A-Za-z0-9._-]*)?/i.test(source) ||
+      sensitiveAssignment(source, "fixture[-_ ](?:plaintext|secret)")) {
+    errors.push(`${label} must not contain fixture plaintext or secret material`);
+  }
+
+  const assignments = [
+    ["ciphertext", "ciphertext|encrypted[-_ ]?value"],
+    ["key material", "(?:encryption[-_ ]?|data[-_ ]?|blind[-_ ]?index[-_ ]?)key|keyring"],
+    ["nonce", "nonce"],
+    ["AAD", "aad"],
+    ["blind index", "blind[-_ ]?index"],
+    ["plaintext", "plaintext"],
+    ["secret material", "secret"],
+    ["DSN", "dsn"],
+  ];
+  for (const [kind, aliases] of assignments) {
+    if (sensitiveAssignment(source, aliases)) errors.push(`${label} must not contain a concrete ${kind}`);
+  }
+  if (plainKeyAssignment(source)) errors.push(`${label} must not contain concrete key material`);
+  if (sensitiveAssignment(source, "record[-_ ]?id", { colonRequiresQuoted: true, unquotedColonPattern: /^record[-_]/i })) {
+    errors.push(`${label} must not contain a concrete record ID`);
+  }
+  if (sensitiveAssignment(source, "tenant[-_ ]?id(?:entifier)?", { colonRequiresQuoted: true, unquotedColonPattern: /^tenant[-_]/i })) {
+    errors.push(`${label} must not contain a concrete tenant ID`);
+  }
+
+  if (/(?:mysql|postgres(?:ql)?|oracle|kingbase(?:es)?|sqlite):\/\/[^\s`"'<>$]+/i.test(source)) {
+    errors.push(`${label} must not contain a URI DSN`);
+  }
+  if (/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(source)) errors.push(`${label} must not contain an email address`);
+  if (/(?:^|\D)1[3-9]\d{9}(?!\d)/.test(source)) errors.push(`${label} must not contain a mainland phone number`);
+  if (/(?:^|\D)\d{17}[\dXx](?![\dXx])/.test(source)) errors.push(`${label} must not contain a Chinese identity number`);
+}
+
+function addEvidenceCarrier(carriers, label, filePath) {
+  const absolutePath = path.resolve(repoRoot, filePath);
+  if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) return;
+  if (!carriers.has(absolutePath)) carriers.set(absolutePath, label);
+}
+
+function evidenceCarriers(graph, closeout) {
+  const carriers = new Map();
+  addEvidenceCarrier(carriers, "runbook", paths.runbook);
+  addEvidenceCarrier(carriers, "Task 7 report", paths.taskReport);
+
+  const migrationTask = values(graph.tasks).find((task) => task.id === migrationTaskID);
+  for (const relativePath of values(migrationTask?.evidence?.docs).filter(isEvidenceTextPath).sort()) {
+    addEvidenceCarrier(carriers, `migration task evidence ${relativePath}`, relativePath);
+  }
+
+  const migrationCloseout = values(closeout.nodeCloseouts).find((item) => item.taskId === migrationTaskID);
+  for (const relativePath of values(migrationCloseout?.cleanupEvidence).filter(isEvidenceTextPath).sort()) {
+    addEvidenceCarrier(carriers, `migration closeout evidence ${relativePath}`, relativePath);
+  }
+
+  for (const relativePath of trackedEvidenceFiles()) {
+    addEvidenceCarrier(carriers, `tracked evidence ${relativePath}`, relativePath);
+  }
+  for (const filePath of argValues("--task-evidence-file")) addEvidenceCarrier(carriers, "migration task evidence", filePath);
+  for (const filePath of argValues("--closeout-evidence-file")) addEvidenceCarrier(carriers, "migration closeout evidence", filePath);
+  for (const filePath of argValues("--evidence-file")) addEvidenceCarrier(carriers, "evidence artifact", filePath);
+  return carriers;
+}
+
+function validateEvidenceFiles(carriers, errors) {
+  for (const [filePath, label] of carriers) validateEvidenceText(label, readText(filePath), errors);
 }
 
 function validate() {
@@ -307,6 +466,8 @@ function validate() {
     model: readText(paths.model),
     cli: readText(paths.cli),
     bootstrap: readText(paths.bootstrap),
+    protectionSource: readText(paths.protectionSource),
+    apiMain: readText(paths.apiMain),
     gormStore: readText(paths.gormStore),
     runner: readText(paths.runner),
     escrow: readText(paths.escrow),
@@ -326,8 +487,7 @@ function validate() {
   validateRunbook(readText(paths.runbook), errors);
   validateSourceContract(source, errors);
   validateGovernance(governance, errors);
-  const explicitEvidence = argValues("--evidence-file").map((filePath) => path.resolve(repoRoot, filePath));
-  validateEvidenceFiles(explicitEvidence.length > 0 ? explicitEvidence : defaultEvidenceFiles(), errors);
+  validateEvidenceFiles(evidenceCarriers(governance.graph, governance.closeout), errors);
   return errors;
 }
 

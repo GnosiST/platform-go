@@ -41,6 +41,11 @@ function tempJSON(name, value) {
   return tempText(name, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+function assertRejected(result, expected) {
+  assert.notEqual(result.status, 0, result.stdout);
+  assert.match(result.stderr, expected);
+}
+
 describe("validate-platform-sensitive-data-migration", () => {
   it("accepts the implemented offline migration governance contract", () => {
     const result = runValidator();
@@ -163,7 +168,7 @@ describe("validate-platform-sensitive-data-migration", () => {
       tempText("unsafe-evidence.json", '{"value":"pgo:enc:v1:fixture-ciphertext"}\n'),
     ]);
     assert.notEqual(evidenceResult.status, 0, evidenceResult.stdout);
-    assert.match(evidenceResult.stderr, /evidence artifact must not contain fixture plaintext or encrypted values/);
+    assert.match(evidenceResult.stderr, /evidence artifact must not contain an encrypted value/);
   });
 
   it("rejects HTTP exposure and a visual-evidence claim for the non-visual migration node", () => {
@@ -177,5 +182,167 @@ describe("validate-platform-sensitive-data-migration", () => {
     const closeoutResult = runValidator(["--closeout", tempJSON("closeout.json", closeout)]);
     assert.notEqual(closeoutResult.status, 0, closeoutResult.stdout);
     assert.match(closeoutResult.stderr, /migration closeout is non-visual and must not declare visualEvidence/);
+  });
+
+  it("scans the full runbook prose for encrypted values", () => {
+    const runbook = `${read("docs/platform-sensitive-data-migration.md")}\nObserved value pgo:enc:v1:actual-ciphertext.\n`;
+
+    assertRejected(
+      runValidator(["--runbook", tempText("runbook.md", runbook)]),
+      /runbook.*encrypted value/i,
+    );
+  });
+
+  it("scans the Task 7 report for secret-bearing assignments", () => {
+    const report = "# Task 7 Report\nnonce=actual-nonce-value\n";
+
+    assertRejected(
+      runValidator(["--task-report", tempText("task-7-report.md", report)]),
+      /Task 7 report.*nonce/i,
+    );
+  });
+
+  it("scans migration closeout document evidence", () => {
+    const closeoutEvidence = "Review evidence only. blind-index=actual-index-value\n";
+
+    assertRejected(
+      runValidator(["--closeout-evidence-file", tempText("closeout-evidence.md", closeoutEvidence)]),
+      /closeout evidence.*blind index/i,
+    );
+  });
+
+  it("rejects concrete cryptographic material while allowing policy terms and placeholders", () => {
+    const safeEvidence = [
+      "Keys, nonces, AAD and blind indexes must never be recorded.",
+      "pgo:enc:v1:",
+      "key=$PLATFORM_DATA_KEY",
+      "nonce=<redacted>",
+      "aad=${MIGRATION_AAD}",
+      "blind-index=<placeholder>",
+    ].join("\n");
+    const safeResult = runValidator(["--evidence-file", tempText("safe-evidence.md", safeEvidence)]);
+    assert.equal(safeResult.status, 0, safeResult.stderr);
+
+    for (const fixture of [
+      { name: "ciphertext", value: "ciphertext=actual-ciphertext-value", expected: /ciphertext/i },
+      { name: "key", value: "key=actual-key-value", expected: /key material/i },
+      { name: "json-key", value: '{"key":"actual-key-value"}', expected: /key material/i },
+      { name: "nonce", value: "nonce=actual-nonce-value", expected: /nonce/i },
+      { name: "aad", value: "aad=tenant-a\/resource-a\/record-1", expected: /AAD/i },
+      { name: "blind-index", value: "blind-index=actual-index-value", expected: /blind index/i },
+    ]) {
+      assertRejected(
+        runValidator(["--evidence-file", tempText(`${fixture.name}.md`, `${fixture.value}\n`)]),
+        fixture.expected,
+      );
+    }
+  });
+
+  it("rejects URI DSNs and concrete record or tenant identifiers", () => {
+    for (const fixture of [
+      { name: "dsn", value: "dsn=postgres://migration:secret@db.internal/platform", expected: /DSN/i },
+      { name: "record-id", value: "record-id=record-1042", expected: /record ID/i },
+      { name: "record-id-colon", value: "record ID: record-1042", expected: /record ID/i },
+      { name: "tenant-id", value: "tenant-id=tenant-north-7", expected: /tenant ID/i },
+      { name: "tenant-id-colon", value: "tenant ID: tenant-north-7", expected: /tenant ID/i },
+    ]) {
+      assertRejected(
+        runValidator(["--evidence-file", tempText(`${fixture.name}.md`, `${fixture.value}\n`)]),
+        fixture.expected,
+      );
+    }
+  });
+
+  it("rejects email, mainland mobile and Chinese identity PII", () => {
+    for (const fixture of [
+      { name: "email", value: "owner=alice@example.com", expected: /email/i },
+      { name: "phone", value: "phone=13800138000", expected: /phone/i },
+      { name: "identity", value: "identity=11010519491231002X", expected: /identity/i },
+    ]) {
+      assertRejected(
+        runValidator(["--evidence-file", tempText(`${fixture.name}.md`, `${fixture.value}\n`)]),
+        fixture.expected,
+      );
+    }
+  });
+
+  it("rejects any bootstrap driver beyond mysql, postgres and sqlite", () => {
+    const source = read("internal/platform/bootstrap/sensitive_migration.go");
+    for (const bootstrap of [
+      source.replace(
+        '\tcase "mysql", "postgres", "sqlite":\n\t\treturn true',
+        '\tcase "mysql", "postgres", "sqlite":\n\t\treturn true\n\tcase "oracle":\n\t\treturn true',
+      ),
+      source.replace(
+        "func sensitiveMigrationGORMDriver(driver string) bool {",
+        'func sensitiveMigrationGORMDriver(driver string) bool {\n\tif driver == "kingbase" {\n\t\treturn true\n\t}',
+      ),
+    ]) {
+      assertRejected(
+        runValidator(["--bootstrap", tempText("sensitive_migration.go", bootstrap)]),
+        /driver gate must allow exactly mysql, postgres and sqlite/i,
+      );
+    }
+  });
+
+  it("rejects mutation or decryption calls from verify", () => {
+    for (const call of ["store.ApplyBatch(ctx, BatchMutation{})", "r.runtime.Reveal(ctx, \"value\", dataprotection.FieldPolicy{}, dataprotection.FieldContext{})"]) {
+      const runner = read("internal/platform/sensitivemigration/runner.go").replace(
+        "func (r *Runner) runVerify(ctx context.Context, store MutatingStore, request RunRequest, batchSize int, state RunState, report Report) (Report, error) {",
+        `func (r *Runner) runVerify(ctx context.Context, store MutatingStore, request RunRequest, batchSize int, state RunState, report Report) (Report, error) {\n\t${call}`,
+      );
+      assertRejected(
+        runValidator(["--runner", tempText("runner.go", runner)]),
+        /verify path must not call mutation or decryption boundaries/i,
+      );
+    }
+  });
+
+  it("rejects a mutation call from the verify dispatch branch", () => {
+    const runner = read("internal/platform/sensitivemigration/runner.go").replace(
+      "case ModeVerify:\n\t\tif !validRunIdentity(request)",
+      "case ModeVerify:\n\t\t_ = store.FinishRun(ctx, request.RunID, StatusCompleted)\n\t\tif !validRunIdentity(request)",
+    );
+
+    assertRejected(
+      runValidator(["--runner", tempText("runner.go", runner)]),
+      /verify path must not call mutation or decryption boundaries/i,
+    );
+  });
+
+  it("rejects a write from the verify state loader", () => {
+    const gormStore = read("internal/platform/adminresource/sensitive_migration_gorm.go").replace(
+      "func (s *GORMProtectedValueMigrationStore) StartOrResume(ctx context.Context, request sensitivemigration.RunRequest) (sensitivemigration.RunState, error) {",
+      "func (s *GORMProtectedValueMigrationStore) StartOrResume(ctx context.Context, request sensitivemigration.RunRequest) (sensitivemigration.RunState, error) {\n\t_ = s.db.Save(&gormSensitiveMigrationRun{}).Error",
+    );
+
+    assertRejected(
+      runValidator(["--gorm-store", tempText("sensitive_migration_gorm.go", gormStore)]),
+      /verify state loader must stay read-only/i,
+    );
+  });
+
+  it("rejects an ordinary Store plaintext fallback", () => {
+    const protectionSource = read("internal/platform/adminresource/security.go").replace(
+      'return invalidSecurityField(field.Key, "does not contain a valid envelope")',
+      "return nil // plaintext fallback",
+    );
+
+    assertRejected(
+      runValidator(["--protection-source", tempText("security.go", protectionSource)]),
+      /ordinary Store must reject plaintext for encrypted fields/i,
+    );
+  });
+
+  it("rejects migration bootstrap from the API startup composition root", () => {
+    const apiMain = read("cmd/platform-api/main.go").replace(
+      "func main() {",
+      "func main() {\n\t_, _ = bootstrap.OpenSensitiveDataMigration(config.Load())",
+    );
+
+    assertRejected(
+      runValidator(["--api-main", tempText("main.go", apiMain)]),
+      /API startup must not call sensitive data migration entry points/i,
+    );
   });
 });
