@@ -459,6 +459,16 @@ func TestGORMProtectedValueMigrationResumeRejectsPreparedPlanHashMismatch(t *tes
 	}
 }
 
+func TestGORMProtectedValueMigrationRehearsalRequiresImmutableApprovals(t *testing.T) {
+	_, store := appliedEscrowMigrationStore(t)
+	request := migrationRunRequest("run-apply")
+	request.Mode = sensitivemigration.ModeRehearseRestore
+	request.ApprovalRef = "different-approval"
+	if _, err := store.StartOrResume(context.Background(), request); !errors.Is(err, ErrMigrationConflict) {
+		t.Fatalf("StartOrResume(rehearsal approval mismatch) error = %v, want ErrMigrationConflict", err)
+	}
+}
+
 func TestGORMProtectedValueMigrationPrepareRecomputesCanonicalPlanHash(t *testing.T) {
 	db := migrationOrdinaryDB(t, map[string]string{"record-1": `{"secretNote":"plain-one"}`})
 	store, err := NewGORMProtectedValueMigrationStore(db, "sqlite")
@@ -1146,6 +1156,95 @@ func TestGORMProtectedValueMigrationRunnerRehearsesAndRollsBackIdempotently(t *t
 	assertGORMCount(t, db, &gormSensitiveMigrationEvent{}, 3)
 }
 
+func TestGORMProtectedValueMigrationRehearsalBindsExactEscrowSet(t *testing.T) {
+	db, store := appliedMigrationStoreBeforeRehearsal(t)
+	entries, err := store.EscrowEntries(context.Background(), "run-apply")
+	if err != nil {
+		t.Fatal(err)
+	}
+	escrowHash, err := sensitivemigration.EscrowSetHash(entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result := db.Model(&gormSensitiveMigrationEscrow{}).Where("run_id = ?", "run-apply").Update("protected_original", migrationAlternateEscrowEnvelope()); result.Error != nil || result.RowsAffected != 1 {
+		t.Fatalf("substitute escrow = %d, %v", result.RowsAffected, result.Error)
+	}
+	if _, err := store.CommitRehearsal(context.Background(), "run-apply", len(entries), escrowHash); !errors.Is(err, ErrMigrationConflict) {
+		t.Fatalf("CommitRehearsal(substituted escrow) error = %v, want ErrMigrationConflict", err)
+	}
+	var run gormSensitiveMigrationRun
+	if err := db.Where("run_id = ?", "run-apply").First(&run).Error; err != nil {
+		t.Fatal(err)
+	}
+	if run.RestoreRehearsed {
+		t.Fatal("substituted escrow persisted rehearsal evidence")
+	}
+}
+
+func TestGORMProtectedValueMigrationCompletedModesReconcileEscrowIntegrity(t *testing.T) {
+	t.Run("rehearsal", func(t *testing.T) {
+		db, store := appliedEscrowMigrationStore(t)
+		if result := db.Where("run_id = ?", "run-apply").Delete(&gormSensitiveMigrationEscrow{}); result.Error != nil || result.RowsAffected != 1 {
+			t.Fatalf("delete escrow = %d, %v", result.RowsAffected, result.Error)
+		}
+		request := migrationRunRequest("run-apply")
+		request.Mode = sensitivemigration.ModeRehearseRestore
+		if _, err := store.StartOrResume(context.Background(), request); !errors.Is(err, ErrMigrationConflict) {
+			t.Fatalf("StartOrResume(completed rehearsal without escrow) error = %v, want ErrMigrationConflict", err)
+		}
+	})
+
+	t.Run("rollback", func(t *testing.T) {
+		db, store := appliedEscrowMigrationStore(t)
+		mutation := migrationRollbackBatch(`{"displayName":"kept","secretNote":"pgo:enc:v1:migrated"}`, `{"displayName":"kept","secretNote":"plain-one"}`, 8)
+		if _, err := store.RollbackBatch(context.Background(), mutation); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.FinishRollback(context.Background(), "run-apply"); err != nil {
+			t.Fatal(err)
+		}
+		if result := db.Where("run_id = ?", "run-apply").Delete(&gormSensitiveMigrationEscrow{}); result.Error != nil || result.RowsAffected != 1 {
+			t.Fatalf("delete escrow = %d, %v", result.RowsAffected, result.Error)
+		}
+		request := migrationRunRequest("run-apply")
+		request.Mode = sensitivemigration.ModeRollback
+		if _, err := store.StartOrResume(context.Background(), request); !errors.Is(err, ErrMigrationConflict) {
+			t.Fatalf("StartOrResume(completed rollback without escrow) error = %v, want ErrMigrationConflict", err)
+		}
+	})
+}
+
+func TestMigrationValuesJSONExactPredicateUsesDriverBinarySemantics(t *testing.T) {
+	want := map[string]string{
+		"mysql":    "BINARY values_json = BINARY ?",
+		"postgres": "values_json = ?",
+		"sqlite":   "CAST(values_json AS BLOB) = CAST(? AS BLOB)",
+	}
+	for driver, expected := range want {
+		clause, err := migrationValuesJSONExactPredicate(driver)
+		if err != nil || clause != expected {
+			t.Fatalf("migrationValuesJSONExactPredicate(%q) = %q, %v; want %q", driver, clause, err, expected)
+		}
+	}
+
+	sqliteDB := openAdminResourceGORMDB(t)
+	sqlDB, err := sqliteDB.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mysqlDB, err := gorm.Open(mysql.New(mysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}), &gorm.Config{DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	statement := mysqlDB.ToSQL(func(tx *gorm.DB) *gorm.DB {
+		predicate, _ := migrationValuesJSONExactPredicate("mysql")
+		return tx.Table(adminResourceRecordsTable).Where("id = ?", "record-1").Where(predicate, "CaseSensitive ").Update("values_json", "updated")
+	})
+	if !strings.Contains(statement, "BINARY values_json = BINARY 'CaseSensitive '") {
+		t.Fatalf("MySQL byte-exact CAS SQL = %q", statement)
+	}
+}
+
 func appliedEscrowMigrationStore(t *testing.T) (*gorm.DB, *GORMProtectedValueMigrationStore) {
 	t.Helper()
 	db, store := preparedMigrationStore(t, map[string]string{"record-1": `{"displayName":"kept","secretNote":"plain-one"}`})
@@ -1161,8 +1260,29 @@ func appliedEscrowMigrationStore(t *testing.T) (*gorm.DB, *GORMProtectedValueMig
 	if err := store.FinishRun(context.Background(), "run-apply", sensitivemigration.StatusCompleted); err != nil {
 		t.Fatalf("FinishRun() error = %v", err)
 	}
-	if _, err := store.CommitRehearsal(context.Background(), "run-apply", 1); err != nil {
+	entries, err := store.EscrowEntries(context.Background(), "run-apply")
+	if err != nil {
+		t.Fatalf("EscrowEntries() error = %v", err)
+	}
+	escrowHash, err := sensitivemigration.EscrowSetHash(entries)
+	if err != nil {
+		t.Fatalf("EscrowSetHash() error = %v", err)
+	}
+	if _, err := store.CommitRehearsal(context.Background(), "run-apply", len(entries), escrowHash); err != nil {
 		t.Fatalf("CommitRehearsal() error = %v", err)
+	}
+	return db, store
+}
+
+func appliedMigrationStoreBeforeRehearsal(t *testing.T) (*gorm.DB, *GORMProtectedValueMigrationStore) {
+	t.Helper()
+	db, store := preparedMigrationStore(t, map[string]string{"record-1": `{"displayName":"kept","secretNote":"plain-one"}`})
+	apply := migrationBatch("record-1", `{"displayName":"kept","secretNote":"plain-one"}`, `{"displayName":"kept","secretNote":"pgo:enc:v1:migrated"}`, 7)
+	if _, err := store.ApplyBatch(context.Background(), apply); err != nil {
+		t.Fatalf("ApplyBatch() error = %v", err)
+	}
+	if err := store.FinishRun(context.Background(), "run-apply", sensitivemigration.StatusCompleted); err != nil {
+		t.Fatalf("FinishRun() error = %v", err)
 	}
 	return db, store
 }
@@ -1364,4 +1484,16 @@ func migrationStoreRuntime() *dataprotection.Service {
 		panic(err)
 	}
 	return dataprotection.NewRuntime(provider)
+}
+
+func migrationAlternateEscrowEnvelope() string {
+	service := migrationStoreRuntime()
+	policy, fieldContext := sensitivemigration.EscrowContext(
+		"run-apply", dataprotection.GlobalTenantID, "customer-records", "record-1", "secretNote",
+	)
+	value, err := service.Protect(context.Background(), "replacement-protected-fixture", policy, fieldContext)
+	if err != nil {
+		panic(err)
+	}
+	return value
 }

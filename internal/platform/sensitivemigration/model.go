@@ -141,7 +141,7 @@ type MutatingStore interface {
 type RestoreStore interface {
 	MutatingStore
 	EscrowEntries(context.Context, string) ([]EscrowEntry, error)
-	CommitRehearsal(context.Context, string, int) (BatchCommit, error)
+	CommitRehearsal(context.Context, string, int, string) (BatchCommit, error)
 	RollbackScopes(context.Context, string, ResourcePlan) ([]string, error)
 	RollbackRows(context.Context, string, ResourcePlan, string, string, int) ([]RollbackRow, error)
 	RollbackBatch(context.Context, BatchMutation) (BatchCommit, error)

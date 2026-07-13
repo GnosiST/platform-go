@@ -338,6 +338,17 @@ func TestInventoryRejectsGenericTypedNilDependenciesBeforeDispatch(t *testing.T)
 	})
 }
 
+func TestRunnerRejectsNilContextBeforeRuntimeReadiness(t *testing.T) {
+	runtime := &readinessProbeRuntime{Runtime: migrationTestRuntime(t)}
+	report, err := NewRunner(migrationApplyPlan(), runtime, newMemoryReadStore(nil)).Run(nil, Options{Mode: ModeInventory})
+	if !errors.Is(err, ErrReadFailed) || report.Status != StatusFailed {
+		t.Fatalf("Run(nil context) report = %+v error = %v", report, err)
+	}
+	if runtime.readyCalls != 0 {
+		t.Fatalf("runtime readiness calls = %d, want zero", runtime.readyCalls)
+	}
+}
+
 func TestInventoryRejectsCancellationReturnedWithEmptyTenantScopes(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	store := &cancelingScopeStore{cancel: cancel}
@@ -531,6 +542,30 @@ func TestApplyRequiresEveryApprovalFieldAndCanonicalBackupHash(t *testing.T) {
 				t.Fatalf("StartOrResume() calls = %d, want zero", store.startCalls)
 			}
 		})
+	}
+}
+
+func TestRehearseRestoreRequiresEveryMutationApprovalBeforeStart(t *testing.T) {
+	plan := migrationApplyPlan()
+	for _, mutate := range []func(*RunRequest){
+		func(request *RunRequest) { request.ActorID = "" },
+		func(request *RunRequest) { request.Reason = "" },
+		func(request *RunRequest) { request.ApprovalRef = "" },
+		func(request *RunRequest) { request.BackupURI = "" },
+		func(request *RunRequest) { request.BackupHash = "" },
+		func(request *RunRequest) { request.RestoreEvidence = "" },
+		func(request *RunRequest) { request.MaintenanceConfirmed = false },
+	} {
+		store := newMemoryMutatingStore(plan, nil)
+		store.state.Status = StatusCompleted
+		request := approvedMigrationRequest("run-resume")
+		mutate(&request)
+		if _, err := NewRunner(plan, migrationTestRuntime(t), store).Run(context.Background(), Options{Mode: ModeRehearseRestore, Request: request}); !errors.Is(err, ErrInvalidOptions) {
+			t.Fatalf("Run(rehearse without approval) error = %v", err)
+		}
+		if store.startCalls != 0 {
+			t.Fatalf("StartOrResume calls = %d, want zero", store.startCalls)
+		}
 	}
 }
 
@@ -733,6 +768,32 @@ func TestEscrowContextUsesReservedAADAndCannotValidateAsTargetField(t *testing.T
 	}
 }
 
+func TestEscrowSetHashIsCanonicalAndBindsProtectedPayloads(t *testing.T) {
+	entries := []EscrowEntry{
+		{RunID: "run-resume", TenantID: "tenant-b", Resource: "resource-b", RecordID: "record-2", FieldKey: "field-b", ProtectedOriginal: "pgo:enc:v1:two", MigratedValueHash: HashMigratedValue("target-two")},
+		{RunID: "run-resume", TenantID: "tenant-a", Resource: "resource-a", RecordID: "record-1", FieldKey: "field-a", ProtectedOriginal: "pgo:enc:v1:one", MigratedValueHash: HashMigratedValue("target-one")},
+	}
+	first, err := EscrowSetHash(entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := EscrowSetHash([]EscrowEntry{entries[1], entries[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second || !canonicalSHA256(first) {
+		t.Fatalf("canonical escrow hashes = %q, %q", first, second)
+	}
+	entries[0].ProtectedOriginal = "pgo:enc:v1:substituted"
+	changed, err := EscrowSetHash(entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed == first {
+		t.Fatal("escrow-set hash did not bind protected original")
+	}
+}
+
 func TestApplyProtectsOriginalIntoEscrowBeforeMutation(t *testing.T) {
 	plan := migrationApplyPlan()
 	store := newMemoryMutatingStore(plan, []Row{{
@@ -797,8 +858,8 @@ func TestRehearseRestoreRevealsEveryEscrowWithoutOutputAndIsIdempotent(t *testin
 	if _, err := NewRunner(plan, runtime, store).Run(context.Background(), Options{Mode: ModeRehearseRestore, Request: request}); err != nil {
 		t.Fatalf("Run(rehearse resume) error = %v", err)
 	}
-	if runtime.revealCalls != 2 || store.rehearsalCalls != 1 {
-		t.Fatalf("idempotent rehearsal reveal calls = %d commit calls = %d", runtime.revealCalls, store.rehearsalCalls)
+	if runtime.revealCalls != 4 || store.rehearsalCalls != 2 {
+		t.Fatalf("idempotent rehearsal reveal calls = %d commit calls = %d, want full revalidation", runtime.revealCalls, store.rehearsalCalls)
 	}
 }
 
@@ -952,9 +1013,10 @@ func (s *memoryMutatingStore) EscrowEntries(context.Context, string) ([]EscrowEn
 	return append([]EscrowEntry(nil), s.escrow...), nil
 }
 
-func (s *memoryMutatingStore) CommitRehearsal(_ context.Context, runID string, count int) (BatchCommit, error) {
+func (s *memoryMutatingStore) CommitRehearsal(_ context.Context, runID string, count int, escrowHash string) (BatchCommit, error) {
 	s.rehearsalCalls++
-	if runID != s.state.RunID || count != len(s.escrow) {
+	wantHash, err := EscrowSetHash(s.escrow)
+	if err != nil || runID != s.state.RunID || count != len(s.escrow) || escrowHash != wantHash {
 		return BatchCommit{}, ErrRunConflict
 	}
 	s.state.RestoreRehearsed = true
@@ -1001,6 +1063,16 @@ type trackingRuntime struct {
 	dataprotection.Runtime
 	protectCalls int
 	revealCalls  int
+}
+
+type readinessProbeRuntime struct {
+	dataprotection.Runtime
+	readyCalls int
+}
+
+func (r *readinessProbeRuntime) Ready(context.Context) error {
+	r.readyCalls++
+	return nil
 }
 
 type revealingTrackingRuntime struct {

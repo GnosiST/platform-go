@@ -35,6 +35,9 @@ func NewRunner(plan Plan, runtime dataprotection.Runtime, store ReadStore) *Runn
 
 func (r *Runner) Run(ctx context.Context, options Options) (Report, error) {
 	report := Report{Status: StatusFailed}
+	if ctx == nil {
+		return report, ErrReadFailed
+	}
 	batchSize, err := batchSizeForMode(options)
 	if err != nil {
 		return report, ErrInvalidOptions
@@ -135,7 +138,7 @@ func (r *Runner) runPrepared(ctx context.Context, options Options, batchSize int
 		}
 		return r.runVerify(ctx, store, request, batchSize, state, report)
 	case ModeRehearseRestore:
-		if !validRunIdentity(request) {
+		if !validMutationRequest(request) {
 			return report, ErrInvalidOptions
 		}
 		restoreStore, ok := store.(RestoreStore)
@@ -302,10 +305,6 @@ func (r *Runner) runRehearsal(ctx context.Context, store RestoreStore, request R
 	}
 	report.EventChainHead = state.EventChainHead
 	report.Counts.Plaintext = state.EscrowCount
-	if state.RestoreRehearsed {
-		report.Status = StatusCompleted
-		return report, nil
-	}
 	entries, err := store.EscrowEntries(ctx, request.RunID)
 	if err != nil || ctx.Err() != nil || len(entries) != state.EscrowCount {
 		return report, ErrVerifyFailed
@@ -319,7 +318,11 @@ func (r *Runner) runRehearsal(ctx context.Context, store RestoreStore, request R
 			return report, ErrVerifyFailed
 		}
 	}
-	commit, err := store.CommitRehearsal(ctx, request.RunID, len(entries))
+	escrowHash, err := EscrowSetHash(entries)
+	if err != nil {
+		return report, ErrVerifyFailed
+	}
+	commit, err := store.CommitRehearsal(ctx, request.RunID, len(entries), escrowHash)
 	if err != nil || commit.Rows != len(entries) || commit.EventHash == "" {
 		return report, ErrVerifyFailed
 	}

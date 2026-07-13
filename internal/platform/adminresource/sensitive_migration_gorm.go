@@ -110,6 +110,7 @@ type gormSensitiveMigrationEvent struct {
 	TargetEnvelope  int    `gorm:"column:target_envelope_count;not null"`
 	ForeignEnvelope int    `gorm:"column:foreign_envelope_count;not null"`
 	Malformed       int    `gorm:"column:malformed_envelope_count;not null"`
+	EscrowSetHash   string `gorm:"column:escrow_set_hash;size:71;not null;default:''"`
 	Revision        uint64 `gorm:"column:revision;not null"`
 	PriorEventHash  string `gorm:"column:prior_event_hash;size:71;not null"`
 	EventHash       string `gorm:"column:event_hash;size:71;not null"`
@@ -330,7 +331,7 @@ func (s *GORMProtectedValueMigrationStore) StartOrResume(ctx context.Context, re
 	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil || !sensitivemigration.ValidRunIdentity(request) {
 		return sensitivemigration.RunState{}, ErrMigrationInvalidOptions
 	}
-	if (request.Mode == sensitivemigration.ModeApply || request.Mode == sensitivemigration.ModeRollback) && !sensitivemigration.ValidMutationRequest(request) ||
+	if (request.Mode == sensitivemigration.ModeApply || request.Mode == sensitivemigration.ModeRehearseRestore || request.Mode == sensitivemigration.ModeRollback) && !sensitivemigration.ValidMutationRequest(request) ||
 		request.Mode != sensitivemigration.ModeApply && request.Mode != sensitivemigration.ModeVerify && request.Mode != sensitivemigration.ModeRehearseRestore && request.Mode != sensitivemigration.ModeRollback {
 		return sensitivemigration.RunState{}, ErrMigrationInvalidOptions
 	}
@@ -350,7 +351,7 @@ func (s *GORMProtectedValueMigrationStore) StartOrResume(ctx context.Context, re
 		if run.PlanHash != request.PlanHash || run.Status != sensitivemigration.StatusPrepared && run.Status != sensitivemigration.StatusCompleted {
 			return ErrMigrationConflict
 		}
-		if (request.Mode == sensitivemigration.ModeApply || request.Mode == sensitivemigration.ModeRollback) && !runMatchesRequest(run, request) {
+		if (request.Mode == sensitivemigration.ModeApply || request.Mode == sensitivemigration.ModeRehearseRestore || request.Mode == sensitivemigration.ModeRollback) && !runMatchesRequest(run, request) {
 			return ErrMigrationConflict
 		}
 		if (request.Mode == sensitivemigration.ModeVerify || request.Mode == sensitivemigration.ModeRehearseRestore || request.Mode == sensitivemigration.ModeRollback) && run.Status != sensitivemigration.StatusCompleted {
@@ -378,7 +379,26 @@ func (s *GORMProtectedValueMigrationStore) StartOrResume(ctx context.Context, re
 				Counts: counts, Batches: checkpoint.Batches, EventHash: checkpoint.EventHash,
 			})
 		}
-		state.EscrowCount = state.Counts.Plaintext
+		if request.Mode == sensitivemigration.ModeRehearseRestore || request.Mode == sensitivemigration.ModeRollback {
+			entries, err := loadMigrationEscrow(tx, request.RunID, journal.ApplyCheckpoints)
+			if err != nil {
+				return err
+			}
+			escrowHash, err := sensitivemigration.EscrowSetHash(entries)
+			if err != nil {
+				return ErrMigrationConflict
+			}
+			if run.RestoreRehearsed {
+				if len(journal.RehearsalEvents) != 1 || journal.RehearsalEvents[0].Rows != len(entries) || journal.RehearsalEvents[0].EscrowSetHash != escrowHash {
+					return ErrMigrationConflict
+				}
+			} else if len(journal.RehearsalEvents) != 0 {
+				return ErrMigrationConflict
+			}
+			state.EscrowCount = len(entries)
+		} else {
+			state.EscrowCount = state.Counts.Plaintext
+		}
 		if migrationCountsTotal(state.Counts) > state.TargetCount {
 			return ErrMigrationConflict
 		}
@@ -509,8 +529,8 @@ func (s *GORMProtectedValueMigrationStore) EscrowEntries(ctx context.Context, ru
 	return entries, nil
 }
 
-func (s *GORMProtectedValueMigrationStore) CommitRehearsal(ctx context.Context, runID string, count int) (sensitivemigration.BatchCommit, error) {
-	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil || !canonicalMigrationRunID(runID) || count < 0 {
+func (s *GORMProtectedValueMigrationStore) CommitRehearsal(ctx context.Context, runID string, count int, escrowHash string) (sensitivemigration.BatchCommit, error) {
+	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil || !canonicalMigrationRunID(runID) || count < 0 || !canonicalMigrationHash(escrowHash) {
 		return sensitivemigration.BatchCommit{}, ErrMigrationInvalidOptions
 	}
 	commit := sensitivemigration.BatchCommit{}
@@ -531,8 +551,12 @@ func (s *GORMProtectedValueMigrationStore) CommitRehearsal(ctx context.Context, 
 		if err != nil || len(entries) != count {
 			return ErrMigrationConflict
 		}
+		actualHash, err := sensitivemigration.EscrowSetHash(entries)
+		if err != nil || actualHash != escrowHash {
+			return ErrMigrationConflict
+		}
 		if run.RestoreRehearsed {
-			if len(journal.RehearsalEvents) != 1 || journal.RehearsalEvents[0].Rows != count {
+			if len(journal.RehearsalEvents) != 1 || journal.RehearsalEvents[0].Rows != count || journal.RehearsalEvents[0].EscrowSetHash != escrowHash {
 				return ErrMigrationConflict
 			}
 			event := journal.RehearsalEvents[0]
@@ -547,7 +571,7 @@ func (s *GORMProtectedValueMigrationStore) CommitRehearsal(ctx context.Context, 
 		event := gormSensitiveMigrationEvent{
 			EventID: migrationSurrogateID("event", runID, strconv.FormatUint(sequence, 10)), RunID: runID,
 			Sequence: sequence, Mode: string(sensitivemigration.ModeRehearseRestore), Resource: sensitiveMigrationEscrowResource,
-			TenantScopeHash: migrationHash("rehearsal-scope", runID), Rows: count, Plaintext: count,
+			TenantScopeHash: migrationHash("rehearsal-scope", runID), Rows: count, Plaintext: count, EscrowSetHash: escrowHash,
 			Revision: run.ExpectedRevision, PriorEventHash: journal.Head, CreatedAt: now,
 		}
 		event.EventHash = migrationEventHash(event)
@@ -561,7 +585,7 @@ func (s *GORMProtectedValueMigrationStore) CommitRehearsal(ctx context.Context, 
 			return ErrMigrationConflict
 		}
 		verified, err := verifyMigrationJournal(tx, runID)
-		if err != nil || verified.Head != event.EventHash || len(verified.RehearsalEvents) != 1 {
+		if err != nil || verified.Head != event.EventHash || len(verified.RehearsalEvents) != 1 || verified.RehearsalEvents[0].EscrowSetHash != escrowHash {
 			return ErrMigrationConflict
 		}
 		commit = sensitivemigration.BatchCommit{Revision: run.ExpectedRevision, Rows: count, EventSequence: sequence, EventHash: event.EventHash}
@@ -824,7 +848,11 @@ func (s *GORMProtectedValueMigrationStore) ApplyBatch(ctx context.Context, mutat
 					return ErrMigrationStore
 				}
 			}
-			query := tx.Table(layout.Table).Where("id = ? AND values_json = ?", row.RecordID, row.OriginalValuesJSON)
+			valuesPredicate, err := migrationValuesJSONExactPredicate(s.driver)
+			if err != nil {
+				return err
+			}
+			query := tx.Table(layout.Table).Where("id = ?", row.RecordID).Where(valuesPredicate, row.OriginalValuesJSON)
 			if generic {
 				query = query.Where("resource = ?", mutation.Resource.Resource)
 			}
@@ -1026,7 +1054,11 @@ func (s *GORMProtectedValueMigrationStore) RollbackBatch(ctx context.Context, mu
 			if !slices.Equal(changedFields, escrowFields) {
 				return ErrMigrationConflict
 			}
-			query := tx.Table(layout.Table).Where("id = ? AND values_json = ?", row.RecordID, row.OriginalValuesJSON)
+			valuesPredicate, err := migrationValuesJSONExactPredicate(s.driver)
+			if err != nil {
+				return err
+			}
+			query := tx.Table(layout.Table).Where("id = ?", row.RecordID).Where(valuesPredicate, row.OriginalValuesJSON)
 			if generic {
 				query = query.Where("resource = ?", mutation.Resource.Resource)
 			}
@@ -1301,6 +1333,19 @@ func migrationStringField(valuesJSON string, field string) (string, error) {
 	return value, nil
 }
 
+func migrationValuesJSONExactPredicate(driver string) (string, error) {
+	switch driver {
+	case "mysql":
+		return "BINARY values_json = BINARY ?", nil
+	case "postgres":
+		return "values_json = ?", nil
+	case "sqlite":
+		return "CAST(values_json AS BLOB) = CAST(? AS BLOB)", nil
+	default:
+		return "", ErrMigrationUnsupportedDriver
+	}
+}
+
 func canonicalMigrationHash(value string) bool {
 	if len(value) != 71 || !strings.HasPrefix(value, "sha256:") {
 		return false
@@ -1428,6 +1473,9 @@ func verifyMigrationJournal(tx *gorm.DB, runID string) (migrationJournalVerifica
 			if event.Resource == "" || event.TenantScopeHash == "" || event.LastRecordID == "" || event.Rows < 1 {
 				return migrationJournalVerification{}, ErrMigrationConflict
 			}
+			if event.EscrowSetHash != "" {
+				return migrationJournalVerification{}, ErrMigrationConflict
+			}
 			if event.Mode == string(sensitivemigration.ModeRollback) && (event.Plaintext < 1 || event.Missing != 0 || event.TargetEnvelope != 0 || event.ForeignEnvelope != 0 || event.Malformed != 0) {
 				return migrationJournalVerification{}, ErrMigrationConflict
 			}
@@ -1445,7 +1493,7 @@ func verifyMigrationJournal(tx *gorm.DB, runID string) (migrationJournalVerifica
 			state.EventHash = event.EventHash
 			reconstructed[key] = state
 		case string(sensitivemigration.ModeRehearseRestore):
-			if event.Resource != sensitiveMigrationEscrowResource || event.TenantScopeHash == "" || event.LastRecordID != "" || event.Rows < 0 ||
+			if event.Resource != sensitiveMigrationEscrowResource || event.TenantScopeHash == "" || event.LastRecordID != "" || event.Rows < 0 || !canonicalMigrationHash(event.EscrowSetHash) ||
 				event.Plaintext != event.Rows || event.Missing != 0 || event.TargetEnvelope != 0 || event.ForeignEnvelope != 0 || event.Malformed != 0 {
 				return migrationJournalVerification{}, ErrMigrationConflict
 			}
@@ -1492,6 +1540,9 @@ func verifyMigrationJournal(tx *gorm.DB, runID string) (migrationJournalVerifica
 			verification.RehearsalEvents = append(verification.RehearsalEvents, event)
 		}
 	}
+	if len(verification.RehearsalEvents) > 1 {
+		return migrationJournalVerification{}, ErrMigrationConflict
+	}
 	return verification, nil
 }
 
@@ -1507,7 +1558,7 @@ func migrationEventHash(event gormSensitiveMigrationEvent) string {
 		"event", event.RunID, strconv.FormatUint(event.Sequence, 10), event.Mode, event.Resource,
 		event.TenantScopeHash, event.LastRecordID, strconv.Itoa(event.Rows), strconv.Itoa(event.Missing), strconv.Itoa(event.Plaintext),
 		strconv.Itoa(event.TargetEnvelope), strconv.Itoa(event.ForeignEnvelope), strconv.Itoa(event.Malformed),
-		strconv.FormatUint(event.Revision, 10), event.PriorEventHash, event.CreatedAt,
+		event.EscrowSetHash, strconv.FormatUint(event.Revision, 10), event.PriorEventHash, event.CreatedAt,
 	)
 }
 
