@@ -311,6 +311,27 @@ describe("validate-platform-sensitive-data-migration", () => {
     }
   });
 
+  it("rejects inline single-token record or tenant identifiers", () => {
+    const safeEvidence = [
+      "Observed record ID: $MIGRATION_RECORD_ID",
+      "Target tenant ID: <redacted>",
+      "Policy record ID: the target record coordinate",
+    ].join("\n");
+    const safeResult = runValidator(["--evidence-file", tempText("safe-inline-identifiers.md", safeEvidence)]);
+    assert.equal(safeResult.status, 0, safeResult.stderr);
+
+    for (const fixture of [
+      { name: "inline-record", value: "Observed record ID: acme42", expected: /record ID/i },
+      { name: "inline-tenant", value: "Target tenant ID: ACME", expected: /tenant ID/i },
+      { name: "inline-ulid", value: "Audit record ID: 01JABC123XYZ", expected: /record ID/i },
+    ]) {
+      assertRejected(
+        runValidator(["--evidence-file", tempText(`${fixture.name}.md`, `${fixture.value}\n`)]),
+        fixture.expected,
+      );
+    }
+  });
+
   it("rejects email, mainland mobile and Chinese identity PII", () => {
     for (const fixture of [
       { name: "email", value: "owner=alice@example.com", expected: /email/i },
@@ -347,6 +368,9 @@ describe("validate-platform-sensitive-data-migration", () => {
         '\tcase "mysql", "postgres", "sqlite":',
         '\tcase configuredDriver(), "mysql", "postgres", "sqlite":',
       ),
+      source.replace("\t\treturn false", '\t\treturn false || driver == "oracle"'),
+      source.replace("\t\treturn true", '\t\treturn true && driver != "oracle"'),
+      source.replace("\t\treturn true", "\t\t_ = driver\n\t\treturn true"),
     ]) {
       assertRejected(
         runValidator(["--bootstrap", tempText("sensitive_migration.go", bootstrap)]),

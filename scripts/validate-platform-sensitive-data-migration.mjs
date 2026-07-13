@@ -166,6 +166,10 @@ function closingBrace(source, openingIndex) {
   return -1;
 }
 
+function withoutGoComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\r\n]*/g, "");
+}
+
 function acceptedDriverCases(source) {
   const gate = goFunction(source, "sensitiveMigrationGORMDriver");
   if (!gate || /\b(?:fallthrough|goto)\b/.test(gate) || /default\s*:\s*return\s+true/.test(gate)) return [];
@@ -177,20 +181,15 @@ function acceptedDriverCases(source) {
   const switchClosing = closingBrace(functionBody, switchOpening);
   if (switchClosing === -1 || functionBody.slice(switchClosing + 1).trim() !== "") return [];
   const switchBody = functionBody.slice(switchOpening + 1, switchClosing);
-  const returns = [...gate.matchAll(/\breturn\b/g)];
-  const booleanReturns = [...gate.matchAll(/\breturn\s+(true|false)\b/g)].map((match) => match[1]);
-  if (returns.length !== 2 || !sameList(booleanReturns, ["true", "false"])) return [];
-  const caseOperands = [...switchBody.matchAll(/case\s+([^:]+):/g)].flatMap((match) =>
-    match[1].split(",").map((operand) => operand.trim()));
+  const caseClauses = [...switchBody.matchAll(/case\s+([^:]+):([\s\S]*?)(?=\n\s*(?:case\s+|default\s*:|$))/g)];
+  if (caseClauses.length === 0 || caseClauses.some((match) => withoutGoComments(match[2]).trim() !== "return true")) return [];
+  const defaultBody = /default\s*:([\s\S]*)$/.exec(switchBody)?.[1] ?? "";
+  if (withoutGoComments(defaultBody).trim() !== "return false") return [];
+  const caseOperands = caseClauses.flatMap((match) => match[1].split(",").map((operand) => operand.trim()));
   if (caseOperands.some((operand) => !/^"(?:mysql|postgres|sqlite)"$/.test(operand))) return [];
   const allCases = caseOperands.map((operand) => operand.slice(1, -1)).sort();
   if (!sameList(allCases, ["mysql", "postgres", "sqlite"])) return [];
-  const accepted = [];
-  for (const match of switchBody.matchAll(/case\s+([^:]+):([\s\S]*?)(?=\n\s*(?:case\s+|default\s*:|$))/g)) {
-    if (!/\breturn\s+true\b/.test(match[2])) continue;
-    accepted.push(...[...match[1].matchAll(/"([^"]+)"/g)].map((item) => item[1]));
-  }
-  return accepted.sort();
+  return allCases;
 }
 
 function validateRunbook(runbook, errors) {
@@ -416,7 +415,7 @@ function plainKeyAssignment(source) {
 }
 
 function singleTokenColonIdentifier(source, aliases) {
-  const pattern = new RegExp(`(?:^|\\n)\\s*(?:[-*]\\s*)?["']?(?:${aliases})["']?\\s*:\\s*([^\\r\\n]*)`, "gim");
+  const pattern = new RegExp(`["']?(?:${aliases})["']?\\s*:\\s*([^\\r\\n]*)`, "gim");
   for (const match of source.matchAll(pattern)) {
     const remainder = match[1].trim();
     if (!safeEvidencePlaceholder(remainder) && /^\S+$/.test(remainder)) return true;
