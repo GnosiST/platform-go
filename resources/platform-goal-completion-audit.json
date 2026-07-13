@@ -8,6 +8,14 @@
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "businessReferenceMode": "reference-only",
     "requiredControlledUnfinishedNodes": [
+      "mask-strategy-runtime",
+      "sensitive-data-reveal-step-up",
+      "data-lifecycle-retention",
+      "multi-datasource-contract-and-runtime",
+      "database-certification-matrix",
+      "integration-ports-disabled-default",
+      "transactional-outbox-and-one-mq-adapter",
+      "asynchronous-search-projection",
       "open-source-portability",
       "public-docs-community",
       "public-docs-site",
@@ -19,9 +27,9 @@
     "frontend": ["Refine", "React", "Ant Design"]
   },
   "taskSummary": {
-    "expectedTotal": 45,
+    "expectedTotal": 53,
     "expectedImplemented": 41,
-    "expectedControlledUnfinished": 4
+    "expectedControlledUnfinished": 12
   },
   "requirements": [
     {

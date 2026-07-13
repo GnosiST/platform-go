@@ -12,7 +12,20 @@ const sourceLockPath = "resources/platform-sensitive-data-migration-source-lock.
 const sourceLockPurpose = "Fail closed when reviewed sensitive migration safety-boundary AST changes without an explicit lock update, tests and review.";
 const sourceLockUpdateCommand = "rtk node scripts/validate-platform-sensitive-data-migration.mjs --print-source-lock";
 const expectedModes = ["inventory", "dry-run", "prepare", "apply", "verify", "rehearse-restore", "rollback"];
-const expectedRemainingTaskIDs = ["open-source-portability", "public-docs-community", "public-docs-site", "github-release-publication"];
+const expectedRemainingTaskIDs = [
+  "mask-strategy-runtime",
+  "sensitive-data-reveal-step-up",
+  "data-lifecycle-retention",
+  "multi-datasource-contract-and-runtime",
+  "database-certification-matrix",
+  "integration-ports-disabled-default",
+  "transactional-outbox-and-one-mq-adapter",
+  "asynchronous-search-projection",
+  "open-source-portability",
+  "public-docs-community",
+  "public-docs-site",
+  "github-release-publication",
+];
 const requiredApprovalFlags = [
   "run-id",
   "actor",
@@ -360,8 +373,8 @@ function validateGovernance({ graph, alignment, goal, closeout, objective, execu
   const tasks = values(graph.tasks);
   const migrationTask = tasks.find((task) => task.id === migrationTaskID);
   const unfinished = tasks.filter((task) => task.status !== "implemented").map((task) => task.id);
-  if (tasks.length !== 45 || tasks.filter((task) => task.status === "implemented").length !== 41 || !sameList(unfinished, expectedRemainingTaskIDs)) {
-    errors.push("official task graph projection must stay 45 total / 41 implemented / 4 controlled unfinished");
+  if (tasks.length !== 53 || tasks.filter((task) => task.status === "implemented").length !== 41 || !sameList(unfinished, expectedRemainingTaskIDs)) {
+    errors.push("official task graph projection must stay 53 total / 41 implemented / 12 controlled unfinished");
   }
   if (migrationTask?.status !== "implemented") errors.push("sensitive-data-historical-migration must stay implemented after closeout");
   for (const [kind, required] of Object.entries(requiredTaskEvidence)) {
@@ -374,15 +387,15 @@ function validateGovernance({ graph, alignment, goal, closeout, objective, execu
   }
 
   if (!values(alignment.requiredTaskNodes).includes(migrationTaskID)) errors.push("alignment requiredTaskNodes must include sensitive-data-historical-migration");
-  if (!sameList(values(alignment.requiredFutureTaskNodes), expectedRemainingTaskIDs)) errors.push("alignment requiredFutureTaskNodes must match the four-node remainder");
+  if (!sameList(values(alignment.requiredFutureTaskNodes), expectedRemainingTaskIDs)) errors.push("alignment requiredFutureTaskNodes must match the twelve-node remainder");
   requireIncludes(alignment.requiredValidators, ["scripts/validate-platform-sensitive-data-migration.mjs"], "alignment requiredValidators", errors);
   requireIncludes(alignment.documents, ["docs/platform-sensitive-data-migration.md"], "alignment documents", errors);
 
-  if (goal.taskSummary?.expectedTotal !== 45 || goal.taskSummary?.expectedImplemented !== 41 || goal.taskSummary?.expectedControlledUnfinished !== 4) {
-    errors.push("goal completion taskSummary must stay 45/41/4");
+  if (goal.taskSummary?.expectedTotal !== 53 || goal.taskSummary?.expectedImplemented !== 41 || goal.taskSummary?.expectedControlledUnfinished !== 12) {
+    errors.push("goal completion taskSummary must stay 53/41/12");
   }
   if (!sameList(values(goal.completionPolicy?.requiredControlledUnfinishedNodes), expectedRemainingTaskIDs)) {
-    errors.push("goal completion controlled unfinished nodes must match the four-node remainder");
+    errors.push("goal completion controlled unfinished nodes must match the twelve-node remainder");
   }
 
   const migrationCloseout = values(closeout.nodeCloseouts).find((item) => item.taskId === migrationTaskID);
@@ -392,17 +405,17 @@ function validateGovernance({ graph, alignment, goal, closeout, objective, execu
   for (const relativePath of values(migrationCloseout?.cleanupEvidence)) {
     if (!relativeExistingPath(relativePath)) errors.push(`migration closeout evidence path is missing or unsafe: ${relativePath}`);
   }
-  if (!sameList(values(closeout.pendingNodeEvidence), expectedRemainingTaskIDs)) errors.push("node closeout pending evidence must match the four-node remainder");
+  if (!sameList(values(closeout.pendingNodeEvidence), expectedRemainingTaskIDs)) errors.push("node closeout pending evidence must match the twelve-node remainder");
 
   if (!sameList(values(objective.taskControlPolicy?.requiredUnfinishedNodes), expectedRemainingTaskIDs) ||
       !sameList(values(objective.completionPolicy?.controlledBlockers), expectedRemainingTaskIDs)) {
-    errors.push("objective conformance unfinished projections must match the four-node remainder");
+    errors.push("objective conformance unfinished projections must match the twelve-node remainder");
   }
   requireIncludes(objective.evidence?.validators, ["scripts/validate-platform-sensitive-data-migration.mjs"], "objective evidence.validators", errors);
   requireIncludes(objective.evidence?.tests, ["scripts/platform-sensitive-data-migration.test.mjs"], "objective evidence.tests", errors);
   requireIncludes(objective.evidence?.docs, ["docs/platform-sensitive-data-migration.md"], "objective evidence.docs", errors);
 
-  if (!sameList(values(execution.requiredUnfinishedNodes), expectedRemainingTaskIDs)) errors.push("task execution unfinished projection must match the four-node remainder");
+  if (!sameList(values(execution.requiredUnfinishedNodes), expectedRemainingTaskIDs)) errors.push("task execution unfinished projection must match the twelve-node remainder");
   requireIncludes(execution.requiredValidators, ["scripts/validate-platform-sensitive-data-migration.mjs"], "task execution requiredValidators", errors);
   requireIncludes(execution.requiredTests, ["scripts/platform-sensitive-data-migration.test.mjs"], "task execution requiredTests", errors);
 
@@ -637,4 +650,4 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log("Validated platform sensitive data migration governance (45/41/4)");
+console.log("Validated platform sensitive data migration governance (53/41/12)");

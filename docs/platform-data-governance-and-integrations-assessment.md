@@ -1,12 +1,15 @@
 # Platform Data Governance And Integrations Assessment
 
 Date: 2026-07-12
+Governance updated: 2026-07-13
 
 ## Purpose
 
 This assessment records the current implementation truth and a proposed delivery order for sensitive-data display and controlled reveal, deletion and retention, multi-datasource portability, and optional messaging/search integrations.
 
-It does not mark the proposed capabilities as implemented and does not change the current completion task graph. New nodes require explicit approval because they expand the release scope beyond the existing 45-node program.
+It does not mark the assessed capabilities as implemented. Governance approval has expanded the completion task graph to `53 total / 41 implemented / 12 controlled unfinished`, while implementation and closeout remain pending.
+
+The eight newly governed pending nodes are `mask-strategy-runtime`, `sensitive-data-reveal-step-up`, `data-lifecycle-retention`, `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`.
 
 ## Current-State Summary
 
@@ -149,7 +152,7 @@ Stage gates:
 8. Add disabled/no-op messaging and search ports, then a transactional outbox. Promote exactly one MQ adapter for the first real workload and build search as an asynchronous projection with rebuild and replay paths.
 9. Synchronize the open-source manuals, operator runbook, compatibility matrix and public docs site before GitHub publication. Experimental adapters must remain clearly labeled.
 
-The first two nodes are implemented in the completion program. The newly proposed nodes must not silently reuse existing closeouts. If approved, the task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation expand together. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
+The first two predecessor nodes are implemented in the completion program. The next eight nodes are now approved as controlled pending scope, but must not silently reuse existing closeouts or be described as runtime capability. The task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation must remain synchronized as each node advances. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
 
 ## Release Recommendation
 

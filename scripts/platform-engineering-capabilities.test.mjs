@@ -11,8 +11,26 @@ const completionProgramCapabilityIDs = [
   "runtime-security-containment",
   "admin-watermark-export-governance",
   "sensitive-data-protection",
+  "mask-strategy-runtime",
+  "sensitive-data-reveal-step-up",
+  "data-lifecycle-retention",
+  "multi-datasource-contract-and-runtime",
+  "database-certification-matrix",
+  "integration-ports-disabled-default",
+  "transactional-outbox-and-one-mq-adapter",
+  "asynchronous-search-projection",
   "open-source-portability",
   "public-documentation-and-release",
+];
+
+const newlyGovernedCapabilityIDs = completionProgramCapabilityIDs.slice(3, 11);
+const newlyGovernedCapabilityDependencies = [
+  "sensitive-data-protection",
+  ...newlyGovernedCapabilityIDs.slice(0, -1),
+];
+const newlyGovernedCapabilityDocs = [
+  "docs/platform-data-governance-and-integrations-assessment.md",
+  "docs/platform-roadmap.md",
 ];
 
 function runValidator(args = []) {
@@ -75,6 +93,19 @@ describe("validate-platform-engineering-capabilities", () => {
       assert.ok(capability.evidence.validators.length > 0);
     }
     assert.ok(capabilities.slice(3).every((item) => item.status === "partial"));
+
+    for (const [index, capabilityID] of newlyGovernedCapabilityIDs.entries()) {
+      const capability = capabilities.find((item) => item.id === capabilityID);
+      assert.deepEqual(capability.dependsOn, [newlyGovernedCapabilityDependencies[index]]);
+      assert.deepEqual(capability.evidence.sourcePaths, newlyGovernedCapabilityDocs);
+      assert.deepEqual(capability.evidence.taskIds, [capabilityID]);
+    }
+
+    const portability = capabilities.find((item) => item.id === "open-source-portability");
+    assert.ok(portability.dependsOn.includes("runtime-security-containment"));
+    assert.ok(portability.dependsOn.includes("admin-watermark-export-governance"));
+    assert.ok(portability.dependsOn.includes("sensitive-data-protection"));
+    assert.ok(portability.dependsOn.includes("asynchronous-search-projection"));
   });
 
   it("rejects regressing watermark governance to partial after closeout", () => {

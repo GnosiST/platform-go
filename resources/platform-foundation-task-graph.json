@@ -2029,6 +2029,290 @@
       }
     },
     {
+      "id": "mask-strategy-runtime",
+      "title": {
+        "zh": "可配置脱敏策略运行时",
+        "en": "Configurable Mask Strategy Runtime"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "字段合同已有脱敏投影模式，但后端仍原样返回存储值，尚无版本化、字段可配置的统一脱敏策略运行时。",
+        "en": "Field contracts declare masked projection modes, but the backend still returns stored values unchanged and has no versioned, field-configurable masking runtime."
+      },
+      "completionGate": {
+        "zh": "实现清单驱动的版本化脱敏策略，并证明列表、详情、Tooltip 与导出只使用同一后端投影且不会重复脱敏。",
+        "en": "Implement manifest-driven versioned mask strategies and prove list, detail, tooltip and export use one backend projection without duplicate masking."
+      },
+      "resourceLocks": [
+        "data-protection",
+        "admin-resource-contract",
+        "admin-resource-api",
+        "storage-runtime",
+        "docs"
+      ],
+      "dependsOn": [
+        "sensitive-data-historical-migration"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ]
+      }
+    },
+    {
+      "id": "sensitive-data-reveal-step-up",
+      "title": {
+        "zh": "敏感数据验证后查看",
+        "en": "Sensitive Data Reveal Step-Up"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "后台尚无短时单次 reveal grant、验证因子编排、专用权限、限流和追加式审计。",
+        "en": "Admin has no short-lived single-use reveal grants, factor orchestration, dedicated permissions, rate limits or append-only audit."
+      },
+      "completionGate": {
+        "zh": "完成服务端 reveal 策略、OIDC 再认证与短信验证首批因子、短时单次授权、审计以及可访问的后台交互验收。",
+        "en": "Complete server-owned reveal policy, initial OIDC re-authentication and SMS factors, short-lived single-use grants, audit and accessible Admin acceptance."
+      },
+      "visual": true,
+      "designGate": [
+        "superpowers:brainstorming",
+        "product-design"
+      ],
+      "resourceLocks": [
+        "data-protection",
+        "admin-resource-api",
+        "rbac-policy",
+        "casbin-policy",
+        "jwt-session",
+        "audit-policy",
+        "admin-ui",
+        "i18n",
+        "browser-qa",
+        "docs"
+      ],
+      "dependsOn": [
+        "mask-strategy-runtime",
+        "production-admin-oidc-auth"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ]
+      }
+    },
+    {
+      "id": "data-lifecycle-retention",
+      "title": {
+        "zh": "数据生命周期与保留策略",
+        "en": "Data Lifecycle And Retention"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "通用资源仍以物理删除为主，尚无资源声明式删除语义、恢复窗口、最终清理和默认关闭的维护运行器。",
+        "en": "Generic resources still primarily use physical deletion and have no resource-declared deletion semantics, recovery windows, final purge or disabled-by-default maintenance runner."
+      },
+      "completionGate": {
+        "zh": "完成资源级删除策略、软删除与恢复、受控清理、保留期变更审计及可恢复的批处理维护运行时。",
+        "en": "Complete resource-level deletion policy, soft delete and restore, controlled purge, retention-change audit and a resumable batch maintenance runtime."
+      },
+      "resourceLocks": [
+        "admin-resource-contract",
+        "admin-resource-api",
+        "storage-runtime",
+        "migration-runtime",
+        "audit-policy",
+        "production-config",
+        "docs"
+      ],
+      "dependsOn": [
+        "sensitive-data-reveal-step-up"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ]
+      }
+    },
+    {
+      "id": "multi-datasource-contract-and-runtime",
+      "title": {
+        "zh": "多数据源合同与运行时",
+        "en": "Multi-Datasource Contract And Runtime"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "当前 DSN 仅按平台子系统分离，尚无命名数据源、能力绑定、健康检查和单数据源事务边界。",
+        "en": "Current DSNs only separate platform subsystems and provide no named datasource registry, capability binding, health checks or single-datasource transaction boundary."
+      },
+      "completionGate": {
+        "zh": "完成命名数据源注册、能力绑定、健康检查、配置验证以及不依赖 XA 的单数据源事务约束。",
+        "en": "Complete named datasource registration, capability binding, health checks, configuration validation and single-datasource transaction constraints without XA."
+      },
+      "resourceLocks": [
+        "capability-manifest",
+        "storage-runtime",
+        "production-config",
+        "docs"
+      ],
+      "dependsOn": [
+        "data-lifecycle-retention",
+        "production-persistence-correctness"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ]
+      }
+    },
+    {
+      "id": "database-certification-matrix",
+      "title": {
+        "zh": "数据库认证矩阵",
+        "en": "Database Certification Matrix"
+      },
+      "phase": "production-governance",
+      "scope": "governance",
+      "status": "pending",
+      "statusReason": {
+        "zh": "MySQL、PostgreSQL 和 SQLite 尚未覆盖全平台仓储、迁移、分页、锁与事务认证，人大金仓和 Oracle 也未实现独立认证。",
+        "en": "MySQL, PostgreSQL and SQLite lack full-platform repository, migration, pagination, locking and transaction certification; KingbaseES and Oracle also lack independent certification."
+      },
+      "completionGate": {
+        "zh": "形成按驱动与版本记录的自动化认证矩阵；未通过的数据库必须明确标记为实验性或不支持。",
+        "en": "Produce an automated driver-and-version certification matrix and label every unverified database experimental or unsupported."
+      },
+      "resourceLocks": [
+        "storage-runtime",
+        "migration-runtime",
+        "production-config",
+        "docs"
+      ],
+      "dependsOn": [
+        "multi-datasource-contract-and-runtime"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ]
+      }
+    },
+    {
+      "id": "integration-ports-disabled-default",
+      "title": {
+        "zh": "默认关闭的集成端口",
+        "en": "Integration Ports Disabled By Default"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "平台尚无统一的消息总线、搜索写入和搜索读取端口，也没有明确的 disabled/no-op 默认实现。",
+        "en": "The platform has no unified message bus, search indexer or search reader ports and no explicit disabled or no-op defaults."
+      },
+      "completionGate": {
+        "zh": "完成业务无关端口、默认关闭实现、能力 profile 接入、健康状态和生产配置门禁。",
+        "en": "Complete business-neutral ports, disabled defaults, capability-profile wiring, health state and production configuration gates."
+      },
+      "resourceLocks": [
+        "capability-manifest",
+        "capability-profile",
+        "production-config",
+        "docs"
+      ],
+      "dependsOn": [
+        "database-certification-matrix",
+        "notification-extension-boundary",
+        "job-extension-boundary"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ]
+      }
+    },
+    {
+      "id": "transactional-outbox-and-one-mq-adapter",
+      "title": {
+        "zh": "事务 Outbox 与单一消息队列适配器",
+        "en": "Transactional Outbox And One MQ Adapter"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "当前 Redis Pub/Sub 只承担缓存失效，不具备事务消息、幂等、重试、死信和重放能力。",
+        "en": "Current Redis Pub/Sub only distributes cache invalidation and provides no transactional messaging, idempotency, retries, dead letters or replay."
+      },
+      "completionGate": {
+        "zh": "完成事务 Outbox、幂等消费、重试/死信/重放治理，并只为首个真实工作负载认证一个消息队列适配器。",
+        "en": "Complete transactional outbox, idempotent consumption, retry/dead-letter/replay governance and certify exactly one MQ adapter for the first real workload."
+      },
+      "resourceLocks": [
+        "storage-runtime",
+        "migration-runtime",
+        "production-config",
+        "audit-policy",
+        "docs"
+      ],
+      "dependsOn": [
+        "integration-ports-disabled-default"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ]
+      }
+    },
+    {
+      "id": "asynchronous-search-projection",
+      "title": {
+        "zh": "异步搜索投影",
+        "en": "Asynchronous Search Projection"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "平台尚无 Elasticsearch/OpenSearch 异步投影、重建、重放和关系数据库事实源边界。",
+        "en": "The platform has no Elasticsearch or OpenSearch asynchronous projection, rebuild, replay or relational source-of-truth boundary."
+      },
+      "completionGate": {
+        "zh": "完成可重建的异步搜索投影、重放与删除同步，保持关系数据库作为授权、恢复和审计事实源。",
+        "en": "Complete rebuildable asynchronous search projection, replay and deletion synchronization while retaining the relational database as the authorization, restore and audit source of truth."
+      },
+      "resourceLocks": [
+        "admin-resource-api",
+        "storage-runtime",
+        "production-config",
+        "docs"
+      ],
+      "dependsOn": [
+        "transactional-outbox-and-one-mq-adapter"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ]
+      }
+    },
+    {
       "id": "open-source-portability",
       "title": {
         "zh": "开源可移植性",
@@ -2052,7 +2336,7 @@
       ],
       "dependsOn": [
         "admin-watermark-export-governance",
-        "sensitive-data-historical-migration"
+        "asynchronous-search-projection"
       ],
       "evidence": {
         "docs": [

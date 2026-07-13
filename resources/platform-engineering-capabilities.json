@@ -2739,6 +2739,174 @@
       }
     },
     {
+      "id": "mask-strategy-runtime",
+      "label": {
+        "zh": "可配置脱敏策略运行时",
+        "en": "Configurable Mask Strategy Runtime"
+      },
+      "status": "partial",
+      "purpose": "Apply versioned, field-configurable masking strategies consistently across admin projections and exports.",
+      "dependsOn": [
+        "sensitive-data-protection"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "mask-strategy-runtime"
+        ]
+      }
+    },
+    {
+      "id": "sensitive-data-reveal-step-up",
+      "label": {
+        "zh": "敏感数据验证后查看",
+        "en": "Sensitive Data Reveal Step-Up"
+      },
+      "status": "partial",
+      "purpose": "Protect plaintext reveal with server-owned policy, step-up verification, short-lived grants and append-only audit.",
+      "dependsOn": [
+        "mask-strategy-runtime"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "sensitive-data-reveal-step-up"
+        ]
+      }
+    },
+    {
+      "id": "data-lifecycle-retention",
+      "label": {
+        "zh": "数据生命周期与保留策略",
+        "en": "Data Lifecycle And Retention"
+      },
+      "status": "partial",
+      "purpose": "Provide resource-declared deletion, recovery, retention and controlled purge semantics.",
+      "dependsOn": [
+        "sensitive-data-reveal-step-up"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "data-lifecycle-retention"
+        ]
+      }
+    },
+    {
+      "id": "multi-datasource-contract-and-runtime",
+      "label": {
+        "zh": "多数据源合同与运行时",
+        "en": "Multi-Datasource Contract And Runtime"
+      },
+      "status": "partial",
+      "purpose": "Route declared resources through isolated, validated datasource configurations without weakening platform contracts.",
+      "dependsOn": [
+        "data-lifecycle-retention"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "multi-datasource-contract-and-runtime"
+        ]
+      }
+    },
+    {
+      "id": "database-certification-matrix",
+      "label": {
+        "zh": "数据库认证矩阵",
+        "en": "Database Certification Matrix"
+      },
+      "status": "partial",
+      "purpose": "Publish evidence-backed compatibility tiers for supported and planned relational database targets.",
+      "dependsOn": [
+        "multi-datasource-contract-and-runtime"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "database-certification-matrix"
+        ]
+      }
+    },
+    {
+      "id": "integration-ports-disabled-default",
+      "label": {
+        "zh": "默认关闭的集成端口",
+        "en": "Integration Ports Disabled By Default"
+      },
+      "status": "partial",
+      "purpose": "Define optional message queue and search ports that remain disabled until explicitly composed and configured.",
+      "dependsOn": [
+        "database-certification-matrix"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "integration-ports-disabled-default"
+        ]
+      }
+    },
+    {
+      "id": "transactional-outbox-and-one-mq-adapter",
+      "label": {
+        "zh": "事务发件箱与单消息队列适配器",
+        "en": "Transactional Outbox And One MQ Adapter"
+      },
+      "status": "partial",
+      "purpose": "Provide durable transactional event publication with one production-ready message queue adapter.",
+      "dependsOn": [
+        "integration-ports-disabled-default"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "transactional-outbox-and-one-mq-adapter"
+        ]
+      }
+    },
+    {
+      "id": "asynchronous-search-projection",
+      "label": {
+        "zh": "异步搜索投影",
+        "en": "Asynchronous Search Projection"
+      },
+      "status": "partial",
+      "purpose": "Build recoverable asynchronous search projections without making search infrastructure a source of truth.",
+      "dependsOn": [
+        "transactional-outbox-and-one-mq-adapter"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "asynchronous-search-projection"
+        ]
+      }
+    },
+    {
       "id": "open-source-portability",
       "label": {
         "zh": "开源可移植性",
@@ -2749,7 +2917,8 @@
       "dependsOn": [
         "runtime-security-containment",
         "admin-watermark-export-governance",
-        "sensitive-data-protection"
+        "sensitive-data-protection",
+        "asynchronous-search-projection"
       ],
       "evidence": {
         "sourcePaths": [

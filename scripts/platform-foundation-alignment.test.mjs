@@ -15,6 +15,14 @@ const completedProgramTaskIDs = [
 ];
 
 const remainingCompletionProgramTaskIDs = [
+  "mask-strategy-runtime",
+  "sensitive-data-reveal-step-up",
+  "data-lifecycle-retention",
+  "multi-datasource-contract-and-runtime",
+  "database-certification-matrix",
+  "integration-ports-disabled-default",
+  "transactional-outbox-and-one-mq-adapter",
+  "asynchronous-search-projection",
   "open-source-portability",
   "public-docs-community",
   "public-docs-site",
@@ -40,7 +48,7 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
-  it("migrates four completed program nodes to required work and tracks four future nodes", () => {
+  it("migrates four completed program nodes to required work and tracks twelve future nodes", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
 
     assert.ok(audit.requiredTaskNodes.includes("production-admin-oidc-auth"));
