@@ -180,9 +180,11 @@ function acceptedDriverCases(source) {
   const returns = [...gate.matchAll(/\breturn\b/g)];
   const booleanReturns = [...gate.matchAll(/\breturn\s+(true|false)\b/g)].map((match) => match[1]);
   if (returns.length !== 2 || !sameList(booleanReturns, ["true", "false"])) return [];
-  const allCases = [...switchBody.matchAll(/case\s+([^:]+):/g)].flatMap((match) =>
-    [...match[1].matchAll(/"([^"]+)"/g)].map((item) => item[1]));
-  if (!sameList(allCases.sort(), ["mysql", "postgres", "sqlite"])) return [];
+  const caseOperands = [...switchBody.matchAll(/case\s+([^:]+):/g)].flatMap((match) =>
+    match[1].split(",").map((operand) => operand.trim()));
+  if (caseOperands.some((operand) => !/^"(?:mysql|postgres|sqlite)"$/.test(operand))) return [];
+  const allCases = caseOperands.map((operand) => operand.slice(1, -1)).sort();
+  if (!sameList(allCases, ["mysql", "postgres", "sqlite"])) return [];
   const accepted = [];
   for (const match of switchBody.matchAll(/case\s+([^:]+):([\s\S]*?)(?=\n\s*(?:case\s+|default\s*:|$))/g)) {
     if (!/\breturn\s+true\b/.test(match[2])) continue;
@@ -413,6 +415,15 @@ function plainKeyAssignment(source) {
   return false;
 }
 
+function singleTokenColonIdentifier(source, aliases) {
+  const pattern = new RegExp(`(?:^|\\n)\\s*(?:[-*]\\s*)?["']?(?:${aliases})["']?\\s*:\\s*([^\\r\\n]*)`, "gim");
+  for (const match of source.matchAll(pattern)) {
+    const remainder = match[1].trim();
+    if (!safeEvidencePlaceholder(remainder) && /^\S+$/.test(remainder)) return true;
+  }
+  return false;
+}
+
 function validateEvidenceText(label, source, errors) {
   if (/\bpgo:enc:v\d+:[A-Za-z0-9+/_=-]{4,}/i.test(source)) errors.push(`${label} must not contain an encrypted value`);
   if (/\bfixture[-_](?:plaintext|secret)(?:[-_][A-Za-z0-9][A-Za-z0-9._-]*)?/i.test(source) ||
@@ -434,11 +445,12 @@ function validateEvidenceText(label, source, errors) {
     if (sensitiveAssignment(source, aliases)) errors.push(`${label} must not contain a concrete ${kind}`);
   }
   if (plainKeyAssignment(source)) errors.push(`${label} must not contain concrete key material`);
-  const clearIdentifier = /^(?:record[-_]|tenant[-_]|\d+$|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$|(?=[A-Za-z0-9:_-]*\d)[A-Za-z0-9]+(?:[-_:][A-Za-z0-9]+)+$)/i;
-  if (sensitiveAssignment(source, "record[-_ ]?id", { colonRequiresQuoted: true, unquotedColonPattern: clearIdentifier })) {
+  const recordID = "record[-_ ]?id";
+  if (sensitiveAssignment(source, recordID, { colonRequiresQuoted: true }) || singleTokenColonIdentifier(source, recordID)) {
     errors.push(`${label} must not contain a concrete record ID`);
   }
-  if (sensitiveAssignment(source, "tenant[-_ ]?id(?:entifier)?", { colonRequiresQuoted: true, unquotedColonPattern: clearIdentifier })) {
+  const tenantID = "tenant[-_ ]?id(?:entifier)?";
+  if (sensitiveAssignment(source, tenantID, { colonRequiresQuoted: true }) || singleTokenColonIdentifier(source, tenantID)) {
     errors.push(`${label} must not contain a concrete tenant ID`);
   }
 

@@ -278,6 +278,8 @@ describe("validate-platform-sensitive-data-migration", () => {
       "record ID: $MIGRATION_RECORD_ID",
       "tenant ID: ${MIGRATION_TENANT_ID}",
       "record ID: <redacted>",
+      "record ID: the target record coordinate",
+      "record ID: run ID plus a domain-separated hash",
     ].join("\n");
     const safeResult = runValidator(["--evidence-file", tempText("safe-identifiers.md", safeEvidence)]);
     assert.equal(safeResult.status, 0, safeResult.stderr);
@@ -287,6 +289,20 @@ describe("validate-platform-sensitive-data-migration", () => {
       { name: "record-uuid", value: "record ID: 550e8400-e29b-41d4-a716-446655440000", expected: /record ID/i },
       { name: "tenant-number", value: "tenant ID: 42", expected: /tenant ID/i },
       { name: "tenant-token", value: "tenant ID: north-tenant-7", expected: /tenant ID/i },
+    ]) {
+      assertRejected(
+        runValidator(["--evidence-file", tempText(`${fixture.name}.md`, `${fixture.value}\n`)]),
+        fixture.expected,
+      );
+    }
+  });
+
+  it("rejects every single-token colon-form record or tenant identifier", () => {
+    for (const fixture of [
+      { name: "record-ulid", value: "record ID: 01JABC123XYZ", expected: /record ID/i },
+      { name: "record-cuid", value: "record ID: ckx7abc123def", expected: /record ID/i },
+      { name: "record-compact", value: "record ID: acme42", expected: /record ID/i },
+      { name: "tenant-alpha", value: "tenant ID: ACME", expected: /tenant ID/i },
     ]) {
       assertRejected(
         runValidator(["--evidence-file", tempText(`${fixture.name}.md`, `${fixture.value}\n`)]),
@@ -322,6 +338,14 @@ describe("validate-platform-sensitive-data-migration", () => {
       source.replace(
         '\tcase "mysql", "postgres", "sqlite":',
         '\tcase "oracle":\n\t\tfallthrough\n\tcase "mysql", "postgres", "sqlite":',
+      ),
+      source.replace(
+        '\tcase "mysql", "postgres", "sqlite":',
+        '\tcase oracleDriver, "mysql", "postgres", "sqlite":',
+      ),
+      source.replace(
+        '\tcase "mysql", "postgres", "sqlite":',
+        '\tcase configuredDriver(), "mysql", "postgres", "sqlite":',
       ),
     ]) {
       assertRejected(
