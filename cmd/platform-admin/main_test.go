@@ -18,6 +18,7 @@ import (
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/config"
 	"platform-go/internal/platform/dataprotection"
+	"platform-go/internal/platform/sensitivemigration"
 )
 
 const (
@@ -247,6 +248,153 @@ func TestRunBindAdminOIDCAuditFailureCanRetryWithoutDuplicates(t *testing.T) {
 	}
 	if got := len(bindingAudits(audits, adminresource.AdminIdentityBindingAuditOutcomeConflict)); got != 1 {
 		t.Fatalf("conflict audit count = %d, want 1", got)
+	}
+}
+
+func TestRunSensitiveDataMigrationAcceptsExactModesAndEmitsOneJSONReport(t *testing.T) {
+	for _, mode := range []sensitivemigration.Mode{
+		sensitivemigration.ModeInventory,
+		sensitivemigration.ModeDryRun,
+		sensitivemigration.ModePrepare,
+		sensitivemigration.ModeApply,
+		sensitivemigration.ModeVerify,
+		sensitivemigration.ModeRehearseRestore,
+		sensitivemigration.ModeRollback,
+	} {
+		t.Run(string(mode), func(t *testing.T) {
+			session := &fakeSensitiveMigrationSession{
+				planHash: "sha256:" + strings.Repeat("a", 64),
+				report:   sensitivemigration.Report{RunID: "run-1", Mode: mode, Status: sensitivemigration.StatusCompleted},
+			}
+			args := []string{"sensitive-data-migrate", "--mode", string(mode), "--batch-size", "25"}
+			switch mode {
+			case sensitivemigration.ModePrepare, sensitivemigration.ModeApply, sensitivemigration.ModeRehearseRestore, sensitivemigration.ModeRollback:
+				args = append(args, mutationCLIArgs()...)
+			case sensitivemigration.ModeVerify:
+				args = append(args, "--run-id", "run-1")
+			}
+			result := executeWithSensitiveMigration(t, args, session, nil)
+			if result.err != nil {
+				t.Fatalf("run() error = %v", result.err)
+			}
+			if result.stderr != "" || strings.Count(result.stdout, "\n") != 1 {
+				t.Fatalf("stdout = %q stderr = %q, want one JSON line and empty stderr", result.stdout, result.stderr)
+			}
+			var report sensitivemigration.Report
+			if err := json.Unmarshal([]byte(result.stdout), &report); err != nil {
+				t.Fatalf("stdout is not a JSON Report: %v", err)
+			}
+			if report != session.report {
+				t.Fatalf("report = %+v, want %+v", report, session.report)
+			}
+			if session.options.Mode != mode || session.options.BatchSize != 25 || session.closes != 1 {
+				t.Fatalf("session options = %+v closes=%d", session.options, session.closes)
+			}
+		})
+	}
+}
+
+func TestRunSensitiveDataMigrationRejectsMalformedOrIncompleteArgumentsWithoutValues(t *testing.T) {
+	secret := "sensitive-cli-token-and-dsn"
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{name: "unknown mode", args: []string{"sensitive-data-migrate", "--mode", secret}},
+		{name: "unknown flag", args: []string{"sensitive-data-migrate", "--mode", "inventory", "--unknown-" + secret}},
+		{name: "positional", args: []string{"sensitive-data-migrate", "--mode", "inventory", secret}},
+		{name: "malformed batch", args: []string{"sensitive-data-migrate", "--mode", "inventory", "--batch-size", secret}},
+		{name: "zero batch", args: []string{"sensitive-data-migrate", "--mode", "inventory", "--batch-size", "0"}},
+		{name: "small batch", args: []string{"sensitive-data-migrate", "--mode", "inventory", "--batch-size", "-1"}},
+		{name: "large batch", args: []string{"sensitive-data-migrate", "--mode", "inventory", "--batch-size", "1001"}},
+		{name: "verify missing run", args: []string{"sensitive-data-migrate", "--mode", "verify"}},
+		{name: "prepare missing approvals", args: []string{"sensitive-data-migrate", "--mode", "prepare", "--run-id", "run-1"}},
+		{name: "apply missing approvals", args: []string{"sensitive-data-migrate", "--mode", "apply", "--run-id", "run-1"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			session := &fakeSensitiveMigrationSession{planHash: "sha256:" + strings.Repeat("a", 64)}
+			result := executeWithSensitiveMigration(t, tc.args, session, nil)
+			if result.err == nil {
+				t.Fatal("run() error = nil")
+			}
+			combined := result.stdout + result.stderr + result.err.Error()
+			if strings.Contains(combined, secret) {
+				t.Fatalf("error output exposed raw argument: %q", combined)
+			}
+			if result.stdout != "" || result.stderr != "" {
+				t.Fatalf("stdout=%q stderr=%q, want empty on error", result.stdout, result.stderr)
+			}
+		})
+	}
+}
+
+func TestRunSensitiveDataMigrationClosesSessionAndNormalizesOperationalErrors(t *testing.T) {
+	secret := "database-secret-dsn"
+	t.Run("open", func(t *testing.T) {
+		result := executeWithSensitiveMigration(t, []string{"sensitive-data-migrate", "--mode", "inventory"}, nil, errors.New(secret))
+		assertSensitiveMigrationOperationalError(t, result, secret)
+	})
+	t.Run("run", func(t *testing.T) {
+		session := &fakeSensitiveMigrationSession{planHash: "sha256:" + strings.Repeat("a", 64), err: errors.New(secret)}
+		result := executeWithSensitiveMigration(t, []string{"sensitive-data-migrate", "--mode", "inventory"}, session, nil)
+		assertSensitiveMigrationOperationalError(t, result, secret)
+		if session.closes != 1 {
+			t.Fatalf("Close() calls = %d, want 1", session.closes)
+		}
+	})
+}
+
+type fakeSensitiveMigrationSession struct {
+	planHash string
+	options  sensitivemigration.Options
+	report   sensitivemigration.Report
+	err      error
+	closes   int
+}
+
+func (s *fakeSensitiveMigrationSession) PlanHash() string { return s.planHash }
+
+func (s *fakeSensitiveMigrationSession) Run(_ context.Context, options sensitivemigration.Options) (sensitivemigration.Report, error) {
+	s.options = options
+	return s.report, s.err
+}
+
+func (s *fakeSensitiveMigrationSession) Close() error {
+	s.closes++
+	return nil
+}
+
+func executeWithSensitiveMigration(t *testing.T, args []string, session sensitiveMigrationSession, openErr error) executionResult {
+	t.Helper()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := runWithDependencies(context.Background(), args, strings.NewReader(""), &stdout, &stderr, func() config.Config { return config.Config{} }, nil,
+		func(config.Config, ...capability.Manifest) (sensitiveMigrationSession, error) {
+			return session, openErr
+		})
+	return executionResult{stdout: stdout.String(), stderr: stderr.String(), err: err}
+}
+
+func mutationCLIArgs() []string {
+	return []string{
+		"--run-id", "run-1",
+		"--actor", "operator-1",
+		"--reason", "approved-maintenance",
+		"--approval-ref", "approval-1",
+		"--backup-uri", "s3://backup/platform-1",
+		"--backup-sha256", "sha256:" + strings.Repeat("b", 64),
+		"--restore-evidence-ref", "restore-test-1",
+		"--maintenance-window-confirmed",
+	}
+}
+
+func assertSensitiveMigrationOperationalError(t *testing.T, result executionResult, secret string) {
+	t.Helper()
+	if result.err == nil {
+		t.Fatal("run() error = nil")
+	}
+	if strings.Contains(result.err.Error(), secret) || result.stdout != "" || result.stderr != "" {
+		t.Fatalf("result = %+v, want value-free error and empty output", result)
 	}
 }
 

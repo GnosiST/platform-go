@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -17,11 +18,23 @@ import (
 	"platform-go/internal/platform/config"
 	"platform-go/internal/platform/dataprotection"
 	"platform-go/internal/platform/httpapi"
+	"platform-go/internal/platform/sensitivemigration"
 )
 
-const bindAdminOIDCCommand = "bind-admin-oidc"
+const (
+	bindAdminOIDCCommand          = "bind-admin-oidc"
+	sensitiveDataMigrationCommand = "sensitive-data-migrate"
+)
 
 type adminResourcesLoader func(config.Config, []capability.Manifest, dataprotection.Runtime) (*adminresource.Store, error)
+
+type sensitiveMigrationSession interface {
+	PlanHash() string
+	Run(context.Context, sensitivemigration.Options) (sensitivemigration.Report, error)
+	Close() error
+}
+
+type sensitiveMigrationOpener func(config.Config, ...capability.Manifest) (sensitiveMigrationSession, error)
 
 func main() {
 	if err := run(context.Background(), os.Args[1:], os.Stdin, os.Stdout, os.Stderr, config.Load); err != nil {
@@ -31,14 +44,35 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, loadConfig func() config.Config) error {
-	return runWithAdminResources(ctx, args, stdin, stdout, stderr, loadConfig, bootstrap.AdminResourcesFromConfig)
+	return runWithDependencies(ctx, args, stdin, stdout, stderr, loadConfig, bootstrap.AdminResourcesFromConfig,
+		func(cfg config.Config, manifests ...capability.Manifest) (sensitiveMigrationSession, error) {
+			return bootstrap.OpenSensitiveDataMigration(cfg, manifests...)
+		})
 }
 
 func runWithAdminResources(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, loadConfig func() config.Config, loadAdminResources adminResourcesLoader) error {
-	if len(args) == 0 || args[0] != bindAdminOIDCCommand {
-		return errors.New("expected bind-admin-oidc command")
-	}
+	return runWithDependencies(ctx, args, stdin, stdout, stderr, loadConfig, loadAdminResources,
+		func(cfg config.Config, manifests ...capability.Manifest) (sensitiveMigrationSession, error) {
+			return bootstrap.OpenSensitiveDataMigration(cfg, manifests...)
+		})
 
+}
+
+func runWithDependencies(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, loadConfig func() config.Config, loadAdminResources adminResourcesLoader, openSensitiveMigration sensitiveMigrationOpener) error {
+	if len(args) == 0 {
+		return errors.New("expected bind-admin-oidc or sensitive-data-migrate command")
+	}
+	switch args[0] {
+	case bindAdminOIDCCommand:
+		return runBindAdminOIDC(ctx, args, stdin, stdout, loadConfig, loadAdminResources)
+	case sensitiveDataMigrationCommand:
+		return runSensitiveDataMigration(ctx, args, stdout, stderr, loadConfig, openSensitiveMigration)
+	default:
+		return errors.New("expected bind-admin-oidc or sensitive-data-migrate command")
+	}
+}
+
+func runBindAdminOIDC(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, loadConfig func() config.Config, loadAdminResources adminResourcesLoader) error {
 	flags := flag.NewFlagSet(bindAdminOIDCCommand, flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	providerID := flags.String("provider", "", "configured Admin OIDC provider ID")
@@ -118,6 +152,89 @@ func runWithAdminResources(ctx context.Context, args []string, stdin io.Reader, 
 	}
 	_, err = fmt.Fprintf(stdout, "provider=%s username=%s\n", provider.ID, binding.Username)
 	return err
+}
+
+func runSensitiveDataMigration(ctx context.Context, args []string, stdout, stderr io.Writer, loadConfig func() config.Config, openSensitiveMigration sensitiveMigrationOpener) error {
+	_ = stderr
+	flags := flag.NewFlagSet(sensitiveDataMigrationCommand, flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	modeValue := flags.String("mode", "", "migration mode")
+	runID := flags.String("run-id", "", "immutable migration run ID")
+	actor := flags.String("actor", "", "operator actor ID")
+	reason := flags.String("reason", "", "approved migration reason")
+	approvalRef := flags.String("approval-ref", "", "approval reference")
+	backupURI := flags.String("backup-uri", "", "external backup URI")
+	backupHash := flags.String("backup-sha256", "", "external backup SHA-256")
+	restoreEvidence := flags.String("restore-evidence-ref", "", "restore rehearsal evidence reference")
+	maintenanceConfirmed := flags.Bool("maintenance-window-confirmed", false, "confirm maintenance window")
+	batchSize := flags.Int("batch-size", sensitivemigration.DefaultBatchSize, "migration batch size")
+	if err := flags.Parse(args[1:]); err != nil {
+		return errors.New("invalid sensitive-data-migrate arguments")
+	}
+	if len(flags.Args()) != 0 {
+		return errors.New("positional arguments are not accepted")
+	}
+	mode := sensitivemigration.Mode(*modeValue)
+	if !validSensitiveMigrationMode(mode) {
+		return errors.New("invalid sensitive-data-migrate mode")
+	}
+	if *batchSize < 1 || *batchSize > sensitivemigration.MaximumBatchSize {
+		return errors.New("invalid sensitive-data-migrate batch size")
+	}
+	if loadConfig == nil || openSensitiveMigration == nil {
+		return errors.New("sensitive data migration bootstrap is unavailable")
+	}
+
+	session, err := openSensitiveMigration(loadConfig(), apps.DefaultManifests()...)
+	if err != nil || session == nil {
+		return errors.New("sensitive data migration bootstrap failed")
+	}
+	closed := false
+	defer func() {
+		if !closed {
+			_ = session.Close()
+		}
+	}()
+
+	request := sensitivemigration.RunRequest{
+		RunID: *runID, PlanHash: session.PlanHash(), ActorID: *actor, Reason: *reason,
+		ApprovalRef: *approvalRef, BackupURI: *backupURI, BackupHash: *backupHash,
+		RestoreEvidence: *restoreEvidence, MaintenanceConfirmed: *maintenanceConfirmed,
+	}
+	switch mode {
+	case sensitivemigration.ModeVerify:
+		if !sensitivemigration.ValidRunIdentity(request) {
+			return errors.New("sensitive data migration run identity is required")
+		}
+	case sensitivemigration.ModePrepare, sensitivemigration.ModeApply, sensitivemigration.ModeRehearseRestore, sensitivemigration.ModeRollback:
+		if !sensitivemigration.ValidMutationRequest(request) {
+			return errors.New("sensitive data migration approval evidence is required")
+		}
+	}
+	report, err := session.Run(ctx, sensitivemigration.Options{Mode: mode, BatchSize: *batchSize, Request: request})
+	if err != nil {
+		return errors.New("sensitive data migration failed")
+	}
+	closeErr := session.Close()
+	closed = true
+	if closeErr != nil {
+		return errors.New("close sensitive data migration storage")
+	}
+	if err := json.NewEncoder(stdout).Encode(report); err != nil {
+		return errors.New("write sensitive data migration report")
+	}
+	return nil
+}
+
+func validSensitiveMigrationMode(mode sensitivemigration.Mode) bool {
+	switch mode {
+	case sensitivemigration.ModeInventory, sensitivemigration.ModeDryRun, sensitivemigration.ModePrepare,
+		sensitivemigration.ModeApply, sensitivemigration.ModeVerify, sensitivemigration.ModeRehearseRestore,
+		sensitivemigration.ModeRollback:
+		return true
+	default:
+		return false
+	}
 }
 
 func findAdminOIDCProvider(manifests []capability.Manifest, providerID string) (capability.AuthProvider, bool) {
