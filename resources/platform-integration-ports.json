@@ -1,0 +1,47 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-integration-ports.json",
+  "version": 1,
+  "defaultState": "disabled",
+  "ports": [
+    {
+      "id": "message-bus",
+      "interface": "integration.MessageBus",
+      "operations": ["publish"],
+      "disabledError": "ErrMessageBusDisabled"
+    },
+    {
+      "id": "search-indexer",
+      "interface": "integration.SearchIndexer",
+      "operations": ["index", "delete"],
+      "disabledError": "ErrSearchDisabled"
+    },
+    {
+      "id": "search-reader",
+      "interface": "integration.SearchReader",
+      "operations": ["search"],
+      "disabledError": "ErrSearchDisabled"
+    }
+  ],
+  "healthStates": ["disabled", "ready", "unavailable"],
+  "configuration": {
+    "messageBus": {
+      "enabled": "PLATFORM_MESSAGE_BUS_ENABLED",
+      "adapter": "PLATFORM_MESSAGE_BUS_ADAPTER"
+    },
+    "search": {
+      "enabled": "PLATFORM_SEARCH_ENABLED",
+      "adapter": "PLATFORM_SEARCH_ADAPTER"
+    },
+    "productionSwitchesExplicit": true,
+    "adapterKind": "canonical-trimmed-lowercase"
+  },
+  "runtimeBoundary": {
+    "capabilityProfilesImplicitlyEnable": false,
+    "vendorAdapters": "not-implemented",
+    "transactionalOutbox": "not-implemented",
+    "deadLetterQueue": "not-implemented",
+    "replay": "not-implemented",
+    "searchProjection": "not-implemented",
+    "adapterHealthErrorExposure": "redacted"
+  }
+}

@@ -3011,17 +3011,46 @@
         "zh": "默认关闭的集成端口",
         "en": "Integration Ports Disabled By Default"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Define optional message queue and search ports that remain disabled until explicitly composed and configured.",
       "dependsOn": [
         "platform-service-contract-standard"
       ],
       "evidence": {
         "sourcePaths": [
+          "resources/platform-integration-ports.json",
+          "internal/platform/integration/integration.go",
+          "internal/platform/integration/disabled.go",
+          "internal/platform/bootstrap/integration.go",
+          "internal/platform/config/config.go",
+          "cmd/platform-api/main.go",
+          "deploy/env/production.example.env",
+          "deploy/compose/docker-compose.prod.yml",
+          "docs/platform-integration-ports.md",
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
+        "validators": [
+          "scripts/validate-platform-integration-ports.mjs",
+          "scripts/validate-platform-production-readiness.mjs",
+          "scripts/validate-platform-deployment-topology.mjs"
+        ],
+        "tests": [
+          "internal/platform/integration/integration_test.go",
+          "internal/platform/bootstrap/integration_test.go",
+          "internal/platform/config/config_test.go",
+          "scripts/platform-integration-ports.test.mjs"
+        ],
+        "runtimeBoundary": {
+          "capabilityProfilesImplicitlyEnable": false,
+          "vendorAdapters": "not-implemented",
+          "transactionalOutbox": "not-implemented",
+          "deadLetterQueue": "not-implemented",
+          "replay": "not-implemented",
+          "searchProjection": "not-implemented",
+          "adapterHealthErrorExposure": "redacted"
+        },
         "taskIds": [
           "integration-ports-disabled-default"
         ]

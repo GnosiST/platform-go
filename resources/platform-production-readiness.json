@@ -217,6 +217,24 @@
   ],
   "conditionalEnv": [
     {
+      "name": "PLATFORM_MESSAGE_BUS_ENABLED",
+      "condition": "must be explicitly false in production unless a named message bus adapter is registered by the process composition root",
+      "purpose": "Keeps broker publication unavailable by default and fails startup when an enabled adapter is missing or mismatched.",
+      "docs": [
+        "docs/platform-integration-ports.md",
+        "docs/platform-deployment.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_SEARCH_ENABLED",
+      "condition": "must be explicitly false in production unless matching search indexer and reader adapters are registered by the process composition root",
+      "purpose": "Keeps external search unavailable by default and fails startup when either side of an enabled adapter is missing or mismatched.",
+      "docs": [
+        "docs/platform-integration-ports.md",
+        "docs/platform-deployment.md"
+      ]
+    },
+    {
       "name": "PLATFORM_RETENTION_RUNNER_ENABLED",
       "condition": "explicitly false by default; enable only after lifecycle tables, impact, dry-run and exact policy promotion evidence exist",
       "purpose": "Controls the destructive retention scheduler and requires persistent GORM Admin resource storage when true.",

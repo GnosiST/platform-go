@@ -10,7 +10,6 @@ const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
   "persisted-query-command-object-runtime",
-  "integration-ports-disabled-default",
   "organization-rbac-menu-contract-and-migration-design",
   "organization-role-pool-backend-and-migration",
   "organization-user-admin-experience",
@@ -100,7 +99,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("preserves 37 baseline closeouts, closes eight completion nodes, and tracks 21 pending nodes", () => {
+  it("preserves 37 baseline closeouts, closes nine completion nodes, and tracks 20 pending nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -108,7 +107,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(task, "task graph must include production-admin-oidc-auth");
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
-    assert.equal(audit.nodeCloseouts.length, 45);
+    assert.equal(audit.nodeCloseouts.length, 46);
     assert.deepEqual(audit.nodeCloseouts.slice(0, 37).map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
     assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts.slice(0, 37))).digest("hex"), foundationBaselineCloseoutDigest);
     const runtimeSecurityCloseout = audit.nodeCloseouts[37];
@@ -157,6 +156,11 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(serviceContractCloseout.cleanupEvidence.includes("docs/platform-service-contract-standard.md"));
     assert.ok(serviceContractCloseout.cleanupEvidence.includes("scripts/validate-platform-service-contract-standard.mjs"));
     assert.equal("visualEvidence" in serviceContractCloseout, false);
+    const integrationCloseout = audit.nodeCloseouts.find((item) => item.taskId === "integration-ports-disabled-default");
+    assert.equal(integrationCloseout.status, "closed");
+    assert.equal(integrationCloseout.neatFreak, false);
+    assert.equal(integrationCloseout.cleanupMode, "focused");
+    assert.ok(integrationCloseout.cleanupEvidence.includes("scripts/validate-platform-integration-ports.mjs"));
     assert.deepEqual(audit.pendingNodeEvidence, completionProgramTaskIDs);
   });
 

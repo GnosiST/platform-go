@@ -60,10 +60,10 @@ const requiredImplementedCapabilityIDs = [
   "sensitive-data-reveal-step-up",
   "data-lifecycle-retention",
   "platform-service-contract-standard",
+  "integration-ports-disabled-default",
 ];
 const requiredPartialCapabilityIDs = [
   "persisted-query-command-object-runtime",
-  "integration-ports-disabled-default",
   "organization-rbac-menu-contract-and-migration-design",
   "organization-role-pool-backend-and-migration",
   "organization-user-admin-experience",
@@ -84,7 +84,6 @@ const requiredPartialCapabilityIDs = [
 ];
 const requiredPartialCapabilityDependencies = {
   "persisted-query-command-object-runtime": ["platform-service-contract-standard"],
-  "integration-ports-disabled-default": ["platform-service-contract-standard"],
   "organization-rbac-menu-contract-and-migration-design": ["persisted-query-command-object-runtime"],
   "organization-role-pool-backend-and-migration": ["organization-rbac-menu-contract-and-migration-design"],
   "organization-user-admin-experience": ["organization-role-pool-backend-and-migration"],
@@ -461,6 +460,31 @@ function validatePlatformServiceContractStandard(capability, errors) {
   }
 }
 
+function validateIntegrationPorts(capability, errors) {
+  if (!capability) return;
+  if (!sameOrderedValues(values(capability.dependsOn), ["platform-service-contract-standard"])) {
+    errors.push("integration-ports-disabled-default dependsOn must equal platform-service-contract-standard");
+  }
+  for (const sourcePath of [
+    "resources/platform-integration-ports.json",
+    "internal/platform/integration/integration.go",
+    "internal/platform/bootstrap/integration.go",
+    "docs/platform-integration-ports.md",
+  ]) {
+    requireIncludes(values(capability.evidence?.sourcePaths), sourcePath, "integration-ports-disabled-default evidence.sourcePaths", errors);
+  }
+  requireIncludes(values(capability.evidence?.validators), "scripts/validate-platform-integration-ports.mjs", "integration-ports-disabled-default evidence.validators", errors);
+  for (const testPath of ["internal/platform/integration/integration_test.go", "scripts/platform-integration-ports.test.mjs"]) {
+    requireIncludes(values(capability.evidence?.tests), testPath, "integration-ports-disabled-default evidence.tests", errors);
+  }
+  if (capability.evidence?.runtimeBoundary?.transactionalOutbox !== "not-implemented") {
+    errors.push("integration ports transactional Outbox must stay unimplemented in this node");
+  }
+  if (capability.evidence?.runtimeBoundary?.searchProjection !== "not-implemented") {
+    errors.push("integration ports search projection must stay unimplemented in this node");
+  }
+}
+
 function validateAppClientAPIBoundary(capability, errors) {
   if (!capability) {
     return;
@@ -529,6 +553,7 @@ function validate() {
   validateDeploymentTopologyGate(capabilityByID.get("deployment-topology-gate"), errors);
   validateCapabilityContractGovernance(capabilityByID.get("capability-contract-governance"), errors);
   validatePlatformServiceContractStandard(capabilityByID.get("platform-service-contract-standard"), errors);
+  validateIntegrationPorts(capabilityByID.get("integration-ports-disabled-default"), errors);
   validateAppClientAPIBoundary(capabilityByID.get("app-client-api-boundary"), errors);
   const adminResourceCodes = new Set((adminContract.resources ?? []).map((resource) => resource.code).filter(Boolean));
   const adminPaths = new Set(Object.keys(adminOpenAPI.paths ?? {}));

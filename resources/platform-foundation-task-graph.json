@@ -2543,15 +2543,7 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
-      "statusReason": {
-        "zh": "平台尚无统一消息总线、搜索写入和读取端口，也没有明确的 disabled/no-op 默认实现。",
-        "en": "The platform has no unified message bus, search indexer or search reader ports and no explicit disabled or no-op defaults."
-      },
-      "completionGate": {
-        "zh": "完成业务无关端口、默认关闭实现、能力 profile 接入、健康状态和生产配置门禁，不实现 MQ 或搜索投影。",
-        "en": "Complete business-neutral ports, disabled defaults, capability-profile wiring, health state and production configuration gates without implementing MQ or search projection."
-      },
+      "status": "implemented",
       "resourceLocks": [
         "event-contract",
         "capability-profile",
@@ -2565,8 +2557,26 @@
       ],
       "evidence": {
         "docs": [
+          "docs/platform-integration-ports.md",
+          "docs/platform-deployment.md",
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
           "docs/platform-data-governance-and-integrations-assessment.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-integration-ports.mjs",
+          "scripts/validate-platform-production-readiness.mjs",
+          "scripts/validate-platform-deployment-topology.mjs"
+        ],
+        "tests": [
+          "internal/platform/integration/integration_test.go",
+          "internal/platform/bootstrap/integration_test.go",
+          "internal/platform/config/config_test.go",
+          "scripts/platform-integration-ports.test.mjs"
+        ],
+        "checks": [
+          "rtk go test ./internal/platform/integration ./internal/platform/bootstrap ./internal/platform/config ./cmd/platform-api",
+          "rtk node --test scripts/platform-integration-ports.test.mjs",
+          "rtk node scripts/validate-platform-integration-ports.mjs"
         ]
       }
     },

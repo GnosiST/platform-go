@@ -41,6 +41,10 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_REDIS_ADDR", "")
 	t.Setenv("PLATFORM_REDIS_PASSWORD", "")
 	t.Setenv("PLATFORM_REDIS_DB", "")
+	t.Setenv("PLATFORM_MESSAGE_BUS_ENABLED", "")
+	t.Setenv("PLATFORM_MESSAGE_BUS_ADAPTER", "")
+	t.Setenv("PLATFORM_SEARCH_ENABLED", "")
+	t.Setenv("PLATFORM_SEARCH_ADAPTER", "")
 	t.Setenv("PLATFORM_RATE_LIMIT_HMAC_KEY", "")
 	t.Setenv("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY", "")
 	t.Setenv("PLATFORM_DATA_KEY_PROVIDER", "")
@@ -158,6 +162,9 @@ func TestLoadUsesDefaults(t *testing.T) {
 	if cfg.RedisDB != 0 {
 		t.Fatalf("RedisDB = %d, want 0", cfg.RedisDB)
 	}
+	if cfg.MessageBusEnabled || cfg.MessageBusAdapter != "" || cfg.SearchEnabled || cfg.SearchAdapter != "" {
+		t.Fatalf("external integrations = message-bus(%t,%q) search(%t,%q), want disabled", cfg.MessageBusEnabled, cfg.MessageBusAdapter, cfg.SearchEnabled, cfg.SearchAdapter)
+	}
 	if cfg.RateLimitHMACKey != "" {
 		t.Fatalf("RateLimitHMACKey = %q, want empty by default", cfg.RateLimitHMACKey)
 	}
@@ -196,6 +203,76 @@ func TestLoadUsesDefaults(t *testing.T) {
 	}
 	if cfg.AdminStepUpPhoneSourceConfigured() {
 		t.Fatal("admin step-up phone source must be disabled by default")
+	}
+}
+
+func TestLoadParsesOptionalIntegrationConfiguration(t *testing.T) {
+	t.Setenv("PLATFORM_MESSAGE_BUS_ENABLED", "true")
+	t.Setenv("PLATFORM_MESSAGE_BUS_ADAPTER", "nats")
+	t.Setenv("PLATFORM_SEARCH_ENABLED", "true")
+	t.Setenv("PLATFORM_SEARCH_ADAPTER", "elasticsearch")
+
+	cfg := Load()
+	if !cfg.MessageBusEnabled || cfg.MessageBusAdapter != "nats" || !cfg.SearchEnabled || cfg.SearchAdapter != "elasticsearch" {
+		t.Fatalf("integration config = message-bus(%t,%q) search(%t,%q)", cfg.MessageBusEnabled, cfg.MessageBusAdapter, cfg.SearchEnabled, cfg.SearchAdapter)
+	}
+	if err := cfg.ValidateRuntime(); err != nil {
+		t.Fatalf("ValidateRuntime() error = %v", err)
+	}
+}
+
+func TestOptionalIntegrationConfigurationFailsClosed(t *testing.T) {
+	tests := []struct {
+		name  string
+		key   string
+		value string
+		want  string
+	}{
+		{name: "invalid message bus switch", key: "PLATFORM_MESSAGE_BUS_ENABLED", value: "sometimes", want: "PLATFORM_MESSAGE_BUS_ENABLED is invalid"},
+		{name: "invalid search switch", key: "PLATFORM_SEARCH_ENABLED", value: "sometimes", want: "PLATFORM_SEARCH_ENABLED is invalid"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(tt.key, tt.value)
+			cfg := Load()
+			if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("ValidateRuntime() error = %v, want %q", err, tt.want)
+			}
+		})
+	}
+
+	cfg := validDataProtectionConfig(RuntimeEnvironmentDevelopment, "local-test")
+	cfg.MessageBusEnabled = true
+	if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "PLATFORM_MESSAGE_BUS_ADAPTER") {
+		t.Fatalf("ValidateRuntime(enabled without adapter) error = %v", err)
+	}
+	cfg.MessageBusEnabled = false
+	cfg.MessageBusAdapter = " NATS "
+	if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "canonical trimmed lowercase") || !strings.Contains(err.Error(), "PLATFORM_MESSAGE_BUS_ENABLED=true") {
+		t.Fatalf("ValidateRuntime(adapter while disabled) error = %v", err)
+	}
+}
+
+func TestProductionLoadRequiresExplicitIntegrationSwitches(t *testing.T) {
+	t.Setenv("PLATFORM_RUNTIME_ENV", RuntimeEnvironmentProduction)
+	t.Setenv("PLATFORM_MESSAGE_BUS_ENABLED", "")
+	t.Setenv("PLATFORM_SEARCH_ENABLED", "")
+	cfg := Load()
+	err := cfg.ValidateRuntime()
+	for _, key := range []string{"PLATFORM_MESSAGE_BUS_ENABLED", "PLATFORM_SEARCH_ENABLED"} {
+		if err == nil || !strings.Contains(err.Error(), "production runtime requires "+key+" to be explicitly configured") {
+			t.Fatalf("ValidateRuntime() error = %v, want explicit %s gate", err, key)
+		}
+	}
+
+	t.Setenv("PLATFORM_MESSAGE_BUS_ENABLED", "false")
+	t.Setenv("PLATFORM_SEARCH_ENABLED", "false")
+	cfg = Load()
+	err = cfg.ValidateRuntime()
+	for _, key := range []string{"PLATFORM_MESSAGE_BUS_ENABLED", "PLATFORM_SEARCH_ENABLED"} {
+		if err != nil && strings.Contains(err.Error(), "production runtime requires "+key+" to be explicitly configured") {
+			t.Fatalf("ValidateRuntime() retained explicit %s error: %v", key, err)
+		}
 	}
 }
 
@@ -1467,6 +1544,8 @@ func setValidProductionLoadEnvironment(t *testing.T) {
 		"PLATFORM_LIFECYCLE_HISTORY_DSN":                  "postgres://platform:secret@localhost:5432/platform",
 		"PLATFORM_CACHE_DRIVER":                           "redis",
 		"PLATFORM_REDIS_ADDR":                             "127.0.0.1:6379",
+		"PLATFORM_MESSAGE_BUS_ENABLED":                    "false",
+		"PLATFORM_SEARCH_ENABLED":                         "false",
 		"PLATFORM_RATE_LIMIT_HMAC_KEY":                    "rate-limit-production-key-value-0001",
 		"PLATFORM_DATA_KEY_PROVIDER":                      "env-aes256",
 		"PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID":          "enc-v1",

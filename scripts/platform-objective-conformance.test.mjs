@@ -9,7 +9,6 @@ const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
   "persisted-query-command-object-runtime",
-  "integration-ports-disabled-default",
   "organization-rbac-menu-contract-and-migration-design",
   "organization-role-pool-backend-and-migration",
   "organization-user-admin-experience",

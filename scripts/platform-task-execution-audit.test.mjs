@@ -9,7 +9,6 @@ const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
   "persisted-query-command-object-runtime",
-  "integration-ports-disabled-default",
   "organization-rbac-menu-contract-and-migration-design",
   "organization-role-pool-backend-and-migration",
   "organization-user-admin-experience",
@@ -92,6 +91,8 @@ describe("validate-platform-task-execution-audit", () => {
     const audit = readJSON("resources/platform-task-execution-audit.json");
     assert.ok(audit.requiredValidators.includes("scripts/validate-platform-service-contract-standard.mjs"));
     assert.ok(audit.requiredTests.includes("scripts/platform-service-contract-standard.test.mjs"));
+    assert.ok(audit.requiredValidators.includes("scripts/validate-platform-integration-ports.mjs"));
+    assert.ok(audit.requiredTests.includes("scripts/platform-integration-ports.test.mjs"));
   });
 
   it("rejects missing or reordered completion program execution projections", () => {

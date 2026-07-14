@@ -99,6 +99,16 @@ const requiredCleanupEvidenceByTask = new Map([
       "scripts/platform-service-contract-standard.test.mjs",
     ],
   ],
+  [
+    "integration-ports-disabled-default",
+    [
+      "docs/platform-integration-ports.md",
+      "internal/platform/integration/integration_test.go",
+      "resources/platform-integration-ports.json",
+      "scripts/validate-platform-integration-ports.mjs",
+      "scripts/platform-integration-ports.test.mjs",
+    ],
+  ],
 ]);
 
 const requiredVisualEvidenceByTask = new Map([

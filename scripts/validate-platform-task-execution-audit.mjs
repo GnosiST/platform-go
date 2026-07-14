@@ -31,6 +31,7 @@ const requiredValidatorPaths = [
   "scripts/validate-platform-node-closeout-audit.mjs",
   "scripts/validate-platform-data-lifecycle-retention.mjs",
   "scripts/validate-platform-service-contract-standard.mjs",
+  "scripts/validate-platform-integration-ports.mjs",
   "scripts/validate-platform-objective-conformance.mjs",
   "scripts/validate-platform-promotion-evidence-templates.mjs",
   "scripts/validate-platform-promotion-evidence-package.mjs",
@@ -38,6 +39,7 @@ const requiredValidatorPaths = [
 const requiredTestPaths = [
   "scripts/platform-task-execution-audit.test.mjs",
   "scripts/platform-service-contract-standard.test.mjs",
+  "scripts/platform-integration-ports.test.mjs",
 ];
 
 function readJSON(filePath) {

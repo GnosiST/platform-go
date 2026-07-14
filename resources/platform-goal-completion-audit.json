@@ -9,7 +9,6 @@
     "businessReferenceMode": "reference-only",
     "requiredControlledUnfinishedNodes": [
       "persisted-query-command-object-runtime",
-      "integration-ports-disabled-default",
       "organization-rbac-menu-contract-and-migration-design",
       "organization-role-pool-backend-and-migration",
       "organization-user-admin-experience",
@@ -37,8 +36,8 @@
   },
   "taskSummary": {
     "expectedTotal": 66,
-    "expectedImplemented": 45,
-    "expectedControlledUnfinished": 21
+    "expectedImplemented": 46,
+    "expectedControlledUnfinished": 20
   },
   "requirements": [
     {

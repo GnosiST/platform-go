@@ -36,7 +36,6 @@
   },
   "pendingNodeEvidence": [
     "persisted-query-command-object-runtime",
-    "integration-ports-disabled-default",
     "organization-rbac-menu-contract-and-migration-design",
     "organization-role-pool-backend-and-migration",
     "organization-user-admin-experience",
@@ -1118,6 +1117,7 @@
         "cmd/platform-admin/main.go",
         "cmd/platform-admin/main_test.go",
         "cmd/platform-api/main.go",
+        "resources/platform-sensitive-data-migration-source-lock.json",
         "cmd/platform-api/main_test.go",
         "resources/generated/admin-resource-contract.json",
         "resources/generated/openapi.admin.json",
@@ -1177,6 +1177,45 @@
         "scripts/validate-platform-goal-completion-audit.mjs",
         "scripts/validate-platform-node-closeout-audit.mjs",
         "scripts/validate-platform-objective-conformance.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "integration-ports-disabled-default",
+      "status": "closed",
+      "neatFreak": false,
+      "cleanupMode": "focused",
+      "cleanupEvidence": [
+        "docs/platform-integration-ports.md",
+        "docs/platform-deployment.md",
+        "resources/platform-integration-ports.json",
+        "internal/platform/integration/integration.go",
+        "internal/platform/integration/disabled.go",
+        "internal/platform/integration/integration_test.go",
+        "internal/platform/bootstrap/integration.go",
+        "internal/platform/bootstrap/integration_test.go",
+        "internal/platform/config/config.go",
+        "internal/platform/config/config_test.go",
+        "cmd/platform-api/main.go",
+        "resources/platform-sensitive-data-migration-source-lock.json",
+        "deploy/env/production.example.env",
+        "deploy/compose/docker-compose.prod.yml",
+        "resources/platform-deployment-topology.json",
+        "resources/platform-production-readiness.json",
+        "resources/platform-foundation-task-graph.json",
+        "resources/platform-engineering-capabilities.json",
+        "resources/platform-task-execution-audit.json",
+        "resources/platform-foundation-alignment-audit.json",
+        "resources/platform-goal-completion-audit.json",
+        "resources/platform-node-closeout-audit.json",
+        "resources/platform-objective-conformance.json",
+        "scripts/validate-platform-integration-ports.mjs",
+        "scripts/platform-integration-ports.test.mjs"
       ],
       "dimensions": [
         "docs",

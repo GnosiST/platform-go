@@ -33,6 +33,13 @@ func main() {
 	if err := validateCredentialBoundary(ordered); err != nil {
 		log.Fatalf("validate credential boundary: %v", err)
 	}
+	integrationRuntime, err := bootstrap.IntegrationsFromConfig(cfg, bootstrap.IntegrationAdapters{})
+	if err != nil {
+		log.Fatalf("build optional integrations: %v", err)
+	}
+	for _, status := range integrationRuntime.Status(ctx) {
+		log.Printf("optional integration capability=%s enabled=%t state=%s adapter=%s", status.Capability, status.Enabled, status.State, status.Adapter)
+	}
 	runtime, err := bootstrap.RuntimeFromConfig(cfg)
 	if err != nil {
 		log.Fatalf("build platform runtime: %v", err)

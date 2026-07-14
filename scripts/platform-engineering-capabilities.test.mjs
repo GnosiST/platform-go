@@ -38,7 +38,6 @@ const completionProgramCapabilityIDs = [
 
 const partialCapabilityDependencies = {
   "persisted-query-command-object-runtime": ["platform-service-contract-standard"],
-  "integration-ports-disabled-default": ["platform-service-contract-standard"],
   "organization-rbac-menu-contract-and-migration-design": ["persisted-query-command-object-runtime"],
   "organization-role-pool-backend-and-migration": ["organization-rbac-menu-contract-and-migration-design"],
   "organization-user-admin-experience": ["organization-role-pool-backend-and-migration"],
@@ -141,13 +140,23 @@ describe("validate-platform-engineering-capabilities", () => {
 
     assert.equal(matrix.capabilities.length, 57);
     assert.deepEqual(capabilities.map((item) => item.id), completionProgramCapabilityIDs);
-    for (const capability of capabilities.slice(0, 7)) {
+    const implementedCapabilityIDs = new Set([
+      "runtime-security-containment",
+      "admin-watermark-export-governance",
+      "sensitive-data-protection",
+      "mask-strategy-runtime",
+      "sensitive-data-reveal-step-up",
+      "data-lifecycle-retention",
+      "platform-service-contract-standard",
+      "integration-ports-disabled-default",
+    ]);
+    for (const capability of capabilities.filter((item) => implementedCapabilityIDs.has(item.id))) {
       assert.equal(capability.status, "implemented");
       assert.ok(capability.evidence.sourcePaths.length > 0);
       assert.ok(capability.evidence.tests.length > 0);
       assert.ok(capability.evidence.validators.length > 0);
     }
-    assert.ok(capabilities.slice(7).every((item) => item.status === "partial"));
+    assert.ok(capabilities.filter((item) => !implementedCapabilityIDs.has(item.id)).every((item) => item.status === "partial"));
 
     for (const [capabilityID, expectedDependencies] of Object.entries(partialCapabilityDependencies)) {
       const capability = capabilities.find((item) => item.id === capabilityID);
@@ -186,6 +195,20 @@ describe("validate-platform-engineering-capabilities", () => {
     assert.ok(serviceContract.evidence.sourcePaths.includes("resources/platform-service-contract-standard.json"));
     assert.ok(serviceContract.evidence.generatedFiles.includes("resources/generated/asyncapi.events.json"));
     assert.ok(serviceContract.evidence.tests.includes("scripts/platform-service-contract-standard.test.mjs"));
+    const integrationPorts = capabilities.find((item) => item.id === "integration-ports-disabled-default");
+    assert.equal(integrationPorts.status, "implemented");
+    assert.ok(integrationPorts.evidence.sourcePaths.includes("resources/platform-integration-ports.json"));
+    assert.ok(integrationPorts.evidence.tests.includes("scripts/platform-integration-ports.test.mjs"));
+  });
+
+  it("rejects regressing integration ports after closeout", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities.find((item) => item.id === "integration-ports-disabled-default").status = "partial";
+
+    const result = runValidator(["--matrix", tempJSON("partial-integration-ports.json", matrix)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /required implemented capability integration-ports-disabled-default must stay implemented/);
   });
 
   it("rejects regressing the platform service contract after closeout", () => {

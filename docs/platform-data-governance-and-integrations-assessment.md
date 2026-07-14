@@ -7,7 +7,7 @@ Governance updated: 2026-07-14
 
 This assessment records the current implementation truth for sensitive-data display and controlled reveal, deletion and retention, multi-datasource portability, and optional messaging/search integrations.
 
-It does not mark every assessed capability as implemented. Governance now records `66 total / 45 implemented / 21 controlled unfinished`; `mask-strategy-runtime`, `sensitive-data-reveal-step-up`, `data-lifecycle-retention` and `platform-service-contract-standard` are implemented and closed, while Query/Command execution, organization governance, datasource, database certification, optional integration and publication work remain pending.
+It does not mark every assessed capability as implemented. Governance now records `66 total / 46 implemented / 20 controlled unfinished`; `mask-strategy-runtime`, `sensitive-data-reveal-step-up`, `data-lifecycle-retention`, `platform-service-contract-standard` and the disabled-by-default integration ports are implemented and closed, while Query/Command execution, organization governance, datasource, database certification, concrete MQ/search adapters and publication work remain pending.
 
 The [remaining-task topology adjustment](superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md) remains the activated source of truth for the program boundaries and dependencies. `platform-service-contract-standard` is now closed; the remaining 21 nodes retain their approved order and independent completion gates.
 

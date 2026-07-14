@@ -45,6 +45,10 @@ type Config struct {
 	RedisAddr                           string
 	RedisPassword                       string
 	RedisDB                             int
+	MessageBusEnabled                   bool
+	MessageBusAdapter                   string
+	SearchEnabled                       bool
+	SearchAdapter                       string
 	RateLimitHMACKey                    string
 	SensitiveRevealHMACKey              string
 	DataKeyProvider                     string
@@ -85,6 +89,7 @@ type Config struct {
 	filePolicySource                    filePolicySource
 	transportPolicySource               transportPolicySource
 	retentionRunnerSource               retentionRunnerSource
+	integrationSource                   integrationSource
 }
 
 type envConfigState uint8
@@ -114,6 +119,11 @@ type retentionRunnerSource struct {
 	interval   envConfigState
 	batchSize  envConfigState
 	maxRetries envConfigState
+}
+
+type integrationSource struct {
+	messageBusEnabled envConfigState
+	searchEnabled     envConfigState
 }
 
 var defaultCapabilities = []string{
@@ -162,6 +172,8 @@ func Load() Config {
 	retentionRunnerInterval, retentionRunnerIntervalState := durationEnvWithState("PLATFORM_RETENTION_RUNNER_INTERVAL", defaultRetentionRunnerInterval)
 	retentionRunnerBatchSize, retentionRunnerBatchSizeState := intEnvWithState("PLATFORM_RETENTION_RUNNER_BATCH_SIZE", defaultRetentionRunnerBatchSize)
 	retentionRunnerMaxRetries, retentionRunnerMaxRetriesState := intEnvWithState("PLATFORM_RETENTION_RUNNER_MAX_RETRIES", defaultRetentionRunnerMaxRetries)
+	messageBusEnabled, messageBusEnabledState := boolEnvWithState("PLATFORM_MESSAGE_BUS_ENABLED", false)
+	searchEnabled, searchEnabledState := boolEnvWithState("PLATFORM_SEARCH_ENABLED", false)
 	return Config{
 		RuntimeEnvironment:                  strings.ToLower(env("PLATFORM_RUNTIME_ENV", RuntimeEnvironmentDevelopment)),
 		HTTPAddr:                            env("PLATFORM_HTTP_ADDR", "127.0.0.1:9200"),
@@ -192,6 +204,10 @@ func Load() Config {
 		RedisAddr:                           env("PLATFORM_REDIS_ADDR", "127.0.0.1:6379"),
 		RedisPassword:                       env("PLATFORM_REDIS_PASSWORD", ""),
 		RedisDB:                             intEnv("PLATFORM_REDIS_DB", 0),
+		MessageBusEnabled:                   messageBusEnabled,
+		MessageBusAdapter:                   env("PLATFORM_MESSAGE_BUS_ADAPTER", ""),
+		SearchEnabled:                       searchEnabled,
+		SearchAdapter:                       env("PLATFORM_SEARCH_ADAPTER", ""),
 		RateLimitHMACKey:                    env("PLATFORM_RATE_LIMIT_HMAC_KEY", ""),
 		SensitiveRevealHMACKey:              env("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY", ""),
 		DataKeyProvider:                     env("PLATFORM_DATA_KEY_PROVIDER", ""),
@@ -242,6 +258,10 @@ func Load() Config {
 		retentionRunnerSource: retentionRunnerSource{
 			enabled: retentionRunnerEnabledState, interval: retentionRunnerIntervalState,
 			batchSize: retentionRunnerBatchSizeState, maxRetries: retentionRunnerMaxRetriesState,
+		},
+		integrationSource: integrationSource{
+			messageBusEnabled: messageBusEnabledState,
+			searchEnabled:     searchEnabledState,
 		},
 	}
 }
@@ -330,6 +350,8 @@ func (c Config) ValidateRuntime() error {
 	if c.CacheDriver == "redis" && strings.TrimSpace(c.RedisAddr) == "" {
 		errs = append(errs, errors.New("redis address is required when cache driver is redis"))
 	}
+	errs = append(errs, validateOptionalIntegration("message bus", "PLATFORM_MESSAGE_BUS_ENABLED", "PLATFORM_MESSAGE_BUS_ADAPTER", c.MessageBusEnabled, c.MessageBusAdapter, c.integrationSource.messageBusEnabled)...)
+	errs = append(errs, validateOptionalIntegration("search", "PLATFORM_SEARCH_ENABLED", "PLATFORM_SEARCH_ADAPTER", c.SearchEnabled, c.SearchAdapter, c.integrationSource.searchEnabled)...)
 
 	if c.FileStorageDriver != "" && c.FileStorageDriver != "local" && c.FileStorageDriver != "s3" {
 		errs = append(errs, fmt.Errorf("unsupported file storage driver %q", c.FileStorageDriver))
@@ -387,10 +409,36 @@ func (c Config) ValidateRuntime() error {
 				errs = append(errs, errors.New("production runtime requires PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION to be explicitly configured"))
 			}
 		}
+		for key, state := range map[string]envConfigState{
+			"PLATFORM_MESSAGE_BUS_ENABLED": c.integrationSource.messageBusEnabled,
+			"PLATFORM_SEARCH_ENABLED":      c.integrationSource.searchEnabled,
+		} {
+			if state == envConfigMissing || state == envConfigEmpty {
+				errs = append(errs, fmt.Errorf("production runtime requires %s to be explicitly configured", key))
+			}
+		}
 		errs = append(errs, c.validateProductionRuntime()...)
 	}
 
 	return errors.Join(errs...)
+}
+
+func validateOptionalIntegration(label string, enabledKey string, adapterKey string, enabled bool, adapter string, enabledState envConfigState) []error {
+	var errs []error
+	if enabledState == envConfigInvalid {
+		errs = append(errs, fmt.Errorf("%s is invalid", enabledKey))
+	}
+	canonical := strings.ToLower(strings.TrimSpace(adapter))
+	if adapter != canonical {
+		errs = append(errs, fmt.Errorf("%s must be canonical trimmed lowercase", adapterKey))
+	}
+	if enabled && canonical == "" {
+		errs = append(errs, fmt.Errorf("%s requires %s", enabledKey, adapterKey))
+	}
+	if !enabled && canonical != "" {
+		errs = append(errs, fmt.Errorf("%s requires %s=true", adapterKey, enabledKey))
+	}
+	return errs
 }
 
 func (c Config) validateAdminStepUpPhoneSource() []error {

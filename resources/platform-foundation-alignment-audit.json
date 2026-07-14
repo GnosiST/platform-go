@@ -69,11 +69,11 @@
     "mask-strategy-runtime",
     "sensitive-data-reveal-step-up",
     "data-lifecycle-retention",
-    "platform-service-contract-standard"
+    "platform-service-contract-standard",
+    "integration-ports-disabled-default"
   ],
   "requiredFutureTaskNodes": [
     "persisted-query-command-object-runtime",
-    "integration-ports-disabled-default",
     "organization-rbac-menu-contract-and-migration-design",
     "organization-role-pool-backend-and-migration",
     "organization-user-admin-experience",
@@ -437,6 +437,7 @@
     "scripts/validate-platform-data-lifecycle-retention.mjs",
     "scripts/validate-platform-sensitive-data-migration.mjs",
     "scripts/validate-platform-service-contract-standard.mjs",
+    "scripts/validate-platform-integration-ports.mjs",
     "scripts/validate-platform-promotion-evidence-templates.mjs",
     "scripts/validate-admin-i18n.mjs",
     "scripts/validate-admin-ui-contracts.mjs",
@@ -453,6 +454,7 @@
     "docs/admin-resource-schema.md",
     "docs/platform-data-lifecycle-retention.md",
     "docs/platform-sensitive-data-migration.md",
+    "docs/platform-integration-ports.md",
     "docs/platform-ui-optimization-assessment.md",
     "docs/admin-ui-foundation.md",
     "docs/superpowers/specs/2026-07-13-sensitive-data-reveal-step-up-design.md",

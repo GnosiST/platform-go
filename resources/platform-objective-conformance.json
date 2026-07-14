@@ -29,7 +29,6 @@
     "requiresTaskGraphBeforeNewNode": true,
     "requiredUnfinishedNodes": [
       "persisted-query-command-object-runtime",
-      "integration-ports-disabled-default",
       "organization-rbac-menu-contract-and-migration-design",
       "organization-role-pool-backend-and-migration",
       "organization-user-admin-experience",
@@ -88,7 +87,6 @@
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "controlledBlockers": [
       "persisted-query-command-object-runtime",
-      "integration-ports-disabled-default",
       "organization-rbac-menu-contract-and-migration-design",
       "organization-role-pool-backend-and-migration",
       "organization-user-admin-experience",
@@ -152,7 +150,8 @@
       "resources/platform-production-readiness.json",
       "resources/platform-deployment-topology.json",
       "resources/platform-node-closeout-audit.json",
-      "resources/platform-service-contract-standard.json"
+      "resources/platform-service-contract-standard.json",
+      "resources/platform-integration-ports.json"
     ],
     "validators": [
       "scripts/validate-platform-objective-conformance.mjs",
@@ -164,6 +163,7 @@
       "scripts/validate-platform-data-lifecycle-retention.mjs",
       "scripts/validate-platform-sensitive-data-migration.mjs",
       "scripts/validate-platform-service-contract-standard.mjs",
+      "scripts/validate-platform-integration-ports.mjs",
       "scripts/validate-platform-engineering-capabilities.mjs",
       "scripts/validate-platform-capability-contracts.mjs",
       "scripts/validate-platform-production-readiness.mjs",
@@ -180,6 +180,7 @@
       "scripts/platform-data-lifecycle-retention.test.mjs",
       "scripts/platform-sensitive-data-migration.test.mjs",
       "scripts/platform-service-contract-standard.test.mjs",
+      "scripts/platform-integration-ports.test.mjs",
       "scripts/platform-deployment-topology.test.mjs",
       "scripts/platform-engineering-capabilities.test.mjs",
       "scripts/platform-production-readiness.test.mjs",
@@ -195,6 +196,7 @@
       "docs/admin-resource-schema.md",
       "docs/platform-data-lifecycle-retention.md",
       "docs/platform-service-contract-standard.md",
+      "docs/platform-integration-ports.md",
       "docs/platform-sensitive-data-migration.md",
       "docs/platform-ui-optimization-assessment.md",
       "docs/admin-ui-foundation.md",

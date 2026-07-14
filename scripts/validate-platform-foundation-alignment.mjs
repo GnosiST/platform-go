@@ -788,6 +788,7 @@ function validateTaskExecutionAudit(audit, taskGraph, taskExecutionAudit, engine
     "scripts/validate-platform-file-storage-experience.mjs",
     "scripts/validate-platform-refresh-token-family-promotion.mjs",
     "scripts/validate-platform-service-contract-standard.mjs",
+    "scripts/validate-platform-integration-ports.mjs",
   ]) {
     if (!values(taskExecutionAudit.requiredValidators).includes(validator)) {
       errors.push(`task execution audit requiredValidators must include ${validator}`);
@@ -796,7 +797,7 @@ function validateTaskExecutionAudit(audit, taskGraph, taskExecutionAudit, engine
       errors.push(`alignment requiredValidators must include task execution validator ${validator}`);
     }
   }
-  for (const test of ["scripts/platform-task-execution-audit.test.mjs", "scripts/platform-service-contract-standard.test.mjs"]) {
+  for (const test of ["scripts/platform-task-execution-audit.test.mjs", "scripts/platform-service-contract-standard.test.mjs", "scripts/platform-integration-ports.test.mjs"]) {
     if (!values(taskExecutionAudit.requiredTests).includes(test)) {
       errors.push(`task execution audit requiredTests must include ${test}`);
     }
