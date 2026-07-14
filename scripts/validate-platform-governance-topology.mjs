@@ -21,6 +21,14 @@ const matrixPath = path.resolve(repoRoot, argValue("--matrix", "resources/platfo
 const personnelAdminContractPath = argValue("--personnel-admin-contract", "");
 const requiredOrgUnitTypeOptions = ["group", "company", "branch", "organization", "department", "team", "store", "custom"];
 const requiredAreaCodeLevelOptions = ["country", "province", "city", "district", "street", "custom"];
+const requiredOrganizationMigrationTaskIDs = [
+  "organization-rbac-menu-contract-and-migration-design",
+  "organization-role-pool-backend-and-migration",
+  "organization-user-admin-experience",
+  "role-tree-and-authorization-entry",
+  "menu-tree-and-button-permission-configuration",
+  "organization-rbac-menu-e2e-qa",
+];
 
 function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -49,6 +57,10 @@ function optionValues(field) {
 function includesAll(actualValues, requiredValues) {
   const actual = new Set(actualValues);
   return requiredValues.every((value) => actual.has(value));
+}
+
+function sameList(actualValues, requiredValues) {
+  return actualValues.length === requiredValues.length && actualValues.every((value, index) => value === requiredValues[index]);
 }
 
 function existingRelativePath(relativePath) {
@@ -301,6 +313,55 @@ function validateGovernanceEvaluation(topology, errors) {
   }
 }
 
+function validateOrganizationRbacMenuMigration(topology, errors) {
+  const migration = topology.organizationRbacMenuMigration ?? {};
+  if (migration.status !== "planned") {
+    errors.push("organizationRbacMenuMigration.status must stay planned until the migration node closes");
+  }
+  if (!sameList(values(migration.taskIds), requiredOrganizationMigrationTaskIDs)) {
+    errors.push("organizationRbacMenuMigration.taskIds must match the approved six-node migration lane");
+  }
+  const requiredSource = {
+    userTenant: "direct-required",
+    primaryOrganization: "optional",
+    roleGroupHierarchy: "nested-parentCode",
+    roleMembership: "users.roles",
+    menuVisibility: "permission-derived",
+    roleMenuBinding: "absent",
+  };
+  for (const [key, value] of Object.entries(requiredSource)) {
+    if (migration.sourceModel?.[key] !== value) {
+      errors.push(`organizationRbacMenuMigration.sourceModel.${key} must stay ${value}`);
+    }
+  }
+  const requiredTarget = {
+    roleGroupHierarchy: "flat-two-level-role-group-to-role",
+    roleGroupScope: "platform-or-tenant",
+    roleOwnership: "exactly-one-role-group",
+    organizationRoleGroupBinding: "org_unit_role_groups",
+    organizationRolePool: "enabled-union-of-enabled-bound-tenant-groups",
+    userTenant: "derived-from-primary-organization",
+    userRoleConstraint: "subset-of-organization-role-pool",
+    platformPrincipalException: "no-organization-platform-roles-only",
+    roleMenuBinding: "role_menu",
+    writeEnforcement: "backend-all-write-import-bulk-paths",
+    menuMigration: "backfill-dual-read-compare-switch-deprecate-menu-permission",
+    authorizationDatasourceBoundary: "single-tenant-single-datasource",
+    federationAndXa: "forbidden-for-authorization",
+  };
+  for (const [key, value] of Object.entries(requiredTarget)) {
+    if (migration.targetModel?.[key] !== value) {
+      errors.push(`organizationRbacMenuMigration.targetModel.${key} must stay ${value}`);
+    }
+  }
+  if (!sameList(values(migration.targetModel?.menuNodeTypes), ["directory", "page"])) {
+    errors.push("organizationRbacMenuMigration.targetModel.menuNodeTypes must be directory then page");
+  }
+  if (!sameList(values(migration.targetModel?.permissionResourceTypes), ["api", "page-button"])) {
+    errors.push("organizationRbacMenuMigration.targetModel.permissionResourceTypes must be api then page-button");
+  }
+}
+
 function validateGeneratedDefaultBoundary(topology, generatedContract, errors) {
   const generatedCodes = new Set(values(generatedContract.resources).map((resource) => resource.code));
   for (const resource of values(topology.defaultFoundation?.mustIncludeResources)) {
@@ -435,6 +496,7 @@ function validateMatrix(topology, matrix, errors) {
 
 function validatePolicyFlags(topology, errors) {
   validateGovernanceEvaluation(topology, errors);
+  validateOrganizationRbacMenuMigration(topology, errors);
   validateDefaultFoundationPolicy(topology, errors);
   validateOrgUnitPolicy(topology, errors);
   if (topology.roleGroupPolicy?.mode !== "classification-only") {

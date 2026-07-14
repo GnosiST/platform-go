@@ -14,23 +14,78 @@ const completionProgramCapabilityIDs = [
   "mask-strategy-runtime",
   "sensitive-data-reveal-step-up",
   "data-lifecycle-retention",
-  "multi-datasource-contract-and-runtime",
-  "database-certification-matrix",
+  "platform-service-contract-standard",
+  "persisted-query-command-object-runtime",
   "integration-ports-disabled-default",
+  "organization-rbac-menu-contract-and-migration-design",
+  "organization-role-pool-backend-and-migration",
+  "organization-user-admin-experience",
+  "role-tree-and-authorization-entry",
+  "menu-tree-and-button-permission-configuration",
+  "organization-rbac-menu-e2e-qa",
+  "multi-datasource-contract-and-runtime",
+  "tenant-placement-and-request-routing",
+  "datasource-read-write-routing",
+  "sharding-and-tenant-migration",
+  "federated-read-query",
+  "xa-optional-adapter",
+  "database-certification-matrix",
   "transactional-outbox-and-one-mq-adapter",
   "asynchronous-search-projection",
   "open-source-portability",
   "public-documentation-and-release",
 ];
 
-const newlyGovernedCapabilityIDs = completionProgramCapabilityIDs.slice(3, 11);
-const newlyGovernedCapabilityDependencies = [
-  "sensitive-data-protection",
-  ...newlyGovernedCapabilityIDs.slice(0, -1),
-];
-const newlyGovernedCapabilityDocs = [
+const partialCapabilityDependencies = {
+  "platform-service-contract-standard": ["data-lifecycle-retention"],
+  "persisted-query-command-object-runtime": ["platform-service-contract-standard"],
+  "integration-ports-disabled-default": ["platform-service-contract-standard"],
+  "organization-rbac-menu-contract-and-migration-design": ["persisted-query-command-object-runtime"],
+  "organization-role-pool-backend-and-migration": ["organization-rbac-menu-contract-and-migration-design"],
+  "organization-user-admin-experience": ["organization-role-pool-backend-and-migration"],
+  "role-tree-and-authorization-entry": ["organization-user-admin-experience"],
+  "menu-tree-and-button-permission-configuration": ["role-tree-and-authorization-entry"],
+  "organization-rbac-menu-e2e-qa": [
+    "organization-user-admin-experience",
+    "role-tree-and-authorization-entry",
+    "menu-tree-and-button-permission-configuration",
+  ],
+  "multi-datasource-contract-and-runtime": ["platform-service-contract-standard"],
+  "tenant-placement-and-request-routing": [
+    "multi-datasource-contract-and-runtime",
+    "organization-role-pool-backend-and-migration",
+  ],
+  "datasource-read-write-routing": ["tenant-placement-and-request-routing"],
+  "sharding-and-tenant-migration": ["datasource-read-write-routing"],
+  "federated-read-query": ["sharding-and-tenant-migration", "persisted-query-command-object-runtime"],
+  "xa-optional-adapter": ["federated-read-query"],
+  "database-certification-matrix": ["xa-optional-adapter"],
+  "transactional-outbox-and-one-mq-adapter": [
+    "integration-ports-disabled-default",
+    "database-certification-matrix",
+  ],
+  "asynchronous-search-projection": [
+    "transactional-outbox-and-one-mq-adapter",
+    "persisted-query-command-object-runtime",
+  ],
+  "open-source-portability": [
+    "runtime-security-containment",
+    "admin-watermark-export-governance",
+    "sensitive-data-protection",
+    "organization-rbac-menu-e2e-qa",
+    "asynchronous-search-projection",
+  ],
+  "public-documentation-and-release": ["open-source-portability"],
+};
+const governedCapabilityDocs = [
+  "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
   "docs/platform-data-governance-and-integrations-assessment.md",
   "docs/platform-roadmap.md",
+];
+const openSourceCapabilityDocs = [
+  "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
+  "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
+  "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
 ];
 
 function runValidator(args = []) {
@@ -85,6 +140,7 @@ describe("validate-platform-engineering-capabilities", () => {
     const matrix = readJSON("resources/platform-engineering-capabilities.json");
     const capabilities = matrix.capabilities.filter((item) => completionProgramCapabilityIDs.includes(item.id));
 
+    assert.equal(matrix.capabilities.length, 57);
     assert.deepEqual(capabilities.map((item) => item.id), completionProgramCapabilityIDs);
     for (const capability of capabilities.slice(0, 6)) {
       assert.equal(capability.status, "implemented");
@@ -94,20 +150,30 @@ describe("validate-platform-engineering-capabilities", () => {
     }
     assert.ok(capabilities.slice(6).every((item) => item.status === "partial"));
 
-    for (const [index, capabilityID] of newlyGovernedCapabilityIDs.entries()) {
+    for (const [capabilityID, expectedDependencies] of Object.entries(partialCapabilityDependencies)) {
       const capability = capabilities.find((item) => item.id === capabilityID);
-      assert.deepEqual(capability.dependsOn, [newlyGovernedCapabilityDependencies[index]]);
-      if (!["mask-strategy-runtime", "sensitive-data-reveal-step-up", "data-lifecycle-retention"].includes(capabilityID)) {
-        assert.deepEqual(capability.evidence.sourcePaths, newlyGovernedCapabilityDocs);
-      }
-      assert.deepEqual(capability.evidence.taskIds, [capabilityID]);
+      assert.equal(capability.status, "partial");
+      assert.deepEqual(capability.dependsOn, expectedDependencies);
+      assert.deepEqual(
+        capability.evidence.sourcePaths,
+        ["open-source-portability", "public-documentation-and-release"].includes(capabilityID)
+          ? openSourceCapabilityDocs
+          : governedCapabilityDocs,
+      );
     }
 
-    const portability = capabilities.find((item) => item.id === "open-source-portability");
-    assert.ok(portability.dependsOn.includes("runtime-security-containment"));
-    assert.ok(portability.dependsOn.includes("admin-watermark-export-governance"));
-    assert.ok(portability.dependsOn.includes("sensitive-data-protection"));
-    assert.ok(portability.dependsOn.includes("asynchronous-search-projection"));
+    for (const capability of capabilities) {
+      if (!["sensitive-data-protection", "public-documentation-and-release"].includes(capability.id)) {
+        assert.deepEqual(capability.evidence.taskIds, [capability.id]);
+      }
+    }
+
+    const publication = capabilities.find((item) => item.id === "public-documentation-and-release");
+    assert.deepEqual(publication.evidence.taskIds, [
+      "public-docs-community",
+      "public-docs-site",
+      "github-release-publication",
+    ]);
 
     const reveal = capabilities.find((item) => item.id === "sensitive-data-reveal-step-up");
     assert.ok(reveal.evidence.sourcePaths.includes("internal/platform/httpapi/sensitive_reveal.go"));
@@ -168,11 +234,20 @@ describe("validate-platform-engineering-capabilities", () => {
 
   it("rejects dropping an approved completion program capability", () => {
     const matrix = readJSON("resources/platform-engineering-capabilities.json");
-    matrix.capabilities = matrix.capabilities.filter((item) => item.id !== completionProgramCapabilityIDs[0]);
+    matrix.capabilities = matrix.capabilities.filter((item) => item.id !== "platform-service-contract-standard");
 
     const result = runValidator(["--matrix", tempJSON("missing-completion-capability.json", matrix)]);
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /missing required capability runtime-security-containment/);
+    assert.match(result.stderr, /missing required capability platform-service-contract-standard/);
+  });
+
+  it("rejects changing the approved completion program dependency topology", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities.find((item) => item.id === "federated-read-query").dependsOn = ["sharding-and-tenant-migration"];
+
+    const result = runValidator(["--matrix", tempJSON("invalid-completion-dependencies.json", matrix)]);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /approved completion program capability federated-read-query dependsOn must equal/);
   });
 
   it("accepts current engineering capability coverage", () => {

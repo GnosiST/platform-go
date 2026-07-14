@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-engineering-capabilities.json",
-  "capturedAt": "2026-07-13",
+  "capturedAt": "2026-07-14",
   "purpose": "Machine-checkable engineering capability coverage for the reusable platform foundation.",
   "stack": {
     "backend": [
@@ -2928,44 +2928,46 @@
       }
     },
     {
-      "id": "multi-datasource-contract-and-runtime",
+      "id": "platform-service-contract-standard",
       "label": {
-        "zh": "多数据源合同与运行时",
-        "en": "Multi-Datasource Contract And Runtime"
+        "zh": "平台服务合同标准",
+        "en": "Platform Service Contract Standard"
       },
       "status": "partial",
-      "purpose": "Route declared resources through isolated, validated datasource configurations without weakening platform contracts.",
+      "purpose": "Define executable service manifests across Admin, Service, Control, External and Event planes with explicit identity, tenant, reliability and compatibility boundaries.",
       "dependsOn": [
         "data-lifecycle-retention"
       ],
       "evidence": {
         "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
         "taskIds": [
-          "multi-datasource-contract-and-runtime"
+          "platform-service-contract-standard"
         ]
       }
     },
     {
-      "id": "database-certification-matrix",
+      "id": "persisted-query-command-object-runtime",
       "label": {
-        "zh": "数据库认证矩阵",
-        "en": "Database Certification Matrix"
+        "zh": "持久化查询与命令对象运行时",
+        "en": "Persisted Query And Command Object Runtime"
       },
       "status": "partial",
-      "purpose": "Publish evidence-backed compatibility tiers for supported and planned relational database targets.",
+      "purpose": "Execute versioned server-registered query and command objects with typed arguments, authorization, tenant and data scope, cost limits and parameterized repository compilation.",
       "dependsOn": [
-        "multi-datasource-contract-and-runtime"
+        "platform-service-contract-standard"
       ],
       "evidence": {
         "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
         "taskIds": [
-          "database-certification-matrix"
+          "persisted-query-command-object-runtime"
         ]
       }
     },
@@ -2978,15 +2980,306 @@
       "status": "partial",
       "purpose": "Define optional message queue and search ports that remain disabled until explicitly composed and configured.",
       "dependsOn": [
-        "database-certification-matrix"
+        "platform-service-contract-standard"
       ],
       "evidence": {
         "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
         "taskIds": [
           "integration-ports-disabled-default"
+        ]
+      }
+    },
+    {
+      "id": "organization-rbac-menu-contract-and-migration-design",
+      "label": {
+        "zh": "组织权限与菜单合同迁移设计",
+        "en": "Organization RBAC And Menu Contract Migration Design"
+      },
+      "status": "partial",
+      "purpose": "Freeze organization role-pool, derived-tenant, role-group ownership, menu visibility, permission and migration contracts before runtime implementation.",
+      "dependsOn": [
+        "persisted-query-command-object-runtime"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "organization-rbac-menu-contract-and-migration-design"
+        ]
+      }
+    },
+    {
+      "id": "organization-role-pool-backend-and-migration",
+      "label": {
+        "zh": "组织角色池后端约束与迁移",
+        "en": "Organization Role Pool Backend And Migration"
+      },
+      "status": "partial",
+      "purpose": "Enforce organization role-group bindings, derived tenant integrity, assignable role pools and conflict-aware migrations across every backend entry point.",
+      "dependsOn": [
+        "organization-rbac-menu-contract-and-migration-design"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "organization-role-pool-backend-and-migration"
+        ]
+      }
+    },
+    {
+      "id": "organization-user-admin-experience",
+      "label": {
+        "zh": "组织与用户管理体验",
+        "en": "Organization And User Admin Experience"
+      },
+      "status": "partial",
+      "purpose": "Provide organization, role-group and user administration with derived tenant display, role-pool filtering and explicit conflict handling.",
+      "dependsOn": [
+        "organization-role-pool-backend-and-migration"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "organization-user-admin-experience"
+        ]
+      }
+    },
+    {
+      "id": "role-tree-and-authorization-entry",
+      "label": {
+        "zh": "角色树与授权入口",
+        "en": "Role Tree And Authorization Entry"
+      },
+      "status": "partial",
+      "purpose": "Manage the strict role-group and role tree while separating menu assignment from API and button permission assignment through governed transfer controls.",
+      "dependsOn": [
+        "organization-user-admin-experience"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "role-tree-and-authorization-entry"
+        ]
+      }
+    },
+    {
+      "id": "menu-tree-and-button-permission-configuration",
+      "label": {
+        "zh": "菜单树与页面按钮权限配置",
+        "en": "Menu Tree And Button Permission Configuration"
+      },
+      "status": "partial",
+      "purpose": "Model directory and page menus separately from API and button permissions, with migration-safe tree configuration and authorization boundaries.",
+      "dependsOn": [
+        "role-tree-and-authorization-entry"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "menu-tree-and-button-permission-configuration"
+        ]
+      }
+    },
+    {
+      "id": "organization-rbac-menu-e2e-qa",
+      "label": {
+        "zh": "组织权限与菜单全链路验收",
+        "en": "Organization RBAC And Menu End-To-End QA"
+      },
+      "status": "partial",
+      "purpose": "Verify organization role-pool enforcement, tenant derivation, role and menu administration, authorization migration and browser-visible accessibility across the complete workflow.",
+      "dependsOn": [
+        "organization-user-admin-experience",
+        "role-tree-and-authorization-entry",
+        "menu-tree-and-button-permission-configuration"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "organization-rbac-menu-e2e-qa"
+        ]
+      }
+    },
+    {
+      "id": "multi-datasource-contract-and-runtime",
+      "label": {
+        "zh": "多数据源合同与运行时",
+        "en": "Multi-Datasource Contract And Runtime"
+      },
+      "status": "partial",
+      "purpose": "Route declared resources through isolated, validated datasource configurations without weakening platform contracts.",
+      "dependsOn": [
+        "platform-service-contract-standard"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "multi-datasource-contract-and-runtime"
+        ]
+      }
+    },
+    {
+      "id": "tenant-placement-and-request-routing",
+      "label": {
+        "zh": "租户放置与请求路由",
+        "en": "Tenant Placement And Request Routing"
+      },
+      "status": "partial",
+      "purpose": "Resolve trusted tenant context through versioned placement configuration to datasource groups, shards and schemas with controlled override and audit boundaries.",
+      "dependsOn": [
+        "multi-datasource-contract-and-runtime",
+        "organization-role-pool-backend-and-migration"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "tenant-placement-and-request-routing"
+        ]
+      }
+    },
+    {
+      "id": "datasource-read-write-routing",
+      "label": {
+        "zh": "数据源读写路由",
+        "en": "Datasource Read Write Routing"
+      },
+      "status": "partial",
+      "purpose": "Route primary and replica operations with transaction-primary enforcement, write-after-read stickiness, replication-lag policy and controlled failover.",
+      "dependsOn": [
+        "tenant-placement-and-request-routing"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "datasource-read-write-routing"
+        ]
+      }
+    },
+    {
+      "id": "sharding-and-tenant-migration",
+      "label": {
+        "zh": "分片与租户迁移",
+        "en": "Sharding And Tenant Migration"
+      },
+      "status": "partial",
+      "purpose": "Provide explicit shard keys, global IDs, routing versions, controlled expansion, rebalancing and auditable tenant migration workflows.",
+      "dependsOn": [
+        "datasource-read-write-routing"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "sharding-and-tenant-migration"
+        ]
+      }
+    },
+    {
+      "id": "federated-read-query",
+      "label": {
+        "zh": "受控联邦只读查询",
+        "en": "Controlled Federated Read Query"
+      },
+      "status": "partial",
+      "purpose": "Execute controlled read-only federated persisted queries with tenant isolation, timeout, cost, field and row boundaries outside ordinary OLTP repositories.",
+      "dependsOn": [
+        "sharding-and-tenant-migration",
+        "persisted-query-command-object-runtime"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "federated-read-query"
+        ]
+      }
+    },
+    {
+      "id": "xa-optional-adapter",
+      "label": {
+        "zh": "可选 XA 适配器",
+        "en": "Optional XA Adapter"
+      },
+      "status": "partial",
+      "purpose": "Provide a default-off XA adapter with certified resource-manager compatibility, timeouts, heuristic recovery and explicit operational procedures.",
+      "dependsOn": [
+        "federated-read-query"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "xa-optional-adapter"
+        ]
+      }
+    },
+    {
+      "id": "database-certification-matrix",
+      "label": {
+        "zh": "数据库认证矩阵",
+        "en": "Database Certification Matrix"
+      },
+      "status": "partial",
+      "purpose": "Publish evidence-backed compatibility tiers for supported and planned relational database targets.",
+      "dependsOn": [
+        "xa-optional-adapter"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-roadmap.md"
+        ],
+        "taskIds": [
+          "database-certification-matrix"
         ]
       }
     },
@@ -2999,10 +3292,12 @@
       "status": "partial",
       "purpose": "Provide durable transactional event publication with one production-ready message queue adapter.",
       "dependsOn": [
-        "integration-ports-disabled-default"
+        "integration-ports-disabled-default",
+        "database-certification-matrix"
       ],
       "evidence": {
         "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -3020,10 +3315,12 @@
       "status": "partial",
       "purpose": "Build recoverable asynchronous search projections without making search infrastructure a source of truth.",
       "dependsOn": [
-        "transactional-outbox-and-one-mq-adapter"
+        "transactional-outbox-and-one-mq-adapter",
+        "persisted-query-command-object-runtime"
       ],
       "evidence": {
         "sourcePaths": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -3044,12 +3341,14 @@
         "runtime-security-containment",
         "admin-watermark-export-governance",
         "sensitive-data-protection",
+        "organization-rbac-menu-e2e-qa",
         "asynchronous-search-projection"
       ],
       "evidence": {
         "sourcePaths": [
           "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md"
         ],
         "taskIds": [
           "open-source-portability"
@@ -3070,7 +3369,8 @@
       "evidence": {
         "sourcePaths": [
           "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md"
         ],
         "taskIds": [
           "public-docs-community",

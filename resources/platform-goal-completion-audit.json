@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-goal-completion-audit.json",
-  "capturedAt": "2026-07-13",
+  "capturedAt": "2026-07-15",
   "purpose": "Machine-checkable completion audit for the active reusable platform foundation goal. It keeps completion claims tied to current task evidence, business-neutral boundaries, approved stack alignment, visual design gates and explicit non-mutating future promotion gates.",
   "completionStatus": "not-complete-controlled",
   "completionPolicy": {
@@ -8,9 +8,22 @@
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "businessReferenceMode": "reference-only",
     "requiredControlledUnfinishedNodes": [
-      "multi-datasource-contract-and-runtime",
-      "database-certification-matrix",
+      "platform-service-contract-standard",
+      "persisted-query-command-object-runtime",
       "integration-ports-disabled-default",
+      "organization-rbac-menu-contract-and-migration-design",
+      "organization-role-pool-backend-and-migration",
+      "organization-user-admin-experience",
+      "role-tree-and-authorization-entry",
+      "menu-tree-and-button-permission-configuration",
+      "organization-rbac-menu-e2e-qa",
+      "multi-datasource-contract-and-runtime",
+      "tenant-placement-and-request-routing",
+      "datasource-read-write-routing",
+      "sharding-and-tenant-migration",
+      "federated-read-query",
+      "xa-optional-adapter",
+      "database-certification-matrix",
       "transactional-outbox-and-one-mq-adapter",
       "asynchronous-search-projection",
       "open-source-portability",
@@ -24,9 +37,9 @@
     "frontend": ["Refine", "React", "Ant Design"]
   },
   "taskSummary": {
-    "expectedTotal": 53,
+    "expectedTotal": 66,
     "expectedImplemented": 44,
-    "expectedControlledUnfinished": 9
+    "expectedControlledUnfinished": 22
   },
   "requirements": [
     {

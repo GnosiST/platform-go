@@ -125,13 +125,9 @@ for (const evidencePath of ["docs/platform-data-lifecycle-retention.md", "script
   if (!(lifecycleCloseout?.cleanupEvidence ?? []).includes(evidencePath)) errors.push(`data lifecycle closeout evidence must include ${evidencePath}`);
 }
 if ((closeout.pendingNodeEvidence ?? []).includes("data-lifecycle-retention")) errors.push("data lifecycle must be removed from pending closeout evidence");
-if (tasks.length !== 53 || tasks.filter((item) => item.status === "implemented").length !== 44 || tasks.filter((item) => item.status !== "implemented").length !== 9) {
-  errors.push("task graph must project 53 total / 44 implemented / 9 unfinished");
-}
-
 if (errors.length > 0) {
   console.error(errors.map((error) => `- ${error}`).join("\n"));
   process.exit(1);
 }
 
-console.log("Validated platform data lifecycle retention governance (53/44/9)");
+console.log("Validated platform data lifecycle retention governance");

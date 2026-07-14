@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-governance-topology.json",
-  "capturedAt": "2026-07-07",
+  "capturedAt": "2026-07-14",
   "purpose": "Machine-checkable governance topology for tenant, organization, role-group, area-code and optional personnel boundaries.",
   "governanceEvaluation": {
     "tenantOnlySupport": {
@@ -41,6 +41,42 @@
       "capability": "personnel",
       "profile": "platform-personnel-ready",
       "reason": "Personnel files, positions and assignments are reusable in some products but too heavy for every platform foundation. They must reuse tenant, org-unit, user and area-code relations when enabled."
+    }
+  },
+  "organizationRbacMenuMigration": {
+    "status": "planned",
+    "taskIds": [
+      "organization-rbac-menu-contract-and-migration-design",
+      "organization-role-pool-backend-and-migration",
+      "organization-user-admin-experience",
+      "role-tree-and-authorization-entry",
+      "menu-tree-and-button-permission-configuration",
+      "organization-rbac-menu-e2e-qa"
+    ],
+    "sourceModel": {
+      "userTenant": "direct-required",
+      "primaryOrganization": "optional",
+      "roleGroupHierarchy": "nested-parentCode",
+      "roleMembership": "users.roles",
+      "menuVisibility": "permission-derived",
+      "roleMenuBinding": "absent"
+    },
+    "targetModel": {
+      "roleGroupHierarchy": "flat-two-level-role-group-to-role",
+      "roleGroupScope": "platform-or-tenant",
+      "roleOwnership": "exactly-one-role-group",
+      "organizationRoleGroupBinding": "org_unit_role_groups",
+      "organizationRolePool": "enabled-union-of-enabled-bound-tenant-groups",
+      "userTenant": "derived-from-primary-organization",
+      "userRoleConstraint": "subset-of-organization-role-pool",
+      "platformPrincipalException": "no-organization-platform-roles-only",
+      "menuNodeTypes": ["directory", "page"],
+      "roleMenuBinding": "role_menu",
+      "permissionResourceTypes": ["api", "page-button"],
+      "writeEnforcement": "backend-all-write-import-bulk-paths",
+      "menuMigration": "backfill-dual-read-compare-switch-deprecate-menu-permission",
+      "authorizationDatasourceBoundary": "single-tenant-single-datasource",
+      "federationAndXa": "forbidden-for-authorization"
     }
   },
   "defaultFoundation": {

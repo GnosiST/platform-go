@@ -8,9 +8,22 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const migrationTaskID = "sensitive-data-historical-migration";
 const remainingTaskIDs = [
-  "multi-datasource-contract-and-runtime",
-  "database-certification-matrix",
+  "platform-service-contract-standard",
+  "persisted-query-command-object-runtime",
   "integration-ports-disabled-default",
+  "organization-rbac-menu-contract-and-migration-design",
+  "organization-role-pool-backend-and-migration",
+  "organization-user-admin-experience",
+  "role-tree-and-authorization-entry",
+  "menu-tree-and-button-permission-configuration",
+  "organization-rbac-menu-e2e-qa",
+  "multi-datasource-contract-and-runtime",
+  "tenant-placement-and-request-routing",
+  "datasource-read-write-routing",
+  "sharding-and-tenant-migration",
+  "federated-read-query",
+  "xa-optional-adapter",
+  "database-certification-matrix",
   "transactional-outbox-and-one-mq-adapter",
   "asynchronous-search-projection",
   "open-source-portability",
@@ -135,7 +148,7 @@ describe("validate-platform-sensitive-data-migration", () => {
     assert.ok(!Object.keys(openAPI.paths ?? {}).some((route) => /sensitive-data-migrat/i.test(route)));
   });
 
-  it("projects 53 total, 44 implemented and nine controlled unfinished nodes with a non-visual closeout", () => {
+  it("keeps migration closed while projecting all controlled unfinished nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const alignment = readJSON("resources/platform-foundation-alignment-audit.json");
     const goal = readJSON("resources/platform-goal-completion-audit.json");
@@ -148,7 +161,6 @@ describe("validate-platform-sensitive-data-migration", () => {
     const migrationCapability = engineering.capabilities.find((item) => item.id === "sensitive-data-protection");
     const implementedTasks = graph.tasks.filter((task) => task.status === "implemented").length;
 
-    assert.equal(graph.tasks.length, 53);
     assert.equal(implementedTasks, 44);
     assert.equal(migrationTask?.status, "implemented");
     assert.deepEqual(graph.tasks.filter((task) => task.status !== "implemented").map((task) => task.id), remainingTaskIDs);

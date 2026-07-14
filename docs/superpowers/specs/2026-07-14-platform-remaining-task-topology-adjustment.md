@@ -1,19 +1,19 @@
 # Platform Remaining Task Topology Adjustment
 
-> **Status:** Approved topology proposal. The current task graph remains `53 total / 44 implemented / 9 unfinished` until the separate graph-activation change is committed. Activation changes the projection to `66 total / 44 implemented / 22 unfinished`.
+> **Status:** Activated governance topology. The task graph projection is `66 total / 44 implemented / 22 controlled unfinished`; activation changes governance only and does not mark any new runtime node implemented.
 
 ## Authority
 
-This document is the only active topology proposal for the remaining platform program.
+This document is the activated and only authoritative topology for the remaining platform program.
 
 - The consolidated SaaS data-plane, persisted Query Object and Platform Service Contract input confirmed on 2026-07-14 is authoritative.
 - Earlier cross-session variants describing only static datasources, separate Query Object drafts, SQL-less drafts or partial service-contract drafts are superseded and must not be accumulated as extra requirements.
 - The organization/RBAC/menu decision remains active: one role belongs to one role group; an organization may bind multiple role groups; role groups classify and isolate roles but do not grant permissions.
-- `data-lifecycle-retention` remains closed at commit `0de9f2d7`. This proposal may reuse its contracts but must not reopen or expand that node.
+- `data-lifecycle-retention` remains closed at commit `0de9f2d7`. This activated topology may reuse its contracts but must not reopen or expand that node.
 
 ## Current Conflict Summary
 
-The current nine unfinished nodes are valid program areas but no longer have sufficient boundaries:
+The original nine unfinished nodes remain valid program areas, but activation expands and reorders them because their previous boundaries were insufficient:
 
 - `multi-datasource-contract-and-runtime` only describes named sources and capability bindings. It cannot also own TenantPlacement, trusted request routing, read/write routing, sharding, federation and XA.
 - `integration-ports-disabled-default` is incorrectly placed after database certification even though Event Plane contracts and disabled ports can be completed earlier.
@@ -42,7 +42,7 @@ Runtime routing is configuration-driven and deterministic. Datasource, Datasourc
 
 ## Adjusted Unfinished Node Order
 
-Graph activation preserves the 44 implemented nodes and replaces the current nine-node unfinished projection with this ordered 22-node projection:
+Activation preserved the 44 implemented nodes and replaced the former nine-node unfinished projection with this ordered 22-node projection:
 
 1. `platform-service-contract-standard`
 2. `persisted-query-command-object-runtime`
@@ -247,11 +247,11 @@ Approved parallelism:
 3. Database certification executes driver/version lanes in parallel and aggregates them into one matrix.
 4. Open-source publication remains serial after search closeout because module-path migration, public docs, Pages and release evidence share release state.
 
-No parallel batch may share `capability-manifest`, `admin-resource-contract`, `storage-runtime`, `migration-runtime`, `OpenAPI/codegen`, `admin-ui` or publication locks. Graph activation must assign the complete lock set per node, not only the new domain locks. Query and integration-port work may run in parallel only after Service Contract freezes their separate query and event extension seams; if they still edit the same manifest, generator or generated contract, the graph must serialize them.
+No parallel batch may share `capability-manifest`, `admin-resource-contract`, `storage-runtime`, `migration-runtime`, `OpenAPI/codegen`, `admin-ui` or publication locks. Each activated node must retain its complete lock set, not only the new domain locks. Query and integration-port work may run in parallel only after Service Contract freezes their separate query and event extension seams; if they still edit the same manifest, generator or generated contract, the graph must serialize them.
 
 ## Resource Lock Adjustment
 
-Graph activation adds these exclusive domain locks:
+The activated graph adds these exclusive domain locks:
 
 ```text
 service-contract
@@ -286,14 +286,15 @@ Later nodes may reuse:
 
 Later nodes may not move TenantPlacement, sharding, federation, XA, Query Object, Outbox or search behavior into lifecycle. Lifecycle policy fingerprints remain independent from routing configuration versions.
 
-## Activation Work
+## Activation State
 
-The next governance-only change must:
+The governance activation:
 
-1. add the 13 new task IDs and reorder the 9 existing unfinished IDs into the 22-node projection;
-2. update graph dependencies, completion gates, resource locks and parallel batches;
-3. update execution, goal, closeout, objective, alignment and engineering projections to `66/44/22`;
-4. update the governance-topology contract and validator, task map, Admin resource schema and menu/RBAC migration gates so the current direct-tenant, nested-role-group and `menu.permission` model is recorded as migration source rather than retained target behavior;
-5. update tests and validators to require the exact new order without regressing the 44 implemented closeouts;
-6. update README, roadmap, assessment and lifecycle plan status wording;
-7. commit the graph activation before any runtime implementation begins.
+1. adds 13 new task IDs and reorders the 9 existing unfinished IDs into the exact 22-node projection above;
+2. records the required dependencies, completion gates, full resource locks and approved parallel windows;
+3. projects execution, goal, closeout, objective, alignment and engineering governance as `66/44/22` while preserving all 44 implemented closeouts;
+4. records the current direct-tenant, nested-role-group and `menu.permission` behavior as migration source rather than retained target behavior;
+5. requires the governance-topology contract, Admin resource schema, tests and validators to migrate with the organization/RBAC/menu nodes;
+6. keeps all 22 nodes controlled unfinished until their own implementation and evidence closeouts pass.
+
+The activation commit established the prerequisite for runtime implementation. It does not authorize an implementation node to bypass its dependency, resource-lock or completion gate.

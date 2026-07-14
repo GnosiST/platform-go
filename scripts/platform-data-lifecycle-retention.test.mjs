@@ -26,7 +26,7 @@ describe("validate-platform-data-lifecycle-retention", () => {
   it("accepts the implemented lifecycle contract", () => {
     const result = run();
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /53\/44\/9/);
+    assert.match(result.stdout, /Validated platform data lifecycle retention governance/);
   });
 
   it("rejects deletion policy and public purge drift", () => {

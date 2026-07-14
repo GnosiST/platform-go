@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-node-closeout-audit.json",
-  "capturedAt": "2026-07-13",
+  "capturedAt": "2026-07-15",
   "purpose": "Machine-checkable node closeout audit for the reusable platform foundation. It keeps implemented task nodes tied to focused cleanup evidence, objective-conflict review and visual design gates, while reserving neat-freak for phase, major-task and release closeout.",
   "policy": {
     "taskGraph": "resources/platform-foundation-task-graph.json",
@@ -35,9 +35,22 @@
     "unfinishedTasksMustNotHaveCloseout": true
   },
   "pendingNodeEvidence": [
-    "multi-datasource-contract-and-runtime",
-    "database-certification-matrix",
+    "platform-service-contract-standard",
+    "persisted-query-command-object-runtime",
     "integration-ports-disabled-default",
+    "organization-rbac-menu-contract-and-migration-design",
+    "organization-role-pool-backend-and-migration",
+    "organization-user-admin-experience",
+    "role-tree-and-authorization-entry",
+    "menu-tree-and-button-permission-configuration",
+    "organization-rbac-menu-e2e-qa",
+    "multi-datasource-contract-and-runtime",
+    "tenant-placement-and-request-routing",
+    "datasource-read-write-routing",
+    "sharding-and-tenant-migration",
+    "federated-read-query",
+    "xa-optional-adapter",
+    "database-certification-matrix",
     "transactional-outbox-and-one-mq-adapter",
     "asynchronous-search-projection",
     "open-source-portability",

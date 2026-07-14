@@ -18,9 +18,22 @@ const completedProgramTaskIDs = [
 ];
 
 const remainingCompletionProgramTaskIDs = [
-  "multi-datasource-contract-and-runtime",
-  "database-certification-matrix",
+  "platform-service-contract-standard",
+  "persisted-query-command-object-runtime",
   "integration-ports-disabled-default",
+  "organization-rbac-menu-contract-and-migration-design",
+  "organization-role-pool-backend-and-migration",
+  "organization-user-admin-experience",
+  "role-tree-and-authorization-entry",
+  "menu-tree-and-button-permission-configuration",
+  "organization-rbac-menu-e2e-qa",
+  "multi-datasource-contract-and-runtime",
+  "tenant-placement-and-request-routing",
+  "datasource-read-write-routing",
+  "sharding-and-tenant-migration",
+  "federated-read-query",
+  "xa-optional-adapter",
+  "database-certification-matrix",
   "transactional-outbox-and-one-mq-adapter",
   "asynchronous-search-projection",
   "open-source-portability",
@@ -48,8 +61,9 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
-  it("migrates seven completed program nodes to required work and tracks nine future nodes", () => {
+  it("migrates seven completed program nodes to required work and tracks 22 future nodes", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
+    const engineering = readJSON("resources/platform-engineering-capabilities.json");
 
     assert.ok(audit.requiredTaskNodes.includes("production-admin-oidc-auth"));
     for (const taskID of completedProgramTaskIDs) {
@@ -58,6 +72,13 @@ describe("validate-platform-foundation-alignment", () => {
     assert.deepEqual(audit.requiredFutureTaskNodes, remainingCompletionProgramTaskIDs);
     for (const taskID of [...completedProgramTaskIDs, ...remainingCompletionProgramTaskIDs]) {
       assert.ok(audit.nonDroppableGoalNodes.includes(taskID), `${taskID} must be non-droppable`);
+    }
+    assert.equal(audit.requiredEngineeringCapabilities.length, engineering.capabilities.length);
+    for (const capability of engineering.capabilities) {
+      assert.ok(audit.requiredEngineeringCapabilities.includes(capability.id), `${capability.id} must be required`);
+    }
+    for (const capability of engineering.capabilities.filter((item) => item.status === "partial")) {
+      assert.ok(audit.nonDroppableEngineeringCapabilities.includes(capability.id), `${capability.id} must be non-droppable`);
     }
   });
 

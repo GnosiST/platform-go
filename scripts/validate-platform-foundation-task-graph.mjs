@@ -64,15 +64,71 @@ const approvedCompletionProgramTaskIDs = [
   "mask-strategy-runtime",
   "sensitive-data-reveal-step-up",
   "data-lifecycle-retention",
-  "multi-datasource-contract-and-runtime",
-  "database-certification-matrix",
+  "platform-service-contract-standard",
+  "persisted-query-command-object-runtime",
   "integration-ports-disabled-default",
+  "organization-rbac-menu-contract-and-migration-design",
+  "organization-role-pool-backend-and-migration",
+  "organization-user-admin-experience",
+  "role-tree-and-authorization-entry",
+  "menu-tree-and-button-permission-configuration",
+  "organization-rbac-menu-e2e-qa",
+  "multi-datasource-contract-and-runtime",
+  "tenant-placement-and-request-routing",
+  "datasource-read-write-routing",
+  "sharding-and-tenant-migration",
+  "federated-read-query",
+  "xa-optional-adapter",
+  "database-certification-matrix",
   "transactional-outbox-and-one-mq-adapter",
   "asynchronous-search-projection",
   "open-source-portability",
   "public-docs-community",
   "public-docs-site",
   "github-release-publication",
+];
+const requiredRemainingTaskDependencies = new Map([
+  ["platform-service-contract-standard", ["data-lifecycle-retention", "capability-contract-governance"]],
+  ["persisted-query-command-object-runtime", ["platform-service-contract-standard", "admin-api-boundary-query-security"]],
+  ["integration-ports-disabled-default", ["platform-service-contract-standard", "notification-extension-boundary", "job-extension-boundary"]],
+  ["organization-rbac-menu-contract-and-migration-design", ["persisted-query-command-object-runtime", "governance-org-area-role-groups", "rbac-menu-data-scope"]],
+  ["organization-role-pool-backend-and-migration", ["organization-rbac-menu-contract-and-migration-design", "production-persistence-correctness"]],
+  ["organization-user-admin-experience", ["organization-role-pool-backend-and-migration", "admin-ui-system-quality-hardening"]],
+  ["role-tree-and-authorization-entry", ["organization-user-admin-experience"]],
+  ["menu-tree-and-button-permission-configuration", ["role-tree-and-authorization-entry"]],
+  ["organization-rbac-menu-e2e-qa", ["organization-user-admin-experience", "role-tree-and-authorization-entry", "menu-tree-and-button-permission-configuration"]],
+  ["multi-datasource-contract-and-runtime", ["platform-service-contract-standard", "data-lifecycle-retention", "production-persistence-correctness"]],
+  ["tenant-placement-and-request-routing", ["multi-datasource-contract-and-runtime", "organization-role-pool-backend-and-migration"]],
+  ["datasource-read-write-routing", ["tenant-placement-and-request-routing"]],
+  ["sharding-and-tenant-migration", ["datasource-read-write-routing"]],
+  ["federated-read-query", ["sharding-and-tenant-migration", "persisted-query-command-object-runtime"]],
+  ["xa-optional-adapter", ["federated-read-query"]],
+  ["database-certification-matrix", ["xa-optional-adapter"]],
+  ["transactional-outbox-and-one-mq-adapter", ["integration-ports-disabled-default", "database-certification-matrix"]],
+  ["asynchronous-search-projection", ["transactional-outbox-and-one-mq-adapter", "persisted-query-command-object-runtime"]],
+  ["open-source-portability", ["admin-watermark-export-governance", "organization-rbac-menu-e2e-qa", "asynchronous-search-projection"]],
+  ["public-docs-community", ["open-source-portability"]],
+  ["public-docs-site", ["public-docs-community"]],
+  ["github-release-publication", ["public-docs-site", "open-source-portability"]],
+]);
+const requiredRemainingResourceLocks = [
+  "service-contract",
+  "query-command-contract",
+  "tenant-context",
+  "organization-rbac-contract",
+  "organization-rbac-migration",
+  "menu-permission-contract",
+  "datasource-registry",
+  "routing-runtime",
+  "sharding-runtime",
+  "federated-query",
+  "xa-runtime",
+  "event-contract",
+  "transaction-outbox",
+  "database-certification",
+  "data-plane-docs",
+  "identity-governance-docs",
+  "integration-docs",
 ];
 
 function argValue(name, fallback) {
@@ -526,6 +582,12 @@ function validateCompletionProgram(tasks, errors) {
   if (completionProgramTaskIDs.length === approvedCompletionProgramTaskIDs.length && !sameList(completionProgramTaskIDs, approvedCompletionProgramTaskIDs)) {
     errors.push("completion program task order must match approved order");
   }
+  const tasksByID = new Map(tasks.map((task) => [task.id, task]));
+  for (const [taskID, dependencies] of requiredRemainingTaskDependencies) {
+    if (!sameList(values(tasksByID.get(taskID)?.dependsOn), dependencies)) {
+      errors.push(`task ${taskID} dependencies must match the approved remaining topology`);
+    }
+  }
 }
 
 function hasLaterPhaseDependencyException(task, dependency) {
@@ -624,6 +686,7 @@ function validate() {
   errors.push(...uniqueErrors(phases.map((phase) => phase.id), "phases.id"));
   errors.push(...uniqueErrors(values(graph.resourceLocks), "resourceLocks"));
   errors.push(...uniqueErrors(tasks.map((task) => task.id), "tasks.id"));
+  requireIncludes(graph.resourceLocks, requiredRemainingResourceLocks, "resourceLocks", errors);
 
   for (const phase of phases) {
     if (!hasLocalizedText(phase.label)) {

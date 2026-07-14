@@ -55,9 +55,22 @@ const completionProgramTaskIDs = [
   "mask-strategy-runtime",
   "sensitive-data-reveal-step-up",
   "data-lifecycle-retention",
-  "multi-datasource-contract-and-runtime",
-  "database-certification-matrix",
+  "platform-service-contract-standard",
+  "persisted-query-command-object-runtime",
   "integration-ports-disabled-default",
+  "organization-rbac-menu-contract-and-migration-design",
+  "organization-role-pool-backend-and-migration",
+  "organization-user-admin-experience",
+  "role-tree-and-authorization-entry",
+  "menu-tree-and-button-permission-configuration",
+  "organization-rbac-menu-e2e-qa",
+  "multi-datasource-contract-and-runtime",
+  "tenant-placement-and-request-routing",
+  "datasource-read-write-routing",
+  "sharding-and-tenant-migration",
+  "federated-read-query",
+  "xa-optional-adapter",
+  "database-certification-matrix",
   "transactional-outbox-and-one-mq-adapter",
   "asynchronous-search-projection",
   "open-source-portability",
@@ -309,7 +322,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /task production-auth-provider-hardening must declare at least one evidence\.docs path/);
   });
 
-  it("preserves the closed 37-node baseline, implements seven completion nodes, and tracks nine pending program nodes", () => {
+  it("preserves the closed 37-node baseline, implements seven completion nodes, and tracks 22 pending program nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
@@ -341,7 +354,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.ok(task.completionEvidence.every((item) => item.status === "verified"));
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
-    assert.equal(graph.tasks.length, 53);
+    assert.equal(graph.tasks.length, 66);
     assert.equal(implemented.length, 44);
     assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "admin-watermark-export-governance")?.status, "implemented");
@@ -351,7 +364,36 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-reveal-step-up")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "data-lifecycle-retention")?.status, "implemented");
     assert.ok(completionProgramTaskIDs.slice(7).every((taskID) => graph.tasks.find((item) => item.id === taskID)?.status === "pending"));
-    assert.ok(graph.tasks.find((item) => item.id === "open-source-portability")?.dependsOn.includes("asynchronous-search-projection"));
+    assert.deepEqual(graph.tasks.find((item) => item.id === "integration-ports-disabled-default")?.dependsOn, [
+      "platform-service-contract-standard",
+      "notification-extension-boundary",
+      "job-extension-boundary",
+    ]);
+    assert.deepEqual(graph.tasks.find((item) => item.id === "tenant-placement-and-request-routing")?.dependsOn, [
+      "multi-datasource-contract-and-runtime",
+      "organization-role-pool-backend-and-migration",
+    ]);
+    assert.deepEqual(graph.tasks.find((item) => item.id === "federated-read-query")?.dependsOn, [
+      "sharding-and-tenant-migration",
+      "persisted-query-command-object-runtime",
+    ]);
+    assert.deepEqual(graph.tasks.find((item) => item.id === "transactional-outbox-and-one-mq-adapter")?.dependsOn, [
+      "integration-ports-disabled-default",
+      "database-certification-matrix",
+    ]);
+    assert.deepEqual(graph.tasks.find((item) => item.id === "open-source-portability")?.dependsOn, [
+      "admin-watermark-export-governance",
+      "organization-rbac-menu-e2e-qa",
+      "asynchronous-search-projection",
+    ]);
+    assert.deepEqual(graph.parallelBatches.find((item) => item.id === "service-contract-extension-lanes")?.taskIds, [
+      "persisted-query-command-object-runtime",
+      "integration-ports-disabled-default",
+    ]);
+    assert.deepEqual(graph.parallelBatches.find((item) => item.id === "organization-ui-and-datasource-registry")?.taskIds, [
+      "organization-user-admin-experience",
+      "multi-datasource-contract-and-runtime",
+    ]);
     assert.deepEqual(pending.map((item) => item.id), pendingCompletionProgramTaskIDs);
     assert.equal(blocked.length, 0);
   });

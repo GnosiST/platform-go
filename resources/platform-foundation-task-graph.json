@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-foundation-task-graph.json",
-  "capturedAt": "2026-07-13",
+  "capturedAt": "2026-07-14",
   "purpose": "Execution dependency and conflict-control graph for the reusable platform foundation.",
   "approvedStack": {
     "backend": [
@@ -79,6 +79,23 @@
     "docs",
     "data-protection",
     "migration-runtime",
+    "service-contract",
+    "query-command-contract",
+    "tenant-context",
+    "organization-rbac-contract",
+    "organization-rbac-migration",
+    "menu-permission-contract",
+    "datasource-registry",
+    "routing-runtime",
+    "sharding-runtime",
+    "federated-query",
+    "xa-runtime",
+    "event-contract",
+    "transaction-outbox",
+    "database-certification",
+    "data-plane-docs",
+    "identity-governance-docs",
+    "integration-docs",
     "open-source-release",
     "public-docs-site",
     "github-publication"
@@ -253,6 +270,142 @@
       }
     },
     {
+      "lock": "service-contract",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "平台服务平面、身份、租户上下文和兼容性合同必须由单一任务冻结。",
+        "en": "Platform service planes, identity, tenant context and compatibility contracts must be frozen by one task."
+      }
+    },
+    {
+      "lock": "query-command-contract",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "持久化查询与命令定义共同决定参数、权限和成本边界。",
+        "en": "Persisted query and command definitions jointly control arguments, authorization and cost boundaries."
+      }
+    },
+    {
+      "lock": "tenant-context",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "可信租户上下文的来源和传播决定所有 SaaS 隔离边界。",
+        "en": "Trusted TenantContext provenance and propagation define every SaaS isolation boundary."
+      }
+    },
+    {
+      "lock": "organization-rbac-contract",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "机构、角色组、角色池和用户约束必须作为一个授权合同演进。",
+        "en": "Organization, role-group, role-pool and user constraints must evolve as one authorization contract."
+      }
+    },
+    {
+      "lock": "organization-rbac-migration",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "组织权限迁移会改变现有授权数据，必须保持单一迁移责任。",
+        "en": "Organization authorization migration changes existing grant data and requires one migration owner."
+      }
+    },
+    {
+      "lock": "menu-permission-contract",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "菜单可见性、页面按钮和 API 权限的拆分必须保持迁移一致。",
+        "en": "Menu visibility, page-button and API permission separation must remain migration-consistent."
+      }
+    },
+    {
+      "lock": "datasource-registry",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "数据源与数据源组注册表是物理存储配置的唯一事实源。",
+        "en": "Datasource and DatasourceGroup registries are the single source of truth for physical storage configuration."
+      }
+    },
+    {
+      "lock": "routing-runtime",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "租户放置与读写路由必须在同一确定性运行时边界内演进。",
+        "en": "Tenant placement and read/write routing must evolve within one deterministic runtime boundary."
+      }
+    },
+    {
+      "lock": "sharding-runtime",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "分片键、全局 ID、再平衡和租户迁移共享路由版本状态。",
+        "en": "Shard keys, global IDs, rebalancing and tenant migration share routing-version state."
+      }
+    },
+    {
+      "lock": "federated-query",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "跨库只读查询需要独立的字段、成本、租户和超时边界。",
+        "en": "Cross-database read queries need independent field, cost, tenant and timeout boundaries."
+      }
+    },
+    {
+      "lock": "xa-runtime",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "XA 协调、启发式恢复和运维处置必须作为默认关闭的独立运行时。",
+        "en": "XA coordination, heuristic recovery and operator remediation must remain an independent default-off runtime."
+      }
+    },
+    {
+      "lock": "event-contract",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "消息、搜索和事件包络合同必须在适配器实现前稳定。",
+        "en": "Message, search and event-envelope contracts must stabilize before adapter implementation."
+      }
+    },
+    {
+      "lock": "transaction-outbox",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "Outbox 写入、消费幂等、重试和补偿共享事务状态。",
+        "en": "Outbox writes, consumer idempotency, retry and compensation share transactional state."
+      }
+    },
+    {
+      "lock": "database-certification",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "数据库驱动、版本和特性声明必须由一个权威认证矩阵聚合。",
+        "en": "Database driver, version and feature claims must aggregate into one authoritative certification matrix."
+      }
+    },
+    {
+      "lock": "data-plane-docs",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "SaaS 数据平面文档必须与路由和认证合同同步。",
+        "en": "SaaS data-plane documentation must stay synchronized with routing and certification contracts."
+      }
+    },
+    {
+      "lock": "identity-governance-docs",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "组织、身份、角色和菜单治理文档必须与迁移合同同步。",
+        "en": "Organization, identity, role and menu governance docs must stay synchronized with migration contracts."
+      }
+    },
+    {
+      "lock": "integration-docs",
+      "mode": "exclusive",
+      "reason": {
+        "zh": "事件、消息和搜索集成文档必须与默认关闭策略同步。",
+        "en": "Event, messaging and search integration docs must stay synchronized with disabled-default policy."
+      }
+    },
+    {
       "lock": "open-source-release",
       "mode": "exclusive",
       "reason": {
@@ -328,6 +481,48 @@
       "reason": {
         "zh": "敏感字段策略、存储格式和资源合同必须作为同一数据保护面串行变更。",
         "en": "Sensitive field policy, storage format and resource contracts must change serially as one data-protection surface."
+      }
+    },
+    {
+      "id": "identity-governance-surface",
+      "locks": [
+        "tenant-context",
+        "organization-rbac-contract",
+        "organization-rbac-migration",
+        "menu-permission-contract",
+        "identity-governance-docs"
+      ],
+      "reason": {
+        "zh": "租户身份、组织角色池、菜单权限和迁移文档必须作为同一治理面串行演进。",
+        "en": "Tenant identity, organization role pools, menu permissions and migration docs must evolve serially as one governance surface."
+      }
+    },
+    {
+      "id": "saas-data-plane-surface",
+      "locks": [
+        "datasource-registry",
+        "routing-runtime",
+        "sharding-runtime",
+        "federated-query",
+        "xa-runtime",
+        "database-certification",
+        "data-plane-docs"
+      ],
+      "reason": {
+        "zh": "数据源、路由、分片、联邦、XA 和认证声明共享同一 SaaS 数据平面。",
+        "en": "Datasource, routing, sharding, federation, XA and certification claims share one SaaS data plane."
+      }
+    },
+    {
+      "id": "event-processing-surface",
+      "locks": [
+        "event-contract",
+        "transaction-outbox",
+        "integration-docs"
+      ],
+      "reason": {
+        "zh": "事件合同、Outbox 和集成文档必须保持交付语义一致。",
+        "en": "Event contracts, Outbox and integration docs must preserve consistent delivery semantics."
       }
     },
     {
@@ -2260,69 +2455,74 @@
       }
     },
     {
-      "id": "multi-datasource-contract-and-runtime",
+      "id": "platform-service-contract-standard",
       "title": {
-        "zh": "多数据源合同与运行时",
-        "en": "Multi-Datasource Contract And Runtime"
+        "zh": "平台服务合同标准",
+        "en": "Platform Service Contract Standard"
       },
       "phase": "production-governance",
       "scope": "foundation",
       "status": "pending",
       "statusReason": {
-        "zh": "当前 DSN 仅按平台子系统分离，尚无命名数据源、能力绑定、健康检查和单数据源事务边界。",
-        "en": "Current DSNs only separate platform subsystems and provide no named datasource registry, capability binding, health checks or single-datasource transaction boundary."
+        "zh": "当前只有 Admin 与 App 合同，尚无五平面服务标准、可信租户上下文、事件包络和兼容性门禁。",
+        "en": "Current contracts cover only Admin and App surfaces and lack five-plane service standards, trusted TenantContext, event envelopes and compatibility gates."
       },
       "completionGate": {
-        "zh": "完成命名数据源注册、能力绑定、健康检查、配置验证以及不依赖 XA 的单数据源事务约束。",
-        "en": "Complete named datasource registration, capability binding, health checks, configuration validation and single-datasource transaction constraints without XA."
+        "zh": "交付可执行服务 Manifest、OpenAPI/AsyncAPI、Go/TypeScript SDK、消费者合同、破坏性变更校验和一个参考能力。",
+        "en": "Deliver executable service manifests, OpenAPI/AsyncAPI, Go/TypeScript SDKs, consumer contracts, breaking-change validation and one reference capability."
       },
       "resourceLocks": [
+        "service-contract",
+        "tenant-context",
         "capability-manifest",
-        "storage-runtime",
-        "production-config",
-        "docs"
+        "openapi",
+        "codegen",
+        "data-plane-docs"
       ],
       "dependsOn": [
         "data-lifecycle-retention",
-        "production-persistence-correctness"
+        "capability-contract-governance"
       ],
       "evidence": {
         "docs": [
-          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
           "docs/platform-roadmap.md"
         ]
       }
     },
     {
-      "id": "database-certification-matrix",
+      "id": "persisted-query-command-object-runtime",
       "title": {
-        "zh": "数据库认证矩阵",
-        "en": "Database Certification Matrix"
+        "zh": "持久化查询与命令对象运行时",
+        "en": "Persisted Query And Command Object Runtime"
       },
       "phase": "production-governance",
-      "scope": "governance",
+      "scope": "foundation",
       "status": "pending",
       "statusReason": {
-        "zh": "MySQL、PostgreSQL 和 SQLite 尚未覆盖全平台仓储、迁移、分页、锁与事务认证，人大金仓和 Oracle 也未实现独立认证。",
-        "en": "MySQL, PostgreSQL and SQLite lack full-platform repository, migration, pagination, locking and transaction certification; KingbaseES and Oracle also lack independent certification."
+        "zh": "高风险查询仍缺少服务端 QueryDefinition/CommandDefinition 注册表和数据库原生执行器。",
+        "en": "High-risk queries still lack server-side QueryDefinition/CommandDefinition registries and a database-native executor."
       },
       "completionGate": {
-        "zh": "形成按驱动与版本记录的自动化认证矩阵；未通过的数据库必须明确标记为实验性或不支持。",
-        "en": "Produce an automated driver-and-version certification matrix and label every unverified database experimental or unsupported."
+        "zh": "完成版本化定义、类型参数、权限与租户范围、成本/超时、参数化执行及越权、篡改、枚举和昂贵查询测试。",
+        "en": "Complete versioned definitions, typed arguments, permission and tenant scopes, cost/timeouts, parameterized execution and authorization, tampering, enumeration and expensive-query tests."
       },
       "resourceLocks": [
+        "query-command-contract",
+        "admin-resource-api",
         "storage-runtime",
-        "migration-runtime",
-        "production-config",
-        "docs"
+        "openapi",
+        "codegen",
+        "data-plane-docs"
       ],
       "dependsOn": [
-        "multi-datasource-contract-and-runtime"
+        "platform-service-contract-standard",
+        "admin-api-boundary-query-security"
       ],
       "evidence": {
         "docs": [
-          "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md"
         ]
       }
     },
@@ -2336,28 +2536,510 @@
       "scope": "foundation",
       "status": "pending",
       "statusReason": {
-        "zh": "平台尚无统一的消息总线、搜索写入和搜索读取端口，也没有明确的 disabled/no-op 默认实现。",
+        "zh": "平台尚无统一消息总线、搜索写入和读取端口，也没有明确的 disabled/no-op 默认实现。",
         "en": "The platform has no unified message bus, search indexer or search reader ports and no explicit disabled or no-op defaults."
       },
       "completionGate": {
-        "zh": "完成业务无关端口、默认关闭实现、能力 profile 接入、健康状态和生产配置门禁。",
-        "en": "Complete business-neutral ports, disabled defaults, capability-profile wiring, health state and production configuration gates."
+        "zh": "完成业务无关端口、默认关闭实现、能力 profile 接入、健康状态和生产配置门禁，不实现 MQ 或搜索投影。",
+        "en": "Complete business-neutral ports, disabled defaults, capability-profile wiring, health state and production configuration gates without implementing MQ or search projection."
       },
       "resourceLocks": [
-        "capability-manifest",
+        "event-contract",
         "capability-profile",
         "production-config",
-        "docs"
+        "integration-docs"
       ],
       "dependsOn": [
-        "database-certification-matrix",
+        "platform-service-contract-standard",
         "notification-extension-boundary",
         "job-extension-boundary"
       ],
       "evidence": {
         "docs": [
-          "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md"
+        ]
+      }
+    },
+    {
+      "id": "organization-rbac-menu-contract-and-migration-design",
+      "title": {
+        "zh": "组织权限与菜单合同迁移设计",
+        "en": "Organization RBAC And Menu Contract Migration Design"
+      },
+      "phase": "production-governance",
+      "scope": "governance",
+      "status": "pending",
+      "statusReason": {
+        "zh": "现有用户直属租户、角色组层级和菜单 permission 过滤与确认后的组织角色池模型冲突。",
+        "en": "Current direct user-tenant ownership, role-group hierarchy and menu permission filtering conflict with the confirmed organization role-pool model."
+      },
+      "completionGate": {
+        "zh": "冻结严格两级角色树、组织角色池、租户派生、role_menu 双读迁移、菜单/权限边界、Tree Transfer 和浏览器验收合同。",
+        "en": "Freeze the strict two-level role tree, organization role pool, tenant derivation, role_menu dual-read migration, menu/permission boundaries, Tree Transfer and browser acceptance contracts."
+      },
+      "visual": true,
+      "contractGateOnly": true,
+      "designGate": [
+        "superpowers:brainstorming",
+        "product-design"
+      ],
+      "resourceLocks": [
+        "organization-rbac-contract",
+        "menu-permission-contract",
+        "tenant-context",
+        "identity-governance-docs"
+      ],
+      "dependsOn": [
+        "persisted-query-command-object-runtime",
+        "governance-org-area-role-groups",
+        "rbac-menu-data-scope"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/admin-resource-schema.md"
+        ]
+      }
+    },
+    {
+      "id": "organization-role-pool-backend-and-migration",
+      "title": {
+        "zh": "组织角色池后端约束与迁移",
+        "en": "Organization Role Pool Backend And Migration"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "组织尚不能绑定角色组，所有用户写入入口也未强制角色池、租户派生和同租户完整性。",
+        "en": "Organizations cannot bind role groups and user write paths do not enforce role pools, tenant derivation or same-tenant integrity."
+      },
+      "completionGate": {
+        "zh": "完成关系迁移、公共领域校验、影响分析、乐观并发、审计以及创建、更新、批量和导入入口的一致约束。",
+        "en": "Complete relational migrations, shared domain validation, impact analysis, optimistic concurrency, audit and consistent constraints across create, update, bulk and import paths."
+      },
+      "resourceLocks": [
+        "organization-rbac-contract",
+        "organization-rbac-migration",
+        "menu-permission-contract",
+        "storage-runtime",
+        "migration-runtime",
+        "rbac-policy",
+        "casbin-policy",
+        "audit-policy",
+        "identity-governance-docs"
+      ],
+      "dependsOn": [
+        "organization-rbac-menu-contract-and-migration-design",
+        "production-persistence-correctness"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-foundation-task-map.md"
+        ]
+      }
+    },
+    {
+      "id": "organization-user-admin-experience",
+      "title": {
+        "zh": "组织与用户管理体验",
+        "en": "Organization And User Admin Experience"
+      },
+      "phase": "production-governance",
+      "scope": "admin-ui",
+      "status": "pending",
+      "statusReason": {
+        "zh": "组织页面缺少角色组绑定与来源明细，用户页面仍可直接选择租户且角色不依赖机构。",
+        "en": "Organization pages lack role-group bindings and source detail, while users can still choose tenants directly and roles do not depend on organization."
+      },
+      "completionGate": {
+        "zh": "完成组织角色组绑定、角色池来源、派生只读租户、机构依赖多角色选择和机构变更冲突确认。",
+        "en": "Complete organization role-group binding, role-pool provenance, derived read-only tenant, organization-dependent multi-role selection and explicit organization-change conflict handling."
+      },
+      "visual": true,
+      "designGate": [
+        "superpowers:brainstorming",
+        "product-design"
+      ],
+      "resourceLocks": [
+        "admin-ui",
+        "i18n",
+        "browser-qa",
+        "identity-governance-docs"
+      ],
+      "dependsOn": [
+        "organization-role-pool-backend-and-migration",
+        "admin-ui-system-quality-hardening"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-ui-optimization-assessment.md"
+        ]
+      }
+    },
+    {
+      "id": "role-tree-and-authorization-entry",
+      "title": {
+        "zh": "角色树与授权入口",
+        "en": "Role Tree And Authorization Entry"
+      },
+      "phase": "production-governance",
+      "scope": "admin-ui",
+      "status": "pending",
+      "statusReason": {
+        "zh": "角色组和角色仍是分离资源，菜单与权限也没有独立授权入口。",
+        "en": "Role groups and roles remain separate resources and menu and permission assignment lack independent entry points."
+      },
+      "completionGate": {
+        "zh": "完成严格两级角色树、角色移动与停用，以及独立的分配菜单和分配权限 Tree Transfer 入口。",
+        "en": "Complete the strict two-level role tree, role move and disable flows, and separate Assign Menus and Assign Permissions Tree Transfer entry points."
+      },
+      "visual": true,
+      "designGate": [
+        "superpowers:brainstorming",
+        "product-design"
+      ],
+      "resourceLocks": [
+        "admin-ui",
+        "i18n",
+        "browser-qa",
+        "identity-governance-docs"
+      ],
+      "dependsOn": [
+        "organization-user-admin-experience"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-ui-optimization-assessment.md"
+        ]
+      }
+    },
+    {
+      "id": "menu-tree-and-button-permission-configuration",
+      "title": {
+        "zh": "菜单树与页面按钮权限配置",
+        "en": "Menu Tree And Button Permission Configuration"
+      },
+      "phase": "production-governance",
+      "scope": "admin-ui",
+      "status": "pending",
+      "statusReason": {
+        "zh": "菜单尚未区分目录与页面，路由元信息、页面按钮和独立 role_menu 分配合同也未实现。",
+        "en": "Menus do not distinguish directories and pages, and route metadata, page buttons and independent role_menu assignment are not implemented."
+      },
+      "completionGate": {
+        "zh": "完成目录/页面菜单树、路由与参数配置、页面按钮资源和独立角色菜单分配，保持 API 权限为后端最终边界。",
+        "en": "Complete directory/page menu trees, route and parameter configuration, page-button resources and independent role-menu assignment while preserving API permissions as the final backend boundary."
+      },
+      "visual": true,
+      "designGate": [
+        "superpowers:brainstorming",
+        "product-design"
+      ],
+      "resourceLocks": [
+        "admin-ui",
+        "i18n",
+        "browser-qa",
+        "identity-governance-docs"
+      ],
+      "dependsOn": [
+        "role-tree-and-authorization-entry"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-ui-optimization-assessment.md"
+        ]
+      }
+    },
+    {
+      "id": "organization-rbac-menu-e2e-qa",
+      "title": {
+        "zh": "组织权限与菜单全链路验收",
+        "en": "Organization RBAC And Menu End-To-End QA"
+      },
+      "phase": "production-governance",
+      "scope": "governance",
+      "status": "pending",
+      "statusReason": {
+        "zh": "新组织授权模型尚无迁移等价、全部写入口、平台主体例外、冲突路径和浏览器可访问性证据。",
+        "en": "The new organization authorization model lacks migration equivalence, all-write-path, platform-principal exception, conflict-path and browser accessibility evidence."
+      },
+      "completionGate": {
+        "zh": "完成迁移双读等价、后端入口回归、独立审计、Tree Transfer 键盘/ARIA、大数据量和桌面/移动浏览器验收。",
+        "en": "Complete migration dual-read equivalence, backend entry-point regression, separate audit, Tree Transfer keyboard/ARIA, large-data and desktop/mobile browser acceptance."
+      },
+      "visual": true,
+      "designGate": [
+        "superpowers:brainstorming",
+        "product-design"
+      ],
+      "resourceLocks": [
+        "organization-rbac-contract",
+        "menu-permission-contract",
+        "rbac-policy",
+        "casbin-policy",
+        "admin-ui",
+        "i18n",
+        "browser-qa",
+        "identity-governance-docs"
+      ],
+      "dependsOn": [
+        "organization-user-admin-experience",
+        "role-tree-and-authorization-entry",
+        "menu-tree-and-button-permission-configuration"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-ui-optimization-assessment.md"
+        ]
+      }
+    },
+    {
+      "id": "multi-datasource-contract-and-runtime",
+      "title": {
+        "zh": "数据源注册表运行时基础",
+        "en": "Datasource Registry Runtime Foundation"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "当前 DSN 仅按平台子系统分离，尚无版本化 Datasource/DatasourceGroup、能力绑定、健康状态和事务钉住。",
+        "en": "Current DSNs only separate platform subsystems and provide no versioned Datasource/DatasourceGroup registry, capability binding, health state or transaction pinning."
+      },
+      "completionGate": {
+        "zh": "完成版本化数据源与数据源组、能力绑定、加密配置引用、启动验证、健康状态和单数据源/分片事务钉住。",
+        "en": "Complete versioned Datasource and DatasourceGroup configuration, capability binding, encrypted configuration references, startup validation, health state and single-datasource/shard transaction pinning."
+      },
+      "resourceLocks": [
+        "datasource-registry",
+        "storage-runtime",
+        "production-config",
+        "data-plane-docs"
+      ],
+      "dependsOn": [
+        "platform-service-contract-standard",
+        "data-lifecycle-retention",
+        "production-persistence-correctness"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md"
+        ]
+      }
+    },
+    {
+      "id": "tenant-placement-and-request-routing",
+      "title": {
+        "zh": "租户放置与请求路由",
+        "en": "Tenant Placement And Request Routing"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "平台没有版本化 tenant 到 datasource group/shard/schema 的控制面和可信请求解析。",
+        "en": "The platform has no versioned tenant-to-datasource-group/shard/schema control plane or trusted request resolution."
+      },
+      "completionGate": {
+        "zh": "完成 TenantPlacement 控制面、状态与迁移审计、可信上下文解析以及高权限限域 override。",
+        "en": "Complete the TenantPlacement control plane, state and migration audit, trusted-context resolution and privileged scoped override."
+      },
+      "resourceLocks": [
+        "tenant-context",
+        "routing-runtime",
+        "datasource-registry",
+        "audit-policy",
+        "production-config",
+        "data-plane-docs"
+      ],
+      "dependsOn": [
+        "multi-datasource-contract-and-runtime",
+        "organization-role-pool-backend-and-migration"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md"
+        ]
+      }
+    },
+    {
+      "id": "datasource-read-write-routing",
+      "title": {
+        "zh": "数据源读写路由",
+        "en": "Datasource Read Write Routing"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "数据源组内部尚无 primary/replica 自动路由、写后读一致性或复制延迟降级策略。",
+        "en": "Datasource groups lack automatic primary/replica routing, read-after-write consistency and replication-lag fallback policy."
+      },
+      "completionGate": {
+        "zh": "完成 dbresolver 或等价适配、写与事务强制主库、sticky window、延迟健康、故障回退和路由证据。",
+        "en": "Complete dbresolver or equivalent routing, primary enforcement for writes and transactions, sticky windows, lag health, failure fallback and routing evidence."
+      },
+      "resourceLocks": [
+        "routing-runtime",
+        "storage-runtime",
+        "production-config",
+        "data-plane-docs"
+      ],
+      "dependsOn": [
+        "tenant-placement-and-request-routing"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md"
+        ]
+      }
+    },
+    {
+      "id": "sharding-and-tenant-migration",
+      "title": {
+        "zh": "分片与租户迁移",
+        "en": "Sharding And Tenant Migration"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "尚无显式分片键、全局 ID、路由版本、扩容再平衡和可恢复租户迁移流程。",
+        "en": "There are no explicit shard keys, global IDs, routing versions, expansion/rebalancing or recoverable tenant migration flows."
+      },
+      "completionGate": {
+        "zh": "完成分片路由、全局 ID、版本化放置、扩容再平衡和带检查点、审计与补偿的租户迁移。",
+        "en": "Complete shard routing, global IDs, versioned placement, expansion/rebalancing and tenant migration with checkpoints, audit and compensation."
+      },
+      "resourceLocks": [
+        "sharding-runtime",
+        "routing-runtime",
+        "storage-runtime",
+        "migration-runtime",
+        "production-config",
+        "data-plane-docs"
+      ],
+      "dependsOn": [
+        "datasource-read-write-routing"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md"
+        ]
+      }
+    },
+    {
+      "id": "federated-read-query",
+      "title": {
+        "zh": "受控联邦只读查询",
+        "en": "Controlled Federated Read Query"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "跨库报表查询尚无 persisted query、租户隔离、字段/行数/成本/超时和取消边界。",
+        "en": "Cross-database report queries lack persisted-query, tenant isolation, field/row/cost/timeout and cancellation boundaries."
+      },
+      "completionGate": {
+        "zh": "完成仅面向持久化报表定义的只读联邦执行器，禁止普通 OLTP Repository 跨库 Join，并验证隔离与资源限制。",
+        "en": "Complete a read-only federated executor only for persisted report definitions, forbid cross-database joins in ordinary OLTP repositories and verify isolation and resource limits."
+      },
+      "resourceLocks": [
+        "federated-query",
+        "query-command-contract",
+        "routing-runtime",
+        "storage-runtime",
+        "data-plane-docs"
+      ],
+      "dependsOn": [
+        "sharding-and-tenant-migration",
+        "persisted-query-command-object-runtime"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md"
+        ]
+      }
+    },
+    {
+      "id": "xa-optional-adapter",
+      "title": {
+        "zh": "可选 XA 适配器",
+        "en": "Optional XA Adapter"
+      },
+      "phase": "production-governance",
+      "scope": "foundation",
+      "status": "pending",
+      "statusReason": {
+        "zh": "平台尚无默认关闭的 XA 协调器、资源管理器兼容矩阵和启发式恢复运维能力。",
+        "en": "The platform has no default-off XA coordinator, resource-manager compatibility matrix or heuristic recovery operations."
+      },
+      "completionGate": {
+        "zh": "完成默认关闭适配器、超时边界、prepare/commit/rollback 证据、启发式恢复记录和运维处置；不替代 Outbox/Saga 默认路径。",
+        "en": "Complete the default-off adapter, timeout bounds, prepare/commit/rollback evidence, heuristic recovery records and operator remediation without replacing the default Outbox/Saga path."
+      },
+      "resourceLocks": [
+        "xa-runtime",
+        "routing-runtime",
+        "storage-runtime",
+        "audit-policy",
+        "production-config",
+        "data-plane-docs"
+      ],
+      "dependsOn": [
+        "federated-read-query"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md"
+        ]
+      }
+    },
+    {
+      "id": "database-certification-matrix",
+      "title": {
+        "zh": "数据库认证矩阵",
+        "en": "Database Certification Matrix"
+      },
+      "phase": "production-governance",
+      "scope": "governance",
+      "status": "pending",
+      "statusReason": {
+        "zh": "MySQL、PostgreSQL、SQLite、人大金仓和 Oracle 尚无覆盖仓储、迁移、路由、分片、联邦与 XA 的权威认证矩阵。",
+        "en": "MySQL, PostgreSQL, SQLite, KingbaseES and Oracle lack an authoritative matrix covering repositories, migrations, routing, sharding, federation and XA."
+      },
+      "completionGate": {
+        "zh": "按驱动、版本和特性聚合自动化认证；任何未通过组合必须明确标记 experimental 或 unsupported。",
+        "en": "Aggregate automated certification by driver, version and feature and label every unverified combination experimental or unsupported."
+      },
+      "resourceLocks": [
+        "database-certification",
+        "storage-runtime",
+        "migration-runtime",
+        "production-config",
+        "data-plane-docs"
+      ],
+      "dependsOn": [
+        "xa-optional-adapter"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md"
         ]
       }
     },
@@ -2371,27 +3053,30 @@
       "scope": "foundation",
       "status": "pending",
       "statusReason": {
-        "zh": "当前 Redis Pub/Sub 只承担缓存失效，不具备事务消息、幂等、重试、死信和重放能力。",
-        "en": "Current Redis Pub/Sub only distributes cache invalidation and provides no transactional messaging, idempotency, retries, dead letters or replay."
+        "zh": "当前 Redis Pub/Sub 只承担缓存失效，不具备事务消息、版本化事件、幂等、重试、死信、重放和补偿能力。",
+        "en": "Current Redis Pub/Sub only distributes cache invalidation and provides no transactional messaging, versioned events, idempotency, retries, dead letters, replay or compensation."
       },
       "completionGate": {
-        "zh": "完成事务 Outbox、幂等消费、重试/死信/重放治理，并只为首个真实工作负载认证一个消息队列适配器。",
-        "en": "Complete transactional outbox, idempotent consumption, retry/dead-letter/replay governance and certify exactly one MQ adapter for the first real workload."
+        "zh": "完成事务 Outbox、版本化事件包络、trace context、幂等消费、重试/死信/重放、Saga 补偿，并只认证一个 MQ 适配器。",
+        "en": "Complete transactional Outbox, versioned event envelopes, trace context, idempotent consumption, retry/dead-letter/replay, Saga compensation and exactly one certified MQ adapter."
       },
       "resourceLocks": [
+        "transaction-outbox",
+        "event-contract",
         "storage-runtime",
         "migration-runtime",
-        "production-config",
         "audit-policy",
-        "docs"
+        "production-config",
+        "integration-docs"
       ],
       "dependsOn": [
-        "integration-ports-disabled-default"
+        "integration-ports-disabled-default",
+        "database-certification-matrix"
       ],
       "evidence": {
         "docs": [
-          "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md"
         ]
       }
     },
@@ -2405,26 +3090,29 @@
       "scope": "foundation",
       "status": "pending",
       "statusReason": {
-        "zh": "平台尚无 Elasticsearch/OpenSearch 异步投影、重建、重放和关系数据库事实源边界。",
-        "en": "The platform has no Elasticsearch or OpenSearch asynchronous projection, rebuild, replay or relational source-of-truth boundary."
+        "zh": "平台尚无消费 Outbox 的 Elasticsearch/OpenSearch 投影、重建、重放和字段/租户隔离边界。",
+        "en": "The platform has no Outbox-fed Elasticsearch/OpenSearch projection, rebuild, replay or field/tenant isolation boundary."
       },
       "completionGate": {
-        "zh": "完成可重建的异步搜索投影、重放与删除同步，保持关系数据库作为授权、恢复和审计事实源。",
-        "en": "Complete rebuildable asynchronous search projection, replay and deletion synchronization while retaining the relational database as the authorization, restore and audit source of truth."
+        "zh": "完成可重建投影、重放与删除同步、字段白名单、租户隔离、成本限制和关系数据库事实源边界。",
+        "en": "Complete rebuildable projection, replay and deletion synchronization, field allowlists, tenant isolation, cost limits and relational source-of-truth boundaries."
       },
       "resourceLocks": [
+        "event-contract",
+        "query-command-contract",
         "admin-resource-api",
         "storage-runtime",
         "production-config",
-        "docs"
+        "integration-docs"
       ],
       "dependsOn": [
-        "transactional-outbox-and-one-mq-adapter"
+        "transactional-outbox-and-one-mq-adapter",
+        "persisted-query-command-object-runtime"
       ],
       "evidence": {
         "docs": [
-          "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-data-governance-and-integrations-assessment.md"
         ]
       }
     },
@@ -2452,6 +3140,7 @@
       ],
       "dependsOn": [
         "admin-watermark-export-governance",
+        "organization-rbac-menu-e2e-qa",
         "asynchronous-search-projection"
       ],
       "evidence": {
@@ -2589,6 +3278,22 @@
       "description": "Visual QA must stay isolated from non-visual backend contract work.",
       "taskIds": [
         "visual-product-design-qa"
+      ]
+    },
+    {
+      "id": "service-contract-extension-lanes",
+      "description": "Persisted Query/Command runtime and disabled integration ports may proceed after the service contract freezes separate extension seams.",
+      "taskIds": [
+        "persisted-query-command-object-runtime",
+        "integration-ports-disabled-default"
+      ]
+    },
+    {
+      "id": "organization-ui-and-datasource-registry",
+      "description": "Organization/user UI and datasource registry may proceed in parallel after organization backend contracts freeze.",
+      "taskIds": [
+        "organization-user-admin-experience",
+        "multi-datasource-contract-and-runtime"
       ]
     }
   ]

@@ -61,14 +61,68 @@ const requiredImplementedCapabilityIDs = [
   "data-lifecycle-retention",
 ];
 const requiredPartialCapabilityIDs = [
-  "multi-datasource-contract-and-runtime",
-  "database-certification-matrix",
+  "platform-service-contract-standard",
+  "persisted-query-command-object-runtime",
   "integration-ports-disabled-default",
+  "organization-rbac-menu-contract-and-migration-design",
+  "organization-role-pool-backend-and-migration",
+  "organization-user-admin-experience",
+  "role-tree-and-authorization-entry",
+  "menu-tree-and-button-permission-configuration",
+  "organization-rbac-menu-e2e-qa",
+  "multi-datasource-contract-and-runtime",
+  "tenant-placement-and-request-routing",
+  "datasource-read-write-routing",
+  "sharding-and-tenant-migration",
+  "federated-read-query",
+  "xa-optional-adapter",
+  "database-certification-matrix",
   "transactional-outbox-and-one-mq-adapter",
   "asynchronous-search-projection",
   "open-source-portability",
   "public-documentation-and-release",
 ];
+const requiredPartialCapabilityDependencies = {
+  "platform-service-contract-standard": ["data-lifecycle-retention"],
+  "persisted-query-command-object-runtime": ["platform-service-contract-standard"],
+  "integration-ports-disabled-default": ["platform-service-contract-standard"],
+  "organization-rbac-menu-contract-and-migration-design": ["persisted-query-command-object-runtime"],
+  "organization-role-pool-backend-and-migration": ["organization-rbac-menu-contract-and-migration-design"],
+  "organization-user-admin-experience": ["organization-role-pool-backend-and-migration"],
+  "role-tree-and-authorization-entry": ["organization-user-admin-experience"],
+  "menu-tree-and-button-permission-configuration": ["role-tree-and-authorization-entry"],
+  "organization-rbac-menu-e2e-qa": [
+    "organization-user-admin-experience",
+    "role-tree-and-authorization-entry",
+    "menu-tree-and-button-permission-configuration",
+  ],
+  "multi-datasource-contract-and-runtime": ["platform-service-contract-standard"],
+  "tenant-placement-and-request-routing": [
+    "multi-datasource-contract-and-runtime",
+    "organization-role-pool-backend-and-migration",
+  ],
+  "datasource-read-write-routing": ["tenant-placement-and-request-routing"],
+  "sharding-and-tenant-migration": ["datasource-read-write-routing"],
+  "federated-read-query": ["sharding-and-tenant-migration", "persisted-query-command-object-runtime"],
+  "xa-optional-adapter": ["federated-read-query"],
+  "database-certification-matrix": ["xa-optional-adapter"],
+  "transactional-outbox-and-one-mq-adapter": [
+    "integration-ports-disabled-default",
+    "database-certification-matrix",
+  ],
+  "asynchronous-search-projection": [
+    "transactional-outbox-and-one-mq-adapter",
+    "persisted-query-command-object-runtime",
+  ],
+  "open-source-portability": [
+    "runtime-security-containment",
+    "admin-watermark-export-governance",
+    "sensitive-data-protection",
+    "organization-rbac-menu-e2e-qa",
+    "asynchronous-search-projection",
+  ],
+  "public-documentation-and-release": ["open-source-portability"],
+};
 const requiredCapabilityIDs = [...requiredImplementedCapabilityIDs, ...requiredPartialCapabilityIDs];
 
 function readJSON(filePath) {
@@ -77,6 +131,10 @@ function readJSON(filePath) {
 
 function values(items) {
   return Array.isArray(items) ? items.filter(Boolean) : [];
+}
+
+function sameOrderedValues(actual, expected) {
+  return actual.length === expected.length && actual.every((value, index) => value === expected[index]);
 }
 
 function hasLocalizedText(value) {
@@ -408,6 +466,15 @@ function validate() {
     const capability = capabilityByID.get(capabilityID);
     if (capability && capability.status !== "partial") {
       errors.push(`approved completion program capability ${capabilityID} must stay partial until implementation closeout`);
+    }
+    if (capability) {
+      const expectedDependencies = requiredPartialCapabilityDependencies[capabilityID];
+      const actualDependencies = values(capability.dependsOn);
+      if (!sameOrderedValues(actualDependencies, expectedDependencies)) {
+        errors.push(
+          `approved completion program capability ${capabilityID} dependsOn must equal ${JSON.stringify(expectedDependencies)}`,
+        );
+      }
     }
   }
   validateSafeCodegenScaffold(capabilityByID.get("safe-codegen-scaffold"), errors);

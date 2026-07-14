@@ -90,6 +90,24 @@ describe("validate-platform-governance-topology", () => {
     assert.match(result.stderr, /roleGroupPolicy\.dataScopeOwner must stay roles\.dataScope/);
   });
 
+  it("records the current organization model only as migration source and protects the approved target", () => {
+    const topology = readJSON("resources/platform-governance-topology.json");
+    assert.equal(topology.organizationRbacMenuMigration.status, "planned");
+    assert.equal(topology.organizationRbacMenuMigration.sourceModel.roleGroupHierarchy, "nested-parentCode");
+    assert.equal(topology.organizationRbacMenuMigration.targetModel.roleGroupHierarchy, "flat-two-level-role-group-to-role");
+    assert.equal(topology.organizationRbacMenuMigration.targetModel.userTenant, "derived-from-primary-organization");
+    assert.equal(topology.organizationRbacMenuMigration.targetModel.roleMenuBinding, "role_menu");
+
+    topology.organizationRbacMenuMigration.targetModel.roleOwnership = "many-role-groups";
+    topology.organizationRbacMenuMigration.targetModel.federationAndXa = "allowed-for-authorization";
+    const topologyPath = tempJSON("platform-governance-topology.json", topology);
+    const result = runValidator(["--topology", topologyPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /targetModel\.roleOwnership must stay exactly-one-role-group/);
+    assert.match(result.stderr, /targetModel\.federationAndXa must stay forbidden-for-authorization/);
+  });
+
   it("rejects role resources whose role-group selector is not tree-shaped", () => {
     const manifestPath = writeBrokenManifest((manifest) => {
       const roles = manifest.resources.find((resource) => resource.code === "roles");
