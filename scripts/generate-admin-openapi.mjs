@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { adminServiceObjectDefinitions } from "./admin-service-object-definitions.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -454,6 +455,198 @@ function addPath(paths, resource, route) {
   paths[routePath][method] = operation(resource, route);
 }
 
+function serviceObjectSchemaPrefix(definition) {
+  return `${definition.codegenName}V${definition.version.replaceAll(".", "_")}`;
+}
+
+function serviceObjectValueSchema(field) {
+  const schema = { type: field.type };
+  if (field.maxLength) schema.maxLength = field.maxLength;
+  if (field.minimum !== undefined) schema.minimum = field.minimum;
+  if (field.maximum !== undefined) schema.maximum = field.maximum;
+  return schema;
+}
+
+function serviceObjectObjectSchema(fields) {
+  const required = fields.filter((field) => field.required !== false).map((field) => field.name);
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: Object.fromEntries(fields.map((field) => [field.name, serviceObjectValueSchema(field)])),
+    ...(required.length > 0 ? { required } : {}),
+  };
+}
+
+function serviceObjectArgumentSchema(definition) {
+  return serviceObjectObjectSchema(definition.arguments.map((argument) => ({ ...argument, required: argument.required === true })));
+}
+
+function serviceObjectQuerySchemas(definition) {
+  const prefix = serviceObjectSchemaPrefix(definition);
+  const argumentsName = `${prefix}Arguments`;
+  const sortName = `${prefix}Sort`;
+  const itemName = `${prefix}Item`;
+  const dataName = `${prefix}QueryData`;
+  const requestName = `${prefix}QueryRequest`;
+  const required = ["queryId", "version"];
+  if (definition.arguments.some((argument) => argument.required)) required.push("arguments");
+  const properties = {
+    queryId: { type: "string", const: definition.id },
+    version: { type: "string", const: definition.version },
+    arguments: { $ref: `#/components/schemas/${argumentsName}` },
+    pagination: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        page: { type: "integer", minimum: 1 },
+        pageSize: { type: "integer", minimum: 1, maximum: definition.maxPageSize },
+      },
+    },
+  };
+  if (definition.allowedSort.length > 0) {
+    properties.sort = {
+      type: "array",
+      maxItems: definition.allowedSort.length,
+      items: { $ref: `#/components/schemas/${sortName}` },
+    };
+  }
+
+  const dataProperties = {
+    items: { type: "array", items: { $ref: `#/components/schemas/${itemName}` } },
+    page: { type: "integer", minimum: 1 },
+    pageSize: { type: "integer", minimum: 1, maximum: definition.maxPageSize },
+  };
+  if (definition.exposeTotal) {
+    dataProperties.total = { type: "integer", minimum: 0 };
+  }
+
+  const generated = {
+    [argumentsName]: serviceObjectArgumentSchema(definition),
+    [itemName]: serviceObjectObjectSchema(definition.result),
+    [dataName]: {
+      type: "object",
+      required: ["items", "page", "pageSize"],
+      additionalProperties: false,
+      properties: dataProperties,
+    },
+    [requestName]: {
+      type: "object",
+      required,
+      additionalProperties: false,
+      properties,
+      "x-platform-definition": {
+        resource: definition.resource,
+        permission: definition.permission,
+        action: definition.action,
+        tenantMode: definition.tenantMode,
+        dataScope: definition.dataScope,
+        cost: definition.cost,
+        timeoutMs: definition.timeoutMs,
+      },
+    },
+  };
+  if (definition.allowedSort.length > 0) {
+    generated[sortName] = {
+      type: "object",
+      required: ["name", "order"],
+      additionalProperties: false,
+      properties: {
+        name: { type: "string", enum: definition.allowedSort },
+        order: { type: "string", enum: ["asc", "desc"] },
+      },
+    };
+  }
+  return generated;
+}
+
+function serviceObjectCommandSchemas(definition) {
+  const prefix = serviceObjectSchemaPrefix(definition);
+  const argumentsName = `${prefix}Arguments`;
+  const valuesName = `${prefix}Values`;
+  const dataName = `${prefix}CommandData`;
+  const requestName = `${prefix}CommandRequest`;
+  const required = ["commandId", "version"];
+  if (definition.arguments.some((argument) => argument.required)) required.push("arguments");
+  if (definition.idempotency === "required-key") required.push("idempotencyKey");
+
+  return {
+    [argumentsName]: serviceObjectArgumentSchema(definition),
+    [valuesName]: serviceObjectObjectSchema(definition.result),
+    [dataName]: {
+      type: "object",
+      required: ["values"],
+      additionalProperties: false,
+      properties: { values: { $ref: `#/components/schemas/${valuesName}` } },
+    },
+    [requestName]: {
+      type: "object",
+      required,
+      additionalProperties: false,
+      properties: {
+        commandId: { type: "string", const: definition.id },
+        version: { type: "string", const: definition.version },
+        arguments: { $ref: `#/components/schemas/${argumentsName}` },
+        idempotencyKey: { type: "string", minLength: 1, maxLength: 128 },
+      },
+      "x-platform-definition": {
+        resource: definition.resource,
+        permission: definition.permission,
+        action: definition.action,
+        tenantMode: definition.tenantMode,
+        dataScope: definition.dataScope,
+        cost: definition.cost,
+        timeoutMs: definition.timeoutMs,
+        idempotency: definition.idempotency,
+        maxAffectedRows: definition.maxAffectedRows,
+      },
+    },
+  };
+}
+
+function serviceObjectUnionSchema(kind, definitions, suffix) {
+  const selector = kind === "query" ? "queryId" : "commandId";
+  const schema = {
+    oneOf: definitions.map((definition) => ({
+      $ref: `#/components/schemas/${serviceObjectSchemaPrefix(definition)}${suffix}`,
+    })),
+    "x-platform-discriminator": {
+      properties: [selector, "version"],
+      values: definitions.map((definition) => ({ [selector]: definition.id, version: definition.version })),
+    },
+  };
+  if (new Set(definitions.map((definition) => definition.id)).size === definitions.length) {
+    schema.discriminator = {
+      propertyName: selector,
+      mapping: Object.fromEntries(
+        definitions.map((definition) => [
+          definition.id,
+          `#/components/schemas/${serviceObjectSchemaPrefix(definition)}${suffix}`,
+        ]),
+      ),
+    };
+  }
+  return schema;
+}
+
+function serviceObjectDataUnionSchema(definitions, suffix) {
+  return {
+    oneOf: definitions.map((definition) => ({
+      $ref: `#/components/schemas/${serviceObjectSchemaPrefix(definition)}${suffix}`,
+    })),
+  };
+}
+
+function serviceObjectSchemas() {
+  return {
+    ...Object.assign({}, ...adminServiceObjectDefinitions.queries.map(serviceObjectQuerySchemas)),
+    ...Object.assign({}, ...adminServiceObjectDefinitions.commands.map(serviceObjectCommandSchemas)),
+    AdminServiceObjectQueryRequest: serviceObjectUnionSchema("query", adminServiceObjectDefinitions.queries, "QueryRequest"),
+    AdminServiceObjectCommandRequest: serviceObjectUnionSchema("command", adminServiceObjectDefinitions.commands, "CommandRequest"),
+    AdminServiceObjectQueryData: serviceObjectDataUnionSchema(adminServiceObjectDefinitions.queries, "QueryData"),
+    AdminServiceObjectCommandData: serviceObjectDataUnionSchema(adminServiceObjectDefinitions.commands, "CommandData"),
+  };
+}
+
 function schemas() {
   const generated = {
     ErrorBody: {
@@ -529,6 +722,7 @@ function schemas() {
         order: { type: "string", enum: ["asc", "desc"] },
       },
     },
+    ...serviceObjectSchemas(),
     AdminAuthProviderStartRequest: {
       type: "object",
       required: ["codeChallenge"],
@@ -950,6 +1144,54 @@ paths["/api/auth/login"] = {
   },
 };
 
+paths["/api/admin/service-objects/query"] = {
+  post: {
+    tags: ["service-objects"],
+    operationId: "executeAdminPersistedQuery",
+    summary: "Execute a versioned server-side persisted QueryDefinition",
+    security: [{ bearerAuth: [] }],
+    requestBody: {
+      required: true,
+      content: { "application/json": { schema: { $ref: "#/components/schemas/AdminServiceObjectQueryRequest" } } },
+    },
+    responses: {
+      "200": successResponse("Persisted query result", apiResponse({ $ref: "#/components/schemas/AdminServiceObjectQueryData" })),
+      ...errorResponses(),
+      "404": {
+        ...successResponse("Service-object runtime unavailable or QueryDefinition not found", apiResponse({ nullable: true })),
+        "x-platform-error-codes": ["SERVICE_OBJECT_UNAVAILABLE", "SERVICE_OBJECT_NOT_FOUND"],
+      },
+      "422": { $ref: "#/components/responses/UnprocessableEntity" },
+    },
+    "x-platform-query-contract": "server-side-versioned-definition",
+    "x-platform-runtime": "conditional",
+  },
+};
+
+paths["/api/admin/service-objects/command"] = {
+  post: {
+    tags: ["service-objects"],
+    operationId: "executeAdminCommandObject",
+    summary: "Execute a versioned server-side CommandDefinition",
+    security: [{ bearerAuth: [] }],
+    requestBody: {
+      required: true,
+      content: { "application/json": { schema: { $ref: "#/components/schemas/AdminServiceObjectCommandRequest" } } },
+    },
+    responses: {
+      "200": successResponse("Command result", apiResponse({ $ref: "#/components/schemas/AdminServiceObjectCommandData" })),
+      ...errorResponses(),
+      "404": {
+        ...successResponse("Service-object runtime unavailable or CommandDefinition not found", apiResponse({ nullable: true })),
+        "x-platform-error-codes": ["SERVICE_OBJECT_UNAVAILABLE", "SERVICE_OBJECT_NOT_FOUND"],
+      },
+      "409": { $ref: "#/components/responses/Conflict" },
+    },
+    "x-platform-command-contract": "server-side-versioned-definition",
+    "x-platform-runtime": "conditional",
+  },
+};
+
 const openapi = {
   openapi: "3.1.0",
   info: {
@@ -962,6 +1204,7 @@ const openapi = {
   tags: [
     { name: "auth", description: "Public Admin authentication endpoints." },
     { name: "sensitive-reveal", description: "Step-up verification and one-time sensitive field reveal endpoints." },
+    { name: "service-objects", description: "Versioned server-side QueryDefinition and CommandDefinition execution." },
     ...resources.map((resource) => ({
       name: resource.name,
       description: `${resource.label?.en ?? resource.name}${resource.label?.zh ? ` / ${resource.label.zh}` : ""}`,
@@ -995,6 +1238,8 @@ const openapi = {
   },
   "x-generated-by": "scripts/generate-admin-openapi.mjs",
   "x-source": path.relative(repoRoot, contractPath),
+  "x-service-object-definition-source": adminServiceObjectDefinitions.source,
+  "x-service-object-runtime-reference": adminServiceObjectDefinitions.runtimeSource,
   "x-source-version": contract.sourceVersion,
   "x-source-updated-at": contract.updatedAt,
   "x-stack": contract.stack,

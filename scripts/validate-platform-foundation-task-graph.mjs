@@ -477,6 +477,24 @@ function validateTask(task, context, errors) {
       errors,
     );
   }
+  if (task.id === "persisted-query-command-object-runtime") {
+    if (task.status !== "implemented") {
+      errors.push("persisted-query-command-object-runtime must stay implemented after closeout");
+    }
+    requireIncludes(task.evidence?.docs, ["docs/platform-service-objects.md"], `${task.id} evidence.docs`, errors);
+    requireIncludes(
+      task.evidence?.validators,
+      ["scripts/validate-platform-service-object-runtime.mjs", "scripts/validate-platform-admin-api-boundary.mjs"],
+      `${task.id} evidence.validators`,
+      errors,
+    );
+    requireIncludes(
+      task.evidence?.tests,
+      ["internal/platform/serviceobject/runtime_test.go", "internal/platform/httpapi/service_objects_test.go", "scripts/platform-service-object-runtime.test.mjs"],
+      `${task.id} evidence.tests`,
+      errors,
+    );
+  }
   if (task.id === "integration-ports-disabled-default") {
     if (task.status !== "implemented") {
       errors.push("integration-ports-disabled-default must stay implemented after closeout");

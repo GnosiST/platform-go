@@ -25,6 +25,8 @@ func TestRateLimitPoliciesMatchSecurityBaseline(t *testing.T) {
 		{OperationPhoneBindingVerification, 10, 10 * time.Minute},
 		{OperationAdminUpload, 30, time.Minute},
 		{OperationAppUpload, 30, time.Minute},
+		{OperationAdminServiceObjectQuery, 120, time.Minute},
+		{OperationAdminServiceObjectCommand, 60, time.Minute},
 	}
 
 	for _, tt := range tests {

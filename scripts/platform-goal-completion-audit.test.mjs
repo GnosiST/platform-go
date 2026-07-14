@@ -8,7 +8,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "persisted-query-command-object-runtime",
   "organization-rbac-menu-contract-and-migration-design",
   "organization-role-pool-backend-and-migration",
   "organization-user-admin-experience",
@@ -63,15 +62,15 @@ describe("validate-platform-goal-completion-audit", () => {
     assert.match(result.stdout, /Validated platform goal completion audit/);
   });
 
-  it("marks the completion program as controlled incomplete at 66/46/20", () => {
+  it("marks the completion program as controlled incomplete at 66/47/19", () => {
     const audit = readJSON("resources/platform-goal-completion-audit.json");
 
     assert.equal(audit.completionStatus, "not-complete-controlled");
     assert.deepEqual(audit.completionPolicy.requiredControlledUnfinishedNodes, completionProgramTaskIDs);
     assert.deepEqual(audit.taskSummary, {
       expectedTotal: 66,
-      expectedImplemented: 46,
-      expectedControlledUnfinished: 20,
+      expectedImplemented: 47,
+      expectedControlledUnfinished: 19,
     });
   });
 
@@ -86,8 +85,8 @@ describe("validate-platform-goal-completion-audit", () => {
     const result = runValidator(["--audit", tempJSON("stale-goal-completion-counts.json", audit)]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /taskSummary\.expectedImplemented must match implemented task count 46/);
-    assert.match(result.stderr, /taskSummary\.expectedControlledUnfinished must match unfinished task count 20/);
+    assert.match(result.stderr, /taskSummary\.expectedImplemented must match implemented task count 47/);
+    assert.match(result.stderr, /taskSummary\.expectedControlledUnfinished must match unfinished task count 19/);
   });
 
   it("rejects marking the completion program complete while nodes remain unfinished", () => {

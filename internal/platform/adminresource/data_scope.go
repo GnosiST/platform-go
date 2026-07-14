@@ -2,6 +2,7 @@ package adminresource
 
 import (
 	"slices"
+	"sort"
 	"strings"
 
 	"platform-go/internal/platform/rbac"
@@ -26,6 +27,50 @@ type dataScopePolicy struct {
 	self       bool
 	username   string
 	userID     string
+}
+
+type PrincipalDataScope struct {
+	All              bool
+	OrgCodes         []string
+	AreaCodes        []string
+	Self             bool
+	ActorIdentifiers []string
+}
+
+func (s *Store) DataScopeForPrincipal(principal rbac.Principal) PrincipalDataScope {
+	if s == nil {
+		return PrincipalDataScope{}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	policy := s.dataScopePolicyLocked(principal)
+	return PrincipalDataScope{
+		All:              policy.all,
+		OrgCodes:         sortedScopeCodes(policy.orgCodes),
+		AreaCodes:        sortedScopeCodes(policy.areaCodes),
+		Self:             policy.self,
+		ActorIdentifiers: compactScopeIdentifiers(policy.username, policy.userID),
+	}
+}
+
+func sortedScopeCodes(codes map[string]struct{}) []string {
+	result := make([]string, 0, len(codes))
+	for code := range codes {
+		result = append(result, code)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func compactScopeIdentifiers(values ...string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" && !slices.Contains(result, value) {
+			result = append(result, value)
+		}
+	}
+	return result
 }
 
 func (s *Store) ListForPrincipal(resource string, principal rbac.Principal) ([]Record, error) {

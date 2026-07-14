@@ -9,7 +9,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "persisted-query-command-object-runtime",
   "organization-rbac-menu-contract-and-migration-design",
   "organization-role-pool-backend-and-migration",
   "organization-user-admin-experience",
@@ -99,7 +98,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("preserves 37 baseline closeouts, closes nine completion nodes, and tracks 20 pending nodes", () => {
+  it("preserves 37 baseline closeouts, closes ten completion nodes, and tracks 19 pending nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -107,7 +106,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(task, "task graph must include production-admin-oidc-auth");
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
-    assert.equal(audit.nodeCloseouts.length, 46);
+    assert.equal(audit.nodeCloseouts.length, 47);
     assert.deepEqual(audit.nodeCloseouts.slice(0, 37).map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
     assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts.slice(0, 37))).digest("hex"), foundationBaselineCloseoutDigest);
     const runtimeSecurityCloseout = audit.nodeCloseouts[37];
@@ -156,6 +155,13 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(serviceContractCloseout.cleanupEvidence.includes("docs/platform-service-contract-standard.md"));
     assert.ok(serviceContractCloseout.cleanupEvidence.includes("scripts/validate-platform-service-contract-standard.mjs"));
     assert.equal("visualEvidence" in serviceContractCloseout, false);
+    const serviceObjectCloseout = audit.nodeCloseouts.find((item) => item.taskId === "persisted-query-command-object-runtime");
+    assert.equal(serviceObjectCloseout.status, "closed");
+    assert.equal(serviceObjectCloseout.neatFreak, true);
+    assert.equal(serviceObjectCloseout.cleanupMode, "phase-level");
+    assert.ok(serviceObjectCloseout.cleanupEvidence.includes("docs/platform-service-objects.md"));
+    assert.ok(serviceObjectCloseout.cleanupEvidence.includes("scripts/validate-platform-service-object-runtime.mjs"));
+    assert.equal("visualEvidence" in serviceObjectCloseout, false);
     const integrationCloseout = audit.nodeCloseouts.find((item) => item.taskId === "integration-ports-disabled-default");
     assert.equal(integrationCloseout.status, "closed");
     assert.equal(integrationCloseout.neatFreak, false);

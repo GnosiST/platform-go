@@ -224,6 +224,89 @@
     "Runtime form slot descriptors are controlled by schema and frontend registries; source-writing form generators remain disabled.",
     "Resource-localized data uses schema.localizedFields plus <field>Zh/<field>En values; business resources can opt in per field."
   ],
+  "serviceObjects": {
+    "runtimePackage": "internal/platform/serviceobject",
+    "transportFile": "internal/platform/httpapi/server.go",
+    "definitionSource": "scripts/admin-service-object-definitions.mjs",
+    "runtimeDefinitionSource": "internal/platform/serviceobject/reference.go",
+    "typescriptClient": "resources/generated/admin-service-object-client.ts",
+    "transportContract": "AdminServiceObjectTransport",
+    "runtime": "conditional",
+    "unavailableError": "SERVICE_OBJECT_UNAVAILABLE",
+    "operations": [
+      {
+        "kind": "query",
+        "id": "platform.reference-records.list",
+        "version": "1.0.0",
+        "clientMethod": "listReferenceRecords",
+        "requestType": "ReferenceRecordsListV1_0_0QueryRequest",
+        "inputType": "ReferenceRecordsListV1_0_0QueryInput",
+        "responseType": "ReferenceRecordsListV1_0_0QueryData",
+        "argumentNames": [
+          "status",
+          "codePrefix"
+        ],
+        "logicalSortNames": [
+          "code",
+          "name"
+        ],
+        "limits": {
+          "timeoutMs": 2000,
+          "cost": {
+            "baseCost": 2,
+            "perRowCost": 1,
+            "perOffsetCost": 1,
+            "predicateCost": 1,
+            "sortCost": 1,
+            "totalCost": 20,
+            "maxOffset": 1000,
+            "limit": 128
+          },
+          "maxPageSize": 100,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.reference-records.rename",
+        "version": "1.0.0",
+        "clientMethod": "renameReferenceRecord",
+        "requestType": "ReferenceRecordsRenameV1_0_0CommandRequest",
+        "inputType": "ReferenceRecordsRenameV1_0_0CommandInput",
+        "responseType": "ReferenceRecordsRenameV1_0_0CommandData",
+        "argumentNames": [
+          "code",
+          "name"
+        ],
+        "limits": {
+          "timeoutMs": 2000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 7
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 1
+        }
+      }
+    ],
+    "forbiddenClientInputs": [
+      "field",
+      "operator",
+      "sql",
+      "join",
+      "dsn",
+      "datasource",
+      "database",
+      "schema",
+      "shard"
+    ]
+  },
   "resources": [
     {
       "resource": "apiDocs",

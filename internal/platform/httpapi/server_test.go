@@ -246,6 +246,8 @@ func (s *rateLimitTestStub) Allow(_ context.Context, key string, _ int, _ time.D
 		ratelimit.OperationPhoneBindingVerification,
 		ratelimit.OperationAdminUpload,
 		ratelimit.OperationAppUpload,
+		ratelimit.OperationAdminServiceObjectQuery,
+		ratelimit.OperationAdminServiceObjectCommand,
 	} {
 		if strings.Contains(key, ":"+string(operation)+":") {
 			s.calls[operation]++

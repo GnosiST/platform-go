@@ -20,6 +20,10 @@
       "description": "Step-up verification and one-time sensitive field reveal endpoints."
     },
     {
+      "name": "service-objects",
+      "description": "Versioned server-side QueryDefinition and CommandDefinition execution."
+    },
+    {
       "name": "apiDocs",
       "description": "API Docs / API 文档",
       "x-platform-group": "system"
@@ -8646,6 +8650,172 @@
         }
       }
     },
+    "/api/admin/service-objects/command": {
+      "post": {
+        "tags": [
+          "service-objects"
+        ],
+        "operationId": "executeAdminCommandObject",
+        "summary": "Execute a versioned server-side CommandDefinition",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminServiceObjectCommandRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Command result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminServiceObjectCommandData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Service-object runtime unavailable or CommandDefinition not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "nullable": true
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            },
+            "x-platform-error-codes": [
+              "SERVICE_OBJECT_UNAVAILABLE",
+              "SERVICE_OBJECT_NOT_FOUND"
+            ]
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-command-contract": "server-side-versioned-definition",
+        "x-platform-runtime": "conditional"
+      }
+    },
+    "/api/admin/service-objects/query": {
+      "post": {
+        "tags": [
+          "service-objects"
+        ],
+        "operationId": "executeAdminPersistedQuery",
+        "summary": "Execute a versioned server-side persisted QueryDefinition",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminServiceObjectQueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Persisted query result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminServiceObjectQueryData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Service-object runtime unavailable or QueryDefinition not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "nullable": true
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            },
+            "x-platform-error-codes": [
+              "SERVICE_OBJECT_UNAVAILABLE",
+              "SERVICE_OBJECT_NOT_FOUND"
+            ]
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-query-contract": "server-side-versioned-definition",
+        "x-platform-runtime": "conditional"
+      }
+    },
     "/api/auth/login": {
       "post": {
         "tags": [
@@ -9142,6 +9312,309 @@
             ]
           }
         }
+      },
+      "ReferenceRecordsListV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "codePrefix": {
+            "type": "string",
+            "maxLength": 64
+          }
+        }
+      },
+      "ReferenceRecordsListV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "status"
+        ]
+      },
+      "ReferenceRecordsListV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReferenceRecordsListV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      },
+      "ReferenceRecordsListV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.reference-records.list"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/ReferenceRecordsListV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              }
+            }
+          },
+          "sort": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "$ref": "#/components/schemas/ReferenceRecordsListV1_0_0Sort"
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "reference-records",
+          "permission": "admin:reference-records:read",
+          "action": "read",
+          "tenantMode": "required",
+          "dataScope": "tenant",
+          "cost": {
+            "baseCost": 2,
+            "perRowCost": 1,
+            "perOffsetCost": 1,
+            "predicateCost": 1,
+            "sortCost": 1,
+            "totalCost": 20,
+            "maxOffset": 1000,
+            "limit": 128
+          },
+          "timeoutMs": 2000
+        }
+      },
+      "ReferenceRecordsListV1_0_0Sort": {
+        "type": "object",
+        "required": [
+          "name",
+          "order"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "code",
+              "name"
+            ]
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          }
+        }
+      },
+      "ReferenceRecordsRenameV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "ReferenceRecordsRenameV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "affected": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "affected"
+        ]
+      },
+      "ReferenceRecordsRenameV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/ReferenceRecordsRenameV1_0_0Values"
+          }
+        }
+      },
+      "ReferenceRecordsRenameV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.reference-records.rename"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/ReferenceRecordsRenameV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "reference-records",
+          "permission": "admin:reference-records:update",
+          "action": "update",
+          "tenantMode": "required",
+          "dataScope": "tenant",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 7
+          },
+          "timeoutMs": 2000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 1
+        }
+      },
+      "AdminServiceObjectQueryRequest": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ReferenceRecordsListV1_0_0QueryRequest"
+          }
+        ],
+        "x-platform-discriminator": {
+          "properties": [
+            "queryId",
+            "version"
+          ],
+          "values": [
+            {
+              "queryId": "platform.reference-records.list",
+              "version": "1.0.0"
+            }
+          ]
+        },
+        "discriminator": {
+          "propertyName": "queryId",
+          "mapping": {
+            "platform.reference-records.list": "#/components/schemas/ReferenceRecordsListV1_0_0QueryRequest"
+          }
+        }
+      },
+      "AdminServiceObjectCommandRequest": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ReferenceRecordsRenameV1_0_0CommandRequest"
+          }
+        ],
+        "x-platform-discriminator": {
+          "properties": [
+            "commandId",
+            "version"
+          ],
+          "values": [
+            {
+              "commandId": "platform.reference-records.rename",
+              "version": "1.0.0"
+            }
+          ]
+        },
+        "discriminator": {
+          "propertyName": "commandId",
+          "mapping": {
+            "platform.reference-records.rename": "#/components/schemas/ReferenceRecordsRenameV1_0_0CommandRequest"
+          }
+        }
+      },
+      "AdminServiceObjectQueryData": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ReferenceRecordsListV1_0_0QueryData"
+          }
+        ]
+      },
+      "AdminServiceObjectCommandData": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ReferenceRecordsRenameV1_0_0CommandData"
+          }
+        ]
       },
       "AdminAuthProviderStartRequest": {
         "type": "object",
@@ -16344,6 +16817,8 @@
   },
   "x-generated-by": "scripts/generate-admin-openapi.mjs",
   "x-source": "resources/generated/admin-resource-contract.json",
+  "x-service-object-definition-source": "scripts/admin-service-object-definitions.mjs",
+  "x-service-object-runtime-reference": "internal/platform/serviceobject/reference.go",
   "x-source-version": "0.1.0",
   "x-source-updated-at": "2026-07-06",
   "x-stack": {

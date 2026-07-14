@@ -1,15 +1,15 @@
 # Platform Data Governance And Integrations Assessment
 
 Date: 2026-07-12
-Governance updated: 2026-07-14
+Governance updated: 2026-07-15
 
 ## Purpose
 
 This assessment records the current implementation truth for sensitive-data display and controlled reveal, deletion and retention, multi-datasource portability, and optional messaging/search integrations.
 
-It does not mark every assessed capability as implemented. Governance now records `66 total / 46 implemented / 20 controlled unfinished`; `mask-strategy-runtime`, `sensitive-data-reveal-step-up`, `data-lifecycle-retention`, `platform-service-contract-standard` and the disabled-by-default integration ports are implemented and closed, while Query/Command execution, organization governance, datasource, database certification, concrete MQ/search adapters and publication work remain pending.
+It does not mark every assessed capability as implemented. Governance now records `66 total / 47 implemented / 19 controlled unfinished`; `mask-strategy-runtime`, `sensitive-data-reveal-step-up`, `data-lifecycle-retention`, `platform-service-contract-standard`, `persisted-query-command-object-runtime` and the disabled-by-default integration ports are implemented and closed, while organization governance, datasource, database certification, concrete MQ/search adapters and publication work remain pending.
 
-The [remaining-task topology adjustment](superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md) remains the activated source of truth for the program boundaries and dependencies. `platform-service-contract-standard` is now closed; the remaining 21 nodes retain their approved order and independent completion gates.
+The [remaining-task topology adjustment](superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md) remains the activated source of truth for the program boundaries and dependencies. The service contract, persisted Query/Command runtime and disabled integration ports are closed; the remaining 19 nodes retain their approved order and independent completion gates.
 
 ## Current-State Summary
 
@@ -18,6 +18,7 @@ The [remaining-task topology adjustment](superpowers/specs/2026-07-14-platform-r
 | Sensitive display | Field contracts support versioned field-configurable masking and explicit reveal policy. Encrypted `masked` projections return only the masked value; an authorized detail-field action can create a scoped challenge, satisfy OIDC reauthentication and/or Admin SMS OTP, consume one short-lived grant and show plaintext only in the expiring modal. | Existing pre-masked or hashed records cannot be revealed because the original plaintext is unavailable. Email OTP, TOTP, WebAuthn and CAPTCHA risk gates are not implemented factors. |
 | Passwords and transport | The default platform has no local-password provider or password repository. Production configuration requires HTTPS and HSTS. | A future local-password capability still needs a dedicated Argon2id repository and must never use generic resource values or reversible encryption. |
 | Deletion | Every enabled Admin resource declares an explicit mode. Supported behavior includes restricted terminal removal, soft delete/restore, API-token revocation with 90-day retained metadata, and file tombstone recovery with 30-day cleanup eligibility. Final purge is maintenance-only. | The scheduler is disabled by default and initially supports only the default datasource. There is no online purge, universal recycle bin, general archive tier or substitute for external backups. |
+| Query and command objects | Versioned server registrations own typed arguments, permission, tenant/data scope, logical AST construction, cost, timeout, result projection and command idempotency. Authenticated Admin routes and generated OpenAPI/TypeScript contracts use only IDs, versions and typed logical inputs. | Runtime composition is conditional and the stock API process does not register the reference definitions. Workload identity, datasource routing and federated query remain separate nodes. |
 | Databases | GORM openers are wired for MySQL, PostgreSQL and SQLite. Admin resources, sessions and lifecycle history can use separate DSNs. | This is subsystem separation, not named business datasources or tenant/capability routing. The three wired drivers do not yet have a full-platform certification matrix; `PLATFORM_DATABASE_DRIVER` and `PLATFORM_DATABASE_DSN` are not wired into process composition. Oracle and KingbaseES are not implemented or certified. |
 | Messaging and search | Redis Pub/Sub distributes cache invalidation and triggers resource/session reload paths. Notification and job profiles provide resource contracts only. | This is best-effort cache coherence, not a durable message bus. There is no transactional outbox, worker engine, Kafka/RabbitMQ/NATS adapter, Elasticsearch/OpenSearch adapter or replay/DLQ runtime. |
 
@@ -117,7 +118,7 @@ The remaining work is feasible within the Gin/GORM/capability-manifest architect
 The unique approved decomposition and all dependency, lock and completion-gate decisions live in the [remaining-task topology adjustment](superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md). The governing sequence is:
 
 ```text
-[persisted-query-command-object-runtime || integration-ports-disabled-default]
+[implemented: persisted-query-command-object-runtime + integration-ports-disabled-default]
   -> [organization-rbac-menu governance lane || datasource registry and routing lane]
   -> database-certification-matrix
   -> transactional-outbox-and-one-mq-adapter
@@ -125,7 +126,7 @@ The unique approved decomposition and all dependency, lock and completion-gate d
   -> open-source-docs-and-release
 ```
 
-`integration-ports-disabled-default` may run in parallel with the Query/Command runtime after the Service Contract standard. The organization UI lane may later run in parallel with the datasource backend lane when their contract and file locks do not overlap.
+The Query/Command runtime and disabled integration ports completed their approved parallel batch. The organization UI lane may later run in parallel with the datasource backend lane when their contract and file locks do not overlap.
 
 Stable and future stage gates:
 
@@ -134,17 +135,17 @@ Stable and future stage gates:
 3. Keep the implemented `mask-strategy-runtime` contract stable: arbitrary sensitive fields remain manifest-driven; response, query, detail, Tooltip and export consume the same backend-owned projection; duplicate projection and plaintext fallback remain forbidden.
 4. Keep the implemented `sensitive-data-reveal-step-up` contract stable: OIDC re-authentication and SMS OTP use short-lived single-use grants, rate limits, response-terminal audit and registered adapters. SMS delivery failures atomically cancel the factor transaction so the same challenge can retry; production startup fails when an SMS factor lacks a verified phone source or registered non-debug sender.
 5. Keep `data-lifecycle-retention` stable: final purge remains maintenance-only, apply requires completed dry-run plus exact promotion evidence, and the runner remains disabled by default and single-datasource.
-6. Keep the implemented executable Platform Service Contract stable, and establish the persisted Query/Command Object runtime before organization authorization or SaaS routing consumes it. Workload identity protocols, event delivery and datasource routing remain outside the closed service-contract node.
+6. Keep the implemented executable Platform Service Contract and persisted Query/Command Object runtime stable. Organization authorization may now consume registered high-risk queries, while workload identity protocols, event delivery, datasource routing, federation and XA remain outside these closed nodes.
 7. Keep `multi-datasource-contract-and-runtime` narrow: versioned Datasource/DatasourceGroup configuration, capability binding, health and transaction pinning. Tenant placement, read/write routing, sharding, federation and XA have independent completion gates.
 8. Certify MySQL, PostgreSQL, SQLite, KingbaseES and Oracle by driver, version and feature. Unverified routing, sharding, federation or XA combinations remain experimental or unsupported.
 9. Add disabled/no-op messaging and search ports early, then transactional Outbox, one MQ adapter and asynchronous search projection after the required transaction and event contracts are stable.
 10. Synchronize the open-source manuals, operator runbook, compatibility matrix and public docs site before GitHub publication. Experimental adapters must remain clearly labeled.
 
-The sensitive-data predecessors, `data-lifecycle-retention` and `platform-service-contract-standard` are implemented in the completion program. All 21 remaining nodes are activated as controlled unfinished work, but none may silently reuse existing closeouts or be described as runtime capability. In particular, federation remains a controlled read-only query boundary and XA remains an optional default-off adapter until their independent implementation and certification gates pass. The task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation must remain synchronized as each node advances. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
+The sensitive-data predecessors, `data-lifecycle-retention`, `platform-service-contract-standard`, `persisted-query-command-object-runtime` and `integration-ports-disabled-default` are implemented in the completion program. All 19 remaining nodes are activated as controlled unfinished work, but none may silently reuse existing closeouts or be described as runtime capability. In particular, federation remains a controlled read-only query boundary and XA remains an optional default-off adapter until their independent implementation and certification gates pass. The task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation must remain synchronized as each node advances. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
 
 ## Release Recommendation
 
-Before a public v0.1 release, retain the historical-migration and lifecycle runbooks and external promotion evidence boundary, publish honest deletion semantics, and avoid claiming database or integration support without a passing matrix. Configurable encryption, offline historical migration, manifest-driven masking, controlled reveal, lifecycle retention and the executable service-contract standard are implemented. Persisted Query/Command execution, named datasources, disabled integration ports, tenant routing, read/write routing, sharding, federation, optional XA, database certification, Outbox/MQ and search projection remain unimplemented until their own gates pass. Vendor-specific Oracle, KingbaseES, MQ and search adapters may ship in staged releases only when their experimental status and verification limits are explicit.
+Before a public v0.1 release, retain the historical-migration and lifecycle runbooks and external promotion evidence boundary, publish honest deletion semantics, and avoid claiming database or integration support without a passing matrix. Configurable encryption, offline historical migration, manifest-driven masking, controlled reveal, lifecycle retention, the executable service-contract standard, persisted Query/Command execution and disabled integration ports are implemented. Named datasources, tenant routing, read/write routing, sharding, federation, optional XA, database certification, Outbox/MQ and search projection remain unimplemented until their own gates pass. Vendor-specific Oracle, KingbaseES, MQ and search adapters may ship in staged releases only when their experimental status and verification limits are explicit.
 
 ## Source Evidence
 

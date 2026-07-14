@@ -37,7 +37,6 @@ const completionProgramCapabilityIDs = [
 ];
 
 const partialCapabilityDependencies = {
-  "persisted-query-command-object-runtime": ["platform-service-contract-standard"],
   "organization-rbac-menu-contract-and-migration-design": ["persisted-query-command-object-runtime"],
   "organization-role-pool-backend-and-migration": ["organization-rbac-menu-contract-and-migration-design"],
   "organization-user-admin-experience": ["organization-role-pool-backend-and-migration"],
@@ -148,6 +147,7 @@ describe("validate-platform-engineering-capabilities", () => {
       "sensitive-data-reveal-step-up",
       "data-lifecycle-retention",
       "platform-service-contract-standard",
+      "persisted-query-command-object-runtime",
       "integration-ports-disabled-default",
     ]);
     for (const capability of capabilities.filter((item) => implementedCapabilityIDs.has(item.id))) {
@@ -195,6 +195,11 @@ describe("validate-platform-engineering-capabilities", () => {
     assert.ok(serviceContract.evidence.sourcePaths.includes("resources/platform-service-contract-standard.json"));
     assert.ok(serviceContract.evidence.generatedFiles.includes("resources/generated/asyncapi.events.json"));
     assert.ok(serviceContract.evidence.tests.includes("scripts/platform-service-contract-standard.test.mjs"));
+    const serviceObjects = capabilities.find((item) => item.id === "persisted-query-command-object-runtime");
+    assert.equal(serviceObjects.status, "implemented");
+    assert.deepEqual(serviceObjects.dependsOn, ["platform-service-contract-standard", "admin-api-boundary-query-security"]);
+    assert.ok(serviceObjects.evidence.sourcePaths.includes("resources/platform-service-object-runtime.json"));
+    assert.ok(serviceObjects.evidence.tests.includes("scripts/platform-service-object-runtime.test.mjs"));
     const integrationPorts = capabilities.find((item) => item.id === "integration-ports-disabled-default");
     assert.equal(integrationPorts.status, "implemented");
     assert.ok(integrationPorts.evidence.sourcePaths.includes("resources/platform-integration-ports.json"));
@@ -209,6 +214,16 @@ describe("validate-platform-engineering-capabilities", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /required implemented capability integration-ports-disabled-default must stay implemented/);
+  });
+
+  it("rejects regressing persisted query runtime after closeout", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities.find((item) => item.id === "persisted-query-command-object-runtime").status = "partial";
+
+    const result = runValidator(["--matrix", tempJSON("partial-persisted-query-runtime.json", matrix)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /required implemented capability persisted-query-command-object-runtime must stay implemented/);
   });
 
   it("rejects regressing the platform service contract after closeout", () => {

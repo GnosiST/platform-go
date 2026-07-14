@@ -1,0 +1,220 @@
+package serviceobject
+
+import (
+	"fmt"
+	"regexp"
+	"slices"
+	"strings"
+	"time"
+)
+
+var (
+	objectIDPattern    = regexp.MustCompile(`^[a-z][a-z0-9.-]*$`)
+	versionPattern     = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
+	resourcePattern    = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+	logicalNamePattern = regexp.MustCompile(`^[a-z][A-Za-z0-9]*$`)
+)
+
+const maximumQueryOffset = 10000
+
+var forbiddenClientNames = []string{"dsn", "datasource", "database", "schema", "shard", "field", "operator", "sql", "join"}
+var forbiddenPhysicalPrefixes = []string{"dsn", "datasource", "database", "schema", "shard", "field", "operator", "sql", "join"}
+
+type Registry struct {
+	queries  map[string]QueryDefinition
+	commands map[string]CommandDefinition
+}
+
+func NewRegistry(queries []QueryDefinition, commands []CommandDefinition) (*Registry, error) {
+	registry := &Registry{
+		queries:  make(map[string]QueryDefinition, len(queries)),
+		commands: make(map[string]CommandDefinition, len(commands)),
+	}
+	for _, definition := range queries {
+		if err := validateQueryDefinition(definition); err != nil {
+			return nil, err
+		}
+		key := definitionKey(definition.ID, definition.Version)
+		if _, exists := registry.queries[key]; exists {
+			return nil, fmt.Errorf("%w: query %s@%s", ErrDefinitionConflict, definition.ID, definition.Version)
+		}
+		registry.queries[key] = cloneQueryDefinition(definition)
+	}
+	for _, definition := range commands {
+		if err := validateCommandDefinition(definition); err != nil {
+			return nil, err
+		}
+		key := definitionKey(definition.ID, definition.Version)
+		if _, exists := registry.commands[key]; exists {
+			return nil, fmt.Errorf("%w: command %s@%s", ErrDefinitionConflict, definition.ID, definition.Version)
+		}
+		registry.commands[key] = cloneCommandDefinition(definition)
+	}
+	return registry, nil
+}
+
+func (r *Registry) query(id string, version string) (QueryDefinition, bool) {
+	if r == nil {
+		return QueryDefinition{}, false
+	}
+	definition, ok := r.queries[definitionKey(id, version)]
+	return cloneQueryDefinition(definition), ok
+}
+
+func (r *Registry) command(id string, version string) (CommandDefinition, bool) {
+	if r == nil {
+		return CommandDefinition{}, false
+	}
+	definition, ok := r.commands[definitionKey(id, version)]
+	return cloneCommandDefinition(definition), ok
+}
+
+func definitionKey(id string, version string) string {
+	return strings.TrimSpace(id) + "@" + strings.TrimSpace(version)
+}
+
+func validateQueryDefinition(definition QueryDefinition) error {
+	if err := validateDefinitionBase(definition.ID, definition.Version, definition.Resource, definition.Permission, definition.Action, definition.TenantMode, definition.DataScope, definition.Arguments, definition.Cost, definition.Timeout, definition.ResultSchema); err != nil {
+		return fmt.Errorf("%w: query %s: %v", ErrDefinitionInvalid, definition.ID, err)
+	}
+	if definition.Build == nil {
+		return fmt.Errorf("%w: query %s: builder is required", ErrDefinitionInvalid, definition.ID)
+	}
+	if definition.MaxPageSize < 1 || definition.MaxPageSize > 1000 {
+		return fmt.Errorf("%w: query %s: max page size must be between 1 and 1000", ErrDefinitionInvalid, definition.ID)
+	}
+	if definition.Cost.MaxOffset < 0 || definition.Cost.MaxOffset > maximumQueryOffset {
+		return fmt.Errorf("%w: query %s: max offset must be between 0 and %d", ErrDefinitionInvalid, definition.ID, maximumQueryOffset)
+	}
+	if definition.Cost.PerRowCost < 1 || definition.Cost.PredicateCost < 1 || definition.Cost.MaxOffset > 0 && definition.Cost.PerOffsetCost < 1 || len(definition.AllowedSort) > 0 && definition.Cost.SortCost < 1 || definition.ExposeTotal && definition.Cost.TotalCost < 1 {
+		return fmt.Errorf("%w: query %s: enabled query work must have a positive cost", ErrDefinitionInvalid, definition.ID)
+	}
+	seen := map[string]struct{}{}
+	for _, sorter := range definition.AllowedSort {
+		if !logicalNamePattern.MatchString(sorter.Name) || forbiddenName(sorter.Name) || !logicalNamePattern.MatchString(sorter.Field) {
+			return fmt.Errorf("%w: query %s: sort declaration is invalid", ErrDefinitionInvalid, definition.ID)
+		}
+		if _, exists := seen[sorter.Name]; exists {
+			return fmt.Errorf("%w: query %s: sort %s is duplicated", ErrDefinitionInvalid, definition.ID, sorter.Name)
+		}
+		seen[sorter.Name] = struct{}{}
+	}
+	return nil
+}
+
+func validateCommandDefinition(definition CommandDefinition) error {
+	if err := validateDefinitionBase(definition.ID, definition.Version, definition.Resource, definition.Permission, definition.Action, definition.TenantMode, definition.DataScope, definition.Arguments, definition.Cost, definition.Timeout, definition.ResultSchema); err != nil {
+		return fmt.Errorf("%w: command %s: %v", ErrDefinitionInvalid, definition.ID, err)
+	}
+	if definition.Build == nil {
+		return fmt.Errorf("%w: command %s: builder is required", ErrDefinitionInvalid, definition.ID)
+	}
+	if !slices.Contains([]IdempotencyMode{IdempotencyNone, IdempotencyRequiredKey}, definition.Idempotency) {
+		return fmt.Errorf("%w: command %s: idempotency mode is invalid", ErrDefinitionInvalid, definition.ID)
+	}
+	if definition.MaxAffectedRows < 1 || definition.MaxAffectedRows > 1000 {
+		return fmt.Errorf("%w: command %s: max affected rows must be between 1 and 1000", ErrDefinitionInvalid, definition.ID)
+	}
+	if definition.Cost.PerRowCost < 1 || definition.Cost.PredicateCost < 1 {
+		return fmt.Errorf("%w: command %s: row and predicate costs must be positive", ErrDefinitionInvalid, definition.ID)
+	}
+	return nil
+}
+
+func validateDefinitionBase(id string, version string, resource string, permission string, action string, tenantMode TenantMode, dataScope string, arguments []ArgumentDefinition, cost CostPolicy, timeout time.Duration, result []ResultField) error {
+	if !objectIDPattern.MatchString(id) || strings.TrimSpace(id) != id {
+		return fmt.Errorf("id must be a stable lowercase identifier")
+	}
+	if !versionPattern.MatchString(version) {
+		return fmt.Errorf("version must use numeric semver")
+	}
+	if !resourcePattern.MatchString(resource) {
+		return fmt.Errorf("resource must be a logical identifier")
+	}
+	if strings.TrimSpace(permission) == "" || strings.TrimSpace(action) == "" {
+		return fmt.Errorf("permission and action are required")
+	}
+	if tenantMode != TenantRequired && tenantMode != TenantPlatform {
+		return fmt.Errorf("tenant mode is invalid")
+	}
+	if dataScope != "tenant" && dataScope != "platform" {
+		return fmt.Errorf("data scope is invalid")
+	}
+	if tenantMode == TenantRequired && dataScope != "tenant" || tenantMode == TenantPlatform && dataScope != "platform" {
+		return fmt.Errorf("tenant mode and data scope do not agree")
+	}
+	if cost.BaseCost < 0 || cost.PerRowCost < 0 || cost.PerOffsetCost < 0 || cost.PredicateCost < 0 || cost.SortCost < 0 || cost.TotalCost < 0 || cost.Limit < 1 || cost.BaseCost > cost.Limit {
+		return fmt.Errorf("cost policy is invalid")
+	}
+	if timeout <= 0 || timeout > time.Minute {
+		return fmt.Errorf("timeout must be between zero and one minute")
+	}
+	seen := map[string]struct{}{}
+	for _, argument := range arguments {
+		if !logicalNamePattern.MatchString(argument.Name) || forbiddenName(argument.Name) {
+			return fmt.Errorf("argument %q is invalid or reserved", argument.Name)
+		}
+		if _, exists := seen[argument.Name]; exists {
+			return fmt.Errorf("argument %q is duplicated", argument.Name)
+		}
+		seen[argument.Name] = struct{}{}
+		if !slices.Contains([]ValueType{ValueString, ValueInteger, ValueBoolean}, argument.Type) {
+			return fmt.Errorf("argument %q type is invalid", argument.Name)
+		}
+		if argument.Type == ValueString && argument.MaxLength <= 0 {
+			return fmt.Errorf("string argument %q requires max length", argument.Name)
+		}
+	}
+	seen = map[string]struct{}{}
+	for _, field := range result {
+		if !logicalNamePattern.MatchString(field.Name) || forbiddenName(field.Name) {
+			return fmt.Errorf("result field %q is invalid or reserved", field.Name)
+		}
+		if _, exists := seen[field.Name]; exists {
+			return fmt.Errorf("result field %q is duplicated", field.Name)
+		}
+		seen[field.Name] = struct{}{}
+		if !slices.Contains([]ValueType{ValueString, ValueInteger, ValueBoolean}, field.Type) {
+			return fmt.Errorf("result field %q type is invalid", field.Name)
+		}
+	}
+	return nil
+}
+
+func forbiddenName(name string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(name))
+	if slices.Contains(forbiddenClientNames, normalized) {
+		return true
+	}
+	return slices.ContainsFunc(forbiddenPhysicalPrefixes, func(prefix string) bool {
+		return strings.HasPrefix(normalized, prefix)
+	})
+}
+
+func cloneQueryDefinition(definition QueryDefinition) QueryDefinition {
+	definition.Arguments = append([]ArgumentDefinition(nil), definition.Arguments...)
+	cloneArgumentBoundaries(definition.Arguments)
+	definition.AllowedSort = append([]SortDefinition(nil), definition.AllowedSort...)
+	definition.ResultSchema = append([]ResultField(nil), definition.ResultSchema...)
+	return definition
+}
+
+func cloneCommandDefinition(definition CommandDefinition) CommandDefinition {
+	definition.Arguments = append([]ArgumentDefinition(nil), definition.Arguments...)
+	cloneArgumentBoundaries(definition.Arguments)
+	definition.ResultSchema = append([]ResultField(nil), definition.ResultSchema...)
+	return definition
+}
+
+func cloneArgumentBoundaries(arguments []ArgumentDefinition) {
+	for index := range arguments {
+		if arguments[index].Minimum != nil {
+			minimum := *arguments[index].Minimum
+			arguments[index].Minimum = &minimum
+		}
+		if arguments[index].Maximum != nil {
+			maximum := *arguments[index].Maximum
+			arguments[index].Maximum = &maximum
+		}
+	}
+}

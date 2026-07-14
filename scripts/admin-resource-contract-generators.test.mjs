@@ -4,6 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { describe, it } from "node:test";
+import {
+  adminServiceObjectDefinitions,
+  forbiddenServiceObjectClientInputs,
+  isForbiddenServiceObjectClientInput,
+} from "./admin-service-object-definitions.mjs";
 
 function runAdminResourceContract(env = {}, args = []) {
   const result = spawnSync(process.execPath, ["scripts/generate-admin-resource-contract.mjs", "--stdout", ...args], {
@@ -25,6 +30,63 @@ function runAdminCodegenPreviewForContract(contract) {
   });
   assert.equal(result.status, 0, `generate-admin-codegen-preview.mjs failed\n${result.stdout}${result.stderr}`);
   return JSON.parse(result.stdout);
+}
+
+function runAdminServiceObjectClientForContract(contract) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-admin-contract-"));
+  const contractPath = path.join(tempDir, "admin-resource-contract.json");
+  fs.writeFileSync(contractPath, JSON.stringify(contract, null, 2));
+  const result = spawnSync(
+    process.execPath,
+    ["scripts/generate-admin-codegen-preview.mjs", "--typescript-stdout", "--contract", contractPath],
+    {
+      cwd: new URL("..", import.meta.url),
+      encoding: "utf8",
+    },
+  );
+  assert.equal(result.status, 0, `generate-admin-codegen-preview.mjs failed\n${result.stdout}${result.stderr}`);
+  return result.stdout;
+}
+
+function compileAdminServiceObjectClient(source) {
+  const repoRoot = path.resolve(import.meta.dirname, "..");
+  const tsc = path.join(repoRoot, "admin", "node_modules", ".bin", "tsc");
+  assert.ok(fs.existsSync(tsc), "admin TypeScript compiler must be installed");
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-admin-service-object-client-"));
+  fs.writeFileSync(path.join(tempDir, "client.ts"), source);
+  fs.writeFileSync(
+    path.join(tempDir, "consumer.ts"),
+    `import type { AdminServiceObjectClient } from "./client";
+
+declare const client: AdminServiceObjectClient;
+
+client.listReferenceRecords({
+  arguments: { status: "active", codePrefix: "REF-" },
+  pagination: { page: 1, pageSize: 25 },
+  sort: [{ name: "code", order: "asc" }],
+}).then((response) => response.data?.items[0]?.code);
+
+client.renameReferenceRecord({
+  arguments: { code: "REF-1", name: "Renamed" },
+  idempotencyKey: "rename-ref-1",
+}).then((response) => response.data?.values.affected);
+
+// @ts-expect-error physical fields are not part of persisted query input
+client.listReferenceRecords({ field: "status" });
+// @ts-expect-error operators are compiled by the server-side definition
+client.listReferenceRecords({ arguments: { operator: "equal" } });
+// @ts-expect-error arbitrary datasource selection is forbidden
+client.listReferenceRecords({ arguments: { datasource: "primary" } });
+// @ts-expect-error idempotency keys are required by this command definition
+client.renameReferenceRecord({ arguments: { code: "REF-1", name: "Renamed" } });
+`,
+  );
+  const result = spawnSync(
+    tsc,
+    ["--noEmit", "--strict", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "node", "client.ts", "consumer.ts"],
+    { cwd: tempDir, encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, `generated Admin service object client did not compile\n${result.stdout}${result.stderr}`);
 }
 
 function writeSensitiveManifest() {
@@ -110,6 +172,105 @@ function validateAdminResourceContract(contract) {
 }
 
 describe("admin resource contract generators", () => {
+  it("rejects physical routing input name variants", () => {
+    for (const name of [
+      "datasource",
+      "datasourceId",
+      "shardKey",
+      "schemaVersion",
+      "fieldName",
+      "operatorType",
+      "sqlExpression",
+      "joinTarget",
+    ]) {
+      assert.equal(isForbiddenServiceObjectClientInput(name), true, `${name} must remain server-controlled`);
+    }
+    assert.equal(isForbiddenServiceObjectClientInput("status"), false);
+  });
+
+  it("publishes separate persisted query and command object transports", () => {
+    const contract = runAdminResourceContract();
+    const openapi = runAdminOpenAPIForContract(contract);
+    const query = openapi.paths["/api/admin/service-objects/query"].post;
+    const command = openapi.paths["/api/admin/service-objects/command"].post;
+
+    assert.equal(query.operationId, "executeAdminPersistedQuery");
+    assert.equal(command.operationId, "executeAdminCommandObject");
+    assert.deepEqual(query.security, [{ bearerAuth: [] }]);
+    assert.deepEqual(command.security, [{ bearerAuth: [] }]);
+    assert.equal(query["x-platform-runtime"], "conditional");
+    assert.equal(command["x-platform-runtime"], "conditional");
+    assert.ok(query.responses["404"]["x-platform-error-codes"].includes("SERVICE_OBJECT_UNAVAILABLE"));
+    assert.ok(command.responses["404"]["x-platform-error-codes"].includes("SERVICE_OBJECT_UNAVAILABLE"));
+
+    const queryDefinition = adminServiceObjectDefinitions.queries[0];
+    const commandDefinition = adminServiceObjectDefinitions.commands[0];
+    const queryUnion = openapi.components.schemas.AdminServiceObjectQueryRequest;
+    const commandUnion = openapi.components.schemas.AdminServiceObjectCommandRequest;
+    assert.equal(queryUnion.oneOf.length, adminServiceObjectDefinitions.queries.length);
+    assert.equal(commandUnion.oneOf.length, adminServiceObjectDefinitions.commands.length);
+    assert.equal(queryUnion.discriminator.propertyName, "queryId");
+    assert.equal(commandUnion.discriminator.propertyName, "commandId");
+    assert.deepEqual(queryUnion["x-platform-discriminator"].properties, ["queryId", "version"]);
+    assert.deepEqual(commandUnion["x-platform-discriminator"].properties, ["commandId", "version"]);
+
+    const queryRequestName = queryUnion.oneOf[0].$ref.split("/").pop();
+    const commandRequestName = commandUnion.oneOf[0].$ref.split("/").pop();
+    const queryRequest = openapi.components.schemas[queryRequestName];
+    const commandRequest = openapi.components.schemas[commandRequestName];
+    assert.equal(queryRequest.additionalProperties, false);
+    assert.equal(commandRequest.additionalProperties, false);
+    assert.equal(queryRequest.properties.queryId.const, queryDefinition.id);
+    assert.equal(queryRequest.properties.version.const, queryDefinition.version);
+    assert.equal(commandRequest.properties.commandId.const, commandDefinition.id);
+    assert.equal(commandRequest.properties.version.const, commandDefinition.version);
+    assert.ok(commandRequest.required.includes("idempotencyKey"));
+    assert.deepEqual(queryRequest["x-platform-definition"].cost, queryDefinition.cost);
+    assert.equal(commandRequest["x-platform-definition"].maxAffectedRows, commandDefinition.maxAffectedRows);
+
+    const queryArguments = openapi.components.schemas[queryRequest.properties.arguments.$ref.split("/").pop()];
+    const commandArguments = openapi.components.schemas[commandRequest.properties.arguments.$ref.split("/").pop()];
+    assert.equal(queryArguments.additionalProperties, false);
+    assert.equal(commandArguments.additionalProperties, false);
+    assert.deepEqual(Object.keys(queryArguments.properties), queryDefinition.arguments.map((argument) => argument.name));
+    assert.deepEqual(Object.keys(commandArguments.properties), commandDefinition.arguments.map((argument) => argument.name));
+    for (const forbidden of forbiddenServiceObjectClientInputs) {
+      assert.equal(queryArguments.properties[forbidden], undefined);
+      assert.equal(commandArguments.properties[forbidden], undefined);
+    }
+
+    const queryDataRef = openapi.components.schemas.AdminServiceObjectQueryData.oneOf[0].$ref;
+    const queryData = openapi.components.schemas[queryDataRef.split("/").pop()];
+    const item = openapi.components.schemas[queryData.properties.items.items.$ref.split("/").pop()];
+    assert.equal(item.additionalProperties, false);
+    assert.deepEqual(Object.keys(item.properties), queryDefinition.result.map((field) => field.name));
+    assert.equal(queryData.properties.total, undefined, "total must follow the definition exposeTotal policy");
+  });
+
+  it("generates a consumable strongly typed Admin service object client from the same definitions", () => {
+    const contract = runAdminResourceContract();
+    const preview = runAdminCodegenPreviewForContract(contract);
+    const source = runAdminServiceObjectClientForContract(contract);
+
+    assert.equal(preview.serviceObjects.definitionSource, adminServiceObjectDefinitions.source);
+    assert.equal(preview.serviceObjects.runtimeDefinitionSource, adminServiceObjectDefinitions.runtimeSource);
+    assert.equal(preview.serviceObjects.runtime, "conditional");
+    assert.equal(preview.serviceObjects.unavailableError, "SERVICE_OBJECT_UNAVAILABLE");
+    assert.equal(preview.serviceObjects.typescriptClient, "resources/generated/admin-service-object-client.ts");
+    assert.deepEqual(
+      preview.serviceObjects.operations.map(({ kind, id, version, clientMethod }) => ({ kind, id, version, clientMethod })),
+      [
+        ...adminServiceObjectDefinitions.queries.map(({ id, version, clientMethod }) => ({ kind: "query", id, version, clientMethod })),
+        ...adminServiceObjectDefinitions.commands.map(({ id, version, clientMethod }) => ({ kind: "command", id, version, clientMethod })),
+      ],
+    );
+    assert.match(source, /class AdminServiceObjectClient/);
+    assert.match(source, /queryId: "platform\.reference-records\.list"/);
+    assert.match(source, /commandId: "platform\.reference-records\.rename"/);
+    assert.doesNotMatch(source, /\[key: string\]/);
+    compileAdminServiceObjectClient(source);
+  });
+
   it("projects lifecycle routes without exposing maintenance purge over HTTP", () => {
     const contract = runAdminResourceContract();
     const openapi = runAdminOpenAPIForContract(contract);

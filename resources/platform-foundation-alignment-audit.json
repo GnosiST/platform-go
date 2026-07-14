@@ -70,10 +70,10 @@
     "sensitive-data-reveal-step-up",
     "data-lifecycle-retention",
     "platform-service-contract-standard",
+    "persisted-query-command-object-runtime",
     "integration-ports-disabled-default"
   ],
   "requiredFutureTaskNodes": [
-    "persisted-query-command-object-runtime",
     "organization-rbac-menu-contract-and-migration-design",
     "organization-role-pool-backend-and-migration",
     "organization-user-admin-experience",
@@ -437,6 +437,7 @@
     "scripts/validate-platform-data-lifecycle-retention.mjs",
     "scripts/validate-platform-sensitive-data-migration.mjs",
     "scripts/validate-platform-service-contract-standard.mjs",
+    "scripts/validate-platform-service-object-runtime.mjs",
     "scripts/validate-platform-integration-ports.mjs",
     "scripts/validate-platform-promotion-evidence-templates.mjs",
     "scripts/validate-admin-i18n.mjs",
@@ -454,6 +455,7 @@
     "docs/admin-resource-schema.md",
     "docs/platform-data-lifecycle-retention.md",
     "docs/platform-sensitive-data-migration.md",
+    "docs/platform-service-objects.md",
     "docs/platform-integration-ports.md",
     "docs/platform-ui-optimization-assessment.md",
     "docs/admin-ui-foundation.md",

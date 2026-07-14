@@ -28,9 +28,11 @@ import (
 	"platform-go/internal/platform/cache"
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/dataprotection"
+	"platform-go/internal/platform/kernel"
 	"platform-go/internal/platform/ratelimit"
 	"platform-go/internal/platform/rbac"
 	"platform-go/internal/platform/sensitivereveal"
+	"platform-go/internal/platform/serviceobject"
 	"platform-go/internal/platform/session"
 	"platform-go/internal/platform/storage"
 )
@@ -57,6 +59,7 @@ type ServerOptions struct {
 	PhoneVerificationSender  PhoneVerificationSender
 	AdminStepUpPhoneResolver AdminStepUpPhoneResolver
 	SensitiveReveal          *sensitivereveal.Runtime
+	ServiceObjects           *serviceobject.Runtime
 	DebugCodeEnabled         bool
 	SessionTTL               time.Duration
 	JWTSecret                string
@@ -119,6 +122,7 @@ type Server struct {
 	phoneVerificationSender  PhoneVerificationSender
 	adminStepUpPhoneResolver AdminStepUpPhoneResolver
 	sensitiveReveal          *sensitivereveal.Runtime
+	serviceObjects           *serviceobject.Runtime
 	debugCodeEnabled         bool
 	tokens                   *authjwt.Service
 	now                      func() time.Time
@@ -250,6 +254,9 @@ func New(options ServerOptions) *Server {
 		rateLimiter:              rateLimiter,
 		rateLimitKeyBuilder:      rateLimitKeyBuilder,
 	}
+	if options.ServiceObjects != nil {
+		server.serviceObjects = options.ServiceObjects.WithAuthorizer(adminServiceObjectAuthorizer{server: server})
+	}
 	server.appRoutes = server.defaultAppRouteHandlers(options.AppRoutes)
 	server.subscribeInvalidations()
 	server.routes(options.AdminRoutes)
@@ -287,6 +294,8 @@ func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 	api.POST("/admin/policy-reviews/:id/reject", s.adminPolicyReviewReject)
 	api.POST("/admin/files/upload", s.adminFileUpload)
 	api.GET("/admin/files/:id/content", s.adminFileContent)
+	api.POST("/admin/service-objects/query", s.adminServiceObjectQuery)
+	api.POST("/admin/service-objects/command", s.adminServiceObjectCommand)
 	adminResources := api.Group("/admin/resources")
 	adminResources.GET("/:resource/schema", s.adminResourceSchema)
 	adminResources.POST("/:resource/query", s.adminResourceQuery)
@@ -410,6 +419,102 @@ type adminResourceRecordResponse struct {
 	Resource string               `json:"resource"`
 	Record   adminresource.Record `json:"record"`
 	Token    string               `json:"token,omitempty"`
+}
+
+type adminServiceObjectAuthorizer struct {
+	server *Server
+}
+
+func (a adminServiceObjectAuthorizer) Can(_ context.Context, execution kernel.ExecutionContext, permission string, action string) bool {
+	if a.server == nil || strings.TrimSpace(execution.Actor.Username) == "" {
+		return false
+	}
+	authorizer, ok := a.server.policyAuthorizerForRequest()
+	return ok && authorizer.Can(execution.Actor.Username, platformTenant, permission, action)
+}
+
+func (s *Server) adminServiceObjectQuery(ctx *gin.Context) {
+	invocation, ok := s.adminServiceObjectInvocation(ctx)
+	if !ok {
+		return
+	}
+	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminServiceObjectQuery, rateLimitClientIP(ctx), invocation.Execution.Actor.Username) {
+		return
+	}
+	if s.serviceObjects == nil {
+		writeServiceObjectError(ctx, serviceobject.ErrObjectUnavailable)
+		return
+	}
+	request, err := serviceobject.DecodeQueryRequest(ctx.Request.Body)
+	if err != nil {
+		writeServiceObjectError(ctx, err)
+		return
+	}
+	result, err := s.serviceObjects.ExecuteQuery(invocation, request)
+	if err != nil {
+		writeServiceObjectError(ctx, err)
+		return
+	}
+	ctx.JSON(http.StatusOK, Response[serviceobject.QueryResult]{Data: result})
+}
+
+func (s *Server) adminServiceObjectCommand(ctx *gin.Context) {
+	invocation, ok := s.adminServiceObjectInvocation(ctx)
+	if !ok {
+		return
+	}
+	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminServiceObjectCommand, rateLimitClientIP(ctx), invocation.Execution.Actor.Username) {
+		return
+	}
+	if s.serviceObjects == nil {
+		writeServiceObjectError(ctx, serviceobject.ErrObjectUnavailable)
+		return
+	}
+	request, err := serviceobject.DecodeCommandRequest(ctx.Request.Body)
+	if err != nil {
+		writeServiceObjectError(ctx, err)
+		return
+	}
+	result, err := s.serviceObjects.ExecuteCommand(invocation, request)
+	if err != nil {
+		writeServiceObjectError(ctx, err)
+		return
+	}
+	ctx.JSON(http.StatusOK, Response[serviceobject.CommandResult]{Data: result})
+}
+
+func (s *Server) adminServiceObjectInvocation(ctx *gin.Context) (serviceobject.Invocation, bool) {
+	if !s.refreshAdminResourceState(ctx, "ADMIN_AUTH_STATE_REFRESH_FAILED", "authorization state is unavailable") {
+		return serviceobject.Invocation{}, false
+	}
+	principal, ok := s.currentPrincipal(ctx)
+	if !ok {
+		writeUnauthorized(ctx)
+		return serviceobject.Invocation{}, false
+	}
+	tenantID := strings.TrimSpace(principal.User.TenantCode)
+	platformWide := tenantID == "" || tenantID == platformTenant
+	tenantScope := kernel.TenantScope{PlatformWide: platformWide}
+	if !platformWide {
+		tenantScope.TenantID = 1
+	} else {
+		tenantID = ""
+	}
+	principalScope := s.resources.DataScopeForPrincipal(principal)
+	return serviceobject.Invocation{
+		Execution: kernel.ExecutionContext{
+			Context:          ctx.Request.Context(),
+			Actor:            kernel.Actor{Username: principal.User.Username, Kind: kernel.ActorKindUser},
+			TenantScope:      tenantScope,
+			PermissionIntent: kernel.PermissionIntent{Code: "service-object", Action: "execute"},
+		},
+		TenantID: tenantID,
+		Scope: serviceobject.ScopeConstraint{
+			All: principalScope.All, Self: principalScope.Self,
+			OrgCodes: principalScope.OrgCodes, AreaCodes: principalScope.AreaCodes,
+			ActorIdentifiers: principalScope.ActorIdentifiers,
+		},
+	}, true
 }
 
 type policyReviewApproveResponse struct {
@@ -2470,6 +2575,21 @@ func writeAuthError(ctx *gin.Context, status int, code string, message string) {
 	ctx.JSON(status, Response[gin.H]{
 		Error: &ErrorBody{Code: code, Message: message},
 	})
+}
+
+func writeServiceObjectError(ctx *gin.Context, err error) {
+	switch {
+	case errors.Is(err, serviceobject.ErrObjectUnavailable):
+		writeAuthError(ctx, http.StatusNotFound, "SERVICE_OBJECT_UNAVAILABLE", "service object is unavailable")
+	case errors.Is(err, serviceobject.ErrRequestInvalid):
+		writeAuthError(ctx, http.StatusBadRequest, "SERVICE_OBJECT_REQUEST_INVALID", "service object request is invalid")
+	case errors.Is(err, serviceobject.ErrCostLimitExceeded):
+		writeAuthError(ctx, http.StatusUnprocessableEntity, "SERVICE_OBJECT_COST_LIMIT", "service object cost limit exceeded")
+	case errors.Is(err, serviceobject.ErrIdempotencyConflict):
+		writeAuthError(ctx, http.StatusConflict, "SERVICE_OBJECT_IDEMPOTENCY_CONFLICT", "service object idempotency conflict")
+	default:
+		writeAuthError(ctx, http.StatusInternalServerError, "SERVICE_OBJECT_EXECUTION_FAILED", "service object execution failed")
+	}
 }
 
 func bearerToken(header string) (string, bool) {

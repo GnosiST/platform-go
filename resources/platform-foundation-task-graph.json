@@ -2507,15 +2507,7 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
-      "statusReason": {
-        "zh": "高风险查询仍缺少服务端 QueryDefinition/CommandDefinition 注册表和数据库原生执行器。",
-        "en": "High-risk queries still lack server-side QueryDefinition/CommandDefinition registries and a database-native executor."
-      },
-      "completionGate": {
-        "zh": "完成版本化定义、类型参数、权限与租户范围、成本/超时、参数化执行及越权、篡改、枚举和昂贵查询测试。",
-        "en": "Complete versioned definitions, typed arguments, permission and tenant scopes, cost/timeouts, parameterized execution and authorization, tampering, enumeration and expensive-query tests."
-      },
+      "status": "implemented",
       "resourceLocks": [
         "query-command-contract",
         "admin-resource-api",
@@ -2530,8 +2522,29 @@
       ],
       "evidence": {
         "docs": [
+          "docs/platform-service-objects.md",
+          "docs/platform-capability-development.md",
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
           "docs/platform-data-governance-and-integrations-assessment.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-service-object-runtime.mjs",
+          "scripts/validate-platform-admin-api-boundary.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs"
+        ],
+        "tests": [
+          "internal/platform/serviceobject/registry_test.go",
+          "internal/platform/serviceobject/runtime_test.go",
+          "internal/platform/serviceobject/idempotency_test.go",
+          "internal/platform/serviceobject/idempotency_gorm_test.go",
+          "internal/platform/httpapi/service_objects_test.go",
+          "scripts/platform-service-object-runtime.test.mjs"
+        ],
+        "checks": [
+          "rtk go test ./internal/platform/serviceobject ./internal/platform/httpapi",
+          "rtk node --test scripts/platform-service-object-runtime.test.mjs",
+          "rtk node scripts/validate-platform-service-object-runtime.mjs",
+          "rtk node scripts/validate-platform-admin-api-boundary.mjs"
         ]
       }
     },

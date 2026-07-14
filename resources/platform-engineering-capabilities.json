@@ -2989,17 +2989,57 @@
         "zh": "持久化查询与命令对象运行时",
         "en": "Persisted Query And Command Object Runtime"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Execute versioned server-registered query and command objects with typed arguments, authorization, tenant and data scope, cost limits and parameterized repository compilation.",
       "dependsOn": [
-        "platform-service-contract-standard"
+        "platform-service-contract-standard",
+        "admin-api-boundary-query-security"
       ],
       "evidence": {
         "sourcePaths": [
+          "resources/platform-service-object-runtime.json",
+          "internal/platform/serviceobject/types.go",
+          "internal/platform/serviceobject/registry.go",
+          "internal/platform/serviceobject/request.go",
+          "internal/platform/serviceobject/runtime.go",
+          "internal/platform/serviceobject/gorm_executor.go",
+          "internal/platform/serviceobject/idempotency.go",
+          "internal/platform/serviceobject/idempotency_gorm.go",
+          "internal/platform/serviceobject/reference.go",
+          "internal/platform/httpapi/server.go",
+          "docs/platform-service-objects.md",
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
+        "generatedFiles": [
+          "resources/generated/openapi.admin.json",
+          "resources/generated/admin-codegen-preview.json",
+          "resources/generated/admin-service-object-client.ts"
+        ],
+        "validators": [
+          "scripts/validate-platform-service-object-runtime.mjs",
+          "scripts/validate-platform-admin-api-boundary.mjs"
+        ],
+        "tests": [
+          "internal/platform/serviceobject/registry_test.go",
+          "internal/platform/serviceobject/runtime_test.go",
+          "internal/platform/serviceobject/idempotency_test.go",
+          "internal/platform/serviceobject/idempotency_gorm_test.go",
+          "internal/platform/httpapi/service_objects_test.go",
+          "scripts/platform-service-object-runtime.test.mjs"
+        ],
+        "runtimeBoundary": {
+          "adminTransport": "conditional-server-option",
+          "clientQueryContract": "query-id-version-typed-arguments-pagination",
+          "physicalRoutingInputs": "forbidden",
+          "persistentIdempotency": "gorm-implemented",
+          "genericLowRiskAdminFiltering": "retained",
+          "workloadIdentity": "not-implemented",
+          "datasourceRouting": "deferred-to-multi-datasource-program",
+          "federatedQuery": "not-implemented",
+          "xa": "not-implemented"
+        },
         "taskIds": [
           "persisted-query-command-object-runtime"
         ]

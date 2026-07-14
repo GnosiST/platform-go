@@ -28,7 +28,6 @@
     "requiresDependencyConflictChecks": true,
     "requiresTaskGraphBeforeNewNode": true,
     "requiredUnfinishedNodes": [
-      "persisted-query-command-object-runtime",
       "organization-rbac-menu-contract-and-migration-design",
       "organization-role-pool-backend-and-migration",
       "organization-user-admin-experience",
@@ -86,7 +85,6 @@
     "mustNotMarkCompleteWhileBlockersActive": true,
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "controlledBlockers": [
-      "persisted-query-command-object-runtime",
       "organization-rbac-menu-contract-and-migration-design",
       "organization-role-pool-backend-and-migration",
       "organization-user-admin-experience",
@@ -151,6 +149,7 @@
       "resources/platform-deployment-topology.json",
       "resources/platform-node-closeout-audit.json",
       "resources/platform-service-contract-standard.json",
+      "resources/platform-service-object-runtime.json",
       "resources/platform-integration-ports.json"
     ],
     "validators": [
@@ -163,6 +162,7 @@
       "scripts/validate-platform-data-lifecycle-retention.mjs",
       "scripts/validate-platform-sensitive-data-migration.mjs",
       "scripts/validate-platform-service-contract-standard.mjs",
+      "scripts/validate-platform-service-object-runtime.mjs",
       "scripts/validate-platform-integration-ports.mjs",
       "scripts/validate-platform-engineering-capabilities.mjs",
       "scripts/validate-platform-capability-contracts.mjs",
@@ -180,6 +180,7 @@
       "scripts/platform-data-lifecycle-retention.test.mjs",
       "scripts/platform-sensitive-data-migration.test.mjs",
       "scripts/platform-service-contract-standard.test.mjs",
+      "scripts/platform-service-object-runtime.test.mjs",
       "scripts/platform-integration-ports.test.mjs",
       "scripts/platform-deployment-topology.test.mjs",
       "scripts/platform-engineering-capabilities.test.mjs",
@@ -196,6 +197,7 @@
       "docs/admin-resource-schema.md",
       "docs/platform-data-lifecycle-retention.md",
       "docs/platform-service-contract-standard.md",
+      "docs/platform-service-objects.md",
       "docs/platform-integration-ports.md",
       "docs/platform-sensitive-data-migration.md",
       "docs/platform-ui-optimization-assessment.md",

@@ -355,6 +355,18 @@ rtk node scripts/validate-platform-service-contract-standard.mjs
 
 See `docs/platform-service-contract-standard.md` for the five-plane boundary and deferred runtime responsibilities.
 
+High-risk Admin queries and commands use the separate server-registered service-object runtime. Generate the Admin OpenAPI and typed client, then verify the runtime contract with:
+
+```bash
+rtk node scripts/generate-admin-openapi.mjs
+rtk node scripts/generate-admin-codegen-preview.mjs
+rtk go test ./internal/platform/serviceobject ./internal/platform/httpapi
+rtk node --test scripts/platform-service-object-runtime.test.mjs
+rtk node scripts/validate-platform-service-object-runtime.mjs
+```
+
+Clients send only a stable query or command ID, version, typed logical arguments and the allowed pagination, sort or idempotency fields. Tenant context, data scope, predicates, physical fields and datasource routing stay server-owned. See `docs/platform-service-objects.md` for registration, execution, idempotency and composition boundaries.
+
 The contract gate cross-checks `resources/platform-capability-profiles.json`, `internal/platform/config.defaultCapabilities` and `cmd/platform-contracts audit` output. It rejects unclassified profile capabilities, profile-only capabilities leaking into defaults, `external-business-capability` inside non-business profiles and declared resource/route/provider drift from actual Go manifests.
 
 The default `rtk node scripts/validate-admin-resources.mjs` gate runs this contract gate before treating the platform resource contract as fresh. Capability profile changes, default capability changes and manifest-surface changes therefore fail during normal admin-resource validation, not only during a separate production preflight.

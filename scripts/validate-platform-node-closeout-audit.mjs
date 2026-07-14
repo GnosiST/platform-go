@@ -100,6 +100,18 @@ const requiredCleanupEvidenceByTask = new Map([
     ],
   ],
   [
+    "persisted-query-command-object-runtime",
+    [
+      "docs/platform-service-objects.md",
+      "internal/platform/serviceobject/runtime_test.go",
+      "internal/platform/serviceobject/idempotency_gorm_test.go",
+      "internal/platform/httpapi/service_objects_test.go",
+      "resources/platform-service-object-runtime.json",
+      "scripts/validate-platform-service-object-runtime.mjs",
+      "scripts/platform-service-object-runtime.test.mjs",
+    ],
+  ],
+  [
     "integration-ports-disabled-default",
     [
       "docs/platform-integration-ports.md",

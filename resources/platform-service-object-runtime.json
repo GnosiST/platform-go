@@ -1,0 +1,85 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-service-object-runtime.json",
+  "capturedAt": "2026-07-15",
+  "version": 1,
+  "purpose": "Executable governance contract for versioned server-registered Query Objects and Command Objects.",
+  "transport": {
+    "audience": "management-user",
+    "runtimeComposition": "conditional-server-option",
+    "queryPath": "/api/admin/service-objects/query",
+    "commandPath": "/api/admin/service-objects/command",
+    "authentication": "admin-bearer-session",
+    "authorization": "casbin-server-side",
+    "strictJSON": true,
+    "maximumBodyBytes": 1048576
+  },
+  "clientContract": {
+    "queryFields": ["queryId", "version", "arguments", "pagination", "sort"],
+    "commandFields": ["commandId", "version", "arguments", "idempotencyKey"],
+    "forbiddenInputs": ["field", "operator", "sql", "join", "dsn", "datasource", "database", "schema", "shard"],
+    "tenantContextClientSelectable": false,
+    "dataScopeClientSelectable": false
+  },
+  "definitionContract": {
+    "versionedRegistry": true,
+    "valueTypes": ["string", "integer", "boolean"],
+    "tenantModes": ["required", "platform"],
+    "idempotencyModes": ["none", "required-key"],
+    "logicalAST": ["query", "insert", "update"],
+    "predicateOperators": ["equal", "prefix", "less-than", "greater-than"],
+    "maximumDefinitionTimeoutMs": 60000,
+    "maximumPageSize": 1000,
+    "maximumQueryOffset": 10000,
+    "positiveQueryCostDimensions": ["row", "predicate", "enabled-offset", "enabled-sort", "enabled-total"],
+    "maximumAffectedRows": 1000
+  },
+  "execution": {
+    "trustedContextSources": ["admin-principal", "tenant-scope", "casbin", "organization-area-self-scope"],
+    "unknownAndUnauthorizedEquivalent": true,
+    "serverOwnedPredicateBuilder": true,
+    "whitelistedGORMBindings": true,
+    "parameterizedClauses": true,
+    "costBudgetEnforcedBeforeExecution": true,
+    "timeoutEnforced": true,
+    "resultProjectionEnforced": true,
+    "physicalSchemaErrorsRedacted": true
+  },
+  "idempotency": {
+    "productionStore": "GORMIdempotencyStore",
+    "scope": ["commandId", "version", "actor", "tenantId", "key"],
+    "states": ["processing", "completed"],
+    "persistentResult": true,
+    "leaseTakeover": true,
+    "recordExpiry": true,
+    "memoryStore": "bounded-test-and-local-harness"
+  },
+  "reference": {
+    "queryId": "platform.reference-records.list",
+    "commandId": "platform.reference-records.rename",
+    "version": "1.0.0"
+  },
+  "generatedArtifacts": [
+    "resources/generated/openapi.admin.json",
+    "resources/generated/admin-codegen-preview.json",
+    "resources/generated/admin-service-object-client.ts"
+  ],
+  "runtimeBoundary": {
+    "defaultAPIProcessRegistration": "not-enabled",
+    "workloadIdentity": "not-implemented",
+    "datasourceRouting": "deferred-to-multi-datasource-program",
+    "federatedQuery": "not-implemented",
+    "xa": "not-implemented",
+    "outboxMQ": "not-implemented",
+    "searchProjection": "not-implemented",
+    "genericLowRiskAdminFiltering": "retained"
+  },
+  "validators": ["scripts/validate-platform-service-object-runtime.mjs"],
+  "tests": [
+    "internal/platform/serviceobject/registry_test.go",
+    "internal/platform/serviceobject/runtime_test.go",
+    "internal/platform/serviceobject/idempotency_test.go",
+    "internal/platform/serviceobject/idempotency_gorm_test.go",
+    "internal/platform/httpapi/service_objects_test.go",
+    "scripts/platform-service-object-runtime.test.mjs"
+  ]
+}
