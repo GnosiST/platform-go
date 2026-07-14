@@ -3102,17 +3102,34 @@
         "zh": "组织权限与菜单合同迁移设计",
         "en": "Organization RBAC And Menu Contract Migration Design"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Freeze organization role-pool, derived-tenant, role-group ownership, menu visibility, permission and migration contracts before runtime implementation.",
       "dependsOn": [
         "persisted-query-command-object-runtime"
       ],
       "evidence": {
         "sourcePaths": [
+          "resources/platform-organization-rbac-menu-contract.json",
+          "docs/platform-organization-rbac-menu-contract.md",
+          "docs/superpowers/specs/2026-07-15-organization-rbac-menu-contract-and-migration-design.md",
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
+        "validators": [
+          "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+          "scripts/validate-platform-governance-topology.mjs"
+        ],
+        "tests": [
+          "scripts/platform-organization-rbac-menu-contract.test.mjs",
+          "scripts/platform-governance-topology.test.mjs"
+        ],
+        "runtimeBoundary": {
+          "implementationStatus": "contract-only",
+          "backendAndMigration": "deferred-to-organization-role-pool-backend-and-migration",
+          "adminUI": "deferred-to-three-admin-ui-nodes",
+          "browserQA": "deferred-to-organization-rbac-menu-e2e-qa"
+        },
         "taskIds": [
           "organization-rbac-menu-contract-and-migration-design"
         ]

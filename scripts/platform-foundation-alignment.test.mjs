@@ -18,10 +18,10 @@ const completedProgramTaskIDs = [
   "platform-service-contract-standard",
   "persisted-query-command-object-runtime",
   "integration-ports-disabled-default",
+  "organization-rbac-menu-contract-and-migration-design",
 ];
 
 const remainingCompletionProgramTaskIDs = [
-  "organization-rbac-menu-contract-and-migration-design",
   "organization-role-pool-backend-and-migration",
   "organization-user-admin-experience",
   "role-tree-and-authorization-entry",
@@ -61,7 +61,7 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
-  it("migrates ten completed program nodes to required work and tracks 19 future nodes", () => {
+  it("migrates eleven completed program nodes to required work and tracks 18 future nodes", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
     const engineering = readJSON("resources/platform-engineering-capabilities.json");
 

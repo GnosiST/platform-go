@@ -79,7 +79,7 @@ const completionProgramTaskIDs = [
   "github-release-publication",
 ];
 
-const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(10);
+const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(11);
 
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-foundation-task-graph.mjs", ...args], {
@@ -322,7 +322,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /task production-auth-provider-hardening must declare at least one evidence\.docs path/);
   });
 
-  it("preserves the closed 37-node baseline, implements ten completion nodes, and tracks 19 pending program nodes", () => {
+  it("preserves the closed 37-node baseline, implements eleven completion nodes, and tracks 18 pending program nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
@@ -355,7 +355,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
     assert.equal(graph.tasks.length, 66);
-    assert.equal(implemented.length, 47);
+    assert.equal(implemented.length, 48);
     assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "admin-watermark-export-governance")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-protection-runtime")?.status, "implemented");
@@ -375,6 +375,15 @@ describe("validate-platform-foundation-task-graph", () => {
     const integrationPorts = graph.tasks.find((item) => item.id === "integration-ports-disabled-default");
     assert.equal(integrationPorts?.status, "implemented");
     assert.ok(integrationPorts?.evidence?.validators?.includes("scripts/validate-platform-integration-ports.mjs"));
+    const organizationContract = graph.tasks.find((item) => item.id === "organization-rbac-menu-contract-and-migration-design");
+    assert.equal(organizationContract?.status, "implemented");
+    assert.equal(organizationContract?.contractGateOnly, true);
+    assert.ok(organizationContract?.evidence?.validators?.includes("scripts/validate-platform-organization-rbac-menu-contract.mjs"));
+    assert.ok(
+      graph.tasks
+        .find((item) => item.id === "organization-role-pool-backend-and-migration")
+        ?.resourceLocks?.includes("query-command-contract"),
+    );
     assert.deepEqual(graph.tasks.find((item) => item.id === "integration-ports-disabled-default")?.dependsOn, [
       "platform-service-contract-standard",
       "notification-extension-boundary",
@@ -407,6 +416,18 @@ describe("validate-platform-foundation-task-graph", () => {
     ]);
     assert.deepEqual(pending.map((item) => item.id), pendingCompletionProgramTaskIDs);
     assert.equal(blocked.length, 0);
+  });
+
+  it("rejects organization backend migration without the query command contract lock", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const task = graph.tasks.find((item) => item.id === "organization-role-pool-backend-and-migration");
+    task.resourceLocks = task.resourceLocks.filter((lock) => lock !== "query-command-contract");
+    const graphPath = tempJSON("platform-foundation-task-graph.json", graph);
+
+    const result = runValidator(["--graph", graphPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /organization-role-pool-backend-and-migration resourceLocks must include query-command-contract/);
   });
 
   it("rejects regressing mask strategy runtime after closeout", () => {

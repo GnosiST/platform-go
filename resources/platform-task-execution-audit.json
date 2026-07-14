@@ -17,7 +17,6 @@
     "parallelBatchesMustAvoidDependencyPaths": true
   },
   "requiredUnfinishedNodes": [
-    "organization-rbac-menu-contract-and-migration-design",
     "organization-role-pool-backend-and-migration",
     "organization-user-admin-experience",
     "role-tree-and-authorization-entry",
@@ -97,6 +96,7 @@
     "scripts/validate-platform-service-contract-standard.mjs",
     "scripts/validate-platform-service-object-runtime.mjs",
     "scripts/validate-platform-integration-ports.mjs",
+    "scripts/validate-platform-organization-rbac-menu-contract.mjs",
     "scripts/validate-platform-sensitive-data-migration.mjs",
     "scripts/validate-platform-objective-conformance.mjs",
     "scripts/validate-platform-promotion-evidence-templates.mjs",
@@ -108,6 +108,7 @@
     "scripts/platform-sensitive-data-migration.test.mjs",
     "scripts/platform-service-contract-standard.test.mjs",
     "scripts/platform-service-object-runtime.test.mjs",
-    "scripts/platform-integration-ports.test.mjs"
+    "scripts/platform-integration-ports.test.mjs",
+    "scripts/platform-organization-rbac-menu-contract.test.mjs"
   ]
 }

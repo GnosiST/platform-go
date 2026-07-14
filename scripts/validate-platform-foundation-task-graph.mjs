@@ -508,6 +508,20 @@ function validateTask(task, context, errors) {
       errors,
     );
   }
+  if (task.id === "organization-rbac-menu-contract-and-migration-design") {
+    if (task.status !== "implemented") {
+      errors.push("organization-rbac-menu-contract-and-migration-design must stay implemented after contract closeout");
+    }
+    if (task.contractGateOnly !== true) {
+      errors.push("organization-rbac-menu-contract-and-migration-design must stay contractGateOnly");
+    }
+    requireIncludes(task.evidence?.docs, ["docs/platform-organization-rbac-menu-contract.md"], `${task.id} evidence.docs`, errors);
+    requireIncludes(task.evidence?.validators, ["scripts/validate-platform-organization-rbac-menu-contract.mjs"], `${task.id} evidence.validators`, errors);
+    requireIncludes(task.evidence?.tests, ["scripts/platform-organization-rbac-menu-contract.test.mjs"], `${task.id} evidence.tests`, errors);
+  }
+  if (task.id === "organization-role-pool-backend-and-migration") {
+    requireIncludes(task.resourceLocks, ["query-command-contract"], `${task.id} resourceLocks`, errors);
+  }
   if (task.status === "implemented" || task.status === "preview") {
     const evidence = task.evidence ?? {};
     const evidencePaths = evidencePathKeys.flatMap((key) => values(evidence[key]));

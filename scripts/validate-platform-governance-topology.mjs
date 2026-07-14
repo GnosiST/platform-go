@@ -318,6 +318,12 @@ function validateOrganizationRbacMenuMigration(topology, errors) {
   if (migration.status !== "planned") {
     errors.push("organizationRbacMenuMigration.status must stay planned until the migration node closes");
   }
+  if (migration.designStatus !== "frozen") {
+    errors.push("organizationRbacMenuMigration.designStatus must stay frozen after the contract node closes");
+  }
+  if (migration.designContract !== "resources/platform-organization-rbac-menu-contract.json" || !existingRelativePath(migration.designContract)) {
+    errors.push("organizationRbacMenuMigration.designContract must reference the frozen organization RBAC menu contract");
+  }
   if (!sameList(values(migration.taskIds), requiredOrganizationMigrationTaskIDs)) {
     errors.push("organizationRbacMenuMigration.taskIds must match the approved six-node migration lane");
   }
@@ -339,11 +345,13 @@ function validateOrganizationRbacMenuMigration(topology, errors) {
     roleGroupScope: "platform-or-tenant",
     roleOwnership: "exactly-one-role-group",
     organizationRoleGroupBinding: "org_unit_role_groups",
+    organizationBindingInheritance: "none-direct-bindings-only",
     organizationRolePool: "enabled-union-of-enabled-bound-tenant-groups",
     userTenant: "derived-from-primary-organization",
     userRoleConstraint: "subset-of-organization-role-pool",
     platformPrincipalException: "no-organization-platform-roles-only",
     roleMenuBinding: "role_menu",
+    roleMenuStoredNodes: "page-only",
     writeEnforcement: "backend-all-write-import-bulk-paths",
     menuMigration: "backfill-dual-read-compare-switch-deprecate-menu-permission",
     authorizationDatasourceBoundary: "single-tenant-single-datasource",

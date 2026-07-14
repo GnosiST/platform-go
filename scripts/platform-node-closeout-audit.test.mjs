@@ -9,7 +9,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "organization-rbac-menu-contract-and-migration-design",
   "organization-role-pool-backend-and-migration",
   "organization-user-admin-experience",
   "role-tree-and-authorization-entry",
@@ -98,7 +97,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("preserves 37 baseline closeouts, closes ten completion nodes, and tracks 19 pending nodes", () => {
+  it("preserves 37 baseline closeouts, closes eleven completion nodes, and tracks 18 pending nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -106,7 +105,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(task, "task graph must include production-admin-oidc-auth");
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
-    assert.equal(audit.nodeCloseouts.length, 47);
+    assert.equal(audit.nodeCloseouts.length, 48);
     assert.deepEqual(audit.nodeCloseouts.slice(0, 37).map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
     assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts.slice(0, 37))).digest("hex"), foundationBaselineCloseoutDigest);
     const runtimeSecurityCloseout = audit.nodeCloseouts[37];
@@ -167,7 +166,45 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.equal(integrationCloseout.neatFreak, false);
     assert.equal(integrationCloseout.cleanupMode, "focused");
     assert.ok(integrationCloseout.cleanupEvidence.includes("scripts/validate-platform-integration-ports.mjs"));
+    const organizationDesignCloseout = audit.nodeCloseouts.find(
+      (item) => item.taskId === "organization-rbac-menu-contract-and-migration-design",
+    );
+    assert.equal(organizationDesignCloseout.status, "closed");
+    assert.equal(organizationDesignCloseout.neatFreak, true);
+    assert.ok(organizationDesignCloseout.cleanupEvidence.includes("resources/platform-organization-rbac-menu-contract.json"));
+    assert.ok(organizationDesignCloseout.cleanupEvidence.includes("docs/platform-organization-rbac-menu-contract.md"));
+    assert.ok(organizationDesignCloseout.cleanupEvidence.includes("scripts/validate-platform-organization-rbac-menu-contract.mjs"));
+    assert.ok(organizationDesignCloseout.cleanupEvidence.includes("scripts/platform-organization-rbac-menu-contract.test.mjs"));
+    assert.ok(organizationDesignCloseout.visualEvidence.includes("superpowers:brainstorming"));
+    assert.ok(organizationDesignCloseout.visualEvidence.includes("product-design"));
+    assert.ok(organizationDesignCloseout.visualEvidence.includes("ui-ux-pro-max"));
+    assert.equal(organizationDesignCloseout.visualEvidence.includes("browser:control-in-app-browser"), false);
     assert.deepEqual(audit.pendingNodeEvidence, completionProgramTaskIDs);
+  });
+
+  it("rejects organization contract closeout without its contract, validator, tests and design evidence", () => {
+    const audit = readJSON("resources/platform-node-closeout-audit.json");
+    const closeout = audit.nodeCloseouts.find(
+      (item) => item.taskId === "organization-rbac-menu-contract-and-migration-design",
+    );
+    closeout.cleanupEvidence = closeout.cleanupEvidence.filter(
+      (item) =>
+        item !== "resources/platform-organization-rbac-menu-contract.json" &&
+        item !== "docs/platform-organization-rbac-menu-contract.md" &&
+        item !== "scripts/validate-platform-organization-rbac-menu-contract.mjs" &&
+        item !== "scripts/platform-organization-rbac-menu-contract.test.mjs",
+    );
+    closeout.visualEvidence = ["superpowers:brainstorming"];
+
+    const result = runValidator(["--audit", tempJSON("missing-organization-contract-closeout-evidence.json", audit)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /nodeCloseouts\.organization-rbac-menu-contract-and-migration-design\.cleanupEvidence must include resources\/platform-organization-rbac-menu-contract\.json/);
+    assert.match(result.stderr, /nodeCloseouts\.organization-rbac-menu-contract-and-migration-design\.cleanupEvidence must include docs\/platform-organization-rbac-menu-contract\.md/);
+    assert.match(result.stderr, /nodeCloseouts\.organization-rbac-menu-contract-and-migration-design\.cleanupEvidence must include scripts\/validate-platform-organization-rbac-menu-contract\.mjs/);
+    assert.match(result.stderr, /nodeCloseouts\.organization-rbac-menu-contract-and-migration-design\.cleanupEvidence must include scripts\/platform-organization-rbac-menu-contract\.test\.mjs/);
+    assert.match(result.stderr, /nodeCloseouts\.organization-rbac-menu-contract-and-migration-design\.visualEvidence must include product-design/);
+    assert.match(result.stderr, /nodeCloseouts\.organization-rbac-menu-contract-and-migration-design\.visualEvidence must include ui-ux-pro-max/);
   });
 
   it("rejects watermark closeout without Product Design, UI UX and browser evidence", () => {

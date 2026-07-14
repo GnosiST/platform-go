@@ -28,7 +28,6 @@
     "requiresDependencyConflictChecks": true,
     "requiresTaskGraphBeforeNewNode": true,
     "requiredUnfinishedNodes": [
-      "organization-rbac-menu-contract-and-migration-design",
       "organization-role-pool-backend-and-migration",
       "organization-user-admin-experience",
       "role-tree-and-authorization-entry",
@@ -85,7 +84,6 @@
     "mustNotMarkCompleteWhileBlockersActive": true,
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "controlledBlockers": [
-      "organization-rbac-menu-contract-and-migration-design",
       "organization-role-pool-backend-and-migration",
       "organization-user-admin-experience",
       "role-tree-and-authorization-entry",
@@ -150,7 +148,8 @@
       "resources/platform-node-closeout-audit.json",
       "resources/platform-service-contract-standard.json",
       "resources/platform-service-object-runtime.json",
-      "resources/platform-integration-ports.json"
+      "resources/platform-integration-ports.json",
+      "resources/platform-organization-rbac-menu-contract.json"
     ],
     "validators": [
       "scripts/validate-platform-objective-conformance.mjs",
@@ -164,6 +163,7 @@
       "scripts/validate-platform-service-contract-standard.mjs",
       "scripts/validate-platform-service-object-runtime.mjs",
       "scripts/validate-platform-integration-ports.mjs",
+      "scripts/validate-platform-organization-rbac-menu-contract.mjs",
       "scripts/validate-platform-engineering-capabilities.mjs",
       "scripts/validate-platform-capability-contracts.mjs",
       "scripts/validate-platform-production-readiness.mjs",
@@ -182,6 +182,7 @@
       "scripts/platform-service-contract-standard.test.mjs",
       "scripts/platform-service-object-runtime.test.mjs",
       "scripts/platform-integration-ports.test.mjs",
+      "scripts/platform-organization-rbac-menu-contract.test.mjs",
       "scripts/platform-deployment-topology.test.mjs",
       "scripts/platform-engineering-capabilities.test.mjs",
       "scripts/platform-production-readiness.test.mjs",
@@ -199,6 +200,7 @@
       "docs/platform-service-contract-standard.md",
       "docs/platform-service-objects.md",
       "docs/platform-integration-ports.md",
+      "docs/platform-organization-rbac-menu-contract.md",
       "docs/platform-sensitive-data-migration.md",
       "docs/platform-ui-optimization-assessment.md",
       "docs/admin-ui-foundation.md",

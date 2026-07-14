@@ -121,6 +121,16 @@ const requiredCleanupEvidenceByTask = new Map([
       "scripts/platform-integration-ports.test.mjs",
     ],
   ],
+  [
+    "organization-rbac-menu-contract-and-migration-design",
+    [
+      "resources/platform-organization-rbac-menu-contract.json",
+      "docs/platform-organization-rbac-menu-contract.md",
+      "docs/superpowers/specs/2026-07-15-organization-rbac-menu-contract-and-migration-design.md",
+      "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+      "scripts/platform-organization-rbac-menu-contract.test.mjs",
+    ],
+  ],
 ]);
 
 const requiredVisualEvidenceByTask = new Map([
@@ -131,6 +141,10 @@ const requiredVisualEvidenceByTask = new Map([
   [
     "sensitive-data-reveal-step-up",
     ["superpowers:brainstorming", "product-design", "ui-ux-pro-max", "browser:control-in-app-browser"],
+  ],
+  [
+    "organization-rbac-menu-contract-and-migration-design",
+    ["superpowers:brainstorming", "product-design", "ui-ux-pro-max"],
   ],
 ]);
 

@@ -1,0 +1,442 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-organization-rbac-menu-contract.json",
+  "capturedAt": "2026-07-15",
+  "status": "design-frozen-runtime-pending",
+  "taskId": "organization-rbac-menu-contract-and-migration-design",
+  "purpose": "Freeze the organization role-pool, derived-tenant, strict role tree, independent menu assignment, permission boundary, conflict and migration contracts before runtime implementation.",
+  "designEvidence": [
+    "superpowers:brainstorming",
+    "product-design",
+    "ui-ux-pro-max"
+  ],
+  "sourceModel": {
+    "userTenant": "direct-required-editable",
+    "primaryOrganization": "optional",
+    "roleGroupHierarchy": "nested-parentCode",
+    "roleOwnership": "optional-single-groupCode",
+    "roleMembership": "users.roles",
+    "menuVisibility": "menu.permission-evaluated-against-effective-role-permissions",
+    "roleMenuBinding": "absent",
+    "permissionTypes": ["unclassified-action-code"]
+  },
+  "targetModel": {
+    "organizationResource": "org-units",
+    "organizationBindingInheritance": "none-direct-bindings-only",
+    "roleGroupHierarchy": "non-nested-role-group-to-role",
+    "roleOwnership": "exactly-one-role-group",
+    "roleGroupScopes": ["platform", "tenant"],
+    "organizationRolePool": "distinct-enabled-roles-in-enabled-directly-bound-enabled-tenant-groups",
+    "tenantUserOwnership": "one-primary-organization-with-server-derived-tenant",
+    "platformPrincipalException": "explicit-platform-scope-no-organization-no-tenant-platform-roles-only",
+    "userRoleConstraint": "subset-of-effective-role-pool",
+    "menuNodeTypes": ["directory", "page"],
+    "roleMenuBinding": "page-leaves-only-with-derived-directory-ancestors",
+    "permissionTypes": ["api", "page-button"],
+    "apiSecurityBoundary": "casbin-protected-api-permission",
+    "authorizationDatasourceBoundary": "single-tenant-single-datasource",
+    "federationAndXa": "forbidden-for-authorization"
+  },
+  "identityContract": {
+    "userScopeField": "scopeType",
+    "userScopes": ["platform", "tenant"],
+    "tenantUser": {
+      "orgUnitCode": "required",
+      "tenantCode": "server-derived-redundantly-persisted-read-only",
+      "roleSource": "effective-organization-role-pool"
+    },
+    "platformUser": {
+      "orgUnitCode": "must-be-empty",
+      "tenantCode": "must-be-empty",
+      "roleSource": "enabled-platform-role-groups"
+    },
+    "allWritePaths": ["create", "update", "bulk-assign", "import", "service-command", "delete", "restore", "purge"],
+    "clientPhysicalRoutingInputs": "forbidden"
+  },
+  "relationalContract": {
+    "codeIdentityPolicy": "globally-unique-stable-codes-retained-for-compatibility",
+    "tables": [
+      {
+        "logicalName": "role_groups",
+        "physicalName": "platform_admin_role_groups",
+        "changes": [
+          "add scope_type platform|tenant",
+          "add nullable tenant_code",
+          "require tenant_code exactly when scope_type=tenant",
+          "remove parent_code after migration",
+          "keep authorization fields forbidden"
+        ]
+      },
+      {
+        "logicalName": "roles",
+        "physicalName": "platform_admin_roles",
+        "changes": [
+          "normalize required group_code",
+          "derive role scope and tenant from role group",
+          "keep permissions deny_permissions and data_scope role-owned"
+        ]
+      },
+      {
+        "logicalName": "org_unit_role_groups",
+        "physicalName": "platform_admin_org_unit_role_groups",
+        "primaryKey": ["org_unit_code", "role_group_code"],
+        "invariants": [
+          "organization and role group are enabled",
+          "role group scope is tenant",
+          "organization tenant equals role group tenant",
+          "platform role groups cannot be bound"
+        ]
+      },
+      {
+        "logicalName": "users",
+        "physicalName": "platform_admin_users",
+        "changes": [
+          "normalize scope_type tenant|platform",
+          "normalize primary org_unit_code",
+          "persist tenant_code only as a server-derived invariant",
+          "reject client tenant changes"
+        ]
+      },
+      {
+        "logicalName": "user_roles",
+        "physicalName": "platform_admin_user_roles",
+        "invariants": [
+          "tenant user roles belong to the effective organization role pool",
+          "platform user roles belong to enabled platform role groups"
+        ]
+      },
+      {
+        "logicalName": "menus",
+        "physicalName": "platform_admin_menus",
+        "changes": [
+          "add required node_type directory|page",
+          "normalize parent_code",
+          "keep legacy permission read-only during migration",
+          "require page nodes to be leaves"
+        ]
+      },
+      {
+        "logicalName": "role_menu",
+        "physicalName": "platform_admin_role_menus",
+        "primaryKey": ["role_code", "menu_code"],
+        "invariants": [
+          "menu_code references an enabled page node",
+          "directory visibility is derived from assigned descendant pages",
+          "writes use a separate revision and audit action from role permissions"
+        ]
+      },
+      {
+        "logicalName": "page_buttons",
+        "physicalName": "platform_admin_page_buttons",
+        "primaryKey": ["menu_code", "button_key"],
+        "invariants": [
+          "menu_code references an enabled page node",
+          "button_key is stable within the page",
+          "permission_code references a page-button permission"
+        ]
+      },
+      {
+        "logicalName": "permissions",
+        "physicalName": "platform_admin_permissions",
+        "changes": [
+          "add required resource_type api|page-button",
+          "page-button permissions reference one page menu and stable button_key",
+          "api permissions retain Casbin method and path enforcement metadata"
+        ]
+      }
+    ]
+  },
+  "organizationRolePoolContract": {
+    "eligibleGroups": "enabled tenant groups directly bound to the selected enabled organization",
+    "eligibleRoles": "enabled roles whose required group is eligible",
+    "deduplicationKey": "role.code",
+    "implicitAncestorGroupInheritance": false,
+    "disabledGroupOrRoleEffect": "removed-from-pool-only-after-reviewed-impact-plan",
+    "provenance": ["roleCode", "roleGroupCode", "roleGroupName", "tenantCode", "status"]
+  },
+  "lifecycleAuthorizationContract": {
+    "activeEligibility": "not-logically-deleted-and-enabled",
+    "lifecycleManagedEntities": ["org-units", "role-groups", "roles", "users", "menus", "permissions"],
+    "dependentAuthorizationRelations": ["org_unit_role_groups", "user_roles", "role_menu", "page_buttons"],
+    "entityDelete": "impact-preview-and-explicit-remediation-before-logical-delete",
+    "entityRestore": "restore-disabled-then-revalidate-and-explicitly-enable",
+    "entityPurge": "retention-expired-no-live-or-unresolved-authorization-references-and-reviewed-irreversible-command",
+    "relationMutation": "explicit-server-side-atomic-diff-only-no-independent-restore",
+    "relationReferencePolicy": "participates-in-impact-preview-purge-blocking-and-audit",
+    "scheduledRunnerBoundary": "must-use-the-same-domain-validator-and-native-transactional-repository"
+  },
+  "repositoryBoundary": {
+    "productionAuthorizationRelations": "native-versioned-transactional-repository",
+    "snapshotDeleteAndRecreate": "forbidden-for-new-authorization-relations",
+    "memoryFileAndLegacySQL": "local-test-or-compatibility-until-full-contract-is-implemented"
+  },
+  "serviceObjectContract": {
+    "queries": [
+      {"id": "platform.identity.organization-role-pool.get", "version": "1.0.0"},
+      {"id": "platform.identity.organization-role-group-change.impact", "version": "1.0.0"},
+      {"id": "platform.identity.user-organization-change.impact", "version": "1.0.0"},
+      {"id": "platform.identity.role-state-or-group-change.impact", "version": "1.0.0"},
+      {"id": "platform.authorization.resource-lifecycle.impact", "version": "1.0.0"},
+      {"id": "platform.navigation.role-menu-change.impact", "version": "1.0.0"},
+      {"id": "platform.authorization.role-permission-change.impact", "version": "1.0.0"},
+      {"id": "platform.navigation.role-menu-migration.compare", "version": "1.0.0"}
+    ],
+    "commands": [
+      {"id": "platform.identity.organization-role-group-change.prepare", "version": "1.0.0", "executionAdapter": "domain-command-executor"},
+      {"id": "platform.identity.user-organization-change.prepare", "version": "1.0.0", "executionAdapter": "domain-command-executor"},
+      {"id": "platform.identity.role-state-or-group-change.prepare", "version": "1.0.0", "executionAdapter": "domain-command-executor"},
+      {"id": "platform.authorization.resource-lifecycle.prepare", "version": "1.0.0", "executionAdapter": "domain-command-executor"},
+      {"id": "platform.navigation.role-menu-change.prepare", "version": "1.0.0", "executionAdapter": "domain-command-executor"},
+      {"id": "platform.authorization.role-permission-change.prepare", "version": "1.0.0", "executionAdapter": "domain-command-executor"},
+      {"id": "platform.identity.organization-role-groups.replace", "version": "1.0.0", "executionAdapter": "domain-command-executor"},
+      {"id": "platform.identity.user-organization.change", "version": "1.0.0", "executionAdapter": "domain-command-executor"},
+      {"id": "platform.identity.role.move", "version": "1.0.0", "executionAdapter": "domain-command-executor"},
+      {"id": "platform.identity.role.disable", "version": "1.0.0", "executionAdapter": "domain-command-executor"},
+      {"id": "platform.authorization.resource-lifecycle.apply", "version": "1.0.0", "executionAdapter": "domain-command-executor"},
+      {"id": "platform.navigation.role-menus.replace", "version": "1.0.0", "executionAdapter": "domain-command-executor"},
+      {"id": "platform.authorization.role-permissions.replace", "version": "1.0.0", "executionAdapter": "domain-command-executor"}
+    ],
+    "runtimeReference": "resources/platform-service-object-runtime.json",
+    "versionFormat": "numeric-semver-string",
+    "executionBoundary": {
+      "queryAdapter": "read-only-persisted-query-runtime-with-scalar-preview-id-and-trusted-principal-scope",
+      "genericCommandAdapter": "single-resource-insert-or-update-maximum-1000-affected-rows",
+      "domainCommandAdapter": "required-for-atomic-multi-relation-replace-move-disable-and-lifecycle-operations",
+      "largeSelectionPolicy": "server-side-diff-in-one-native-transaction-no-client-chunked-partial-apply",
+      "implementedBy": "organization-role-pool-backend-and-migration"
+    },
+    "domainCommandRuntimeExtension": {
+      "registry": "versioned-domain-command-handler-registry",
+      "argumentTypes": ["string-set", "typed-remediation-list"],
+      "planType": "DomainCommandPlan-independent-from-generic-CommandAST",
+      "sharedGuards": ["authentication", "authorization", "trusted-tenant-and-data-scope", "cost", "timeout", "idempotency", "audit"],
+      "previewPersistence": "server-persists-normalized-full-change-set-with-owner-scope-expiry-revision-and-impact-hash",
+      "applyArguments": ["previewId", "expectedRevision", "impactHash", "idempotencyKey"],
+      "maximumSelectedLeafKeys": 2000,
+      "genericMaximumAffectedRowsUnchanged": 1000
+    },
+    "previewFlow": {
+      "prepare": "idempotent-domain-prepare-command-accepts-set-and-remediation-arguments-and-persists-reviewed-change-set",
+      "prepareResult": ["previewId", "expectedRevision", "impactHash", "expiresAt"],
+      "impactQuery": "read-only-persisted-query-loads-owner-scoped-preview-by-previewId",
+      "apply": "domain-apply-command-reloads-preview-revalidates-and-commits-atomically",
+      "genericQuerySideEffects": "forbidden"
+    },
+    "highRiskRequestFields": ["previewId", "expectedRevision", "impactHash", "idempotencyKey"],
+    "conflictResponseStatus": 409,
+    "ordinaryClientDatasourceSelection": "forbidden"
+  },
+  "conflictContract": {
+    "defaultStrategy": "reject",
+    "silentRoleRetention": "forbidden",
+    "silentRoleRemoval": "forbidden",
+    "preview": {
+      "requiredFields": [
+        "previewId",
+        "expectedRevision",
+        "severity",
+        "affectedCounts",
+        "conflicts",
+        "allowedRemediations",
+        "impactHash",
+        "expiresAt"
+      ],
+      "valueDisclosure": "minimum-authorized-identifiers-and-counts-only"
+    },
+    "operations": {
+      "userOrganizationChange": "reject-or-apply-reviewed-remove-or-replacement-plan",
+      "organizationRoleGroupUnbind": "reject-or-apply-reviewed-user-role-remediation-plan",
+      "roleDisable": "reject-or-apply-reviewed-user-role-remediation-plan",
+      "emergencyRoleDisable": "separate-high-permission-immediate-deny-with-unresolved-conflict-and-blocked-reenable",
+      "roleMove": "same-scope-same-tenant-only-and-reject-when-target-pool-does-not-cover-assignments",
+      "roleGroupDisable": "reject-or-apply-reviewed-user-role-remediation-plan",
+      "authorizationResourceDelete": "same-impact-preview-and-remediation-as-disable-before-logical-delete",
+      "authorizationResourceRestore": "restore-disabled-with-no-effective-authorization-then-explicitly-revalidate-and-enable",
+      "authorizationResourcePurge": "reject-until-retention-and-all-live-or-unresolved-reference-gates-pass"
+    },
+    "stalePreview": "reject-409-and-recompute",
+    "audit": {
+      "events": "preview-and-apply-record-separate-sanitized-events",
+      "requiredFields": ["actorType", "tenantCode", "orgUnitCode", "beforeRevision", "afterRevision", "requestId", "traceId", "conflictCount", "changeSetHash"],
+      "forbiddenPayloads": ["userPII", "roleDisplayNames", "fullBeforeAfterSnapshots", "arbitraryDependencyErrors"]
+    }
+  },
+  "menuContract": {
+    "directory": {
+      "route": "must-be-empty",
+      "componentKey": "must-be-empty",
+      "interaction": "expand-collapse-only",
+      "visibility": "derived-from-visible-descendant-pages"
+    },
+    "page": {
+      "route": "required-for-internal-pages",
+      "componentKey": "registered-key-only",
+      "resourceCode": "optional-registered-resource",
+      "mustBeLeaf": true,
+      "routeParameters": "typed-static-key-value-list-no-script-or-expression",
+      "advancedMetadata": ["external", "externalUrl", "openMode", "cacheEnabled", "hidden", "activeMenuCode", "breadcrumbVisible"]
+    },
+    "assignment": {
+      "storedNodes": "page-only",
+      "effectiveDirectories": "ancestor-closure-of-visible-pages",
+      "multipleRoleResolution": "union-of-enabled-role-page-bindings",
+      "routeGuard": "frontend-navigation-boundary-only"
+    }
+  },
+  "permissionContract": {
+    "owners": {
+      "allowPermissions": "roles",
+      "denyPermissions": "roles",
+      "dataScope": "roles",
+      "menuVisibility": "role_menu",
+      "apiEnforcement": "Casbin"
+    },
+    "api": {
+      "requiredMetadata": ["capability", "resource", "action", "method", "pathPattern"],
+      "securityMeaning": "authoritative-backend-action-boundary"
+    },
+    "pageButton": {
+      "requiredMetadata": ["menuCode", "buttonKey", "action"],
+      "securityMeaning": "frontend-button-visibility-only",
+      "apiPermissionStillRequired": true
+    },
+    "allowDenyOverlap": "forbidden-in-same-role",
+    "menuPermissionCoherence": "lint-and-warning-not-implicit-grant-or-hide"
+  },
+  "menuPermissionMigration": {
+    "legacyField": "menus.permission",
+    "writePolicy": "freeze-read-only-before-backfill",
+    "phases": [
+      "inventory-and-classify-directory-page-and-permission-records",
+      "create-target-tables-and-columns-disabled-from-serving",
+      "backfill-role-menu-candidates-from-each-role-allow-deny-policy",
+      "compare-legacy-and-candidate-effective-menus-for-every-active-principal",
+      "resolve-all-unapproved-added-or-removed-menu-diffs",
+      "dual-read-return-legacy-and-record-value-free-diffs",
+      "switch-to-role-menu-with-rollback-flag",
+      "bounded-cutover-observation-with-auth-writes-frozen",
+      "enable-role-menu-writes-and-require-checkpoint-for-legacy-rollback",
+      "stop-reading-and-later-remove-menu-permission"
+    ],
+    "cutoverGate": "zero-unapproved-principal-diffs-and-reviewed-rollback-plan",
+    "rollback": "read-path-flag-only-before-new-role-menu-writes-then-reviewed-database-checkpoint-required",
+    "superAdminBackfill": "wildcard-role-receives-all-enabled-page-menus",
+    "crossRoleDenyRisk": "must-be-detected-by-principal-level-comparison"
+  },
+  "identityRbacMigration": {
+    "migrationManifestRequired": [
+      "roleGroupScopeTenantMap",
+      "orphanRoleGroupMap",
+      "tenantUserOrganizationMap",
+      "organizationRoleGroupBindingMap",
+      "platformPrincipalAllowlist",
+      "rolePoolConflictRemediations"
+    ],
+    "legacyNestedRoleGroups": "flatten-to-top-level-with-stable-group-identity-no-role-move-and-explicit-scope-tenant-map",
+    "orphanRoles": "block-until-explicitly-mapped-to-one-existing-or-new-role-group",
+    "usersWithoutOrganization": "block-unless-explicitly-assigned-one-organization-or-listed-as-platform-principal",
+    "tenantMismatch": "block-until-user-organization-role-group-and-role-tenant-conflicts-are-remediated",
+    "platformPrincipalDetection": "explicit-reviewed-allowlist-never-inferred-from-empty-organization",
+    "organizationRoleGroupBackfill": {
+      "candidateAlgorithm": "per-organization-distinct-owner-groups-of-existing-user-roles",
+      "applicationPolicy": "explicit-versioned-manifest-approval-required-no-inferred-binding-is-applied",
+      "expansionReview": "record-and-approve-every-newly-assignable-role-before-cutover",
+      "sameTenantGate": "all-bound-groups-must-match-the-explicit-target-organization-tenant"
+    },
+    "rolePoolViolation": "block-until-explicit-role-removal-or-replacement-plan-is-approved",
+    "phases": [
+      "inventory-and-export-all-identity-rbac-conflicts",
+      "approve-versioned-migration-manifest",
+      "add-target-columns-and-relations-with-serving-disabled",
+      "flatten-role-groups-without-changing-role-membership",
+      "map-or-block-every-orphan-role",
+      "derive-tenant-users-from-explicit-primary-organization",
+      "create-explicit-platform-principals-from-reviewed-allowlist",
+      "derive-minimal-organization-role-group-candidates-and-approve-expansion-diffs",
+      "backfill-approved-organization-role-groups-and-validate-every-user-role",
+      "compare-principal-role-permission-data-scope-and-menu-results",
+      "freeze-legacy-authorization-writes-for-final-diff",
+      "cut-over-atomically-with-database-checkpoint"
+    ],
+    "cutoverGate": "zero-unresolved-identity-rbac-conflicts-and-zero-unapproved-principal-authorization-diffs",
+    "rollback": "additive-schema-and-legacy-read-path-before-new-target-writes-then-reviewed-database-checkpoint-required"
+  },
+  "treeTransferContract": {
+    "component": "PlatformTreeTransfer",
+    "workbenchComponent": "AdminTreeWorkbench",
+    "value": "assignable-leaf-keys-plus-revision",
+    "nodeFields": ["key", "parentKey", "kind", "label", "code", "status", "disabledReason", "childCount"],
+    "features": [
+      "server-search-with-ancestor-paths",
+      "lazy-loading",
+      "virtualized-visible-nodes",
+      "half-selection",
+      "disabled-reasons",
+      "selected-value-hydration",
+      "filtered-result-select-all",
+      "counts",
+      "optimistic-concurrency"
+    ],
+    "virtualizeAtVisibleNodes": 50,
+    "largeDatasetAcceptance": {"nodes": 10000, "selected": 2000},
+    "accessibility": {
+      "keyboard": ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "Space", "Enter"],
+      "mixedState": "aria-checked=mixed",
+      "countAnnouncement": "aria-live=polite",
+      "minimumTargetPixels": 44,
+      "focusReturn": true,
+      "dragOnlyInteraction": "forbidden"
+    },
+    "responsive": {
+      "desktopMin": 1024,
+      "tabletMin": 768,
+      "mobileMax": 767,
+      "mobileMode": "available-selected-single-pane-tabs-with-sticky-actions",
+      "horizontalPageOverflow": "forbidden"
+    }
+  },
+  "adminExperienceContract": {
+    "organization": ["role-group-count", "effective-role-count", "role-pool-provenance", "conflict-preview-before-unbind"],
+    "user": ["scope-type", "organization-first", "derived-read-only-tenant", "disabled-role-control-until-org", "role-group-source-label", "explicit-invalid-role-remediation"],
+    "role": ["strict-two-level-workbench", "explicit-move-command", "separate-assign-menus", "separate-assign-permissions", "role-owned-data-scope"],
+    "menu": ["tree-workbench", "directory-page-segmented-type", "registered-component-key", "typed-route-parameters", "page-button-permissions"]
+  },
+  "browserAcceptance": {
+    "viewports": ["375x812", "390x844", "768x1024", "1024x768", "1280x720", "1440x1024"],
+    "scenarios": [
+      "organization-bind-groups-and-inspect-role-pool-provenance",
+      "tenant-user-select-organization-derive-tenant-and-load-role-pool",
+      "user-organization-change-preview-and-explicit-invalid-role-remediation",
+      "platform-user-rejects-tenant-role",
+      "group-unbind-role-disable-and-role-move-zero-impact-and-conflict-paths",
+      "strict-role-tree-and-non-nested-role-group-validation",
+      "directory-does-not-navigate-and-page-route-does",
+      "menu-and-permission-save-refresh-and-separate-audit",
+      "large-tree-search-scroll-half-select-and-save",
+      "keyboard-screen-reader-focus-reduced-motion-200-percent-zoom-no-overflow",
+      "legacy-role-menu-dual-read-equivalence-and-rollback"
+    ]
+  },
+  "runtimeBoundary": {
+    "implementationStatus": "contract-only",
+    "implementedByThisNode": ["design-docs", "machine-contract", "validator", "mutation-tests", "task-governance-closeout"],
+    "deferredTaskIds": [
+      "organization-role-pool-backend-and-migration",
+      "organization-user-admin-experience",
+      "role-tree-and-authorization-entry",
+      "menu-tree-and-button-permission-configuration",
+      "organization-rbac-menu-e2e-qa"
+    ],
+    "notOwned": ["datasource-routing", "federated-query", "xa", "outbox", "mq", "search-projection", "workload-identity"]
+  },
+  "resourceLocks": ["organization-rbac-contract", "menu-permission-contract", "tenant-context", "identity-governance-docs"],
+  "evidence": {
+    "docs": [
+      "docs/platform-organization-rbac-menu-contract.md",
+      "docs/admin-rbac-menu.md",
+      "docs/admin-resource-schema.md",
+      "docs/superpowers/specs/2026-07-15-organization-rbac-menu-contract-and-migration-design.md"
+    ],
+    "validators": ["scripts/validate-platform-organization-rbac-menu-contract.mjs"],
+    "tests": ["scripts/platform-organization-rbac-menu-contract.test.mjs"]
+  }
+}

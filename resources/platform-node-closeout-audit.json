@@ -35,7 +35,6 @@
     "unfinishedTasksMustNotHaveCloseout": true
   },
   "pendingNodeEvidence": [
-    "organization-rbac-menu-contract-and-migration-design",
     "organization-role-pool-backend-and-migration",
     "organization-user-admin-experience",
     "role-tree-and-authorization-entry",
@@ -1270,6 +1269,61 @@
         "scripts/validate-platform-goal-completion-audit.mjs",
         "scripts/validate-platform-node-closeout-audit.mjs",
         "scripts/validate-platform-objective-conformance.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "organization-rbac-menu-contract-and-migration-design",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupMode": "phase-level",
+      "cleanupEvidence": [
+        "README.md",
+        "docs/admin-rbac-menu.md",
+        "docs/admin-resource-schema.md",
+        "docs/platform-data-governance-and-integrations-assessment.md",
+        "docs/platform-foundation-task-map.md",
+        "docs/platform-organization-rbac-menu-contract.md",
+        "docs/platform-roadmap.md",
+        "docs/platform-ui-optimization-assessment.md",
+        "docs/superpowers/specs/2026-07-15-organization-rbac-menu-contract-and-migration-design.md",
+        "resources/platform-organization-rbac-menu-contract.json",
+        "resources/platform-governance-topology.json",
+        "resources/platform-foundation-task-graph.json",
+        "resources/platform-engineering-capabilities.json",
+        "resources/platform-task-execution-audit.json",
+        "resources/platform-foundation-alignment-audit.json",
+        "resources/platform-goal-completion-audit.json",
+        "resources/platform-node-closeout-audit.json",
+        "resources/platform-objective-conformance.json",
+        "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+        "scripts/platform-organization-rbac-menu-contract.test.mjs",
+        "scripts/validate-platform-governance-topology.mjs",
+        "scripts/platform-governance-topology.test.mjs",
+        "scripts/validate-platform-foundation-task-graph.mjs",
+        "scripts/platform-foundation-task-graph.test.mjs",
+        "scripts/validate-platform-engineering-capabilities.mjs",
+        "scripts/platform-engineering-capabilities.test.mjs",
+        "scripts/validate-platform-task-execution-audit.mjs",
+        "scripts/platform-task-execution-audit.test.mjs",
+        "scripts/validate-platform-foundation-alignment.mjs",
+        "scripts/platform-foundation-alignment.test.mjs",
+        "scripts/validate-platform-goal-completion-audit.mjs",
+        "scripts/platform-goal-completion-audit.test.mjs",
+        "scripts/validate-platform-node-closeout-audit.mjs",
+        "scripts/platform-node-closeout-audit.test.mjs",
+        "scripts/validate-platform-objective-conformance.mjs",
+        "scripts/platform-objective-conformance.test.mjs"
+      ],
+      "visualEvidence": [
+        "superpowers:brainstorming",
+        "product-design",
+        "ui-ux-pro-max"
       ],
       "dimensions": [
         "docs",

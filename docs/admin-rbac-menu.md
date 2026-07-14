@@ -1,11 +1,13 @@
 # Admin RBAC And Dynamic Menu
 
 Date: 2026-07-04
-Last updated: 2026-07-11
+Last updated: 2026-07-15
 
 ## Purpose
 
 The admin foundation now has a runtime RBAC slice for platform menus and generic admin resources. Menu records are generated from enabled capability manifests, then filtered by the current principal.
+
+The current behavior below is the migration source. The frozen target contract is `docs/platform-organization-rbac-menu-contract.md`: role groups become non-nested and scoped, organizations bind tenant role groups, tenant users derive tenant from one primary organization, role menus become independent page bindings, and API/page-button permissions remain separate. The five downstream migration, UI and E2E nodes are still pending; do not describe the target as current runtime behavior.
 
 This slice turns resource permission codes into executable behavior:
 

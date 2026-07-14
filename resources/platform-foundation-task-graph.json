@@ -2601,15 +2601,7 @@
       },
       "phase": "production-governance",
       "scope": "governance",
-      "status": "pending",
-      "statusReason": {
-        "zh": "现有用户直属租户、角色组层级和菜单 permission 过滤与确认后的组织角色池模型冲突。",
-        "en": "Current direct user-tenant ownership, role-group hierarchy and menu permission filtering conflict with the confirmed organization role-pool model."
-      },
-      "completionGate": {
-        "zh": "冻结严格两级角色树、组织角色池、租户派生、role_menu 双读迁移、菜单/权限边界、Tree Transfer 和浏览器验收合同。",
-        "en": "Freeze the strict two-level role tree, organization role pool, tenant derivation, role_menu dual-read migration, menu/permission boundaries, Tree Transfer and browser acceptance contracts."
-      },
+      "status": "implemented",
       "visual": true,
       "contractGateOnly": true,
       "designGate": [
@@ -2629,8 +2621,28 @@
       ],
       "evidence": {
         "docs": [
+          "docs/platform-organization-rbac-menu-contract.md",
+          "docs/superpowers/specs/2026-07-15-organization-rbac-menu-contract-and-migration-design.md",
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
-          "docs/admin-resource-schema.md"
+          "docs/admin-resource-schema.md",
+          "docs/admin-rbac-menu.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+          "scripts/validate-platform-governance-topology.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs"
+        ],
+        "tests": [
+          "scripts/platform-organization-rbac-menu-contract.test.mjs",
+          "scripts/platform-governance-topology.test.mjs"
+        ],
+        "skills": [
+          "ui-ux-pro-max"
+        ],
+        "checks": [
+          "rtk node --test scripts/platform-organization-rbac-menu-contract.test.mjs",
+          "rtk node scripts/validate-platform-organization-rbac-menu-contract.mjs",
+          "rtk node scripts/validate-platform-governance-topology.mjs"
         ]
       }
     },
@@ -2655,6 +2667,7 @@
         "organization-rbac-contract",
         "organization-rbac-migration",
         "menu-permission-contract",
+        "query-command-contract",
         "storage-runtime",
         "migration-runtime",
         "rbac-policy",
