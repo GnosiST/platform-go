@@ -65,6 +65,11 @@ function writeSensitiveManifest() {
             preserveSuffix: 2,
             maskLength: 6,
           },
+          reveal: {
+            policyId: "custom-sensitive-step-up-v1",
+            permission: "admin:custom-sensitive-record:reveal",
+            copyAllowed: true,
+          },
         },
       ],
       search: [],
@@ -211,6 +216,7 @@ describe("admin resource contract generators", () => {
     assert.deepEqual(recordSchema["x-platform-protection"], resource.schema.protection);
     assert.deepEqual(recordSchema.properties.governmentReference["x-platform-protection"], field.protection);
     assert.deepEqual(recordSchema.properties.governmentReference["x-platform-masking"], field.masking);
+    assert.deepEqual(recordSchema.properties.governmentReference["x-platform-reveal"], field.reveal);
     assert.deepEqual(recordSchema.properties.governmentReference["x-platform-query-operators"], ["="]);
 
     const preview = runAdminCodegenPreviewForContract(contract);
@@ -225,6 +231,123 @@ describe("admin resource contract generators", () => {
     assert.match(clientSource, /protection\?: AdminResourceFieldProtection/);
     assert.match(clientSource, /masking\?: AdminResourceFieldMasking/);
     assert.match(clientSource, /protection\?: AdminResourceProtection/);
+  });
+
+  it("always documents strict generic sensitive field reveal routes", () => {
+    const openapi = runAdminOpenAPIForContract(runAdminResourceContract());
+    const routeCases = [
+      ["/api/admin/resources/{resource}/{id}/fields/{field}/reveal-policy", "get", "getAdminSensitiveRevealPolicy", undefined],
+      [
+        "/api/admin/resources/{resource}/{id}/fields/{field}/reveal/challenges",
+        "post",
+        "createAdminSensitiveRevealChallenge",
+        "AdminSensitiveRevealChallengeRequest",
+      ],
+      [
+        "/api/admin/resources/{resource}/{id}/fields/{field}/reveal/challenges/{challenge}/factors/oidc/start",
+        "post",
+        "startAdminSensitiveRevealOIDC",
+        "AdminSensitiveRevealOIDCStartRequest",
+      ],
+      [
+        "/api/admin/resources/{resource}/{id}/fields/{field}/reveal/challenges/{challenge}/factors/oidc/complete",
+        "post",
+        "completeAdminSensitiveRevealOIDC",
+        "AdminSensitiveRevealOIDCCompleteRequest",
+      ],
+      [
+        "/api/admin/resources/{resource}/{id}/fields/{field}/reveal/challenges/{challenge}/factors/sms/start",
+        "post",
+        "startAdminSensitiveRevealSMS",
+        "AdminSensitiveRevealSMSStartRequest",
+      ],
+      [
+        "/api/admin/resources/{resource}/{id}/fields/{field}/reveal/challenges/{challenge}/factors/sms/complete",
+        "post",
+        "completeAdminSensitiveRevealSMS",
+        "AdminSensitiveRevealSMSCompleteRequest",
+      ],
+      [
+        "/api/admin/resources/{resource}/{id}/fields/{field}/reveal",
+        "post",
+        "revealAdminSensitiveField",
+        "AdminSensitiveRevealRequest",
+      ],
+    ];
+
+    for (const [routePath, method, operationId, requestSchema] of routeCases) {
+      const operation = openapi.paths[routePath]?.[method];
+      assert.ok(operation, `expected ${method.toUpperCase()} ${routePath}`);
+      assert.equal(operation.operationId, operationId);
+      if (requestSchema) {
+        assert.equal(operation.requestBody.content["application/json"].schema.$ref, `#/components/schemas/${requestSchema}`);
+        assert.equal(openapi.components.schemas[requestSchema].additionalProperties, false);
+      } else {
+        assert.equal(operation.requestBody, undefined);
+      }
+      assert.ok(operation.responses["503"], `${operationId} must document unavailable runtime responses`);
+    }
+
+    for (const operationId of [
+      "startAdminSensitiveRevealOIDC",
+      "completeAdminSensitiveRevealOIDC",
+      "startAdminSensitiveRevealSMS",
+      "completeAdminSensitiveRevealSMS",
+    ]) {
+      const operation = Object.values(openapi.paths)
+        .flatMap((pathItem) => Object.values(pathItem))
+        .find((candidate) => candidate.operationId === operationId);
+      for (const status of ["409", "410", "429", "503"]) {
+        assert.ok(operation.responses[status], `${operationId} must document ${status}`);
+      }
+    }
+    for (const operationId of ["completeAdminSensitiveRevealOIDC", "startAdminSensitiveRevealSMS"]) {
+      const operation = Object.values(openapi.paths)
+        .flatMap((pathItem) => Object.values(pathItem))
+        .find((candidate) => candidate.operationId === operationId);
+      assert.ok(operation.responses["502"], `${operationId} must document upstream failures`);
+    }
+    for (const operationId of ["completeAdminSensitiveRevealOIDC", "completeAdminSensitiveRevealSMS"]) {
+      const operation = Object.values(openapi.paths)
+        .flatMap((pathItem) => Object.values(pathItem))
+        .find((candidate) => candidate.operationId === operationId);
+      assert.equal(operation.responses["422"].$ref, "#/components/responses/UnprocessableEntity");
+    }
+    for (const operationId of ["startAdminSensitiveRevealOIDC", "startAdminSensitiveRevealSMS"]) {
+      const operation = Object.values(openapi.paths)
+        .flatMap((pathItem) => Object.values(pathItem))
+        .find((candidate) => candidate.operationId === operationId);
+      assert.equal(operation.responses["422"], undefined, `${operationId} must not document verification failure before completion`);
+    }
+    assert.ok(openapi.components.responses.UnprocessableEntity);
+
+    const schemas = openapi.components.schemas;
+    assert.deepEqual(schemas.AdminSensitiveRevealPolicyData.properties.purposes.items, {
+      $ref: "#/components/schemas/AdminSensitiveRevealPurpose",
+    });
+    assert.deepEqual(schemas.AdminSensitiveRevealPolicyData.properties.factors.items, {
+      $ref: "#/components/schemas/AdminSensitiveRevealFactor",
+    });
+    assert.deepEqual(schemas.AdminSensitiveRevealFactor.properties.providers.items, {
+      $ref: "#/components/schemas/AdminSensitiveRevealProvider",
+    });
+    assert.equal(schemas.AdminSensitiveRevealPolicyData.properties.grantToken, undefined);
+    assert.equal(schemas.AdminSensitiveRevealOIDCStartData.properties.grantToken, undefined);
+    assert.equal(schemas.AdminSensitiveRevealSMSStartData.properties.grantToken, undefined);
+    assert.ok(schemas.AdminSensitiveRevealFactorCompleteData.properties.grantToken);
+
+    const revealResponseSchemas = [
+      "AdminSensitiveRevealPolicyData",
+      "AdminSensitiveRevealChallengeData",
+      "AdminSensitiveRevealOIDCStartData",
+      "AdminSensitiveRevealSMSStartData",
+      "AdminSensitiveRevealFactorCompleteData",
+      "AdminSensitiveRevealValueData",
+    ];
+    assert.deepEqual(
+      revealResponseSchemas.filter((schemaName) => Object.hasOwn(schemas[schemaName].properties, "value")),
+      ["AdminSensitiveRevealValueData"],
+    );
   });
 
   it("keeps optional notification resources out of the default generated contract", () => {

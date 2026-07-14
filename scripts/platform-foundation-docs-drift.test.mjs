@@ -70,10 +70,11 @@ describe("platform foundation documentation drift", () => {
 
     assert.match(
       assessment,
-      /Encrypted `masked` response\/export projection decrypts only inside the backend, applies one of five strategies and returns only the masked value/,
+      /Encrypted `masked` projections return only the masked value/,
     );
     assert.doesNotMatch(assessment, /`masked` projection returns the stored value unchanged/);
-    assert.match(assessment, /There are currently zero reveal-capable step-up factors/);
+    assert.match(assessment, /initial reveal-capable factor set is implemented as OIDC reauthentication and Admin SMS OTP/);
+    assert.doesNotMatch(assessment, /There are currently zero reveal-capable step-up factors/);
     assert.match(assessment, /`PLATFORM_DATABASE_DRIVER` and `PLATFORM_DATABASE_DSN` are not wired into process composition/);
     assert.doesNotMatch(assessment, /Redis Pub\/Sub is used only for cache invalidation/);
   });

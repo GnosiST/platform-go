@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-objective-conformance.json",
-  "capturedAt": "2026-07-12",
+  "capturedAt": "2026-07-13",
   "purpose": "Machine-checkable conformance contract for the persistent reusable platform foundation objective. It keeps stack choices, business-neutral reference use, future promotion gates, visual gates, deployment boundaries and closeout discipline aligned before further implementation continues.",
   "objectiveMode": "persistent-full-scope",
   "approvedStack": {
@@ -28,7 +28,6 @@
     "requiresDependencyConflictChecks": true,
     "requiresTaskGraphBeforeNewNode": true,
     "requiredUnfinishedNodes": [
-      "sensitive-data-reveal-step-up",
       "data-lifecycle-retention",
       "multi-datasource-contract-and-runtime",
       "database-certification-matrix",
@@ -77,7 +76,6 @@
     "mustNotMarkCompleteWhileBlockersActive": true,
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "controlledBlockers": [
-      "sensitive-data-reveal-step-up",
       "data-lifecycle-retention",
       "multi-datasource-contract-and-runtime",
       "database-certification-matrix",
@@ -165,10 +163,14 @@
       "AGENTS.md",
       "docs/platform-foundation-task-map.md",
       "docs/platform-roadmap.md",
+      "docs/platform-auth.md",
       "docs/platform-deployment.md",
+      "docs/admin-resource-schema.md",
       "docs/platform-sensitive-data-migration.md",
       "docs/platform-ui-optimization-assessment.md",
       "docs/admin-ui-foundation.md",
+      "docs/superpowers/specs/2026-07-13-sensitive-data-reveal-step-up-design.md",
+      "docs/superpowers/plans/2026-07-13-sensitive-data-reveal-step-up.md",
       "design-qa.md"
     ]
   }

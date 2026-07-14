@@ -77,6 +77,7 @@ type FieldDefinition struct {
 	ExportMode   string           `json:"exportMode"`
 	Protection   *FieldProtection `json:"protection,omitempty"`
 	Masking      *FieldMasking    `json:"masking,omitempty"`
+	Reveal       *FieldReveal     `json:"reveal,omitempty"`
 }
 
 type FieldProtection struct {
@@ -91,6 +92,12 @@ type FieldMasking struct {
 	PreserveSuffix int    `json:"preserveSuffix,omitempty"`
 	MaskLength     int    `json:"maskLength,omitempty"`
 	Replacement    string `json:"replacement,omitempty"`
+}
+
+type FieldReveal struct {
+	PolicyID    string `json:"policyId"`
+	Permission  string `json:"permission"`
+	CopyAllowed bool   `json:"copyAllowed,omitempty"`
 }
 
 type ResourceProtection struct {
@@ -220,6 +227,10 @@ func cloneSchema(schema Schema) Schema {
 		if schema.Fields[index].Masking != nil {
 			masking := *schema.Fields[index].Masking
 			schema.Fields[index].Masking = &masking
+		}
+		if schema.Fields[index].Reveal != nil {
+			reveal := *schema.Fields[index].Reveal
+			schema.Fields[index].Reveal = &reveal
 		}
 	}
 	for index := range schema.RuntimeSlots {
@@ -379,6 +390,7 @@ func mergeCapabilityProtection(schema Schema, resource capability.AdminResource)
 		schema.Fields[index].ExportMode = declared.ExportMode
 		schema.Fields[index].Protection = declared.Protection
 		schema.Fields[index].Masking = declared.Masking
+		schema.Fields[index].Reveal = declared.Reveal
 	}
 	for _, declared := range resource.Fields {
 		if _, ok := existing[declared.Key]; ok {
@@ -424,6 +436,13 @@ func fieldMaskingFromCapability(masking *capability.AdminFieldMasking) *FieldMas
 		Strategy: masking.Strategy, PreservePrefix: masking.PreservePrefix, PreserveSuffix: masking.PreserveSuffix,
 		MaskLength: masking.MaskLength, Replacement: masking.Replacement,
 	}
+}
+
+func fieldRevealFromCapability(reveal *capability.AdminFieldReveal) *FieldReveal {
+	if reveal == nil {
+		return nil
+	}
+	return &FieldReveal{PolicyID: reveal.PolicyID, Permission: reveal.Permission, CopyAllowed: reveal.CopyAllowed}
 }
 
 func actionsFromCapability(actions []capability.AdminResourceAction) []ResourceActionDefinition {
@@ -1099,6 +1118,7 @@ func fieldsFromCapability(fields []capability.AdminField) []FieldDefinition {
 			ExportMode:   defaultString(field.ExportMode, capability.FieldProjectionFull),
 			Protection:   fieldProtectionFromCapability(field.Protection),
 			Masking:      fieldMaskingFromCapability(field.Masking),
+			Reveal:       fieldRevealFromCapability(field.Reveal),
 		})
 	}
 	return withLocalizedValueFields(withStandardRecordFields(definitions))

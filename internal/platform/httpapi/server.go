@@ -31,6 +31,7 @@ import (
 	"platform-go/internal/platform/ratelimit"
 	"platform-go/internal/platform/rbac"
 	"platform-go/internal/platform/session"
+	"platform-go/internal/platform/sensitivereveal"
 	"platform-go/internal/platform/storage"
 )
 
@@ -54,6 +55,8 @@ type ServerOptions struct {
 	AppIdentityBindings     AppIdentityBindingStore
 	PhoneProtector          PhoneProtector
 	PhoneVerificationSender PhoneVerificationSender
+	AdminStepUpPhoneResolver AdminStepUpPhoneResolver
+	SensitiveReveal         *sensitivereveal.Runtime
 	DebugCodeEnabled        bool
 	SessionTTL              time.Duration
 	JWTSecret               string
@@ -114,6 +117,8 @@ type Server struct {
 	appIdentityBindings     AppIdentityBindingStore
 	phoneProtector          PhoneProtector
 	phoneVerificationSender PhoneVerificationSender
+	adminStepUpPhoneResolver AdminStepUpPhoneResolver
+	sensitiveReveal         *sensitivereveal.Runtime
 	debugCodeEnabled        bool
 	tokens                  *authjwt.Service
 	now                     func() time.Time
@@ -233,6 +238,8 @@ func New(options ServerOptions) *Server {
 		appIdentityBindings:     appIdentityBindings,
 		phoneProtector:          options.PhoneProtector,
 		phoneVerificationSender: options.PhoneVerificationSender,
+		adminStepUpPhoneResolver: options.AdminStepUpPhoneResolver,
+		sensitiveReveal:         options.SensitiveReveal,
 		debugCodeEnabled:        options.DebugCodeEnabled,
 		tokens:                  tokens,
 		now:                     now,
@@ -287,6 +294,13 @@ func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 	adminResources.POST("/:resource", s.adminResourceCreate)
 	adminResources.PUT("/:resource/:id", s.adminResourceUpdate)
 	adminResources.DELETE("/:resource/:id", s.adminResourceDelete)
+	adminResources.GET("/:resource/:id/fields/:field/reveal-policy", s.adminSensitiveRevealPolicy)
+	adminResources.POST("/:resource/:id/fields/:field/reveal/challenges", s.adminSensitiveRevealChallenge)
+	adminResources.POST("/:resource/:id/fields/:field/reveal/challenges/:challenge/factors/oidc/start", s.adminSensitiveRevealOIDCStart)
+	adminResources.POST("/:resource/:id/fields/:field/reveal/challenges/:challenge/factors/oidc/complete", s.adminSensitiveRevealOIDCComplete)
+	adminResources.POST("/:resource/:id/fields/:field/reveal/challenges/:challenge/factors/sms/start", s.adminSensitiveRevealSMSStart)
+	adminResources.POST("/:resource/:id/fields/:field/reveal/challenges/:challenge/factors/sms/complete", s.adminSensitiveRevealSMSComplete)
+	adminResources.POST("/:resource/:id/fields/:field/reveal", s.adminSensitiveReveal)
 	s.registerAdminRoutes(api, adminRoutes)
 }
 

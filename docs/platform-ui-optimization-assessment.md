@@ -11,11 +11,11 @@ This assessment records how two design aids are routed without disrupting the pl
 - `ui-ux-pro-max` for implementation-level admin UI quality, accessibility, responsive behavior and shared-component hardening;
 - `design-taste-frontend` for the visual direction of login, brand-entry, landing, portfolio, marketing or deliberate redesign surfaces.
 
-Candidate A has completed that activation path as `admin-ui-system-quality-hardening`. Candidate B's broader brand-entry redesign remains deferred until a real public or brand brief is approved. The bounded `admin-watermark-export-governance` visual node has now completed implementation and fresh browser acceptance; `public-docs-site` remains pending and still requires `superpowers:brainstorming`, Product Design and fresh browser evidence.
+Candidate A has completed that activation path as `admin-ui-system-quality-hardening`. Candidate B's broader brand-entry redesign remains deferred until a real public or brand brief is approved. The bounded `admin-watermark-export-governance` and `sensitive-data-reveal-step-up` visual nodes have completed implementation and fresh browser acceptance; `public-docs-site` remains pending and still requires `superpowers:brainstorming`, Product Design and fresh browser evidence.
 
-The original 37-node foundation baseline remains closed. `runtime-security-containment`, `admin-watermark-export-governance`, `sensitive-data-protection-runtime`, the non-visual `sensitive-data-historical-migration` node and `mask-strategy-runtime` are `implemented`, so current governance is `53 total / 42 implemented / 11 controlled unfinished` with `completionStatus=not-complete-controlled`.
+The original 37-node foundation baseline remains closed. `runtime-security-containment`, `admin-watermark-export-governance`, `sensitive-data-protection-runtime`, the non-visual `sensitive-data-historical-migration` node, `mask-strategy-runtime` and `sensitive-data-reveal-step-up` are `implemented`, so current governance is `53 total / 43 implemented / 10 controlled unfinished` with `completionStatus=not-complete-controlled`.
 
-The seven newly governed pending nodes are `sensitive-data-reveal-step-up`, `data-lifecycle-retention`, `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`. `sensitive-data-reveal-step-up` and `public-docs-site` are visual nodes, so neither may advance without the required design gates and fresh browser evidence. Approved specifications: [completion program](superpowers/specs/2026-07-12-platform-go-completion-program-design.md), [runtime security](superpowers/specs/2026-07-12-runtime-security-hardening-design.md), [watermark/export governance](superpowers/specs/2026-07-12-admin-watermark-export-design.md), [sensitive data encryption](superpowers/specs/2026-07-12-sensitive-data-encryption-design.md), [mask strategy runtime](superpowers/specs/2026-07-13-mask-strategy-runtime-design.md) and [open-source docs/site](superpowers/specs/2026-07-12-open-source-docs-site-design.md).
+The six newly governed pending nodes are `data-lifecycle-retention`, `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`. `public-docs-site` is the remaining visual node and may not advance without the required design gates and fresh browser evidence. Approved specifications also include [mask strategy runtime](superpowers/specs/2026-07-13-mask-strategy-runtime-design.md) and [sensitive data reveal step-up](superpowers/specs/2026-07-13-sensitive-data-reveal-step-up-design.md).
 
 ## Current Evidence
 
@@ -106,12 +106,27 @@ Requested aid: `ui-ux-pro-max`, with `superpowers:brainstorming` and Product Des
 Implemented result:
 
 - one master switch progressively reveals independent screen/export scope controls; valid empty, screen-only, export-only and combined scope selections persist through normalization;
-- screen watermark count is restricted to exact `1`, `4`, `9` and `16` DOM marks, rendered through an inert grid layer with `aria-hidden="true"` and no pointer capture;
+- screen watermark count is restricted to exact `1`, `4`, `9` and `16` DOM marks, rendered through one fixed inert viewport layer with `aria-hidden="true"` and no pointer capture;
+- the layer covers the topbar, sidebar, lists, dashboards, drawers, dropdowns and modals; at `<=768px`, sixteen marks reflow to `2x8` and retain readable attribution;
 - the master switch has an explicit localized accessible name, mobile controls retain the shared 44px target contract and the `390x844` settings state has no horizontal overflow;
 - light and dark themes preserve readable settings hierarchy without turning the operational drawer into a promotional surface;
 - Policy Review JSON export alone accepts explicit watermark intent and returns structured provenance; canonical OpenAPI, original file bytes and other export formats are unchanged.
 
-Accepted evidence is stored under `.superpowers/product-design-audit/watermark/`: settings controls, sixteen-mark desktop layout, mobile settings/count controls, dark theme and Policy Review export success. Runtime inspection confirmed exact `1/4/9/16` DOM counts, all scope combinations, a clean browser console, and export metadata whose `exportedAt` matches the export timestamp while audit policy records only `watermarkApplied=true`.
+Accepted evidence is stored under `.superpowers/product-design-audit/watermark/`: settings controls, sixteen-mark desktop layout, full-viewport dashboard/navigation/dropdown/modal coverage, responsive `2x8` mobile layout, dark theme and Policy Review export success. Runtime inspection confirmed exact `1/4/9/16` DOM counts, full viewport bounds, overlay stacking, pointer pass-through, no truncated narrow sixteen-mark text, a clean current-run console, and export metadata whose `exportedAt` matches the export timestamp while audit policy records only `watermarkApplied=true`.
+
+## Sensitive Data Reveal Step-Up Closeout
+
+Status: implemented on 2026-07-13.
+
+Requested aids: Product Design audit and `ui-ux-pro-max`, with the required `superpowers:brainstorming` design gate.
+
+Implemented result:
+
+- only manifest-declared encrypted detail fields expose the reveal action, with dedicated permission, purpose and copy policy;
+- the modal progressively handles purpose, `anyOf`/`allOf` factor selection/progress, SMS OTP, OIDC reauthentication and the expiring plaintext state;
+- modal headings receive focus, controls meet the 44px target contract, mobile actions stack without horizontal overflow, and plaintext clears on close, page hide or expiry;
+- verification failure returns a sanitized message and `422` without clearing the main Admin session;
+- browser evidence under `.superpowers/product-design-audit/sensitive-reveal/` covers factor selection, SMS verification, revealed value and the exact `390x844` mobile result.
 
 ## Candidate B: Brand Entry And Public-Surface Visual Redesign
 
@@ -143,6 +158,6 @@ Completion gate:
 
 1. Production persistence correctness and Candidate A are implemented.
 2. Keep Candidate B deferred until there is a real brand/public-surface brief. If only the admin console changes, use the existing quiet operational design language and the implemented Candidate A contracts.
-3. Any future visual candidate requires an explicit task-graph node, design gates, resource locks and fresh screenshot evidence. Candidate A and production Admin OIDC remain closed in the original 37-node baseline; `admin-watermark-export-governance` is `implemented` with Product Design, `ui-ux-pro-max` and browser evidence, while `sensitive-data-reveal-step-up` and `public-docs-site` remain controlled pending visual nodes in the active `53 total / 42 implemented / 11 controlled unfinished` completion program.
+3. Any future visual candidate requires an explicit task-graph node, design gates, resource locks and fresh screenshot evidence. Candidate A and production Admin OIDC remain closed in the original 37-node baseline; `admin-watermark-export-governance` and `sensitive-data-reveal-step-up` are implemented with Product Design, `ui-ux-pro-max` and browser evidence, while `public-docs-site` remains the controlled pending visual node in the active `53 total / 43 implemented / 10 controlled unfinished` completion program.
 
 Evidence remains scoped: screenshots, DOM measurements and keyboard checks support this implementation but do not certify WCAG conformance. Screen-reader announcements, high zoom/reflow and platform-specific assistive technology require separate evidence.

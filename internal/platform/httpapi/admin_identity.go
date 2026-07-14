@@ -25,6 +25,11 @@ type AdminIdentityResolver interface {
 	ResolveAdminIdentity(context.Context, AdminIdentityResolveInput) (AdminIdentity, error)
 }
 
+type AdminStepUpIdentityResolver interface {
+	StartAdminStepUpIdentity(context.Context, AdminIdentityStartInput) (AdminIdentityStart, error)
+	ResolveAdminStepUpIdentity(context.Context, AdminIdentityResolveInput) (AdminStepUpIdentity, error)
+}
+
 type AdminIdentityStartInput struct {
 	Provider      capability.AuthProvider
 	CodeChallenge string
@@ -46,6 +51,12 @@ type AdminIdentityResolveInput struct {
 type AdminIdentity struct {
 	Issuer          string
 	ProviderSubject string
+}
+
+type AdminStepUpIdentity struct {
+	AdminIdentity
+	AuthenticatedAt      time.Time
+	AuthenticationMethod []string
 }
 
 type AdminIdentityBindingStore interface {

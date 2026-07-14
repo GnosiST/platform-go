@@ -86,33 +86,50 @@ func main() {
 	if err := httpapi.ValidatePhoneProtectionHistory(resources, phoneVerification.Protector); err != nil {
 		log.Fatalf("validate phone protection history: %v", err)
 	}
+	sensitiveReveal, err := bootstrap.SensitiveRevealRuntimeFromConfig(cfg, ordered, phoneVerification)
+	if err != nil {
+		log.Fatalf("build sensitive reveal runtime: %v", err)
+	}
 	rateLimitRuntime, err := bootstrap.RateLimitRuntimeFromConfig(cfg)
 	if err != nil {
 		log.Fatalf("build rate limit runtime: %v", err)
 	}
+	var adminStepUpPhoneResolver httpapi.AdminStepUpPhoneResolver
+	if cfg.AdminStepUpPhoneSourceConfigured() {
+		adminStepUpPhoneResolver, err = httpapi.NewResourceAdminStepUpPhoneResolver(resources, phoneVerification.Protector, httpapi.AdminStepUpPhoneSource{
+			Resource: cfg.AdminStepUpPhoneResource, ActorField: cfg.AdminStepUpPhoneActorField,
+			PhoneField: cfg.AdminStepUpPhoneField, VerifiedAtField: cfg.AdminStepUpPhoneVerifiedAtField,
+			VerifiedPhoneDigestField: cfg.AdminStepUpPhoneVerifiedDigestField,
+		}, time.Now)
+		if err != nil {
+			log.Fatalf("build admin step-up phone resolver: %v", err)
+		}
+	}
 	server := httpapi.New(httpapi.ServerOptions{
-		Capabilities:            ordered,
-		Resources:               resources,
-		Sessions:                sessions,
-		Cache:                   cacheStore,
-		InvalidationBus:         invalidationBus,
-		CacheTTL:                cfg.CacheDefaultTTL,
-		FileStorage:             fileStorage,
-		UploadPolicy:            uploadPolicy,
-		AdminRoutes:             apps.DefaultAdminRoutes(resources),
-		AppRoutes:               apps.DefaultAppRoutes(resources),
-		AdminIdentityResolver:   adminIdentityResolver,
-		AdminIdentityBindings:   adminIdentityBindings,
-		AppIdentityResolver:     appIdentityResolver,
-		PhoneProtector:          phoneVerification.Protector,
-		PhoneVerificationSender: phoneVerification.Sender,
-		DebugCodeEnabled:        phoneVerification.DebugCodeEnabled,
-		JWTSecret:               cfg.JWTSecret,
-		OpenAPIDocument:         openAPIDocument,
-		DisableDemoAuthProvider: cfg.DisableDemoAuthProvider,
-		Security:                securityOptionsFromConfig(cfg),
-		RateLimiter:             rateLimitRuntime.Limiter,
-		RateLimitKeyBuilder:     rateLimitRuntime.KeyBuilder,
+		Capabilities:             ordered,
+		Resources:                resources,
+		Sessions:                 sessions,
+		Cache:                    cacheStore,
+		InvalidationBus:          invalidationBus,
+		CacheTTL:                 cfg.CacheDefaultTTL,
+		FileStorage:              fileStorage,
+		UploadPolicy:             uploadPolicy,
+		AdminRoutes:              apps.DefaultAdminRoutes(resources),
+		AppRoutes:                apps.DefaultAppRoutes(resources),
+		AdminIdentityResolver:    adminIdentityResolver,
+		AdminIdentityBindings:    adminIdentityBindings,
+		AppIdentityResolver:      appIdentityResolver,
+		PhoneProtector:           phoneVerification.Protector,
+		PhoneVerificationSender:  phoneVerification.Sender,
+		AdminStepUpPhoneResolver: adminStepUpPhoneResolver,
+		SensitiveReveal:          sensitiveReveal,
+		DebugCodeEnabled:         phoneVerification.DebugCodeEnabled,
+		JWTSecret:                cfg.JWTSecret,
+		OpenAPIDocument:          openAPIDocument,
+		DisableDemoAuthProvider:  cfg.DisableDemoAuthProvider,
+		Security:                 securityOptionsFromConfig(cfg),
+		RateLimiter:              rateLimitRuntime.Limiter,
+		RateLimitKeyBuilder:      rateLimitRuntime.KeyBuilder,
 	})
 	if err := server.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("run platform api: %v", err)

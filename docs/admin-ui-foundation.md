@@ -233,7 +233,7 @@ Account and system settings drawer opened from the avatar trigger. It owns:
 - appearance theme and custom primary preview;
 - layout mode, density, work tabs, page transition and sidebar collapse through visual setting cards;
 - layout legend cards for side, top, mixed and split layouts;
-- watermark and visual-aid switches;
+- watermark master/scope/count controls and visual-aid switches;
 - config import, export and reset actions;
 - persistence through the app shell, so language, theme, layout and UI preferences survive page reloads.
 
@@ -257,6 +257,9 @@ The shell supports:
 - side, top, mixed and split layout modes;
 - multi-level navigation through slash-separated menu `parent` paths.
 - top and mixed layout modes render a horizontal resource navigation row; work tabs remain browser-like task history instead of replacing primary navigation.
+- the screen watermark is one fixed inert viewport layer covering topbar, navigation, data surfaces and body-portaled overlays; it must remain `aria-hidden`, non-interactive and responsive, including a `2x8` narrow layout for sixteen marks.
+
+Sensitive encrypted detail fields may expose the shared `SensitiveFieldRevealModal` only when the generated field contract includes `reveal` and the operator has the dedicated permission. The modal owns purpose/factor selection, required-factor progress, SMS code entry, OIDC resume, expiry, copy policy and plaintext clearing. Plaintext must appear only once inside the modal and must clear on close, page hide or expiry; list, table, Tooltip and ordinary detail projections remain server-masked.
 
 ### System Quality Hardening Contract
 

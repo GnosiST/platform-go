@@ -14,6 +14,8 @@ const requiredVisualDesignGate = ["superpowers:brainstorming", "product-design"]
 const allowedVisualDesignGates = new Set(requiredVisualDesignGate);
 const evidencePathKeys = ["docs", "validators", "tests", "screenshots"];
 const requiredAdminUIContractTests = ["scripts/admin-ui-contracts.test.mjs"];
+const requiredWatermarkEvidenceManifest = "resources/evidence/admin-watermark-export-governance-20260713.json";
+const requiredSensitiveRevealEvidenceManifest = "resources/evidence/sensitive-data-reveal-step-up-20260713.json";
 const foundationPromotionGateTaskIDs = new Set(["production-auth-provider-hardening", "source-writing-codegen-promotion"]);
 const foundationBaselineTaskIDs = [
   "stack-alignment-and-architecture",
@@ -326,6 +328,7 @@ function validateTask(task, context, errors) {
       `${task.id} evidence.validators`,
       errors,
     );
+    requireIncludes(task.evidence?.screenshots, [requiredWatermarkEvidenceManifest], `${task.id} evidence.screenshots`, errors);
   }
   if (task.id === "sensitive-data-protection-runtime") {
     if (task.status !== "implemented") {
@@ -383,6 +386,9 @@ function validateTask(task, context, errors) {
       `${task.id} evidence.validators`,
       errors,
     );
+  }
+  if (task.id === "sensitive-data-reveal-step-up" && task.status === "implemented") {
+    requireIncludes(task.evidence?.screenshots, [requiredSensitiveRevealEvidenceManifest], `${task.id} evidence.screenshots`, errors);
   }
   if (task.status === "implemented" || task.status === "preview") {
     const evidence = task.evidence ?? {};

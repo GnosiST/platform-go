@@ -35,9 +35,9 @@ Controls must meet 44px touch targets at mobile widths, expose visible labels, r
 
 ## Screen Rendering
 
-Render a dedicated `aria-hidden="true"` watermark layer. Generate exactly the configured number of spans and arrange them as `1x1`, `2x2`, `3x3` or `4x4` CSS grids. Each item rotates independently. The layer keeps `pointer-events:none`, stable containment and a lower stacking level than interactive content.
+Render one dedicated `aria-hidden="true"` watermark layer directly under `.platform-shell`. It is fixed to the viewport with `inset:0`, sits above the shell and Ant Design overlays, and keeps `pointer-events:none`, so the marks cover the topbar, sidebar, data lists, dashboard, drawers, dropdowns and modals without intercepting interaction.
 
-Responsive rules reduce watermark text size and gaps for dense mobile grids without viewport-based font scaling. Long product or user names wrap or clip inside their cell and must not cause horizontal page overflow.
+Generate exactly the configured number of spans. Desktop uses `1x1`, `2x2`, `3x3` or `4x4` CSS grids and places first/last rows and columns against viewport edges so chrome is visibly marked. At `<=768px`, the sixteen-mark mode reflows to `2x8` with a fixed smaller text size and tighter gaps; attribution text must remain readable without horizontal overflow. Each item rotates independently.
 
 ## Export Semantics
 
@@ -60,6 +60,8 @@ Deferred formats are explicit: this phase does not claim generic CSV, XLSX, PDF,
 - Legacy localStorage and imported JSON settings normalize correctly.
 - All scope combinations persist and restore.
 - The DOM contains exactly `1`, `4`, `9` or `16` hidden watermark items.
+- Screen marks cover navigation, data surfaces and body-portaled overlays while all controls remain operable.
+- Sixteen marks reflow to two columns on narrow viewports without truncated attribution text.
 - Mobile and desktop layouts have no horizontal overflow in light and dark themes.
 - Policy-review JSON stays valid and carries accurate structured metadata.
 - Watermark settings never create or replace a marked OpenAPI derivative, and original downloaded file bytes do not change.

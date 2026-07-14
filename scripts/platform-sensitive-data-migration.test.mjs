@@ -8,7 +8,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const migrationTaskID = "sensitive-data-historical-migration";
 const remainingTaskIDs = [
-  "sensitive-data-reveal-step-up",
   "data-lifecycle-retention",
   "multi-datasource-contract-and-runtime",
   "database-certification-matrix",
@@ -137,7 +136,7 @@ describe("validate-platform-sensitive-data-migration", () => {
     assert.ok(!Object.keys(openAPI.paths ?? {}).some((route) => /sensitive-data-migrat/i.test(route)));
   });
 
-  it("projects 53 total, 42 implemented and eleven controlled unfinished nodes with a non-visual closeout", () => {
+  it("projects 53 total, 43 implemented and ten controlled unfinished nodes with a non-visual closeout", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const alignment = readJSON("resources/platform-foundation-alignment-audit.json");
     const goal = readJSON("resources/platform-goal-completion-audit.json");
@@ -150,12 +149,12 @@ describe("validate-platform-sensitive-data-migration", () => {
     const migrationCapability = engineering.capabilities.find((item) => item.id === "sensitive-data-protection");
 
     assert.equal(graph.tasks.length, 53);
-    assert.equal(graph.tasks.filter((task) => task.status === "implemented").length, 42);
+    assert.equal(graph.tasks.filter((task) => task.status === "implemented").length, 43);
     assert.equal(migrationTask?.status, "implemented");
     assert.deepEqual(graph.tasks.filter((task) => task.status !== "implemented").map((task) => task.id), remainingTaskIDs);
     assert.ok(alignment.requiredTaskNodes.includes(migrationTaskID));
     assert.deepEqual(alignment.requiredFutureTaskNodes, remainingTaskIDs);
-    assert.deepEqual(goal.taskSummary, { expectedTotal: 53, expectedImplemented: 42, expectedControlledUnfinished: 11 });
+    assert.deepEqual(goal.taskSummary, { expectedTotal: 53, expectedImplemented: 43, expectedControlledUnfinished: 10 });
     assert.deepEqual(goal.completionPolicy.requiredControlledUnfinishedNodes, remainingTaskIDs);
     assert.deepEqual(closeout.pendingNodeEvidence, remainingTaskIDs);
     assert.equal(migrationCloseout?.status, "closed");

@@ -20,6 +20,7 @@ const promotionReviewPath = path.resolve(repoRoot, argValue("--promotion-review"
 const sessionPolicyDocPath = path.resolve(repoRoot, argValue("--session-policy-doc", "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md"));
 const oidcDesignDocPath = path.resolve(repoRoot, argValue("--oidc-design-doc", "docs/superpowers/specs/2026-07-11-production-admin-oidc-auth-design.md"));
 const adminResourceSchemaDocPath = path.resolve(repoRoot, argValue("--admin-resource-schema-doc", "docs/admin-resource-schema.md"));
+const mainGoPath = path.resolve(repoRoot, argValue("--main-go", "cmd/platform-api/main.go"));
 
 function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -212,6 +213,55 @@ function validateSessionPolicy(contract, errors) {
   for (const relativePath of values(policy.refreshTokenFamily?.implementedRuntimeEvidence)) {
     if (!relativeExistingPath(relativePath)) {
       errors.push(`sessionCredentialPolicy.refreshTokenFamily.implementedRuntimeEvidence path is missing or unsafe: ${relativePath}`);
+    }
+  }
+}
+
+function validateStepUpVerificationPolicy(contract, errors) {
+  const policy = contract.stepUpVerificationPolicy ?? {};
+  if (policy.status !== "implemented-port-default-disabled") {
+    errors.push("stepUpVerificationPolicy.status must stay implemented-port-default-disabled");
+  }
+  requireIncludes(policy.factorAdapters, ["oidc-reauth-v1", "admin-sms-otp-v1"], "stepUpVerificationPolicy.factorAdapters", errors);
+  requireIncludes(
+    policy.conditionalConfigKeys,
+    [
+      "PLATFORM_SENSITIVE_REVEAL_HMAC_KEY",
+      "PLATFORM_PHONE_HMAC_KEY",
+      "PLATFORM_PHONE_CODE_HMAC_KEY",
+      "PLATFORM_PHONE_VERIFICATION_PROVIDER",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_FIELD",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD",
+    ],
+    "stepUpVerificationPolicy.conditionalConfigKeys",
+    errors,
+  );
+  requireIncludes(
+    policy.secretSeparation,
+    ["jwt", "phone", "verification-code", "sensitive-reveal", "rate-limit"],
+    "stepUpVerificationPolicy.secretSeparation",
+    errors,
+  );
+  if (policy.smsProviderPolicy?.productionProvider !== "non-debug-registered-adapter-required") {
+    errors.push("stepUpVerificationPolicy.smsProviderPolicy.productionProvider must require a registered non-debug adapter");
+  }
+  if (policy.smsProviderPolicy?.stockProcess !== "debug-only-local-harness") {
+    errors.push("stepUpVerificationPolicy.smsProviderPolicy.stockProcess must stay debug-only-local-harness");
+  }
+  if (policy.smsProviderPolicy?.failClosedWithoutRegisteredSender !== true) {
+    errors.push("stepUpVerificationPolicy.smsProviderPolicy.failClosedWithoutRegisteredSender must stay true");
+  }
+  for (const field of ["required", "currentPhoneDigestMustMatchStoredVerifiedDigest", "phoneFieldMustBeRecoverablyEncrypted", "partialSourceConfigurationRejected"]) {
+    if (policy.verifiedPhoneBinding?.[field] !== true) {
+      errors.push(`stepUpVerificationPolicy.verifiedPhoneBinding.${field} must stay true`);
+    }
+  }
+  for (const relativePath of values(policy.runtimeEvidence)) {
+    if (!relativeExistingPath(relativePath)) {
+      errors.push(`stepUpVerificationPolicy.runtimeEvidence path is missing or unsafe: ${relativePath}`);
     }
   }
 }
@@ -605,9 +655,9 @@ function validateProviderRuntimePolicy(contract, errors) {
     }
   }
   const mainPath = "cmd/platform-api/main.go";
-  if (relativeExistingPath(mainPath)) {
-    const main = fs.readFileSync(path.resolve(repoRoot, mainPath), "utf8");
-    if (!main.includes("DisableDemoAuthProvider: cfg.DisableDemoAuthProvider")) {
+  if (fs.existsSync(mainGoPath)) {
+    const main = fs.readFileSync(mainGoPath, "utf8");
+    if (!/DisableDemoAuthProvider:\s*cfg\.DisableDemoAuthProvider\b/.test(main)) {
       errors.push(`${mainPath} must pass DisableDemoAuthProvider into httpapi.ServerOptions`);
     }
   }
@@ -1062,6 +1112,7 @@ function validate() {
   }
   validateCredentialClasses(contract, errors);
   validateSessionPolicy(contract, errors);
+  validateStepUpVerificationPolicy(contract, errors);
   validateProviderPolicy(contract, errors);
   validateProductionPromotionApprovalPackage(contract, errors);
   validateProductionPromotionReview(contract, refreshTokenFamilyPromotion, readiness, promotionReview, errors);

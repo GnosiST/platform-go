@@ -27,7 +27,8 @@ type LocalizedText struct {
 }
 
 type AdminSurface struct {
-	Resources []AdminResource
+	Resources      []AdminResource
+	RevealPolicies []AdminRevealPolicy
 }
 
 type AdminResource struct {
@@ -83,6 +84,7 @@ type AdminField struct {
 	ExportMode   string
 	Protection   *AdminFieldProtection
 	Masking      *AdminFieldMasking
+	Reveal       *AdminFieldReveal
 }
 
 type AdminFieldProtection struct {
@@ -97,6 +99,26 @@ type AdminFieldMasking struct {
 	PreserveSuffix int    `json:"preserveSuffix,omitempty"`
 	MaskLength     int    `json:"maskLength,omitempty"`
 	Replacement    string `json:"replacement,omitempty"`
+}
+
+type AdminFieldReveal struct {
+	PolicyID    string `json:"policyId"`
+	Permission  string `json:"permission"`
+	CopyAllowed bool   `json:"copyAllowed,omitempty"`
+}
+
+type AdminRevealPolicy struct {
+	ID                  string
+	Mode                string
+	Factors             []string
+	Purposes            []AdminRevealPurpose
+	ChallengeTTLSeconds int
+	GrantTTLSeconds     int
+}
+
+type AdminRevealPurpose struct {
+	Code  string
+	Label LocalizedText
 }
 
 type AdminResourceProtection struct {
@@ -121,6 +143,12 @@ const (
 	FieldProjectionMasked     = "masked"
 	FieldProjectionPrivileged = "privileged"
 	FieldProjectionOmitted    = "omitted"
+
+	AdminRevealModeAnyOf = "anyOf"
+	AdminRevealModeAllOf = "allOf"
+
+	AdminRevealFactorOIDCReauthentication = "oidc-reauth-v1"
+	AdminRevealFactorSMSOTP               = "admin-sms-otp-v1"
 )
 
 type AdminFieldRelation struct {

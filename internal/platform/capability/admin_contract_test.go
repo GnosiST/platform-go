@@ -28,6 +28,77 @@ func TestValidateAdminSurfaceAcceptsUniqueEnabledResources(t *testing.T) {
 	}
 }
 
+func TestValidateAdminSurfaceAcceptsManifestDrivenSensitiveReveal(t *testing.T) {
+	resource := validAdminResource("demo-resources", "/demo-resources", "admin:demo")
+	resource.Protection = &AdminResourceProtection{SchemaVersion: 1, Scope: "global"}
+	resource.Fields = []AdminField{{
+		Key: "contactPhone", Label: Text("联系电话", "Contact Phone"), Type: "text", Source: "values", InDetail: true,
+		Sensitivity: FieldSensitivitySensitive, StorageMode: FieldStorageEncrypted, ResponseMode: FieldProjectionMasked, ExportMode: FieldProjectionMasked,
+		Protection: &AdminFieldProtection{Format: "aes-256-gcm-v1", Normalization: "phone-e164-cn-v1"},
+		Masking:    &AdminFieldMasking{Strategy: "phone-v1"},
+		Reveal:     &AdminFieldReveal{PolicyID: "admin-sensitive-any-v1", Permission: "admin:demo:reveal"},
+	}}
+	manifest := Manifest{ID: "demo", Admin: AdminSurface{
+		RevealPolicies: []AdminRevealPolicy{{
+			ID: "admin-sensitive-any-v1", Mode: AdminRevealModeAnyOf,
+			Factors:             []string{AdminRevealFactorOIDCReauthentication, AdminRevealFactorSMSOTP},
+			Purposes:            []AdminRevealPurpose{{Code: "support-case", Label: Text("客户支持", "Support Case")}},
+			ChallengeTTLSeconds: 300, GrantTTLSeconds: 90,
+		}},
+		Resources: []AdminResource{resource},
+	}}
+
+	if err := ValidateAdminSurface([]Manifest{manifest}); err != nil {
+		t.Fatalf("ValidateAdminSurface() error = %v", err)
+	}
+}
+
+func TestValidateAdminSurfaceRejectsUnsafeSensitiveRevealContracts(t *testing.T) {
+	validPolicy := AdminRevealPolicy{
+		ID: "admin-sensitive-any-v1", Mode: AdminRevealModeAnyOf,
+		Factors:             []string{AdminRevealFactorOIDCReauthentication},
+		Purposes:            []AdminRevealPurpose{{Code: "support-case", Label: Text("客户支持", "Support Case")}},
+		ChallengeTTLSeconds: 300, GrantTTLSeconds: 90,
+	}
+	baseResource := validAdminResource("demo-resources", "/demo-resources", "admin:demo")
+	baseResource.Protection = &AdminResourceProtection{SchemaVersion: 1, Scope: "global"}
+	baseResource.Fields = []AdminField{{
+		Key: "contactPhone", Label: Text("联系电话", "Contact Phone"), Type: "text", Source: "values",
+		Sensitivity: FieldSensitivitySensitive, StorageMode: FieldStorageEncrypted, ResponseMode: FieldProjectionMasked, ExportMode: FieldProjectionMasked,
+		Protection: &AdminFieldProtection{Format: "aes-256-gcm-v1", Normalization: "phone-e164-cn-v1"},
+		Masking:    &AdminFieldMasking{Strategy: "phone-v1"},
+		Reveal:     &AdminFieldReveal{PolicyID: validPolicy.ID, Permission: "admin:demo:reveal"},
+	}}
+	tests := []struct {
+		name    string
+		mutate  func(*AdminResource, *AdminRevealPolicy)
+		wantErr string
+	}{
+		{name: "unknown policy", mutate: func(resource *AdminResource, _ *AdminRevealPolicy) { resource.Fields[0].Reveal.PolicyID = "missing" }, wantErr: "unknown reveal policy"},
+		{name: "plaintext export", mutate: func(resource *AdminResource, _ *AdminRevealPolicy) {
+			resource.Fields[0].ExportMode = FieldProjectionPrivileged
+		}, wantErr: "cannot expose plaintext exports"},
+		{name: "unsupported factor", mutate: func(_ *AdminResource, policy *AdminRevealPolicy) { policy.Factors = []string{"captcha-v1"} }, wantErr: "factor \"captcha-v1\" is unsupported"},
+		{name: "grant not shorter", mutate: func(_ *AdminResource, policy *AdminRevealPolicy) { policy.GrantTTLSeconds = policy.ChallengeTTLSeconds }, wantErr: "grant TTL"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resource := baseResource
+			resource.Fields = append([]AdminField(nil), baseResource.Fields...)
+			field := resource.Fields[0]
+			field.Reveal = &AdminFieldReveal{PolicyID: field.Reveal.PolicyID, Permission: field.Reveal.Permission}
+			resource.Fields[0] = field
+			policy := validPolicy
+			policy.Factors = append([]string(nil), validPolicy.Factors...)
+			test.mutate(&resource, &policy)
+			err := ValidateAdminSurface([]Manifest{{ID: "demo", Admin: AdminSurface{RevealPolicies: []AdminRevealPolicy{policy}, Resources: []AdminResource{resource}}}})
+			if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+				t.Fatalf("ValidateAdminSurface() error = %v, want %q", err, test.wantErr)
+			}
+		})
+	}
+}
+
 func TestValidateAdminSurfaceAcceptsExternalMenuURL(t *testing.T) {
 	manifests := []Manifest{
 		{

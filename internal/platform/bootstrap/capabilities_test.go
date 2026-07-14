@@ -214,6 +214,26 @@ func TestPhoneVerificationRuntimeFromConfigComposesExplicitDevelopmentDebugSende
 	}
 }
 
+func TestPhoneVerificationRuntimeFromConfigSupportsAdminStepUpWithoutAppPhone(t *testing.T) {
+	runtime, err := PhoneVerificationRuntimeFromConfig(config.Config{
+		RuntimeEnvironment:                  config.RuntimeEnvironmentDevelopment,
+		PhoneHMACKey:                        strings.Repeat("p", 32),
+		PhoneCodeHMACKey:                    strings.Repeat("c", 32),
+		PhoneVerificationProvider:           "debug",
+		AdminStepUpPhoneResource:            "staff-profiles",
+		AdminStepUpPhoneActorField:          "accountCode",
+		AdminStepUpPhoneField:               "mobile",
+		AdminStepUpPhoneVerifiedAtField:     "mobileVerifiedAt",
+		AdminStepUpPhoneVerifiedDigestField: "mobileVerifiedDigest",
+	}, httpapi.NewDebugPhoneVerificationSender())
+	if err != nil {
+		t.Fatalf("PhoneVerificationRuntimeFromConfig() error = %v", err)
+	}
+	if runtime.Protector == nil || runtime.Sender == nil || !runtime.DebugCodeEnabled {
+		t.Fatalf("phone verification runtime = %+v, want Admin step-up runtime without app-phone", runtime)
+	}
+}
+
 func TestPhoneVerificationRuntimeFromConfigDoesNotImplicitlyCreateDebugSender(t *testing.T) {
 	_, err := PhoneVerificationRuntimeFromConfig(config.Config{
 		RuntimeEnvironment:        config.RuntimeEnvironmentDevelopment,

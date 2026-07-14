@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-node-closeout-audit.json",
-  "capturedAt": "2026-07-12",
+  "capturedAt": "2026-07-13",
   "purpose": "Machine-checkable node closeout audit for the reusable platform foundation. It keeps implemented task nodes tied to focused cleanup evidence, objective-conflict review and visual design gates, while reserving neat-freak for phase, major-task and release closeout.",
   "policy": {
     "taskGraph": "resources/platform-foundation-task-graph.json",
@@ -35,7 +35,6 @@
     "unfinishedTasksMustNotHaveCloseout": true
   },
   "pendingNodeEvidence": [
-    "sensitive-data-reveal-step-up",
     "data-lifecycle-retention",
     "multi-datasource-contract-and-runtime",
     "database-certification-matrix",
@@ -1036,6 +1035,52 @@
         "tests-or-validators",
         "resource-lock-review",
         "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "sensitive-data-reveal-step-up",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "README.md",
+        "design-qa.md",
+        "docs/superpowers/specs/2026-07-13-sensitive-data-reveal-step-up-design.md",
+        "docs/superpowers/plans/2026-07-13-sensitive-data-reveal-step-up.md",
+        "docs/admin-resource-schema.md",
+        "docs/platform-auth.md",
+        "docs/platform-capability-development.md",
+        "docs/platform-data-governance-and-integrations-assessment.md",
+        "docs/platform-deployment.md",
+        "docs/platform-foundation-task-map.md",
+        "docs/platform-roadmap.md",
+        "docs/platform-ui-optimization-assessment.md",
+        "internal/platform/sensitivereveal/runtime.go",
+        "internal/platform/sensitivereveal/runtime_test.go",
+        "internal/platform/bootstrap/sensitive_reveal.go",
+        "internal/platform/bootstrap/sensitive_reveal_test.go",
+        "internal/platform/httpapi/sensitive_reveal.go",
+        "internal/platform/httpapi/sensitive_reveal_test.go",
+        "admin/src/platform/resources/SensitiveFieldRevealModal.tsx",
+        "admin/src/platform/security/sensitiveRevealOIDC.ts",
+        "scripts/sensitive-reveal-oidc.test.mjs",
+        "scripts/admin-ui-contracts.test.mjs",
+        "resources/platform-foundation-task-graph.json",
+        "resources/platform-engineering-capabilities.json",
+        "resources/platform-node-closeout-audit.json",
+        "scripts/validate-platform-node-closeout-audit.mjs",
+        "scripts/platform-node-closeout-audit.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ],
+      "visualEvidence": [
+        "superpowers:brainstorming",
+        "product-design",
+        "ui-ux-pro-max",
+        "browser:control-in-app-browser"
       ]
     }
   ]

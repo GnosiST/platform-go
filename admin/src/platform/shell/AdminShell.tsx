@@ -247,6 +247,13 @@ export function AdminShell({
       <a className="platform-skip-link" href="#platform-main-content">
         {dictionary.skipToContent}
       </a>
+      {showScreenWatermark ? (
+        <div className="platform-watermark-layer" aria-hidden="true" data-count={uiConfig.watermarkCount} data-scope="viewport">
+          {Array.from({ length: uiConfig.watermarkCount }, (_, index) => (
+            <span key={`${watermarkText}-${index}`}>{watermarkText}</span>
+          ))}
+        </div>
+      ) : null}
       <aside className="platform-sider" aria-label={dictionary.primaryNavigation}>
         <Brand
           dictionary={dictionary}
@@ -523,13 +530,6 @@ export function AdminShell({
         </section>
 
         <section className="platform-content">
-          {showScreenWatermark ? (
-            <div className="platform-watermark-layer" aria-hidden="true" data-count={uiConfig.watermarkCount}>
-              {Array.from({ length: uiConfig.watermarkCount }, (_, index) => (
-                <span key={`${watermarkText}-${index}`}>{watermarkText}</span>
-              ))}
-            </div>
-          ) : null}
           {children}
         </section>
       </main>

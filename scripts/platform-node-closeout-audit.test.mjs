@@ -9,7 +9,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "sensitive-data-reveal-step-up",
   "data-lifecycle-retention",
   "multi-datasource-contract-and-runtime",
   "database-certification-matrix",
@@ -90,7 +89,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("preserves 37 baseline closeouts, closes five completion nodes, and tracks eleven pending nodes", () => {
+  it("preserves 37 baseline closeouts, closes six completion nodes, and tracks ten pending nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -98,7 +97,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(task, "task graph must include production-admin-oidc-auth");
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
-    assert.equal(audit.nodeCloseouts.length, 42);
+    assert.equal(audit.nodeCloseouts.length, 43);
     assert.deepEqual(audit.nodeCloseouts.slice(0, 37).map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
     assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts.slice(0, 37))).digest("hex"), foundationBaselineCloseoutDigest);
     const runtimeSecurityCloseout = audit.nodeCloseouts[37];
@@ -134,6 +133,13 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.equal("visualEvidence" in maskCloseout, false);
     assert.ok(maskCloseout.cleanupEvidence.includes("internal/platform/masking/runtime_test.go"));
     assert.ok(maskCloseout.cleanupEvidence.includes("internal/platform/httpapi/projection_test.go"));
+    const revealCloseout = audit.nodeCloseouts.find((item) => item.taskId === "sensitive-data-reveal-step-up");
+    assert.equal(revealCloseout.status, "closed");
+    assert.equal(revealCloseout.neatFreak, true);
+    assert.ok(revealCloseout.cleanupEvidence.includes("internal/platform/httpapi/sensitive_reveal_test.go"));
+    assert.ok(revealCloseout.visualEvidence.includes("product-design"));
+    assert.ok(revealCloseout.visualEvidence.includes("ui-ux-pro-max"));
+    assert.ok(revealCloseout.visualEvidence.includes("browser:control-in-app-browser"));
     assert.deepEqual(audit.pendingNodeEvidence, completionProgramTaskIDs);
   });
 
@@ -148,6 +154,19 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stderr, /nodeCloseouts\.admin-watermark-export-governance\.visualEvidence must include product-design/);
     assert.match(result.stderr, /nodeCloseouts\.admin-watermark-export-governance\.visualEvidence must include ui-ux-pro-max/);
     assert.match(result.stderr, /nodeCloseouts\.admin-watermark-export-governance\.visualEvidence must include browser:control-in-app-browser/);
+  });
+
+  it("rejects reveal closeout without Product Design, UI UX and browser evidence", () => {
+    const audit = readJSON("resources/platform-node-closeout-audit.json");
+    const closeout = audit.nodeCloseouts.find((item) => item.taskId === "sensitive-data-reveal-step-up");
+    closeout.visualEvidence = ["superpowers:brainstorming"];
+
+    const result = runValidator(["--audit", tempJSON("missing-reveal-visual-evidence.json", audit)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /nodeCloseouts\.sensitive-data-reveal-step-up\.visualEvidence must include product-design/);
+    assert.match(result.stderr, /nodeCloseouts\.sensitive-data-reveal-step-up\.visualEvidence must include ui-ux-pro-max/);
+    assert.match(result.stderr, /nodeCloseouts\.sensitive-data-reveal-step-up\.visualEvidence must include browser:control-in-app-browser/);
   });
 
   it("rejects omitting runtime security closeout evidence after implementation", () => {

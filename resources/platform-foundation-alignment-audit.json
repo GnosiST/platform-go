@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-foundation-alignment-audit.json",
-  "capturedAt": "2026-07-12",
+  "capturedAt": "2026-07-13",
   "purpose": "Machine-checkable alignment audit for the active platform foundation goal: approved stack, task dependencies, reference coverage, capability boundaries, governance topology, visual design gates and source-writing safety must not conflict.",
   "approvedStack": {
     "backend": [
@@ -66,10 +66,10 @@
     "admin-watermark-export-governance",
     "sensitive-data-protection-runtime",
     "sensitive-data-historical-migration",
-    "mask-strategy-runtime"
+    "mask-strategy-runtime",
+    "sensitive-data-reveal-step-up"
   ],
   "requiredFutureTaskNodes": [
-    "sensitive-data-reveal-step-up",
     "data-lifecycle-retention",
     "multi-datasource-contract-and-runtime",
     "database-certification-matrix",
@@ -393,9 +393,14 @@
     "docs/platform-foundation-task-map.md",
     "docs/platform-capability-development.md",
     "docs/platform-roadmap.md",
+    "docs/platform-auth.md",
+    "docs/platform-deployment.md",
+    "docs/admin-resource-schema.md",
     "docs/platform-sensitive-data-migration.md",
     "docs/platform-ui-optimization-assessment.md",
     "docs/admin-ui-foundation.md",
+    "docs/superpowers/specs/2026-07-13-sensitive-data-reveal-step-up-design.md",
+    "docs/superpowers/plans/2026-07-13-sensitive-data-reveal-step-up.md",
     "design-qa.md"
   ]
 }

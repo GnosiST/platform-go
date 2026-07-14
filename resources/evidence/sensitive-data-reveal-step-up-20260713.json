@@ -1,0 +1,55 @@
+{
+  "$schema": "https://platform-go.local/schemas/sensitive-data-reveal-step-up-evidence.json",
+  "capturedAt": "2026-07-13",
+  "purpose": "Tracked, redacted manifest for sensitive field reveal step-up browser acceptance. Source screenshots remain local under .superpowers and are integrity-addressed here so governance validation is reproducible from a clean checkout.",
+  "sourceEvidenceRoot": ".superpowers/product-design-audit/sensitive-reveal",
+  "sourceArtifactsTracked": false,
+  "browser": {
+    "tool": "browser:control-in-app-browser",
+    "viewports": ["1280x720", "390x844"],
+    "scenarios": ["factor-selection", "sms-verification", "revealed-value", "mobile-revealed-value"],
+    "horizontalOverflow": false,
+    "consoleWarnings": 0,
+    "consoleErrors": 0
+  },
+  "redaction": {
+    "scanPassed": true,
+    "screenshotsInspected": true,
+    "plaintextSensitiveValuePersisted": false,
+    "credentialsPresent": false
+  },
+  "screenshots": [
+    {
+      "scenario": "factor-selection",
+      "viewport": "1280x720",
+      "localPath": ".superpowers/product-design-audit/sensitive-reveal/01-factor-selection.png",
+      "sha256": "sha256:d3529a4022cd6625fb14c98db8f8e79f98ae607f0d9821f91e88b3b93ef8e3d6",
+      "sizeBytes": 32946,
+      "redacted": true
+    },
+    {
+      "scenario": "sms-verification",
+      "viewport": "1280x720",
+      "localPath": ".superpowers/product-design-audit/sensitive-reveal/02-sms-verification.png",
+      "sha256": "sha256:26d74e36568b8a442eeeb33bc654998711445ab710cc674157e3b6a57edda055",
+      "sizeBytes": 20473,
+      "redacted": true
+    },
+    {
+      "scenario": "revealed-value",
+      "viewport": "1280x720",
+      "localPath": ".superpowers/product-design-audit/sensitive-reveal/03-revealed-value.png",
+      "sha256": "sha256:6b447a2ccd163356650769ef233521dffe4564b2806b2315d47be8729dde6e6c",
+      "sizeBytes": 26462,
+      "redacted": true
+    },
+    {
+      "scenario": "mobile-revealed-value",
+      "viewport": "390x844",
+      "localPath": ".superpowers/product-design-audit/sensitive-reveal/04-mobile-revealed-value.png",
+      "sha256": "sha256:a1fa8bee39edf70deff6368ad1c642032daf7a3f9fe9f89add821cd22c4a24c5",
+      "sizeBytes": 20866,
+      "redacted": true
+    }
+  ]
+}

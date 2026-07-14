@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-production-auth-hardening.json",
-  "capturedAt": "2026-07-11",
+  "capturedAt": "2026-07-13",
   "purpose": "Machine-checkable production auth hardening policy for JWT sessions, provider adapters, credential rotation and future refresh-token family promotion.",
   "taskGraph": {
     "path": "resources/platform-foundation-task-graph.json",
@@ -227,6 +227,47 @@
         "forbidPrivateNetworkHosts": true
       }
     }
+  },
+  "stepUpVerificationPolicy": {
+    "status": "implemented-port-default-disabled",
+    "factorAdapters": ["oidc-reauth-v1", "admin-sms-otp-v1"],
+    "conditionalConfigKeys": [
+      "PLATFORM_SENSITIVE_REVEAL_HMAC_KEY",
+      "PLATFORM_PHONE_HMAC_KEY",
+      "PLATFORM_PHONE_CODE_HMAC_KEY",
+      "PLATFORM_PHONE_VERIFICATION_PROVIDER",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_FIELD",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD"
+    ],
+    "secretSeparation": ["jwt", "phone", "verification-code", "sensitive-reveal", "rate-limit"],
+    "smsProviderPolicy": {
+      "productionProvider": "non-debug-registered-adapter-required",
+      "stockProcess": "debug-only-local-harness",
+      "failClosedWithoutRegisteredSender": true
+    },
+    "verifiedPhoneBinding": {
+      "required": true,
+      "currentPhoneDigestMustMatchStoredVerifiedDigest": true,
+      "phoneFieldMustBeRecoverablyEncrypted": true,
+      "partialSourceConfigurationRejected": true
+    },
+    "runtimeEvidence": [
+      "internal/platform/config/config.go",
+      "internal/platform/config/config_test.go",
+      "internal/platform/bootstrap/sensitive_reveal.go",
+      "internal/platform/httpapi/admin_step_up_phone.go",
+      "internal/platform/httpapi/admin_step_up_phone_test.go",
+      "cmd/platform-api/main.go",
+      "scripts/validate-platform-production-env.mjs",
+      "scripts/platform-production-env.test.mjs",
+      "deploy/env/production.example.env",
+      "deploy/compose/docker-compose.prod.yml",
+      "docs/platform-auth.md",
+      "docs/platform-deployment.md"
+    ]
   },
   "providerAdapterPolicy": {
     "boundary": "httpapi.AppIdentityResolver",

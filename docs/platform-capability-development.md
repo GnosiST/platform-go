@@ -144,7 +144,30 @@ resource.Fields = append(resource.Fields, capability.AdminField{
 })
 ```
 
-Use `raw-v1`, `trim-v1`, `email-v1`, `phone-e164-cn-v1` or `identity-cn-v1` according to the value contract. Do not infer the normalizer from the key. Omit `BlindIndexNamespace` when lookup is unnecessary; otherwise only exact `=` queries are available. A `tenant-field` must be declared, required, plain and stable. Ordinary API and export projection omit encrypted values. No generic reveal HTTP route exists; authorized reveal, step-up verification and historical plaintext migration require separate approved capabilities.
+To allow controlled plaintext reveal, register a policy in the same manifest and reference it from an encrypted field. Do not infer policy from the field name and do not add a custom plaintext route:
+
+```go
+manifest.Admin.RevealPolicies = append(manifest.Admin.RevealPolicies, capability.AdminRevealPolicy{
+    ID: "feedback-sensitive-review-v1",
+    Mode: capability.AdminRevealModeAnyOf,
+    Factors: []string{capability.AdminRevealFactorOIDCReauthentication},
+    Purposes: []capability.AdminRevealPurpose{{
+        Code: "case-review",
+        Label: capability.Text("工单复核", "Case Review"),
+    }},
+    ChallengeTTLSeconds: 300,
+    GrantTTLSeconds: 30,
+})
+resource.Fields[len(resource.Fields)-1].Reveal = &capability.AdminFieldReveal{
+    PolicyID: "feedback-sensitive-review-v1",
+    Permission: "admin:feedback-ticket:sensitive-reveal",
+    CopyAllowed: false,
+}
+```
+
+Revealable fields must remain recoverably encrypted and use masked or omitted ordinary projections. The platform exposes the generic policy/challenge/factor/reveal routes, enforces the field permission and policy, and consumes a short-lived single-use grant before privileged projection.
+
+Use `raw-v1`, `trim-v1`, `email-v1`, `phone-e164-cn-v1` or `identity-cn-v1` according to the value contract. Do not infer the normalizer from the key. Omit `BlindIndexNamespace` when lookup is unnecessary; otherwise only exact `=` queries are available. A `tenant-field` must be declared, required, plain and stable. Ordinary API and export projection omit encrypted values. Do not add a capability-private plaintext route: authorized viewing must use the platform's generic reveal flow, while historical plaintext migration remains a separate offline approved capability.
 
 The platform does not infer sensitivity from names such as `phone`, `email`, `address`, `password` or `token`. Manifest authors must classify every non-public value explicitly; contract validation enforces the declared policy but does not replace that ownership decision with a built-in name list.
 
@@ -591,6 +614,20 @@ PLATFORM_ADMIN_OIDC_CLIENT_ID=platform-admin
 PLATFORM_ADMIN_OIDC_CLIENT_SECRET=<redacted-secret>
 PLATFORM_ADMIN_OIDC_REDIRECT_URL=https://admin.example/login
 PLATFORM_ADMIN_OIDC_SCOPES=openid,profile,email
+```
+
+When an enabled manifest declares a reveal policy, add the conditional reveal configuration below. SMS factors require all phone fields and keys together. The stock process does not bundle a production SMS vendor; a downstream composition root must register a non-debug sender before production startup can pass.
+
+```bash
+PLATFORM_SENSITIVE_REVEAL_HMAC_KEY=<dedicated-at-least-32-byte-secret>
+PLATFORM_PHONE_HMAC_KEY=<different-dedicated-at-least-32-byte-secret>
+PLATFORM_PHONE_CODE_HMAC_KEY=<different-dedicated-at-least-32-byte-secret>
+PLATFORM_PHONE_VERIFICATION_PROVIDER=<registered-non-debug-provider>
+PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE=<resource>
+PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD=<username-field>
+PLATFORM_ADMIN_STEP_UP_PHONE_FIELD=<encrypted-phone-field>
+PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD=<verified-at-field>
+PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD=<verified-phone-digest-field>
 ```
 
 `cmd/platform-api` calls `config.Config.ValidateRuntime()` before opening stores. `PLATFORM_ADMIN_RESOURCE_DRIVER`, `PLATFORM_SESSION_DRIVER` and `PLATFORM_LIFECYCLE_HISTORY_DRIVER` use GORM-backed repositories for `mysql`, `postgres` and `sqlite`; when `PLATFORM_RUNTIME_ENV=production`, they must be configured with DSNs, the JWT secret must not be the development default, Redis must be selected for cache/invalidation, `PLATFORM_CAPABILITIES` must not include `demo-data`, and `PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true` must disable demo login. If `admin-oidc` is enabled, all OIDC settings must be complete, scopes must include `openid`, the production redirect must use absolute HTTPS, and an operator must bind an existing enabled Admin identity through `platform-admin bind-admin-oidc --subject-stdin` before the demo-disabled readiness gate can pass. Standard platform resources including tenants, org units, users, role groups, roles, permissions, menus, area codes and operations resources are normalized in the GORM admin resource adapter; external business resources can remain generic in the consuming package until that package needs dedicated tables.

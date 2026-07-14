@@ -364,3 +364,15 @@ Browser and accessibility evidence:
 Evidence limit: this focused QA is not a WCAG certification and does not include a live external identity provider. Production-like OIDC acceptance remains a separate plan task.
 
 final result: passed
+
+## 2026-07-13 Full-Viewport Watermark And Sensitive Reveal QA
+
+Status: implemented and accepted for the `admin-watermark-export-governance` correction and `sensitive-data-reveal-step-up` closeout.
+
+Watermark evidence under `.superpowers/product-design-audit/watermark/` confirms one fixed viewport layer over the topbar, sidebar, dashboard/list data, dropdown, modal and mobile navigation Drawer. The layer matches the viewport, uses `z-index:2200`, remains above Ant Design overlays at `1000`, and keeps `pointer-events:none`. Narrow sixteen-mark mode uses two columns and eight rows with no truncated attribution or horizontal overflow.
+
+Sensitive reveal evidence under `.superpowers/product-design-audit/sensitive-reveal/` covers factor selection, SMS verification, revealed value and the exact `390x844` mobile result. The modal keeps 44px controls, focuses its heading, renders plaintext once, clears it on close/hide/expiry, and does not expose it through the underlying masked resource view.
+
+Automated evidence includes the Admin UI validator and 92 drift tests, Admin TypeScript checking, generated OpenAPI tests, focused Go runtime/config/HTTP/OIDC/bootstrap tests and the final Admin build. Screenshot and DOM evidence support the implemented interaction but do not certify full WCAG conformance.
+
+final result: passed

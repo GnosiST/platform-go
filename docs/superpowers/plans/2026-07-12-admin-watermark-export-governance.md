@@ -4,7 +4,7 @@
 
 **Goal:** Implement the approved screen-count and policy-review JSON watermark contract, then close `admin-watermark-export-governance` with automated and browser evidence.
 
-**Architecture:** Keep watermark preferences in the existing Admin UI configuration, normalized at the local-storage/import boundary. Render screen marks through one inert grid layer inside `AdminShell`; pass export intent explicitly from the Policy Review console to the API, where the server adds structured provenance metadata and records only the applied boolean in audit policy. Watermark settings never create a marked OpenAPI derivative, while the enabled policy-review schema remains aligned with the runtime contract and original file bytes remain unchanged.
+**Architecture:** Keep watermark preferences in the existing Admin UI configuration, normalized at the local-storage/import boundary. Render screen marks through one fixed, inert viewport layer directly under `.platform-shell`, above navigation, data surfaces and body-portaled overlays; pass export intent explicitly from the Policy Review console to the API, where the server adds structured provenance metadata and records only the applied boolean in audit policy. Watermark settings never create a marked OpenAPI derivative, while the enabled policy-review schema remains aligned with the runtime contract and original file bytes remain unchanged.
 
 **Tech Stack:** React 18, TypeScript, Ant Design, CSS grid, Gin, Go, Node contract tests, local in-app browser QA.
 
@@ -14,7 +14,9 @@
 - Allowed counts are exactly `1 | 4 | 9 | 16`; default is `1`.
 - Allowed scopes are exactly `"screen" | "export"`; default is `["screen"]`.
 - Watermark controls remain bilingual, keyboard operable and at least 44px high on mobile.
-- Screen watermark content is `aria-hidden="true"` and `pointer-events: none`.
+- Screen watermark content is `aria-hidden="true"`, fixed to the viewport and `pointer-events: none`.
+- Watermarks cover the topbar, sidebar, lists, dashboards, drawers, dropdowns and modals.
+- At `<=768px`, sixteen marks use a `2x8` grid so attribution stays readable.
 - Policy-review JSON is the only export format changed in this node.
 - Watermark settings never create or replace a marked OpenAPI derivative; generated schemas may evolve to describe the new policy-review query and response.
 - Original file downloads remain byte-identical.
@@ -120,7 +122,7 @@ Render:
 ) : null}
 ```
 
-Use CSS grid templates for `1`, `4`, `9`, `16`; keep content above the layer, no pointer capture, no horizontal overflow and no viewport-scaled typography.
+Use CSS grid templates for `1`, `4`, `9`, `16`; mount the fixed layer directly under `.platform-shell`, keep pointer handling inert, place edge marks against the viewport, and reflow sixteen marks to `2x8` at `<=768px` without horizontal overflow or viewport-scaled typography.
 
 - [ ] **Step 5: Verify GREEN**
 

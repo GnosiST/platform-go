@@ -358,6 +358,25 @@ describe("validate-platform-production-auth-hardening", () => {
     assert.match(result.stderr, /providerAdapterPolicy.requiredControls must include provider-subject-redaction/);
   });
 
+  it("rejects step-up verification policy drift", () => {
+    const contract = readJSON("resources/platform-production-auth-hardening.json");
+    contract.stepUpVerificationPolicy.conditionalConfigKeys = [];
+    contract.stepUpVerificationPolicy.secretSeparation = ["phone"];
+    contract.stepUpVerificationPolicy.smsProviderPolicy.stockProcess = "production-sms-bundled";
+    contract.stepUpVerificationPolicy.smsProviderPolicy.failClosedWithoutRegisteredSender = false;
+    contract.stepUpVerificationPolicy.verifiedPhoneBinding.currentPhoneDigestMustMatchStoredVerifiedDigest = false;
+    const contractPath = tempJSON("platform-production-auth-hardening.json", contract);
+
+    const result = runValidator(["--contract", contractPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /stepUpVerificationPolicy\.conditionalConfigKeys must include PLATFORM_SENSITIVE_REVEAL_HMAC_KEY/);
+    assert.match(result.stderr, /stepUpVerificationPolicy\.secretSeparation must include rate-limit/);
+    assert.match(result.stderr, /stepUpVerificationPolicy\.smsProviderPolicy\.stockProcess must stay debug-only-local-harness/);
+    assert.match(result.stderr, /stepUpVerificationPolicy\.smsProviderPolicy\.failClosedWithoutRegisteredSender must stay true/);
+    assert.match(result.stderr, /stepUpVerificationPolicy\.verifiedPhoneBinding\.currentPhoneDigestMustMatchStoredVerifiedDigest must stay true/);
+  });
+
   it("rejects provider runtime policies that allow unconfigured login or raw subject exposure", () => {
     const contract = readJSON("resources/platform-production-auth-hardening.json");
     contract.providerRuntimePolicy.defaultDenyUnconfiguredProviders = false;
@@ -595,6 +614,31 @@ describe("validate-platform-production-auth-hardening", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /providerRuntimePolicy.productionForbiddenCapabilities must include demo-data/);
     assert.match(result.stderr, /providerRuntimePolicy.productionForbiddenAuthProviders must include demo/);
+  });
+
+  it("accepts gofmt-aligned DisableDemoAuthProvider wiring", () => {
+    const main = fs.readFileSync(path.join(repoRoot, "cmd/platform-api/main.go"), "utf8");
+    const mainPath = tempText(
+      "main.go",
+      main.replace(/DisableDemoAuthProvider:\s*cfg\.DisableDemoAuthProvider\b/, "DisableDemoAuthProvider:\t\tcfg.DisableDemoAuthProvider"),
+    );
+
+    const result = runValidator(["--main-go", mainPath]);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  it("rejects API composition roots that omit DisableDemoAuthProvider wiring", () => {
+    const main = fs.readFileSync(path.join(repoRoot, "cmd/platform-api/main.go"), "utf8");
+    const mainPath = tempText(
+      "main.go",
+      main.replace(/\s*DisableDemoAuthProvider:\s*cfg\.DisableDemoAuthProvider,?/, ""),
+    );
+
+    const result = runValidator(["--main-go", mainPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /cmd\/platform-api\/main\.go must pass DisableDemoAuthProvider into httpapi\.ServerOptions/);
   });
 
   it("rejects auth audit policies that allow raw credential fields or drop runtime evidence", () => {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-foundation-task-graph.json",
-  "capturedAt": "2026-07-12",
+  "capturedAt": "2026-07-13",
   "purpose": "Execution dependency and conflict-control graph for the reusable platform foundation.",
   "approvedStack": {
     "backend": [
@@ -1883,12 +1883,7 @@
           "scripts/platform-node-closeout-audit.test.mjs"
         ],
         "screenshots": [
-          ".superpowers/product-design-audit/watermark/03-settings-watermark-controls.png",
-          ".superpowers/product-design-audit/watermark/04-desktop-sixteen-watermarks.png",
-          ".superpowers/product-design-audit/watermark/05-mobile-settings-watermark.png",
-          ".superpowers/product-design-audit/watermark/06-mobile-watermark-count.png",
-          ".superpowers/product-design-audit/watermark/07-dark-settings-watermark.png",
-          ".superpowers/product-design-audit/watermark/08-policy-review-export-success.png"
+          "resources/evidence/admin-watermark-export-governance-20260713.json"
         ],
         "skills": [
           "ui-ux-pro-max"
@@ -2106,15 +2101,7 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
-      "statusReason": {
-        "zh": "后台尚无短时单次 reveal grant、验证因子编排、专用权限、限流和追加式审计。",
-        "en": "Admin has no short-lived single-use reveal grants, factor orchestration, dedicated permissions, rate limits or append-only audit."
-      },
-      "completionGate": {
-        "zh": "完成服务端 reveal 策略、OIDC 再认证与短信验证首批因子、短时单次授权、审计以及可访问的后台交互验收。",
-        "en": "Complete server-owned reveal policy, initial OIDC re-authentication and SMS factors, short-lived single-use grants, audit and accessible Admin acceptance."
-      },
+      "status": "implemented",
       "visual": true,
       "designGate": [
         "superpowers:brainstorming",
@@ -2138,8 +2125,86 @@
       ],
       "evidence": {
         "docs": [
+          "docs/superpowers/specs/2026-07-13-sensitive-data-reveal-step-up-design.md",
+          "docs/superpowers/plans/2026-07-13-sensitive-data-reveal-step-up.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/platform-roadmap.md",
+          "docs/platform-foundation-task-map.md",
+          "docs/platform-auth.md",
+          "docs/platform-deployment.md",
+          "docs/admin-resource-schema.md",
+          "docs/admin-ui-foundation.md",
+          "docs/platform-ui-optimization-assessment.md",
+          "design-qa.md"
+        ],
+        "sourcePaths": [
+          "internal/platform/capability/manifest.go",
+          "internal/platform/capability/admin_contract.go",
+          "internal/platform/adminresource/schema.go",
+          "internal/platform/adminresource/security.go",
+          "internal/platform/adminresource/permission.go",
+          "internal/platform/sensitivereveal/runtime.go",
+          "internal/platform/sensitivereveal/store.go",
+          "internal/platform/sensitivereveal/memory_store.go",
+          "internal/platform/sensitivereveal/gorm_store.go",
+          "internal/platform/bootstrap/sensitive_reveal.go",
+          "internal/platform/httpapi/sensitive_reveal.go",
+          "internal/platform/httpapi/admin_step_up_phone.go",
+          "internal/platform/authprovider/oidc/state.go",
+          "internal/platform/authprovider/oidc/resolver.go",
+          "internal/platform/config/config.go",
+          "cmd/platform-api/main.go",
+          "admin/src/platform/resources/SensitiveFieldRevealModal.tsx",
+          "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "admin/src/platform/security/sensitiveRevealOIDC.ts",
+          "admin/src/platform/api/client.ts",
+          "admin/src/platform/api/sessionExpiry.ts",
+          "admin/src/App.tsx",
+          "admin/src/platform/i18n.ts",
+          "admin/src/styles.css",
+          "scripts/generate-admin-openapi.mjs",
+          "resources/generated/openapi.admin.json"
+        ],
+        "validators": [
+          "scripts/validate-admin-resources.mjs",
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs",
+          "scripts/validate-platform-foundation-task-graph.mjs",
+          "scripts/validate-platform-foundation-alignment.mjs",
+          "scripts/validate-platform-task-execution-audit.mjs",
+          "scripts/validate-platform-goal-completion-audit.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs",
+          "scripts/validate-platform-objective-conformance.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs"
+        ],
+        "tests": [
+          "internal/platform/sensitivereveal/runtime_test.go",
+          "internal/platform/bootstrap/sensitive_reveal_test.go",
+          "internal/platform/httpapi/sensitive_reveal_test.go",
+          "internal/platform/httpapi/admin_step_up_phone_test.go",
+          "internal/platform/authprovider/oidc/state_test.go",
+          "internal/platform/authprovider/oidc/resolver_test.go",
+          "internal/platform/config/config_test.go",
+          "internal/platform/capability/admin_contract_test.go",
+          "internal/platform/adminresource/protection_test.go",
+          "scripts/sensitive-reveal-oidc.test.mjs",
+          "scripts/admin-resource-contract-generators.test.mjs",
+          "scripts/admin-ui-contracts.test.mjs"
+        ],
+        "screenshots": [
+          "resources/evidence/sensitive-data-reveal-step-up-20260713.json"
+        ],
+        "skills": [
+          "ui-ux-pro-max"
+        ],
+        "checks": [
+          "rtk go test ./internal/platform/authprovider/oidc ./internal/platform/httpapi ./internal/platform/config ./internal/platform/bootstrap",
+          "rtk node --test scripts/admin-resource-contract-generators.test.mjs",
+          "rtk node scripts/validate-admin-ui-contracts.mjs",
+          "rtk node --test scripts/admin-ui-contracts.test.mjs",
+          "rtk npm --prefix admin run typecheck",
+          "desktop and 390x844 browser acceptance",
+          "clean current-run browser console"
         ]
       }
     },

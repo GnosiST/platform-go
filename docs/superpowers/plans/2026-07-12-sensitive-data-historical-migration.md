@@ -227,7 +227,7 @@ platform-admin sensitive-data-migrate --mode <mode> [flags]
 
 **Interfaces:**
 
-- Produces an implemented `sensitive-data-historical-migration` node; the current official graph has since advanced to `53/42/11` after `mask-strategy-runtime` closeout.
+- Produces an implemented `sensitive-data-historical-migration` node; the current official graph has since advanced to `53/43/10` after `sensitive-data-reveal-step-up` closeout.
 - Keeps MySQL/PostgreSQL production certification as an explicit promotion evidence requirement when external integration environments are unavailable.
 
 - [ ] Write failing Node tests for required command modes, driver policy, approval fields, redaction rules, evidence paths, current graph projections and closeout consistency.

@@ -2,12 +2,18 @@ package adminresource
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/dataprotection"
 	"platform-go/internal/platform/masking"
+)
+
+var (
+	ErrProtectedFieldUnavailable      = errors.New("protected field is unavailable")
+	ErrProtectedFieldDecryptionFailed = errors.New("protected field decryption failed")
 )
 
 type WriteOrigin string
@@ -19,6 +25,20 @@ const (
 
 type ProtectedFieldAuthorizer interface {
 	AuthorizeProtectedField(context.Context, string, string, string, ProjectionPurpose) error
+}
+
+type ProtectedFieldPurpose string
+
+const (
+	ProtectedFieldPurposeSensitiveReveal ProtectedFieldPurpose = "sensitive-reveal"
+	ProtectedFieldPurposeStepUpDelivery  ProtectedFieldPurpose = "step-up-delivery"
+)
+
+type ProtectedFieldRevealRequest struct {
+	Resource string
+	RecordID string
+	Field    string
+	Purpose  ProtectedFieldPurpose
 }
 
 type ProjectionPurpose string
@@ -467,6 +487,52 @@ func (s *Store) ProjectRecordPrivileged(ctx context.Context, resource string, re
 		projected.Values[field.Key] = value
 	}
 	return projected, nil
+}
+
+func (s *Store) RevealProtectedField(ctx context.Context, request ProtectedFieldRevealRequest) (string, error) {
+	request.Resource = strings.TrimSpace(request.Resource)
+	request.RecordID = strings.TrimSpace(request.RecordID)
+	request.Field = strings.TrimSpace(request.Field)
+	if request.Resource == "" || request.RecordID == "" || request.Field == "" ||
+		(request.Purpose != ProtectedFieldPurposeSensitiveReveal && request.Purpose != ProtectedFieldPurposeStepUpDelivery) {
+		return "", errors.Join(ErrInvalidRecord, ErrProtectedFieldUnavailable)
+	}
+	s.mu.Lock()
+	schema, ok := s.schemas[request.Resource]
+	if !ok {
+		s.mu.Unlock()
+		return "", ErrUnknownResource
+	}
+	items := s.resources[request.Resource]
+	index := recordIndexByID(items, request.RecordID)
+	if index < 0 {
+		s.mu.Unlock()
+		return "", ErrRecordNotFound
+	}
+	record := cloneRecord(items[index])
+	runtime := s.protection
+	s.mu.Unlock()
+	field, ok := schemaFieldByKey(schema, request.Field)
+	if !ok {
+		return "", errors.Join(ErrInvalidRecord, ErrProtectedFieldUnavailable)
+	}
+	field = defaultFieldPolicy(field)
+	if field.StorageMode != capability.FieldStorageEncrypted || field.Protection == nil {
+		return "", errors.Join(ErrInvalidRecord, ErrProtectedFieldUnavailable)
+	}
+	envelope, exists := record.Values[field.Key]
+	if !exists || strings.TrimSpace(envelope) == "" || runtime == nil {
+		return "", errors.Join(ErrInvalidRecord, ErrProtectedFieldUnavailable)
+	}
+	policy, fieldContext, err := protectedPolicyAndContext(schema, request.Resource, record, field)
+	if err != nil {
+		return "", errors.Join(ErrInvalidRecord, fmt.Errorf("%w: protected field context is unavailable", ErrProtectedFieldUnavailable))
+	}
+	value, err := runtime.Reveal(ctx, envelope, policy, fieldContext)
+	if err != nil {
+		return "", errors.Join(ErrInvalidRecord, fmt.Errorf("%w: protected field reveal failed", ErrProtectedFieldDecryptionFailed))
+	}
+	return value, nil
 }
 
 func (s *Store) validateProtectionRuntime() error {

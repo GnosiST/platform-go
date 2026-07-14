@@ -18,9 +18,13 @@ const files = {
   oidcPolicy: readSource("admin/src/platform/auth/oidcPolicy.ts"),
   capabilityMetadata: readSource("admin/src/platform/capabilities/metadata.ts"),
   client: readSource("admin/src/platform/api/client.ts"),
+  sessionExpiry: readSource("admin/src/platform/api/sessionExpiry.ts"),
   i18n: readSource("admin/src/platform/i18n.ts"),
   primitives: readSource("admin/src/platform/ui/AdminPrimitives.tsx"),
   resourceConsole: readSource("admin/src/platform/resources/GenericResourceConsole.tsx"),
+  resourceRoute: readSource("admin/src/platform/refine/ResourceRoutePage.tsx"),
+  sensitiveRevealModal: readSource("admin/src/platform/resources/SensitiveFieldRevealModal.tsx"),
+  sensitiveRevealOIDC: readSource("admin/src/platform/security/sensitiveRevealOIDC.ts"),
   shell: readSource("admin/src/platform/shell/AdminShell.tsx"),
   settings: readSource("admin/src/platform/ui/SystemSettingsDrawer.tsx"),
   table: readSource("admin/src/platform/ui/PlatformDataTable.tsx"),
@@ -44,15 +48,14 @@ requireIncludes(files.app, "PolicyReviewConsole", "App must mount the policy-rev
 requireIncludes(files.app, 'resource.route !== "/policy-reviews"', "Generic resource routing must not also mount policy-reviews when the custom console is active.");
 requireIncludes(files.client, "export class AdminAPIError", "Admin API failures must expose typed status codes.");
 requireIncludes(files.client, "ADMIN_SESSION_EXPIRED_EVENT", "The shared client must expose the session-expired event contract.");
+requireIncludes(files.client, "shouldExpireAdminSession", "The shared client must centralize session-expiry decisions.");
+requireIncludes(files.client, "handleUnauthorizedResponse(response.status, requestToken, error?.code)", "Session expiry must consider the structured API error code.");
+requireIncludes(files.sessionExpiry, 'errorCode !== "ADMIN_SENSITIVE_REVEAL_VERIFICATION_FAILED"', "Failed sensitive reveal verification must preserve the authenticated Admin session.");
 requireIncludes(files.client, "statusCode", "Admin API errors must carry HTTP status.");
 requireIncludes(files.client, "dispatchEvent", "Stored-token 401 responses must notify the app.");
 requireIncludes(files.app, "ADMIN_SESSION_EXPIRED_EVENT", "App must listen for shared session expiry.");
 requireIncludes(files.app, "dictionary.sessionExpired", "Session expiry feedback must be localized.");
-requireRegex(
-  files.client,
-  /statusCode !== 401\s*\|\|\s*!requestToken\s*\|\|\s*getAuthToken\(\) !== requestToken/,
-  "Session expiry must clear only the exact token used by the failed request.",
-);
+requireIncludes(files.sessionExpiry, "currentToken === requestToken", "Session expiry must clear only the exact token used by the failed request.");
 requireNotIncludes(files.client, "hadToken", "Session expiry handling must retain the exact request token instead of a boolean token flag.");
 requireIncludes(files.client, 'const { auth = "stored-token", ...fetchInit } = init;', "Request must separate the platform auth mode from native fetch options.");
 requireNotIncludes(files.client, "...init,", "Platform-only request options must not be forwarded to fetch.");
@@ -152,9 +155,57 @@ for (const key of [
 requireIncludes(files.app, "const [sessionExpired, setSessionExpired] = useState(false);", "App must keep session expiry in stable non-localized state.");
 requireIncludes(files.app, "setSessionExpired(true);", "Session expiry recovery must set the stable expiry state.");
 requireCountExactly(files.app, "setSessionExpired(true);", 1, "Only the exact-token session-expired event may set App expiry state.");
+requireIncludes(
+  files.app,
+  "setSensitiveRevealOIDCResume(null);\n      clearPendingSensitiveRevealOIDC();",
+  "Session expiry must let the reveal callback cleanup remove code and state before mounting the login flow.",
+);
 requireIncludes(files.app, "sessionExpired ? dictionary.sessionExpired : authError || error", "Session expiry display must use the current localized dictionary and override provider errors.");
 requireIncludes(files.app, "setSessionExpired(false);", "Successful login must clear stable session expiry state.");
 requireNotIncludes(files.app, "current === dictionary.sessionExpired", "App must not identify session expiry by comparing localized strings.");
+requireIncludes(files.app, "hasSensitiveRevealOIDCCallback(window.location.search)", "App must identify reveal callbacks before the login view mounts.");
+requireOrder(
+  files.app,
+  "if (sensitiveRevealOIDCCallbackPending)",
+  "if (!getAuthToken() || !session)",
+  "Reveal callbacks must remain isolated from the login OIDC callback consumer.",
+);
+requireRegex(
+  files.app,
+  /navigate\(\{ pathname: route, search: "", hash: "" \}, \{ replace: true \}\)/,
+  "Reveal callbacks must clear callback parameters through React Router after exchange.",
+);
+requireIncludes(files.resourceRoute, "oidcResume={sensitiveRevealOIDCResume}", "Resource routes must pass reveal resume state only to the mounted resource console.");
+requireRegex(
+  files.resourceConsole,
+  /const canRevealField = useCallback\([\s\S]*?field\.inDetail && field\.reveal && permissionAllows\(permissions, field\.reveal\.permission, deniedPermissions\)/,
+  "Sensitive reveal actions must require detail visibility, manifest declaration, and the declared permission.",
+);
+requireRegex(
+  files.resourceConsole,
+  /function DetailFieldsPanel\([\s\S]*?className="sensitive-field-reveal-trigger"[\s\S]*?dictionary\.sensitiveRevealAction/,
+  "Sensitive reveal actions must be rendered only by the detail field panel.",
+);
+requireCountExactly(files.resourceConsole, 'className="sensitive-field-reveal-trigger"', 1, "Sensitive reveal must expose exactly one detail-only trigger implementation.");
+requireIncludes(files.resourceConsole, "provider.getOne<AdminResourceRecord>", "OIDC resume must hydrate a detail record that is outside the current list page.");
+requireIncludes(files.resourceConsole, "setSensitiveRevealTarget(null);", "Closing the detail context must also close the sensitive reveal modal.");
+requireNotIncludes(files.app, "revealedValue", "App state must never retain sensitive plaintext.");
+requireNotIncludes(files.resourceConsole, "revealedValue", "Resource page state must never retain sensitive plaintext.");
+requireNotIncludes(files.sensitiveRevealOIDC, "revealedValue", "OIDC pending state must never retain sensitive plaintext.");
+requireIncludes(files.sensitiveRevealModal, 'document.visibilityState === "hidden"', "Sensitive plaintext must be cleared when the page becomes hidden.");
+requireIncludes(files.sensitiveRevealModal, "operationGenerationRef", "Sensitive reveal requests must use an operation generation guard.");
+requireRegex(
+  files.sensitiveRevealModal,
+  /const result = await revealAdminSensitiveField[\s\S]*?if \(operationGenerationRef\.current !== generation\) return;/,
+  "Reveal responses must be discarded after close, hide, or target changes.",
+);
+requireIncludes(
+  files.sensitiveRevealModal,
+  "result.copyAllowed && policy?.copyAllowed && field.reveal?.copyAllowed",
+  "Sensitive plaintext copy must require the response, policy, and field contract to allow it.",
+);
+requireRegex(files.styles, /\.sensitive-field-reveal-trigger\.ant-btn\s*\{[\s\S]*?min-width:\s*44px;[\s\S]*?min-height:\s*44px;/, "Sensitive reveal detail triggers must keep a 44px pointer target.");
+requireRegex(files.styles, /@media \(max-width: 640px\)[\s\S]*?\.sensitive-reveal-modal[\s\S]*?width:\s*calc\(100vw - 24px\)/, "Sensitive reveal modal must remain near-full-width on small screens.");
 requireIncludes(files.client, "parsePlatformResponse", "Direct fetch helpers must share response normalization.");
 requireIncludes(files.authProvider, "error instanceof AdminAPIError", "Refine auth errors must use the typed admin API error contract.");
 requireIncludes(files.capabilityMetadata, 'label: { zh: "身份与组织", en: "Identity & Organization" }', "Core identity capability must make default organization ownership explicit.");
@@ -174,6 +225,18 @@ requireIncludes(files.shell, '"business/dispatch"', "AdminShell must label busin
 requireNotIncludes(files.shell, "access: dictionary.navBusinessAccess", "AdminShell must not reuse plain access for business navigation labels.");
 requireIncludes(files.shell, 'href="#platform-main-content"', "AdminShell must expose a skip-to-content link.");
 requireIncludes(files.shell, 'id="platform-main-content"', "AdminShell main region must expose a stable focus target.");
+requireCountExactly(files.shell, 'className="platform-watermark-layer"', 1, "AdminShell must render exactly one screen watermark layer.");
+requireRegex(
+  files.shell,
+  /<div className=\{shellClass\}[^>]*>\s*<a className="platform-skip-link"[\s\S]*?<\/a>\s*\{showScreenWatermark\s*\?\s*\(\s*<div className="platform-watermark-layer"/,
+  "Screen watermark must be mounted directly under .platform-shell so it covers navigation, data surfaces, and overlays.",
+);
+requireIncludes(files.shell, 'data-scope="viewport"', "Screen watermark must declare viewport scope.");
+requireNotRegex(
+  files.shell,
+  /<section className="platform-content">[\s\S]*?className="platform-watermark-layer"[\s\S]*?<\/section>/,
+  "Screen watermark must not be nested under .platform-content.",
+);
 requireIncludes(files.shell, "previousRouteRef", "AdminShell must move focus only after actual route changes.");
 requireIncludes(files.shell, "pendingDrawerRouteFocusRef", "Drawer route changes must defer main focus until the mobile navigation closes.");
 requireIncludes(files.shell, "if (pendingDrawerRouteFocusRef.current)", "Route focus must remain deferred while mobile navigation is closing.");
@@ -474,6 +537,27 @@ requireRegex(
 requireIncludes(files.styles, ".dashboard-chart {\n    height: 150px;", "Mobile dashboard chart must keep a compact height.");
 requireIncludes(files.styles, ".health-panel .ant-progress", "Mobile health panel must keep compact progress styling.");
 requireIncludes(files.styles, ".platform-skip-link", "styles.css must expose skip-link focus behavior.");
+requireCssRule(
+  files.styles,
+  ".platform-watermark-layer",
+  ["position: fixed;", "inset: 0;", "z-index: 2200;", "pointer-events: none;"],
+  "Screen watermark must remain a fixed, full-viewport, non-interactive overlay above the Admin shell.",
+);
+requireRegex(
+  files.styles,
+  /\.platform-watermark-layer\[data-count="16"\] span:nth-child\(-n \+ 4\)[\s\S]*?align-self:\s*start;/,
+  "Multi-watermark layouts must place their first row against the viewport edge so the topbar is visibly watermarked.",
+);
+requireRegex(
+  files.styles,
+  /\.platform-watermark-layer\[data-count="16"\] span:nth-child\(4n \+ 1\)[\s\S]*?justify-self:\s*start;/,
+  "Multi-watermark layouts must place their first column against the viewport edge so the sidebar is visibly watermarked.",
+);
+requireRegex(
+  files.styles,
+  /@media\s*\(max-width:\s*768px\)[\s\S]*?\.platform-watermark-layer\[data-count="16"\]\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);[\s\S]*?grid-template-rows:\s*repeat\(8,\s*minmax\(0,\s*1fr\)\);/,
+  "Narrow viewports must reflow sixteen watermarks to two columns so attribution text remains readable.",
+);
 requireRegex(files.styles, /:focus-visible[\s\S]*outline:\s*2px solid var\(--primary\)/, "Visible focus must be a default platform behavior.");
 requireRegex(files.styles, /@media\s*\(prefers-reduced-motion:\s*reduce\)/, "styles.css must respect reduced motion.");
 requireRegex(
@@ -562,6 +646,12 @@ function requireIncludes(source, needle, message) {
 
 function requireNotIncludes(source, needle, message) {
   if (source.includes(needle)) {
+    failures.push(message);
+  }
+}
+
+function requireNotRegex(source, pattern, message) {
+  if (pattern.test(source)) {
     failures.push(message);
   }
 }

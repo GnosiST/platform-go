@@ -105,7 +105,7 @@ func wechatMiniAppConfigured(cfg config.Config) bool {
 }
 
 func PhoneVerificationRuntimeFromConfig(cfg config.Config, sender httpapi.PhoneVerificationSender) (PhoneVerificationRuntime, error) {
-	if !configuredCapability(cfg.Capabilities, "app-phone") {
+	if !configuredCapability(cfg.Capabilities, "app-phone") && !cfg.AdminStepUpPhoneSourceConfigured() {
 		return PhoneVerificationRuntime{}, nil
 	}
 	protector := httpapi.NewHMACPhoneProtector([]byte(cfg.PhoneHMACKey), []byte(cfg.PhoneCodeHMACKey))

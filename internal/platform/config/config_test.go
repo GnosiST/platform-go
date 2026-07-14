@@ -36,6 +36,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_REDIS_PASSWORD", "")
 	t.Setenv("PLATFORM_REDIS_DB", "")
 	t.Setenv("PLATFORM_RATE_LIMIT_HMAC_KEY", "")
+	t.Setenv("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY", "")
 	t.Setenv("PLATFORM_DATA_KEY_PROVIDER", "")
 	t.Setenv("PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID", "")
 	t.Setenv("PLATFORM_DATA_ENCRYPTION_KEYRING_JSON", "")
@@ -62,6 +63,11 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_ADMIN_OIDC_CLIENT_SECRET", "")
 	t.Setenv("PLATFORM_ADMIN_OIDC_REDIRECT_URL", "")
 	t.Setenv("PLATFORM_ADMIN_OIDC_SCOPES", "")
+	t.Setenv("PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE", "")
+	t.Setenv("PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD", "")
+	t.Setenv("PLATFORM_ADMIN_STEP_UP_PHONE_FIELD", "")
+	t.Setenv("PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD", "")
+	t.Setenv("PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD", "")
 
 	cfg := Load()
 
@@ -143,6 +149,9 @@ func TestLoadUsesDefaults(t *testing.T) {
 	if cfg.RateLimitHMACKey != "" {
 		t.Fatalf("RateLimitHMACKey = %q, want empty by default", cfg.RateLimitHMACKey)
 	}
+	if cfg.SensitiveRevealHMACKey != "" {
+		t.Fatalf("SensitiveRevealHMACKey = %q, want empty by default", cfg.SensitiveRevealHMACKey)
+	}
 	if cfg.DataKeyProvider != "" || cfg.DataEncryptionActiveKeyID != "" || cfg.DataEncryptionKeyringJSON != "" || cfg.DataBlindIndexActiveKeyID != "" || cfg.DataBlindIndexKeyringJSON != "" {
 		t.Fatal("data protection configuration must be empty by default")
 	}
@@ -172,6 +181,9 @@ func TestLoadUsesDefaults(t *testing.T) {
 	}
 	if cfg.DisableDemoAuthProvider {
 		t.Fatalf("DisableDemoAuthProvider = true, want false by default")
+	}
+	if cfg.AdminStepUpPhoneSourceConfigured() {
+		t.Fatal("admin step-up phone source must be disabled by default")
 	}
 }
 
@@ -398,6 +410,7 @@ func TestLoadParsesCacheConfig(t *testing.T) {
 	t.Setenv("PLATFORM_REDIS_PASSWORD", "secret")
 	t.Setenv("PLATFORM_REDIS_DB", "2")
 	t.Setenv("PLATFORM_RATE_LIMIT_HMAC_KEY", strings.Repeat("r", 32))
+	t.Setenv("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY", strings.Repeat("s", 32))
 
 	cfg := Load()
 	if cfg.CacheDriver != "redis" {
@@ -417,6 +430,44 @@ func TestLoadParsesCacheConfig(t *testing.T) {
 	}
 	if cfg.RateLimitHMACKey != strings.Repeat("r", 32) {
 		t.Fatalf("RateLimitHMACKey = %q", cfg.RateLimitHMACKey)
+	}
+	if cfg.SensitiveRevealHMACKey != strings.Repeat("s", 32) {
+		t.Fatalf("SensitiveRevealHMACKey = %q", cfg.SensitiveRevealHMACKey)
+	}
+}
+
+func TestValidateRuntimeRejectsShortSensitiveRevealHMACKey(t *testing.T) {
+	cfg := validDevelopmentOIDCConfig("https://admin.example/login")
+	cfg.SensitiveRevealHMACKey = "short"
+	if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "PLATFORM_SENSITIVE_REVEAL_HMAC_KEY must contain at least 32 bytes") {
+		t.Fatalf("ValidateRuntime() error = %v", err)
+	}
+}
+
+func TestValidateRuntimeRejectsReusedSensitiveRevealHMACKey(t *testing.T) {
+	tests := []struct {
+		name  string
+		apply func(*Config)
+	}{
+		{name: "jwt", apply: func(cfg *Config) { cfg.SensitiveRevealHMACKey = cfg.JWTSecret }},
+		{name: "phone", apply: func(cfg *Config) {
+			cfg.PhoneHMACKey = strings.Repeat("p", 32)
+			cfg.SensitiveRevealHMACKey = cfg.PhoneHMACKey
+		}},
+		{name: "code", apply: func(cfg *Config) {
+			cfg.PhoneCodeHMACKey = strings.Repeat("c", 32)
+			cfg.SensitiveRevealHMACKey = cfg.PhoneCodeHMACKey
+		}},
+		{name: "rate limit", apply: func(cfg *Config) { cfg.SensitiveRevealHMACKey = cfg.RateLimitHMACKey }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := validProductionRuntimeConfig()
+			tt.apply(&cfg)
+			if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "PLATFORM_SENSITIVE_REVEAL_HMAC_KEY must be distinct from JWT, phone, code, and rate-limit keys") {
+				t.Fatalf("ValidateRuntime() error = %v", err)
+			}
+		})
 	}
 }
 
@@ -671,6 +722,38 @@ func TestLoadParsesPhoneVerificationConfiguration(t *testing.T) {
 	cfg := Load()
 	if cfg.PhoneHMACKey != "phone-key" || cfg.PhoneCodeHMACKey != "code-key" || cfg.PhoneVerificationProvider != "SMS-VENDOR" {
 		t.Fatalf("phone verification config = %+v", cfg)
+	}
+}
+
+func TestLoadParsesAdminStepUpPhoneSource(t *testing.T) {
+	t.Setenv("PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE", "staff-profiles")
+	t.Setenv("PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD", "accountCode")
+	t.Setenv("PLATFORM_ADMIN_STEP_UP_PHONE_FIELD", "mobile")
+	t.Setenv("PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD", "mobileVerifiedAt")
+	t.Setenv("PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD", "mobileVerifiedDigest")
+
+	cfg := Load()
+	if !cfg.AdminStepUpPhoneSourceConfigured() {
+		t.Fatalf("admin step-up phone source = %+v, want configured", cfg)
+	}
+	if cfg.AdminStepUpPhoneResource != "staff-profiles" || cfg.AdminStepUpPhoneActorField != "accountCode" || cfg.AdminStepUpPhoneField != "mobile" || cfg.AdminStepUpPhoneVerifiedAtField != "mobileVerifiedAt" || cfg.AdminStepUpPhoneVerifiedDigestField != "mobileVerifiedDigest" {
+		t.Fatalf("admin step-up phone source = %+v", cfg)
+	}
+}
+
+func TestValidateRuntimeRejectsPartialOrUntrimmedAdminStepUpPhoneSource(t *testing.T) {
+	cfg := Load()
+	cfg.AdminStepUpPhoneResource = "staff-profiles"
+	if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "must be configured together") {
+		t.Fatalf("ValidateRuntime() partial source error = %v", err)
+	}
+
+	cfg.AdminStepUpPhoneActorField = "accountCode"
+	cfg.AdminStepUpPhoneField = " mobile "
+	cfg.AdminStepUpPhoneVerifiedAtField = "mobileVerifiedAt"
+	cfg.AdminStepUpPhoneVerifiedDigestField = "mobileVerifiedDigest"
+	if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "PLATFORM_ADMIN_STEP_UP_PHONE_FIELD must be trimmed") {
+		t.Fatalf("ValidateRuntime() untrimmed source error = %v", err)
 	}
 }
 
@@ -1056,6 +1139,30 @@ func TestValidateRuntimeAcceptsProductionAppPhoneProtectionConfig(t *testing.T) 
 
 	if err := cfg.ValidateRuntime(); err != nil {
 		t.Fatalf("ValidateRuntime() error = %v", err)
+	}
+}
+
+func TestValidateRuntimeRequiresPhoneProtectionForAdminStepUpWithoutAppPhone(t *testing.T) {
+	cfg := Load()
+	cfg.AdminStepUpPhoneResource = "staff-profiles"
+	cfg.AdminStepUpPhoneActorField = "accountCode"
+	cfg.AdminStepUpPhoneField = "mobile"
+	cfg.AdminStepUpPhoneVerifiedAtField = "mobileVerifiedAt"
+	cfg.AdminStepUpPhoneVerifiedDigestField = "mobileVerifiedDigest"
+
+	err := cfg.ValidateRuntime()
+	if err == nil {
+		t.Fatal("ValidateRuntime() error = nil, want Admin step-up phone protection errors")
+	}
+	for _, want := range []string{
+		"admin step-up phone requires PLATFORM_PHONE_HMAC_KEY to be at least 32 bytes",
+		"admin step-up phone requires PLATFORM_PHONE_CODE_HMAC_KEY to be at least 32 bytes",
+		"admin step-up phone requires distinct phone and code HMAC keys",
+		"admin step-up phone requires PLATFORM_PHONE_VERIFICATION_PROVIDER",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("ValidateRuntime() error = %q, missing %q", err, want)
+		}
 	}
 }
 

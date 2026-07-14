@@ -3,6 +3,8 @@ import { useCan, useResourceParams } from "@refinedev/core";
 import type { Dictionary, Language } from "../i18n";
 import { GenericResourceConsole } from "../resources/GenericResourceConsole";
 import type { AdminResourceDefinition } from "../resources/registry";
+import type { AdminSensitiveRevealFactorComplete } from "../api/client";
+import type { SensitiveRevealOIDCResume } from "../security/sensitiveRevealOIDC";
 import { AdminFeedback } from "../ui";
 
 type ResourceRoutePageProps = {
@@ -12,9 +14,11 @@ type ResourceRoutePageProps = {
   dictionary: Dictionary;
   permissions: string[];
   deniedPermissions: string[];
+  sensitiveRevealOIDCResume: SensitiveRevealOIDCResume<AdminSensitiveRevealFactorComplete> | null;
+  onSensitiveRevealOIDCResumeConsumed: () => void;
 };
 
-export function ResourceRoutePage({ resource, availableResourceRoutes, language, dictionary, permissions, deniedPermissions }: ResourceRoutePageProps) {
+export function ResourceRoutePage({ resource, availableResourceRoutes, language, dictionary, permissions, deniedPermissions, sensitiveRevealOIDCResume, onSensitiveRevealOIDCResumeConsumed }: ResourceRoutePageProps) {
   const { resource: refineResource } = useResourceParams({ resource: resource.name, action: "list" });
   const readAccess = useCan({
     resource: resource.name,
@@ -42,6 +46,8 @@ export function ResourceRoutePage({ resource, availableResourceRoutes, language,
       dictionary={dictionary}
       permissions={permissions}
       deniedPermissions={deniedPermissions}
+      oidcResume={sensitiveRevealOIDCResume}
+      onOIDCResumeConsumed={onSensitiveRevealOIDCResumeConsumed}
     />
   );
 }

@@ -255,6 +255,16 @@ Browser acceptance covers `375x812`, `390x844`, `768x1024`, `1024x768`, `1280x72
 
 The matrix is intentionally stricter than provider discovery. Discovery may show an enabled but unconfigured provider; production use needs explicit configuration plus the matrix evidence.
 
+## Sensitive Reveal Step-Up
+
+Sensitive-field reveal is an authenticated authorization flow, not a second login provider. A manifest-declared field selects a dedicated permission and an `anyOf` or `allOf` policy over versioned factors. The initial factors are Admin OIDC reauthentication and Admin SMS OTP.
+
+OIDC reveal uses PKCE and a reveal-specific state flow. Completion must resolve the same provider binding and platform username as the active Admin session. Login state cannot complete a reveal, and reveal state cannot complete login. A failed identity match returns `422 ADMIN_SENSITIVE_REVEAL_VERIFICATION_FAILED` without revoking the main session.
+
+SMS reveal uses the phone verification provider port plus a configured Admin phone source. Configure `PLATFORM_PHONE_HMAC_KEY`, `PLATFORM_PHONE_CODE_HMAC_KEY`, `PLATFORM_PHONE_VERIFICATION_PROVIDER`, `PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE`, `PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD`, `PLATFORM_ADMIN_STEP_UP_PHONE_FIELD`, `PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD` and `PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD` together. The current encrypted phone's digest must constant-time match the stored verified digest, so changing the phone cannot inherit an old verification timestamp. When reveal policies are enabled, `PLATFORM_SENSITIVE_REVEAL_HMAC_KEY` must be a dedicated value of at least 32 bytes. Production must use a non-debug delivery provider and distinct JWT, phone, code, reveal and rate-limit keys. The stock `cmd/platform-api` process registers only the local debug sender and rejects it outside development/test; a production SMS vendor therefore requires a downstream composition-root adapter and fails closed when none is registered.
+
+Challenges, factor transactions and grants are short-lived. Grant tokens are scoped to the active actor/session/resource/record/field/purpose, stored only as HMAC digests, consumed once and followed by a terminal audit outcome. `reveal.succeeded` means the complete response body was accepted by the server-side HTTP writer; it is not proof that a remote client rendered the value. A writer failure records `reveal.failed` with `response_aborted`. Sensitive HTTP responses are `no-store`; plaintext, tokens and codes must not enter logs, browser storage or generic resource projections.
+
 ## Authorization Link
 
 Login does not own authorization. After a provider resolves a platform username, authorization is still calculated by the generic RBAC model:

@@ -231,6 +231,150 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(styles, /\.settings-switch-hit-target\s*\{[\s\S]*?min-height:\s*44px[\s\S]*?min-width:\s*44px/);
   });
 
+  it("rejects a screen watermark nested under the scrollable content region", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/shell/AdminShell.tsx",
+      "      {showScreenWatermark ? (",
+      '      <section className="platform-content">\n        {showScreenWatermark ? (',
+    );
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/shell/AdminShell.tsx",
+      '      ) : null}\n      <aside className="platform-sider"',
+      '        ) : null}\n      </section>\n      <aside className="platform-sider"',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Screen watermark must be mounted directly under \.platform-shell/);
+    assert.match(result.stderr, /Screen watermark must not be nested under \.platform-content/);
+  });
+
+  for (const [name, declaration, replacement] of [
+    ["fixed viewport positioning", "position: fixed;", "position: absolute;"],
+    ["full viewport inset", "inset: 0;", "inset: auto;"],
+    ["overlay stacking", "z-index: 2200;", "z-index: 1100;"],
+    ["non-interactive pointer handling", "pointer-events: none;", "pointer-events: auto;"],
+  ]) {
+    it(`rejects a screen watermark without ${name}`, () => {
+      const tempRoot = tempAdminRoot();
+      replaceRegexInTemp(
+        tempRoot,
+        "admin/src/styles.css",
+        new RegExp(`(\\.platform-watermark-layer\\s*\\{[\\s\\S]*?)${declaration.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}`),
+        `$1${replacement}`,
+      );
+
+      const result = runValidator(["--root", tempRoot]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /Screen watermark must remain a fixed, full-viewport, non-interactive overlay above the Admin shell/);
+    });
+  }
+
+  it("rejects a multi-watermark layout that leaves the topbar visually blank", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/styles.css",
+      '.platform-watermark-layer[data-count="16"] span:nth-child(-n + 4)',
+      '.platform-watermark-layer[data-count="16"] span:nth-child(-n + 0)',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /first row against the viewport edge/);
+  });
+
+  it("rejects a sixteen-watermark layout that stays four columns on narrow viewports", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/styles.css",
+      'grid-template-columns: repeat(2, minmax(0, 1fr));\n    grid-template-rows: repeat(8, minmax(0, 1fr));',
+      'grid-template-columns: repeat(4, minmax(0, 1fr));\n    grid-template-rows: repeat(4, minmax(0, 1fr));',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /reflow sixteen watermarks to two columns/);
+  });
+
+  it("rejects reveal callbacks that can mount the login OIDC consumer", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/App.tsx", "if (sensitiveRevealOIDCCallbackPending) {", "if (false) {");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Reveal callbacks must remain isolated from the login OIDC callback consumer/);
+  });
+
+  it("rejects sensitive reveal actions outside manifest-governed detail fields", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "field.inDetail && field.reveal && permissionAllows(permissions, field.reveal.permission, deniedPermissions)",
+      "field.reveal && permissionAllows(permissions, field.reveal.permission, deniedPermissions)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Sensitive reveal actions must require detail visibility, manifest declaration, and the declared permission/);
+  });
+
+  it("rejects reveal responses that can restore plaintext after close or page hide", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/SensitiveFieldRevealModal.tsx",
+      "if (operationGenerationRef.current !== generation) return;",
+      "void generation;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Reveal responses must be discarded after close, hide, or target changes/);
+  });
+
+  it("rejects plaintext copy that bypasses field or policy configuration", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/SensitiveFieldRevealModal.tsx",
+      "result.copyAllowed && policy?.copyAllowed && field.reveal?.copyAllowed",
+      "result.copyAllowed",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Sensitive plaintext copy must require the response, policy, and field contract to allow it/);
+  });
+
+  it("rejects OIDC resume without off-page detail hydration", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "provider.getOne<AdminResourceRecord>",
+      "provider.getMany<AdminResourceRecord>",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /OIDC resume must hydrate a detail record that is outside the current list page/);
+  });
+
   it("passes the shared export watermark intent to policy review JSON exports", () => {
     const client = fs.readFileSync(path.join(repoRoot, "admin/src/platform/api/client.ts"), "utf8");
     const app = fs.readFileSync(path.join(repoRoot, "admin/src/App.tsx"), "utf8");
@@ -321,15 +465,64 @@ describe("validate-admin-ui-contracts", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
       tempRoot,
-      "admin/src/platform/api/client.ts",
-      "getAuthToken() !== requestToken",
-      "Boolean(getAuthToken())",
+      "admin/src/platform/api/sessionExpiry.ts",
+      "currentToken === requestToken",
+      "Boolean(currentToken)",
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /Session expiry must clear only the exact token used by the failed request/);
+  });
+
+  it("keeps the Admin session after sensitive reveal verification fails", () => {
+    const result = runTypeScriptProbe("admin/src/platform/api/sessionExpiry.ts", (moduleURL) => `
+      import assert from "node:assert/strict";
+      import { shouldExpireAdminSession } from ${JSON.stringify(moduleURL)};
+
+      assert.equal(shouldExpireAdminSession({
+        statusCode: 422,
+        requestToken: "current-token",
+        currentToken: "current-token",
+        errorCode: "ADMIN_SENSITIVE_REVEAL_VERIFICATION_FAILED",
+      }), false);
+      assert.equal(shouldExpireAdminSession({
+        statusCode: 401,
+        requestToken: "current-token",
+        currentToken: "current-token",
+        errorCode: "ADMIN_SENSITIVE_REVEAL_VERIFICATION_FAILED",
+      }), false);
+      assert.equal(shouldExpireAdminSession({
+        statusCode: 401,
+        requestToken: "current-token",
+        currentToken: "current-token",
+        errorCode: "ADMIN_SESSION_INVALID",
+      }), true);
+      assert.equal(shouldExpireAdminSession({
+        statusCode: 401,
+        requestToken: "stale-token",
+        currentToken: "current-token",
+        errorCode: "ADMIN_SESSION_INVALID",
+      }), false);
+    `);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  it("rejects session expiry that mounts login before reveal callback URL cleanup", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/App.tsx",
+      "      setSensitiveRevealOIDCResume(null);\n      clearPendingSensitiveRevealOIDC();",
+      "      setSensitiveRevealOIDCResume(null);\n      setSensitiveRevealOIDCCallbackPending(false);\n      clearPendingSensitiveRevealOIDC();",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /reveal callback cleanup remove code and state/);
   });
 
   it("rejects auth bootstrap calls that use stored-token authentication", () => {

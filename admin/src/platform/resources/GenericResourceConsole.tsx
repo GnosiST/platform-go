@@ -19,6 +19,7 @@ import {
   executeAdminResourceAction,
   getAdminFileBlob,
   getAdminResourceSchema,
+  startAdminSensitiveRevealOIDC,
   uploadAdminFile,
   type AdminResourceAction,
   type AdminResourceField,
@@ -29,8 +30,10 @@ import {
   type AdminResourceQuerySort,
   type AdminResourceRecord,
   type AdminResourceSchema,
+  type AdminSensitiveRevealFactorComplete,
 } from "../api/client";
 import { dictionaries, type Dictionary, type Language } from "../i18n";
+import { beginSensitiveRevealOIDC, type SensitiveRevealOIDCBeginInput, type SensitiveRevealOIDCResume } from "../security/sensitiveRevealOIDC";
 import {
   AdminActionButton,
   AdminFeedback,
@@ -52,6 +55,7 @@ import {
   type PlatformResourceFormSlots,
 } from "../ui";
 import type { AdminResourceDefinition } from "./registry";
+import { SensitiveFieldRevealModal } from "./SensitiveFieldRevealModal";
 
 type GenericResourceConsoleProps = {
   resource: AdminResourceDefinition;
@@ -60,6 +64,8 @@ type GenericResourceConsoleProps = {
   dictionary: Dictionary;
   permissions?: string[];
   deniedPermissions?: string[];
+  oidcResume: SensitiveRevealOIDCResume<AdminSensitiveRevealFactorComplete> | null;
+  onOIDCResumeConsumed: () => void;
 };
 
 type ResourceFormValues = Record<string, string | string[] | boolean | number | undefined>;
@@ -80,6 +86,11 @@ type FilePreviewState = {
   error?: string;
 };
 
+type SensitiveRevealTarget = {
+  recordId: string;
+  field: AdminResourceField;
+};
+
 const FOCUSABLE_RESOURCE_FORM_CONTROL_SELECTOR = [
   '.resource-form-fields input:not([type="hidden"]):not([disabled]):not([readonly])',
   ".resource-form-fields textarea:not([disabled]):not([readonly])",
@@ -89,7 +100,7 @@ const FOCUSABLE_RESOURCE_FORM_CONTROL_SELECTOR = [
   '.resource-form-fields [tabindex]:not([tabindex="-1"]):not([disabled]):not([readonly]):not([aria-disabled="true"])',
 ].join(", ");
 
-export function GenericResourceConsole({ resource, availableResourceRoutes = [], language, dictionary, permissions = ["*"], deniedPermissions = [] }: GenericResourceConsoleProps) {
+export function GenericResourceConsole({ resource, availableResourceRoutes = [], language, dictionary, permissions = ["*"], deniedPermissions = [], oidcResume, onOIDCResumeConsumed }: GenericResourceConsoleProps) {
   const resourceKey = resourceKeyFromRoute(resource.route);
   const isFileResource = resourceKey === "files";
   const hasAuditResource = availableResourceRoutes.includes("/audit-logs");
@@ -114,12 +125,15 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
   const [modalOpen, setModalOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailRecordID, setDetailRecordID] = useState("");
+  const [detachedDetailRecord, setDetachedDetailRecord] = useState<AdminResourceRecord | null>(null);
+  const [sensitiveRevealTarget, setSensitiveRevealTarget] = useState<SensitiveRevealTarget | null>(null);
   const [issuedToken, setIssuedToken] = useState("");
   const [togglingRecordID, setTogglingRecordID] = useState("");
   const [actionExecutingKey, setActionExecutingKey] = useState("");
   const [form] = Form.useForm<ResourceFormValues>();
   const watchedFormValues = Form.useWatch([], form) as ResourceFormValues | undefined;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const oidcResumeOpeningRef = useRef("");
   const dataProvider = useDataProvider();
 
   const relationOptionSignature = useMemo(() => relationSignature(schema.fields), [schema.fields]);
@@ -271,8 +285,8 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
     [items, selectedID],
   );
   const detailRecord = useMemo(
-    () => items.find((item) => item.id === detailRecordID) ?? selectedRecord,
-    [detailRecordID, items, selectedRecord],
+    () => items.find((item) => item.id === detailRecordID) ?? (detachedDetailRecord?.id === detailRecordID ? detachedDetailRecord : undefined) ?? (detailRecordID ? undefined : selectedRecord),
+    [detachedDetailRecord, detailRecordID, items, selectedRecord],
   );
   const canReadAuditLogs = useMemo(() => hasAuditResource && permissionAllows(permissions, "admin:audit-log:read", deniedPermissions), [deniedPermissions, hasAuditResource, permissions]);
   const openCreate = () => {
@@ -286,10 +300,78 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
   };
 
   const openDetail = (record: AdminResourceRecord) => {
+    setDetachedDetailRecord(null);
     setSelectedID(record.id);
     setDetailRecordID(record.id);
     setDetailOpen(true);
   };
+
+  const canRevealField = useCallback(
+    (field: AdminResourceField) => Boolean(field.inDetail && field.reveal && permissionAllows(permissions, field.reveal.permission, deniedPermissions)),
+    [deniedPermissions, permissions],
+  );
+
+  const openSensitiveReveal = useCallback((record: AdminResourceRecord, field: AdminResourceField) => {
+    setSensitiveRevealTarget({ recordId: record.id, field });
+  }, []);
+
+  const startSensitiveRevealOIDC = useCallback(
+    (input: SensitiveRevealOIDCBeginInput) => beginSensitiveRevealOIDC(
+      input,
+      (request) => startAdminSensitiveRevealOIDC(request.resource, request.recordId, request.field, request.challengeId, {
+        challengeToken: request.challengeToken,
+        purpose: request.purpose,
+        provider: request.provider,
+        codeChallenge: request.codeChallenge,
+      }),
+    ),
+    [],
+  );
+
+  useEffect(() => {
+    if (!schemaReady || !oidcResume || oidcResume.context.resource !== resourceKey) {
+      return;
+    }
+    const resumeKey = [oidcResume.context.challengeId, oidcResume.context.recordId, oidcResume.context.field].join(":");
+    if (oidcResumeOpeningRef.current === resumeKey) {
+      return;
+    }
+    oidcResumeOpeningRef.current = resumeKey;
+    const field = schema.fields.find((candidate) => candidate.key === oidcResume.context.field);
+    if (!field || !canRevealField(field)) {
+      onOIDCResumeConsumed();
+      setError(dictionary.sensitiveRevealVerificationFailed);
+      return;
+    }
+
+    const recordId = oidcResume.context.recordId;
+    const listedRecord = items.find((item) => item.id === recordId);
+    setSelectedID(listedRecord?.id ?? "");
+    setDetailRecordID(recordId);
+    setDetachedDetailRecord(listedRecord ?? null);
+    setDetailOpen(true);
+    setSensitiveRevealTarget({ recordId, field });
+    if (listedRecord) {
+      return;
+    }
+
+    let cancelled = false;
+    const provider = dataProvider();
+    void provider.getOne<AdminResourceRecord>({ resource: resourceKey, id: recordId })
+      .then((result) => {
+        if (!cancelled) {
+          setDetachedDetailRecord(result.data);
+        }
+      })
+      .catch((nextError: unknown) => {
+        if (!cancelled) {
+          setError(nextError instanceof Error ? nextError.message : dictionary.loadResourceFailed);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canRevealField, dataProvider, dictionary.loadResourceFailed, dictionary.sensitiveRevealVerificationFailed, items, oidcResume, onOIDCResumeConsumed, resourceKey, schema.fields, schemaReady]);
 
   useEffect(() => {
     if (!modalOpen) {
@@ -792,7 +874,10 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
         placement="right"
         rootStyle={{ position: "absolute" }}
         width={520}
-        onClose={() => setDetailOpen(false)}
+        onClose={() => {
+          setSensitiveRevealTarget(null);
+          setDetailOpen(false);
+        }}
       >
         <ResourceInspector
           detailFields={detailFields}
@@ -807,12 +892,14 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
           panels={customPanels}
           record={detailRecord}
           canUpdate={canUpdate}
+          canRevealField={canRevealField}
           onDownload={(record) => void downloadFile(record)}
           onEdit={(record) => {
             setDetailOpen(false);
             openEdit(record);
           }}
           onReloadPreview={(record) => void loadFilePreview(record)}
+          onReveal={openSensitiveReveal}
         />
       </Drawer>
 
@@ -864,6 +951,18 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
         <AdminFeedback type="warning" message={dictionary.oneTimeSecretWarning} description={dictionary.oneTimeSecretDescription} />
         <Input.TextArea readOnly rows={3} value={issuedToken} />
       </Modal>
+      <SensitiveFieldRevealModal
+        dictionary={dictionary}
+        field={sensitiveRevealTarget?.field}
+        language={language}
+        oidcResume={oidcResume}
+        open={Boolean(sensitiveRevealTarget)}
+        recordId={sensitiveRevealTarget?.recordId}
+        resource={resourceKey}
+        onClose={() => setSensitiveRevealTarget(null)}
+        onOIDCResumeConsumed={onOIDCResumeConsumed}
+        onStartOIDC={startSensitiveRevealOIDC}
+      />
     </AdminPage>
   );
 }
@@ -881,9 +980,11 @@ function ResourceInspector({
   permissions,
   panels,
   canUpdate,
+  canRevealField,
   onDownload,
   onEdit,
   onReloadPreview,
+  onReveal,
 }: {
   detailFields: AdminResourceField[];
   record?: AdminResourceRecord;
@@ -897,9 +998,11 @@ function ResourceInspector({
   permissions: AdminResourceSchema["permissions"];
   panels: AdminResourcePanel[];
   canUpdate: boolean;
+  canRevealField: (field: AdminResourceField) => boolean;
   onDownload: (record: AdminResourceRecord) => void;
   onEdit: (record: AdminResourceRecord) => void;
   onReloadPreview: (record: AdminResourceRecord) => void;
+  onReveal: (record: AdminResourceRecord, field: AdminResourceField) => void;
 }) {
   if (!record) {
     return <aside className="resource-inspector empty" />;
@@ -916,9 +1019,11 @@ function ResourceInspector({
         language={language}
         record={record}
         canUpdate={canUpdate}
+        canRevealField={canRevealField}
         onDownload={onDownload}
         onEdit={onEdit}
         onReloadPreview={onReloadPreview}
+        onReveal={onReveal}
       />
     );
   }
@@ -936,7 +1041,7 @@ function ResourceInspector({
           {
             key: "fields",
             label: dictionary.detailPanel,
-            children: <DetailFieldsPanel detailFields={detailFields} dictionary={dictionary} language={language} record={record} />,
+            children: <DetailFieldsPanel canRevealField={canRevealField} detailFields={detailFields} dictionary={dictionary} language={language} record={record} onReveal={onReveal} />,
           },
           {
             key: "permissions",
@@ -975,9 +1080,11 @@ function FileResourceInspector({
   filePreview,
   language,
   canUpdate,
+  canRevealField,
   onDownload,
   onEdit,
   onReloadPreview,
+  onReveal,
 }: {
   detailFields: AdminResourceField[];
   record: AdminResourceRecord;
@@ -988,9 +1095,11 @@ function FileResourceInspector({
   filePreview: FilePreviewState;
   language: Language;
   canUpdate: boolean;
+  canRevealField: (field: AdminResourceField) => boolean;
   onDownload: (record: AdminResourceRecord) => void;
   onEdit: (record: AdminResourceRecord) => void;
   onReloadPreview: (record: AdminResourceRecord) => void;
+  onReveal: (record: AdminResourceRecord, field: AdminResourceField) => void;
 }) {
   const previewKind = filePreviewKind(record);
   return (
@@ -1014,7 +1123,7 @@ function FileResourceInspector({
           {
             key: "metadata",
             label: dictionary.fileMetadata,
-            children: <FileMetadataPanel detailFields={detailFields} dictionary={dictionary} language={language} record={record} />,
+            children: <FileMetadataPanel canRevealField={canRevealField} detailFields={detailFields} dictionary={dictionary} language={language} record={record} onReveal={onReveal} />,
           },
           {
             key: "preview",
@@ -1056,11 +1165,15 @@ function FileMetadataPanel({
   record,
   dictionary,
   language,
+  canRevealField,
+  onReveal,
 }: {
   detailFields: AdminResourceField[];
   record: AdminResourceRecord;
   dictionary: Dictionary;
   language: Language;
+  canRevealField: (field: AdminResourceField) => boolean;
+  onReveal: (record: AdminResourceRecord, field: AdminResourceField) => void;
 }) {
   const fields = detailFields.filter((field) => !["status"].includes(field.key));
   return (
@@ -1071,7 +1184,7 @@ function FileMetadataPanel({
         <FileMetadataItem label={dictionary.fileSize} value={formatBytes(fileSize(record))} />
         <FileMetadataItem label={dictionary.fileStorageDriver} value={fileStorageDriver(record) || "-"} />
       </div>
-      <DetailFieldsPanel detailFields={fields} dictionary={dictionary} language={language} record={record} />
+      <DetailFieldsPanel canRevealField={canRevealField} detailFields={fields} dictionary={dictionary} language={language} record={record} onReveal={onReveal} />
     </section>
   );
 }
@@ -1248,18 +1361,36 @@ function DetailFieldsPanel({
   record,
   dictionary,
   language,
+  canRevealField,
+  onReveal,
 }: {
   detailFields: AdminResourceField[];
   record: AdminResourceRecord;
   dictionary: Dictionary;
   language: Language;
+  canRevealField: (field: AdminResourceField) => boolean;
+  onReveal: (record: AdminResourceRecord, field: AdminResourceField) => void;
 }) {
   return (
     <dl className="detail-list">
       {detailFields.map((field) => (
         <div key={field.key}>
           <dt>{localizedText(field.label, language)}</dt>
-          <dd>{renderPlainFieldValue(record, field, language, dictionary)}</dd>
+          <dd className="detail-field-value">
+            <span>{renderPlainFieldValue(record, field, language, dictionary)}</span>
+            {canRevealField(field) ? (
+              <AdminActionButton
+                className="sensitive-field-reveal-trigger"
+                icon={<EyeOutlined />}
+                label={dictionary.sensitiveRevealAction}
+                size="small"
+                type="link"
+                onClick={() => onReveal(record, field)}
+              >
+                {dictionary.sensitiveRevealAction}
+              </AdminActionButton>
+            ) : null}
+          </dd>
         </div>
       ))}
     </dl>

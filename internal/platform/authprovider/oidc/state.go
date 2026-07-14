@@ -14,6 +14,8 @@ import (
 const (
 	stateKeyContext = "platform-admin-oidc-state-v1"
 	stateLifetime   = 5 * time.Minute
+	stateFlowLogin  = "login"
+	stateFlowStepUp = "step-up"
 )
 
 var errInvalidState = errors.New("invalid oidc state")
@@ -24,6 +26,7 @@ type stateCodec struct {
 }
 
 type stateClaims struct {
+	Flow          string    `json:"flow"`
 	ProviderID    string    `json:"provider_id"`
 	Nonce         string    `json:"nonce"`
 	CodeChallenge string    `json:"code_challenge"`
@@ -49,9 +52,14 @@ func newStateCodec(key []byte, now func() time.Time) (*stateCodec, error) {
 }
 
 func (c *stateCodec) issue(providerID string, codeChallenge string) (string, stateClaims, error) {
+	return c.issueForFlow(providerID, codeChallenge, stateFlowLogin)
+}
+
+func (c *stateCodec) issueForFlow(providerID string, codeChallenge string, flow string) (string, stateClaims, error) {
 	providerID = strings.TrimSpace(providerID)
 	codeChallenge = strings.TrimSpace(codeChallenge)
-	if providerID == "" || codeChallenge == "" {
+	flow = strings.TrimSpace(flow)
+	if providerID == "" || codeChallenge == "" || (flow != stateFlowLogin && flow != stateFlowStepUp) {
 		return "", stateClaims{}, errInvalidState
 	}
 	nonce, err := randomStateValue()
@@ -64,6 +72,7 @@ func (c *stateCodec) issue(providerID string, codeChallenge string) (string, sta
 	}
 	now := c.now().UTC()
 	claims := stateClaims{
+		Flow:          flow,
 		ProviderID:    providerID,
 		Nonce:         nonce,
 		CodeChallenge: codeChallenge,
@@ -81,6 +90,10 @@ func (c *stateCodec) issue(providerID string, codeChallenge string) (string, sta
 }
 
 func (c *stateCodec) verify(signedState string, providerID string) (stateClaims, error) {
+	return c.verifyForFlow(signedState, providerID, stateFlowLogin)
+}
+
+func (c *stateCodec) verifyForFlow(signedState string, providerID string, flow string) (stateClaims, error) {
 	payloadPart, signaturePart, ok := strings.Cut(strings.TrimSpace(signedState), ".")
 	if !ok || payloadPart == "" || signaturePart == "" || strings.Contains(signaturePart, ".") {
 		return stateClaims{}, errInvalidState
@@ -98,7 +111,7 @@ func (c *stateCodec) verify(signedState string, providerID string) (stateClaims,
 		return stateClaims{}, errInvalidState
 	}
 	now := c.now().UTC()
-	if claims.ProviderID == "" || claims.Nonce == "" || claims.CodeChallenge == "" || claims.TransactionID == "" || claims.IssuedAt.IsZero() || claims.ExpiresAt.IsZero() ||
+	if claims.Flow != strings.TrimSpace(flow) || claims.ProviderID == "" || claims.Nonce == "" || claims.CodeChallenge == "" || claims.TransactionID == "" || claims.IssuedAt.IsZero() || claims.ExpiresAt.IsZero() ||
 		!hmac.Equal([]byte(claims.ProviderID), []byte(strings.TrimSpace(providerID))) ||
 		!claims.ExpiresAt.Equal(claims.IssuedAt.Add(stateLifetime)) || now.Before(claims.IssuedAt) || !now.Before(claims.ExpiresAt) {
 		return stateClaims{}, errInvalidState

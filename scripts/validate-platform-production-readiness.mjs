@@ -34,6 +34,7 @@ const requiredRuntimeGateSnippets = [
   "production runtime requires PLATFORM_CACHE_DRIVER=redis",
   "production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY to be at least 32 bytes",
   "production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY to be distinct from phone and code HMAC keys",
+  "PLATFORM_SENSITIVE_REVEAL_HMAC_KEY must be distinct from JWT, phone, code, and rate-limit keys",
   "production runtime must not enable demo-data capability",
   "production runtime requires PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
   "production runtime requires PLATFORM_PUBLIC_BASE_URL to be an absolute HTTPS origin",
@@ -48,6 +49,14 @@ const requiredProductionEnv = [
   "PLATFORM_EDGE_TRUSTED_PROXY",
   "PLATFORM_HTTP_MAX_BODY_BYTES",
   "PLATFORM_RATE_LIMIT_HMAC_KEY",
+];
+const requiredConditionalProductionEnv = [
+  "PLATFORM_SENSITIVE_REVEAL_HMAC_KEY",
+  "PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE",
+  "PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD",
+  "PLATFORM_ADMIN_STEP_UP_PHONE_FIELD",
+  "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD",
+  "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD",
 ];
 const requiredPreflightCommands = [
   "production-runtime-tests",
@@ -157,6 +166,46 @@ function validateRequiredEnv(readiness, configSource, errors) {
     }
   }
   requireIncludes(values(readiness.requiredEnv).map((item) => item.name), requiredProductionEnv, "requiredEnv", errors);
+
+  const conditionalNames = new Set();
+  for (const item of values(readiness.conditionalEnv)) {
+    const name = item.name ?? "";
+    const prefix = `conditional env ${name || "<missing>"}`;
+    if (!name) {
+      errors.push("conditional env is missing name");
+      continue;
+    }
+    if (seen.has(name) || conditionalNames.has(name)) {
+      errors.push(`${prefix} is duplicated`);
+    }
+    conditionalNames.add(name);
+    if (!/^PLATFORM_[A-Z0-9_]+$/.test(name)) {
+      errors.push(`${prefix} must use PLATFORM_* uppercase naming`);
+    }
+    if (!item.condition) {
+      errors.push(`${prefix} must declare condition`);
+    }
+    if (!item.purpose) {
+      errors.push(`${prefix} must declare purpose`);
+    }
+    if (!configSource.includes(`"${name}"`)) {
+      errors.push(`${prefix} is not read by config.Load`);
+    }
+    const docs = values(item.docs);
+    if (docs.length === 0) {
+      errors.push(`${prefix} must declare docs`);
+    }
+    for (const docPath of docs) {
+      if (!relativeExistingPath(docPath)) {
+        errors.push(`${prefix} doc path is missing or unsafe: ${docPath}`);
+        continue;
+      }
+      if (!readRelativeFile(docPath).includes(name)) {
+        errors.push(`${prefix} is missing from ${docPath}`);
+      }
+    }
+  }
+  requireIncludes([...conditionalNames], requiredConditionalProductionEnv, "conditionalEnv", errors);
 }
 
 function expectedOperationPlanOutput(readinessFilePath) {

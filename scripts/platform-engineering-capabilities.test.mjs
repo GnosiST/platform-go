@@ -86,18 +86,18 @@ describe("validate-platform-engineering-capabilities", () => {
     const capabilities = matrix.capabilities.filter((item) => completionProgramCapabilityIDs.includes(item.id));
 
     assert.deepEqual(capabilities.map((item) => item.id), completionProgramCapabilityIDs);
-    for (const capability of capabilities.slice(0, 4)) {
+    for (const capability of capabilities.slice(0, 5)) {
       assert.equal(capability.status, "implemented");
       assert.ok(capability.evidence.sourcePaths.length > 0);
       assert.ok(capability.evidence.tests.length > 0);
       assert.ok(capability.evidence.validators.length > 0);
     }
-    assert.ok(capabilities.slice(4).every((item) => item.status === "partial"));
+    assert.ok(capabilities.slice(5).every((item) => item.status === "partial"));
 
     for (const [index, capabilityID] of newlyGovernedCapabilityIDs.entries()) {
       const capability = capabilities.find((item) => item.id === capabilityID);
       assert.deepEqual(capability.dependsOn, [newlyGovernedCapabilityDependencies[index]]);
-      if (capabilityID !== "mask-strategy-runtime") {
+      if (!["mask-strategy-runtime", "sensitive-data-reveal-step-up"].includes(capabilityID)) {
         assert.deepEqual(capability.evidence.sourcePaths, newlyGovernedCapabilityDocs);
       }
       assert.deepEqual(capability.evidence.taskIds, [capabilityID]);
@@ -108,6 +108,12 @@ describe("validate-platform-engineering-capabilities", () => {
     assert.ok(portability.dependsOn.includes("admin-watermark-export-governance"));
     assert.ok(portability.dependsOn.includes("sensitive-data-protection"));
     assert.ok(portability.dependsOn.includes("asynchronous-search-projection"));
+
+    const reveal = capabilities.find((item) => item.id === "sensitive-data-reveal-step-up");
+    assert.ok(reveal.evidence.sourcePaths.includes("internal/platform/httpapi/sensitive_reveal.go"));
+    assert.ok(reveal.evidence.sourcePaths.includes("admin/src/platform/resources/SensitiveFieldRevealModal.tsx"));
+    assert.ok(reveal.evidence.tests.includes("internal/platform/httpapi/sensitive_reveal_test.go"));
+    assert.ok(reveal.evidence.validators.includes("scripts/validate-admin-ui-contracts.mjs"));
   });
 
   it("rejects regressing watermark governance to partial after closeout", () => {
@@ -138,6 +144,16 @@ describe("validate-platform-engineering-capabilities", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /required implemented capability mask-strategy-runtime must stay implemented/);
+  });
+
+  it("rejects regressing sensitive reveal step-up to partial after implementation", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities.find((item) => item.id === "sensitive-data-reveal-step-up").status = "partial";
+
+    const result = runValidator(["--matrix", tempJSON("partial-sensitive-reveal-step-up.json", matrix)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /required implemented capability sensitive-data-reveal-step-up must stay implemented/);
   });
 
   it("keeps sensitive data migration evidence implemented after closeout", () => {

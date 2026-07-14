@@ -20,14 +20,28 @@ var adminFieldProjectionModes = []string{FieldProjectionFull, FieldProjectionMas
 var adminFieldProtectionFormats = []string{"aes-256-gcm-v1"}
 var adminFieldProtectionNormalizations = []string{"raw-v1", "trim-v1", "email-v1", "phone-e164-cn-v1", "identity-cn-v1"}
 var adminResourceProtectionScopes = []string{"global", "tenant-field"}
+var adminRevealModes = []string{AdminRevealModeAnyOf, AdminRevealModeAllOf}
+var adminRevealFactors = []string{AdminRevealFactorOIDCReauthentication, AdminRevealFactorSMSOTP}
 
 func ValidateAdminSurface(manifests []Manifest) error {
 	resources := map[string]ID{}
 	routes := map[string]ID{}
 	permissionPrefixes := map[string]ID{}
+	revealPolicies := map[string]AdminRevealPolicy{}
+	for _, manifest := range manifests {
+		for _, policy := range manifest.Admin.RevealPolicies {
+			if err := validateAdminRevealPolicy(manifest.ID, policy); err != nil {
+				return err
+			}
+			if _, exists := revealPolicies[policy.ID]; exists {
+				return fmt.Errorf("capability %q admin reveal policy %q is already registered", manifest.ID, policy.ID)
+			}
+			revealPolicies[policy.ID] = policy
+		}
+	}
 	for _, manifest := range manifests {
 		for _, resource := range manifest.Admin.Resources {
-			if err := validateAdminResource(manifest.ID, resource); err != nil {
+			if err := validateAdminResource(manifest.ID, resource, revealPolicies); err != nil {
 				return err
 			}
 			if owner, exists := resources[resource.Resource]; exists {
@@ -134,7 +148,7 @@ func validateAdminRelationTargetField(owner ID, resource string, field string, t
 	return fmt.Errorf("capability %q admin resource %q field %q relation %s field %q is not declared by target resource %q; declared fields: %s", owner, resource, field, label, key, target, strings.Join(validFields, ","))
 }
 
-func validateAdminResource(owner ID, resource AdminResource) error {
+func validateAdminResource(owner ID, resource AdminResource, revealPolicies map[string]AdminRevealPolicy) error {
 	switch {
 	case strings.TrimSpace(resource.Resource) == "":
 		return fmt.Errorf("capability %q admin resource key is required", owner)
@@ -157,7 +171,7 @@ func validateAdminResource(owner ID, resource AdminResource) error {
 	if err := validateAdminFormGroups(owner, resource); err != nil {
 		return err
 	}
-	if err := validateAdminResourceFields(owner, resource); err != nil {
+	if err := validateAdminResourceFields(owner, resource, revealPolicies); err != nil {
 		return err
 	}
 	if err := validateAdminResourceFieldReferences(owner, resource); err != nil {
@@ -195,7 +209,7 @@ func validateAdminFormGroups(owner ID, resource AdminResource) error {
 	return nil
 }
 
-func validateAdminResourceFields(owner ID, resource AdminResource) error {
+func validateAdminResourceFields(owner ID, resource AdminResource, revealPolicies map[string]AdminRevealPolicy) error {
 	seen := map[string]struct{}{}
 	blindIndexNamespaces := map[string]string{}
 	hasEncryptedField := false
@@ -219,6 +233,9 @@ func validateAdminResourceFields(owner ID, resource AdminResource) error {
 		if err := validateAdminField(owner, resource.Resource, field); err != nil {
 			return err
 		}
+		if err := validateAdminFieldReveal(owner, resource, field, revealPolicies); err != nil {
+			return err
+		}
 		if defaultAdminFieldPolicy(field.StorageMode, FieldStoragePlain) == FieldStorageEncrypted {
 			hasEncryptedField = true
 			if field.Searchable {
@@ -240,6 +257,81 @@ func validateAdminResourceFields(owner ID, resource AdminResource) error {
 		}
 	}
 	return validateAdminResourceProtection(owner, resource, hasEncryptedField)
+}
+
+func validateAdminRevealPolicy(owner ID, policy AdminRevealPolicy) error {
+	policyID := strings.TrimSpace(policy.ID)
+	if !validAdminProtectionName(policyID) {
+		return fmt.Errorf("capability %q admin reveal policy id must be canonical lowercase kebab-case", owner)
+	}
+	if !slices.Contains(adminRevealModes, strings.TrimSpace(policy.Mode)) {
+		return fmt.Errorf("capability %q admin reveal policy %q mode must be one of %s", owner, policyID, strings.Join(adminRevealModes, ","))
+	}
+	if len(policy.Factors) == 0 {
+		return fmt.Errorf("capability %q admin reveal policy %q factors are required", owner, policyID)
+	}
+	seenFactors := map[string]struct{}{}
+	for _, factor := range policy.Factors {
+		factor = strings.TrimSpace(factor)
+		if !slices.Contains(adminRevealFactors, factor) {
+			return fmt.Errorf("capability %q admin reveal policy %q factor %q is unsupported", owner, policyID, factor)
+		}
+		if _, exists := seenFactors[factor]; exists {
+			return fmt.Errorf("capability %q admin reveal policy %q duplicate factor %q", owner, policyID, factor)
+		}
+		seenFactors[factor] = struct{}{}
+	}
+	if len(policy.Purposes) == 0 {
+		return fmt.Errorf("capability %q admin reveal policy %q purposes are required", owner, policyID)
+	}
+	seenPurposes := map[string]struct{}{}
+	for _, purpose := range policy.Purposes {
+		code := strings.TrimSpace(purpose.Code)
+		if !validAdminProtectionName(code) || !hasLocalizedText(purpose.Label) {
+			return fmt.Errorf("capability %q admin reveal policy %q purpose must declare a canonical code and zh/en label", owner, policyID)
+		}
+		if _, exists := seenPurposes[code]; exists {
+			return fmt.Errorf("capability %q admin reveal policy %q duplicate purpose %q", owner, policyID, code)
+		}
+		seenPurposes[code] = struct{}{}
+	}
+	if policy.ChallengeTTLSeconds < 60 || policy.ChallengeTTLSeconds > 600 {
+		return fmt.Errorf("capability %q admin reveal policy %q challenge TTL must be between 60 and 600 seconds", owner, policyID)
+	}
+	if policy.GrantTTLSeconds < 30 || policy.GrantTTLSeconds > 300 || policy.GrantTTLSeconds >= policy.ChallengeTTLSeconds {
+		return fmt.Errorf("capability %q admin reveal policy %q grant TTL must be between 30 and 300 seconds and shorter than the challenge TTL", owner, policyID)
+	}
+	return nil
+}
+
+func validateAdminFieldReveal(owner ID, resource AdminResource, field AdminField, revealPolicies map[string]AdminRevealPolicy) error {
+	if field.Reveal == nil {
+		return nil
+	}
+	storageMode := defaultAdminFieldPolicy(field.StorageMode, FieldStoragePlain)
+	responseMode := defaultAdminFieldPolicy(field.ResponseMode, FieldProjectionFull)
+	exportMode := defaultAdminFieldPolicy(field.ExportMode, FieldProjectionFull)
+	if storageMode != FieldStorageEncrypted {
+		return fmt.Errorf("capability %q admin resource %q field %q reveal metadata requires encrypted storage", owner, resource.Resource, field.Key)
+	}
+	if responseMode != FieldProjectionMasked && responseMode != FieldProjectionPrivileged {
+		return fmt.Errorf("capability %q admin resource %q field %q reveal metadata requires a masked or privileged response", owner, resource.Resource, field.Key)
+	}
+	if exportMode == FieldProjectionFull || exportMode == FieldProjectionPrivileged {
+		return fmt.Errorf("capability %q admin resource %q field %q reveal metadata cannot expose plaintext exports", owner, resource.Resource, field.Key)
+	}
+	policyID := strings.TrimSpace(field.Reveal.PolicyID)
+	if _, exists := revealPolicies[policyID]; !exists {
+		return fmt.Errorf("capability %q admin resource %q field %q references unknown reveal policy %q", owner, resource.Resource, field.Key, policyID)
+	}
+	permission := strings.TrimSpace(field.Reveal.Permission)
+	if permission == "" {
+		return fmt.Errorf("capability %q admin resource %q field %q reveal permission is required", owner, resource.Resource, field.Key)
+	}
+	if err := validateAdminPermission(owner, resource.Resource, fmt.Sprintf("field %s reveal", field.Key), resource.PermissionPrefix, permission); err != nil {
+		return err
+	}
+	return nil
 }
 
 func validateAdminResourceFieldReferences(owner ID, resource AdminResource) error {

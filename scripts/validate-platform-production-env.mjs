@@ -382,6 +382,18 @@ function validatePlatformEnv(env, errors) {
   if (rateLimitHMACKey && (rateLimitHMACKey === phoneHMACKey || rateLimitHMACKey === phoneCodeHMACKey)) {
     errors.push("PLATFORM_RATE_LIMIT_HMAC_KEY must be distinct from phone and code HMAC keys");
   }
+  const sensitiveRevealHMACKey = env.get("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY") ?? "";
+  if (sensitiveRevealHMACKey !== "") {
+    if (Buffer.byteLength(sensitiveRevealHMACKey, "utf8") < 32) {
+      errors.push("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY must be at least 32 bytes");
+    }
+    if ([env.get("PLATFORM_JWT_SECRET") ?? "", phoneHMACKey, phoneCodeHMACKey, rateLimitHMACKey].includes(sensitiveRevealHMACKey)) {
+      errors.push("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY must be distinct from JWT, phone, code, and rate-limit keys");
+    }
+    if (strictSecrets && isPlaceholderSecret(sensitiveRevealHMACKey)) {
+      errors.push("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY must not be a placeholder when --strict-secrets is used");
+    }
+  }
   if (!isTruthy(requireKey(env, "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER", errors))) {
     errors.push("PLATFORM_DISABLE_DEMO_AUTH_PROVIDER must be true");
   }
@@ -503,7 +515,22 @@ function validatePlatformEnv(env, errors) {
   if (capabilities.includes("demo-data")) {
     errors.push("PLATFORM_CAPABILITIES must not include demo-data in production");
   }
-  if (capabilities.includes("app-phone")) {
+  const adminStepUpPhoneKeys = [
+    "PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE",
+    "PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD",
+    "PLATFORM_ADMIN_STEP_UP_PHONE_FIELD",
+    "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD",
+    "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD",
+  ];
+  const configuredAdminStepUpPhoneKeys = adminStepUpPhoneKeys.filter((key) => (env.get(key) ?? "").trim() !== "");
+  if (configuredAdminStepUpPhoneKeys.length > 0 && configuredAdminStepUpPhoneKeys.length !== adminStepUpPhoneKeys.length) {
+    errors.push("all PLATFORM_ADMIN_STEP_UP_PHONE_* values must be configured together");
+  }
+  const adminStepUpPhoneConfigured = configuredAdminStepUpPhoneKeys.length === adminStepUpPhoneKeys.length;
+  if (adminStepUpPhoneConfigured && sensitiveRevealHMACKey === "") {
+    errors.push("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY is required when Admin step-up phone is configured");
+  }
+  if (capabilities.includes("app-phone") || adminStepUpPhoneConfigured) {
     const phoneKey = requireKey(env, "PLATFORM_PHONE_HMAC_KEY", errors);
     const codeKey = requireKey(env, "PLATFORM_PHONE_CODE_HMAC_KEY", errors);
     const rawProvider = requireKey(env, "PLATFORM_PHONE_VERIFICATION_PROVIDER", errors);

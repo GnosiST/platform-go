@@ -127,6 +127,22 @@ describe("validate-platform-production-readiness", () => {
 		assert.match(result.stderr, /runtimeGate\.requiredSnippets must include production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY to be distinct/);
 	});
 
+  it("rejects readiness contracts that omit conditional sensitive reveal configuration", () => {
+    const readiness = readJSON("resources/platform-production-readiness.json");
+    readiness.conditionalEnv = [];
+    readiness.runtimeGate.requiredSnippets = readiness.runtimeGate.requiredSnippets.filter(
+      (snippet) => !snippet.includes("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY"),
+    );
+    const readinessPath = tempJSON("platform-production-readiness.json", readiness);
+
+    const result = runValidator(["--readiness", readinessPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /conditionalEnv must include PLATFORM_SENSITIVE_REVEAL_HMAC_KEY/);
+    assert.match(result.stderr, /conditionalEnv must include PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD/);
+    assert.match(result.stderr, /runtimeGate\.requiredSnippets must include PLATFORM_SENSITIVE_REVEAL_HMAC_KEY must be distinct/);
+  });
+
   it("rejects readiness commands whose executable script is missing", () => {
     const readiness = readJSON("resources/platform-production-readiness.json");
     readiness.preflightCommands.push({

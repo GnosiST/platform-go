@@ -165,6 +165,17 @@
       "PLATFORM_FILE_ALLOWED_MIME_TYPES",
       "PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION"
     ],
+    "conditionalEnv": [
+      "PLATFORM_SENSITIVE_REVEAL_HMAC_KEY",
+      "PLATFORM_PHONE_HMAC_KEY",
+      "PLATFORM_PHONE_CODE_HMAC_KEY",
+      "PLATFORM_PHONE_VERIFICATION_PROVIDER",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_FIELD",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD"
+    ],
     "forbiddenProductionCapabilities": ["demo-data"],
     "recommendedFileStorage": "s3-for-multi-instance"
   },
@@ -251,6 +262,14 @@
       {
         "path": "deploy/compose/docker-compose.prod.yml",
         "contains": "PLATFORM_EDGE_TRUSTED_PROXY: ${PLATFORM_EDGE_TRUSTED_PROXY:?required}"
+      },
+      {
+        "path": "deploy/compose/docker-compose.prod.yml",
+        "contains": "PLATFORM_SENSITIVE_REVEAL_HMAC_KEY: ${PLATFORM_SENSITIVE_REVEAL_HMAC_KEY:-}"
+      },
+      {
+        "path": "deploy/compose/docker-compose.prod.yml",
+        "contains": "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD: ${PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD:-}"
       },
       {
         "path": "deploy/compose/docker-compose.prod.yml",

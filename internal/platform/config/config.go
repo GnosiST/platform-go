@@ -16,64 +16,70 @@ import (
 )
 
 type Config struct {
-	RuntimeEnvironment                string
-	HTTPAddr                          string
-	PublicBaseURL                     string
-	TrustedProxies                    []string
-	EdgeTrustedProxy                  string
-	HTTPMaxBodyBytes                  int64
-	Capabilities                      []string
-	AdminResourceFile                 string
-	AdminResourceDriver               string
-	AdminResourceDSN                  string
-	SessionFile                       string
-	SessionDriver                     string
-	SessionDSN                        string
-	LifecycleHistoryFile              string
-	LifecycleHistoryDriver            string
-	LifecycleHistoryDSN               string
-	DatabaseDriver                    string
-	DatabaseDSN                       string
-	OpenAPIFile                       string
-	JWTSecret                         string
-	CacheDriver                       string
-	CacheDefaultTTL                   time.Duration
-	RedisAddr                         string
-	RedisPassword                     string
-	RedisDB                           int
-	RateLimitHMACKey                  string
-	DataKeyProvider                   string
-	DataEncryptionActiveKeyID         string
-	DataEncryptionKeyringJSON         string
-	DataBlindIndexActiveKeyID         string
-	DataBlindIndexKeyringJSON         string
-	FileStorageDriver                 string
-	FileStorageLocalDir               string
-	FileMaxUploadBytes                int64
-	FileAllowedMIMETypes              []string
-	FileStorageS3Endpoint             string
-	FileStorageS3Region               string
-	FileStorageS3Bucket               string
-	FileStorageS3AccessKey            string
-	FileStorageS3SecretKey            string
-	FileStorageS3Prefix               string
-	FileStorageS3PathStyle            bool
-	FileStorageS3ServerSideEncryption string
-	FileStorageS3KMSKeyID             string
-	WechatMiniAppID                   string
-	WechatMiniAppSecret               string
-	WechatMiniAppCode2SessionEndpoint string
-	AdminOIDCIssuerURL                string
-	AdminOIDCClientID                 string
-	AdminOIDCClientSecret             string
-	AdminOIDCRedirectURL              string
-	AdminOIDCScopes                   []string
-	DisableDemoAuthProvider           bool
-	PhoneHMACKey                      string
-	PhoneCodeHMACKey                  string
-	PhoneVerificationProvider         string
-	filePolicySource                  filePolicySource
-	transportPolicySource             transportPolicySource
+	RuntimeEnvironment                  string
+	HTTPAddr                            string
+	PublicBaseURL                       string
+	TrustedProxies                      []string
+	EdgeTrustedProxy                    string
+	HTTPMaxBodyBytes                    int64
+	Capabilities                        []string
+	AdminResourceFile                   string
+	AdminResourceDriver                 string
+	AdminResourceDSN                    string
+	SessionFile                         string
+	SessionDriver                       string
+	SessionDSN                          string
+	LifecycleHistoryFile                string
+	LifecycleHistoryDriver              string
+	LifecycleHistoryDSN                 string
+	DatabaseDriver                      string
+	DatabaseDSN                         string
+	OpenAPIFile                         string
+	JWTSecret                           string
+	CacheDriver                         string
+	CacheDefaultTTL                     time.Duration
+	RedisAddr                           string
+	RedisPassword                       string
+	RedisDB                             int
+	RateLimitHMACKey                    string
+	SensitiveRevealHMACKey              string
+	DataKeyProvider                     string
+	DataEncryptionActiveKeyID           string
+	DataEncryptionKeyringJSON           string
+	DataBlindIndexActiveKeyID           string
+	DataBlindIndexKeyringJSON           string
+	FileStorageDriver                   string
+	FileStorageLocalDir                 string
+	FileMaxUploadBytes                  int64
+	FileAllowedMIMETypes                []string
+	FileStorageS3Endpoint               string
+	FileStorageS3Region                 string
+	FileStorageS3Bucket                 string
+	FileStorageS3AccessKey              string
+	FileStorageS3SecretKey              string
+	FileStorageS3Prefix                 string
+	FileStorageS3PathStyle              bool
+	FileStorageS3ServerSideEncryption   string
+	FileStorageS3KMSKeyID               string
+	WechatMiniAppID                     string
+	WechatMiniAppSecret                 string
+	WechatMiniAppCode2SessionEndpoint   string
+	AdminOIDCIssuerURL                  string
+	AdminOIDCClientID                   string
+	AdminOIDCClientSecret               string
+	AdminOIDCRedirectURL                string
+	AdminOIDCScopes                     []string
+	DisableDemoAuthProvider             bool
+	PhoneHMACKey                        string
+	PhoneCodeHMACKey                    string
+	PhoneVerificationProvider           string
+	AdminStepUpPhoneResource            string
+	AdminStepUpPhoneActorField          string
+	AdminStepUpPhoneField               string
+	AdminStepUpPhoneVerifiedAtField     string
+	AdminStepUpPhoneVerifiedDigestField string
+	filePolicySource                    filePolicySource
+	transportPolicySource               transportPolicySource
 }
 
 type envConfigState uint8
@@ -134,62 +140,68 @@ func Load() Config {
 	fileS3Encryption, fileS3EncryptionState := envWithState("PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION", "AES256")
 	httpMaxBodyBytes, httpMaxBodyBytesState := int64EnvWithState("PLATFORM_HTTP_MAX_BODY_BYTES", 1<<20)
 	return Config{
-		RuntimeEnvironment:                strings.ToLower(env("PLATFORM_RUNTIME_ENV", RuntimeEnvironmentDevelopment)),
-		HTTPAddr:                          env("PLATFORM_HTTP_ADDR", "127.0.0.1:9200"),
-		PublicBaseURL:                     env("PLATFORM_PUBLIC_BASE_URL", ""),
-		TrustedProxies:                    csvEnv("PLATFORM_TRUSTED_PROXIES", nil),
-		EdgeTrustedProxy:                  env("PLATFORM_EDGE_TRUSTED_PROXY", ""),
-		HTTPMaxBodyBytes:                  httpMaxBodyBytes,
-		Capabilities:                      csvEnv("PLATFORM_CAPABILITIES", defaultCapabilities),
-		AdminResourceFile:                 env("PLATFORM_ADMIN_RESOURCE_FILE", ""),
-		AdminResourceDriver:               env("PLATFORM_ADMIN_RESOURCE_DRIVER", ""),
-		AdminResourceDSN:                  env("PLATFORM_ADMIN_RESOURCE_DSN", ""),
-		SessionFile:                       env("PLATFORM_SESSION_FILE", ""),
-		SessionDriver:                     env("PLATFORM_SESSION_DRIVER", ""),
-		SessionDSN:                        env("PLATFORM_SESSION_DSN", ""),
-		LifecycleHistoryFile:              env("PLATFORM_LIFECYCLE_HISTORY_FILE", ""),
-		LifecycleHistoryDriver:            env("PLATFORM_LIFECYCLE_HISTORY_DRIVER", ""),
-		LifecycleHistoryDSN:               env("PLATFORM_LIFECYCLE_HISTORY_DSN", ""),
-		DatabaseDriver:                    env("PLATFORM_DATABASE_DRIVER", "mysql"),
-		DatabaseDSN:                       env("PLATFORM_DATABASE_DSN", ""),
-		OpenAPIFile:                       env("PLATFORM_OPENAPI_FILE", "resources/generated/openapi.admin.json"),
-		JWTSecret:                         env("PLATFORM_JWT_SECRET", defaultJWTSecret),
-		CacheDriver:                       env("PLATFORM_CACHE_DRIVER", ""),
-		CacheDefaultTTL:                   durationEnv("PLATFORM_CACHE_DEFAULT_TTL", 5*time.Minute),
-		RedisAddr:                         env("PLATFORM_REDIS_ADDR", "127.0.0.1:6379"),
-		RedisPassword:                     env("PLATFORM_REDIS_PASSWORD", ""),
-		RedisDB:                           intEnv("PLATFORM_REDIS_DB", 0),
-		RateLimitHMACKey:                  env("PLATFORM_RATE_LIMIT_HMAC_KEY", ""),
-		DataKeyProvider:                   env("PLATFORM_DATA_KEY_PROVIDER", ""),
-		DataEncryptionActiveKeyID:         env("PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID", ""),
-		DataEncryptionKeyringJSON:         env("PLATFORM_DATA_ENCRYPTION_KEYRING_JSON", ""),
-		DataBlindIndexActiveKeyID:         env("PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID", ""),
-		DataBlindIndexKeyringJSON:         env("PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON", ""),
-		FileStorageDriver:                 env("PLATFORM_FILE_STORAGE_DRIVER", "local"),
-		FileStorageLocalDir:               env("PLATFORM_FILE_STORAGE_LOCAL_DIR", ".platform/uploads"),
-		FileMaxUploadBytes:                fileMaxUploadBytes,
-		FileAllowedMIMETypes:              fileAllowedMIMETypes,
-		FileStorageS3Endpoint:             env("PLATFORM_FILE_STORAGE_S3_ENDPOINT", ""),
-		FileStorageS3Region:               env("PLATFORM_FILE_STORAGE_S3_REGION", ""),
-		FileStorageS3Bucket:               env("PLATFORM_FILE_STORAGE_S3_BUCKET", ""),
-		FileStorageS3AccessKey:            env("PLATFORM_FILE_STORAGE_S3_ACCESS_KEY", ""),
-		FileStorageS3SecretKey:            env("PLATFORM_FILE_STORAGE_S3_SECRET_KEY", ""),
-		FileStorageS3Prefix:               env("PLATFORM_FILE_STORAGE_S3_PREFIX", ""),
-		FileStorageS3PathStyle:            boolEnv("PLATFORM_FILE_STORAGE_S3_FORCE_PATH_STYLE", false),
-		FileStorageS3ServerSideEncryption: fileS3Encryption,
-		FileStorageS3KMSKeyID:             env("PLATFORM_FILE_STORAGE_S3_KMS_KEY_ID", ""),
-		WechatMiniAppID:                   env("PLATFORM_WECHAT_MINIAPP_APP_ID", ""),
-		WechatMiniAppSecret:               env("PLATFORM_WECHAT_MINIAPP_SECRET", ""),
-		WechatMiniAppCode2SessionEndpoint: env("PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT", ""),
-		AdminOIDCIssuerURL:                env("PLATFORM_ADMIN_OIDC_ISSUER_URL", ""),
-		AdminOIDCClientID:                 env("PLATFORM_ADMIN_OIDC_CLIENT_ID", ""),
-		AdminOIDCClientSecret:             env("PLATFORM_ADMIN_OIDC_CLIENT_SECRET", ""),
-		AdminOIDCRedirectURL:              env("PLATFORM_ADMIN_OIDC_REDIRECT_URL", ""),
-		AdminOIDCScopes:                   csvEnv("PLATFORM_ADMIN_OIDC_SCOPES", []string{"openid", "profile", "email"}),
-		DisableDemoAuthProvider:           boolEnv("PLATFORM_DISABLE_DEMO_AUTH_PROVIDER", false),
-		PhoneHMACKey:                      env("PLATFORM_PHONE_HMAC_KEY", ""),
-		PhoneCodeHMACKey:                  env("PLATFORM_PHONE_CODE_HMAC_KEY", ""),
-		PhoneVerificationProvider:         env("PLATFORM_PHONE_VERIFICATION_PROVIDER", ""),
+		RuntimeEnvironment:                  strings.ToLower(env("PLATFORM_RUNTIME_ENV", RuntimeEnvironmentDevelopment)),
+		HTTPAddr:                            env("PLATFORM_HTTP_ADDR", "127.0.0.1:9200"),
+		PublicBaseURL:                       env("PLATFORM_PUBLIC_BASE_URL", ""),
+		TrustedProxies:                      csvEnv("PLATFORM_TRUSTED_PROXIES", nil),
+		EdgeTrustedProxy:                    env("PLATFORM_EDGE_TRUSTED_PROXY", ""),
+		HTTPMaxBodyBytes:                    httpMaxBodyBytes,
+		Capabilities:                        csvEnv("PLATFORM_CAPABILITIES", defaultCapabilities),
+		AdminResourceFile:                   env("PLATFORM_ADMIN_RESOURCE_FILE", ""),
+		AdminResourceDriver:                 env("PLATFORM_ADMIN_RESOURCE_DRIVER", ""),
+		AdminResourceDSN:                    env("PLATFORM_ADMIN_RESOURCE_DSN", ""),
+		SessionFile:                         env("PLATFORM_SESSION_FILE", ""),
+		SessionDriver:                       env("PLATFORM_SESSION_DRIVER", ""),
+		SessionDSN:                          env("PLATFORM_SESSION_DSN", ""),
+		LifecycleHistoryFile:                env("PLATFORM_LIFECYCLE_HISTORY_FILE", ""),
+		LifecycleHistoryDriver:              env("PLATFORM_LIFECYCLE_HISTORY_DRIVER", ""),
+		LifecycleHistoryDSN:                 env("PLATFORM_LIFECYCLE_HISTORY_DSN", ""),
+		DatabaseDriver:                      env("PLATFORM_DATABASE_DRIVER", "mysql"),
+		DatabaseDSN:                         env("PLATFORM_DATABASE_DSN", ""),
+		OpenAPIFile:                         env("PLATFORM_OPENAPI_FILE", "resources/generated/openapi.admin.json"),
+		JWTSecret:                           env("PLATFORM_JWT_SECRET", defaultJWTSecret),
+		CacheDriver:                         env("PLATFORM_CACHE_DRIVER", ""),
+		CacheDefaultTTL:                     durationEnv("PLATFORM_CACHE_DEFAULT_TTL", 5*time.Minute),
+		RedisAddr:                           env("PLATFORM_REDIS_ADDR", "127.0.0.1:6379"),
+		RedisPassword:                       env("PLATFORM_REDIS_PASSWORD", ""),
+		RedisDB:                             intEnv("PLATFORM_REDIS_DB", 0),
+		RateLimitHMACKey:                    env("PLATFORM_RATE_LIMIT_HMAC_KEY", ""),
+		SensitiveRevealHMACKey:              env("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY", ""),
+		DataKeyProvider:                     env("PLATFORM_DATA_KEY_PROVIDER", ""),
+		DataEncryptionActiveKeyID:           env("PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID", ""),
+		DataEncryptionKeyringJSON:           env("PLATFORM_DATA_ENCRYPTION_KEYRING_JSON", ""),
+		DataBlindIndexActiveKeyID:           env("PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID", ""),
+		DataBlindIndexKeyringJSON:           env("PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON", ""),
+		FileStorageDriver:                   env("PLATFORM_FILE_STORAGE_DRIVER", "local"),
+		FileStorageLocalDir:                 env("PLATFORM_FILE_STORAGE_LOCAL_DIR", ".platform/uploads"),
+		FileMaxUploadBytes:                  fileMaxUploadBytes,
+		FileAllowedMIMETypes:                fileAllowedMIMETypes,
+		FileStorageS3Endpoint:               env("PLATFORM_FILE_STORAGE_S3_ENDPOINT", ""),
+		FileStorageS3Region:                 env("PLATFORM_FILE_STORAGE_S3_REGION", ""),
+		FileStorageS3Bucket:                 env("PLATFORM_FILE_STORAGE_S3_BUCKET", ""),
+		FileStorageS3AccessKey:              env("PLATFORM_FILE_STORAGE_S3_ACCESS_KEY", ""),
+		FileStorageS3SecretKey:              env("PLATFORM_FILE_STORAGE_S3_SECRET_KEY", ""),
+		FileStorageS3Prefix:                 env("PLATFORM_FILE_STORAGE_S3_PREFIX", ""),
+		FileStorageS3PathStyle:              boolEnv("PLATFORM_FILE_STORAGE_S3_FORCE_PATH_STYLE", false),
+		FileStorageS3ServerSideEncryption:   fileS3Encryption,
+		FileStorageS3KMSKeyID:               env("PLATFORM_FILE_STORAGE_S3_KMS_KEY_ID", ""),
+		WechatMiniAppID:                     env("PLATFORM_WECHAT_MINIAPP_APP_ID", ""),
+		WechatMiniAppSecret:                 env("PLATFORM_WECHAT_MINIAPP_SECRET", ""),
+		WechatMiniAppCode2SessionEndpoint:   env("PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT", ""),
+		AdminOIDCIssuerURL:                  env("PLATFORM_ADMIN_OIDC_ISSUER_URL", ""),
+		AdminOIDCClientID:                   env("PLATFORM_ADMIN_OIDC_CLIENT_ID", ""),
+		AdminOIDCClientSecret:               env("PLATFORM_ADMIN_OIDC_CLIENT_SECRET", ""),
+		AdminOIDCRedirectURL:                env("PLATFORM_ADMIN_OIDC_REDIRECT_URL", ""),
+		AdminOIDCScopes:                     csvEnv("PLATFORM_ADMIN_OIDC_SCOPES", []string{"openid", "profile", "email"}),
+		DisableDemoAuthProvider:             boolEnv("PLATFORM_DISABLE_DEMO_AUTH_PROVIDER", false),
+		PhoneHMACKey:                        env("PLATFORM_PHONE_HMAC_KEY", ""),
+		PhoneCodeHMACKey:                    env("PLATFORM_PHONE_CODE_HMAC_KEY", ""),
+		PhoneVerificationProvider:           env("PLATFORM_PHONE_VERIFICATION_PROVIDER", ""),
+		AdminStepUpPhoneResource:            env("PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE", ""),
+		AdminStepUpPhoneActorField:          env("PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD", ""),
+		AdminStepUpPhoneField:               env("PLATFORM_ADMIN_STEP_UP_PHONE_FIELD", ""),
+		AdminStepUpPhoneVerifiedAtField:     env("PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD", ""),
+		AdminStepUpPhoneVerifiedDigestField: env("PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD", ""),
 		filePolicySource: filePolicySource{
 			loadedFromEnvironment: true,
 			maxUploadBytes:        fileMaxUploadBytesState,
@@ -208,6 +220,14 @@ func (c Config) AdminOIDCConfigured() bool {
 		strings.TrimSpace(c.AdminOIDCClientID) != "" &&
 		strings.TrimSpace(c.AdminOIDCClientSecret) != "" &&
 		strings.TrimSpace(c.AdminOIDCRedirectURL) != ""
+}
+
+func (c Config) AdminStepUpPhoneSourceConfigured() bool {
+	return strings.TrimSpace(c.AdminStepUpPhoneResource) != "" &&
+		strings.TrimSpace(c.AdminStepUpPhoneActorField) != "" &&
+		strings.TrimSpace(c.AdminStepUpPhoneField) != "" &&
+		strings.TrimSpace(c.AdminStepUpPhoneVerifiedAtField) != "" &&
+		strings.TrimSpace(c.AdminStepUpPhoneVerifiedDigestField) != ""
 }
 
 func (c Config) ValidateRuntime() error {
@@ -234,6 +254,14 @@ func (c Config) ValidateRuntime() error {
 	}
 	if c.CacheDefaultTTL <= 0 {
 		errs = append(errs, errors.New("cache default ttl must be positive"))
+	}
+	if key := strings.TrimSpace(c.SensitiveRevealHMACKey); key != "" {
+		if len([]byte(key)) < 32 {
+			errs = append(errs, errors.New("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY must contain at least 32 bytes"))
+		}
+		if key == c.JWTSecret || key == c.PhoneHMACKey || key == c.PhoneCodeHMACKey || key == c.RateLimitHMACKey {
+			errs = append(errs, errors.New("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY must be distinct from JWT, phone, code, and rate-limit keys"))
+		}
 	}
 	errs = append(errs, validateCapabilities(c.Capabilities)...)
 
@@ -284,7 +312,8 @@ func (c Config) ValidateRuntime() error {
 		errs = append(errs, errors.New("wechat miniapp app id and secret must be configured together"))
 	}
 	errs = append(errs, c.validateAdminOIDC(environment)...)
-	errs = append(errs, c.validateAppPhone(environment)...)
+	errs = append(errs, c.validatePhoneVerification(environment)...)
+	errs = append(errs, c.validateAdminStepUpPhoneSource()...)
 	errs = append(errs, c.validateDataProtection(environment)...)
 
 	if environment == RuntimeEnvironmentProduction {
@@ -307,6 +336,34 @@ func (c Config) ValidateRuntime() error {
 	}
 
 	return errors.Join(errs...)
+}
+
+func (c Config) validateAdminStepUpPhoneSource() []error {
+	values := []struct {
+		name  string
+		value string
+	}{
+		{name: "PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE", value: c.AdminStepUpPhoneResource},
+		{name: "PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD", value: c.AdminStepUpPhoneActorField},
+		{name: "PLATFORM_ADMIN_STEP_UP_PHONE_FIELD", value: c.AdminStepUpPhoneField},
+		{name: "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD", value: c.AdminStepUpPhoneVerifiedAtField},
+		{name: "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD", value: c.AdminStepUpPhoneVerifiedDigestField},
+	}
+	configured := 0
+	var errs []error
+	for _, item := range values {
+		trimmed := strings.TrimSpace(item.value)
+		if trimmed != "" {
+			configured++
+		}
+		if item.value != trimmed {
+			errs = append(errs, fmt.Errorf("%s must be trimmed", item.name))
+		}
+	}
+	if configured != 0 && configured != len(values) {
+		errs = append(errs, errors.New("admin step-up phone source resource and fields must be configured together"))
+	}
+	return errs
 }
 
 func (c Config) validateDataProtection(environment string) []error {
@@ -361,14 +418,21 @@ func (c Config) validateDataProtection(environment string) []error {
 	return errs
 }
 
-func (c Config) validateAppPhone(environment string) []error {
-	if !hasCapability(c.Capabilities, "app-phone") {
+func (c Config) validatePhoneVerification(environment string) []error {
+	appPhoneEnabled := hasCapability(c.Capabilities, "app-phone")
+	adminStepUpEnabled := c.AdminStepUpPhoneSourceConfigured()
+	if !appPhoneEnabled && !adminStepUpEnabled {
 		return nil
 	}
 	var errs []error
-	prefix := "app-phone"
+	prefix := "phone verification"
+	if appPhoneEnabled && !adminStepUpEnabled {
+		prefix = "app-phone"
+	} else if adminStepUpEnabled && !appPhoneEnabled {
+		prefix = "admin step-up phone"
+	}
 	if environment == RuntimeEnvironmentProduction {
-		prefix = "production app-phone"
+		prefix = "production " + prefix
 	}
 	if len([]byte(c.PhoneHMACKey)) < 32 {
 		errs = append(errs, fmt.Errorf("%s requires PLATFORM_PHONE_HMAC_KEY to be at least 32 bytes", prefix))
@@ -391,7 +455,7 @@ func (c Config) validateAppPhone(environment string) []error {
 		errs = append(errs, errors.New("PLATFORM_PHONE_VERIFICATION_PROVIDER must identify a configured provider"))
 	}
 	if provider == "debug" && environment != RuntimeEnvironmentDevelopment && environment != RuntimeEnvironmentTest {
-		errs = append(errs, errors.New("app-phone debug provider is allowed only in development or test"))
+		errs = append(errs, fmt.Errorf("%s debug provider is allowed only in development or test", prefix))
 	}
 	return errs
 }

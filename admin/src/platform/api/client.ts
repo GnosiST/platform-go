@@ -1,3 +1,5 @@
+import { shouldExpireAdminSession } from "./sessionExpiry";
+
 const API_BASE = import.meta.env.VITE_PLATFORM_API_BASE ?? "/api";
 const AUTH_TOKEN_KEY = "platform.auth.token";
 
@@ -256,6 +258,12 @@ export type AdminResourceFieldMasking = {
   replacement?: string;
 };
 
+export type AdminResourceFieldReveal = {
+  policyId: string;
+  permission: string;
+  copyAllowed?: boolean;
+};
+
 export type AdminResourceProtection = {
   schemaVersion: number;
   scope: "global" | "tenant-field";
@@ -288,6 +296,7 @@ export type AdminResourceField = {
   exportMode: "full" | "masked" | "privileged" | "omitted";
   protection?: AdminResourceFieldProtection;
   masking?: AdminResourceFieldMasking;
+  reveal?: AdminResourceFieldReveal;
 };
 
 export type AdminResourcePermissions = {
@@ -405,13 +414,78 @@ export type AdminPolicyReviewExport = {
   audits: AdminResourceRecord[];
 };
 
+export type AdminSensitiveRevealPurpose = {
+  code: string;
+  label: LocalizedText;
+};
+
+export type AdminSensitiveRevealProvider = {
+  id: string;
+  title: LocalizedText;
+};
+
+export type AdminSensitiveRevealFactor = {
+  type: "oidc-reauth-v1" | "admin-sms-otp-v1";
+  available: boolean;
+  providers?: AdminSensitiveRevealProvider[];
+  maskedDestination?: string;
+};
+
+export type AdminSensitiveRevealPolicy = {
+  policyId: string;
+  mode: "anyOf" | "allOf";
+  purposes: AdminSensitiveRevealPurpose[];
+  factors: AdminSensitiveRevealFactor[];
+  challengeTtlSeconds: number;
+  grantTtlSeconds: number;
+  copyAllowed: boolean;
+};
+
+export type AdminSensitiveRevealChallenge = {
+  challengeId: string;
+  challengeToken: string;
+  policyId: string;
+  mode: "anyOf" | "allOf";
+  factors: AdminSensitiveRevealFactor["type"][];
+  expiresAt: string;
+};
+
+export type AdminSensitiveRevealOIDCStart = {
+  challengeId: string;
+  transactionToken: string;
+  authorizationUrl: string;
+  state: string;
+  expiresAt: string;
+};
+
+export type AdminSensitiveRevealSMSStart = {
+  challengeId: string;
+  transactionToken: string;
+  maskedPhone: string;
+  expiresAt: string;
+  debugCode?: string;
+};
+
+export type AdminSensitiveRevealFactorComplete = {
+  challengeId: string;
+  policySatisfied: boolean;
+  grantToken?: string;
+  grantExpiresAt?: string;
+};
+
+export type AdminSensitiveRevealValue = {
+  field: string;
+  value: string;
+  copyAllowed: boolean;
+};
+
 type PlatformResponseMode = "data" | "raw" | "blob";
 type PlatformRequestInit = RequestInit & {
   auth?: "stored-token" | "none";
 };
 
-function handleUnauthorizedResponse(statusCode: number, requestToken: string) {
-  if (statusCode !== 401 || !requestToken || getAuthToken() !== requestToken) {
+function handleUnauthorizedResponse(statusCode: number, requestToken: string, errorCode = "") {
+  if (!shouldExpireAdminSession({ statusCode, requestToken, currentToken: getAuthToken(), errorCode })) {
     return;
   }
   clearAuthToken();
@@ -434,7 +508,7 @@ async function parsePlatformResponse<T>(response: Response, requestToken: string
     ? (payload as PlatformResponse<unknown>).error
     : undefined;
   if (!response.ok || error || payload === undefined) {
-    handleUnauthorizedResponse(response.status, requestToken);
+    handleUnauthorizedResponse(response.status, requestToken, error?.code);
     throw new AdminAPIError(error?.message ?? `HTTP ${response.status}`, response.status, error?.code);
   }
 
@@ -590,6 +664,84 @@ export function deleteAdminResource(resource: string, id: string) {
   return request<{ deleted: boolean; resource: string }>(`/admin/resources/${resource}/${id}` as `/${string}`, {
     method: "DELETE",
   });
+}
+
+export function getAdminSensitiveRevealPolicy(resource: string, id: string, field: string) {
+  return request<AdminSensitiveRevealPolicy>(`${adminSensitiveRevealFieldPath(resource, id, field)}/reveal-policy` as `/${string}`);
+}
+
+export function createAdminSensitiveRevealChallenge(resource: string, id: string, field: string, purpose: string) {
+  return request<AdminSensitiveRevealChallenge>(`${adminSensitiveRevealFieldPath(resource, id, field)}/reveal/challenges` as `/${string}`, {
+    method: "POST",
+    body: JSON.stringify({ purpose }),
+  });
+}
+
+export function startAdminSensitiveRevealOIDC(
+  resource: string,
+  id: string,
+  field: string,
+  challengeId: string,
+  input: { challengeToken: string; purpose: string; provider: string; codeChallenge: string },
+) {
+  return request<AdminSensitiveRevealOIDCStart>(`${adminSensitiveRevealChallengePath(resource, id, field, challengeId)}/factors/oidc/start` as `/${string}`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function completeAdminSensitiveRevealOIDC(
+  resource: string,
+  id: string,
+  field: string,
+  challengeId: string,
+  input: { challengeToken: string; purpose: string; transactionToken: string; provider: string; code: string; state: string; codeVerifier: string },
+) {
+  return request<AdminSensitiveRevealFactorComplete>(`${adminSensitiveRevealChallengePath(resource, id, field, challengeId)}/factors/oidc/complete` as `/${string}`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function startAdminSensitiveRevealSMS(
+  resource: string,
+  id: string,
+  field: string,
+  challengeId: string,
+  input: { challengeToken: string; purpose: string },
+) {
+  return request<AdminSensitiveRevealSMSStart>(`${adminSensitiveRevealChallengePath(resource, id, field, challengeId)}/factors/sms/start` as `/${string}`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function completeAdminSensitiveRevealSMS(
+  resource: string,
+  id: string,
+  field: string,
+  challengeId: string,
+  input: { challengeToken: string; purpose: string; transactionToken: string; code: string },
+) {
+  return request<AdminSensitiveRevealFactorComplete>(`${adminSensitiveRevealChallengePath(resource, id, field, challengeId)}/factors/sms/complete` as `/${string}`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function revealAdminSensitiveField(resource: string, id: string, field: string, input: { purpose: string; grantToken: string }) {
+  return request<AdminSensitiveRevealValue>(`${adminSensitiveRevealFieldPath(resource, id, field)}/reveal` as `/${string}`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+function adminSensitiveRevealFieldPath(resource: string, id: string, field: string) {
+  return `/admin/resources/${encodeURIComponent(resource)}/${encodeURIComponent(id)}/fields/${encodeURIComponent(field)}`;
+}
+
+function adminSensitiveRevealChallengePath(resource: string, id: string, field: string, challengeId: string) {
+  return `${adminSensitiveRevealFieldPath(resource, id, field)}/reveal/challenges/${encodeURIComponent(challengeId)}`;
 }
 
 export function executeAdminResourceAction(action: AdminResourceAction, record: AdminResourceRecord, metadata: Record<string, string> = {}) {

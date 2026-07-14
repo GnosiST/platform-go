@@ -38,6 +38,7 @@ type Resolver struct {
 }
 
 var _ httpapi.AdminIdentityResolver = (*Resolver)(nil)
+var _ httpapi.AdminStepUpIdentityResolver = (*Resolver)(nil)
 
 func NewResolver(config Config) (*Resolver, error) {
 	issuerURL := strings.TrimSpace(config.IssuerURL)
@@ -102,13 +103,41 @@ func (r *Resolver) StartAdminIdentity(_ context.Context, input httpapi.AdminIden
 	}, nil
 }
 
-func (r *Resolver) ResolveAdminIdentity(ctx context.Context, input httpapi.AdminIdentityResolveInput) (httpapi.AdminIdentity, error) {
-	if !validAdminOIDCProvider(input.Provider) || strings.TrimSpace(input.Code) == "" || strings.TrimSpace(input.State) == "" || strings.TrimSpace(input.CodeVerifier) == "" {
-		return httpapi.AdminIdentity{}, httpapi.ErrAdminIdentityInvalid
+func (r *Resolver) StartAdminStepUpIdentity(_ context.Context, input httpapi.AdminIdentityStartInput) (httpapi.AdminIdentityStart, error) {
+	if !validAdminOIDCProvider(input.Provider) || !validS256Challenge(input.CodeChallenge) {
+		return httpapi.AdminIdentityStart{}, httpapi.ErrAdminIdentityInvalid
 	}
-	claims, err := r.state.verify(input.State, input.Provider.ID)
+	signedState, claims, err := r.state.issueForFlow(input.Provider.ID, input.CodeChallenge, stateFlowStepUp)
+	if err != nil {
+		return httpapi.AdminIdentityStart{}, httpapi.ErrAdminIdentityTransaction
+	}
+	authorizationURL := r.oauth2.AuthCodeURL(
+		signedState,
+		oauth2.SetAuthURLParam("nonce", claims.Nonce),
+		oauth2.SetAuthURLParam("code_challenge", claims.CodeChallenge),
+		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
+		oauth2.SetAuthURLParam("prompt", "login"),
+		oauth2.SetAuthURLParam("max_age", "0"),
+	)
+	return httpapi.AdminIdentityStart{AuthorizationURL: authorizationURL, State: signedState, ExpiresAt: claims.ExpiresAt}, nil
+}
+
+func (r *Resolver) ResolveAdminIdentity(ctx context.Context, input httpapi.AdminIdentityResolveInput) (httpapi.AdminIdentity, error) {
+	identity, err := r.resolveAdminIdentity(ctx, input, stateFlowLogin, false)
+	return identity.AdminIdentity, err
+}
+
+func (r *Resolver) ResolveAdminStepUpIdentity(ctx context.Context, input httpapi.AdminIdentityResolveInput) (httpapi.AdminStepUpIdentity, error) {
+	return r.resolveAdminIdentity(ctx, input, stateFlowStepUp, true)
+}
+
+func (r *Resolver) resolveAdminIdentity(ctx context.Context, input httpapi.AdminIdentityResolveInput, flow string, requireFresh bool) (httpapi.AdminStepUpIdentity, error) {
+	if !validAdminOIDCProvider(input.Provider) || strings.TrimSpace(input.Code) == "" || strings.TrimSpace(input.State) == "" || strings.TrimSpace(input.CodeVerifier) == "" {
+		return httpapi.AdminStepUpIdentity{}, httpapi.ErrAdminIdentityInvalid
+	}
+	claims, err := r.state.verifyForFlow(input.State, input.Provider.ID, flow)
 	if err != nil || !matchesS256Challenge(input.CodeVerifier, claims.CodeChallenge) {
-		return httpapi.AdminIdentity{}, httpapi.ErrAdminIdentityTransaction
+		return httpapi.AdminStepUpIdentity{}, httpapi.ErrAdminIdentityTransaction
 	}
 	providerContext := coreoidc.ClientContext(ctx, r.httpClient)
 	token, err := r.oauth2.Exchange(
@@ -117,25 +146,43 @@ func (r *Resolver) ResolveAdminIdentity(ctx context.Context, input httpapi.Admin
 		oauth2.SetAuthURLParam("code_verifier", input.CodeVerifier),
 	)
 	if err != nil {
-		return httpapi.AdminIdentity{}, fmt.Errorf("%w: token exchange failed", httpapi.ErrAdminIdentityProviderExchange)
+		return httpapi.AdminStepUpIdentity{}, fmt.Errorf("%w: token exchange failed", httpapi.ErrAdminIdentityProviderExchange)
 	}
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok || strings.TrimSpace(rawIDToken) == "" {
-		return httpapi.AdminIdentity{}, fmt.Errorf("%w: id token missing", httpapi.ErrAdminIdentityProviderExchange)
+		return httpapi.AdminStepUpIdentity{}, fmt.Errorf("%w: id token missing", httpapi.ErrAdminIdentityProviderExchange)
 	}
 	verified, err := r.provider.VerifierContext(providerContext, &coreoidc.Config{
 		ClientID: r.clientID,
 		Now:      r.now,
 	}).Verify(providerContext, rawIDToken)
 	if err != nil {
-		return httpapi.AdminIdentity{}, fmt.Errorf("%w: id token invalid", httpapi.ErrAdminIdentityProviderExchange)
+		return httpapi.AdminStepUpIdentity{}, fmt.Errorf("%w: id token invalid", httpapi.ErrAdminIdentityProviderExchange)
 	}
 	if subtle.ConstantTimeCompare([]byte(verified.Nonce), []byte(claims.Nonce)) != 1 || strings.TrimSpace(verified.Subject) == "" {
-		return httpapi.AdminIdentity{}, fmt.Errorf("%w: id token claims invalid", httpapi.ErrAdminIdentityProviderExchange)
+		return httpapi.AdminStepUpIdentity{}, fmt.Errorf("%w: id token claims invalid", httpapi.ErrAdminIdentityProviderExchange)
 	}
-	return httpapi.AdminIdentity{
-		Issuer:          verified.Issuer,
-		ProviderSubject: strings.TrimSpace(verified.Subject),
+	var authentication struct {
+		AuthTime int64    `json:"auth_time"`
+		AMR      []string `json:"amr"`
+	}
+	if err := verified.Claims(&authentication); err != nil {
+		return httpapi.AdminStepUpIdentity{}, fmt.Errorf("%w: id token claims invalid", httpapi.ErrAdminIdentityProviderExchange)
+	}
+	authenticatedAt := time.Time{}
+	if authentication.AuthTime > 0 {
+		authenticatedAt = time.Unix(authentication.AuthTime, 0).UTC()
+	}
+	if requireFresh {
+		const clockSkew = 30 * time.Second
+		now := r.now().UTC()
+		if authenticatedAt.IsZero() || authenticatedAt.Before(claims.IssuedAt.Add(-clockSkew)) || authenticatedAt.After(now.Add(clockSkew)) {
+			return httpapi.AdminStepUpIdentity{}, fmt.Errorf("%w: fresh authentication is required", httpapi.ErrAdminIdentityProviderExchange)
+		}
+	}
+	return httpapi.AdminStepUpIdentity{
+		AdminIdentity:   httpapi.AdminIdentity{Issuer: verified.Issuer, ProviderSubject: strings.TrimSpace(verified.Subject)},
+		AuthenticatedAt: authenticatedAt, AuthenticationMethod: append([]string(nil), authentication.AMR...),
 	}, nil
 }
 

@@ -13,10 +13,10 @@ const completedProgramTaskIDs = [
   "sensitive-data-protection-runtime",
   "sensitive-data-historical-migration",
   "mask-strategy-runtime",
+  "sensitive-data-reveal-step-up",
 ];
 
 const remainingCompletionProgramTaskIDs = [
-  "sensitive-data-reveal-step-up",
   "data-lifecycle-retention",
   "multi-datasource-contract-and-runtime",
   "database-certification-matrix",
@@ -48,7 +48,7 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
-  it("migrates five completed program nodes to required work and tracks eleven future nodes", () => {
+  it("migrates six completed program nodes to required work and tracks ten future nodes", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
 
     assert.ok(audit.requiredTaskNodes.includes("production-admin-oidc-auth"));

@@ -32,6 +32,9 @@ const (
 	OperationPhoneBindingVerification Operation = "phone-binding-verification"
 	OperationAdminUpload              Operation = "admin-upload"
 	OperationAppUpload                Operation = "app-upload"
+	OperationSensitiveRevealChallenge Operation = "sensitive-reveal-challenge"
+	OperationSensitiveRevealFactor    Operation = "sensitive-reveal-factor"
+	OperationSensitiveRevealConsume   Operation = "sensitive-reveal-consume"
 )
 
 type Policy struct {
@@ -47,6 +50,9 @@ var policies = map[Operation]Policy{
 	OperationPhoneBindingVerification: {Limit: 10, Window: 10 * time.Minute},
 	OperationAdminUpload:              {Limit: 30, Window: time.Minute},
 	OperationAppUpload:                {Limit: 30, Window: time.Minute},
+	OperationSensitiveRevealChallenge: {Limit: 10, Window: 10 * time.Minute},
+	OperationSensitiveRevealFactor:    {Limit: 15, Window: 10 * time.Minute},
+	OperationSensitiveRevealConsume:   {Limit: 10, Window: 5 * time.Minute},
 }
 
 func PolicyFor(operation Operation) (Policy, bool) {

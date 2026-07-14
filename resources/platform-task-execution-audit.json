@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-task-execution-audit.json",
-  "capturedAt": "2026-07-12",
+  "capturedAt": "2026-07-13",
   "purpose": "Machine-checkable execution audit for the active platform foundation goal: every task node, dependency, resource lock, parallel batch, future runtime-promotion gate and visual workflow gate remains explicit after foundation implementation closes.",
   "taskGraph": "resources/platform-foundation-task-graph.json",
   "alignmentAudit": "resources/platform-foundation-alignment-audit.json",
@@ -17,7 +17,6 @@
     "parallelBatchesMustAvoidDependencyPaths": true
   },
   "requiredUnfinishedNodes": [
-    "sensitive-data-reveal-step-up",
     "data-lifecycle-retention",
     "multi-datasource-contract-and-runtime",
     "database-certification-matrix",

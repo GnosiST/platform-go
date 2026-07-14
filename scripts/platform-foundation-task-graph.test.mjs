@@ -66,7 +66,7 @@ const completionProgramTaskIDs = [
   "github-release-publication",
 ];
 
-const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(5);
+const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(6);
 
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-foundation-task-graph.mjs", ...args], {
@@ -309,7 +309,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /task production-auth-provider-hardening must declare at least one evidence\.docs path/);
   });
 
-  it("preserves the closed 37-node baseline, closes five completion nodes, and tracks eleven pending program nodes", () => {
+  it("preserves the closed 37-node baseline, implements six completion nodes, and tracks ten pending program nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
@@ -342,13 +342,14 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
     assert.equal(graph.tasks.length, 53);
-    assert.equal(implemented.length, 42);
+    assert.equal(implemented.length, 43);
     assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "admin-watermark-export-governance")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-protection-runtime")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-historical-migration")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "mask-strategy-runtime")?.status, "implemented");
-    assert.ok(completionProgramTaskIDs.slice(5, 12).every((taskID) => graph.tasks.find((item) => item.id === taskID)?.status === "pending"));
+    assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-reveal-step-up")?.status, "implemented");
+    assert.ok(completionProgramTaskIDs.slice(6, 13).every((taskID) => graph.tasks.find((item) => item.id === taskID)?.status === "pending"));
     assert.ok(graph.tasks.find((item) => item.id === "open-source-portability")?.dependsOn.includes("asynchronous-search-projection"));
     assert.deepEqual(pending.map((item) => item.id), pendingCompletionProgramTaskIDs);
     assert.equal(blocked.length, 0);
@@ -399,6 +400,23 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /admin-watermark-export-governance evidence\.skills must include ui-ux-pro-max/);
     assert.match(result.stderr, /visual task admin-watermark-export-governance with status implemented must declare screenshot evidence/);
+  });
+
+  it("requires tracked evidence manifests for current watermark and sensitive reveal visual nodes", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const watermarkTask = graph.tasks.find((item) => item.id === "admin-watermark-export-governance");
+    const revealTask = graph.tasks.find((item) => item.id === "sensitive-data-reveal-step-up");
+
+    assert.deepEqual(watermarkTask.evidence.screenshots, ["resources/evidence/admin-watermark-export-governance-20260713.json"]);
+    assert.deepEqual(revealTask.evidence.screenshots, ["resources/evidence/sensitive-data-reveal-step-up-20260713.json"]);
+
+    watermarkTask.evidence.screenshots = [".superpowers/product-design-audit/watermark/09-full-viewport-dashboard.png"];
+    revealTask.evidence.screenshots = [".superpowers/product-design-audit/sensitive-reveal/01-factor-selection.png"];
+    const result = runValidator(["--graph", tempJSON("ignored-current-visual-evidence.json", graph)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /admin-watermark-export-governance evidence\.screenshots must include resources\/evidence\/admin-watermark-export-governance-20260713\.json/);
+    assert.match(result.stderr, /sensitive-data-reveal-step-up evidence\.screenshots must include resources\/evidence\/sensitive-data-reveal-step-up-20260713\.json/);
   });
 
   it("rejects missing or reordered completion program task IDs", () => {

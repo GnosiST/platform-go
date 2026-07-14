@@ -143,13 +143,29 @@ PLATFORM_ADMIN_OIDC_SCOPES=openid,profile,email
 
 Data-protection settings are initialization-time compatibility contracts. `PLATFORM_DATA_KEY_PROVIDER` must be `env-aes256` in production. Both keyrings are JSON objects keyed by canonical version IDs, and every value is a standard-base64-encoded 32-byte key. Encryption and blind-index key material must be distinct. The active IDs select new writes only; startup still requires every historical key referenced by stored envelopes. To rotate, add the new material under a new ID, deploy with the old and new entries present, change the active ID, verify reads and backups, and retire an old entry only after a separately approved migration proves no envelope references it. Replacing material under an existing ID fails startup.
 
-The standard env template contains recognizable placeholder material and passes only the non-strict shape check. Private production files must pass `--strict-secrets`. Do not commit real keyrings or print them in logs, traces, errors or audit records. `local-test` is limited to development/test. KMS/HSM providers and an authorized reveal HTTP flow are not implemented by this runtime.
+The standard env template contains recognizable placeholder material and passes only the non-strict shape check. Private production files must pass `--strict-secrets`. Do not commit real keyrings or print them in logs, traces, errors or audit records. `local-test` is limited to development/test. KMS/HSM providers remain future work. The implemented reveal flow is available only to manifest-declared encrypted fields after dedicated permission, active session, step-up policy and one-time grant checks.
 
 Historical plaintext migration is an offline maintenance workflow, not an API deployment step. MySQL and PostgreSQL remain production targets only after real driver/version integration rehearsal and certification evidence exists; SQLite is accepted only in development/test for local rehearsal and fails closed in staging/production. Oracle, Kingbase, file mutation and legacy SQL mutation are outside the certified boundary. Before migration, operators must create an external backup and retain isolated restore evidence; encrypted escrow is not a replacement. Follow [Sensitive Data Historical Migration Runbook](platform-sensitive-data-migration.md) for inventory, dry-run, prepare, apply, verify, restore rehearsal, rollback, resume and incident-stop procedures.
 
 Production `PLATFORM_CAPABILITIES` must not be empty and must not include `demo-data`. Capability IDs are trimmed, must use lowercase letters, numbers and hyphens, and must not contain empty or duplicate comma-separated entries. Use `minimal-admin` for the smallest supported admin foundation, or include `admin-oidc` with complete OIDC configuration when OIDC is the Admin provider. The OIDC subject must enter only through `platform-admin bind-admin-oidc --subject-stdin`; API startup does not provision accounts or authorization relationships.
 
 When the optional `app-phone` capability is enabled, also set `PLATFORM_PHONE_HMAC_KEY=<dedicated-at-least-32-byte-secret>`, `PLATFORM_PHONE_CODE_HMAC_KEY=<different-dedicated-at-least-32-byte-secret>` and `PLATFORM_PHONE_VERIFICATION_PROVIDER=<configured-provider-id>`. The rate-limit, phone and verification-code HMAC keys must be mutually distinct, and the production verification provider must not be `debug`.
+
+When production manifests declare reveal policies, add the conditional configuration below. If no reveal policy is enabled, these values remain unset. If a policy offers SMS, configure the full phone block and retain the verified phone digest alongside the verification timestamp.
+
+```bash
+PLATFORM_SENSITIVE_REVEAL_HMAC_KEY=<dedicated-at-least-32-byte-secret>
+PLATFORM_PHONE_HMAC_KEY=<different-dedicated-at-least-32-byte-secret>
+PLATFORM_PHONE_CODE_HMAC_KEY=<different-dedicated-at-least-32-byte-secret>
+PLATFORM_PHONE_VERIFICATION_PROVIDER=<registered-non-debug-provider>
+PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE=<resource>
+PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD=<username-field>
+PLATFORM_ADMIN_STEP_UP_PHONE_FIELD=<encrypted-phone-field>
+PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD=<verified-at-field>
+PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD=<verified-phone-digest-field>
+```
+
+JWT, phone, code, reveal and rate-limit keys must all be distinct. The standard Compose adapter passes these conditional values through without enabling them. The stock `cmd/platform-api` binary includes only the debug sender for local harnesses; production SMS requires a separately registered non-debug sender in a downstream composition root and startup remains fail-closed without it. Changing the configured resource/field mapping or historical digest semantics requires a reviewed data migration; partial configuration fails startup validation.
 
 The local Keycloak rehearsal documented in `design-qa.md` proves the protocol, binding, session and browser paths against production-like components. It does not approve an external production promotion or satisfy provider-secret ownership, rotation, rollback and release-approval requirements.
 

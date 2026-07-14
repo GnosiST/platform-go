@@ -71,6 +71,71 @@ func TestResolverStartsAndResolvesAdminIdentity(t *testing.T) {
 	assertDoesNotContain(t, string(serialized), "fixture-client-secret", verifier, "single-use-code", "subject-123")
 }
 
+func TestResolverStepUpForcesFreshAuthenticationAndRejectsLoginState(t *testing.T) {
+	providerFixture := newOIDCProviderFixture(t)
+	defer providerFixture.Close()
+	now := time.Date(2026, time.July, 13, 10, 0, 0, 0, time.UTC)
+	resolver := newTestResolver(t, providerFixture, now)
+	provider := configuredAdminOIDCProvider()
+	verifier := "step-up-verifier-marker"
+	challenge := testCodeChallenge(verifier)
+
+	start, err := resolver.StartAdminStepUpIdentity(context.Background(), httpapi.AdminIdentityStartInput{Provider: provider, CodeChallenge: challenge})
+	if err != nil {
+		t.Fatalf("StartAdminStepUpIdentity() error = %v", err)
+	}
+	authorizationURL, err := url.Parse(start.AuthorizationURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := authorizationURL.Query()
+	if query.Get("prompt") != "login" || query.Get("max_age") != "0" || query.Get("code_challenge") != challenge {
+		t.Fatalf("step-up authorization URL query = %v", query)
+	}
+	providerFixture.SetTokenClaims(providerFixture.URL(), "platform-admin", query.Get("nonce"))
+	providerFixture.SetAuthentication(now, []string{"pwd", "mfa"})
+	identity, err := resolver.ResolveAdminStepUpIdentity(context.Background(), httpapi.AdminIdentityResolveInput{
+		Provider: provider, Code: "step-up-code", State: start.State, CodeVerifier: verifier,
+	})
+	if err != nil {
+		t.Fatalf("ResolveAdminStepUpIdentity() error = %v", err)
+	}
+	if !identity.AuthenticatedAt.Equal(now) || len(identity.AuthenticationMethod) != 2 {
+		t.Fatalf("step-up identity = %+v", identity)
+	}
+
+	login, err := resolver.StartAdminIdentity(context.Background(), httpapi.AdminIdentityStartInput{Provider: provider, CodeChallenge: challenge})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolver.ResolveAdminStepUpIdentity(context.Background(), httpapi.AdminIdentityResolveInput{
+		Provider: provider, Code: "login-code", State: login.State, CodeVerifier: verifier,
+	}); !errors.Is(err, httpapi.ErrAdminIdentityTransaction) {
+		t.Fatalf("ResolveAdminStepUpIdentity(login state) error = %v", err)
+	}
+}
+
+func TestResolverStepUpRejectsStaleAuthTime(t *testing.T) {
+	providerFixture := newOIDCProviderFixture(t)
+	defer providerFixture.Close()
+	now := time.Date(2026, time.July, 13, 10, 0, 0, 0, time.UTC)
+	resolver := newTestResolver(t, providerFixture, now)
+	provider := configuredAdminOIDCProvider()
+	verifier := "stale-step-up-verifier"
+	start, err := resolver.StartAdminStepUpIdentity(context.Background(), httpapi.AdminIdentityStartInput{Provider: provider, CodeChallenge: testCodeChallenge(verifier)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorizationURL, _ := url.Parse(start.AuthorizationURL)
+	providerFixture.SetTokenClaims(providerFixture.URL(), "platform-admin", authorizationURL.Query().Get("nonce"))
+	providerFixture.SetAuthentication(now.Add(-10*time.Minute), []string{"pwd"})
+	if _, err := resolver.ResolveAdminStepUpIdentity(context.Background(), httpapi.AdminIdentityResolveInput{
+		Provider: provider, Code: "stale-code", State: start.State, CodeVerifier: verifier,
+	}); !errors.Is(err, httpapi.ErrAdminIdentityProviderExchange) {
+		t.Fatalf("ResolveAdminStepUpIdentity(stale auth_time) error = %v", err)
+	}
+}
+
 func TestResolverRejectsPKCEMismatchBeforeProviderExchange(t *testing.T) {
 	providerFixture := newOIDCProviderFixture(t)
 	defer providerFixture.Close()
@@ -297,6 +362,8 @@ type oidcProviderFixture struct {
 	claimAudience string
 	claimNonce    string
 	claimSubject  string
+	claimAuthTime time.Time
+	claimAMR      []string
 	now           time.Time
 	expiredToken  bool
 	corruptToken  bool
@@ -342,6 +409,13 @@ func (f *oidcProviderFixture) SetTokenClaims(issuer string, audience string, non
 	f.claimIssuer = issuer
 	f.claimAudience = audience
 	f.claimNonce = nonce
+}
+
+func (f *oidcProviderFixture) SetAuthentication(authenticatedAt time.Time, methods []string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.claimAuthTime = authenticatedAt.UTC()
+	f.claimAMR = append([]string(nil), methods...)
 }
 
 func (f *oidcProviderFixture) SetNow(now time.Time) {
@@ -468,6 +542,8 @@ func (f *oidcProviderFixture) handleToken(response http.ResponseWriter, request 
 	audience := f.claimAudience
 	nonce := f.claimNonce
 	subject := f.claimSubject
+	authTime := f.claimAuthTime
+	amr := append([]string(nil), f.claimAMR...)
 	now := f.now
 	expiredToken := f.expiredToken
 	corruptToken := f.corruptToken
@@ -482,7 +558,7 @@ func (f *oidcProviderFixture) handleToken(response http.ResponseWriter, request 
 		response.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	idToken := f.signIDToken(issuer, audience, nonce, subject, now, expiredToken)
+	idToken := f.signIDToken(issuer, audience, nonce, subject, authTime, amr, now, expiredToken)
 	if corruptToken {
 		idToken = corruptIDTokenSignature(idToken)
 	}
@@ -496,7 +572,7 @@ func (f *oidcProviderFixture) handleToken(response http.ResponseWriter, request 
 	})
 }
 
-func (f *oidcProviderFixture) signIDToken(issuer string, audience string, nonce string, subject string, now time.Time, expired bool) string {
+func (f *oidcProviderFixture) signIDToken(issuer string, audience string, nonce string, subject string, authTime time.Time, amr []string, now time.Time, expired bool) string {
 	header, _ := json.Marshal(map[string]string{"alg": "RS256", "kid": "fixture-key", "typ": "JWT"})
 	now = now.UTC()
 	expiresAt := now.Add(5 * time.Minute)
@@ -505,15 +581,20 @@ func (f *oidcProviderFixture) signIDToken(issuer string, audience string, nonce 
 		expiresAt = now.Add(-time.Minute)
 		issuedAt = now.Add(-2 * time.Minute)
 	}
-	claims, _ := json.Marshal(map[string]any{
+	claims := map[string]any{
 		"iss":   issuer,
 		"sub":   subject,
 		"aud":   audience,
 		"exp":   expiresAt.Unix(),
 		"iat":   issuedAt.Unix(),
 		"nonce": nonce,
-	})
-	signingInput := base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(claims)
+	}
+	if !authTime.IsZero() {
+		claims["auth_time"] = authTime.Unix()
+		claims["amr"] = append([]string(nil), amr...)
+	}
+	claimsJSON, _ := json.Marshal(claims)
+	signingInput := base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(claimsJSON)
 	digest := sha256.Sum256([]byte(signingInput))
 	signature, err := rsa.SignPKCS1v15(rand.Reader, f.key, crypto.SHA256, digest[:])
 	if err != nil {

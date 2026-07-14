@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-engineering-capabilities.json",
-  "capturedAt": "2026-07-12",
+  "capturedAt": "2026-07-13",
   "purpose": "Machine-checkable engineering capability coverage for the reusable platform foundation.",
   "stack": {
     "backend": [
@@ -2798,15 +2798,67 @@
         "zh": "敏感数据验证后查看",
         "en": "Sensitive Data Reveal Step-Up"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Protect plaintext reveal with server-owned policy, step-up verification, short-lived grants and append-only audit.",
       "dependsOn": [
         "mask-strategy-runtime"
       ],
       "evidence": {
         "sourcePaths": [
+          "docs/superpowers/specs/2026-07-13-sensitive-data-reveal-step-up-design.md",
+          "docs/superpowers/plans/2026-07-13-sensitive-data-reveal-step-up.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/platform-roadmap.md",
+          "docs/platform-auth.md",
+          "docs/platform-deployment.md",
+          "docs/admin-resource-schema.md",
+          "docs/admin-ui-foundation.md",
+          "internal/platform/capability/manifest.go",
+          "internal/platform/capability/admin_contract.go",
+          "internal/platform/adminresource/schema.go",
+          "internal/platform/adminresource/security.go",
+          "internal/platform/sensitivereveal/runtime.go",
+          "internal/platform/sensitivereveal/gorm_store.go",
+          "internal/platform/bootstrap/sensitive_reveal.go",
+          "internal/platform/httpapi/sensitive_reveal.go",
+          "internal/platform/httpapi/admin_step_up_phone.go",
+          "internal/platform/authprovider/oidc/state.go",
+          "internal/platform/authprovider/oidc/resolver.go",
+          "internal/platform/config/config.go",
+          "cmd/platform-api/main.go",
+          "admin/src/platform/resources/SensitiveFieldRevealModal.tsx",
+          "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "admin/src/platform/security/sensitiveRevealOIDC.ts",
+          "admin/src/platform/api/sessionExpiry.ts",
+          "admin/src/platform/api/client.ts",
+          "admin/src/App.tsx",
+          "admin/src/styles.css",
+          "scripts/generate-admin-openapi.mjs",
+          "resources/generated/openapi.admin.json"
+        ],
+        "validators": [
+          "scripts/validate-admin-resources.mjs",
+          "scripts/validate-admin-ui-contracts.mjs",
+          "scripts/validate-platform-foundation-task-graph.mjs",
+          "scripts/validate-platform-foundation-alignment.mjs",
+          "scripts/validate-platform-task-execution-audit.mjs",
+          "scripts/validate-platform-goal-completion-audit.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs",
+          "scripts/validate-platform-objective-conformance.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs"
+        ],
+        "tests": [
+          "internal/platform/sensitivereveal/runtime_test.go",
+          "internal/platform/bootstrap/sensitive_reveal_test.go",
+          "internal/platform/httpapi/sensitive_reveal_test.go",
+          "internal/platform/httpapi/admin_step_up_phone_test.go",
+          "internal/platform/authprovider/oidc/state_test.go",
+          "internal/platform/authprovider/oidc/resolver_test.go",
+          "internal/platform/config/config_test.go",
+          "internal/platform/capability/admin_contract_test.go",
+          "scripts/sensitive-reveal-oidc.test.mjs",
+          "scripts/admin-resource-contract-generators.test.mjs",
+          "scripts/admin-ui-contracts.test.mjs"
         ],
         "taskIds": [
           "sensitive-data-reveal-step-up"

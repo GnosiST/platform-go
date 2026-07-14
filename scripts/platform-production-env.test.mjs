@@ -47,6 +47,7 @@ const validStrictEnv = [
   "PLATFORM_CACHE_DRIVER=redis",
   "PLATFORM_REDIS_ADDR=platform-redis:6379",
   "PLATFORM_RATE_LIMIT_HMAC_KEY=rate-limit-production-key-value-0001",
+  "PLATFORM_SENSITIVE_REVEAL_HMAC_KEY=sensitive-reveal-production-key-value-0001",
   "PLATFORM_FILE_STORAGE_DRIVER=s3",
   "PLATFORM_FILE_MAX_UPLOAD_BYTES=10485760",
   "PLATFORM_FILE_ALLOWED_MIME_TYPES=application/pdf,image/jpeg,image/png,text/plain",
@@ -204,6 +205,60 @@ describe("validate-platform-production-env", () => {
 			}
 		}
 	});
+
+  it("rejects short, reused, or placeholder sensitive reveal HMAC keys", () => {
+    for (const source of [
+      validStrictEnv.replace("sensitive-reveal-production-key-value-0001", "short"),
+      validStrictEnv.replace("sensitive-reveal-production-key-value-0001", "rate-limit-production-key-value-0001"),
+      validStrictEnv.replace("sensitive-reveal-production-key-value-0001", "replace-with-sensitive-reveal-key-0001"),
+    ]) {
+      const { tempDir, filePath } = tempEnv(source);
+      try {
+        const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+        assert.notEqual(result.status, 0, result.stdout);
+        assert.match(result.stderr, /PLATFORM_SENSITIVE_REVEAL_HMAC_KEY/);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("validates Admin step-up phone as one verified-digest-bound configuration", () => {
+    const configured = [
+      "PLATFORM_PHONE_HMAC_KEY=phone-production-key-material-000001",
+      "PLATFORM_PHONE_CODE_HMAC_KEY=code-production-key-material-000002",
+      "PLATFORM_PHONE_VERIFICATION_PROVIDER=sms-vendor",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE=staff-profiles",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD=accountCode",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_FIELD=mobile",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD=mobileVerifiedAt",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD=mobileVerifiedDigest",
+    ].join("\n");
+    const validSource = validStrictEnv.replace("PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true", `PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true\n${configured}`);
+    const invalidSources = [
+      validSource.replace("PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD=mobileVerifiedDigest\n", ""),
+      validSource.replace("PLATFORM_PHONE_VERIFICATION_PROVIDER=sms-vendor", "PLATFORM_PHONE_VERIFICATION_PROVIDER=debug"),
+      validSource.replace("sensitive-reveal-production-key-value-0001", "phone-production-key-material-000001"),
+    ];
+
+    const valid = tempEnv(validSource);
+    try {
+      const result = runValidator(["--env-file", valid.filePath, "--strict-secrets"]);
+      assert.equal(result.status, 0, result.stderr);
+    } finally {
+      fs.rmSync(valid.tempDir, { recursive: true, force: true });
+    }
+
+    for (const source of invalidSources) {
+      const { tempDir, filePath } = tempEnv(source);
+      try {
+        const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+        assert.notEqual(result.status, 0, result.stdout);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
 
   it("rejects unsafe production file upload and S3 settings", () => {
     const source = validStrictEnv

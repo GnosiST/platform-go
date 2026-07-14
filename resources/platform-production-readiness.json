@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-production-readiness.json",
-  "capturedAt": "2026-07-11",
+  "capturedAt": "2026-07-13",
   "purpose": "Machine-checkable production readiness contract for platform runtime configuration and preflight gates.",
   "runtimeGate": {
     "source": "internal/platform/config/config.go",
@@ -30,6 +30,7 @@
       "production runtime requires PLATFORM_CACHE_DRIVER=redis",
       "production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY to be at least 32 bytes",
       "production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY to be distinct from phone and code HMAC keys",
+      "PLATFORM_SENSITIVE_REVEAL_HMAC_KEY must be distinct from JWT, phone, code, and rate-limit keys",
       "production runtime must not enable demo-data capability",
       "production runtime requires PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
       "production runtime requires PLATFORM_PUBLIC_BASE_URL to be an absolute HTTPS origin",
@@ -208,6 +209,61 @@
         "README.md",
         "docs/platform-capability-development.md",
         "docs/platform-auth.md"
+      ]
+    }
+  ],
+  "conditionalEnv": [
+    {
+      "name": "PLATFORM_SENSITIVE_REVEAL_HMAC_KEY",
+      "condition": "required when enabled capability manifests declare Admin reveal policies",
+      "purpose": "Dedicated HMAC key for persisted reveal challenge, factor and grant token digests; it must be at least 32 bytes and separate from JWT, phone, code and rate-limit keys.",
+      "docs": [
+        "docs/platform-deployment.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE",
+      "condition": "required with all other PLATFORM_ADMIN_STEP_UP_PHONE_* values when an enabled reveal policy offers SMS",
+      "purpose": "Selects the Admin resource that owns verified phone bindings for SMS step-up delivery.",
+      "docs": [
+        "docs/platform-auth.md",
+        "docs/platform-deployment.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD",
+      "condition": "required with all other PLATFORM_ADMIN_STEP_UP_PHONE_* values when an enabled reveal policy offers SMS",
+      "purpose": "Maps the active Admin username to exactly one enabled phone-source record.",
+      "docs": [
+        "docs/platform-auth.md",
+        "docs/platform-deployment.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_ADMIN_STEP_UP_PHONE_FIELD",
+      "condition": "required with all other PLATFORM_ADMIN_STEP_UP_PHONE_* values when an enabled reveal policy offers SMS",
+      "purpose": "Selects the recoverably encrypted phone field used only for verified SMS delivery.",
+      "docs": [
+        "docs/platform-auth.md",
+        "docs/platform-deployment.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD",
+      "condition": "required with all other PLATFORM_ADMIN_STEP_UP_PHONE_* values when an enabled reveal policy offers SMS",
+      "purpose": "Selects the timestamp proving the phone-source record completed verification.",
+      "docs": [
+        "docs/platform-auth.md",
+        "docs/platform-deployment.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD",
+      "condition": "required with all other PLATFORM_ADMIN_STEP_UP_PHONE_* values when an enabled reveal policy offers SMS",
+      "purpose": "Selects the stored verified-phone digest that must constant-time match the current encrypted phone before delivery.",
+      "docs": [
+        "docs/platform-auth.md",
+        "docs/platform-deployment.md"
       ]
     }
   ],
@@ -607,12 +663,24 @@
         "contains": "PLATFORM_CACHE_DRIVER must be redis"
       },
       {
+        "path": "scripts/validate-platform-production-env.mjs",
+        "contains": "PLATFORM_SENSITIVE_REVEAL_HMAC_KEY must be distinct from JWT, phone, code, and rate-limit keys"
+      },
+      {
+        "path": "scripts/validate-platform-production-env.mjs",
+        "contains": "all PLATFORM_ADMIN_STEP_UP_PHONE_* values must be configured together"
+      },
+      {
         "path": "scripts/platform-production-env.test.mjs",
         "contains": "rejects the standard template when strict secret checks are enabled"
       },
       {
         "path": "scripts/platform-production-env.test.mjs",
         "contains": "rejects unsafe production transport security settings"
+      },
+      {
+        "path": "scripts/platform-production-env.test.mjs",
+        "contains": "validates Admin step-up phone as one verified-digest-bound configuration"
       },
       {
         "path": "deploy/env/production.example.env",

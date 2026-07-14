@@ -72,6 +72,7 @@ Each field declares:
 - `storageMode`: `plain`, `masked`, `hashed` or `encrypted` storage contract;
 - `responseMode` and `exportMode`: `full`, `masked`, `privileged` or `omitted` projections applied before values leave the Store;
 - `protection`: required only for `storageMode=encrypted`; declares `format`, `normalization` and optional `blindIndexNamespace`.
+- `reveal`: optional only for recoverable encrypted fields; declares a registered `policyId`, dedicated `permission` and `copyAllowed` decision.
 
 ## Configurable Encrypted Fields
 
@@ -104,7 +105,23 @@ capability.AdminResource{
 
 Supported normalizers are `raw-v1`, `trim-v1`, `email-v1`, `phone-e164-cn-v1` and `identity-cn-v1`. The manifest selects the rule explicitly; the field name never selects it. An empty `blindIndexNamespace` disables querying. A declared namespace enables only structured `=` conditions; encrypted fields cannot participate in keyword search, range conditions or sorting. `Scope=global` uses the stable platform sentinel. `Scope=tenant-field` requires a declared, required, plain tenant field whose value cannot change after encrypted data exists.
 
-The Store assigns the record ID before encryption, creates an AES-256-GCM envelope, and persists the blind-index metadata inside that envelope. Ordinary response and export projection omit encrypted values and never decrypt. `ProjectRecordPrivileged` authorizes each field before calling `Reveal`; this runtime does not expose a privileged HTTP endpoint. Hashed fields remain one-way and are never revealable. File, SQL and GORM repositories persist opaque envelopes without understanding the field policy.
+The Store assigns the record ID before encryption, creates an AES-256-GCM envelope, and persists the blind-index metadata inside that envelope. Ordinary response and export projection remain masked or omitted. `ProjectRecordPrivileged` authorizes each field before calling `Reveal`; HTTP access exists only through the manifest-declared reveal policy, dedicated permission, active Admin session, step-up challenge and one-time scoped grant. Hashed fields remain one-way and are never revealable. File, SQL and GORM repositories persist opaque envelopes without understanding the field policy.
+
+Reveal policies live in `AdminSurface.RevealPolicies`, not in frontend code. A policy declares `anyOf` or `allOf`, versioned factors (`oidc-reauth-v1`, `admin-sms-otp-v1`), localized purposes, challenge TTL and grant TTL. The generated Admin contract and OpenAPI preserve the field policy. Plaintext is returned only by `POST /api/admin/resources/:resource/:id/fields/:field/reveal` after consuming the matching grant; list, query, detail, Tooltip and export responses never reuse that privileged result.
+
+The complete server-owned reveal flow is:
+
+```text
+GET  /api/admin/resources/:resource/:id/fields/:field/reveal-policy
+POST /api/admin/resources/:resource/:id/fields/:field/reveal/challenges
+POST /api/admin/resources/:resource/:id/fields/:field/reveal/challenges/:challenge/factors/oidc/start
+POST /api/admin/resources/:resource/:id/fields/:field/reveal/challenges/:challenge/factors/oidc/complete
+POST /api/admin/resources/:resource/:id/fields/:field/reveal/challenges/:challenge/factors/sms/start
+POST /api/admin/resources/:resource/:id/fields/:field/reveal/challenges/:challenge/factors/sms/complete
+POST /api/admin/resources/:resource/:id/fields/:field/reveal
+```
+
+Failed factor verification returns `422` without clearing the active Admin session. Challenges and grants are short-lived, grants are single-use and scoped to actor/session/resource/record/field/purpose, and all reveal responses are `Cache-Control: no-store`.
 
 Format, normalization, namespace, tenant scope and schema version are compatibility contracts once data exists. Startup authenticates stored envelopes and fails when policy drifts or a referenced historical key is missing or replaced.
 

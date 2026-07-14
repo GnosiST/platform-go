@@ -237,6 +237,22 @@ func TestProtectedProjectionAuthorizesBeforeRevealAndBlindIndexQueryDoesNotRevea
 	if projected.Values[protectedTestField] != "  REF-1001  " || runtime.revealCalls != 1 {
 		t.Fatalf("privileged projection = %+v, Reveal calls = %d", projected, runtime.revealCalls)
 	}
+
+	runtime.revealCalls = 0
+	value, err := store.RevealProtectedField(context.Background(), ProtectedFieldRevealRequest{
+		Resource: protectedTestResource, RecordID: first.ID, Field: protectedTestField, Purpose: ProtectedFieldPurposeSensitiveReveal,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value != "  REF-1001  " || runtime.revealCalls != 1 {
+		t.Fatalf("single field reveal = %q, Reveal calls = %d", value, runtime.revealCalls)
+	}
+	if _, err := store.RevealProtectedField(context.Background(), ProtectedFieldRevealRequest{
+		Resource: protectedTestResource, RecordID: first.ID, Field: protectedTenantField, Purpose: ProtectedFieldPurposeSensitiveReveal,
+	}); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("RevealProtectedField(plain field) error = %v, want ErrInvalidRecord", err)
+	}
 }
 
 func TestProtectedDataValidationAuthenticatesWithoutRevealAndRejectsPolicyOrKeyChange(t *testing.T) {

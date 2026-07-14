@@ -100,13 +100,46 @@ func TestStateContainsOnlyTransactionClaims(t *testing.T) {
 	if err := json.Unmarshal(payload, &claims); err != nil {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
-	for _, key := range []string{"provider_id", "nonce", "code_challenge", "transaction_id", "issued_at", "expires_at"} {
+	for _, key := range []string{"flow", "provider_id", "nonce", "code_challenge", "transaction_id", "issued_at", "expires_at"} {
 		if _, ok := claims[key]; !ok {
 			t.Fatalf("state payload missing %q", key)
 		}
 	}
-	if len(claims) != 6 {
-		t.Fatalf("state payload keys = %d, want 6", len(claims))
+	if claims["flow"] != stateFlowLogin {
+		t.Fatalf("state payload flow = %v, want %q", claims["flow"], stateFlowLogin)
+	}
+	if len(claims) != 7 {
+		t.Fatalf("state payload keys = %d, want 7", len(claims))
+	}
+}
+
+func TestStateSeparatesLoginAndStepUpFlows(t *testing.T) {
+	codec, err := newStateCodec([]byte("0123456789abcdef0123456789abcdef"), time.Now)
+	if err != nil {
+		t.Fatalf("newStateCodec() error = %v", err)
+	}
+	loginState, loginClaims, err := codec.issue("oidc", "login-challenge")
+	if err != nil {
+		t.Fatalf("issue() error = %v", err)
+	}
+	stepUpState, stepUpClaims, err := codec.issueForFlow("oidc", "step-up-challenge", stateFlowStepUp)
+	if err != nil {
+		t.Fatalf("issueForFlow() error = %v", err)
+	}
+	if loginClaims.Flow != stateFlowLogin || stepUpClaims.Flow != stateFlowStepUp {
+		t.Fatalf("issued flows = %q/%q", loginClaims.Flow, stepUpClaims.Flow)
+	}
+	if _, err := codec.verify(loginState, "oidc"); err != nil {
+		t.Fatalf("verify(login) error = %v", err)
+	}
+	if _, err := codec.verifyForFlow(stepUpState, "oidc", stateFlowStepUp); err != nil {
+		t.Fatalf("verifyForFlow(step-up) error = %v", err)
+	}
+	if _, err := codec.verifyForFlow(loginState, "oidc", stateFlowStepUp); !errors.Is(err, errInvalidState) {
+		t.Fatalf("verify login state as step-up error = %v, want invalid state", err)
+	}
+	if _, err := codec.verify(stepUpState, "oidc"); !errors.Is(err, errInvalidState) {
+		t.Fatalf("verify step-up state as login error = %v, want invalid state", err)
 	}
 }
 

@@ -21,13 +21,13 @@ The `zshenmez` project is only external reference evidence for reusable capabili
 
 ## Active Completion Program
 
-The original 37-node foundation baseline remains implemented and closed. The active completion program now contains 16 controlled nodes beyond that baseline; `runtime-security-containment`, `admin-watermark-export-governance`, `sensitive-data-protection-runtime`, `sensitive-data-historical-migration` and `mask-strategy-runtime` are `implemented`, so the current governance state is `53 total / 42 implemented / 11 controlled unfinished` with `completionStatus=not-complete-controlled`.
+The original 37-node foundation baseline remains implemented and closed. The active completion program now contains 16 controlled nodes beyond that baseline; `runtime-security-containment`, `admin-watermark-export-governance`, `sensitive-data-protection-runtime`, `sensitive-data-historical-migration`, `mask-strategy-runtime` and `sensitive-data-reveal-step-up` are `implemented`, so the current governance state is `53 total / 43 implemented / 10 controlled unfinished` with `completionStatus=not-complete-controlled`.
 
-The seven newly governed pending nodes, in task-graph order, are `sensitive-data-reveal-step-up`, `data-lifecycle-retention`, `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`. This does not reopen the baseline, mark any of the eleven pending nodes implemented, certify MySQL/PostgreSQL migration without real integration rehearsal evidence, claim Oracle or KingbaseES support, enable MQ/search adapters by default, or approve production auth promotion, refresh-token-family default runtime, source writing or external publication.
+The six newly governed pending nodes, in task-graph order, are `data-lifecycle-retention`, `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`. This does not reopen the baseline, mark any of the ten pending nodes implemented, certify MySQL/PostgreSQL migration without real integration rehearsal evidence, claim Oracle or KingbaseES support, enable MQ/search adapters by default, or approve production auth promotion, refresh-token-family default runtime, source writing or external publication.
 
-`mask-strategy-runtime` now provides manifest-driven `partial-v1`, `phone-v1`, `email-v1`, `identity-cn-v1` and `address-cn-v1` strategies for arbitrary encrypted fields. Response, query and export projections decrypt only inside the backend, mask once and fail closed; Admin editing keeps encrypted fields blank and status updates exclude projected encrypted values. Plaintext reveal and step-up verification remain a separate controlled node.
+`mask-strategy-runtime` provides manifest-driven `partial-v1`, `phone-v1`, `email-v1`, `identity-cn-v1` and `address-cn-v1` strategies for arbitrary encrypted fields. Response, query and export projections decrypt only inside the backend, mask once and fail closed; Admin editing keeps encrypted fields blank and status updates exclude projected encrypted values. `sensitive-data-reveal-step-up` adds a separate manifest-declared, permission-checked flow with OIDC reauthentication and Admin SMS OTP, short-lived single-use grants, rate limits, append-only audit and plaintext confined to an expiring modal.
 
-Admin watermark preferences now use one normalized switch with independent `screen` and `export` scopes. Screen watermarks render exactly `1`, `4`, `9` or `16` inert DOM marks and preserve legacy boolean settings. Export watermarking is intentionally limited to `GET /api/admin/policy-reviews/export?watermark=true|false`: the returned JSON carries structured product, actor and timestamp provenance, while the audit record stores only `watermarkApplied=true|false`. Canonical OpenAPI output, original file bytes and unsupported export formats remain unchanged.
+Admin watermark preferences use one normalized switch with independent `screen` and `export` scopes. Screen watermarks render exactly `1`, `4`, `9` or `16` inert DOM marks in one fixed viewport layer covering the topbar, sidebar, data surfaces, drawers, dropdowns and modals; narrow sixteen-mark layouts reflow to `2x8`. Export watermarking is intentionally limited to `GET /api/admin/policy-reviews/export?watermark=true|false`: the returned JSON carries structured product, actor and timestamp provenance, while the audit record stores only `watermarkApplied=true|false`. Canonical OpenAPI output, original file bytes and unsupported export formats remain unchanged.
 
 Approved 2026-07-12 specifications:
 
@@ -36,6 +36,11 @@ Approved 2026-07-12 specifications:
 - [admin watermark and export governance](docs/superpowers/specs/2026-07-12-admin-watermark-export-design.md);
 - [sensitive data encryption](docs/superpowers/specs/2026-07-12-sensitive-data-encryption-design.md);
 - [open-source documentation and site](docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md).
+
+Approved 2026-07-13 specifications:
+
+- [mask strategy runtime](docs/superpowers/specs/2026-07-13-mask-strategy-runtime-design.md);
+- [sensitive data reveal step-up](docs/superpowers/specs/2026-07-13-sensitive-data-reveal-step-up-design.md).
 
 ## Run
 
@@ -221,7 +226,23 @@ PLATFORM_ADMIN_OIDC_REDIRECT_URL=https://admin.example/login
 PLATFORM_ADMIN_OIDC_SCOPES=openid,profile,email
 ```
 
-Sensitive fields are selected by capability manifest policy, not by fixed field names. Production startup validates every stored envelope against its declared format, normalization, tenant scope and configured historical keys before serving HTTP. Rotate by adding a new key ID and changing the active ID; keep historical entries until all referenced envelopes have been migrated and verified. The current provider is environment-backed AES-256 only. Historical plaintext migration is implemented as an offline, approval-gated maintenance workflow; see [Sensitive data historical migration](docs/platform-sensitive-data-migration.md). KMS/HSM adapters and step-up reveal endpoints remain unfinished work.
+Enable manifest-declared sensitive reveal with Admin SMS only when a downstream composition has registered a non-debug sender. Configure the reveal secret, phone-verification runtime and all five Admin phone mapping fields together:
+
+```bash
+PLATFORM_SENSITIVE_REVEAL_HMAC_KEY=<dedicated-at-least-32-byte-secret>
+PLATFORM_PHONE_HMAC_KEY=<different-dedicated-at-least-32-byte-secret>
+PLATFORM_PHONE_CODE_HMAC_KEY=<different-dedicated-at-least-32-byte-secret>
+PLATFORM_PHONE_VERIFICATION_PROVIDER=<registered-production-provider-id>
+PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE=<resource>
+PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD=<username-field>
+PLATFORM_ADMIN_STEP_UP_PHONE_FIELD=<encrypted-phone-field>
+PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD=<verified-at-field>
+PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD=<verified-phone-digest-field>
+```
+
+JWT, reveal, phone, verification-code and rate-limit keys must all be distinct. Treat the five `PLATFORM_ADMIN_STEP_UP_PHONE_*` values as one initialization-time mapping; changing it after data exists requires a reviewed historical migration.
+
+Sensitive fields are selected by capability manifest policy, not by fixed field names. Production startup validates every stored envelope against its declared format, normalization, tenant scope and configured historical keys before serving HTTP. Rotate by adding a new key ID and changing the active ID; keep historical entries until all referenced envelopes have been migrated and verified. The current provider is environment-backed AES-256 only. Historical plaintext migration is implemented as an offline, approval-gated maintenance workflow; see [Sensitive data historical migration](docs/platform-sensitive-data-migration.md). Step-up reveal endpoints are implemented for manifest-declared encrypted fields with OIDC reauthentication and the Admin SMS port; the stock API process intentionally bundles no production SMS vendor adapter, so SMS remains fail-closed until a downstream composition registers one. KMS/HSM adapters remain unfinished work.
 
 When `admin-oidc` is the production Admin provider, provision an existing enabled Admin user through `platform-admin bind-admin-oidc --subject-stdin` before API startup. OIDC authentication never creates platform users, roles, permissions, tenants, organizations or areas automatically. See `docs/platform-auth.md` for the stdin-only binding procedure and readiness gate.
 

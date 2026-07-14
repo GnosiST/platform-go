@@ -110,6 +110,18 @@ describe("validate-platform-deployment-topology", () => {
     assert.match(result.stderr, /productionApiRequirements\.forbiddenProductionCapabilities must include demo-data/);
   });
 
+  it("rejects deployment contracts that omit conditional reveal and step-up configuration", () => {
+    const contract = readJSON("resources/platform-deployment-topology.json");
+    contract.productionApiRequirements.conditionalEnv = [];
+    const contractPath = tempJSON("platform-deployment-topology.json", contract);
+
+    const result = runValidator(["--contract", contractPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /productionApiRequirements\.conditionalEnv must include PLATFORM_SENSITIVE_REVEAL_HMAC_KEY/);
+    assert.match(result.stderr, /productionApiRequirements\.conditionalEnv must include PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD/);
+  });
+
   it("rejects deployment packages that drop the standard production files", () => {
     const contract = readJSON("resources/platform-deployment-topology.json");
     contract.deploymentPackage.dockerfile = "missing.Dockerfile";

@@ -7,15 +7,15 @@ Governance updated: 2026-07-13
 
 This assessment records the current implementation truth and a proposed delivery order for sensitive-data display and controlled reveal, deletion and retention, multi-datasource portability, and optional messaging/search integrations.
 
-It does not mark every assessed capability as implemented. Governance approval has expanded the completion task graph to `53 total / 42 implemented / 11 controlled unfinished`; `mask-strategy-runtime` is now implemented and closed, while reveal, lifecycle, datasource, database certification and optional integration work remain pending.
+It does not mark every assessed capability as implemented. Governance approval has expanded the completion task graph to `53 total / 43 implemented / 10 controlled unfinished`; `mask-strategy-runtime` and `sensitive-data-reveal-step-up` are implemented and closed, while lifecycle, datasource, database certification and optional integration work remain pending.
 
-The seven newly governed pending nodes are `sensitive-data-reveal-step-up`, `data-lifecycle-retention`, `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`.
+The six newly governed pending nodes are `data-lifecycle-retention`, `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`.
 
 ## Current-State Summary
 
 | Area | Current implementation | Important limitation |
 | --- | --- | --- |
-| Sensitive display | Field contracts now support versioned field-configurable masking. Encrypted `masked` response/export projection decrypts only inside the backend, applies one of five strategies and returns only the masked value; legacy pre-masked storage remains pass-through. The Admin frontend renders the server projection, hydrates encrypted edits blank and excludes projected encrypted values from status updates. | There is no reveal API, reveal grant or step-up flow. Existing pre-masked records cannot be revealed because the original plaintext was never stored. |
+| Sensitive display | Field contracts support versioned field-configurable masking and explicit reveal policy. Encrypted `masked` projections return only the masked value; an authorized detail-field action can create a scoped challenge, satisfy OIDC reauthentication and/or Admin SMS OTP, consume one short-lived grant and show plaintext only in the expiring modal. | Existing pre-masked or hashed records cannot be revealed because the original plaintext is unavailable. Email OTP, TOTP, WebAuthn and CAPTCHA risk gates are not implemented factors. |
 | Passwords and transport | The default platform has no local-password provider or password repository. Production configuration requires HTTPS and HSTS. | A future local-password capability still needs a dedicated Argon2id repository and must never use generic resource values or reversible encryption. |
 | Deletion | Generic resources use physical deletion. Sessions and API tokens use domain-specific expiration or revocation. Files use tombstone, object deletion and purge in one request path. | There is no platform-wide deletion policy, recycle bin, restore window, retention runner or historical purge strategy. |
 | Databases | GORM openers are wired for MySQL, PostgreSQL and SQLite. Admin resources, sessions and lifecycle history can use separate DSNs. | This is subsystem separation, not named business datasources or tenant/capability routing. The three wired drivers do not yet have a full-platform certification matrix; `PLATFORM_DATABASE_DRIVER` and `PLATFORM_DATABASE_DSN` are not wired into process composition. Oracle and KingbaseES are not implemented or certified. |
@@ -43,7 +43,7 @@ The recommended model separates masking from revealing:
 - A slider or CAPTCHA is a risk and anti-automation condition, not an identity factor. It may precede step-up but cannot satisfy reveal by itself.
 - Revealed values automatically return to the masked state and must not enter browser storage, URLs, logs, analytics or client-generated exports.
 
-There are currently zero reveal-capable step-up factors. Existing Admin OIDC is a login flow, and existing SMS verification is scoped to App phone binding. They are reusable implementation primitives, not evidence of an Admin reveal flow. Email OTP, TOTP, WebAuthn and slider/CAPTCHA adapters do not exist today.
+The initial reveal-capable factor set is implemented as OIDC reauthentication and Admin SMS OTP. OIDC uses a reveal-specific state flow and must resolve to the active bound Admin identity. SMS uses the phone verification provider port and a configured Admin phone source whose current phone digest must match the digest captured at verification time. Email OTP, TOTP, WebAuthn and slider/CAPTCHA adapters are not implemented in the current runtime.
 
 The first supported step-up set should be small and evidence-based:
 
@@ -114,9 +114,9 @@ All four requested capability groups are feasible within the current Gin/GORM/ca
 
 The work should be decomposed into four independent specifications and detailed implementation plans:
 
-1. `sensitive-data-reveal-step-up`
-   - Depends on the implemented `sensitive-data-protection-runtime` node, which now provides configurable field policy, encryption, key-provider and persistence contracts; reveal work still requires its own authorization and verification design.
-   - Adds mask strategies, reveal policy, step-up registry, grants, audit and Admin masked-field components.
+1. `sensitive-data-reveal-step-up` (implemented)
+   - Depends on the implemented protection, migration, masking and production Admin OIDC nodes.
+   - Adds manifest reveal policy, OIDC/SMS factor orchestration, short-lived single-use grants, rate limits, append-only audit and the accessible Admin reveal modal.
 2. `data-lifecycle-retention`
    - Adds deletion policy contracts, reference guards, soft-delete/recycle-bin runtime, file recovery, session/token linkage and the maintenance retention runner.
 3. `multi-datasource-database-portability`
@@ -145,18 +145,18 @@ Stage gates:
 1. Keep the implemented `sensitive-data-protection-runtime` contract stable: versioned encryption, explicit normalizers, key-provider configuration, protected persistence and authorized internal projection are now available.
 2. Keep the implemented `sensitive-data-historical-migration` contract stable: no HTTP route or plaintext dual-read, prepare-only journal creation, bounded resumable batches, verification, encrypted escrow and hash-guarded rollback. Require external backup/restore evidence and real MySQL/PostgreSQL integration certification before production promotion.
 3. Keep the implemented `mask-strategy-runtime` contract stable: arbitrary sensitive fields remain manifest-driven; response, query, detail, Tooltip and export consume the same backend-owned projection; duplicate projection and plaintext fallback remain forbidden.
-4. Add `sensitive-data-reveal-step-up`; start with OIDC re-authentication and SMS OTP, short-lived single-use grants, rate limits and append-only audit. Add other factors only through registered adapters.
+4. Keep the implemented `sensitive-data-reveal-step-up` contract stable: OIDC re-authentication and SMS OTP use short-lived single-use grants, rate limits, response-terminal audit and registered adapters. SMS delivery failures atomically cancel the factor transaction so the same challenge can retry; production startup fails when an SMS factor lacks a verified phone source or registered non-debug sender.
 5. Add `data-lifecycle-retention`; declare deletion semantics per resource, then implement restore, final purge and a disabled-by-default maintenance runner.
 6. Add `multi-datasource-contract-and-runtime`; provide named sources, capability binding, health checks and one-datasource transaction boundaries without XA.
 7. Add `database-certification-matrix`; certify MySQL, PostgreSQL and SQLite across repositories, migrations, transactions, pagination and locking. Run separate KingbaseES and Oracle milestones before labeling either supported.
 8. Add disabled/no-op messaging and search ports, then a transactional outbox. Promote exactly one MQ adapter for the first real workload and build search as an asynchronous projection with rebuild and replay paths.
 9. Synchronize the open-source manuals, operator runbook, compatibility matrix and public docs site before GitHub publication. Experimental adapters must remain clearly labeled.
 
-The first two predecessor nodes are implemented in the completion program. The next eight nodes are now approved as controlled pending scope, but must not silently reuse existing closeouts or be described as runtime capability. The task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation must remain synchronized as each node advances. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
+The four sensitive-data predecessor nodes are implemented in the completion program. The remaining six data/integration nodes and four open-source nodes are controlled pending scope, and must not silently reuse existing closeouts or be described as runtime capability. The task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation must remain synchronized as each node advances. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
 
 ## Release Recommendation
 
-Before a public v0.1 release, retain the historical-migration runbook and external promotion evidence boundary, publish honest deletion semantics, and avoid claiming database or integration support without a passing matrix. The configurable encryption runtime and offline historical migration are implemented, but controlled reveal, named datasources and disabled integration ports remain future foundation capabilities. Vendor-specific Oracle, KingbaseES, MQ and search adapters may ship in staged releases only when their experimental status and verification limits are explicit.
+Before a public v0.1 release, retain the historical-migration runbook and external promotion evidence boundary, publish honest deletion semantics, and avoid claiming database or integration support without a passing matrix. Configurable encryption, offline historical migration, manifest-driven masking and controlled reveal are implemented; named datasources and disabled integration ports remain future foundation capabilities. Vendor-specific Oracle, KingbaseES, MQ and search adapters may ship in staged releases only when their experimental status and verification limits are explicit.
 
 ## Source Evidence
 

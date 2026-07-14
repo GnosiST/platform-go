@@ -84,6 +84,10 @@ const requiredVisualEvidenceByTask = new Map([
     "admin-watermark-export-governance",
     ["superpowers:brainstorming", "product-design", "ui-ux-pro-max", "browser:control-in-app-browser"],
   ],
+  [
+    "sensitive-data-reveal-step-up",
+    ["superpowers:brainstorming", "product-design", "ui-ux-pro-max", "browser:control-in-app-browser"],
+  ],
 ]);
 
 function validate() {

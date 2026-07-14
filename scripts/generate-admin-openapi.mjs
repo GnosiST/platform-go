@@ -119,6 +119,7 @@ function fieldSchema(field) {
     "x-platform-export-mode": field.exportMode ?? "full",
     ...(field.protection ? { "x-platform-protection": field.protection } : {}),
     ...(field.masking ? { "x-platform-masking": field.masking } : {}),
+    ...(field.reveal ? { "x-platform-reveal": field.reveal } : {}),
     ...(field.storageMode === "encrypted"
       ? { "x-platform-query-operators": field.protection?.blindIndexNamespace ? ["="] : [] }
       : {}),
@@ -281,6 +282,51 @@ function publicAuthErrorResponses() {
     "500": { $ref: "#/components/responses/InternalError" },
     "501": { $ref: "#/components/responses/NotImplemented" },
     "502": { $ref: "#/components/responses/BadGateway" },
+  };
+}
+
+function sensitiveRevealErrorResponses({ conflict = false, expired = false, rateLimited = false, upstream = false, verificationFailed = false } = {}) {
+  return {
+    "400": { $ref: "#/components/responses/BadRequest" },
+    "401": { $ref: "#/components/responses/Unauthorized" },
+    "403": { $ref: "#/components/responses/Forbidden" },
+    "404": { $ref: "#/components/responses/NotFound" },
+    ...(conflict ? { "409": { $ref: "#/components/responses/Conflict" } } : {}),
+    ...(expired ? { "410": { $ref: "#/components/responses/Gone" } } : {}),
+    ...(verificationFailed ? { "422": { $ref: "#/components/responses/UnprocessableEntity" } } : {}),
+    ...(rateLimited ? { "429": { $ref: "#/components/responses/TooManyRequests" } } : {}),
+    "500": { $ref: "#/components/responses/InternalError" },
+    ...(upstream ? { "502": { $ref: "#/components/responses/BadGateway" } } : {}),
+    "503": { $ref: "#/components/responses/ServiceUnavailable" },
+  };
+}
+
+function sensitiveRevealRequestBody(schemaName) {
+  return {
+    required: true,
+    content: {
+      "application/json": {
+        schema: { $ref: `#/components/schemas/${schemaName}` },
+      },
+    },
+  };
+}
+
+function sensitiveRevealOperation({ operationId, summary, schemaName, status = "200", requestSchema, challenge = false, errors }) {
+  return {
+    tags: ["sensitive-reveal"],
+    operationId,
+    summary,
+    description:
+      "Reveals one manifest-declared protected field. Authorization, purpose, factor policy and copy behavior come from the field x-platform-reveal contract.",
+    security: [{ bearerAuth: [] }],
+    parameters: ["resource", "id", "field", ...(challenge ? ["challenge"] : [])].map(pathParameter),
+    ...(requestSchema ? { requestBody: sensitiveRevealRequestBody(requestSchema) } : {}),
+    responses: {
+      [status]: successResponse("Successful sensitive field reveal response", apiResponse({ $ref: `#/components/schemas/${schemaName}` })),
+      ...sensitiveRevealErrorResponses(errors),
+    },
+    "x-platform-permission-source": "field.reveal.permission",
   };
 }
 
@@ -526,6 +572,195 @@ function schemas() {
         principal: { type: "object", additionalProperties: true },
       },
     },
+    AdminSensitiveRevealLocalizedText: {
+      type: "object",
+      required: ["zh", "en"],
+      additionalProperties: false,
+      properties: {
+        zh: { type: "string" },
+        en: { type: "string" },
+      },
+    },
+    AdminSensitiveRevealPurpose: {
+      type: "object",
+      required: ["code", "label"],
+      additionalProperties: false,
+      properties: {
+        code: { type: "string", minLength: 1 },
+        label: { $ref: "#/components/schemas/AdminSensitiveRevealLocalizedText" },
+      },
+    },
+    AdminSensitiveRevealProvider: {
+      type: "object",
+      required: ["id", "title"],
+      additionalProperties: false,
+      properties: {
+        id: { type: "string", minLength: 1 },
+        title: { $ref: "#/components/schemas/AdminSensitiveRevealLocalizedText" },
+      },
+    },
+    AdminSensitiveRevealFactor: {
+      type: "object",
+      required: ["type", "available"],
+      additionalProperties: false,
+      properties: {
+        type: { type: "string", enum: ["oidc-reauth-v1", "admin-sms-otp-v1"] },
+        available: { type: "boolean" },
+        providers: {
+          type: "array",
+          items: { $ref: "#/components/schemas/AdminSensitiveRevealProvider" },
+        },
+        maskedDestination: { type: "string" },
+      },
+    },
+    AdminSensitiveRevealPolicyData: {
+      type: "object",
+      required: ["policyId", "mode", "purposes", "factors", "challengeTtlSeconds", "grantTtlSeconds", "copyAllowed"],
+      additionalProperties: false,
+      properties: {
+        policyId: { type: "string", minLength: 1 },
+        mode: { type: "string", enum: ["anyOf", "allOf"] },
+        purposes: {
+          type: "array",
+          items: { $ref: "#/components/schemas/AdminSensitiveRevealPurpose" },
+        },
+        factors: {
+          type: "array",
+          items: { $ref: "#/components/schemas/AdminSensitiveRevealFactor" },
+        },
+        challengeTtlSeconds: { type: "integer", minimum: 1 },
+        grantTtlSeconds: { type: "integer", minimum: 1 },
+        copyAllowed: { type: "boolean" },
+      },
+    },
+    AdminSensitiveRevealChallengeRequest: {
+      type: "object",
+      required: ["purpose"],
+      additionalProperties: false,
+      properties: {
+        purpose: { type: "string", minLength: 1 },
+      },
+    },
+    AdminSensitiveRevealChallengeData: {
+      type: "object",
+      required: ["challengeId", "challengeToken", "policyId", "mode", "factors", "expiresAt"],
+      additionalProperties: false,
+      properties: {
+        challengeId: { type: "string", minLength: 1 },
+        challengeToken: { type: "string", minLength: 1 },
+        policyId: { type: "string", minLength: 1 },
+        mode: { type: "string", enum: ["anyOf", "allOf"] },
+        factors: {
+          type: "array",
+          items: { type: "string", enum: ["oidc-reauth-v1", "admin-sms-otp-v1"] },
+        },
+        expiresAt: { type: "string", format: "date-time" },
+      },
+    },
+    AdminSensitiveRevealOIDCStartRequest: {
+      type: "object",
+      required: ["challengeToken", "purpose", "provider", "codeChallenge"],
+      additionalProperties: false,
+      properties: {
+        challengeToken: { type: "string", minLength: 1, writeOnly: true },
+        purpose: { type: "string", minLength: 1 },
+        provider: { type: "string", minLength: 1 },
+        codeChallenge: {
+          type: "string",
+          minLength: 43,
+          maxLength: 43,
+          pattern: "^[A-Za-z0-9_-]{43}$",
+        },
+      },
+    },
+    AdminSensitiveRevealOIDCStartData: {
+      type: "object",
+      required: ["challengeId", "transactionToken", "authorizationUrl", "state", "expiresAt"],
+      additionalProperties: false,
+      properties: {
+        challengeId: { type: "string", minLength: 1 },
+        transactionToken: { type: "string", minLength: 1 },
+        authorizationUrl: { type: "string", format: "uri" },
+        state: { type: "string", minLength: 1 },
+        expiresAt: { type: "string", format: "date-time" },
+      },
+    },
+    AdminSensitiveRevealOIDCCompleteRequest: {
+      type: "object",
+      required: ["challengeToken", "purpose", "transactionToken", "provider", "code", "state", "codeVerifier"],
+      additionalProperties: false,
+      properties: {
+        challengeToken: { type: "string", minLength: 1, writeOnly: true },
+        purpose: { type: "string", minLength: 1 },
+        transactionToken: { type: "string", minLength: 1, writeOnly: true },
+        provider: { type: "string", minLength: 1 },
+        code: { type: "string", minLength: 1, writeOnly: true },
+        state: { type: "string", minLength: 1, writeOnly: true },
+        codeVerifier: { type: "string", minLength: 1, writeOnly: true },
+      },
+    },
+    AdminSensitiveRevealSMSStartRequest: {
+      type: "object",
+      required: ["challengeToken", "purpose"],
+      additionalProperties: false,
+      properties: {
+        challengeToken: { type: "string", minLength: 1, writeOnly: true },
+        purpose: { type: "string", minLength: 1 },
+      },
+    },
+    AdminSensitiveRevealSMSStartData: {
+      type: "object",
+      required: ["challengeId", "transactionToken", "maskedPhone", "expiresAt"],
+      additionalProperties: false,
+      properties: {
+        challengeId: { type: "string", minLength: 1 },
+        transactionToken: { type: "string", minLength: 1 },
+        maskedPhone: { type: "string" },
+        expiresAt: { type: "string", format: "date-time" },
+        debugCode: { type: "string" },
+      },
+    },
+    AdminSensitiveRevealSMSCompleteRequest: {
+      type: "object",
+      required: ["challengeToken", "purpose", "transactionToken", "code"],
+      additionalProperties: false,
+      properties: {
+        challengeToken: { type: "string", minLength: 1, writeOnly: true },
+        purpose: { type: "string", minLength: 1 },
+        transactionToken: { type: "string", minLength: 1, writeOnly: true },
+        code: { type: "string", minLength: 1, writeOnly: true },
+      },
+    },
+    AdminSensitiveRevealFactorCompleteData: {
+      type: "object",
+      required: ["challengeId", "policySatisfied"],
+      additionalProperties: false,
+      properties: {
+        challengeId: { type: "string", minLength: 1 },
+        policySatisfied: { type: "boolean" },
+        grantToken: { type: "string", minLength: 1 },
+        grantExpiresAt: { type: "string", format: "date-time" },
+      },
+    },
+    AdminSensitiveRevealRequest: {
+      type: "object",
+      required: ["purpose", "grantToken"],
+      additionalProperties: false,
+      properties: {
+        purpose: { type: "string", minLength: 1 },
+        grantToken: { type: "string", minLength: 1, writeOnly: true },
+      },
+    },
+    AdminSensitiveRevealValueData: {
+      type: "object",
+      required: ["field", "value", "copyAllowed"],
+      additionalProperties: false,
+      properties: {
+        field: { type: "string", minLength: 1 },
+        value: { type: "string" },
+        copyAllowed: { type: "boolean" },
+      },
+    },
   };
 
   for (const resource of resources) {
@@ -588,6 +823,84 @@ for (const resource of resources) {
   }
 }
 
+const sensitiveRevealFieldPath = "/api/admin/resources/{resource}/{id}/fields/{field}";
+const sensitiveRevealChallengePath = `${sensitiveRevealFieldPath}/reveal/challenges/{challenge}`;
+
+paths[`${sensitiveRevealFieldPath}/reveal-policy`] = {
+  get: sensitiveRevealOperation({
+    operationId: "getAdminSensitiveRevealPolicy",
+    summary: "Get the step-up policy for one sensitive field",
+    schemaName: "AdminSensitiveRevealPolicyData",
+  }),
+};
+
+paths[`${sensitiveRevealFieldPath}/reveal/challenges`] = {
+  post: sensitiveRevealOperation({
+    operationId: "createAdminSensitiveRevealChallenge",
+    summary: "Create a sensitive field reveal challenge",
+    schemaName: "AdminSensitiveRevealChallengeData",
+    status: "201",
+    requestSchema: "AdminSensitiveRevealChallengeRequest",
+    errors: { rateLimited: true },
+  }),
+};
+
+paths[`${sensitiveRevealChallengePath}/factors/oidc/start`] = {
+  post: sensitiveRevealOperation({
+    operationId: "startAdminSensitiveRevealOIDC",
+    summary: "Start OIDC reauthentication for a sensitive field reveal challenge",
+    schemaName: "AdminSensitiveRevealOIDCStartData",
+    status: "201",
+    requestSchema: "AdminSensitiveRevealOIDCStartRequest",
+    challenge: true,
+    errors: { conflict: true, expired: true, rateLimited: true },
+  }),
+};
+
+paths[`${sensitiveRevealChallengePath}/factors/oidc/complete`] = {
+  post: sensitiveRevealOperation({
+    operationId: "completeAdminSensitiveRevealOIDC",
+    summary: "Complete OIDC reauthentication for a sensitive field reveal challenge",
+    schemaName: "AdminSensitiveRevealFactorCompleteData",
+    requestSchema: "AdminSensitiveRevealOIDCCompleteRequest",
+    challenge: true,
+    errors: { conflict: true, expired: true, rateLimited: true, upstream: true, verificationFailed: true },
+  }),
+};
+
+paths[`${sensitiveRevealChallengePath}/factors/sms/start`] = {
+  post: sensitiveRevealOperation({
+    operationId: "startAdminSensitiveRevealSMS",
+    summary: "Start SMS verification for a sensitive field reveal challenge",
+    schemaName: "AdminSensitiveRevealSMSStartData",
+    status: "201",
+    requestSchema: "AdminSensitiveRevealSMSStartRequest",
+    challenge: true,
+    errors: { conflict: true, expired: true, rateLimited: true, upstream: true },
+  }),
+};
+
+paths[`${sensitiveRevealChallengePath}/factors/sms/complete`] = {
+  post: sensitiveRevealOperation({
+    operationId: "completeAdminSensitiveRevealSMS",
+    summary: "Complete SMS verification for a sensitive field reveal challenge",
+    schemaName: "AdminSensitiveRevealFactorCompleteData",
+    requestSchema: "AdminSensitiveRevealSMSCompleteRequest",
+    challenge: true,
+    errors: { conflict: true, expired: true, rateLimited: true, verificationFailed: true },
+  }),
+};
+
+paths[`${sensitiveRevealFieldPath}/reveal`] = {
+  post: sensitiveRevealOperation({
+    operationId: "revealAdminSensitiveField",
+    summary: "Consume a grant and reveal one sensitive field value",
+    schemaName: "AdminSensitiveRevealValueData",
+    requestSchema: "AdminSensitiveRevealRequest",
+    errors: { conflict: true, expired: true, rateLimited: true },
+  }),
+};
+
 paths["/api/auth/providers/{provider}/start"] = {
   post: {
     tags: ["auth"],
@@ -645,6 +958,7 @@ const openapi = {
   servers: [{ url: "/" }],
   tags: [
     { name: "auth", description: "Public Admin authentication endpoints." },
+    { name: "sensitive-reveal", description: "Step-up verification and one-time sensitive field reveal endpoints." },
     ...resources.map((resource) => ({
       name: resource.name,
       description: `${resource.label?.en ?? resource.name}${resource.label?.zh ? ` / ${resource.label.zh}` : ""}`,
@@ -665,9 +979,14 @@ const openapi = {
       Unauthorized: successResponse("Authentication required", apiResponse({ nullable: true })),
       Forbidden: successResponse("Permission denied", apiResponse({ nullable: true })),
       NotFound: successResponse("Resource not found", apiResponse({ nullable: true })),
+      Conflict: successResponse("Request conflicts with the current reveal state", apiResponse({ nullable: true })),
+      Gone: successResponse("Reveal challenge, factor or grant expired", apiResponse({ nullable: true })),
+      UnprocessableEntity: successResponse("Sensitive reveal verification failed", apiResponse({ nullable: true })),
+      TooManyRequests: successResponse("Sensitive reveal rate limit exceeded", apiResponse({ nullable: true })),
       InternalError: successResponse("Internal server error", apiResponse({ nullable: true })),
       NotImplemented: successResponse("Identity provider resolver not configured", apiResponse({ nullable: true })),
       BadGateway: successResponse("Identity provider unavailable", apiResponse({ nullable: true })),
+      ServiceUnavailable: successResponse("Sensitive reveal runtime or protected value unavailable", apiResponse({ nullable: true })),
     },
     schemas: schemas(),
   },

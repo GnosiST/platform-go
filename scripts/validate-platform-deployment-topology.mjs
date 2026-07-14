@@ -323,6 +323,22 @@ function validateProductionRequirements(contract, errors) {
     "productionApiRequirements.requiredEnv",
     errors,
   );
+  requireIncludes(
+    requirements.conditionalEnv,
+    [
+      "PLATFORM_SENSITIVE_REVEAL_HMAC_KEY",
+      "PLATFORM_PHONE_HMAC_KEY",
+      "PLATFORM_PHONE_CODE_HMAC_KEY",
+      "PLATFORM_PHONE_VERIFICATION_PROVIDER",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_FIELD",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD",
+      "PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD",
+    ],
+    "productionApiRequirements.conditionalEnv",
+    errors,
+  );
   requireIncludes(requirements.forbiddenProductionCapabilities, ["demo-data"], "productionApiRequirements.forbiddenProductionCapabilities", errors);
 }
 
@@ -472,6 +488,11 @@ function validateDeploymentPackage(contract, errors) {
     }
     if (!/^PLATFORM_INTERNAL_SUBNET=.+$/m.test(envTemplate) || !/^PLATFORM_ADMIN_PROXY_IP=.+$/m.test(envTemplate)) {
       errors.push("production env must align PLATFORM_INTERNAL_SUBNET and PLATFORM_ADMIN_PROXY_IP with trusted proxies");
+    }
+    for (const conditionalEnv of values(contract.productionApiRequirements?.conditionalEnv)) {
+      if (!new RegExp(`^${conditionalEnv}=`, "m").test(envTemplate)) {
+        errors.push(`deploymentPackage.envTemplate must declare conditional ${conditionalEnv}`);
+      }
     }
     const adminProxyIP = envTemplate.match(/^PLATFORM_ADMIN_PROXY_IP=(.+)$/m)?.[1]?.trim() ?? "";
     const trustedProxyValues = (envTemplate.match(/^PLATFORM_TRUSTED_PROXIES=(.+)$/m)?.[1] ?? "").split(",").map((item) => item.trim());
