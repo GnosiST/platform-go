@@ -1,0 +1,640 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Platform External Plane API",
+    "version": "1.0.0",
+    "description": "Generated from capability.Manifest.Service. Contract-only operations are declarations and do not claim runtime handlers."
+  },
+  "paths": {
+    "/api/app/files": {
+      "post": {
+        "operationId": "upload-file",
+        "tags": [
+          "file-storage"
+        ],
+        "summary": "Upload an app file.",
+        "security": [
+          {
+            "appSession": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/AppFileUploadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppFileUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "429": {
+            "description": "Rate or cost limit exceeded"
+          }
+        },
+        "x-platform-capability": "file-storage",
+        "x-platform-service": "file-storage",
+        "x-platform-plane": "external",
+        "x-platform-runtime-status": "bound",
+        "x-platform-identity-mode": "management-user",
+        "x-platform-tenant-mode": "required",
+        "x-platform-permissions": [],
+        "x-platform-data-scopes": [
+          "tenant"
+        ],
+        "x-platform-reliability": {
+          "idempotency": "none",
+          "optimisticConcurrency": "none",
+          "timeoutMilliseconds": 5000,
+          "maxRetries": 0,
+          "rateLimitPerMinute": 120,
+          "costLimit": 10
+        },
+        "x-platform-compatibility": {
+          "mode": "semver",
+          "deprecated": false
+        }
+      }
+    },
+    "/api/app/files/{id}/content": {
+      "get": {
+        "operationId": "read-file-content",
+        "tags": [
+          "file-storage"
+        ],
+        "summary": "Read app file content.",
+        "security": [
+          {
+            "appSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "429": {
+            "description": "Rate or cost limit exceeded"
+          }
+        },
+        "x-platform-capability": "file-storage",
+        "x-platform-service": "file-storage",
+        "x-platform-plane": "external",
+        "x-platform-runtime-status": "bound",
+        "x-platform-identity-mode": "management-user",
+        "x-platform-tenant-mode": "required",
+        "x-platform-permissions": [],
+        "x-platform-data-scopes": [
+          "tenant"
+        ],
+        "x-platform-reliability": {
+          "idempotency": "none",
+          "optimisticConcurrency": "none",
+          "timeoutMilliseconds": 5000,
+          "maxRetries": 0,
+          "rateLimitPerMinute": 120,
+          "costLimit": 10
+        },
+        "x-platform-compatibility": {
+          "mode": "semver",
+          "deprecated": false
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "adminSession": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Management-user Admin session."
+      },
+      "appSession": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Management-user App session."
+      },
+      "apiToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Scoped pgo_ API token."
+      },
+      "oauth2ClientCredentials": {
+        "type": "oauth2",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "/oauth2/token",
+            "scopes": {}
+          }
+        },
+        "x-runtime-status": "declaration-only"
+      },
+      "mtls": {
+        "type": "mutualTLS",
+        "x-runtime-status": "declaration-only"
+      },
+      "workloadJWT": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "x-runtime-status": "declaration-only"
+      }
+    },
+    "schemas": {
+      "AdminResourceRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "deletedAt": {
+            "type": "string"
+          },
+          "deletedBy": {
+            "type": "string"
+          },
+          "deleteReason": {
+            "type": "string"
+          },
+          "purgeAfter": {
+            "type": "string"
+          },
+          "deletionPolicyVersion": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "status",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AppFileContentRequest": {
+        "type": "object",
+        "properties": {
+          "id": {}
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "none",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "database"
+              ]
+            },
+            {
+              "required": [
+                "datasource"
+              ]
+            },
+            {
+              "required": [
+                "dsn"
+              ]
+            },
+            {
+              "required": [
+                "schema"
+              ]
+            },
+            {
+              "required": [
+                "shard"
+              ]
+            }
+          ]
+        },
+        "x-platform-forbidden-client-fields": [
+          "database",
+          "datasource",
+          "dsn",
+          "schema",
+          "shard"
+        ]
+      },
+      "AppFileUploadRequest": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "sensitive",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "database"
+              ]
+            },
+            {
+              "required": [
+                "datasource"
+              ]
+            },
+            {
+              "required": [
+                "dsn"
+              ]
+            },
+            {
+              "required": [
+                "schema"
+              ]
+            },
+            {
+              "required": [
+                "shard"
+              ]
+            }
+          ]
+        },
+        "x-platform-forbidden-client-fields": [
+          "database",
+          "datasource",
+          "dsn",
+          "schema",
+          "shard"
+        ]
+      },
+      "AppFileUploadResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "resource": {
+                "type": "string",
+                "const": "files"
+              },
+              "record": {
+                "$ref": "#/components/schemas/AdminResourceRecord"
+              }
+            },
+            "required": [
+              "resource",
+              "record"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "personal"
+      },
+      "FileContent": {
+        "type": "object",
+        "properties": {
+          "content": {}
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "sensitive"
+      },
+      "FileRecord": {
+        "type": "object",
+        "properties": {
+          "id": {}
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "personal"
+      },
+      "FileRecordPage": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false,
+        "x-platform-pii": "personal"
+      },
+      "FileStoredEvent": {
+        "type": "object",
+        "properties": {
+          "fileId": {}
+        },
+        "required": [
+          "fileId"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "personal"
+      },
+      "InspectStorageRequest": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false,
+        "x-platform-pii": "none",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "database"
+              ]
+            },
+            {
+              "required": [
+                "datasource"
+              ]
+            },
+            {
+              "required": [
+                "dsn"
+              ]
+            },
+            {
+              "required": [
+                "schema"
+              ]
+            },
+            {
+              "required": [
+                "shard"
+              ]
+            }
+          ]
+        },
+        "x-platform-forbidden-client-fields": [
+          "database",
+          "datasource",
+          "dsn",
+          "schema",
+          "shard"
+        ]
+      },
+      "ListFilesRequest": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false,
+        "x-platform-pii": "none",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "database"
+              ]
+            },
+            {
+              "required": [
+                "datasource"
+              ]
+            },
+            {
+              "required": [
+                "dsn"
+              ]
+            },
+            {
+              "required": [
+                "schema"
+              ]
+            },
+            {
+              "required": [
+                "shard"
+              ]
+            }
+          ]
+        },
+        "x-platform-forbidden-client-fields": [
+          "database",
+          "datasource",
+          "dsn",
+          "schema",
+          "shard"
+        ]
+      },
+      "ReadFileRequest": {
+        "type": "object",
+        "properties": {
+          "id": {}
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "none",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "database"
+              ]
+            },
+            {
+              "required": [
+                "datasource"
+              ]
+            },
+            {
+              "required": [
+                "dsn"
+              ]
+            },
+            {
+              "required": [
+                "schema"
+              ]
+            },
+            {
+              "required": [
+                "shard"
+              ]
+            }
+          ]
+        },
+        "x-platform-forbidden-client-fields": [
+          "database",
+          "datasource",
+          "dsn",
+          "schema",
+          "shard"
+        ]
+      },
+      "StorageStatus": {
+        "type": "object",
+        "properties": {
+          "status": {}
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "none"
+      },
+      "StoreFileRequest": {
+        "type": "object",
+        "properties": {
+          "fileName": {},
+          "content": {}
+        },
+        "required": [
+          "fileName",
+          "content"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "sensitive",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "database"
+              ]
+            },
+            {
+              "required": [
+                "datasource"
+              ]
+            },
+            {
+              "required": [
+                "dsn"
+              ]
+            },
+            {
+              "required": [
+                "schema"
+              ]
+            },
+            {
+              "required": [
+                "shard"
+              ]
+            }
+          ]
+        },
+        "x-platform-forbidden-client-fields": [
+          "database",
+          "datasource",
+          "dsn",
+          "schema",
+          "shard"
+        ]
+      }
+    }
+  },
+  "x-generated-by": "scripts/generate-platform-service-contract-artifacts.mjs",
+  "x-source": "resources/generated/platform-service-contract.json",
+  "x-source-hash": "sha256:c18bec1b88558546fd6396360d37d2d8d41c19accce6b5ce862d72d486ba5ef5",
+  "x-platform-plane": "external",
+  "x-platform-tenant-context": {
+    "fields": [
+      "tenantId",
+      "tenantCode",
+      "organizationId",
+      "configurationVersion"
+    ],
+    "provenance": [
+      "authenticated-identity",
+      "trusted-gateway",
+      "authorized-control-plane-override"
+    ],
+    "clientPhysicalRoutingSelectable": false,
+    "forbiddenClientFields": [
+      "dsn",
+      "datasource",
+      "database",
+      "schema",
+      "shard"
+    ]
+  },
+  "x-platform-trace-context": {
+    "standard": "W3C Trace Context",
+    "fields": [
+      "traceparent",
+      "tracestate"
+    ]
+  },
+  "x-platform-contract-only-operations": []
+}

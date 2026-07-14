@@ -540,6 +540,81 @@ func TestDefaultManifestsExposeAppRouteDeclarations(t *testing.T) {
 	}
 }
 
+func TestFileStorageServiceContractMatchesBoundAppRoutes(t *testing.T) {
+	manifests := DefaultManifests()
+	if err := capability.ValidateServiceContracts(manifests); err != nil {
+		t.Fatalf("ValidateServiceContracts(DefaultManifests()) error = %v", err)
+	}
+
+	var fileStorage capability.Manifest
+	for _, manifest := range manifests {
+		if manifest.ID == "file-storage" {
+			fileStorage = manifest
+			break
+		}
+	}
+	if fileStorage.Service.ID != "file-storage" {
+		t.Fatalf("file-storage service = %+v, want canonical service surface", fileStorage.Service)
+	}
+	if fileStorage.Service.Stability != capability.ServiceStabilityStable || fileStorage.Service.Version != "1.0.0" {
+		t.Fatalf("file-storage service baseline = %q/%q, want stable 1.0.0", fileStorage.Service.Stability, fileStorage.Service.Version)
+	}
+
+	wantBoundRoutes := map[string]bool{}
+	for _, route := range fileStorage.App.Routes {
+		wantBoundRoutes[route.Method+" "+route.Path] = true
+	}
+	gotBoundRoutes := map[string]bool{}
+	boundSuccessStatuses := map[string]int{}
+	planes := map[capability.ServicePlane]bool{}
+	for _, operation := range fileStorage.Service.Operations {
+		planes[operation.Plane] = true
+		if operation.RuntimeStatus != capability.ServiceRuntimeBound {
+			if operation.Method != "" || operation.Path != "" {
+				t.Fatalf("contract-only operation %q claims HTTP binding %s %s", operation.ID, operation.Method, operation.Path)
+			}
+			continue
+		}
+		if operation.Plane != capability.ServicePlaneExternal {
+			t.Fatalf("bound operation %q plane = %q, want external", operation.ID, operation.Plane)
+		}
+		gotBoundRoutes[operation.Method+" "+operation.Path] = true
+		boundSuccessStatuses[operation.ID] = operation.SuccessStatus
+		if operation.ID == "upload-file" {
+			if !slices.Equal(operation.ResponseSchema.RequiredFields, []string{"data"}) {
+				t.Fatalf("upload-file response required fields = %+v, want data envelope", operation.ResponseSchema.RequiredFields)
+			}
+		}
+	}
+	if len(gotBoundRoutes) != len(wantBoundRoutes) {
+		t.Fatalf("bound service routes = %+v, app routes = %+v", gotBoundRoutes, wantBoundRoutes)
+	}
+	for route := range wantBoundRoutes {
+		if !gotBoundRoutes[route] {
+			t.Fatalf("bound service routes = %+v, missing app route %q", gotBoundRoutes, route)
+		}
+	}
+	if boundSuccessStatuses["upload-file"] != 201 {
+		t.Fatalf("upload-file success status = %d, want 201", boundSuccessStatuses["upload-file"])
+	}
+	if boundSuccessStatuses["read-file-content"] != 200 {
+		t.Fatalf("read-file-content success status = %d, want 200", boundSuccessStatuses["read-file-content"])
+	}
+	for _, plane := range []capability.ServicePlane{capability.ServicePlaneAdmin, capability.ServicePlaneData, capability.ServicePlaneControl, capability.ServicePlaneExternal} {
+		if !planes[plane] {
+			t.Fatalf("file-storage service planes = %+v, missing %q", planes, plane)
+		}
+	}
+	if len(fileStorage.Service.Events) == 0 {
+		t.Fatalf("file-storage service events are empty")
+	}
+	for _, event := range fileStorage.Service.Events {
+		if event.RuntimeStatus != capability.ServiceRuntimeContractOnly {
+			t.Fatalf("event %q runtime status = %q, want contract-only", event.ID, event.RuntimeStatus)
+		}
+	}
+}
+
 func TestDefaultManifestsRecordLifecycleHistory(t *testing.T) {
 	registry := capability.NewRegistry()
 	for _, manifest := range DefaultManifests() {

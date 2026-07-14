@@ -1,0 +1,9 @@
+{
+  "fixtureType": "positive",
+  "consumerId": "reference-file-client",
+  "serviceId": "file-storage",
+  "operations": ["upload-file", "read-file-content"],
+  "events": ["file-stored"],
+  "tenantContextSource": "authenticated-identity",
+  "physicalRouting": null
+}

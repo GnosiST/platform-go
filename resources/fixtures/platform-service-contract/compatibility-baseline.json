@@ -1,0 +1,216 @@
+{
+  "contractVersion": "1.0.0",
+  "services": [
+    {
+      "id": "file-storage",
+      "stability": "stable",
+      "version": "1.0.0",
+      "audiences": ["operator", "internal", "partner"],
+      "identityModes": ["management-user", "workload"],
+      "authModes": ["admin-session", "app-session", "workload-jwt"],
+      "operations": [
+        {
+          "id": "inspect-storage",
+          "kind": "query",
+          "plane": "control",
+          "runtimeStatus": "contract-only",
+          "identityMode": "workload",
+          "authModes": ["workload-jwt"],
+          "tenantMode": "platform",
+          "permissions": [],
+          "dataScopes": [],
+          "reliability": {
+            "idempotency": "none",
+            "optimisticConcurrency": "none",
+            "timeoutMilliseconds": 5000,
+            "maxRetries": 0,
+            "rateLimitPerMinute": 120,
+            "costLimit": 10
+          },
+          "requestSchema": {
+            "ref": "#/schemas/InspectStorageRequest",
+            "requiredFields": [],
+            "pii": "none"
+          },
+          "responseSchema": {
+            "ref": "#/schemas/StorageStatus",
+            "requiredFields": ["status"],
+            "pii": "none"
+          }
+        },
+        {
+          "id": "list-files",
+          "kind": "query",
+          "plane": "admin",
+          "runtimeStatus": "contract-only",
+          "identityMode": "management-user",
+          "authModes": ["admin-session"],
+          "tenantMode": "required",
+          "permissions": ["admin:file:read"],
+          "dataScopes": ["tenant"],
+          "reliability": {
+            "idempotency": "none",
+            "optimisticConcurrency": "none",
+            "timeoutMilliseconds": 5000,
+            "maxRetries": 0,
+            "rateLimitPerMinute": 120,
+            "costLimit": 10
+          },
+          "requestSchema": {
+            "ref": "#/schemas/ListFilesRequest",
+            "requiredFields": [],
+            "pii": "none"
+          },
+          "responseSchema": {
+            "ref": "#/schemas/FileRecordPage",
+            "requiredFields": [],
+            "pii": "personal"
+          }
+        },
+        {
+          "id": "read-file",
+          "kind": "query",
+          "plane": "service",
+          "runtimeStatus": "contract-only",
+          "identityMode": "workload",
+          "authModes": ["workload-jwt"],
+          "tenantMode": "required",
+          "permissions": [],
+          "dataScopes": ["tenant"],
+          "reliability": {
+            "idempotency": "none",
+            "optimisticConcurrency": "none",
+            "timeoutMilliseconds": 5000,
+            "maxRetries": 0,
+            "rateLimitPerMinute": 120,
+            "costLimit": 10
+          },
+          "requestSchema": {
+            "ref": "#/schemas/ReadFileRequest",
+            "requiredFields": ["id"],
+            "pii": "none"
+          },
+          "responseSchema": {
+            "ref": "#/schemas/FileContent",
+            "requiredFields": ["content"],
+            "pii": "sensitive"
+          }
+        },
+        {
+          "id": "read-file-content",
+          "kind": "query",
+          "plane": "external",
+          "runtimeStatus": "bound",
+          "identityMode": "management-user",
+          "authModes": ["app-session"],
+          "tenantMode": "required",
+          "permissions": [],
+          "dataScopes": ["tenant"],
+          "method": "GET",
+          "path": "/api/app/files/:id/content",
+          "responseMediaType": "application/octet-stream",
+          "successStatus": 200,
+          "reliability": {
+            "idempotency": "none",
+            "optimisticConcurrency": "none",
+            "timeoutMilliseconds": 5000,
+            "maxRetries": 0,
+            "rateLimitPerMinute": 120,
+            "costLimit": 10
+          },
+          "requestSchema": {
+            "ref": "#/schemas/AppFileContentRequest",
+            "requiredFields": ["id"],
+            "pii": "none"
+          },
+          "responseSchema": {
+            "ref": "#/schemas/FileContent",
+            "requiredFields": ["content"],
+            "pii": "sensitive"
+          }
+        },
+        {
+          "id": "store-file",
+          "kind": "command",
+          "plane": "service",
+          "runtimeStatus": "contract-only",
+          "identityMode": "workload",
+          "authModes": ["workload-jwt"],
+          "tenantMode": "required",
+          "permissions": [],
+          "dataScopes": ["tenant"],
+          "reliability": {
+            "idempotency": "required-key",
+            "optimisticConcurrency": "none",
+            "timeoutMilliseconds": 5000,
+            "maxRetries": 0,
+            "rateLimitPerMinute": 120,
+            "costLimit": 20
+          },
+          "requestSchema": {
+            "ref": "#/schemas/StoreFileRequest",
+            "requiredFields": ["fileName", "content"],
+            "pii": "sensitive"
+          },
+          "responseSchema": {
+            "ref": "#/schemas/FileRecord",
+            "requiredFields": ["id"],
+            "pii": "personal"
+          }
+        },
+        {
+          "id": "upload-file",
+          "kind": "command",
+          "plane": "external",
+          "runtimeStatus": "bound",
+          "identityMode": "management-user",
+          "authModes": ["app-session"],
+          "tenantMode": "required",
+          "permissions": [],
+          "dataScopes": ["tenant"],
+          "method": "POST",
+          "path": "/api/app/files",
+          "requestMediaType": "multipart/form-data",
+          "responseMediaType": "application/json",
+          "successStatus": 201,
+          "reliability": {
+            "idempotency": "none",
+            "optimisticConcurrency": "none",
+            "timeoutMilliseconds": 5000,
+            "maxRetries": 0,
+            "rateLimitPerMinute": 120,
+            "costLimit": 10
+          },
+          "requestSchema": {
+            "ref": "#/schemas/AppFileUploadRequest",
+            "requiredFields": ["file"],
+            "pii": "sensitive"
+          },
+          "responseSchema": {
+            "ref": "#/schemas/AppFileUploadResponse",
+            "requiredFields": ["data"],
+            "pii": "personal"
+          }
+        }
+      ],
+      "events": [
+        {
+          "id": "file-stored",
+          "name": "platform.file-storage.file-stored.v1",
+          "version": 1,
+          "direction": "publish",
+          "runtimeStatus": "contract-only",
+          "tenantMode": "required",
+          "permissions": [],
+          "dataScopes": ["tenant"],
+          "payloadSchema": {
+            "ref": "#/schemas/FileStoredEvent",
+            "requiredFields": ["fileId"],
+            "pii": "personal"
+          },
+          "envelopeVersion": "1.0"
+        }
+      ]
+    }
+  ]
+}

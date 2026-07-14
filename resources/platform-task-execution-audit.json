@@ -17,7 +17,6 @@
     "parallelBatchesMustAvoidDependencyPaths": true
   },
   "requiredUnfinishedNodes": [
-    "platform-service-contract-standard",
     "persisted-query-command-object-runtime",
     "integration-ports-disabled-default",
     "organization-rbac-menu-contract-and-migration-design",
@@ -97,6 +96,7 @@
     "scripts/validate-platform-goal-completion-audit.mjs",
     "scripts/validate-platform-node-closeout-audit.mjs",
     "scripts/validate-platform-data-lifecycle-retention.mjs",
+    "scripts/validate-platform-service-contract-standard.mjs",
     "scripts/validate-platform-sensitive-data-migration.mjs",
     "scripts/validate-platform-objective-conformance.mjs",
     "scripts/validate-platform-promotion-evidence-templates.mjs",
@@ -105,6 +105,7 @@
   "requiredTests": [
     "scripts/platform-task-execution-audit.test.mjs",
     "scripts/platform-data-lifecycle-retention.test.mjs",
-    "scripts/platform-sensitive-data-migration.test.mjs"
+    "scripts/platform-sensitive-data-migration.test.mjs",
+    "scripts/platform-service-contract-standard.test.mjs"
   ]
 }

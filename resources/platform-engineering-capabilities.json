@@ -2933,17 +2933,51 @@
         "zh": "平台服务合同标准",
         "en": "Platform Service Contract Standard"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Define executable service manifests across Admin, Service, Control, External and Event planes with explicit identity, tenant, reliability and compatibility boundaries.",
       "dependsOn": [
-        "data-lifecycle-retention"
+        "data-lifecycle-retention",
+        "capability-contract-governance"
       ],
       "evidence": {
         "sourcePaths": [
+          "resources/platform-service-contract-standard.json",
+          "internal/platform/capability/manifest.go",
+          "internal/platform/capability/service_contract.go",
+          "internal/platform/capability/registry.go",
+          "internal/platform/core/capabilities.go",
+          "cmd/platform-contracts/main.go",
+          "docs/platform-service-contract-standard.md",
+          "docs/platform-capability-development.md",
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
+        "generatedFiles": [
+          "resources/generated/platform-service-contract.json",
+          "resources/generated/openapi.service.json",
+          "resources/generated/openapi.control.json",
+          "resources/generated/openapi.external.json",
+          "resources/generated/asyncapi.events.json",
+          "resources/generated/service-sdk/go/service_contract_sdk.go",
+          "resources/generated/service-sdk/typescript/serviceContractSDK.ts"
+        ],
+        "validators": [
+          "scripts/validate-platform-service-contract-standard.mjs"
+        ],
+        "tests": [
+          "internal/platform/capability/service_contract_test.go",
+          "internal/platform/core/capabilities_test.go",
+          "cmd/platform-contracts/main_test.go",
+          "scripts/platform-service-contract-standard.test.mjs"
+        ],
+        "runtimeBoundary": {
+          "queryCommandExecution": "deferred-to-persisted-query-command-object-runtime",
+          "workloadIdentityProtocols": "declaration-only",
+          "eventDelivery": "deferred-to-outbox-and-mq",
+          "datasourceRouting": "deferred-to-multi-datasource-program",
+          "runtimeSourceWriting": "disabled"
+        },
         "taskIds": [
           "platform-service-contract-standard"
         ]

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-service-contract-standard.json",
+  "capturedAt": "2026-07-14",
+  "contractVersion": "1.0.0",
+  "purpose": "Executable governance standard for capability service contracts across Admin, Service/Data, Control, External/Partner and Event planes.",
+  "source": "capability.Manifest.Service",
+  "planes": ["admin", "service", "control", "external", "event"],
+  "identityModes": ["management-user", "workload"],
+  "authModes": ["admin-session", "app-session", "api-token", "oauth2-client-credentials", "mtls", "workload-jwt"],
+  "tenantContext": {
+    "fields": ["tenantId", "tenantCode", "organizationId", "configurationVersion"],
+    "provenance": ["authenticated-identity", "trusted-gateway", "authorized-control-plane-override"],
+    "clientPhysicalRoutingSelectable": false,
+    "forbiddenClientFields": ["dsn", "datasource", "database", "schema", "shard"]
+  },
+  "identityBoundary": {
+    "managementUser": ["admin-session", "app-session", "api-token"],
+    "workload": ["oauth2-client-credentials", "mtls", "workload-jwt"],
+    "runtimeStatus": {
+      "admin-session": "implemented",
+      "app-session": "implemented",
+      "api-token": "implemented-admin-scope",
+      "oauth2-client-credentials": "declaration-only",
+      "mtls": "declaration-only",
+      "workload-jwt": "declaration-only"
+    }
+  },
+  "traceContext": {
+    "standard": "W3C Trace Context",
+    "fields": ["traceparent", "tracestate"],
+    "runtimePropagation": "not-implemented"
+  },
+  "eventEnvelope": {
+    "version": "1.0",
+    "requiredFields": ["eventId", "eventType", "eventVersion", "occurredAt", "producer", "tenantContext", "traceContext", "payload"],
+    "tenantContextRequirement": "required-only-for-tenant-required-events",
+    "runtimeDelivery": "not-implemented"
+  },
+  "compatibility": {
+    "mode": "semver",
+    "sameMajorMustPreserve": [
+      "stable-service-version-and-classification",
+      "service-identity-and-auth-modes",
+      "operation-identity-and-http-binding",
+      "operation-success-status",
+      "request-response-schema-ref-pii-required-fields",
+      "reliability-semantics",
+      "event-identity-direction-envelope-payload",
+      "tenantMode",
+      "permissions",
+      "dataScopes"
+    ],
+    "deprecationRequires": ["deprecated=true", "sunsetAt-rfc3339", "replacedBy"]
+  },
+  "generatedArtifacts": [
+    "resources/generated/platform-service-contract.json",
+    "resources/generated/openapi.service.json",
+    "resources/generated/openapi.control.json",
+    "resources/generated/openapi.external.json",
+    "resources/generated/asyncapi.events.json",
+    "resources/generated/service-sdk/go/service_contract_sdk.go",
+    "resources/generated/service-sdk/typescript/serviceContractSDK.ts"
+  ],
+  "consumerFixtures": {
+    "positive": "resources/fixtures/platform-service-contract/valid-file-storage-consumer.json",
+    "negative": "resources/fixtures/platform-service-contract/rejected-physical-routing-consumer.json",
+    "compatibilityBaseline": "resources/fixtures/platform-service-contract/compatibility-baseline.json"
+  },
+  "runtimeBoundary": {
+    "queryCommandExecution": "deferred-to-persisted-query-command-object-runtime",
+    "workloadIdentityProtocols": "declaration-only",
+    "eventDelivery": "deferred-to-outbox-and-mq",
+    "datasourceRouting": "deferred-to-multi-datasource-program",
+    "runtimeSourceWriting": "disabled",
+    "openapiRuntimePublication": "admin-document-only"
+  },
+  "validators": ["scripts/validate-platform-service-contract-standard.mjs"],
+  "tests": ["scripts/platform-service-contract-standard.test.mjs"]
+}

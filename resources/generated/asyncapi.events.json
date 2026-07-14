@@ -1,0 +1,575 @@
+{
+  "asyncapi": "3.0.0",
+  "info": {
+    "title": "Platform Event Plane",
+    "version": "1.0.0",
+    "description": "Schema-level Event Plane contract. Reliable delivery is not implemented by this node."
+  },
+  "channels": {
+    "platform.file-storage.file-stored.v1": {
+      "address": "platform.file-storage.file-stored.v1",
+      "messages": {
+        "file_storage_file_stored_v1": {
+          "$ref": "#/components/messages/file_storage_file_stored_v1"
+        }
+      },
+      "x-platform-direction": "publish",
+      "x-platform-runtime-status": "contract-only"
+    }
+  },
+  "components": {
+    "messages": {
+      "file_storage_file_stored_v1": {
+        "name": "platform.file-storage.file-stored.v1",
+        "title": "File stored contract event.",
+        "headers": {
+          "type": "object",
+          "properties": {
+            "traceparent": {
+              "type": "string"
+            },
+            "tracestate": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "traceparent"
+          ],
+          "additionalProperties": false
+        },
+        "payload": {
+          "$ref": "#/components/schemas/FileStorageFileStoredEventEnvelopeV1"
+        },
+        "x-platform-capability": "file-storage",
+        "x-platform-service": "file-storage",
+        "x-platform-event-id": "file-stored",
+        "x-platform-event-version": 1,
+        "x-platform-envelope-version": "1.0",
+        "x-platform-runtime-status": "contract-only",
+        "x-platform-tenant-mode": "required",
+        "x-platform-data-scopes": [
+          "tenant"
+        ],
+        "x-platform-compatibility": {
+          "mode": "semver",
+          "deprecated": false
+        }
+      }
+    },
+    "schemas": {
+      "AdminResourceRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "deletedAt": {
+            "type": "string"
+          },
+          "deletedBy": {
+            "type": "string"
+          },
+          "deleteReason": {
+            "type": "string"
+          },
+          "purgeAfter": {
+            "type": "string"
+          },
+          "deletionPolicyVersion": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "status",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AppFileContentRequest": {
+        "type": "object",
+        "properties": {
+          "id": {}
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "none",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "database"
+              ]
+            },
+            {
+              "required": [
+                "datasource"
+              ]
+            },
+            {
+              "required": [
+                "dsn"
+              ]
+            },
+            {
+              "required": [
+                "schema"
+              ]
+            },
+            {
+              "required": [
+                "shard"
+              ]
+            }
+          ]
+        },
+        "x-platform-forbidden-client-fields": [
+          "database",
+          "datasource",
+          "dsn",
+          "schema",
+          "shard"
+        ]
+      },
+      "AppFileUploadRequest": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "sensitive",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "database"
+              ]
+            },
+            {
+              "required": [
+                "datasource"
+              ]
+            },
+            {
+              "required": [
+                "dsn"
+              ]
+            },
+            {
+              "required": [
+                "schema"
+              ]
+            },
+            {
+              "required": [
+                "shard"
+              ]
+            }
+          ]
+        },
+        "x-platform-forbidden-client-fields": [
+          "database",
+          "datasource",
+          "dsn",
+          "schema",
+          "shard"
+        ]
+      },
+      "AppFileUploadResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "resource": {
+                "type": "string",
+                "const": "files"
+              },
+              "record": {
+                "$ref": "#/components/schemas/AdminResourceRecord"
+              }
+            },
+            "required": [
+              "resource",
+              "record"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "personal"
+      },
+      "FileContent": {
+        "type": "object",
+        "properties": {
+          "content": {}
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "sensitive"
+      },
+      "FileRecord": {
+        "type": "object",
+        "properties": {
+          "id": {}
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "personal"
+      },
+      "FileRecordPage": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false,
+        "x-platform-pii": "personal"
+      },
+      "FileStorageFileStoredEventEnvelopeV1": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "eventType": {
+            "type": "string",
+            "const": "platform.file-storage.file-stored.v1"
+          },
+          "eventVersion": {
+            "type": "integer",
+            "const": 1
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "producer": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tenantContext": {
+            "type": "object",
+            "properties": {
+              "tenantId": {
+                "type": "string"
+              },
+              "tenantCode": {
+                "type": "string"
+              },
+              "organizationId": {
+                "type": "string"
+              },
+              "configurationVersion": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tenantId",
+              "tenantCode",
+              "configurationVersion"
+            ],
+            "additionalProperties": false
+          },
+          "traceContext": {
+            "type": "object",
+            "properties": {
+              "traceparent": {
+                "type": "string"
+              },
+              "tracestate": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "traceparent"
+            ],
+            "additionalProperties": false
+          },
+          "payload": {
+            "$ref": "#/components/schemas/FileStoredEvent"
+          }
+        },
+        "required": [
+          "eventId",
+          "eventType",
+          "eventVersion",
+          "occurredAt",
+          "producer",
+          "tenantContext",
+          "traceContext",
+          "payload"
+        ],
+        "additionalProperties": false,
+        "x-platform-envelope-version": "1.0"
+      },
+      "FileStoredEvent": {
+        "type": "object",
+        "properties": {
+          "fileId": {}
+        },
+        "required": [
+          "fileId"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "personal"
+      },
+      "InspectStorageRequest": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false,
+        "x-platform-pii": "none",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "database"
+              ]
+            },
+            {
+              "required": [
+                "datasource"
+              ]
+            },
+            {
+              "required": [
+                "dsn"
+              ]
+            },
+            {
+              "required": [
+                "schema"
+              ]
+            },
+            {
+              "required": [
+                "shard"
+              ]
+            }
+          ]
+        },
+        "x-platform-forbidden-client-fields": [
+          "database",
+          "datasource",
+          "dsn",
+          "schema",
+          "shard"
+        ]
+      },
+      "ListFilesRequest": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false,
+        "x-platform-pii": "none",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "database"
+              ]
+            },
+            {
+              "required": [
+                "datasource"
+              ]
+            },
+            {
+              "required": [
+                "dsn"
+              ]
+            },
+            {
+              "required": [
+                "schema"
+              ]
+            },
+            {
+              "required": [
+                "shard"
+              ]
+            }
+          ]
+        },
+        "x-platform-forbidden-client-fields": [
+          "database",
+          "datasource",
+          "dsn",
+          "schema",
+          "shard"
+        ]
+      },
+      "ReadFileRequest": {
+        "type": "object",
+        "properties": {
+          "id": {}
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "none",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "database"
+              ]
+            },
+            {
+              "required": [
+                "datasource"
+              ]
+            },
+            {
+              "required": [
+                "dsn"
+              ]
+            },
+            {
+              "required": [
+                "schema"
+              ]
+            },
+            {
+              "required": [
+                "shard"
+              ]
+            }
+          ]
+        },
+        "x-platform-forbidden-client-fields": [
+          "database",
+          "datasource",
+          "dsn",
+          "schema",
+          "shard"
+        ]
+      },
+      "StorageStatus": {
+        "type": "object",
+        "properties": {
+          "status": {}
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "none"
+      },
+      "StoreFileRequest": {
+        "type": "object",
+        "properties": {
+          "fileName": {},
+          "content": {}
+        },
+        "required": [
+          "fileName",
+          "content"
+        ],
+        "additionalProperties": false,
+        "x-platform-pii": "sensitive",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "database"
+              ]
+            },
+            {
+              "required": [
+                "datasource"
+              ]
+            },
+            {
+              "required": [
+                "dsn"
+              ]
+            },
+            {
+              "required": [
+                "schema"
+              ]
+            },
+            {
+              "required": [
+                "shard"
+              ]
+            }
+          ]
+        },
+        "x-platform-forbidden-client-fields": [
+          "database",
+          "datasource",
+          "dsn",
+          "schema",
+          "shard"
+        ]
+      }
+    }
+  },
+  "x-generated-by": "scripts/generate-platform-service-contract-artifacts.mjs",
+  "x-source": "resources/generated/platform-service-contract.json",
+  "x-source-hash": "sha256:c18bec1b88558546fd6396360d37d2d8d41c19accce6b5ce862d72d486ba5ef5",
+  "x-platform-event-envelope": {
+    "version": "1.0",
+    "requiredFields": [
+      "eventId",
+      "eventType",
+      "eventVersion",
+      "occurredAt",
+      "producer",
+      "tenantContext",
+      "traceContext",
+      "payload"
+    ],
+    "tenantContextRequirement": "required-only-for-tenant-required-events",
+    "runtimeStatus": "schema-only"
+  },
+  "x-platform-trace-context": {
+    "standard": "W3C Trace Context",
+    "fields": [
+      "traceparent",
+      "tracestate"
+    ]
+  }
+}

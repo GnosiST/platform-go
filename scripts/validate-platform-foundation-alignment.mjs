@@ -787,6 +787,7 @@ function validateTaskExecutionAudit(audit, taskGraph, taskExecutionAudit, engine
     "scripts/validate-platform-foundation-task-graph.mjs",
     "scripts/validate-platform-file-storage-experience.mjs",
     "scripts/validate-platform-refresh-token-family-promotion.mjs",
+    "scripts/validate-platform-service-contract-standard.mjs",
   ]) {
     if (!values(taskExecutionAudit.requiredValidators).includes(validator)) {
       errors.push(`task execution audit requiredValidators must include ${validator}`);
@@ -795,8 +796,10 @@ function validateTaskExecutionAudit(audit, taskGraph, taskExecutionAudit, engine
       errors.push(`alignment requiredValidators must include task execution validator ${validator}`);
     }
   }
-  if (!values(taskExecutionAudit.requiredTests).includes("scripts/platform-task-execution-audit.test.mjs")) {
-    errors.push("task execution audit requiredTests must include scripts/platform-task-execution-audit.test.mjs");
+  for (const test of ["scripts/platform-task-execution-audit.test.mjs", "scripts/platform-service-contract-standard.test.mjs"]) {
+    if (!values(taskExecutionAudit.requiredTests).includes(test)) {
+      errors.push(`task execution audit requiredTests must include ${test}`);
+    }
   }
   const capability = values(engineering.capabilities).find((item) => item.id === taskExecutionAudit.engineeringCapability);
   if (!capability) {

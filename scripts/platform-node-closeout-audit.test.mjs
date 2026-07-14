@@ -9,7 +9,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "platform-service-contract-standard",
   "persisted-query-command-object-runtime",
   "integration-ports-disabled-default",
   "organization-rbac-menu-contract-and-migration-design",
@@ -101,7 +100,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("preserves 37 baseline closeouts, closes seven completion nodes, and tracks 22 pending nodes", () => {
+  it("preserves 37 baseline closeouts, closes eight completion nodes, and tracks 21 pending nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -109,7 +108,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(task, "task graph must include production-admin-oidc-auth");
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
-    assert.equal(audit.nodeCloseouts.length, 44);
+    assert.equal(audit.nodeCloseouts.length, 45);
     assert.deepEqual(audit.nodeCloseouts.slice(0, 37).map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
     assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts.slice(0, 37))).digest("hex"), foundationBaselineCloseoutDigest);
     const runtimeSecurityCloseout = audit.nodeCloseouts[37];
@@ -152,6 +151,12 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(revealCloseout.visualEvidence.includes("product-design"));
     assert.ok(revealCloseout.visualEvidence.includes("ui-ux-pro-max"));
     assert.ok(revealCloseout.visualEvidence.includes("browser:control-in-app-browser"));
+    const serviceContractCloseout = audit.nodeCloseouts.find((item) => item.taskId === "platform-service-contract-standard");
+    assert.equal(serviceContractCloseout.status, "closed");
+    assert.equal(serviceContractCloseout.neatFreak, true);
+    assert.ok(serviceContractCloseout.cleanupEvidence.includes("docs/platform-service-contract-standard.md"));
+    assert.ok(serviceContractCloseout.cleanupEvidence.includes("scripts/validate-platform-service-contract-standard.mjs"));
+    assert.equal("visualEvidence" in serviceContractCloseout, false);
     assert.deepEqual(audit.pendingNodeEvidence, completionProgramTaskIDs);
   });
 

@@ -68,10 +68,10 @@
     "sensitive-data-historical-migration",
     "mask-strategy-runtime",
     "sensitive-data-reveal-step-up",
-    "data-lifecycle-retention"
+    "data-lifecycle-retention",
+    "platform-service-contract-standard"
   ],
   "requiredFutureTaskNodes": [
-    "platform-service-contract-standard",
     "persisted-query-command-object-runtime",
     "integration-ports-disabled-default",
     "organization-rbac-menu-contract-and-migration-design",
@@ -436,6 +436,7 @@
     "scripts/validate-platform-objective-conformance.mjs",
     "scripts/validate-platform-data-lifecycle-retention.mjs",
     "scripts/validate-platform-sensitive-data-migration.mjs",
+    "scripts/validate-platform-service-contract-standard.mjs",
     "scripts/validate-platform-promotion-evidence-templates.mjs",
     "scripts/validate-admin-i18n.mjs",
     "scripts/validate-admin-ui-contracts.mjs",

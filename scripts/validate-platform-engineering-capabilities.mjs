@@ -59,9 +59,9 @@ const requiredImplementedCapabilityIDs = [
   "mask-strategy-runtime",
   "sensitive-data-reveal-step-up",
   "data-lifecycle-retention",
+  "platform-service-contract-standard",
 ];
 const requiredPartialCapabilityIDs = [
-  "platform-service-contract-standard",
   "persisted-query-command-object-runtime",
   "integration-ports-disabled-default",
   "organization-rbac-menu-contract-and-migration-design",
@@ -83,7 +83,6 @@ const requiredPartialCapabilityIDs = [
   "public-documentation-and-release",
 ];
 const requiredPartialCapabilityDependencies = {
-  "platform-service-contract-standard": ["data-lifecycle-retention"],
   "persisted-query-command-object-runtime": ["platform-service-contract-standard"],
   "integration-ports-disabled-default": ["platform-service-contract-standard"],
   "organization-rbac-menu-contract-and-migration-design": ["persisted-query-command-object-runtime"],
@@ -417,6 +416,51 @@ function validateCapabilityContractGovernance(capability, errors) {
   }
 }
 
+function validatePlatformServiceContractStandard(capability, errors) {
+  if (!capability) {
+    return;
+  }
+  if (capability.status !== "implemented") {
+    errors.push("platform-service-contract-standard status must be implemented");
+  }
+  if (!sameOrderedValues(values(capability.dependsOn), ["data-lifecycle-retention", "capability-contract-governance"])) {
+    errors.push("platform-service-contract-standard dependsOn must equal data-lifecycle-retention then capability-contract-governance");
+  }
+  for (const sourcePath of [
+    "resources/platform-service-contract-standard.json",
+    "internal/platform/capability/service_contract.go",
+    "docs/platform-service-contract-standard.md",
+  ]) {
+    requireIncludes(values(capability.evidence?.sourcePaths), sourcePath, "platform-service-contract-standard evidence.sourcePaths", errors);
+  }
+  for (const generatedFile of [
+    "resources/generated/platform-service-contract.json",
+    "resources/generated/openapi.service.json",
+    "resources/generated/openapi.control.json",
+    "resources/generated/openapi.external.json",
+    "resources/generated/asyncapi.events.json",
+    "resources/generated/service-sdk/go/service_contract_sdk.go",
+    "resources/generated/service-sdk/typescript/serviceContractSDK.ts",
+  ]) {
+    requireIncludes(values(capability.evidence?.generatedFiles), generatedFile, "platform-service-contract-standard evidence.generatedFiles", errors);
+  }
+  requireIncludes(
+    values(capability.evidence?.validators),
+    "scripts/validate-platform-service-contract-standard.mjs",
+    "platform-service-contract-standard evidence.validators",
+    errors,
+  );
+  for (const testPath of ["internal/platform/capability/service_contract_test.go", "scripts/platform-service-contract-standard.test.mjs"]) {
+    requireIncludes(values(capability.evidence?.tests), testPath, "platform-service-contract-standard evidence.tests", errors);
+  }
+  if (capability.evidence?.runtimeBoundary?.datasourceRouting !== "deferred-to-multi-datasource-program") {
+    errors.push("platform-service-contract-standard datasource routing must stay deferred to the multi-datasource program");
+  }
+  if (capability.evidence?.runtimeBoundary?.runtimeSourceWriting !== "disabled") {
+    errors.push("platform-service-contract-standard runtime source writing must stay disabled");
+  }
+}
+
 function validateAppClientAPIBoundary(capability, errors) {
   if (!capability) {
     return;
@@ -484,6 +528,7 @@ function validate() {
   validateFileStorageAdminExperience(capabilityByID.get("file-storage-admin-experience"), errors);
   validateDeploymentTopologyGate(capabilityByID.get("deployment-topology-gate"), errors);
   validateCapabilityContractGovernance(capabilityByID.get("capability-contract-governance"), errors);
+  validatePlatformServiceContractStandard(capabilityByID.get("platform-service-contract-standard"), errors);
   validateAppClientAPIBoundary(capabilityByID.get("app-client-api-boundary"), errors);
   const adminResourceCodes = new Set((adminContract.resources ?? []).map((resource) => resource.code).filter(Boolean));
   const adminPaths = new Set(Object.keys(adminOpenAPI.paths ?? {}));

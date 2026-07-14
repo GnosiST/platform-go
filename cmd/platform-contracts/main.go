@@ -22,6 +22,7 @@ import (
 const (
 	defaultAppRouteContractPath      = "resources/generated/app-route-contract.json"
 	defaultAdminResourceContractPath = "resources/generated/admin-capability-resource-contract.json"
+	defaultServiceContractPath       = "resources/generated/platform-service-contract.json"
 	defaultPlatformAuditPath         = "resources/generated/platform-capability-audit.json"
 )
 
@@ -165,21 +166,26 @@ type platformAuditDocument struct {
 	DemoDataSetCount        int                       `json:"demoDataSetCount"`
 	MigrationCount          int                       `json:"migrationCount"`
 	SeedCount               int                       `json:"seedCount"`
+	ServiceCount            int                       `json:"serviceCount"`
+	ServiceOperationCount   int                       `json:"serviceOperationCount"`
+	ServiceEventCount       int                       `json:"serviceEventCount"`
 	Capabilities            []platformAuditCapability `json:"capabilities"`
 }
 
 type platformAuditCapability struct {
-	ID               string   `json:"id"`
-	Name             string   `json:"name"`
-	Version          string   `json:"version"`
-	Dependencies     []string `json:"dependencies,omitempty"`
-	AdminResources   []string `json:"adminResources,omitempty"`
-	AppRoutes        []string `json:"appRoutes,omitempty"`
-	AppRouteHandlers []string `json:"appRouteHandlers,omitempty"`
-	AuthProviders    []string `json:"authProviders,omitempty"`
-	DemoDataSets     []string `json:"demoDataSets,omitempty"`
-	Migrations       []string `json:"migrations,omitempty"`
-	Seeds            []string `json:"seeds,omitempty"`
+	ID                string   `json:"id"`
+	Name              string   `json:"name"`
+	Version           string   `json:"version"`
+	Dependencies      []string `json:"dependencies,omitempty"`
+	AdminResources    []string `json:"adminResources,omitempty"`
+	AppRoutes         []string `json:"appRoutes,omitempty"`
+	AppRouteHandlers  []string `json:"appRouteHandlers,omitempty"`
+	AuthProviders     []string `json:"authProviders,omitempty"`
+	DemoDataSets      []string `json:"demoDataSets,omitempty"`
+	Migrations        []string `json:"migrations,omitempty"`
+	Seeds             []string `json:"seeds,omitempty"`
+	ServiceOperations []string `json:"serviceOperations,omitempty"`
+	ServiceEvents     []string `json:"serviceEvents,omitempty"`
 }
 
 func main() {
@@ -198,11 +204,49 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runAppRoutes(args[1:], stdout, stderr)
 	case "admin-resources":
 		return runAdminResources(args[1:], stdout, stderr)
+	case "service-manifests":
+		return runServiceManifests(args[1:], stdout, stderr)
 	case "audit":
 		return runAudit(args[1:], stdout, stderr)
 	default:
 		return fmt.Errorf("unknown contract command %q", args[0])
 	}
+}
+
+func runServiceManifests(args []string, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("service-manifests", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	outputPath := flags.String("output", defaultServiceContractPath, "output service contract path")
+	stdoutMode := flags.Bool("stdout", false, "write service contract to stdout")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 0 {
+		return fmt.Errorf("unexpected service-manifests arguments: %v", flags.Args())
+	}
+
+	manifests, err := enabledManifests()
+	if err != nil {
+		return err
+	}
+	document, err := capability.ServiceContractDocumentFromManifests(manifests)
+	if err != nil {
+		return err
+	}
+	var output bytes.Buffer
+	encoder := json.NewEncoder(&output)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(document); err != nil {
+		return err
+	}
+	if *stdoutMode {
+		_, err = stdout.Write(output.Bytes())
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(*outputPath), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(*outputPath, output.Bytes(), 0644)
 }
 
 func runAppRoutes(args []string, stdout io.Writer, stderr io.Writer) error {
@@ -396,6 +440,10 @@ func buildPlatformAuditDocument(manifests []capability.Manifest) (platformAuditD
 	if err != nil {
 		return platformAuditDocument{}, err
 	}
+	serviceDocument, err := capability.ServiceContractDocumentFromManifests(manifests)
+	if err != nil {
+		return platformAuditDocument{}, err
+	}
 	handlerCoverage, err := httpapi.AppRouteHandlerCoverage(manifests, apps.DefaultAppRoutes(nil))
 	if err != nil {
 		return platformAuditDocument{}, err
@@ -415,23 +463,29 @@ func buildPlatformAuditDocument(manifests []capability.Manifest) (platformAuditD
 	var demoDataSetCount int
 	var migrationCount int
 	var seedCount int
+	var serviceOperationCount int
+	var serviceEventCount int
 	for _, manifest := range manifests {
 		authProviderCount += len(manifest.AuthProviders)
 		demoDataSetCount += len(manifest.DemoData)
 		migrationCount += len(manifest.Migrations)
 		seedCount += len(manifest.Seeds)
+		serviceOperationCount += len(manifest.Service.Operations)
+		serviceEventCount += len(manifest.Service.Events)
 		capabilities = append(capabilities, platformAuditCapability{
-			ID:               string(manifest.ID),
-			Name:             manifest.Name,
-			Version:          manifest.Version,
-			Dependencies:     capabilityIDs(manifest.Dependencies),
-			AdminResources:   adminResourceNames(manifest.Admin.Resources),
-			AppRoutes:        appRouteNames(manifest.App.Routes),
-			AppRouteHandlers: appRouteHandlersForCapability(manifest.App.Routes, handlerCoverage.CoveredRoutes),
-			AuthProviders:    authProviderIDs(manifest.AuthProviders),
-			DemoDataSets:     demoDataSetIDs(manifest.DemoData),
-			Migrations:       migrationIDs(manifest.Migrations),
-			Seeds:            seedIDs(manifest.Seeds),
+			ID:                string(manifest.ID),
+			Name:              manifest.Name,
+			Version:           manifest.Version,
+			Dependencies:      capabilityIDs(manifest.Dependencies),
+			AdminResources:    adminResourceNames(manifest.Admin.Resources),
+			AppRoutes:         appRouteNames(manifest.App.Routes),
+			AppRouteHandlers:  appRouteHandlersForCapability(manifest.App.Routes, handlerCoverage.CoveredRoutes),
+			AuthProviders:     authProviderIDs(manifest.AuthProviders),
+			DemoDataSets:      demoDataSetIDs(manifest.DemoData),
+			Migrations:        migrationIDs(manifest.Migrations),
+			Seeds:             seedIDs(manifest.Seeds),
+			ServiceOperations: serviceOperationIDs(manifest.Service.Operations),
+			ServiceEvents:     serviceEventIDs(manifest.Service.Events),
 		})
 	}
 
@@ -452,8 +506,29 @@ func buildPlatformAuditDocument(manifests []capability.Manifest) (platformAuditD
 		DemoDataSetCount:        demoDataSetCount,
 		MigrationCount:          migrationCount,
 		SeedCount:               seedCount,
+		ServiceCount:            len(serviceDocument.Services),
+		ServiceOperationCount:   serviceOperationCount,
+		ServiceEventCount:       serviceEventCount,
 		Capabilities:            capabilities,
 	}, nil
+}
+
+func serviceOperationIDs(operations []capability.ServiceOperation) []string {
+	ids := make([]string, 0, len(operations))
+	for _, operation := range operations {
+		ids = append(ids, operation.ID)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func serviceEventIDs(events []capability.ServiceEvent) []string {
+	ids := make([]string, 0, len(events))
+	for _, event := range events {
+		ids = append(ids, event.ID)
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 func adminResourcePermissions(resource capability.AdminResource) map[string]string {

@@ -8,7 +8,6 @@
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "businessReferenceMode": "reference-only",
     "requiredControlledUnfinishedNodes": [
-      "platform-service-contract-standard",
       "persisted-query-command-object-runtime",
       "integration-ports-disabled-default",
       "organization-rbac-menu-contract-and-migration-design",
@@ -38,8 +37,8 @@
   },
   "taskSummary": {
     "expectedTotal": 66,
-    "expectedImplemented": 44,
-    "expectedControlledUnfinished": 22
+    "expectedImplemented": 45,
+    "expectedControlledUnfinished": 21
   },
   "requirements": [
     {

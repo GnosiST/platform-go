@@ -1,0 +1,441 @@
+{
+  "generatedBy": "cmd/platform-contracts service-manifests",
+  "source": "capability.Manifest.Service",
+  "sourceMode": "go-manifest",
+  "contractVersion": "1.0.0",
+  "sourceVersion": "0.1.0",
+  "contractHash": "sha256:c18bec1b88558546fd6396360d37d2d8d41c19accce6b5ce862d72d486ba5ef5",
+  "policies": {
+    "planes": [
+      "admin",
+      "service",
+      "control",
+      "external",
+      "event"
+    ],
+    "identityModes": [
+      "management-user",
+      "workload"
+    ],
+    "authModes": [
+      "admin-session",
+      "app-session",
+      "api-token",
+      "oauth2-client-credentials",
+      "mtls",
+      "workload-jwt"
+    ],
+    "tenantModes": [
+      "none",
+      "required",
+      "optional",
+      "platform"
+    ],
+    "runtimeStatuses": [
+      "bound",
+      "contract-only"
+    ]
+  },
+  "tenantContext": {
+    "fields": [
+      "tenantId",
+      "tenantCode",
+      "organizationId",
+      "configurationVersion"
+    ],
+    "provenance": [
+      "authenticated-identity",
+      "trusted-gateway",
+      "authorized-control-plane-override"
+    ],
+    "clientPhysicalRoutingSelectable": false,
+    "forbiddenClientFields": [
+      "dsn",
+      "datasource",
+      "database",
+      "schema",
+      "shard"
+    ]
+  },
+  "traceContext": {
+    "standard": "W3C Trace Context",
+    "fields": [
+      "traceparent",
+      "tracestate"
+    ]
+  },
+  "eventEnvelope": {
+    "version": "1.0",
+    "requiredFields": [
+      "eventId",
+      "eventType",
+      "eventVersion",
+      "occurredAt",
+      "producer",
+      "tenantContext",
+      "traceContext",
+      "payload"
+    ],
+    "tenantContextRequirement": "required-only-for-tenant-required-events",
+    "runtimeStatus": "schema-only"
+  },
+  "services": [
+    {
+      "capabilityId": "file-storage",
+      "id": "file-storage",
+      "owner": "platform-core",
+      "audiences": [
+        "operator",
+        "internal",
+        "partner"
+      ],
+      "stability": "stable",
+      "version": "1.0.0",
+      "identityModes": [
+        "management-user",
+        "workload"
+      ],
+      "authModes": [
+        "admin-session",
+        "app-session",
+        "workload-jwt"
+      ],
+      "tenantContext": {
+        "fields": [
+          "tenantId",
+          "tenantCode",
+          "organizationId",
+          "configurationVersion"
+        ],
+        "provenance": [
+          "authenticated-identity",
+          "trusted-gateway",
+          "authorized-control-plane-override"
+        ],
+        "clientPhysicalRoutingSelectable": false,
+        "forbiddenClientFields": [
+          "dsn",
+          "datasource",
+          "database",
+          "schema",
+          "shard"
+        ]
+      },
+      "operations": [
+        {
+          "id": "inspect-storage",
+          "kind": "query",
+          "plane": "control",
+          "runtimeStatus": "contract-only",
+          "identityMode": "workload",
+          "authModes": [
+            "workload-jwt"
+          ],
+          "tenantMode": "platform",
+          "requestSchema": {
+            "ref": "#/schemas/InspectStorageRequest",
+            "pii": "none"
+          },
+          "responseSchema": {
+            "ref": "#/schemas/StorageStatus",
+            "requiredFields": [
+              "status"
+            ],
+            "pii": "none"
+          },
+          "reliability": {
+            "idempotency": "none",
+            "optimisticConcurrency": "none",
+            "timeoutMilliseconds": 5000,
+            "maxRetries": 0,
+            "rateLimitPerMinute": 120,
+            "costLimit": 10
+          },
+          "compatibility": {
+            "mode": "semver",
+            "deprecated": false
+          },
+          "description": {
+            "zh": "检查文件存储运行状态。",
+            "en": "Inspect file storage runtime status."
+          }
+        },
+        {
+          "id": "list-files",
+          "kind": "query",
+          "plane": "admin",
+          "runtimeStatus": "contract-only",
+          "identityMode": "management-user",
+          "authModes": [
+            "admin-session"
+          ],
+          "tenantMode": "required",
+          "permissions": [
+            "admin:file:read"
+          ],
+          "dataScopes": [
+            "tenant"
+          ],
+          "requestSchema": {
+            "ref": "#/schemas/ListFilesRequest",
+            "pii": "none"
+          },
+          "responseSchema": {
+            "ref": "#/schemas/FileRecordPage",
+            "pii": "personal"
+          },
+          "reliability": {
+            "idempotency": "none",
+            "optimisticConcurrency": "none",
+            "timeoutMilliseconds": 5000,
+            "maxRetries": 0,
+            "rateLimitPerMinute": 120,
+            "costLimit": 10
+          },
+          "compatibility": {
+            "mode": "semver",
+            "deprecated": false
+          },
+          "description": {
+            "zh": "按租户查询文件记录。",
+            "en": "Query tenant file records."
+          }
+        },
+        {
+          "id": "read-file",
+          "kind": "query",
+          "plane": "service",
+          "runtimeStatus": "contract-only",
+          "identityMode": "workload",
+          "authModes": [
+            "workload-jwt"
+          ],
+          "tenantMode": "required",
+          "dataScopes": [
+            "tenant"
+          ],
+          "requestSchema": {
+            "ref": "#/schemas/ReadFileRequest",
+            "requiredFields": [
+              "id"
+            ],
+            "pii": "none"
+          },
+          "responseSchema": {
+            "ref": "#/schemas/FileContent",
+            "requiredFields": [
+              "content"
+            ],
+            "pii": "sensitive"
+          },
+          "reliability": {
+            "idempotency": "none",
+            "optimisticConcurrency": "none",
+            "timeoutMilliseconds": 5000,
+            "maxRetries": 0,
+            "rateLimitPerMinute": 120,
+            "costLimit": 10
+          },
+          "compatibility": {
+            "mode": "semver",
+            "deprecated": false
+          },
+          "description": {
+            "zh": "为可信服务读取租户文件。",
+            "en": "Read a tenant file for a trusted service."
+          }
+        },
+        {
+          "id": "read-file-content",
+          "kind": "query",
+          "plane": "external",
+          "runtimeStatus": "bound",
+          "identityMode": "management-user",
+          "authModes": [
+            "app-session"
+          ],
+          "tenantMode": "required",
+          "dataScopes": [
+            "tenant"
+          ],
+          "method": "GET",
+          "path": "/api/app/files/:id/content",
+          "responseMediaType": "application/octet-stream",
+          "successStatus": 200,
+          "requestSchema": {
+            "ref": "#/schemas/AppFileContentRequest",
+            "requiredFields": [
+              "id"
+            ],
+            "pii": "none"
+          },
+          "responseSchema": {
+            "ref": "#/schemas/FileContent",
+            "requiredFields": [
+              "content"
+            ],
+            "pii": "sensitive"
+          },
+          "reliability": {
+            "idempotency": "none",
+            "optimisticConcurrency": "none",
+            "timeoutMilliseconds": 5000,
+            "maxRetries": 0,
+            "rateLimitPerMinute": 120,
+            "costLimit": 10
+          },
+          "compatibility": {
+            "mode": "semver",
+            "deprecated": false
+          },
+          "description": {
+            "zh": "读取 App 文件内容。",
+            "en": "Read app file content."
+          }
+        },
+        {
+          "id": "store-file",
+          "kind": "command",
+          "plane": "service",
+          "runtimeStatus": "contract-only",
+          "identityMode": "workload",
+          "authModes": [
+            "workload-jwt"
+          ],
+          "tenantMode": "required",
+          "dataScopes": [
+            "tenant"
+          ],
+          "requestSchema": {
+            "ref": "#/schemas/StoreFileRequest",
+            "requiredFields": [
+              "fileName",
+              "content"
+            ],
+            "pii": "sensitive"
+          },
+          "responseSchema": {
+            "ref": "#/schemas/FileRecord",
+            "requiredFields": [
+              "id"
+            ],
+            "pii": "personal"
+          },
+          "reliability": {
+            "idempotency": "required-key",
+            "optimisticConcurrency": "none",
+            "timeoutMilliseconds": 5000,
+            "maxRetries": 0,
+            "rateLimitPerMinute": 120,
+            "costLimit": 20
+          },
+          "compatibility": {
+            "mode": "semver",
+            "deprecated": false
+          },
+          "description": {
+            "zh": "为可信服务存储租户文件。",
+            "en": "Store a tenant file for a trusted service."
+          }
+        },
+        {
+          "id": "upload-file",
+          "kind": "command",
+          "plane": "external",
+          "runtimeStatus": "bound",
+          "identityMode": "management-user",
+          "authModes": [
+            "app-session"
+          ],
+          "tenantMode": "required",
+          "dataScopes": [
+            "tenant"
+          ],
+          "method": "POST",
+          "path": "/api/app/files",
+          "requestMediaType": "multipart/form-data",
+          "responseMediaType": "application/json",
+          "successStatus": 201,
+          "requestSchema": {
+            "ref": "#/schemas/AppFileUploadRequest",
+            "requiredFields": [
+              "file"
+            ],
+            "pii": "sensitive"
+          },
+          "responseSchema": {
+            "ref": "#/schemas/AppFileUploadResponse",
+            "requiredFields": [
+              "data"
+            ],
+            "pii": "personal"
+          },
+          "reliability": {
+            "idempotency": "none",
+            "optimisticConcurrency": "none",
+            "timeoutMilliseconds": 5000,
+            "maxRetries": 0,
+            "rateLimitPerMinute": 120,
+            "costLimit": 10
+          },
+          "compatibility": {
+            "mode": "semver",
+            "deprecated": false
+          },
+          "description": {
+            "zh": "上传 App 文件。",
+            "en": "Upload an app file."
+          }
+        }
+      ],
+      "events": [
+        {
+          "id": "file-stored",
+          "name": "platform.file-storage.file-stored.v1",
+          "version": 1,
+          "direction": "publish",
+          "runtimeStatus": "contract-only",
+          "tenantMode": "required",
+          "dataScopes": [
+            "tenant"
+          ],
+          "payloadSchema": {
+            "ref": "#/schemas/FileStoredEvent",
+            "requiredFields": [
+              "fileId"
+            ],
+            "pii": "personal"
+          },
+          "envelopeVersion": "1.0",
+          "traceContext": [
+            "traceparent",
+            "tracestate"
+          ],
+          "compatibility": {
+            "mode": "semver",
+            "deprecated": false
+          },
+          "description": {
+            "zh": "文件已存储合同事件。",
+            "en": "File stored contract event."
+          }
+        }
+      ],
+      "sla": {
+        "availabilityTarget": "99.9%",
+        "latencyP95Ms": 1000
+      },
+      "compatibility": {
+        "mode": "semver",
+        "deprecated": false
+      },
+      "runtimeBoundary": {
+        "contractExecution": "external upload and content read are HTTP-bound; admin, service, and control operations are contract-only",
+        "identityProtocols": "app-session is bound for external operations; admin-session and workload-jwt are declaration-only",
+        "eventDelivery": "contract-only; no event broker or outbox delivery is implemented",
+        "datasourceRouting": "single configured datasource; client physical routing is forbidden",
+        "runtimeSourceWriting": "disabled"
+      }
+    }
+  ]
+}

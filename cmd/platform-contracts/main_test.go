@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"platform-go/internal/platform/capability"
 )
 
 func TestRunAppRoutesWritesManifestDerivedContract(t *testing.T) {
@@ -177,6 +179,77 @@ func TestRunAdminResourcesStdoutWritesSingleJSONDocument(t *testing.T) {
 	}
 }
 
+func TestRunServiceManifestsWritesCanonicalReference(t *testing.T) {
+	outputPath := filepath.Join(t.TempDir(), "platform-service-contract.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	if err := run([]string{"service-manifests", "--output", outputPath}, &stdout, &stderr); err != nil {
+		t.Fatalf("run(service-manifests) error = %v, stderr = %s", err, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty when writing to file", stdout.String())
+	}
+
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("ReadFile(output) error = %v", err)
+	}
+	var document capability.ServiceContractDocument
+	if err := json.Unmarshal(data, &document); err != nil {
+		t.Fatalf("Unmarshal(output) error = %v", err)
+	}
+	if document.GeneratedBy != "cmd/platform-contracts service-manifests" || document.Source != "capability.Manifest.Service" || document.SourceMode != "go-manifest" {
+		t.Fatalf("service contract source = %q/%q/%q", document.GeneratedBy, document.Source, document.SourceMode)
+	}
+	if document.ContractHash == "" || len(document.Services) != 1 || document.Services[0].CapabilityID != "file-storage" {
+		t.Fatalf("service contract identity = hash:%q services:%+v", document.ContractHash, document.Services)
+	}
+
+	boundRoutes := map[string]bool{}
+	for _, operation := range document.Services[0].Operations {
+		if operation.RuntimeStatus == capability.ServiceRuntimeBound {
+			boundRoutes[operation.Method+" "+operation.Path] = true
+			continue
+		}
+		if operation.Method != "" || operation.Path != "" {
+			t.Fatalf("contract-only operation %q claims HTTP binding %s %s", operation.ID, operation.Method, operation.Path)
+		}
+	}
+	for _, route := range []string{"POST /api/app/files", "GET /api/app/files/:id/content"} {
+		if !boundRoutes[route] {
+			t.Fatalf("bound service routes = %+v, missing %q", boundRoutes, route)
+		}
+	}
+	if len(boundRoutes) != 2 {
+		t.Fatalf("bound service routes = %+v, want only canonical file App routes", boundRoutes)
+	}
+	for _, event := range document.Services[0].Events {
+		if event.RuntimeStatus != capability.ServiceRuntimeContractOnly {
+			t.Fatalf("event %q runtime status = %q, want contract-only", event.ID, event.RuntimeStatus)
+		}
+	}
+}
+
+func TestRunServiceManifestsStdoutWritesSingleJSONDocument(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	if err := run([]string{"service-manifests", "--stdout"}, &stdout, &stderr); err != nil {
+		t.Fatalf("run(service-manifests --stdout) error = %v, stderr = %s", err, stderr.String())
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(stdout.Bytes()))
+	var document capability.ServiceContractDocument
+	if err := decoder.Decode(&document); err != nil {
+		t.Fatalf("Decode(stdout) error = %v, stdout = %s", err, stdout.String())
+	}
+	var extra map[string]any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		t.Fatalf("Decode(extra) error = %v, want EOF; stdout = %s", err, stdout.String())
+	}
+}
+
 func TestRunAuditWritesPlatformCapabilitySummary(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -186,21 +259,24 @@ func TestRunAuditWritesPlatformCapabilitySummary(t *testing.T) {
 	}
 
 	var document struct {
-		GeneratedBy          string `json:"generatedBy"`
-		Source               string `json:"source"`
-		SourceMode           string `json:"sourceMode"`
-		Status               string `json:"status"`
-		CapabilityCount      int    `json:"capabilityCount"`
-		ResourceCount        int    `json:"resourceCount"`
-		RouteCount           int    `json:"routeCount"`
-		AppRouteHandlerCount int    `json:"appRouteHandlerCount"`
-		AdminPermissionCount int    `json:"adminPermissionCount"`
-		AppPermissionCount   int    `json:"appPermissionCount"`
-		AuthProviderCount    int    `json:"authProviderCount"`
-		DemoDataSetCount     int    `json:"demoDataSetCount"`
-		MigrationCount       int    `json:"migrationCount"`
-		SeedCount            int    `json:"seedCount"`
-		Capabilities         []struct {
+		GeneratedBy           string `json:"generatedBy"`
+		Source                string `json:"source"`
+		SourceMode            string `json:"sourceMode"`
+		Status                string `json:"status"`
+		CapabilityCount       int    `json:"capabilityCount"`
+		ResourceCount         int    `json:"resourceCount"`
+		RouteCount            int    `json:"routeCount"`
+		AppRouteHandlerCount  int    `json:"appRouteHandlerCount"`
+		AdminPermissionCount  int    `json:"adminPermissionCount"`
+		AppPermissionCount    int    `json:"appPermissionCount"`
+		AuthProviderCount     int    `json:"authProviderCount"`
+		DemoDataSetCount      int    `json:"demoDataSetCount"`
+		MigrationCount        int    `json:"migrationCount"`
+		SeedCount             int    `json:"seedCount"`
+		ServiceCount          int    `json:"serviceCount"`
+		ServiceOperationCount int    `json:"serviceOperationCount"`
+		ServiceEventCount     int    `json:"serviceEventCount"`
+		Capabilities          []struct {
 			ID               string   `json:"id"`
 			AdminResources   []string `json:"adminResources,omitempty"`
 			AppRoutes        []string `json:"appRoutes,omitempty"`
@@ -235,6 +311,9 @@ func TestRunAuditWritesPlatformCapabilitySummary(t *testing.T) {
 	}
 	if document.AuthProviderCount == 0 || document.MigrationCount == 0 || document.SeedCount == 0 {
 		t.Fatalf("audit lifecycle/auth counts = auth:%d migrations:%d seeds:%d", document.AuthProviderCount, document.MigrationCount, document.SeedCount)
+	}
+	if document.ServiceCount != 1 || document.ServiceOperationCount == 0 || document.ServiceEventCount == 0 {
+		t.Fatalf("audit service counts = services:%d operations:%d events:%d", document.ServiceCount, document.ServiceOperationCount, document.ServiceEventCount)
 	}
 	if !auditCapabilityHasResource(document.Capabilities, "identity", "org-units") {
 		t.Fatalf("capabilities = %+v, want identity org-units resource", document.Capabilities)

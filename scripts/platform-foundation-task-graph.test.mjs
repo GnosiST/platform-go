@@ -79,7 +79,7 @@ const completionProgramTaskIDs = [
   "github-release-publication",
 ];
 
-const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(7);
+const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(8);
 
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-foundation-task-graph.mjs", ...args], {
@@ -322,7 +322,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /task production-auth-provider-hardening must declare at least one evidence\.docs path/);
   });
 
-  it("preserves the closed 37-node baseline, implements seven completion nodes, and tracks 22 pending program nodes", () => {
+  it("preserves the closed 37-node baseline, implements eight completion nodes, and tracks 21 pending program nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
@@ -355,7 +355,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
     assert.equal(graph.tasks.length, 66);
-    assert.equal(implemented.length, 44);
+    assert.equal(implemented.length, 45);
     assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "admin-watermark-export-governance")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-protection-runtime")?.status, "implemented");
@@ -363,7 +363,11 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.equal(graph.tasks.find((item) => item.id === "mask-strategy-runtime")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-reveal-step-up")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "data-lifecycle-retention")?.status, "implemented");
-    assert.ok(completionProgramTaskIDs.slice(7).every((taskID) => graph.tasks.find((item) => item.id === taskID)?.status === "pending"));
+    const serviceContract = graph.tasks.find((item) => item.id === "platform-service-contract-standard");
+    assert.equal(serviceContract?.status, "implemented");
+    assert.deepEqual(serviceContract?.dependsOn, ["data-lifecycle-retention", "capability-contract-governance"]);
+    assert.ok(serviceContract?.evidence?.validators?.includes("scripts/validate-platform-service-contract-standard.mjs"));
+    assert.ok(completionProgramTaskIDs.slice(8).every((taskID) => graph.tasks.find((item) => item.id === taskID)?.status === "pending"));
     assert.deepEqual(graph.tasks.find((item) => item.id === "integration-ports-disabled-default")?.dependsOn, [
       "platform-service-contract-standard",
       "notification-extension-boundary",

@@ -8,7 +8,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "platform-service-contract-standard",
   "persisted-query-command-object-runtime",
   "integration-ports-disabled-default",
   "organization-rbac-menu-contract-and-migration-design",
@@ -87,6 +86,12 @@ describe("validate-platform-task-execution-audit", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /requiredValidators must include scripts\/validate-platform-admin-api-boundary\.mjs/);
+  });
+
+  it("requires service contract validation and consumer contract tests after closeout", () => {
+    const audit = readJSON("resources/platform-task-execution-audit.json");
+    assert.ok(audit.requiredValidators.includes("scripts/validate-platform-service-contract-standard.mjs"));
+    assert.ok(audit.requiredTests.includes("scripts/platform-service-contract-standard.test.mjs"));
   });
 
   it("rejects missing or reordered completion program execution projections", () => {

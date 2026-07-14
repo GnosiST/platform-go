@@ -37,7 +37,6 @@ const completionProgramCapabilityIDs = [
 ];
 
 const partialCapabilityDependencies = {
-  "platform-service-contract-standard": ["data-lifecycle-retention"],
   "persisted-query-command-object-runtime": ["platform-service-contract-standard"],
   "integration-ports-disabled-default": ["platform-service-contract-standard"],
   "organization-rbac-menu-contract-and-migration-design": ["persisted-query-command-object-runtime"],
@@ -142,13 +141,13 @@ describe("validate-platform-engineering-capabilities", () => {
 
     assert.equal(matrix.capabilities.length, 57);
     assert.deepEqual(capabilities.map((item) => item.id), completionProgramCapabilityIDs);
-    for (const capability of capabilities.slice(0, 6)) {
+    for (const capability of capabilities.slice(0, 7)) {
       assert.equal(capability.status, "implemented");
       assert.ok(capability.evidence.sourcePaths.length > 0);
       assert.ok(capability.evidence.tests.length > 0);
       assert.ok(capability.evidence.validators.length > 0);
     }
-    assert.ok(capabilities.slice(6).every((item) => item.status === "partial"));
+    assert.ok(capabilities.slice(7).every((item) => item.status === "partial"));
 
     for (const [capabilityID, expectedDependencies] of Object.entries(partialCapabilityDependencies)) {
       const capability = capabilities.find((item) => item.id === capabilityID);
@@ -180,6 +179,26 @@ describe("validate-platform-engineering-capabilities", () => {
     assert.ok(reveal.evidence.sourcePaths.includes("admin/src/platform/resources/SensitiveFieldRevealModal.tsx"));
     assert.ok(reveal.evidence.tests.includes("internal/platform/httpapi/sensitive_reveal_test.go"));
     assert.ok(reveal.evidence.validators.includes("scripts/validate-admin-ui-contracts.mjs"));
+
+    const serviceContract = capabilities.find((item) => item.id === "platform-service-contract-standard");
+    assert.equal(serviceContract.status, "implemented");
+    assert.deepEqual(serviceContract.dependsOn, ["data-lifecycle-retention", "capability-contract-governance"]);
+    assert.ok(serviceContract.evidence.sourcePaths.includes("resources/platform-service-contract-standard.json"));
+    assert.ok(serviceContract.evidence.generatedFiles.includes("resources/generated/asyncapi.events.json"));
+    assert.ok(serviceContract.evidence.tests.includes("scripts/platform-service-contract-standard.test.mjs"));
+  });
+
+  it("rejects regressing the platform service contract after closeout", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    const capability = matrix.capabilities.find((item) => item.id === "platform-service-contract-standard");
+    capability.status = "partial";
+    capability.dependsOn = ["data-lifecycle-retention"];
+
+    const result = runValidator(["--matrix", tempJSON("partial-platform-service-contract.json", matrix)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /required implemented capability platform-service-contract-standard must stay implemented/);
+    assert.match(result.stderr, /platform-service-contract-standard dependsOn must equal/);
   });
 
   it("rejects regressing watermark governance to partial after closeout", () => {

@@ -15,10 +15,10 @@ const completedProgramTaskIDs = [
   "mask-strategy-runtime",
   "sensitive-data-reveal-step-up",
   "data-lifecycle-retention",
+  "platform-service-contract-standard",
 ];
 
 const remainingCompletionProgramTaskIDs = [
-  "platform-service-contract-standard",
   "persisted-query-command-object-runtime",
   "integration-ports-disabled-default",
   "organization-rbac-menu-contract-and-migration-design",
@@ -61,7 +61,7 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
-  it("migrates seven completed program nodes to required work and tracks 22 future nodes", () => {
+  it("migrates eight completed program nodes to required work and tracks 21 future nodes", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
     const engineering = readJSON("resources/platform-engineering-capabilities.json");
 

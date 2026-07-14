@@ -454,6 +454,29 @@ function validateTask(task, context, errors) {
     requireIncludes(task.evidence?.validators, ["scripts/validate-platform-data-lifecycle-retention.mjs"], `${task.id} evidence.validators`, errors);
     requireIncludes(task.evidence?.tests, ["internal/platform/datalifecycle/runner_test.go", "scripts/platform-data-lifecycle-retention.test.mjs"], `${task.id} evidence.tests`, errors);
   }
+  if (task.id === "platform-service-contract-standard") {
+    if (task.status !== "implemented") {
+      errors.push("platform-service-contract-standard must stay implemented after closeout");
+    }
+    requireIncludes(
+      task.evidence?.docs,
+      ["docs/platform-service-contract-standard.md"],
+      `${task.id} evidence.docs`,
+      errors,
+    );
+    requireIncludes(
+      task.evidence?.validators,
+      ["scripts/validate-platform-service-contract-standard.mjs"],
+      `${task.id} evidence.validators`,
+      errors,
+    );
+    requireIncludes(
+      task.evidence?.tests,
+      ["internal/platform/capability/service_contract_test.go", "scripts/platform-service-contract-standard.test.mjs"],
+      `${task.id} evidence.tests`,
+      errors,
+    );
+  }
   if (task.status === "implemented" || task.status === "preview") {
     const evidence = task.evidence ?? {};
     const evidencePaths = evidencePathKeys.flatMap((key) => values(evidence[key]));

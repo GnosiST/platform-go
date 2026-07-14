@@ -14,6 +14,9 @@
   "demoDataSetCount": 1,
   "migrationCount": 14,
   "seedCount": 14,
+  "serviceCount": 1,
+  "serviceOperationCount": 6,
+  "serviceEventCount": 1,
   "capabilities": [
     {
       "id": "dictionary",
@@ -237,6 +240,17 @@
       ],
       "seeds": [
         "core-file-storage-seed-0001"
+      ],
+      "serviceOperations": [
+        "inspect-storage",
+        "list-files",
+        "read-file",
+        "read-file-content",
+        "store-file",
+        "upload-file"
+      ],
+      "serviceEvents": [
+        "file-stored"
       ]
     },
     {

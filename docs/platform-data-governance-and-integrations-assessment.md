@@ -7,9 +7,9 @@ Governance updated: 2026-07-14
 
 This assessment records the current implementation truth for sensitive-data display and controlled reveal, deletion and retention, multi-datasource portability, and optional messaging/search integrations.
 
-It does not mark every assessed capability as implemented. Governance now records `66 total / 44 implemented / 22 controlled unfinished`; `mask-strategy-runtime`, `sensitive-data-reveal-step-up` and `data-lifecycle-retention` are implemented and closed, while service-contract, organization governance, datasource, database certification, optional integration and publication work remain pending.
+It does not mark every assessed capability as implemented. Governance now records `66 total / 45 implemented / 21 controlled unfinished`; `mask-strategy-runtime`, `sensitive-data-reveal-step-up`, `data-lifecycle-retention` and `platform-service-contract-standard` are implemented and closed, while Query/Command execution, organization governance, datasource, database certification, optional integration and publication work remain pending.
 
-The [remaining-task topology adjustment](superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md) is the activated source of truth for all 22 unfinished nodes. Activation fixes their boundaries, dependencies and order; it does not claim any of those nodes as implemented runtime capability.
+The [remaining-task topology adjustment](superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md) remains the activated source of truth for the program boundaries and dependencies. `platform-service-contract-standard` is now closed; the remaining 21 nodes retain their approved order and independent completion gates.
 
 ## Current-State Summary
 
@@ -117,8 +117,7 @@ The remaining work is feasible within the Gin/GORM/capability-manifest architect
 The unique approved decomposition and all dependency, lock and completion-gate decisions live in the [remaining-task topology adjustment](superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md). The governing sequence is:
 
 ```text
-platform-service-contract-standard
-  -> [persisted-query-command-object-runtime || integration-ports-disabled-default]
+[persisted-query-command-object-runtime || integration-ports-disabled-default]
   -> [organization-rbac-menu governance lane || datasource registry and routing lane]
   -> database-certification-matrix
   -> transactional-outbox-and-one-mq-adapter
@@ -135,17 +134,17 @@ Stable and future stage gates:
 3. Keep the implemented `mask-strategy-runtime` contract stable: arbitrary sensitive fields remain manifest-driven; response, query, detail, Tooltip and export consume the same backend-owned projection; duplicate projection and plaintext fallback remain forbidden.
 4. Keep the implemented `sensitive-data-reveal-step-up` contract stable: OIDC re-authentication and SMS OTP use short-lived single-use grants, rate limits, response-terminal audit and registered adapters. SMS delivery failures atomically cancel the factor transaction so the same challenge can retry; production startup fails when an SMS factor lacks a verified phone source or registered non-debug sender.
 5. Keep `data-lifecycle-retention` stable: final purge remains maintenance-only, apply requires completed dry-run plus exact promotion evidence, and the runner remains disabled by default and single-datasource.
-6. Establish the executable Platform Service Contract and persisted Query/Command Object runtime before organization authorization or SaaS routing consumes them.
+6. Keep the implemented executable Platform Service Contract stable, and establish the persisted Query/Command Object runtime before organization authorization or SaaS routing consumes it. Workload identity protocols, event delivery and datasource routing remain outside the closed service-contract node.
 7. Keep `multi-datasource-contract-and-runtime` narrow: versioned Datasource/DatasourceGroup configuration, capability binding, health and transaction pinning. Tenant placement, read/write routing, sharding, federation and XA have independent completion gates.
 8. Certify MySQL, PostgreSQL, SQLite, KingbaseES and Oracle by driver, version and feature. Unverified routing, sharding, federation or XA combinations remain experimental or unsupported.
 9. Add disabled/no-op messaging and search ports early, then transactional Outbox, one MQ adapter and asynchronous search projection after the required transaction and event contracts are stable.
 10. Synchronize the open-source manuals, operator runbook, compatibility matrix and public docs site before GitHub publication. Experimental adapters must remain clearly labeled.
 
-The four sensitive-data predecessor nodes and `data-lifecycle-retention` are implemented in the completion program. All 22 remaining nodes are activated as controlled unfinished work, but none may silently reuse existing closeouts or be described as runtime capability. In particular, federation remains a controlled read-only query boundary and XA remains an optional default-off adapter until their independent implementation and certification gates pass. The task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation must remain synchronized as each node advances. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
+The sensitive-data predecessors, `data-lifecycle-retention` and `platform-service-contract-standard` are implemented in the completion program. All 21 remaining nodes are activated as controlled unfinished work, but none may silently reuse existing closeouts or be described as runtime capability. In particular, federation remains a controlled read-only query boundary and XA remains an optional default-off adapter until their independent implementation and certification gates pass. The task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation must remain synchronized as each node advances. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
 
 ## Release Recommendation
 
-Before a public v0.1 release, retain the historical-migration and lifecycle runbooks and external promotion evidence boundary, publish honest deletion semantics, and avoid claiming database or integration support without a passing matrix. Configurable encryption, offline historical migration, manifest-driven masking, controlled reveal and lifecycle retention are implemented. Named datasources, disabled integration ports, tenant routing, read/write routing, sharding, federation, optional XA, database certification, Outbox/MQ and search projection are activated tasks but remain unimplemented until their own gates pass. Vendor-specific Oracle, KingbaseES, MQ and search adapters may ship in staged releases only when their experimental status and verification limits are explicit.
+Before a public v0.1 release, retain the historical-migration and lifecycle runbooks and external promotion evidence boundary, publish honest deletion semantics, and avoid claiming database or integration support without a passing matrix. Configurable encryption, offline historical migration, manifest-driven masking, controlled reveal, lifecycle retention and the executable service-contract standard are implemented. Persisted Query/Command execution, named datasources, disabled integration ports, tenant routing, read/write routing, sharding, federation, optional XA, database certification, Outbox/MQ and search projection remain unimplemented until their own gates pass. Vendor-specific Oracle, KingbaseES, MQ and search adapters may ship in staged releases only when their experimental status and verification limits are explicit.
 
 ## Source Evidence
 
@@ -153,6 +152,7 @@ Before a public v0.1 release, retain the historical-migration and lifecycle runb
 - Historical migration: `docs/platform-sensitive-data-migration.md`, `internal/platform/sensitivemigration/`, `internal/platform/adminresource/sensitive_migration_gorm.go`, `internal/platform/bootstrap/sensitive_migration.go`, `cmd/platform-admin/main.go`.
 - Admin value rendering: `admin/src/platform/resources/GenericResourceConsole.tsx`, `admin/src/platform/ui/AdminPrimitives.tsx`.
 - Phone masking and verification: `internal/platform/httpapi/app_phone.go`, `internal/platform/httpapi/phone_protection.go`.
+- Service contract standard: `internal/platform/capability/service_contract.go`, `resources/platform-service-contract-standard.json`, `resources/generated/platform-service-contract.json`.
 - Password and transport boundaries: `cmd/platform-api/main.go`, `internal/platform/httpapi/security_headers.go`.
 - Lifecycle policies, runner and file tombstones: `internal/platform/capability/manifest.go`, `internal/platform/adminresource/lifecycle.go`, `internal/platform/datalifecycle/`, `internal/platform/bootstrap/data_lifecycle.go`, `internal/platform/httpapi/server.go`.
 - Session and token revocation: `internal/platform/session/store.go`, `internal/platform/httpapi/server.go`.

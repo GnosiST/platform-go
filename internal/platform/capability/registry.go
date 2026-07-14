@@ -153,6 +153,9 @@ func (r *Registry) ResolveEnabled(enabled []ID) ([]Manifest, error) {
 	if err := ValidateAppSurface(ordered); err != nil {
 		return nil, err
 	}
+	if err := ValidateServiceContracts(ordered); err != nil {
+		return nil, err
+	}
 	if err := ValidateLifecycleDeclarations(ordered); err != nil {
 		return nil, err
 	}

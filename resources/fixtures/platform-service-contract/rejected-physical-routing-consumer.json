@@ -1,0 +1,13 @@
+{
+  "fixtureType": "negative",
+  "consumerId": "unsafe-routing-client",
+  "serviceId": "file-storage",
+  "operations": ["upload-file"],
+  "events": [],
+  "tenantContextSource": "client-request",
+  "physicalRouting": {
+    "datasource": "primary",
+    "schema": "tenant_001"
+  },
+  "expectedError": "consumer must not select physical routing"
+}

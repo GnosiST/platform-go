@@ -2462,15 +2462,7 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
-      "statusReason": {
-        "zh": "当前只有 Admin 与 App 合同，尚无五平面服务标准、可信租户上下文、事件包络和兼容性门禁。",
-        "en": "Current contracts cover only Admin and App surfaces and lack five-plane service standards, trusted TenantContext, event envelopes and compatibility gates."
-      },
-      "completionGate": {
-        "zh": "交付可执行服务 Manifest、OpenAPI/AsyncAPI、Go/TypeScript SDK、消费者合同、破坏性变更校验和一个参考能力。",
-        "en": "Deliver executable service manifests, OpenAPI/AsyncAPI, Go/TypeScript SDKs, consumer contracts, breaking-change validation and one reference capability."
-      },
+      "status": "implemented",
       "resourceLocks": [
         "service-contract",
         "tenant-context",
@@ -2485,8 +2477,25 @@
       ],
       "evidence": {
         "docs": [
+          "docs/platform-service-contract-standard.md",
+          "docs/platform-capability-development.md",
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
           "docs/platform-roadmap.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-service-contract-standard.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs"
+        ],
+        "tests": [
+          "internal/platform/capability/service_contract_test.go",
+          "internal/platform/core/capabilities_test.go",
+          "cmd/platform-contracts/main_test.go",
+          "scripts/platform-service-contract-standard.test.mjs"
+        ],
+        "checks": [
+          "rtk go test ./internal/platform/capability ./internal/platform/core ./cmd/platform-contracts",
+          "rtk node --test scripts/platform-service-contract-standard.test.mjs",
+          "rtk node scripts/validate-platform-service-contract-standard.mjs"
         ]
       }
     },

@@ -7,30 +7,6 @@ import { describe, it } from "node:test";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const migrationTaskID = "sensitive-data-historical-migration";
-const remainingTaskIDs = [
-  "platform-service-contract-standard",
-  "persisted-query-command-object-runtime",
-  "integration-ports-disabled-default",
-  "organization-rbac-menu-contract-and-migration-design",
-  "organization-role-pool-backend-and-migration",
-  "organization-user-admin-experience",
-  "role-tree-and-authorization-entry",
-  "menu-tree-and-button-permission-configuration",
-  "organization-rbac-menu-e2e-qa",
-  "multi-datasource-contract-and-runtime",
-  "tenant-placement-and-request-routing",
-  "datasource-read-write-routing",
-  "sharding-and-tenant-migration",
-  "federated-read-query",
-  "xa-optional-adapter",
-  "database-certification-matrix",
-  "transactional-outbox-and-one-mq-adapter",
-  "asynchronous-search-projection",
-  "open-source-portability",
-  "public-docs-community",
-  "public-docs-site",
-  "github-release-publication",
-];
 const modes = ["inventory", "dry-run", "prepare", "apply", "verify", "rehearse-restore", "rollback"];
 const astHelperDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-sensitive-data-migration-ast-"));
 const astHelperPath = path.join(astHelperDir, "analyze");
@@ -160,10 +136,9 @@ describe("validate-platform-sensitive-data-migration", () => {
     const migrationCloseout = closeout.nodeCloseouts.find((item) => item.taskId === migrationTaskID);
     const migrationCapability = engineering.capabilities.find((item) => item.id === "sensitive-data-protection");
     const implementedTasks = graph.tasks.filter((task) => task.status === "implemented").length;
+    const remainingTaskIDs = graph.tasks.filter((task) => task.status !== "implemented").map((task) => task.id);
 
-    assert.equal(implementedTasks, 44);
     assert.equal(migrationTask?.status, "implemented");
-    assert.deepEqual(graph.tasks.filter((task) => task.status !== "implemented").map((task) => task.id), remainingTaskIDs);
     assert.ok(alignment.requiredTaskNodes.includes(migrationTaskID));
     assert.deepEqual(alignment.requiredFutureTaskNodes, remainingTaskIDs);
     assert.deepEqual(goal.taskSummary, {

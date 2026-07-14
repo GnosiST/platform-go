@@ -14,6 +14,7 @@ type Manifest struct {
 	Dependencies  []ID
 	Admin         AdminSurface
 	App           AppSurface
+	Service       ServiceSurface
 	AuthProviders []AuthProvider
 	Migrations    []Migration
 	Seeds         []Seed

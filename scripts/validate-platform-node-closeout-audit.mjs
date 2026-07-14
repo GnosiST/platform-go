@@ -86,6 +86,19 @@ const requiredCleanupEvidenceByTask = new Map([
       "scripts/platform-data-lifecycle-retention.test.mjs",
     ],
   ],
+  [
+    "platform-service-contract-standard",
+    [
+      "docs/platform-service-contract-standard.md",
+      "internal/platform/capability/service_contract_test.go",
+      "resources/generated/platform-service-contract.json",
+      "resources/generated/asyncapi.events.json",
+      "resources/generated/service-sdk/go/service_contract_sdk.go",
+      "resources/generated/service-sdk/typescript/serviceContractSDK.ts",
+      "scripts/validate-platform-service-contract-standard.mjs",
+      "scripts/platform-service-contract-standard.test.mjs",
+    ],
+  ],
 ]);
 
 const requiredVisualEvidenceByTask = new Map([

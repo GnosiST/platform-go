@@ -35,7 +35,6 @@
     "unfinishedTasksMustNotHaveCloseout": true
   },
   "pendingNodeEvidence": [
-    "platform-service-contract-standard",
     "persisted-query-command-object-runtime",
     "integration-ports-disabled-default",
     "organization-rbac-menu-contract-and-migration-design",
@@ -1131,6 +1130,53 @@
         "resources/platform-objective-conformance.json",
         "scripts/validate-platform-data-lifecycle-retention.mjs",
         "scripts/platform-data-lifecycle-retention.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "platform-service-contract-standard",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-service-contract-standard.md",
+        "docs/platform-capability-development.md",
+        "internal/platform/capability/manifest.go",
+        "internal/platform/capability/service_contract.go",
+        "internal/platform/capability/service_contract_test.go",
+        "internal/platform/capability/registry.go",
+        "internal/platform/core/capabilities.go",
+        "internal/platform/core/capabilities_test.go",
+        "cmd/platform-contracts/main.go",
+        "cmd/platform-contracts/main_test.go",
+        "resources/platform-service-contract-standard.json",
+        "resources/generated/platform-service-contract.json",
+        "resources/generated/openapi.service.json",
+        "resources/generated/openapi.control.json",
+        "resources/generated/openapi.external.json",
+        "resources/generated/asyncapi.events.json",
+        "resources/generated/service-sdk/go/service_contract_sdk.go",
+        "resources/generated/service-sdk/typescript/serviceContractSDK.ts",
+        "resources/platform-foundation-task-graph.json",
+        "resources/platform-engineering-capabilities.json",
+        "resources/platform-task-execution-audit.json",
+        "resources/platform-foundation-alignment-audit.json",
+        "resources/platform-goal-completion-audit.json",
+        "resources/platform-node-closeout-audit.json",
+        "resources/platform-objective-conformance.json",
+        "scripts/validate-platform-service-contract-standard.mjs",
+        "scripts/platform-service-contract-standard.test.mjs",
+        "scripts/validate-platform-foundation-task-graph.mjs",
+        "scripts/validate-platform-engineering-capabilities.mjs",
+        "scripts/validate-platform-task-execution-audit.mjs",
+        "scripts/validate-platform-foundation-alignment.mjs",
+        "scripts/validate-platform-goal-completion-audit.mjs",
+        "scripts/validate-platform-node-closeout-audit.mjs",
+        "scripts/validate-platform-objective-conformance.mjs"
       ],
       "dimensions": [
         "docs",

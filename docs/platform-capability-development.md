@@ -342,6 +342,19 @@ Plugin-style capability governance is split into two gates. `resources/platform-
 rtk node scripts/validate-platform-capability-contracts.mjs
 ```
 
+Executable cross-plane service declarations are separate from that classification metadata. A capability may add `capability.Manifest.Service` for Admin, Service/Data, Control, External/Partner and Event Plane contracts. The service surface owns identity, trusted tenant context, operations, events, reliability, PII and compatibility declarations; profile policy and replaceability remain in `resources/platform-capability-contracts.json`.
+
+Generate and verify the service artifacts with:
+
+```bash
+rtk go run ./cmd/platform-contracts service-manifests --output resources/generated/platform-service-contract.json
+rtk node scripts/generate-platform-service-contract-artifacts.mjs
+rtk node --test scripts/platform-service-contract-standard.test.mjs
+rtk node scripts/validate-platform-service-contract-standard.mjs
+```
+
+See `docs/platform-service-contract-standard.md` for the five-plane boundary and deferred runtime responsibilities.
+
 The contract gate cross-checks `resources/platform-capability-profiles.json`, `internal/platform/config.defaultCapabilities` and `cmd/platform-contracts audit` output. It rejects unclassified profile capabilities, profile-only capabilities leaking into defaults, `external-business-capability` inside non-business profiles and declared resource/route/provider drift from actual Go manifests.
 
 The default `rtk node scripts/validate-admin-resources.mjs` gate runs this contract gate before treating the platform resource contract as fresh. Capability profile changes, default capability changes and manifest-surface changes therefore fail during normal admin-resource validation, not only during a separate production preflight.

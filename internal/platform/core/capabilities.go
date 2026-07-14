@@ -24,7 +24,7 @@ func DefaultManifests() []capability.Manifest {
 		{ID: "personnel", Name: "Personnel", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity", "dictionary"}, Admin: adminSurface(personnelProfileAdminResource(), positionAdminResource(), positionAssignmentAdminResource()), Migrations: lifecycleMigrations("personnel"), Seeds: lifecycleSeeds("personnel")},
 		{ID: "dictionary", Name: "Dictionary", Version: "0.1.0", Admin: adminSurface(dictionaryAdminResource(), dictionaryParameterAdminResource(), areaCodeAdminResource()), Migrations: lifecycleMigrations("dictionary"), Seeds: lifecycleSeeds("dictionary")},
 		{ID: "parameter", Name: "Parameter", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "audit"}, Admin: adminSurface(parameterAdminResource(), brandingAdminResource(), adminResource("settings", "设置", "Settings", "平台配置和品牌设置。", "Platform configuration and branding.", "admin:settings", "/settings", "security", "settings", 310)), Migrations: lifecycleMigrations("parameter"), Seeds: lifecycleSeeds("parameter")},
-		{ID: "file-storage", Name: "File Storage", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity", "parameter", "audit"}, Admin: adminSurface(fileStorageAdminResource()), App: appSurface(appRoute("POST", "/api/app/files", capability.AppRouteAuthSession, "", "上传 App 文件。", "Upload app file."), appRoute("GET", "/api/app/files/:id/content", capability.AppRouteAuthSession, "", "读取 App 文件内容。", "Read app file content.")), Migrations: lifecycleMigrations("file-storage"), Seeds: lifecycleSeeds("file-storage")},
+		{ID: "file-storage", Name: "File Storage", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity", "parameter", "audit"}, Admin: adminSurface(fileStorageAdminResource()), App: appSurface(appRoute("POST", "/api/app/files", capability.AppRouteAuthSession, "", "上传 App 文件。", "Upload app file."), appRoute("GET", "/api/app/files/:id/content", capability.AppRouteAuthSession, "", "读取 App 文件内容。", "Read app file content.")), Service: fileStorageServiceSurface(), Migrations: lifecycleMigrations("file-storage"), Seeds: lifecycleSeeds("file-storage")},
 		{ID: "admin-shell", Name: "Admin Shell", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "rbac", "menu"}, Admin: adminSurface(adminResource("capabilities", "能力清单", "Capabilities", "查看当前平台启用的能力包。", "View enabled platform capability packages.", "admin:capability", "/capabilities", "foundation", "capabilities", 20), adminResource("overview", "概览", "Overview", "平台底座运行概览。", "Platform foundation overview.", "admin:overview", "/overview", "foundation", "overview", 10)), Migrations: lifecycleMigrations("admin-shell"), Seeds: lifecycleSeeds("admin-shell")},
 		{ID: "demo-data", Name: "Demo Data", Version: "0.1.0", Dependencies: []capability.ID{"admin-shell", "tenant"}, Admin: adminSurface(adminResource("demo-data", "演示数据", "Demo Data", "声明式演示数据集。", "Declarative demo data sets.", "admin:demo-data", "/demo-data", "operations", "dictParams", 205)), Migrations: lifecycleMigrations("demo-data"), Seeds: lifecycleSeeds("demo-data"), DemoData: platformDemoDataSets()},
 		{ID: "system-admin", Name: "System Admin", Version: "0.1.0", Dependencies: []capability.ID{"admin-shell", "api-resource", "dictionary", "parameter", "audit"}, Admin: adminSurface(monitoringAdminResource(), adminResource("versions", "版本管理", "Versions", "平台版本、发布记录和运行基线。", "Platform versions, release records and runtime baselines.", "admin:version", "/versions", "operations", "cluster", 360), apiTokenAdminResource()), Migrations: lifecycleMigrations("system-admin"), Seeds: lifecycleSeeds("system-admin")},
@@ -78,6 +78,97 @@ func appRoute(method string, path string, auth capability.AppRouteAuth, permissi
 		Auth:        auth,
 		Permission:  permission,
 		Description: capability.Text(descriptionZH, descriptionEN),
+	}
+}
+
+func fileStorageServiceSurface() capability.ServiceSurface {
+	compatibility := capability.ServiceCompatibility{Mode: "semver"}
+	defaultReliability := capability.ServiceReliability{
+		Idempotency:           "none",
+		OptimisticConcurrency: "none",
+		TimeoutMilliseconds:   5000,
+		MaxRetries:            0,
+		RateLimitPerMinute:    120,
+		CostLimit:             10,
+	}
+	tenantScopes := []string{"tenant"}
+	return capability.ServiceSurface{
+		ID:            "file-storage",
+		Owner:         "platform-core",
+		Audiences:     []capability.ServiceAudience{capability.ServiceAudienceOperator, capability.ServiceAudienceInternal, capability.ServiceAudiencePartner},
+		Stability:     capability.ServiceStabilityStable,
+		Version:       "1.0.0",
+		IdentityModes: []capability.ServiceIdentityMode{capability.ServiceIdentityManagementUser, capability.ServiceIdentityWorkload},
+		AuthModes:     []capability.ServiceAuthMode{capability.ServiceAuthAdminSession, capability.ServiceAuthAppSession, capability.ServiceAuthWorkloadJWT},
+		TenantContext: capability.DefaultTrustedTenantContext(),
+		Operations: []capability.ServiceOperation{
+			{
+				ID: "list-files", Kind: capability.ServiceOperationQuery, Plane: capability.ServicePlaneAdmin, RuntimeStatus: capability.ServiceRuntimeContractOnly,
+				IdentityMode: capability.ServiceIdentityManagementUser, AuthModes: []capability.ServiceAuthMode{capability.ServiceAuthAdminSession}, TenantMode: capability.ServiceTenantRequired,
+				Permissions: []string{"admin:file:read"}, DataScopes: tenantScopes,
+				RequestSchema:  capability.ServicePayloadSchema{Ref: "#/schemas/ListFilesRequest", PII: capability.ServicePIINone},
+				ResponseSchema: capability.ServicePayloadSchema{Ref: "#/schemas/FileRecordPage", PII: capability.ServicePIIPersonal},
+				Reliability:    defaultReliability, Compatibility: compatibility, Description: capability.Text("按租户查询文件记录。", "Query tenant file records."),
+			},
+			{
+				ID: "store-file", Kind: capability.ServiceOperationCommand, Plane: capability.ServicePlaneData, RuntimeStatus: capability.ServiceRuntimeContractOnly,
+				IdentityMode: capability.ServiceIdentityWorkload, AuthModes: []capability.ServiceAuthMode{capability.ServiceAuthWorkloadJWT}, TenantMode: capability.ServiceTenantRequired,
+				DataScopes:     tenantScopes,
+				RequestSchema:  capability.ServicePayloadSchema{Ref: "#/schemas/StoreFileRequest", RequiredFields: []string{"fileName", "content"}, PII: capability.ServicePIISensitive},
+				ResponseSchema: capability.ServicePayloadSchema{Ref: "#/schemas/FileRecord", RequiredFields: []string{"id"}, PII: capability.ServicePIIPersonal},
+				Reliability:    capability.ServiceReliability{Idempotency: "required-key", OptimisticConcurrency: "none", TimeoutMilliseconds: 5000, MaxRetries: 0, RateLimitPerMinute: 120, CostLimit: 20}, Compatibility: compatibility,
+				Description: capability.Text("为可信服务存储租户文件。", "Store a tenant file for a trusted service."),
+			},
+			{
+				ID: "read-file", Kind: capability.ServiceOperationQuery, Plane: capability.ServicePlaneData, RuntimeStatus: capability.ServiceRuntimeContractOnly,
+				IdentityMode: capability.ServiceIdentityWorkload, AuthModes: []capability.ServiceAuthMode{capability.ServiceAuthWorkloadJWT}, TenantMode: capability.ServiceTenantRequired,
+				DataScopes:     tenantScopes,
+				RequestSchema:  capability.ServicePayloadSchema{Ref: "#/schemas/ReadFileRequest", RequiredFields: []string{"id"}, PII: capability.ServicePIINone},
+				ResponseSchema: capability.ServicePayloadSchema{Ref: "#/schemas/FileContent", RequiredFields: []string{"content"}, PII: capability.ServicePIISensitive},
+				Reliability:    defaultReliability, Compatibility: compatibility, Description: capability.Text("为可信服务读取租户文件。", "Read a tenant file for a trusted service."),
+			},
+			{
+				ID: "inspect-storage", Kind: capability.ServiceOperationQuery, Plane: capability.ServicePlaneControl, RuntimeStatus: capability.ServiceRuntimeContractOnly,
+				IdentityMode: capability.ServiceIdentityWorkload, AuthModes: []capability.ServiceAuthMode{capability.ServiceAuthWorkloadJWT}, TenantMode: capability.ServiceTenantPlatform,
+				RequestSchema:  capability.ServicePayloadSchema{Ref: "#/schemas/InspectStorageRequest", PII: capability.ServicePIINone},
+				ResponseSchema: capability.ServicePayloadSchema{Ref: "#/schemas/StorageStatus", RequiredFields: []string{"status"}, PII: capability.ServicePIINone},
+				Reliability:    defaultReliability, Compatibility: compatibility, Description: capability.Text("检查文件存储运行状态。", "Inspect file storage runtime status."),
+			},
+			{
+				ID: "upload-file", Kind: capability.ServiceOperationCommand, Plane: capability.ServicePlaneExternal, RuntimeStatus: capability.ServiceRuntimeBound,
+				IdentityMode: capability.ServiceIdentityManagementUser, AuthModes: []capability.ServiceAuthMode{capability.ServiceAuthAppSession}, TenantMode: capability.ServiceTenantRequired,
+				DataScopes: tenantScopes, Method: "POST", Path: "/api/app/files", RequestMediaType: "multipart/form-data", ResponseMediaType: "application/json", SuccessStatus: 201,
+				RequestSchema:  capability.ServicePayloadSchema{Ref: "#/schemas/AppFileUploadRequest", RequiredFields: []string{"file"}, PII: capability.ServicePIISensitive},
+				ResponseSchema: capability.ServicePayloadSchema{Ref: "#/schemas/AppFileUploadResponse", RequiredFields: []string{"data"}, PII: capability.ServicePIIPersonal},
+				Reliability:    defaultReliability, Compatibility: compatibility, Description: capability.Text("上传 App 文件。", "Upload an app file."),
+			},
+			{
+				ID: "read-file-content", Kind: capability.ServiceOperationQuery, Plane: capability.ServicePlaneExternal, RuntimeStatus: capability.ServiceRuntimeBound,
+				IdentityMode: capability.ServiceIdentityManagementUser, AuthModes: []capability.ServiceAuthMode{capability.ServiceAuthAppSession}, TenantMode: capability.ServiceTenantRequired,
+				DataScopes: tenantScopes, Method: "GET", Path: "/api/app/files/:id/content", ResponseMediaType: "application/octet-stream", SuccessStatus: 200,
+				RequestSchema:  capability.ServicePayloadSchema{Ref: "#/schemas/AppFileContentRequest", RequiredFields: []string{"id"}, PII: capability.ServicePIINone},
+				ResponseSchema: capability.ServicePayloadSchema{Ref: "#/schemas/FileContent", RequiredFields: []string{"content"}, PII: capability.ServicePIISensitive},
+				Reliability:    defaultReliability, Compatibility: compatibility, Description: capability.Text("读取 App 文件内容。", "Read app file content."),
+			},
+		},
+		Events: []capability.ServiceEvent{
+			{
+				ID: "file-stored", Name: "platform.file-storage.file-stored.v1", Version: 1, Direction: capability.ServiceEventPublish, RuntimeStatus: capability.ServiceRuntimeContractOnly,
+				TenantMode: capability.ServiceTenantRequired, DataScopes: tenantScopes,
+				PayloadSchema:   capability.ServicePayloadSchema{Ref: "#/schemas/FileStoredEvent", RequiredFields: []string{"fileId"}, PII: capability.ServicePIIPersonal},
+				EnvelopeVersion: "1.0", TraceContext: []string{"traceparent", "tracestate"}, Compatibility: compatibility,
+				Description: capability.Text("文件已存储合同事件。", "File stored contract event."),
+			},
+		},
+		SLA:           capability.ServiceSLA{AvailabilityTarget: "99.9%", LatencyP95MS: 1000},
+		Compatibility: compatibility,
+		RuntimeBoundary: capability.ServiceRuntimeBoundary{
+			ContractExecution:    "external upload and content read are HTTP-bound; admin, service, and control operations are contract-only",
+			IdentityProtocols:    "app-session is bound for external operations; admin-session and workload-jwt are declaration-only",
+			EventDelivery:        "contract-only; no event broker or outbox delivery is implemented",
+			DatasourceRouting:    "single configured datasource; client physical routing is forbidden",
+			RuntimeSourceWriting: "disabled",
+		},
 	}
 }
 
