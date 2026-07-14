@@ -6,7 +6,6 @@
 
 package httpapi
 
-// DELETE /api/admin/resources/sessions/:id -> admin:session:delete
 // POST /api/admin/resources/sessions/query -> admin:session:read
 
 // RegisterSessionsRoutes is a draft route hook.

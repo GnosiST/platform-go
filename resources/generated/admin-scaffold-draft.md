@@ -8,11 +8,11 @@ This file is a review artifact for AI-assisted development. It must not be copie
 
 - Source version: `0.1.0`
 - Resource count: 27
-- Route count: 82
+- Route count: 90
 - Schema count: 27
 - Template candidates: `apiResources`, `appIdentities`, `areaCodes`, `auditLogs`, `dictionaries`, `errorLogs`, `loginLogs`, `menus`, `orgUnits`, `parameters`, `permissions`, `roleGroups`, `roles`, `sessions`, `tenants`, `users`, `versions`
 - Manual review: `apiDocs`, `apiTokens`, `branding`, `capabilities`, `demoData`, `dictionary-parameters`, `files`, `monitoring`, `overview`, `settings`
-- Write resources: `apiResources`, `apiTokens`, `appIdentities`, `areaCodes`, `branding`, `demoData`, `dictionaries`, `dictionary-parameters`, `files`, `menus`, `monitoring`, `orgUnits`, `parameters`, `permissions`, `roleGroups`, `roles`, `sessions`, `settings`, `tenants`, `users`, `versions`
+- Write resources: `apiResources`, `apiTokens`, `appIdentities`, `areaCodes`, `branding`, `demoData`, `dictionaries`, `dictionary-parameters`, `files`, `menus`, `monitoring`, `orgUnits`, `parameters`, `permissions`, `roleGroups`, `roles`, `settings`, `tenants`, `users`, `versions`
 
 ## Dry-run Safety Plan
 
@@ -198,12 +198,11 @@ Audit candidates: `api_token.create`, `api_token.delete`
 
 Routes:
 
-- `DELETE /api/admin/resources/app-identities/:id` -> permission: `admin:app-identity:delete`, operation: `appIdentities.delete`, audit: `app_identity.delete`
 - `POST /api/admin/resources/app-identities` -> permission: `admin:app-identity:create`, operation: `appIdentities.create`, audit: `app_identity.create`
 - `POST /api/admin/resources/app-identities/query` -> permission: `admin:app-identity:read`, operation: `appIdentities.query`
 - `PUT /api/admin/resources/app-identities/:id` -> permission: `admin:app-identity:update`, operation: `appIdentities.update`, audit: `app_identity.update`
 
-Audit candidates: `app_identity.create`, `app_identity.delete`, `app_identity.update`
+Audit candidates: `app_identity.create`, `app_identity.update`
 
 ### Frontend
 
@@ -535,10 +534,11 @@ Routes:
 
 - `DELETE /api/admin/resources/dictionary-parameters/:id` -> permission: `admin:dictionary-parameter:delete`, operation: `dictionary-parameters.delete`, audit: `dictionary_parameter.delete`
 - `POST /api/admin/resources/dictionary-parameters` -> permission: `admin:dictionary-parameter:create`, operation: `dictionary-parameters.create`, audit: `dictionary_parameter.create`
+- `POST /api/admin/resources/dictionary-parameters/:id/restore` -> permission: `admin:dictionary-parameter:restore`, operation: `dictionary-parameters.restore`, audit: `dictionary_parameter.restore`
 - `POST /api/admin/resources/dictionary-parameters/query` -> permission: `admin:dictionary-parameter:read`, operation: `dictionary-parameters.query`
 - `PUT /api/admin/resources/dictionary-parameters/:id` -> permission: `admin:dictionary-parameter:update`, operation: `dictionary-parameters.update`, audit: `dictionary_parameter.update`
 
-Audit candidates: `dictionary_parameter.create`, `dictionary_parameter.delete`, `dictionary_parameter.update`
+Audit candidates: `dictionary_parameter.create`, `dictionary_parameter.delete`, `dictionary_parameter.restore`, `dictionary_parameter.update`
 
 ### Frontend
 
@@ -632,9 +632,10 @@ Routes:
 - `GET /api/admin/files/:id/content` -> permission: `admin:file:read`, operation: `files.read`
 - `POST /api/admin/files/upload` -> permission: `admin:file:create`, operation: `files.upload`, audit: `file.upload`
 - `POST /api/admin/resources/files` -> permission: `admin:file:create`, operation: `files.create`, audit: `file.create`
+- `POST /api/admin/resources/files/:id/restore` -> permission: `admin:file:restore`, operation: `files.restore`, audit: `file.restore`
 - `POST /api/admin/resources/files/query` -> permission: `admin:file:read`, operation: `files.query`
 
-Audit candidates: `file.create`, `file.delete`, `file.upload`
+Audit candidates: `file.create`, `file.delete`, `file.restore`, `file.upload`
 
 ### Frontend
 
@@ -727,10 +728,11 @@ Routes:
 - `DELETE /api/admin/resources/menus/:id` -> permission: `admin:menu:delete`, operation: `menus.delete`, audit: `menu.delete`
 - `GET /api/admin/navigation/menus` -> permission: `admin:menu:read`, operation: `menus.read`
 - `POST /api/admin/resources/menus` -> permission: `admin:menu:create`, operation: `menus.create`, audit: `menu.create`
+- `POST /api/admin/resources/menus/:id/restore` -> permission: `admin:menu:restore`, operation: `menus.restore`, audit: `menu.restore`
 - `POST /api/admin/resources/menus/query` -> permission: `admin:menu:read`, operation: `menus.query`
 - `PUT /api/admin/resources/menus/:id` -> permission: `admin:menu:update`, operation: `menus.update`, audit: `menu.update`
 
-Audit candidates: `menu.create`, `menu.delete`, `menu.update`
+Audit candidates: `menu.create`, `menu.delete`, `menu.restore`, `menu.update`
 
 ### Frontend
 
@@ -778,10 +780,11 @@ Routes:
 
 - `DELETE /api/admin/resources/monitoring/:id` -> permission: `admin:monitoring:delete`, operation: `monitoring.delete`, audit: `monitoring.delete`
 - `POST /api/admin/resources/monitoring` -> permission: `admin:monitoring:create`, operation: `monitoring.create`, audit: `monitoring.create`
+- `POST /api/admin/resources/monitoring/:id/restore` -> permission: `admin:monitoring:restore`, operation: `monitoring.restore`, audit: `monitoring.restore`
 - `POST /api/admin/resources/monitoring/query` -> permission: `admin:monitoring:read`, operation: `monitoring.query`
 - `PUT /api/admin/resources/monitoring/:id` -> permission: `admin:monitoring:update`, operation: `monitoring.update`, audit: `monitoring.update`
 
-Audit candidates: `monitoring.create`, `monitoring.delete`, `monitoring.update`
+Audit candidates: `monitoring.create`, `monitoring.delete`, `monitoring.restore`, `monitoring.update`
 
 ### Frontend
 
@@ -825,10 +828,11 @@ Routes:
 
 - `DELETE /api/admin/resources/org-units/:id` -> permission: `admin:org-unit:delete`, operation: `orgUnits.delete`, audit: `org_unit.delete`
 - `POST /api/admin/resources/org-units` -> permission: `admin:org-unit:create`, operation: `orgUnits.create`, audit: `org_unit.create`
+- `POST /api/admin/resources/org-units/:id/restore` -> permission: `admin:org-unit:restore`, operation: `orgUnits.restore`, audit: `org_unit.restore`
 - `POST /api/admin/resources/org-units/query` -> permission: `admin:org-unit:read`, operation: `orgUnits.query`
 - `PUT /api/admin/resources/org-units/:id` -> permission: `admin:org-unit:update`, operation: `orgUnits.update`, audit: `org_unit.update`
 
-Audit candidates: `org_unit.create`, `org_unit.delete`, `org_unit.update`
+Audit candidates: `org_unit.create`, `org_unit.delete`, `org_unit.restore`, `org_unit.update`
 
 ### Frontend
 
@@ -920,10 +924,11 @@ Routes:
 
 - `DELETE /api/admin/resources/parameters/:id` -> permission: `admin:parameter:delete`, operation: `parameters.delete`, audit: `parameter.delete`
 - `POST /api/admin/resources/parameters` -> permission: `admin:parameter:create`, operation: `parameters.create`, audit: `parameter.create`
+- `POST /api/admin/resources/parameters/:id/restore` -> permission: `admin:parameter:restore`, operation: `parameters.restore`, audit: `parameter.restore`
 - `POST /api/admin/resources/parameters/query` -> permission: `admin:parameter:read`, operation: `parameters.query`
 - `PUT /api/admin/resources/parameters/:id` -> permission: `admin:parameter:update`, operation: `parameters.update`, audit: `parameter.update`
 
-Audit candidates: `parameter.create`, `parameter.delete`, `parameter.update`
+Audit candidates: `parameter.create`, `parameter.delete`, `parameter.restore`, `parameter.update`
 
 ### Frontend
 
@@ -1022,10 +1027,11 @@ Routes:
 
 - `DELETE /api/admin/resources/role-groups/:id` -> permission: `admin:role-group:delete`, operation: `roleGroups.delete`, audit: `role_group.delete`
 - `POST /api/admin/resources/role-groups` -> permission: `admin:role-group:create`, operation: `roleGroups.create`, audit: `role_group.create`
+- `POST /api/admin/resources/role-groups/:id/restore` -> permission: `admin:role-group:restore`, operation: `roleGroups.restore`, audit: `role_group.restore`
 - `POST /api/admin/resources/role-groups/query` -> permission: `admin:role-group:read`, operation: `roleGroups.query`
 - `PUT /api/admin/resources/role-groups/:id` -> permission: `admin:role-group:update`, operation: `roleGroups.update`, audit: `role_group.update`
 
-Audit candidates: `role_group.create`, `role_group.delete`, `role_group.update`
+Audit candidates: `role_group.create`, `role_group.delete`, `role_group.restore`, `role_group.update`
 
 ### Frontend
 
@@ -1073,10 +1079,11 @@ Routes:
 
 - `DELETE /api/admin/resources/roles/:id` -> permission: `admin:role:delete`, operation: `roles.delete`, audit: `role.delete`
 - `POST /api/admin/resources/roles` -> permission: `admin:role:create`, operation: `roles.create`, audit: `role.create`
+- `POST /api/admin/resources/roles/:id/restore` -> permission: `admin:role:restore`, operation: `roles.restore`, audit: `role.restore`
 - `POST /api/admin/resources/roles/query` -> permission: `admin:role:read`, operation: `roles.query`
 - `PUT /api/admin/resources/roles/:id` -> permission: `admin:role:update`, operation: `roles.update`, audit: `role.update`
 
-Audit candidates: `role.create`, `role.delete`, `role.update`
+Audit candidates: `role.create`, `role.delete`, `role.restore`, `role.update`
 
 ### Frontend
 
@@ -1122,10 +1129,9 @@ Audit candidates: `role.create`, `role.delete`, `role.update`
 
 Routes:
 
-- `DELETE /api/admin/resources/sessions/:id` -> permission: `admin:session:delete`, operation: `sessions.delete`, audit: `session.delete`
 - `POST /api/admin/resources/sessions/query` -> permission: `admin:session:read`, operation: `sessions.query`
 
-Audit candidates: `session.delete`
+Audit candidates: -
 
 ### Frontend
 
@@ -1218,10 +1224,11 @@ Routes:
 
 - `DELETE /api/admin/resources/tenants/:id` -> permission: `admin:tenant:delete`, operation: `tenants.delete`, audit: `tenant.delete`
 - `POST /api/admin/resources/tenants` -> permission: `admin:tenant:create`, operation: `tenants.create`, audit: `tenant.create`
+- `POST /api/admin/resources/tenants/:id/restore` -> permission: `admin:tenant:restore`, operation: `tenants.restore`, audit: `tenant.restore`
 - `POST /api/admin/resources/tenants/query` -> permission: `admin:tenant:read`, operation: `tenants.query`
 - `PUT /api/admin/resources/tenants/:id` -> permission: `admin:tenant:update`, operation: `tenants.update`, audit: `tenant.update`
 
-Audit candidates: `tenant.create`, `tenant.delete`, `tenant.update`
+Audit candidates: `tenant.create`, `tenant.delete`, `tenant.restore`, `tenant.update`
 
 ### Frontend
 
@@ -1269,10 +1276,11 @@ Routes:
 
 - `DELETE /api/admin/resources/users/:id` -> permission: `admin:user:delete`, operation: `users.delete`, audit: `user.delete`
 - `POST /api/admin/resources/users` -> permission: `admin:user:create`, operation: `users.create`, audit: `user.create`
+- `POST /api/admin/resources/users/:id/restore` -> permission: `admin:user:restore`, operation: `users.restore`, audit: `user.restore`
 - `POST /api/admin/resources/users/query` -> permission: `admin:user:read`, operation: `users.query`
 - `PUT /api/admin/resources/users/:id` -> permission: `admin:user:update`, operation: `users.update`, audit: `user.update`
 
-Audit candidates: `user.create`, `user.delete`, `user.update`
+Audit candidates: `user.create`, `user.delete`, `user.restore`, `user.update`
 
 ### Frontend
 

@@ -18,6 +18,14 @@ var permissionActions = []struct {
 	{Key: "delete", LabelZH: "删除", LabelEN: "Delete"},
 }
 
+var lifecyclePermissionActions = []struct {
+	Key     string
+	LabelZH string
+	LabelEN string
+}{
+	{Key: "restore", LabelZH: "恢复", LabelEN: "Restore"},
+}
+
 func permissionCatalogFromCapabilities(manifests []capability.Manifest, updatedAt string) []Record {
 	records := make([]Record, 0)
 	seen := map[string]struct{}{}
@@ -27,7 +35,7 @@ func permissionCatalogFromCapabilities(manifests []capability.Manifest, updatedA
 				continue
 			}
 			title := localizedTextFromCapability(resource.Title)
-			for _, action := range permissionActions {
+			for _, action := range permissionActionsForResource(resource) {
 				code := resource.PermissionPrefix + ":" + action.Key
 				if _, exists := seen[code]; exists {
 					continue
@@ -108,6 +116,28 @@ func permissionCatalogFromCapabilities(manifests []capability.Manifest, updatedA
 		return records[i].Code < records[j].Code
 	})
 	return records
+}
+
+func permissionActionsForResource(resource capability.AdminResource) []struct {
+	Key     string
+	LabelZH string
+	LabelEN string
+} {
+	actions := append([]struct {
+		Key     string
+		LabelZH string
+		LabelEN string
+	}(nil), permissionActions...)
+	if resource.Deletion == nil {
+		return actions[:3]
+	}
+	switch resource.Deletion.Mode {
+	case capability.AdminDeletionDisabled, capability.AdminDeletionAppendOnly:
+		actions = actions[:3]
+	case capability.AdminDeletionSoftDelete, capability.AdminDeletionTombstone:
+		actions = append(actions, lifecyclePermissionActions...)
+	}
+	return actions
 }
 
 func permissionOptionsFromCapabilities(manifests []capability.Manifest) []FieldOption {

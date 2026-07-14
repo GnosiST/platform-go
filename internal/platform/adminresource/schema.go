@@ -106,11 +106,21 @@ type ResourceProtection struct {
 	TenantField   string `json:"tenantField,omitempty"`
 }
 
+type ResourceDeletionPolicy struct {
+	Mode               string `json:"mode"`
+	PolicyVersion      uint32 `json:"policyVersion"`
+	RetentionDays      int    `json:"retentionDays,omitempty"`
+	AutoPurge          bool   `json:"autoPurge,omitempty"`
+	RestrictReferences bool   `json:"restrictReferences,omitempty"`
+}
+
 type ActionPermissions struct {
-	Read   string `json:"read"`
-	Create string `json:"create"`
-	Update string `json:"update"`
-	Delete string `json:"delete"`
+	Read    string `json:"read"`
+	Create  string `json:"create"`
+	Update  string `json:"update"`
+	Delete  string `json:"delete"`
+	Restore string `json:"restore,omitempty"`
+	Purge   string `json:"purge,omitempty"`
 }
 
 type ResourceActionConfirm struct {
@@ -176,6 +186,7 @@ type Schema struct {
 	SearchFields   []string                   `json:"searchFields"`
 	DefaultSortKey string                     `json:"defaultSortKey,omitempty"`
 	Protection     *ResourceProtection        `json:"protection,omitempty"`
+	Deletion       *ResourceDeletionPolicy    `json:"deletion"`
 }
 
 func (s *Store) Schema(resource string) (Schema, error) {
@@ -198,6 +209,10 @@ func cloneSchema(schema Schema) Schema {
 	if schema.Protection != nil {
 		protection := *schema.Protection
 		schema.Protection = &protection
+	}
+	if schema.Deletion != nil {
+		deletion := *schema.Deletion
+		schema.Deletion = &deletion
 	}
 	for index := range schema.Actions {
 		if schema.Actions[index].Confirm != nil {
@@ -244,7 +259,7 @@ func seedResourceSchemas() map[string]Schema {
 		option("*", "全部权限", "All Permissions"),
 		option("admin:*", "后台全部权限", "All Admin Permissions"),
 	}
-	return map[string]Schema{
+	schemas := map[string]Schema{
 		"overview":              overviewResourceSchema(),
 		"tenants":               tenantResourceSchema(),
 		"users":                 userResourceSchema(),
@@ -263,6 +278,12 @@ func seedResourceSchemas() map[string]Schema {
 		"branding":              brandingResourceSchema(),
 		"settings":              settingsResourceSchema(),
 	}
+	for resource, schema := range schemas {
+		schema.Deletion = seedDeletionPolicy(resource)
+		schema.Permissions = permissionsForDeletion(schema.Permissions, strings.TrimSuffix(schema.Permissions.Read, ":read"), deletionPolicyToCapability(schema.Deletion))
+		schemas[resource] = schema
+	}
+	return schemas
 }
 
 func seedResourceSchemasFromCapabilities(manifests []capability.Manifest) map[string]Schema {
@@ -273,6 +294,11 @@ func seedResourceSchemasFromCapabilities(manifests []capability.Manifest) map[st
 		"menus":       menuResourceSchema(),
 		"permissions": permissionResourceSchema(),
 	}
+	for resource, schema := range schemas {
+		schema.Deletion = seedDeletionPolicy(resource)
+		schema.Permissions = permissionsForDeletion(schema.Permissions, strings.TrimSuffix(schema.Permissions.Read, ":read"), deletionPolicyToCapability(schema.Deletion))
+		schemas[resource] = schema
+	}
 	registered := false
 	for _, manifest := range manifests {
 		for _, resource := range manifest.Admin.Resources {
@@ -281,7 +307,7 @@ func seedResourceSchemasFromCapabilities(manifests []capability.Manifest) map[st
 			}
 			registered = true
 			if resource.Resource == "roles" {
-				schemas[resource.Resource] = mergeCapabilityProtection(roleResourceSchema(permissionOptions), resource)
+				schemas[resource.Resource] = mergeCapabilityDeletion(mergeCapabilityProtection(roleResourceSchema(permissionOptions), resource), resource)
 				continue
 			}
 			schemas[resource.Resource] = schemaFromCapabilityResource(resource)
@@ -291,6 +317,33 @@ func seedResourceSchemasFromCapabilities(manifests []capability.Manifest) map[st
 		return seedResourceSchemas()
 	}
 	return schemas
+}
+
+func seedDeletionPolicy(resource string) *ResourceDeletionPolicy {
+	policy := &ResourceDeletionPolicy{PolicyVersion: 1}
+	switch resource {
+	case "overview", "branding", "settings":
+		policy.Mode = capability.AdminDeletionDisabled
+	case "audit-logs":
+		policy.Mode = capability.AdminDeletionAppendOnly
+	case "api-resources", "area-codes", "dictionaries", "permissions":
+		policy.Mode = capability.AdminDeletionRestrict
+		policy.RestrictReferences = true
+	default:
+		policy.Mode = capability.AdminDeletionSoftDelete
+		policy.RestrictReferences = true
+	}
+	return policy
+}
+
+func deletionPolicyToCapability(policy *ResourceDeletionPolicy) *capability.AdminResourceDeletionPolicy {
+	if policy == nil {
+		return nil
+	}
+	return &capability.AdminResourceDeletionPolicy{
+		Mode: policy.Mode, PolicyVersion: policy.PolicyVersion, RetentionDays: policy.RetentionDays,
+		AutoPurge: policy.AutoPurge, RestrictReferences: policy.RestrictReferences,
+	}
 }
 
 func schemaFromCapabilityResource(resource capability.AdminResource) Schema {
@@ -330,7 +383,7 @@ func schemaFromCapabilityResource(resource capability.AdminResource) Schema {
 		specialized = overviewResourceSchema()
 	}
 	if specialized.Resource != "" {
-		return mergeCapabilityProtection(specialized, resource)
+		return mergeCapabilityDeletion(mergeCapabilityProtection(specialized, resource), resource)
 	}
 	if len(resource.Fields) == 0 {
 		schema := defaultSchema(
@@ -344,10 +397,12 @@ func schemaFromCapabilityResource(resource capability.AdminResource) Schema {
 		schema.RuntimeSlots = runtimeSlotsFromCapability(resource.RuntimeSlots)
 		schema.FormLayout = formLayoutFromCapability(resource.FormLayout, schema.Fields)
 		schema.Protection = resourceProtectionFromCapability(resource.Protection)
+		schema.Deletion = resourceDeletionFromCapability(resource.Deletion)
+		schema.Permissions = permissionsForDeletion(schema.Permissions, resource.PermissionPrefix, resource.Deletion)
 		return schema
 	}
 	fields := fieldsFromCapability(resource.Fields)
-	return Schema{
+	schema := Schema{
 		Resource:       resource.Resource,
 		Title:          localizedTextFromCapability(resource.Title),
 		Description:    localizedTextFromCapability(resource.Description),
@@ -361,7 +416,47 @@ func schemaFromCapabilityResource(resource capability.AdminResource) Schema {
 		SearchFields:   append([]string(nil), resource.SearchFields...),
 		DefaultSortKey: resource.DefaultSortKey,
 		Protection:     resourceProtectionFromCapability(resource.Protection),
+		Deletion:       resourceDeletionFromCapability(resource.Deletion),
 	}
+	schema.Permissions = permissionsForDeletion(schema.Permissions, resource.PermissionPrefix, resource.Deletion)
+	return schema
+}
+
+func mergeCapabilityDeletion(schema Schema, resource capability.AdminResource) Schema {
+	schema.Deletion = resourceDeletionFromCapability(resource.Deletion)
+	schema.Permissions = permissionsForDeletion(schema.Permissions, resource.PermissionPrefix, resource.Deletion)
+	return schema
+}
+
+func resourceDeletionFromCapability(policy *capability.AdminResourceDeletionPolicy) *ResourceDeletionPolicy {
+	if policy == nil {
+		return nil
+	}
+	return &ResourceDeletionPolicy{
+		Mode: policy.Mode, PolicyVersion: policy.PolicyVersion, RetentionDays: policy.RetentionDays,
+		AutoPurge: policy.AutoPurge, RestrictReferences: policy.RestrictReferences,
+	}
+}
+
+func permissionsForDeletion(current ActionPermissions, prefix string, policy *capability.AdminResourceDeletionPolicy) ActionPermissions {
+	current.Restore = ""
+	current.Purge = ""
+	if policy == nil {
+		current.Delete = ""
+		return current
+	}
+	switch policy.Mode {
+	case capability.AdminDeletionDisabled, capability.AdminDeletionAppendOnly:
+		current.Delete = ""
+	case capability.AdminDeletionSoftDelete, capability.AdminDeletionTombstone:
+		current.Delete = prefix + ":delete"
+		current.Restore = prefix + ":restore"
+	case capability.AdminDeletionRevoke:
+		current.Delete = prefix + ":delete"
+	default:
+		current.Delete = prefix + ":delete"
+	}
+	return current
 }
 
 func mergeCapabilityProtection(schema Schema, resource capability.AdminResource) Schema {

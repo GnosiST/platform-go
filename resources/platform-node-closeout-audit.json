@@ -35,7 +35,6 @@
     "unfinishedTasksMustNotHaveCloseout": true
   },
   "pendingNodeEvidence": [
-    "data-lifecycle-retention",
     "multi-datasource-contract-and-runtime",
     "database-certification-matrix",
     "integration-ports-disabled-default",
@@ -1081,6 +1080,50 @@
         "product-design",
         "ui-ux-pro-max",
         "browser:control-in-app-browser"
+      ]
+    },
+    {
+      "taskId": "data-lifecycle-retention",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupEvidence": [
+        "docs/platform-data-lifecycle-retention.md",
+        "docs/superpowers/specs/2026-07-14-data-lifecycle-retention-design.md",
+        "docs/superpowers/plans/2026-07-14-data-lifecycle-retention.md",
+        "internal/platform/datalifecycle/model.go",
+        "internal/platform/datalifecycle/runner.go",
+        "internal/platform/datalifecycle/runner_test.go",
+        "internal/platform/datalifecycle/gorm_repository.go",
+        "internal/platform/datalifecycle/gorm_repository_test.go",
+        "internal/platform/datalifecycle/adminresource_adapter.go",
+        "internal/platform/datalifecycle/adminresource_adapter_test.go",
+        "internal/platform/datalifecycle/adminresource_gorm_applier.go",
+        "internal/platform/datalifecycle/adminresource_gorm_applier_test.go",
+        "internal/platform/bootstrap/data_lifecycle.go",
+        "internal/platform/bootstrap/data_lifecycle_test.go",
+        "internal/platform/bootstrap/data_lifecycle_scheduler.go",
+        "internal/platform/bootstrap/data_lifecycle_scheduler_test.go",
+        "cmd/platform-admin/main.go",
+        "cmd/platform-admin/main_test.go",
+        "cmd/platform-api/main.go",
+        "cmd/platform-api/main_test.go",
+        "resources/generated/admin-resource-contract.json",
+        "resources/generated/openapi.admin.json",
+        "resources/platform-foundation-task-graph.json",
+        "resources/platform-engineering-capabilities.json",
+        "resources/platform-task-execution-audit.json",
+        "resources/platform-foundation-alignment-audit.json",
+        "resources/platform-goal-completion-audit.json",
+        "resources/platform-node-closeout-audit.json",
+        "resources/platform-objective-conformance.json",
+        "scripts/validate-platform-data-lifecycle-retention.mjs",
+        "scripts/platform-data-lifecycle-retention.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
       ]
     }
   ]

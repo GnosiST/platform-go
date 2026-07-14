@@ -940,10 +940,14 @@
       "evidence": {
         "sourcePaths": [
           "internal/platform/httpapi/server.go",
+          "internal/platform/datalifecycle/adminresource_adapter.go",
+          "internal/platform/datalifecycle/adminresource_gorm_applier.go",
           "resources/admin-resources.json"
         ],
         "tests": [
-          "internal/platform/httpapi/server_test.go"
+          "internal/platform/httpapi/server_test.go",
+          "internal/platform/datalifecycle/adminresource_adapter_test.go",
+          "internal/platform/datalifecycle/adminresource_gorm_applier_test.go"
         ],
         "adminResources": [
           "files",
@@ -968,8 +972,8 @@
             "contains": "TombstoneFileWithAudit(id"
           },
           {
-            "path": "internal/platform/httpapi/server.go",
-            "contains": "PurgeTombstonedFileWithAudit(id"
+            "path": "internal/platform/datalifecycle/adminresource_adapter.go",
+            "contains": "PurgeTombstonedFileWithPolicyAndAudit(candidate.RecordID"
           },
           {
             "path": "internal/platform/httpapi/server_test.go",
@@ -2871,16 +2875,53 @@
         "zh": "数据生命周期与保留策略",
         "en": "Data Lifecycle And Retention"
       },
-      "status": "partial",
-      "purpose": "Provide resource-declared deletion, recovery, retention and controlled purge semantics.",
+      "status": "implemented",
+      "purpose": "Provide resource-declared deletion, recovery, retention and maintenance-only controlled purge semantics through a persistent GORM lifecycle runtime that is disabled by default.",
       "dependsOn": [
         "sensitive-data-reveal-step-up"
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "internal/platform/capability/manifest.go",
+          "internal/platform/capability/admin_contract.go",
+          "internal/platform/adminresource/lifecycle.go",
+          "internal/platform/datalifecycle/model.go",
+          "internal/platform/datalifecycle/runner.go",
+          "internal/platform/datalifecycle/gorm_repository.go",
+          "internal/platform/datalifecycle/adminresource_adapter.go",
+          "internal/platform/datalifecycle/adminresource_gorm_applier.go",
+          "internal/platform/bootstrap/data_lifecycle.go",
+          "internal/platform/bootstrap/data_lifecycle_scheduler.go",
+          "cmd/platform-admin/main.go",
+          "cmd/platform-api/main.go",
+          "docs/platform-data-lifecycle-retention.md"
         ],
+        "generatedFiles": [
+          "resources/generated/admin-resource-contract.json",
+          "resources/generated/openapi.admin.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-data-lifecycle-retention.mjs"
+        ],
+        "tests": [
+          "internal/platform/datalifecycle/runner_test.go",
+          "internal/platform/datalifecycle/gorm_repository_test.go",
+          "internal/platform/datalifecycle/adminresource_adapter_test.go",
+          "internal/platform/datalifecycle/adminresource_gorm_applier_test.go",
+          "internal/platform/bootstrap/data_lifecycle_test.go",
+          "internal/platform/bootstrap/data_lifecycle_scheduler_test.go",
+          "cmd/platform-admin/main_test.go",
+          "cmd/platform-api/main_test.go",
+          "scripts/platform-data-lifecycle-retention.test.mjs"
+        ],
+        "runtimeBoundary": {
+          "defaultRunner": "disabled",
+          "repository": "persistent-gorm-required",
+          "datasourceScope": "single-default",
+          "purgeExposure": "maintenance-only",
+          "dynamicDatasourceRouting": "not-implemented",
+          "crossDatasourceTransactions": "not-implemented"
+        },
         "taskIds": [
           "data-lifecycle-retention"
         ]

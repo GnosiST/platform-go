@@ -8,7 +8,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const migrationTaskID = "sensitive-data-historical-migration";
 const remainingTaskIDs = [
-  "data-lifecycle-retention",
   "multi-datasource-contract-and-runtime",
   "database-certification-matrix",
   "integration-ports-disabled-default",
@@ -136,7 +135,7 @@ describe("validate-platform-sensitive-data-migration", () => {
     assert.ok(!Object.keys(openAPI.paths ?? {}).some((route) => /sensitive-data-migrat/i.test(route)));
   });
 
-  it("projects 53 total, 43 implemented and ten controlled unfinished nodes with a non-visual closeout", () => {
+  it("projects 53 total, 44 implemented and nine controlled unfinished nodes with a non-visual closeout", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const alignment = readJSON("resources/platform-foundation-alignment-audit.json");
     const goal = readJSON("resources/platform-goal-completion-audit.json");
@@ -147,14 +146,19 @@ describe("validate-platform-sensitive-data-migration", () => {
     const migrationTask = graph.tasks.find((task) => task.id === migrationTaskID);
     const migrationCloseout = closeout.nodeCloseouts.find((item) => item.taskId === migrationTaskID);
     const migrationCapability = engineering.capabilities.find((item) => item.id === "sensitive-data-protection");
+    const implementedTasks = graph.tasks.filter((task) => task.status === "implemented").length;
 
     assert.equal(graph.tasks.length, 53);
-    assert.equal(graph.tasks.filter((task) => task.status === "implemented").length, 43);
+    assert.equal(implementedTasks, 44);
     assert.equal(migrationTask?.status, "implemented");
     assert.deepEqual(graph.tasks.filter((task) => task.status !== "implemented").map((task) => task.id), remainingTaskIDs);
     assert.ok(alignment.requiredTaskNodes.includes(migrationTaskID));
     assert.deepEqual(alignment.requiredFutureTaskNodes, remainingTaskIDs);
-    assert.deepEqual(goal.taskSummary, { expectedTotal: 53, expectedImplemented: 43, expectedControlledUnfinished: 10 });
+    assert.deepEqual(goal.taskSummary, {
+      expectedTotal: graph.tasks.length,
+      expectedImplemented: implementedTasks,
+      expectedControlledUnfinished: graph.tasks.length - implementedTasks,
+    });
     assert.deepEqual(goal.completionPolicy.requiredControlledUnfinishedNodes, remainingTaskIDs);
     assert.deepEqual(closeout.pendingNodeEvidence, remainingTaskIDs);
     assert.equal(migrationCloseout?.status, "closed");

@@ -226,7 +226,7 @@ func (s *Store) EnsureAdminIdentityBindingAudit(ctx context.Context, input Admin
 		}
 		actorID := "system:platform"
 		if input.Outcome == AdminIdentityBindingAuditOutcomeBound {
-			actorID = adminIdentityAuditActorID(s.resources["users"], input.Username)
+			actorID = adminIdentityAuditActorID(visibleRecords("users", s.resources["users"]), input.Username)
 			if actorID == "" {
 				return Record{}, ErrInvalidRecord
 			}

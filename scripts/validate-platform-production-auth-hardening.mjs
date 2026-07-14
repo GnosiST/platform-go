@@ -663,12 +663,15 @@ function validateProviderRuntimePolicy(contract, errors) {
   }
   if (relativeExistingPath(serverPath)) {
     const server = fs.readFileSync(path.resolve(repoRoot, serverPath), "utf8");
-    for (const snippet of [
-      "DisableDemoAuthProvider bool",
-      "disableDemoAuthProvider bool",
-      "authProviderAvailable(provider)",
-      "provider.Kind == \"demo\"",
+    for (const [field, pattern] of [
+      ["DisableDemoAuthProvider bool", /\bDisableDemoAuthProvider\s+bool\b/],
+      ["disableDemoAuthProvider bool", /\bdisableDemoAuthProvider\s+bool\b/],
     ]) {
+      if (!pattern.test(server)) {
+        errors.push(`${serverPath} must include production demo auth provider guard ${field}`);
+      }
+    }
+    for (const snippet of ["authProviderAvailable(provider)", "provider.Kind == \"demo\""]) {
       if (!server.includes(snippet)) {
         errors.push(`${serverPath} must include production demo auth provider guard ${snippet}`);
       }

@@ -157,6 +157,29 @@ func TestDefaultManifestsExposeAdminSurface(t *testing.T) {
 	}
 }
 
+func TestDefaultDeletionPoliciesDoNotAdvertiseMissingAuthoritativeAdapters(t *testing.T) {
+	expectedDisabled := map[string]bool{
+		"admin-identities":   true,
+		"app-identities":     true,
+		"app-phone-bindings": true,
+		"sessions":           true,
+	}
+	for _, manifest := range DefaultManifests() {
+		for _, resource := range manifest.Admin.Resources {
+			if expectedDisabled[resource.Resource] {
+				if resource.Deletion == nil || resource.Deletion.Mode != capability.AdminDeletionDisabled {
+					t.Fatalf("%s deletion policy = %+v, want disabled until an authoritative adapter exists", resource.Resource, resource.Deletion)
+				}
+			}
+			if resource.Resource == "api-tokens" {
+				if resource.Deletion == nil || resource.Deletion.Mode != capability.AdminDeletionRevoke || resource.Deletion.RetentionDays != 90 {
+					t.Fatalf("api-tokens deletion policy = %+v, want authoritative revoke with retention", resource.Deletion)
+				}
+			}
+		}
+	}
+}
+
 func TestPolicyReviewManifestIsOptionalAndKeepsRoleGroupsClassificationOnly(t *testing.T) {
 	manifests := DefaultManifests()
 	var policyReview capability.Manifest

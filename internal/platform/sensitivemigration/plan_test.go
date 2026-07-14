@@ -188,6 +188,7 @@ func migrationResource(resource string, scope string, tenantField string, fields
 		Resource: resource, Title: capability.Text("迁移资源", "Migration Resource"),
 		Description:      capability.Text("迁移测试资源。", "Migration test resource."),
 		PermissionPrefix: "admin:" + resource,
+		Deletion:         &capability.AdminResourceDeletionPolicy{Mode: capability.AdminDeletionSoftDelete, PolicyVersion: 1},
 		Menu:             capability.AdminMenu{Route: "/" + resource, Group: "foundation", Icon: "overview", Order: 10},
 		Fields:           fields,
 		Protection:       &capability.AdminResourceProtection{SchemaVersion: 7, Scope: scope, TenantField: tenantField},

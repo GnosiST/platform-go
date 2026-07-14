@@ -6,7 +6,6 @@
 
 package httpapi
 
-// DELETE /api/admin/resources/app-identities/:id -> admin:app-identity:delete
 // POST /api/admin/resources/app-identities -> admin:app-identity:create
 // POST /api/admin/resources/app-identities/query -> admin:app-identity:read
 // PUT /api/admin/resources/app-identities/:id -> admin:app-identity:update

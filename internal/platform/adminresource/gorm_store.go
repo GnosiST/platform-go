@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -16,20 +17,21 @@ type GORMAdminResourceRepository struct {
 }
 
 const (
-	adminUsersTable           = "platform_admin_users"
-	adminUserRolesTable       = "platform_admin_user_roles"
-	adminTenantsTable         = "platform_admin_tenants"
-	adminOrgUnitsTable        = "platform_admin_org_units"
-	adminRolesTable           = "platform_admin_roles"
-	adminRoleGroupsTable      = "platform_admin_role_groups"
-	adminRolePermissionsTable = "platform_admin_role_permissions"
-	adminPermissionsTable     = "platform_admin_permissions"
-	adminMenusTable           = "platform_admin_menus"
-	adminAreaCodesTable       = "platform_area_codes"
-	adminAuditLogsTable       = "platform_audit_logs"
-	adminLoginLogsTable       = "platform_login_logs"
-	adminErrorLogsTable       = "platform_error_logs"
-	adminVersionsTable        = "platform_versions"
+	adminUsersTable             = "platform_admin_users"
+	adminUserRolesTable         = "platform_admin_user_roles"
+	adminTenantsTable           = "platform_admin_tenants"
+	adminOrgUnitsTable          = "platform_admin_org_units"
+	adminRolesTable             = "platform_admin_roles"
+	adminRoleGroupsTable        = "platform_admin_role_groups"
+	adminRolePermissionsTable   = "platform_admin_role_permissions"
+	adminPermissionsTable       = "platform_admin_permissions"
+	adminMenusTable             = "platform_admin_menus"
+	adminAreaCodesTable         = "platform_area_codes"
+	adminAuditLogsTable         = "platform_audit_logs"
+	adminLoginLogsTable         = "platform_login_logs"
+	adminErrorLogsTable         = "platform_error_logs"
+	adminVersionsTable          = "platform_versions"
+	adminResourceLifecycleTable = "platform_admin_resource_lifecycle"
 )
 
 type gormAdminResourceLayout struct {
@@ -137,6 +139,16 @@ type gormAdminResourceRecord struct {
 type gormAdminResourceState struct {
 	Key   string `gorm:"column:key;primaryKey"`
 	Value string `gorm:"column:value;not null"`
+}
+
+type gormAdminResourceLifecycle struct {
+	Resource              string `gorm:"column:resource;primaryKey"`
+	RecordID              string `gorm:"column:record_id;primaryKey"`
+	DeletedAt             string `gorm:"column:deleted_at;index;not null"`
+	DeletedBy             string `gorm:"column:deleted_by;not null"`
+	DeleteReason          string `gorm:"column:delete_reason;not null"`
+	PurgeAfter            string `gorm:"column:purge_after;index;not null"`
+	DeletionPolicyVersion uint32 `gorm:"column:deletion_policy_version;not null"`
 }
 
 type gormAdminUser struct {
@@ -314,10 +326,33 @@ type gormAdminVersion struct {
 }
 
 func NewGORMAdminResourceRepository(ctx context.Context, db *gorm.DB) (*GORMAdminResourceRepository, error) {
+	if ctx == nil || db == nil {
+		return nil, errors.New("gorm admin resource repository is unavailable")
+	}
 	repository := &GORMAdminResourceRepository{db: db}
-	if err := db.WithContext(ctx).AutoMigrate(
+	if err := db.WithContext(ctx).AutoMigrate(gormAdminResourceModels()...); err != nil {
+		return nil, err
+	}
+	return repository, nil
+}
+
+func OpenGORMAdminResourceRepository(ctx context.Context, db *gorm.DB) (*GORMAdminResourceRepository, error) {
+	if ctx == nil || db == nil {
+		return nil, errors.New("gorm admin resource repository is unavailable")
+	}
+	for _, model := range gormAdminResourceModels() {
+		if !db.WithContext(ctx).Migrator().HasTable(model) {
+			return nil, errors.New("gorm admin resource schema is not prepared")
+		}
+	}
+	return &GORMAdminResourceRepository{db: db}, nil
+}
+
+func gormAdminResourceModels() []any {
+	return []any{
 		&gormAdminResourceRecord{},
 		&gormAdminResourceState{},
+		&gormAdminResourceLifecycle{},
 		&gormAdminUser{},
 		&gormAdminUserRole{},
 		&gormAdminTenant{},
@@ -332,10 +367,7 @@ func NewGORMAdminResourceRepository(ctx context.Context, db *gorm.DB) (*GORMAdmi
 		&gormAdminLoginLog{},
 		&gormAdminErrorLog{},
 		&gormAdminVersion{},
-	); err != nil {
-		return nil, err
 	}
-	return repository, nil
 }
 
 func (gormAdminResourceRecord) TableName() string {
@@ -344,6 +376,10 @@ func (gormAdminResourceRecord) TableName() string {
 
 func (gormAdminResourceState) TableName() string {
 	return adminResourceStateTable
+}
+
+func (gormAdminResourceLifecycle) TableName() string {
+	return adminResourceLifecycleTable
 }
 
 func (gormAdminUser) TableName() string {
@@ -441,6 +477,9 @@ func (r *GORMAdminResourceRepository) Load(ctx context.Context) (ResourceSnapsho
 	if err := r.loadNormalizedResources(ctx, &snapshot); err != nil {
 		return ResourceSnapshot{}, err
 	}
+	if err := r.loadLifecycle(ctx, &snapshot); err != nil {
+		return ResourceSnapshot{}, err
+	}
 	actual, err := loadGORMRevision(r.db.WithContext(ctx))
 	if err != nil {
 		return ResourceSnapshot{}, err
@@ -481,6 +520,7 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 		deleteAll := tx.Session(&gorm.Session{AllowGlobalUpdate: true})
 		for _, model := range []interface{}{
 			&gormAdminResourceRecord{},
+			&gormAdminResourceLifecycle{},
 			&gormAdminUserRole{},
 			&gormAdminRolePermission{},
 			&gormAdminUser{},
@@ -531,15 +571,57 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 				})
 			}
 		}
-		if len(rows) == 0 {
-			return nil
+		if len(rows) > 0 {
+			if err := tx.Create(&rows).Error; err != nil {
+				return err
+			}
 		}
-		return tx.Create(&rows).Error
+		return saveLifecycleRows(tx, snapshot)
 	})
 	if err != nil {
 		return 0, err
 	}
 	return committed, nil
+}
+
+func (r *GORMAdminResourceRepository) loadLifecycle(ctx context.Context, snapshot *ResourceSnapshot) error {
+	var rows []gormAdminResourceLifecycle
+	if err := r.db.WithContext(ctx).Order("resource, record_id").Find(&rows).Error; err != nil {
+		return err
+	}
+	for _, row := range rows {
+		records := snapshot.Resources[row.Resource]
+		index := recordIndexByID(records, row.RecordID)
+		if index < 0 {
+			return fmt.Errorf("lifecycle metadata references missing record %s/%s", row.Resource, row.RecordID)
+		}
+		records[index].DeletedAt = row.DeletedAt
+		records[index].DeletedBy = row.DeletedBy
+		records[index].DeleteReason = row.DeleteReason
+		records[index].PurgeAfter = row.PurgeAfter
+		records[index].DeletionPolicyVersion = row.DeletionPolicyVersion
+		snapshot.Resources[row.Resource] = records
+	}
+	return nil
+}
+
+func saveLifecycleRows(tx *gorm.DB, snapshot ResourceSnapshot) error {
+	rows := make([]gormAdminResourceLifecycle, 0)
+	for resource, records := range snapshot.Resources {
+		for _, record := range records {
+			if !isLifecycleDeleted(record) {
+				continue
+			}
+			rows = append(rows, gormAdminResourceLifecycle{
+				Resource: resource, RecordID: record.ID, DeletedAt: record.DeletedAt, DeletedBy: record.DeletedBy,
+				DeleteReason: record.DeleteReason, PurgeAfter: record.PurgeAfter, DeletionPolicyVersion: record.DeletionPolicyVersion,
+			})
+		}
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	return tx.Create(&rows).Error
 }
 
 func loadGORMRevision(db *gorm.DB) (uint64, error) {

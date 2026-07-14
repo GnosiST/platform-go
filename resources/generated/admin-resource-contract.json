@@ -32,57 +32,86 @@
     "system"
   ],
   "permissions": [
+    "admin:api-docs:create",
     "admin:api-docs:read",
+    "admin:api-docs:update",
     "admin:api-resource:create",
     "admin:api-resource:delete",
     "admin:api-resource:read",
     "admin:api-resource:update",
     "admin:api-token:create",
     "admin:api-token:delete",
+    "admin:api-token:purge",
     "admin:api-token:read",
+    "admin:api-token:update",
     "admin:app-identity:create",
-    "admin:app-identity:delete",
     "admin:app-identity:read",
     "admin:app-identity:update",
     "admin:area-code:create",
     "admin:area-code:delete",
     "admin:area-code:read",
     "admin:area-code:update",
+    "admin:audit-log:create",
     "admin:audit-log:read",
+    "admin:audit-log:update",
+    "admin:branding:create",
     "admin:branding:read",
     "admin:branding:update",
+    "admin:capability:create",
     "admin:capability:read",
+    "admin:capability:update",
     "admin:demo-data:apply",
+    "admin:demo-data:create",
     "admin:demo-data:read",
+    "admin:demo-data:update",
     "admin:dictionary-parameter:create",
     "admin:dictionary-parameter:delete",
+    "admin:dictionary-parameter:purge",
     "admin:dictionary-parameter:read",
+    "admin:dictionary-parameter:restore",
     "admin:dictionary-parameter:update",
     "admin:dictionary:create",
     "admin:dictionary:delete",
     "admin:dictionary:read",
     "admin:dictionary:update",
+    "admin:error-log:create",
     "admin:error-log:read",
+    "admin:error-log:update",
     "admin:file:create",
     "admin:file:delete",
+    "admin:file:purge",
     "admin:file:read",
+    "admin:file:restore",
+    "admin:file:update",
+    "admin:login-log:create",
     "admin:login-log:read",
+    "admin:login-log:update",
     "admin:menu:create",
     "admin:menu:delete",
+    "admin:menu:purge",
     "admin:menu:read",
+    "admin:menu:restore",
     "admin:menu:update",
     "admin:monitoring:create",
     "admin:monitoring:delete",
+    "admin:monitoring:purge",
     "admin:monitoring:read",
+    "admin:monitoring:restore",
     "admin:monitoring:update",
     "admin:org-unit:create",
     "admin:org-unit:delete",
+    "admin:org-unit:purge",
     "admin:org-unit:read",
+    "admin:org-unit:restore",
     "admin:org-unit:update",
+    "admin:overview:create",
     "admin:overview:read",
+    "admin:overview:update",
     "admin:parameter:create",
     "admin:parameter:delete",
+    "admin:parameter:purge",
     "admin:parameter:read",
+    "admin:parameter:restore",
     "admin:parameter:update",
     "admin:permission:create",
     "admin:permission:delete",
@@ -90,23 +119,33 @@
     "admin:permission:update",
     "admin:role-group:create",
     "admin:role-group:delete",
+    "admin:role-group:purge",
     "admin:role-group:read",
+    "admin:role-group:restore",
     "admin:role-group:update",
     "admin:role:create",
     "admin:role:delete",
+    "admin:role:purge",
     "admin:role:read",
+    "admin:role:restore",
     "admin:role:update",
-    "admin:session:delete",
+    "admin:session:create",
     "admin:session:read",
+    "admin:session:update",
+    "admin:settings:create",
     "admin:settings:read",
     "admin:settings:update",
     "admin:tenant:create",
     "admin:tenant:delete",
+    "admin:tenant:purge",
     "admin:tenant:read",
+    "admin:tenant:restore",
     "admin:tenant:update",
     "admin:user:create",
     "admin:user:delete",
+    "admin:user:purge",
     "admin:user:read",
+    "admin:user:restore",
     "admin:user:update",
     "admin:version:create",
     "admin:version:read",
@@ -589,13 +628,6 @@
       "auditAction": "api_token.delete"
     },
     {
-      "resource": "appIdentities",
-      "method": "DELETE",
-      "path": "/api/admin/resources/app-identities/:id",
-      "permission": "admin:app-identity:delete",
-      "auditAction": "app_identity.delete"
-    },
-    {
       "resource": "areaCodes",
       "method": "DELETE",
       "path": "/api/admin/resources/area-codes/:id",
@@ -671,13 +703,6 @@
       "path": "/api/admin/resources/roles/:id",
       "permission": "admin:role:delete",
       "auditAction": "role.delete"
-    },
-    {
-      "resource": "sessions",
-      "method": "DELETE",
-      "path": "/api/admin/resources/sessions/:id",
-      "permission": "admin:session:delete",
-      "auditAction": "session.delete"
     },
     {
       "resource": "tenants",
@@ -836,6 +861,13 @@
     {
       "resource": "dictionary-parameters",
       "method": "POST",
+      "path": "/api/admin/resources/dictionary-parameters/:id/restore",
+      "permission": "admin:dictionary-parameter:restore",
+      "auditAction": "dictionary_parameter.restore"
+    },
+    {
+      "resource": "dictionary-parameters",
+      "method": "POST",
       "path": "/api/admin/resources/dictionary-parameters/query",
       "permission": "admin:dictionary-parameter:read"
     },
@@ -851,6 +883,13 @@
       "path": "/api/admin/resources/files",
       "permission": "admin:file:create",
       "auditAction": "file.create"
+    },
+    {
+      "resource": "files",
+      "method": "POST",
+      "path": "/api/admin/resources/files/:id/restore",
+      "permission": "admin:file:restore",
+      "auditAction": "file.restore"
     },
     {
       "resource": "files",
@@ -874,6 +913,13 @@
     {
       "resource": "menus",
       "method": "POST",
+      "path": "/api/admin/resources/menus/:id/restore",
+      "permission": "admin:menu:restore",
+      "auditAction": "menu.restore"
+    },
+    {
+      "resource": "menus",
+      "method": "POST",
       "path": "/api/admin/resources/menus/query",
       "permission": "admin:menu:read"
     },
@@ -883,6 +929,13 @@
       "path": "/api/admin/resources/monitoring",
       "permission": "admin:monitoring:create",
       "auditAction": "monitoring.create"
+    },
+    {
+      "resource": "monitoring",
+      "method": "POST",
+      "path": "/api/admin/resources/monitoring/:id/restore",
+      "permission": "admin:monitoring:restore",
+      "auditAction": "monitoring.restore"
     },
     {
       "resource": "monitoring",
@@ -900,6 +953,13 @@
     {
       "resource": "orgUnits",
       "method": "POST",
+      "path": "/api/admin/resources/org-units/:id/restore",
+      "permission": "admin:org-unit:restore",
+      "auditAction": "org_unit.restore"
+    },
+    {
+      "resource": "orgUnits",
+      "method": "POST",
       "path": "/api/admin/resources/org-units/query",
       "permission": "admin:org-unit:read"
     },
@@ -909,6 +969,13 @@
       "path": "/api/admin/resources/parameters",
       "permission": "admin:parameter:create",
       "auditAction": "parameter.create"
+    },
+    {
+      "resource": "parameters",
+      "method": "POST",
+      "path": "/api/admin/resources/parameters/:id/restore",
+      "permission": "admin:parameter:restore",
+      "auditAction": "parameter.restore"
     },
     {
       "resource": "parameters",
@@ -939,6 +1006,13 @@
     {
       "resource": "roleGroups",
       "method": "POST",
+      "path": "/api/admin/resources/role-groups/:id/restore",
+      "permission": "admin:role-group:restore",
+      "auditAction": "role_group.restore"
+    },
+    {
+      "resource": "roleGroups",
+      "method": "POST",
       "path": "/api/admin/resources/role-groups/query",
       "permission": "admin:role-group:read"
     },
@@ -948,6 +1022,13 @@
       "path": "/api/admin/resources/roles",
       "permission": "admin:role:create",
       "auditAction": "role.create"
+    },
+    {
+      "resource": "roles",
+      "method": "POST",
+      "path": "/api/admin/resources/roles/:id/restore",
+      "permission": "admin:role:restore",
+      "auditAction": "role.restore"
     },
     {
       "resource": "roles",
@@ -971,6 +1052,13 @@
     {
       "resource": "tenants",
       "method": "POST",
+      "path": "/api/admin/resources/tenants/:id/restore",
+      "permission": "admin:tenant:restore",
+      "auditAction": "tenant.restore"
+    },
+    {
+      "resource": "tenants",
+      "method": "POST",
       "path": "/api/admin/resources/tenants/query",
       "permission": "admin:tenant:read"
     },
@@ -980,6 +1068,13 @@
       "path": "/api/admin/resources/users",
       "permission": "admin:user:create",
       "auditAction": "user.create"
+    },
+    {
+      "resource": "users",
+      "method": "POST",
+      "path": "/api/admin/resources/users/:id/restore",
+      "permission": "admin:user:restore",
+      "auditAction": "user.restore"
     },
     {
       "resource": "users",
@@ -5844,10 +5939,18 @@
       },
       "apiBase": "/api/openapi.json",
       "permissions": {
-        "read": "admin:api-docs:read"
+        "read": "admin:api-docs:read",
+        "create": "admin:api-docs:create",
+        "update": "admin:api-docs:update"
+      },
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
       },
       "permissionCodes": [
-        "admin:api-docs:read"
+        "admin:api-docs:create",
+        "admin:api-docs:read",
+        "admin:api-docs:update"
       ],
       "actions": [],
       "panels": [],
@@ -5959,6 +6062,11 @@
         "create": "admin:api-resource:create",
         "update": "admin:api-resource:update",
         "delete": "admin:api-resource:delete"
+      },
+      "deletion": {
+        "mode": "restrict",
+        "policyVersion": 1,
+        "restrictReferences": true
       },
       "permissionCodes": [
         "admin:api-resource:create",
@@ -6135,12 +6243,22 @@
       "permissions": {
         "read": "admin:api-token:read",
         "create": "admin:api-token:create",
-        "delete": "admin:api-token:delete"
+        "delete": "admin:api-token:delete",
+        "purge": "admin:api-token:purge",
+        "update": "admin:api-token:update"
+      },
+      "deletion": {
+        "mode": "revoke",
+        "policyVersion": 1,
+        "retentionDays": 90,
+        "autoPurge": true
       },
       "permissionCodes": [
         "admin:api-token:create",
         "admin:api-token:delete",
-        "admin:api-token:read"
+        "admin:api-token:purge",
+        "admin:api-token:read",
+        "admin:api-token:update"
       ],
       "actions": [],
       "panels": [],
@@ -6296,24 +6414,20 @@
       "permissions": {
         "read": "admin:app-identity:read",
         "create": "admin:app-identity:create",
-        "update": "admin:app-identity:update",
-        "delete": "admin:app-identity:delete"
+        "update": "admin:app-identity:update"
+      },
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
       },
       "permissionCodes": [
         "admin:app-identity:create",
-        "admin:app-identity:delete",
         "admin:app-identity:read",
         "admin:app-identity:update"
       ],
       "actions": [],
       "panels": [],
       "routes": [
-        {
-          "method": "DELETE",
-          "path": "/api/admin/resources/app-identities/:id",
-          "permission": "admin:app-identity:delete",
-          "auditAction": "app_identity.delete"
-        },
         {
           "method": "POST",
           "path": "/api/admin/resources/app-identities",
@@ -6617,6 +6731,11 @@
         "update": "admin:area-code:update",
         "delete": "admin:area-code:delete"
       },
+      "deletion": {
+        "mode": "restrict",
+        "policyVersion": 1,
+        "restrictReferences": true
+      },
       "permissionCodes": [
         "admin:area-code:create",
         "admin:area-code:delete",
@@ -6887,10 +7006,18 @@
       },
       "apiBase": "/api/admin/audit-logs",
       "permissions": {
-        "read": "admin:audit-log:read"
+        "read": "admin:audit-log:read",
+        "create": "admin:audit-log:create",
+        "update": "admin:audit-log:update"
+      },
+      "deletion": {
+        "mode": "append-only",
+        "policyVersion": 1
       },
       "permissionCodes": [
-        "admin:audit-log:read"
+        "admin:audit-log:create",
+        "admin:audit-log:read",
+        "admin:audit-log:update"
       ],
       "actions": [],
       "panels": [],
@@ -7147,9 +7274,15 @@
       "apiBase": "/api/platform/branding",
       "permissions": {
         "read": "admin:branding:read",
-        "update": "admin:branding:update"
+        "update": "admin:branding:update",
+        "create": "admin:branding:create"
+      },
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
       },
       "permissionCodes": [
+        "admin:branding:create",
         "admin:branding:read",
         "admin:branding:update"
       ],
@@ -7290,10 +7423,18 @@
       },
       "apiBase": "/api/capabilities",
       "permissions": {
-        "read": "admin:capability:read"
+        "read": "admin:capability:read",
+        "create": "admin:capability:create",
+        "update": "admin:capability:update"
+      },
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
       },
       "permissionCodes": [
-        "admin:capability:read"
+        "admin:capability:create",
+        "admin:capability:read",
+        "admin:capability:update"
       ],
       "actions": [],
       "panels": [],
@@ -7404,11 +7545,19 @@
       "apiBase": "/api/admin/demo-data",
       "permissions": {
         "read": "admin:demo-data:read",
-        "apply": "admin:demo-data:apply"
+        "apply": "admin:demo-data:apply",
+        "create": "admin:demo-data:create",
+        "update": "admin:demo-data:update"
+      },
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
       },
       "permissionCodes": [
         "admin:demo-data:apply",
-        "admin:demo-data:read"
+        "admin:demo-data:create",
+        "admin:demo-data:read",
+        "admin:demo-data:update"
       ],
       "actions": [],
       "panels": [],
@@ -7527,6 +7676,11 @@
         "create": "admin:dictionary:create",
         "update": "admin:dictionary:update",
         "delete": "admin:dictionary:delete"
+      },
+      "deletion": {
+        "mode": "restrict",
+        "policyVersion": 1,
+        "restrictReferences": true
       },
       "permissionCodes": [
         "admin:dictionary:create",
@@ -7696,13 +7850,22 @@
       "permissions": {
         "create": "admin:dictionary-parameter:create",
         "delete": "admin:dictionary-parameter:delete",
+        "purge": "admin:dictionary-parameter:purge",
         "read": "admin:dictionary-parameter:read",
+        "restore": "admin:dictionary-parameter:restore",
         "update": "admin:dictionary-parameter:update"
+      },
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
       },
       "permissionCodes": [
         "admin:dictionary-parameter:create",
         "admin:dictionary-parameter:delete",
+        "admin:dictionary-parameter:purge",
         "admin:dictionary-parameter:read",
+        "admin:dictionary-parameter:restore",
         "admin:dictionary-parameter:update"
       ],
       "actions": [],
@@ -7719,6 +7882,12 @@
           "path": "/api/admin/resources/dictionary-parameters",
           "permission": "admin:dictionary-parameter:create",
           "auditAction": "dictionary_parameter.create"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/resources/dictionary-parameters/:id/restore",
+          "permission": "admin:dictionary-parameter:restore",
+          "auditAction": "dictionary_parameter.restore"
         },
         {
           "method": "POST",
@@ -8122,10 +8291,18 @@
       },
       "apiBase": "/api/admin/error-logs",
       "permissions": {
-        "read": "admin:error-log:read"
+        "read": "admin:error-log:read",
+        "create": "admin:error-log:create",
+        "update": "admin:error-log:update"
+      },
+      "deletion": {
+        "mode": "append-only",
+        "policyVersion": 1
       },
       "permissionCodes": [
-        "admin:error-log:read"
+        "admin:error-log:create",
+        "admin:error-log:read",
+        "admin:error-log:update"
       ],
       "actions": [],
       "panels": [],
@@ -8256,12 +8433,24 @@
       "permissions": {
         "read": "admin:file:read",
         "create": "admin:file:create",
-        "delete": "admin:file:delete"
+        "delete": "admin:file:delete",
+        "purge": "admin:file:purge",
+        "restore": "admin:file:restore",
+        "update": "admin:file:update"
+      },
+      "deletion": {
+        "mode": "tombstone",
+        "policyVersion": 1,
+        "retentionDays": 30,
+        "autoPurge": true
       },
       "permissionCodes": [
         "admin:file:create",
         "admin:file:delete",
-        "admin:file:read"
+        "admin:file:purge",
+        "admin:file:read",
+        "admin:file:restore",
+        "admin:file:update"
       ],
       "actions": [],
       "panels": [],
@@ -8288,6 +8477,12 @@
           "path": "/api/admin/resources/files",
           "permission": "admin:file:create",
           "auditAction": "file.create"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/resources/files/:id/restore",
+          "permission": "admin:file:restore",
+          "auditAction": "file.restore"
         },
         {
           "method": "POST",
@@ -8596,10 +8791,18 @@
       },
       "apiBase": "/api/admin/login-logs",
       "permissions": {
-        "read": "admin:login-log:read"
+        "read": "admin:login-log:read",
+        "create": "admin:login-log:create",
+        "update": "admin:login-log:update"
+      },
+      "deletion": {
+        "mode": "append-only",
+        "policyVersion": 1
       },
       "permissionCodes": [
-        "admin:login-log:read"
+        "admin:login-log:create",
+        "admin:login-log:read",
+        "admin:login-log:update"
       ],
       "actions": [],
       "panels": [],
@@ -8731,12 +8934,21 @@
         "read": "admin:menu:read",
         "create": "admin:menu:create",
         "update": "admin:menu:update",
-        "delete": "admin:menu:delete"
+        "delete": "admin:menu:delete",
+        "purge": "admin:menu:purge",
+        "restore": "admin:menu:restore"
+      },
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
       },
       "permissionCodes": [
         "admin:menu:create",
         "admin:menu:delete",
+        "admin:menu:purge",
         "admin:menu:read",
+        "admin:menu:restore",
         "admin:menu:update"
       ],
       "actions": [
@@ -8787,6 +8999,12 @@
           "path": "/api/admin/resources/menus",
           "permission": "admin:menu:create",
           "auditAction": "menu.create"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/resources/menus/:id/restore",
+          "permission": "admin:menu:restore",
+          "auditAction": "menu.restore"
         },
         {
           "method": "POST",
@@ -8984,13 +9202,22 @@
       "permissions": {
         "create": "admin:monitoring:create",
         "delete": "admin:monitoring:delete",
+        "purge": "admin:monitoring:purge",
         "read": "admin:monitoring:read",
+        "restore": "admin:monitoring:restore",
         "update": "admin:monitoring:update"
+      },
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
       },
       "permissionCodes": [
         "admin:monitoring:create",
         "admin:monitoring:delete",
+        "admin:monitoring:purge",
         "admin:monitoring:read",
+        "admin:monitoring:restore",
         "admin:monitoring:update"
       ],
       "actions": [],
@@ -9007,6 +9234,12 @@
           "path": "/api/admin/resources/monitoring",
           "permission": "admin:monitoring:create",
           "auditAction": "monitoring.create"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/resources/monitoring/:id/restore",
+          "permission": "admin:monitoring:restore",
+          "auditAction": "monitoring.restore"
         },
         {
           "method": "POST",
@@ -9472,12 +9705,21 @@
         "read": "admin:org-unit:read",
         "create": "admin:org-unit:create",
         "update": "admin:org-unit:update",
-        "delete": "admin:org-unit:delete"
+        "delete": "admin:org-unit:delete",
+        "purge": "admin:org-unit:purge",
+        "restore": "admin:org-unit:restore"
+      },
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
       },
       "permissionCodes": [
         "admin:org-unit:create",
         "admin:org-unit:delete",
+        "admin:org-unit:purge",
         "admin:org-unit:read",
+        "admin:org-unit:restore",
         "admin:org-unit:update"
       ],
       "actions": [],
@@ -9494,6 +9736,12 @@
           "path": "/api/admin/resources/org-units",
           "permission": "admin:org-unit:create",
           "auditAction": "org_unit.create"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/resources/org-units/:id/restore",
+          "permission": "admin:org-unit:restore",
+          "auditAction": "org_unit.restore"
         },
         {
           "method": "POST",
@@ -9798,10 +10046,18 @@
       },
       "apiBase": "/api/admin/overview",
       "permissions": {
-        "read": "admin:overview:read"
+        "read": "admin:overview:read",
+        "create": "admin:overview:create",
+        "update": "admin:overview:update"
+      },
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
       },
       "permissionCodes": [
-        "admin:overview:read"
+        "admin:overview:create",
+        "admin:overview:read",
+        "admin:overview:update"
       ],
       "actions": [],
       "panels": [],
@@ -9891,12 +10147,21 @@
         "read": "admin:parameter:read",
         "create": "admin:parameter:create",
         "update": "admin:parameter:update",
-        "delete": "admin:parameter:delete"
+        "delete": "admin:parameter:delete",
+        "purge": "admin:parameter:purge",
+        "restore": "admin:parameter:restore"
+      },
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
       },
       "permissionCodes": [
         "admin:parameter:create",
         "admin:parameter:delete",
+        "admin:parameter:purge",
         "admin:parameter:read",
+        "admin:parameter:restore",
         "admin:parameter:update"
       ],
       "actions": [],
@@ -9913,6 +10178,12 @@
           "path": "/api/admin/resources/parameters",
           "permission": "admin:parameter:create",
           "auditAction": "parameter.create"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/resources/parameters/:id/restore",
+          "permission": "admin:parameter:restore",
+          "auditAction": "parameter.restore"
         },
         {
           "method": "POST",
@@ -10060,6 +10331,11 @@
         "create": "admin:permission:create",
         "update": "admin:permission:update",
         "delete": "admin:permission:delete"
+      },
+      "deletion": {
+        "mode": "restrict",
+        "policyVersion": 1,
+        "restrictReferences": true
       },
       "permissionCodes": [
         "admin:permission:create",
@@ -10225,12 +10501,21 @@
         "read": "admin:role-group:read",
         "create": "admin:role-group:create",
         "update": "admin:role-group:update",
-        "delete": "admin:role-group:delete"
+        "delete": "admin:role-group:delete",
+        "purge": "admin:role-group:purge",
+        "restore": "admin:role-group:restore"
+      },
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
       },
       "permissionCodes": [
         "admin:role-group:create",
         "admin:role-group:delete",
+        "admin:role-group:purge",
         "admin:role-group:read",
+        "admin:role-group:restore",
         "admin:role-group:update"
       ],
       "actions": [],
@@ -10247,6 +10532,12 @@
           "path": "/api/admin/resources/role-groups",
           "permission": "admin:role-group:create",
           "auditAction": "role_group.create"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/resources/role-groups/:id/restore",
+          "permission": "admin:role-group:restore",
+          "auditAction": "role_group.restore"
         },
         {
           "method": "POST",
@@ -10450,12 +10741,21 @@
         "read": "admin:role:read",
         "create": "admin:role:create",
         "update": "admin:role:update",
-        "delete": "admin:role:delete"
+        "delete": "admin:role:delete",
+        "purge": "admin:role:purge",
+        "restore": "admin:role:restore"
+      },
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
       },
       "permissionCodes": [
         "admin:role:create",
         "admin:role:delete",
+        "admin:role:purge",
         "admin:role:read",
+        "admin:role:restore",
         "admin:role:update"
       ],
       "actions": [],
@@ -10472,6 +10772,12 @@
           "path": "/api/admin/resources/roles",
           "permission": "admin:role:create",
           "auditAction": "role.create"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/resources/roles/:id/restore",
+          "permission": "admin:role:restore",
+          "auditAction": "role.restore"
         },
         {
           "method": "POST",
@@ -10805,21 +11111,21 @@
       "apiBase": "/api/admin/sessions",
       "permissions": {
         "read": "admin:session:read",
-        "delete": "admin:session:delete"
+        "create": "admin:session:create",
+        "update": "admin:session:update"
+      },
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
       },
       "permissionCodes": [
-        "admin:session:delete",
-        "admin:session:read"
+        "admin:session:create",
+        "admin:session:read",
+        "admin:session:update"
       ],
       "actions": [],
       "panels": [],
       "routes": [
-        {
-          "method": "DELETE",
-          "path": "/api/admin/resources/sessions/:id",
-          "permission": "admin:session:delete",
-          "auditAction": "session.delete"
-        },
         {
           "method": "POST",
           "path": "/api/admin/resources/sessions/query",
@@ -10947,9 +11253,15 @@
       "apiBase": "/api/admin/settings",
       "permissions": {
         "read": "admin:settings:read",
-        "update": "admin:settings:update"
+        "update": "admin:settings:update",
+        "create": "admin:settings:create"
+      },
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
       },
       "permissionCodes": [
+        "admin:settings:create",
         "admin:settings:read",
         "admin:settings:update"
       ],
@@ -11088,12 +11400,21 @@
         "read": "admin:tenant:read",
         "create": "admin:tenant:create",
         "update": "admin:tenant:update",
-        "delete": "admin:tenant:delete"
+        "delete": "admin:tenant:delete",
+        "purge": "admin:tenant:purge",
+        "restore": "admin:tenant:restore"
+      },
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
       },
       "permissionCodes": [
         "admin:tenant:create",
         "admin:tenant:delete",
+        "admin:tenant:purge",
         "admin:tenant:read",
+        "admin:tenant:restore",
         "admin:tenant:update"
       ],
       "actions": [],
@@ -11110,6 +11431,12 @@
           "path": "/api/admin/resources/tenants",
           "permission": "admin:tenant:create",
           "auditAction": "tenant.create"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/resources/tenants/:id/restore",
+          "permission": "admin:tenant:restore",
+          "auditAction": "tenant.restore"
         },
         {
           "method": "POST",
@@ -11319,12 +11646,21 @@
         "read": "admin:user:read",
         "create": "admin:user:create",
         "update": "admin:user:update",
-        "delete": "admin:user:delete"
+        "delete": "admin:user:delete",
+        "purge": "admin:user:purge",
+        "restore": "admin:user:restore"
+      },
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
       },
       "permissionCodes": [
         "admin:user:create",
         "admin:user:delete",
+        "admin:user:purge",
         "admin:user:read",
+        "admin:user:restore",
         "admin:user:update"
       ],
       "actions": [],
@@ -11341,6 +11677,12 @@
           "path": "/api/admin/resources/users",
           "permission": "admin:user:create",
           "auditAction": "user.create"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/resources/users/:id/restore",
+          "permission": "admin:user:restore",
+          "auditAction": "user.restore"
         },
         {
           "method": "POST",
@@ -11635,6 +11977,10 @@
         "read": "admin:version:read",
         "create": "admin:version:create",
         "update": "admin:version:update"
+      },
+      "deletion": {
+        "mode": "append-only",
+        "policyVersion": 1
       },
       "permissionCodes": [
         "admin:version:create",

@@ -31,6 +31,7 @@ const requiredRuntimeGateSnippets = [
   "production runtime requires PLATFORM_ADMIN_RESOURCE_DRIVER to be mysql, postgres, or sqlite",
   "production runtime requires PLATFORM_SESSION_DRIVER to be mysql, postgres, or sqlite",
   "production runtime requires PLATFORM_LIFECYCLE_HISTORY_DRIVER to be mysql, postgres, or sqlite",
+  "PLATFORM_RETENTION_RUNNER_ENABLED requires persistent GORM Admin resource storage and no file repository",
   "production runtime requires PLATFORM_CACHE_DRIVER=redis",
   "production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY to be at least 32 bytes",
   "production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY to be distinct from phone and code HMAC keys",
@@ -51,6 +52,10 @@ const requiredProductionEnv = [
   "PLATFORM_RATE_LIMIT_HMAC_KEY",
 ];
 const requiredConditionalProductionEnv = [
+  "PLATFORM_RETENTION_RUNNER_ENABLED",
+  "PLATFORM_RETENTION_RUNNER_INTERVAL",
+  "PLATFORM_RETENTION_RUNNER_BATCH_SIZE",
+  "PLATFORM_RETENTION_RUNNER_MAX_RETRIES",
   "PLATFORM_SENSITIVE_REVEAL_HMAC_KEY",
   "PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE",
   "PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD",

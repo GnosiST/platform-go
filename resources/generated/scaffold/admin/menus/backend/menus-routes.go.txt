@@ -9,6 +9,7 @@ package httpapi
 // DELETE /api/admin/resources/menus/:id -> admin:menu:delete
 // GET /api/admin/navigation/menus -> admin:menu:read
 // POST /api/admin/resources/menus -> admin:menu:create
+// POST /api/admin/resources/menus/:id/restore -> admin:menu:restore
 // POST /api/admin/resources/menus/query -> admin:menu:read
 // PUT /api/admin/resources/menus/:id -> admin:menu:update
 

@@ -86,18 +86,18 @@ describe("validate-platform-engineering-capabilities", () => {
     const capabilities = matrix.capabilities.filter((item) => completionProgramCapabilityIDs.includes(item.id));
 
     assert.deepEqual(capabilities.map((item) => item.id), completionProgramCapabilityIDs);
-    for (const capability of capabilities.slice(0, 5)) {
+    for (const capability of capabilities.slice(0, 6)) {
       assert.equal(capability.status, "implemented");
       assert.ok(capability.evidence.sourcePaths.length > 0);
       assert.ok(capability.evidence.tests.length > 0);
       assert.ok(capability.evidence.validators.length > 0);
     }
-    assert.ok(capabilities.slice(5).every((item) => item.status === "partial"));
+    assert.ok(capabilities.slice(6).every((item) => item.status === "partial"));
 
     for (const [index, capabilityID] of newlyGovernedCapabilityIDs.entries()) {
       const capability = capabilities.find((item) => item.id === capabilityID);
       assert.deepEqual(capability.dependsOn, [newlyGovernedCapabilityDependencies[index]]);
-      if (!["mask-strategy-runtime", "sensitive-data-reveal-step-up"].includes(capabilityID)) {
+      if (!["mask-strategy-runtime", "sensitive-data-reveal-step-up", "data-lifecycle-retention"].includes(capabilityID)) {
         assert.deepEqual(capability.evidence.sourcePaths, newlyGovernedCapabilityDocs);
       }
       assert.deepEqual(capability.evidence.taskIds, [capabilityID]);

@@ -3,15 +3,38 @@ package adminresource
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
+
+	"platform-go/internal/platform/capability"
 )
 
 const (
 	fileDeletionStateField       = "deletionState"
 	fileDeletionRequestedAtField = "deletionRequestedAt"
 	fileDeletionPending          = "pending"
+	fileDeletionCleanupStarted   = "cleanup-started"
+	fileDeletionObjectDeleted    = "object-deleted"
+	FileDeletionPending          = fileDeletionPending
+	FileDeletionCleanupStarted   = fileDeletionCleanupStarted
+	FileDeletionObjectDeleted    = fileDeletionObjectDeleted
 )
+
+func FileDeletionState(record Record) string {
+	return fileDeletionState(record)
+}
+
+func FileObjectKey(record Record) string {
+	if key := strings.TrimSpace(record.Values["storageKey"]); key != "" {
+		return key
+	}
+	return strings.TrimSpace(record.Code)
+}
+
+func FileStorageDriver(record Record) string {
+	return strings.TrimSpace(record.Values["storageDriver"])
+}
 
 type AuditEvent struct {
 	Actor      string
@@ -156,6 +179,118 @@ func (s *Store) DeleteWithAudit(resource string, id string, event AuditEvent) (M
 	if err != nil {
 		return MutationResult{}, err
 	}
+	record, nextItems, err := s.deletionMutationLocked(resource, id, event.Actor, event.ReasonCode)
+	if err != nil {
+		return MutationResult{}, err
+	}
+	event.TargetID = record.ID
+	event.Resource = resource
+	audit, err := s.auditRecordLocked(event, s.nextID+1)
+	if err != nil {
+		return MutationResult{}, err
+	}
+	s.nextID++
+	s.resources[resource] = nextItems
+	s.resources["audit-logs"] = append(s.resources["audit-logs"], audit)
+	if err := s.persistLocked(); err != nil {
+		s.restoreSnapshotLocked(previous)
+		return MutationResult{}, err
+	}
+	return MutationResult{Record: record, Audit: cloneRecord(audit)}, nil
+}
+
+func (s *Store) RestoreWithAudit(resource string, id string, event AuditEvent) (MutationResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	previous, err := s.prepareMutationLocked()
+	if err != nil {
+		return MutationResult{}, err
+	}
+	record, nextItems, err := s.restoreMutationLocked(resource, id)
+	if err != nil {
+		return MutationResult{}, err
+	}
+	event.TargetID = record.ID
+	event.Resource = resource
+	audit, err := s.auditRecordLocked(event, s.nextID+1)
+	if err != nil {
+		return MutationResult{}, err
+	}
+	resultRecord, err := s.mutationRecordResultLocked(resource, record, WriteOriginExternal)
+	if err != nil {
+		return MutationResult{}, err
+	}
+	s.nextID++
+	s.resources[resource] = nextItems
+	s.resources["audit-logs"] = append(s.resources["audit-logs"], audit)
+	if err := s.persistLocked(); err != nil {
+		s.restoreSnapshotLocked(previous)
+		return MutationResult{}, err
+	}
+	return MutationResult{Record: resultRecord, Audit: cloneRecord(audit)}, nil
+}
+
+func (s *Store) PurgeWithAudit(resource string, id string, event AuditEvent) (MutationResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	previous, err := s.prepareMutationLocked()
+	if err != nil {
+		return MutationResult{}, err
+	}
+	record, nextItems, err := s.purgeMutationLocked(resource, id)
+	if err != nil {
+		return MutationResult{}, err
+	}
+	event.TargetID = record.ID
+	event.Resource = resource
+	audit, err := s.auditRecordLocked(event, s.nextID+1)
+	if err != nil {
+		return MutationResult{}, err
+	}
+	s.nextID++
+	s.resources[resource] = nextItems
+	s.resources["audit-logs"] = append(s.resources["audit-logs"], audit)
+	if err := s.persistLocked(); err != nil {
+		s.restoreSnapshotLocked(previous)
+		return MutationResult{}, err
+	}
+	return MutationResult{Record: record, Audit: cloneRecord(audit)}, nil
+}
+
+func (s *Store) PurgeWithPolicyAndAudit(resource string, id string, policy MaintenanceRetentionPolicy, event AuditEvent) (MutationResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	previous, err := s.prepareMutationLocked()
+	if err != nil {
+		return MutationResult{}, err
+	}
+	record, nextItems, err := s.purgeMutationWithPolicyLocked(resource, id, policy)
+	if err != nil {
+		return MutationResult{}, err
+	}
+	event.TargetID = record.ID
+	event.Resource = resource
+	audit, err := s.auditRecordLocked(event, s.nextID+1)
+	if err != nil {
+		return MutationResult{}, err
+	}
+	s.nextID++
+	s.resources[resource] = nextItems
+	s.resources["audit-logs"] = append(s.resources["audit-logs"], audit)
+	if err := s.persistLocked(); err != nil {
+		s.restoreSnapshotLocked(previous)
+		return MutationResult{}, err
+	}
+	return MutationResult{Record: record, Audit: cloneRecord(audit)}, nil
+}
+
+func (s *Store) PurgeRevokedWithPolicyAndAudit(resource string, id string, terminalField string, policy MaintenanceRetentionPolicy, event AuditEvent) (MutationResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	previous, err := s.prepareMutationLocked()
+	if err != nil {
+		return MutationResult{}, err
+	}
 	items, ok := s.resources[resource]
 	if !ok {
 		return MutationResult{}, ErrUnknownResource
@@ -164,7 +299,27 @@ func (s *Store) DeleteWithAudit(resource string, id string, event AuditEvent) (M
 	if index < 0 {
 		return MutationResult{}, ErrRecordNotFound
 	}
+	configured, err := s.deletionPolicyLocked(resource)
+	if err != nil {
+		return MutationResult{}, err
+	}
+	retention, ok := capability.AdminRetentionDuration(policy.RetentionDays)
+	if configured.Mode != capability.AdminDeletionRevoke || !configured.AutoPurge || !policy.AutoPurge ||
+		policy.Mode != capability.AdminDeletionRevoke || !capability.SupportsAdminAutoPurge(resource, policy.Mode) || !ok || retention <= 0 ||
+		configured.PolicyVersion != policy.PolicyVersion || configured.RetentionDays != policy.RetentionDays || policy.RetentionDays <= 0 {
+		return MutationResult{}, ErrRetentionPolicyMismatch
+	}
 	record := cloneRecord(items[index])
+	if record.Status != "revoked" {
+		return MutationResult{}, ErrRecordNotDeleted
+	}
+	terminalAt, err := time.Parse(time.RFC3339, strings.TrimSpace(record.Values[terminalField]))
+	if err != nil {
+		return MutationResult{}, fmt.Errorf("%w: invalid terminal timestamp", ErrInvalidRecord)
+	}
+	if s.now().UTC().Before(terminalAt.UTC().Add(retention)) {
+		return MutationResult{}, ErrRetentionNotElapsed
+	}
 	event.TargetID = record.ID
 	event.Resource = resource
 	audit, err := s.auditRecordLocked(event, s.nextID+1)
@@ -172,7 +327,7 @@ func (s *Store) DeleteWithAudit(resource string, id string, event AuditEvent) (M
 		return MutationResult{}, err
 	}
 	s.nextID++
-	s.resources[resource] = append(append([]Record(nil), items[:index]...), items[index+1:]...)
+	s.resources[resource] = slices.Delete(append([]Record(nil), items...), index, index+1)
 	s.resources["audit-logs"] = append(s.resources["audit-logs"], audit)
 	if err := s.persistLocked(); err != nil {
 		s.restoreSnapshotLocked(previous)
@@ -200,12 +355,37 @@ func (s *Store) TombstoneFileWithAudit(id string, event AuditEvent) (MutationRes
 	if isTombstonedFile(record) {
 		return MutationResult{Record: record}, nil
 	}
+	policy, err := s.deletionPolicyLocked("files")
+	if err != nil {
+		return MutationResult{}, err
+	}
+	if policy.Mode != capability.AdminDeletionTombstone {
+		return MutationResult{}, ErrDeletionRequiresAdapter
+	}
+	retention, ok := capability.AdminRetentionDuration(policy.RetentionDays)
+	if !ok {
+		return MutationResult{}, ErrDeletionPolicyMissing
+	}
 	if record.Values == nil {
 		record.Values = map[string]string{}
 	}
+	now := s.now().UTC()
 	record.Values[fileDeletionStateField] = fileDeletionPending
-	record.Values[fileDeletionRequestedAtField] = s.now().UTC().Format(time.RFC3339)
-	record.UpdatedAt = s.now().UTC().Format(time.RFC3339)
+	record.Values[fileDeletionRequestedAtField] = now.Format(time.RFC3339)
+	record.DeletedAt = now.Format(time.RFC3339)
+	record.DeletedBy = strings.TrimSpace(event.Actor)
+	if record.DeletedBy == "" {
+		record.DeletedBy = "system"
+	}
+	record.DeleteReason = strings.TrimSpace(event.ReasonCode)
+	if record.DeleteReason == "" {
+		record.DeleteReason = "cleanup-pending"
+	}
+	record.DeletionPolicyVersion = policy.PolicyVersion
+	if policy.RetentionDays > 0 {
+		record.PurgeAfter = now.Add(retention).Format(time.RFC3339)
+	}
+	record.UpdatedAt = now.Format(time.RFC3339)
 	event.TargetID = record.ID
 	event.Resource = "files"
 	audit, err := s.auditRecordLocked(event, s.nextID+1)
@@ -224,6 +404,66 @@ func (s *Store) TombstoneFileWithAudit(id string, event AuditEvent) (MutationRes
 }
 
 func (s *Store) PurgeTombstonedFileWithAudit(id string, event AuditEvent) (MutationResult, error) {
+	return s.purgeTombstonedFileWithAudit(id, nil, event)
+}
+
+func (s *Store) PurgeTombstonedFileWithPolicyAndAudit(id string, policy MaintenanceRetentionPolicy, event AuditEvent) (MutationResult, error) {
+	return s.purgeTombstonedFileWithAudit(id, &policy, event)
+}
+
+func (s *Store) purgeTombstonedFileWithAudit(id string, policy *MaintenanceRetentionPolicy, event AuditEvent) (MutationResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	previous, err := s.prepareMutationLocked()
+	if err != nil {
+		return MutationResult{}, err
+	}
+	items, ok := s.resources["files"]
+	if !ok {
+		return MutationResult{}, ErrUnknownResource
+	}
+	index := recordIndexByID(items, id)
+	if index < 0 {
+		return MutationResult{}, ErrRecordNotFound
+	}
+	if fileDeletionState(items[index]) != fileDeletionObjectDeleted {
+		return MutationResult{}, ErrDeletionCleanupStarted
+	}
+	var record Record
+	var nextItems []Record
+	if policy == nil {
+		record, nextItems, err = s.purgeMutationLocked("files", id)
+	} else {
+		record, nextItems, err = s.purgeMutationWithPolicyLocked("files", id, *policy)
+	}
+	if err != nil {
+		return MutationResult{}, err
+	}
+	event.TargetID = record.ID
+	event.Resource = "files"
+	audit, err := s.auditRecordLocked(event, s.nextID+1)
+	if err != nil {
+		return MutationResult{}, err
+	}
+	s.nextID++
+	s.resources["files"] = nextItems
+	s.resources["audit-logs"] = append(s.resources["audit-logs"], audit)
+	if err := s.persistLocked(); err != nil {
+		s.restoreSnapshotLocked(previous)
+		return MutationResult{}, err
+	}
+	return MutationResult{Record: record, Audit: cloneRecord(audit)}, nil
+}
+
+func (s *Store) ClaimTombstonedFileCleanupWithAudit(id string, event AuditEvent) (MutationResult, error) {
+	return s.claimTombstonedFileCleanupWithAudit(id, nil, event)
+}
+
+func (s *Store) ClaimTombstonedFileCleanupWithPolicyAndAudit(id string, policy MaintenanceRetentionPolicy, event AuditEvent) (MutationResult, error) {
+	return s.claimTombstonedFileCleanupWithAudit(id, &policy, event)
+}
+
+func (s *Store) claimTombstonedFileCleanupWithAudit(id string, policy *MaintenanceRetentionPolicy, event AuditEvent) (MutationResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	previous, err := s.prepareMutationLocked()
@@ -239,23 +479,92 @@ func (s *Store) PurgeTombstonedFileWithAudit(id string, event AuditEvent) (Mutat
 		return MutationResult{}, ErrRecordNotFound
 	}
 	record := cloneRecord(items[index])
-	if !isTombstonedFile(record) {
-		return MutationResult{}, ErrInvalidRecord
+	state := fileDeletionState(record)
+	if state == fileDeletionCleanupStarted || state == fileDeletionObjectDeleted {
+		return MutationResult{Record: record}, nil
 	}
+	if state != fileDeletionPending {
+		return MutationResult{}, ErrRecordNotDeleted
+	}
+	if policy == nil {
+		if err := s.requireRetentionElapsedLocked(record); err != nil {
+			return MutationResult{}, err
+		}
+	} else if err := s.requireMaintenanceRetentionElapsedLocked("files", record, *policy); err != nil {
+		return MutationResult{}, err
+	}
+	record.Values[fileDeletionStateField] = fileDeletionCleanupStarted
+	record.UpdatedAt = s.now().UTC().Format(time.RFC3339)
 	event.TargetID = record.ID
 	event.Resource = "files"
 	audit, err := s.auditRecordLocked(event, s.nextID+1)
 	if err != nil {
 		return MutationResult{}, err
 	}
+	items[index] = record
 	s.nextID++
-	s.resources["files"] = append(append([]Record(nil), items[:index]...), items[index+1:]...)
+	s.resources["files"] = items
 	s.resources["audit-logs"] = append(s.resources["audit-logs"], audit)
 	if err := s.persistLocked(); err != nil {
 		s.restoreSnapshotLocked(previous)
 		return MutationResult{}, err
 	}
-	return MutationResult{Record: record, Audit: cloneRecord(audit)}, nil
+	return MutationResult{Record: cloneRecord(record), Audit: cloneRecord(audit)}, nil
+}
+
+func (s *Store) CompleteTombstonedFileCleanupWithAudit(id string, event AuditEvent) (MutationResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	previous, err := s.prepareMutationLocked()
+	if err != nil {
+		return MutationResult{}, err
+	}
+	items, ok := s.resources["files"]
+	if !ok {
+		return MutationResult{}, ErrUnknownResource
+	}
+	index := recordIndexByID(items, id)
+	if index < 0 {
+		return MutationResult{}, ErrRecordNotFound
+	}
+	record := cloneRecord(items[index])
+	if fileDeletionState(record) == fileDeletionObjectDeleted {
+		return MutationResult{Record: record}, nil
+	}
+	if fileDeletionState(record) != fileDeletionCleanupStarted {
+		return MutationResult{}, ErrDeletionCleanupStarted
+	}
+	record.Values[fileDeletionStateField] = fileDeletionObjectDeleted
+	record.UpdatedAt = s.now().UTC().Format(time.RFC3339)
+	event.TargetID = record.ID
+	event.Resource = "files"
+	audit, err := s.auditRecordLocked(event, s.nextID+1)
+	if err != nil {
+		return MutationResult{}, err
+	}
+	items[index] = record
+	s.nextID++
+	s.resources["files"] = items
+	s.resources["audit-logs"] = append(s.resources["audit-logs"], audit)
+	if err := s.persistLocked(); err != nil {
+		s.restoreSnapshotLocked(previous)
+		return MutationResult{}, err
+	}
+	return MutationResult{Record: cloneRecord(record), Audit: cloneRecord(audit)}, nil
+}
+
+func (s *Store) requireRetentionElapsedLocked(record Record) error {
+	if strings.TrimSpace(record.PurgeAfter) == "" {
+		return ErrRetentionNotConfigured
+	}
+	purgeAfter, err := time.Parse(time.RFC3339, record.PurgeAfter)
+	if err != nil {
+		return fmt.Errorf("%w: invalid purgeAfter", ErrInvalidRecord)
+	}
+	if s.now().UTC().Before(purgeAfter.UTC()) {
+		return ErrRetentionNotElapsed
+	}
+	return nil
 }
 
 func (s *Store) InternalRecord(resource string, id string) (Record, error) {
@@ -270,6 +579,19 @@ func (s *Store) InternalRecord(resource string, id string) (Record, error) {
 		return Record{}, ErrRecordNotFound
 	}
 	return cloneRecord(items[index]), nil
+}
+
+func (s *Store) InternalRecordsContext(ctx context.Context, resource string) ([]Record, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.reloadContextLocked(ctx); err != nil {
+		return nil, err
+	}
+	items, ok := s.resources[resource]
+	if !ok {
+		return nil, ErrUnknownResource
+	}
+	return cloneRecords(items), nil
 }
 
 func (s *Store) auditRecordLocked(event AuditEvent, nextID int) (Record, error) {
@@ -316,16 +638,22 @@ func (s *Store) auditRecordLocked(event AuditEvent, nextID int) (Record, error) 
 }
 
 func isTombstonedFile(record Record) bool {
-	return strings.TrimSpace(record.Values[fileDeletionStateField]) == fileDeletionPending
+	switch fileDeletionState(record) {
+	case fileDeletionPending, fileDeletionCleanupStarted, fileDeletionObjectDeleted:
+		return true
+	default:
+		return false
+	}
+}
+
+func fileDeletionState(record Record) string {
+	return strings.TrimSpace(record.Values[fileDeletionStateField])
 }
 
 func visibleRecords(resource string, records []Record) []Record {
-	if resource != "files" {
-		return records
-	}
 	visible := make([]Record, 0, len(records))
 	for _, record := range records {
-		if !isTombstonedFile(record) {
+		if !isLifecycleDeleted(record) && (resource != "files" || !isTombstonedFile(record)) {
 			visible = append(visible, record)
 		}
 	}

@@ -2216,15 +2216,7 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
-      "statusReason": {
-        "zh": "通用资源仍以物理删除为主，尚无资源声明式删除语义、恢复窗口、最终清理和默认关闭的维护运行器。",
-        "en": "Generic resources still primarily use physical deletion and have no resource-declared deletion semantics, recovery windows, final purge or disabled-by-default maintenance runner."
-      },
-      "completionGate": {
-        "zh": "完成资源级删除策略、软删除与恢复、受控清理、保留期变更审计及可恢复的批处理维护运行时。",
-        "en": "Complete resource-level deletion policy, soft delete and restore, controlled purge, retention-change audit and a resumable batch maintenance runtime."
-      },
+      "status": "implemented",
       "resourceLocks": [
         "admin-resource-contract",
         "admin-resource-api",
@@ -2239,8 +2231,31 @@
       ],
       "evidence": {
         "docs": [
+          "docs/platform-data-lifecycle-retention.md",
+          "docs/superpowers/specs/2026-07-14-data-lifecycle-retention-design.md",
+          "docs/superpowers/plans/2026-07-14-data-lifecycle-retention.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-data-lifecycle-retention.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs"
+        ],
+        "tests": [
+          "internal/platform/datalifecycle/runner_test.go",
+          "internal/platform/datalifecycle/gorm_repository_test.go",
+          "internal/platform/datalifecycle/adminresource_adapter_test.go",
+          "internal/platform/datalifecycle/adminresource_gorm_applier_test.go",
+          "internal/platform/bootstrap/data_lifecycle_test.go",
+          "internal/platform/bootstrap/data_lifecycle_scheduler_test.go",
+          "cmd/platform-admin/main_test.go",
+          "cmd/platform-api/main_test.go",
+          "scripts/platform-data-lifecycle-retention.test.mjs"
+        ],
+        "checks": [
+          "rtk go test ./internal/platform/datalifecycle ./internal/platform/bootstrap ./cmd/platform-admin ./cmd/platform-api",
+          "rtk node --test scripts/platform-data-lifecycle-retention.test.mjs",
+          "rtk node scripts/validate-platform-data-lifecycle-retention.mjs"
         ]
       }
     },

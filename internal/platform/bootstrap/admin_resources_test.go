@@ -174,7 +174,8 @@ func bootstrapProtectedManifests() []capability.Manifest {
 		ID: "protected-bootstrap-test",
 		Admin: capability.AdminSurface{Resources: []capability.AdminResource{{
 			Resource: "protected-bootstrap-records", Title: capability.Text("受保护记录", "Protected Records"), Description: capability.Text("测试。", "Test."),
-			PermissionPrefix: "admin:protected-bootstrap", Protection: &capability.AdminResourceProtection{SchemaVersion: 1, Scope: "global"},
+			PermissionPrefix: "admin:protected-bootstrap", Deletion: &capability.AdminResourceDeletionPolicy{Mode: capability.AdminDeletionSoftDelete, PolicyVersion: 1},
+			Protection: &capability.AdminResourceProtection{SchemaVersion: 1, Scope: "global"},
 			Fields: []capability.AdminField{
 				{Key: "code", Label: capability.Text("编码", "Code"), Type: "text", Source: "record", Required: true, InForm: true},
 				{Key: "name", Label: capability.Text("名称", "Name"), Type: "text", Source: "record", Required: true, InForm: true},
@@ -208,9 +209,10 @@ func (bootstrapAdminResourceDriver) Open(name string) (driver.Conn, error) {
 }
 
 type bootstrapAdminResourceState struct {
-	mu      sync.Mutex
-	nextID  string
-	records []bootstrapAdminResourceRecord
+	mu       sync.Mutex
+	nextID   string
+	revision string
+	records  []bootstrapAdminResourceRecord
 }
 
 type bootstrapAdminResourceRecord struct {
@@ -237,8 +239,13 @@ func (c *bootstrapAdminResourceConn) Close() error {
 }
 
 func (c *bootstrapAdminResourceConn) Begin() (driver.Tx, error) {
-	return nil, driver.ErrSkip
+	return bootstrapAdminResourceTx{}, nil
 }
+
+type bootstrapAdminResourceTx struct{}
+
+func (bootstrapAdminResourceTx) Commit() error   { return nil }
+func (bootstrapAdminResourceTx) Rollback() error { return nil }
 
 func (c *bootstrapAdminResourceConn) Exec(query string, args []driver.Value) (driver.Result, error) {
 	c.state.mu.Lock()
@@ -249,11 +256,31 @@ func (c *bootstrapAdminResourceConn) Exec(query string, args []driver.Value) (dr
 	case strings.Contains(query, "DELETE FROM platform_admin_resource_records"):
 		c.state.records = nil
 		return driver.RowsAffected(1), nil
+	case strings.Contains(query, "DELETE FROM platform_admin_resource_lifecycle"):
+		return driver.RowsAffected(0), nil
 	case strings.Contains(query, "DELETE FROM platform_admin_resource_state"):
-		c.state.nextID = ""
+		if len(args) > 0 {
+			switch fmt.Sprint(args[0]) {
+			case "next_id":
+				c.state.nextID = ""
+			case "revision":
+				c.state.revision = ""
+			}
+		}
+		return driver.RowsAffected(1), nil
+	case strings.Contains(query, "UPDATE platform_admin_resource_state"):
+		if len(args) != 3 || fmt.Sprint(args[1]) != "revision" || c.state.revision != fmt.Sprint(args[2]) {
+			return driver.RowsAffected(0), nil
+		}
+		c.state.revision = fmt.Sprint(args[0])
 		return driver.RowsAffected(1), nil
 	case strings.Contains(query, "INSERT INTO platform_admin_resource_state"):
-		c.state.nextID = fmt.Sprint(args[1])
+		switch fmt.Sprint(args[0]) {
+		case "next_id":
+			c.state.nextID = fmt.Sprint(args[1])
+		case "revision":
+			c.state.revision = fmt.Sprint(args[1])
+		}
 		return driver.RowsAffected(1), nil
 	case strings.Contains(query, "INSERT INTO platform_admin_resource_records"):
 		c.state.records = append(c.state.records, bootstrapAdminResourceRecord{
@@ -277,10 +304,24 @@ func (c *bootstrapAdminResourceConn) Query(query string, args []driver.Value) (d
 	defer c.state.mu.Unlock()
 	if strings.Contains(query, "platform_admin_resource_state") {
 		values := [][]driver.Value{}
-		if c.state.nextID != "" {
-			values = append(values, []driver.Value{c.state.nextID})
+		if len(args) > 0 {
+			var value string
+			switch fmt.Sprint(args[0]) {
+			case "next_id":
+				value = c.state.nextID
+			case "revision":
+				value = c.state.revision
+			}
+			if value != "" {
+				values = append(values, []driver.Value{value})
+			}
 		}
 		return &bootstrapAdminResourceRows{columns: []string{"value"}, values: values}, nil
+	}
+	if strings.Contains(query, "platform_admin_resource_lifecycle") {
+		return &bootstrapAdminResourceRows{
+			columns: []string{"resource", "record_id", "deleted_at", "deleted_by", "delete_reason", "purge_after", "deletion_policy_version"},
+		}, nil
 	}
 	values := make([][]driver.Value, 0, len(c.state.records))
 	for _, record := range c.state.records {

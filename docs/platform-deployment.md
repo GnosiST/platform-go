@@ -47,21 +47,21 @@ The repository includes a standard adapter package for this topology:
 - `deploy/nginx/platform.conf`: serves `admin/dist` and proxies `/api/` to the Go service; file bytes are never exposed through a static alias;
 - `deploy/env/production.example.env`: production environment template with `demo-data` removed, demo auth disabled, bounded upload policy, private S3 encryption policy and the optional `admin-oidc` provider configuration declared.
 
-Use the package as a reviewable starting point:
+Copy `deploy/env/production.example.env` to a private environment file and replace every required placeholder before running Compose. Use the package as a reviewable starting point:
 
 ```bash
 rtk node scripts/validate-platform-production-env.mjs
 rtk node scripts/validate-platform-objective-conformance.mjs
-rtk docker compose -f deploy/compose/docker-compose.prod.yml --env-file deploy/env/production.example.env config
+rtk docker compose -f deploy/compose/docker-compose.prod.yml --env-file <private-production-env> config
 rtk node scripts/run-platform-production-preflight.mjs --command production-env-audit --strict-env-file <private-production-env> --run
 rtk docker compose -f deploy/compose/docker-compose.prod.yml --env-file <private-production-env> up --build -d
 ```
 
-Copy `deploy/env/production.example.env` to a private environment file before deployment. Replace every secret, keep `PLATFORM_CAPABILITIES` business-neutral, and do not re-add `demo-data` in production. When `admin-oidc` is enabled, run the stdin-only `platform-admin bind-admin-oidc` procedure in `docs/platform-auth.md` against the same Admin store before starting the demo-disabled API.
+Keep `PLATFORM_CAPABILITIES` business-neutral, and do not re-add `demo-data` in production. When `admin-oidc` is enabled, run the stdin-only `platform-admin bind-admin-oidc` procedure in `docs/platform-auth.md` against the same Admin store before starting the demo-disabled API.
 
 File content is delivered only through the authenticated Admin or App content endpoints. Do not add an Nginx `/uploads` location, point an Nginx `alias` or `root` at upload storage, mount any volume into the Admin proxy, or configure a public file URL. The deployment topology validator parses Compose as YAML and inspects active service mappings; commented examples do not count as runtime configuration. `PLATFORM_HTTP_MAX_BODY_BYTES` is applied to every request body except valid multipart requests on the two declared file-upload paths, which remain governed by `PLATFORM_FILE_MAX_UPLOAD_BYTES` and the MIME allowlist. Declared, detected and allowed MIME values are compared by their canonical base media type after `mime.ParseMediaType`, so parameters such as `charset` are not compared directly. Object keys are cryptographically random opaque identifiers and never include the original filename. S3 deployments must use HTTPS and explicitly select `AES256` or `aws:kms`; `aws:kms` also requires `PLATFORM_FILE_STORAGE_S3_KMS_KEY_ID`. Before promotion, operators must independently verify bucket-level Block Public Access and private bucket policy. The application configures `PutObject` encryption and no public ACL, but it does not claim to inspect external bucket policy.
 
-File deletion is a recoverable tombstone/outbox flow, not a direct metadata delete. The API atomically stores `deletionState=pending`, `deletionRequestedAt` and a redacted `file.delete.request` audit before calling object storage. Tombstoned files disappear immediately from list/query/content access while the internal object reference remains available for idempotent cleanup retry. Missing objects count as cleanup success; other object-delete failures retain the tombstone. Metadata is purged with the completion audit only after object deletion succeeds.
+File deletion is a recoverable lifecycle tombstone flow, not an immediate object or metadata delete. The API atomically records lifecycle metadata and a redacted delete audit, then hides the file from list/query/content access for its declared restore window while retaining the internal object reference. The maintenance runner later claims cleanup, deletes or confirms the object missing, durably records cleanup completion and only then purges metadata. Other object-store failures keep the tombstone and retry state. Object deletion cannot share the database transaction, so persistent cleanup state provides restart recovery; this capability is not a backup or general archive service.
 
 ### Split Admin And API
 
@@ -128,6 +128,10 @@ PLATFORM_SESSION_DRIVER=mysql
 PLATFORM_SESSION_DSN=<dsn>
 PLATFORM_LIFECYCLE_HISTORY_DRIVER=mysql
 PLATFORM_LIFECYCLE_HISTORY_DSN=<dsn>
+PLATFORM_RETENTION_RUNNER_ENABLED=false
+PLATFORM_RETENTION_RUNNER_INTERVAL=24h
+PLATFORM_RETENTION_RUNNER_BATCH_SIZE=100
+PLATFORM_RETENTION_RUNNER_MAX_RETRIES=3
 PLATFORM_CACHE_DRIVER=redis
 PLATFORM_REDIS_ADDR=<host:port>
 PLATFORM_RATE_LIMIT_HMAC_KEY=<dedicated-at-least-32-byte-secret>
@@ -146,6 +150,8 @@ Data-protection settings are initialization-time compatibility contracts. `PLATF
 The standard env template contains recognizable placeholder material and passes only the non-strict shape check. Private production files must pass `--strict-secrets`. Do not commit real keyrings or print them in logs, traces, errors or audit records. `local-test` is limited to development/test. KMS/HSM providers remain future work. The implemented reveal flow is available only to manifest-declared encrypted fields after dedicated permission, active session, step-up policy and one-time grant checks.
 
 Historical plaintext migration is an offline maintenance workflow, not an API deployment step. MySQL and PostgreSQL remain production targets only after real driver/version integration rehearsal and certification evidence exists; SQLite is accepted only in development/test for local rehearsal and fails closed in staging/production. Oracle, Kingbase, file mutation and legacy SQL mutation are outside the certified boundary. Before migration, operators must create an external backup and retain isolated restore evidence; encrypted escrow is not a replacement. Follow [Sensitive Data Historical Migration Runbook](platform-sensitive-data-migration.md) for inventory, dry-run, prepare, apply, verify, restore rehearsal, rollback, resume and incident-stop procedures.
+
+Retention maintenance is also an explicit production operation. Leave `PLATFORM_RETENTION_RUNNER_ENABLED=false` until `platform-admin data-lifecycle --operation prepare` has created the reviewed state, the active policy has a completed impact and dry-run, and the exact current/proposed fingerprints have persisted promotion evidence. Enabling the scheduler requires the GORM-backed Admin resource store; memory and file-backed Admin stores are rejected. The runner defaults to `24h`, batch `100` and three retries and accepts only the default datasource. It performs no cross-datasource transaction, exposes no HTTP purge endpoint, provides no generic archive tier and does not replace database or object-storage backups. Oracle and KingbaseES remain uncertified.
 
 Production `PLATFORM_CAPABILITIES` must not be empty and must not include `demo-data`. Capability IDs are trimmed, must use lowercase letters, numbers and hyphens, and must not contain empty or duplicate comma-separated entries. Use `minimal-admin` for the smallest supported admin foundation, or include `admin-oidc` with complete OIDC configuration when OIDC is the Admin provider. The OIDC subject must enter only through `platform-admin bind-admin-oidc --subject-stdin`; API startup does not provision accounts or authorization relationships.
 

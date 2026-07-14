@@ -32,6 +32,10 @@ type Config struct {
 	LifecycleHistoryFile                string
 	LifecycleHistoryDriver              string
 	LifecycleHistoryDSN                 string
+	RetentionRunnerEnabled              bool
+	RetentionRunnerInterval             time.Duration
+	RetentionRunnerBatchSize            int
+	RetentionRunnerMaxRetries           int
 	DatabaseDriver                      string
 	DatabaseDSN                         string
 	OpenAPIFile                         string
@@ -80,6 +84,7 @@ type Config struct {
 	AdminStepUpPhoneVerifiedDigestField string
 	filePolicySource                    filePolicySource
 	transportPolicySource               transportPolicySource
+	retentionRunnerSource               retentionRunnerSource
 }
 
 type envConfigState uint8
@@ -102,6 +107,13 @@ type filePolicySource struct {
 type transportPolicySource struct {
 	loadedFromEnvironment bool
 	maxBodyBytes          envConfigState
+}
+
+type retentionRunnerSource struct {
+	enabled    envConfigState
+	interval   envConfigState
+	batchSize  envConfigState
+	maxRetries envConfigState
 }
 
 var defaultCapabilities = []string{
@@ -130,6 +142,13 @@ const (
 	defaultJWTSecret   = "dev-platform-go-secret"
 	maxFileUploadBytes = int64(100 << 20)
 	maxHTTPBodyBytes   = int64(100 << 20)
+
+	defaultRetentionRunnerInterval   = 24 * time.Hour
+	defaultRetentionRunnerBatchSize  = 100
+	defaultRetentionRunnerMaxRetries = 3
+	maximumRetentionRunnerInterval   = 30 * 24 * time.Hour
+	maximumRetentionRunnerBatchSize  = 1000
+	maximumRetentionRunnerRetries    = 5
 )
 
 var defaultFileAllowedMIMETypes = []string{"application/pdf", "image/jpeg", "image/png", "text/plain"}
@@ -139,6 +158,10 @@ func Load() Config {
 	fileAllowedMIMETypes, fileAllowedMIMETypesState := csvEnvWithState("PLATFORM_FILE_ALLOWED_MIME_TYPES", defaultFileAllowedMIMETypes)
 	fileS3Encryption, fileS3EncryptionState := envWithState("PLATFORM_FILE_STORAGE_S3_SERVER_SIDE_ENCRYPTION", "AES256")
 	httpMaxBodyBytes, httpMaxBodyBytesState := int64EnvWithState("PLATFORM_HTTP_MAX_BODY_BYTES", 1<<20)
+	retentionRunnerEnabled, retentionRunnerEnabledState := boolEnvWithState("PLATFORM_RETENTION_RUNNER_ENABLED", false)
+	retentionRunnerInterval, retentionRunnerIntervalState := durationEnvWithState("PLATFORM_RETENTION_RUNNER_INTERVAL", defaultRetentionRunnerInterval)
+	retentionRunnerBatchSize, retentionRunnerBatchSizeState := intEnvWithState("PLATFORM_RETENTION_RUNNER_BATCH_SIZE", defaultRetentionRunnerBatchSize)
+	retentionRunnerMaxRetries, retentionRunnerMaxRetriesState := intEnvWithState("PLATFORM_RETENTION_RUNNER_MAX_RETRIES", defaultRetentionRunnerMaxRetries)
 	return Config{
 		RuntimeEnvironment:                  strings.ToLower(env("PLATFORM_RUNTIME_ENV", RuntimeEnvironmentDevelopment)),
 		HTTPAddr:                            env("PLATFORM_HTTP_ADDR", "127.0.0.1:9200"),
@@ -156,6 +179,10 @@ func Load() Config {
 		LifecycleHistoryFile:                env("PLATFORM_LIFECYCLE_HISTORY_FILE", ""),
 		LifecycleHistoryDriver:              env("PLATFORM_LIFECYCLE_HISTORY_DRIVER", ""),
 		LifecycleHistoryDSN:                 env("PLATFORM_LIFECYCLE_HISTORY_DSN", ""),
+		RetentionRunnerEnabled:              retentionRunnerEnabled,
+		RetentionRunnerInterval:             retentionRunnerInterval,
+		RetentionRunnerBatchSize:            retentionRunnerBatchSize,
+		RetentionRunnerMaxRetries:           retentionRunnerMaxRetries,
 		DatabaseDriver:                      env("PLATFORM_DATABASE_DRIVER", "mysql"),
 		DatabaseDSN:                         env("PLATFORM_DATABASE_DSN", ""),
 		OpenAPIFile:                         env("PLATFORM_OPENAPI_FILE", "resources/generated/openapi.admin.json"),
@@ -211,6 +238,10 @@ func Load() Config {
 		transportPolicySource: transportPolicySource{
 			loadedFromEnvironment: true,
 			maxBodyBytes:          httpMaxBodyBytesState,
+		},
+		retentionRunnerSource: retentionRunnerSource{
+			enabled: retentionRunnerEnabledState, interval: retentionRunnerIntervalState,
+			batchSize: retentionRunnerBatchSizeState, maxRetries: retentionRunnerMaxRetriesState,
 		},
 	}
 }
@@ -268,6 +299,30 @@ func (c Config) ValidateRuntime() error {
 	errs = append(errs, validateDriverPair("admin resource", c.AdminResourceDriver, c.AdminResourceDSN)...)
 	errs = append(errs, validateDriverPair("session", c.SessionDriver, c.SessionDSN)...)
 	errs = append(errs, validateDriverPair("lifecycle history", c.LifecycleHistoryDriver, c.LifecycleHistoryDSN)...)
+	for key, state := range map[string]envConfigState{
+		"PLATFORM_RETENTION_RUNNER_ENABLED":     c.retentionRunnerSource.enabled,
+		"PLATFORM_RETENTION_RUNNER_INTERVAL":    c.retentionRunnerSource.interval,
+		"PLATFORM_RETENTION_RUNNER_BATCH_SIZE":  c.retentionRunnerSource.batchSize,
+		"PLATFORM_RETENTION_RUNNER_MAX_RETRIES": c.retentionRunnerSource.maxRetries,
+	} {
+		if state == envConfigInvalid {
+			errs = append(errs, fmt.Errorf("%s is invalid", key))
+		}
+	}
+	if c.RetentionRunnerEnabled {
+		if !isGORMDriver(c.AdminResourceDriver) || strings.TrimSpace(c.AdminResourceDSN) == "" || strings.TrimSpace(c.AdminResourceFile) != "" {
+			errs = append(errs, errors.New("PLATFORM_RETENTION_RUNNER_ENABLED requires persistent GORM Admin resource storage and no file repository"))
+		}
+		if c.RetentionRunnerInterval < time.Minute || c.RetentionRunnerInterval > maximumRetentionRunnerInterval {
+			errs = append(errs, errors.New("PLATFORM_RETENTION_RUNNER_INTERVAL must be between 1m and 720h"))
+		}
+		if c.RetentionRunnerBatchSize < 1 || c.RetentionRunnerBatchSize > maximumRetentionRunnerBatchSize {
+			errs = append(errs, errors.New("PLATFORM_RETENTION_RUNNER_BATCH_SIZE must be between 1 and 1000"))
+		}
+		if c.RetentionRunnerMaxRetries < 0 || c.RetentionRunnerMaxRetries > maximumRetentionRunnerRetries {
+			errs = append(errs, errors.New("PLATFORM_RETENTION_RUNNER_MAX_RETRIES must be between 0 and 5"))
+		}
+	}
 
 	if c.CacheDriver != "" && c.CacheDriver != "memory" && c.CacheDriver != "redis" {
 		errs = append(errs, fmt.Errorf("unsupported cache driver %q", c.CacheDriver))
@@ -818,6 +873,18 @@ func durationEnv(key string, fallback time.Duration) time.Duration {
 	return parsed
 }
 
+func durationEnvWithState(key string, fallback time.Duration) (time.Duration, envConfigState) {
+	value, state := envWithState(key, "")
+	if state != envConfigPresent {
+		return fallback, state
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		return fallback, envConfigInvalid
+	}
+	return parsed, envConfigPresent
+}
+
 func intEnv(key string, fallback int) int {
 	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
@@ -828,6 +895,18 @@ func intEnv(key string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func intEnvWithState(key string, fallback int) (int, envConfigState) {
+	value, state := envWithState(key, "")
+	if state != envConfigPresent {
+		return fallback, state
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback, envConfigInvalid
+	}
+	return parsed, envConfigPresent
 }
 
 func envWithState(key string, fallback string) (string, envConfigState) {
@@ -877,4 +956,16 @@ func boolEnv(key string, fallback bool) bool {
 		return fallback
 	}
 	return parsed
+}
+
+func boolEnvWithState(key string, fallback bool) (bool, envConfigState) {
+	value, state := envWithState(key, "")
+	if state != envConfigPresent {
+		return fallback, state
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return fallback, envConfigInvalid
+	}
+	return parsed, envConfigPresent
 }

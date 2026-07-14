@@ -8,7 +8,6 @@
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "businessReferenceMode": "reference-only",
     "requiredControlledUnfinishedNodes": [
-      "data-lifecycle-retention",
       "multi-datasource-contract-and-runtime",
       "database-certification-matrix",
       "integration-ports-disabled-default",
@@ -26,8 +25,8 @@
   },
   "taskSummary": {
     "expectedTotal": 53,
-    "expectedImplemented": 43,
-    "expectedControlledUnfinished": 10
+    "expectedImplemented": 44,
+    "expectedControlledUnfinished": 9
   },
   "requirements": [
     {

@@ -29,7 +29,7 @@ func (s *Store) MenuItemsForPrincipal(principal rbac.Principal) []MenuItem {
 	defer s.mu.Unlock()
 	policy := rbac.NewPolicySetWithDeny(principal.Permissions, principal.DeniedPermissions)
 	items := make([]MenuItem, 0)
-	for _, record := range s.resources["menus"] {
+	for _, record := range visibleRecords("menus", s.resources["menus"]) {
 		if record.Status == "disabled" {
 			continue
 		}

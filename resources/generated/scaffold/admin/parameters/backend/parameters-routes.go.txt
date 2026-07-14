@@ -8,6 +8,7 @@ package httpapi
 
 // DELETE /api/admin/resources/parameters/:id -> admin:parameter:delete
 // POST /api/admin/resources/parameters -> admin:parameter:create
+// POST /api/admin/resources/parameters/:id/restore -> admin:parameter:restore
 // POST /api/admin/resources/parameters/query -> admin:parameter:read
 // PUT /api/admin/resources/parameters/:id -> admin:parameter:update
 

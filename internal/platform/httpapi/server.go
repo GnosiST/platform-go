@@ -30,45 +30,45 @@ import (
 	"platform-go/internal/platform/dataprotection"
 	"platform-go/internal/platform/ratelimit"
 	"platform-go/internal/platform/rbac"
-	"platform-go/internal/platform/session"
 	"platform-go/internal/platform/sensitivereveal"
+	"platform-go/internal/platform/session"
 	"platform-go/internal/platform/storage"
 )
 
 type ServerOptions struct {
-	Capabilities            []capability.Manifest
-	Resources               *adminresource.Store
-	DataProtection          dataprotection.Runtime
-	Sessions                *session.Store
-	Cache                   cache.Store
-	InvalidationBus         cache.InvalidationBus
-	CacheTTL                time.Duration
-	FileStorage             storage.ObjectStore
-	UploadPolicy            UploadPolicy
-	InternalErrorSink       InternalErrorSink
-	FileCleanupSink         FileCleanupSink
-	AdminRoutes             []AdminRouteRegistration
-	AppRoutes               []AppRouteRegistration
-	AdminIdentityResolver   AdminIdentityResolver
-	AdminIdentityBindings   AdminIdentityBindingStore
-	AppIdentityResolver     AppIdentityResolver
-	AppIdentityBindings     AppIdentityBindingStore
-	PhoneProtector          PhoneProtector
-	PhoneVerificationSender PhoneVerificationSender
+	Capabilities             []capability.Manifest
+	Resources                *adminresource.Store
+	DataProtection           dataprotection.Runtime
+	Sessions                 *session.Store
+	Cache                    cache.Store
+	InvalidationBus          cache.InvalidationBus
+	CacheTTL                 time.Duration
+	FileStorage              storage.ObjectStore
+	UploadPolicy             UploadPolicy
+	InternalErrorSink        InternalErrorSink
+	FileCleanupSink          FileCleanupSink
+	AdminRoutes              []AdminRouteRegistration
+	AppRoutes                []AppRouteRegistration
+	AdminIdentityResolver    AdminIdentityResolver
+	AdminIdentityBindings    AdminIdentityBindingStore
+	AppIdentityResolver      AppIdentityResolver
+	AppIdentityBindings      AppIdentityBindingStore
+	PhoneProtector           PhoneProtector
+	PhoneVerificationSender  PhoneVerificationSender
 	AdminStepUpPhoneResolver AdminStepUpPhoneResolver
-	SensitiveReveal         *sensitivereveal.Runtime
-	DebugCodeEnabled        bool
-	SessionTTL              time.Duration
-	JWTSecret               string
-	OpenAPIDocument         []byte
-	TokenService            *authjwt.Service
-	Now                     func() time.Time
-	Authorizer              Authorizer
-	AllowInsecureHeaderAuth bool
-	DisableDemoAuthProvider bool
-	Security                SecurityOptions
-	RateLimiter             ratelimit.Limiter
-	RateLimitKeyBuilder     *ratelimit.KeyBuilder
+	SensitiveReveal          *sensitivereveal.Runtime
+	DebugCodeEnabled         bool
+	SessionTTL               time.Duration
+	JWTSecret                string
+	OpenAPIDocument          []byte
+	TokenService             *authjwt.Service
+	Now                      func() time.Time
+	Authorizer               Authorizer
+	AllowInsecureHeaderAuth  bool
+	DisableDemoAuthProvider  bool
+	Security                 SecurityOptions
+	RateLimiter              ratelimit.Limiter
+	RateLimitKeyBuilder      *ratelimit.KeyBuilder
 }
 
 type Authorizer interface {
@@ -98,38 +98,38 @@ type FileCleanupSink interface {
 }
 
 type Server struct {
-	router                  *gin.Engine
-	capabilities            []capability.Manifest
-	resources               *adminresource.Store
-	sessions                *session.Store
-	cache                   cache.Store
-	invalidationBus         cache.InvalidationBus
-	cacheStats              cache.StatsProvider
-	cacheTTL                time.Duration
-	fileStorage             storage.ObjectStore
-	uploadPolicy            UploadPolicy
-	internalErrorSink       InternalErrorSink
-	fileCleanupSink         FileCleanupSink
-	appRoutes               map[appRouteKey]gin.HandlerFunc
-	adminIdentityResolver   AdminIdentityResolver
-	adminIdentityBindings   AdminIdentityBindingStore
-	appIdentityResolver     AppIdentityResolver
-	appIdentityBindings     AppIdentityBindingStore
-	phoneProtector          PhoneProtector
-	phoneVerificationSender PhoneVerificationSender
+	router                   *gin.Engine
+	capabilities             []capability.Manifest
+	resources                *adminresource.Store
+	sessions                 *session.Store
+	cache                    cache.Store
+	invalidationBus          cache.InvalidationBus
+	cacheStats               cache.StatsProvider
+	cacheTTL                 time.Duration
+	fileStorage              storage.ObjectStore
+	uploadPolicy             UploadPolicy
+	internalErrorSink        InternalErrorSink
+	fileCleanupSink          FileCleanupSink
+	appRoutes                map[appRouteKey]gin.HandlerFunc
+	adminIdentityResolver    AdminIdentityResolver
+	adminIdentityBindings    AdminIdentityBindingStore
+	appIdentityResolver      AppIdentityResolver
+	appIdentityBindings      AppIdentityBindingStore
+	phoneProtector           PhoneProtector
+	phoneVerificationSender  PhoneVerificationSender
 	adminStepUpPhoneResolver AdminStepUpPhoneResolver
-	sensitiveReveal         *sensitivereveal.Runtime
-	debugCodeEnabled        bool
-	tokens                  *authjwt.Service
-	now                     func() time.Time
-	openAPIDocument         []byte
-	authorizer              Authorizer
-	policyMu                sync.Mutex
-	policyAuthorizer        Authorizer
-	allowInsecureHeaderAuth bool
-	disableDemoAuthProvider bool
-	rateLimiter             ratelimit.Limiter
-	rateLimitKeyBuilder     *ratelimit.KeyBuilder
+	sensitiveReveal          *sensitivereveal.Runtime
+	debugCodeEnabled         bool
+	tokens                   *authjwt.Service
+	now                      func() time.Time
+	openAPIDocument          []byte
+	authorizer               Authorizer
+	policyMu                 sync.Mutex
+	policyAuthorizer         Authorizer
+	allowInsecureHeaderAuth  bool
+	disableDemoAuthProvider  bool
+	rateLimiter              ratelimit.Limiter
+	rateLimitKeyBuilder      *ratelimit.KeyBuilder
 }
 
 const (
@@ -220,35 +220,35 @@ func New(options ServerOptions) *Server {
 		rateLimitKeyBuilder, _ = ratelimit.NewKeyBuilder([]byte(defaultRateLimitHMACKey))
 	}
 	server := &Server{
-		router:                  router,
-		capabilities:            options.Capabilities,
-		resources:               resources,
-		sessions:                sessions,
-		cache:                   cacheStore,
-		invalidationBus:         options.InvalidationBus,
-		cacheStats:              cacheStats,
-		cacheTTL:                cacheTTL,
-		fileStorage:             fileStorage,
-		uploadPolicy:            normalizeUploadPolicy(options.UploadPolicy),
-		internalErrorSink:       options.InternalErrorSink,
-		fileCleanupSink:         fileCleanupSink,
-		adminIdentityResolver:   options.AdminIdentityResolver,
-		adminIdentityBindings:   adminIdentityBindings,
-		appIdentityResolver:     options.AppIdentityResolver,
-		appIdentityBindings:     appIdentityBindings,
-		phoneProtector:          options.PhoneProtector,
-		phoneVerificationSender: options.PhoneVerificationSender,
+		router:                   router,
+		capabilities:             options.Capabilities,
+		resources:                resources,
+		sessions:                 sessions,
+		cache:                    cacheStore,
+		invalidationBus:          options.InvalidationBus,
+		cacheStats:               cacheStats,
+		cacheTTL:                 cacheTTL,
+		fileStorage:              fileStorage,
+		uploadPolicy:             normalizeUploadPolicy(options.UploadPolicy),
+		internalErrorSink:        options.InternalErrorSink,
+		fileCleanupSink:          fileCleanupSink,
+		adminIdentityResolver:    options.AdminIdentityResolver,
+		adminIdentityBindings:    adminIdentityBindings,
+		appIdentityResolver:      options.AppIdentityResolver,
+		appIdentityBindings:      appIdentityBindings,
+		phoneProtector:           options.PhoneProtector,
+		phoneVerificationSender:  options.PhoneVerificationSender,
 		adminStepUpPhoneResolver: options.AdminStepUpPhoneResolver,
-		sensitiveReveal:         options.SensitiveReveal,
-		debugCodeEnabled:        options.DebugCodeEnabled,
-		tokens:                  tokens,
-		now:                     now,
-		openAPIDocument:         append([]byte(nil), options.OpenAPIDocument...),
-		authorizer:              options.Authorizer,
-		allowInsecureHeaderAuth: options.AllowInsecureHeaderAuth,
-		disableDemoAuthProvider: options.DisableDemoAuthProvider,
-		rateLimiter:             rateLimiter,
-		rateLimitKeyBuilder:     rateLimitKeyBuilder,
+		sensitiveReveal:          options.SensitiveReveal,
+		debugCodeEnabled:         options.DebugCodeEnabled,
+		tokens:                   tokens,
+		now:                      now,
+		openAPIDocument:          append([]byte(nil), options.OpenAPIDocument...),
+		authorizer:               options.Authorizer,
+		allowInsecureHeaderAuth:  options.AllowInsecureHeaderAuth,
+		disableDemoAuthProvider:  options.DisableDemoAuthProvider,
+		rateLimiter:              rateLimiter,
+		rateLimitKeyBuilder:      rateLimitKeyBuilder,
 	}
 	server.appRoutes = server.defaultAppRouteHandlers(options.AppRoutes)
 	server.subscribeInvalidations()
@@ -294,6 +294,7 @@ func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 	adminResources.POST("/:resource", s.adminResourceCreate)
 	adminResources.PUT("/:resource/:id", s.adminResourceUpdate)
 	adminResources.DELETE("/:resource/:id", s.adminResourceDelete)
+	adminResources.POST("/:resource/:id/restore", s.adminResourceRestore)
 	adminResources.GET("/:resource/:id/fields/:field/reveal-policy", s.adminSensitiveRevealPolicy)
 	adminResources.POST("/:resource/:id/fields/:field/reveal/challenges", s.adminSensitiveRevealChallenge)
 	adminResources.POST("/:resource/:id/fields/:field/reveal/challenges/:challenge/factors/oidc/start", s.adminSensitiveRevealOIDCStart)
@@ -1310,6 +1311,70 @@ func (s *Server) adminResourceDelete(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, Response[gin.H]{Data: gin.H{"resource": resource, "deleted": true}})
 }
 
+func (s *Server) adminResourceRestore(ctx *gin.Context) {
+	resource := ctx.Param("resource")
+	principal, hasPrincipal, ok := s.authorizeAdminResourcePrincipal(ctx, resource, "restore")
+	if !ok {
+		return
+	}
+	if hasPrincipal {
+		if _, err := s.resources.InternalRecordForPrincipal(resource, ctx.Param("id"), principal); err != nil {
+			writeAdminResourceError(ctx, err)
+			return
+		}
+	}
+	if resource == "files" {
+		s.restoreAdminFile(ctx, ctx.Param("id"))
+		return
+	}
+	result, err := s.resources.RestoreWithAudit(resource, ctx.Param("id"), s.mutationAuditEvent(ctx, "admin_resource.restore", resource, "restored"))
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
+	s.invalidateCachesForResource(ctx.Request.Context(), resource)
+	ctx.JSON(http.StatusOK, Response[gin.H]{Data: gin.H{
+		"resource": resource,
+		"restored": true,
+		"record":   result.Record,
+	}})
+}
+
+func (s *Server) restoreAdminFile(ctx *gin.Context, id string) {
+	record, err := s.resources.InternalRecord("files", id)
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
+	key := fileStorageKey(record)
+	if key == "" {
+		writeFileError(ctx, http.StatusConflict, "ADMIN_FILE_RESTORE_UNAVAILABLE", "file restore is unavailable")
+		return
+	}
+	body, err := s.fileStorage.Open(ctx.Request.Context(), key)
+	if errors.Is(err, storage.ErrObjectNotFound) {
+		writeFileError(ctx, http.StatusConflict, "ADMIN_FILE_RESTORE_UNAVAILABLE", "file restore is unavailable")
+		return
+	}
+	if err != nil {
+		s.recordInternalError(ctx, "ADMIN_FILE_RESTORE_FAILED", err)
+		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_RESTORE_FAILED", "file restore failed")
+		return
+	}
+	_ = body.Close()
+	result, err := s.resources.RestoreWithAudit("files", id, s.mutationAuditEvent(ctx, "file.restore", "files", "restored"))
+	if err != nil {
+		writeAdminResourceError(ctx, err)
+		return
+	}
+	s.invalidateCachesForResource(ctx.Request.Context(), "files")
+	ctx.JSON(http.StatusOK, Response[gin.H]{Data: gin.H{
+		"resource": "files",
+		"restored": true,
+		"record":   result.Record,
+	}})
+}
+
 func (s *Server) adminFileUpload(ctx *gin.Context) {
 	if !s.authorizeAdminResource(ctx, "files", "create") {
 		return
@@ -1544,23 +1609,13 @@ func (s *Server) deleteAdminFile(ctx *gin.Context, id string) {
 		writeAdminResourceError(ctx, err)
 		return
 	}
-	record := mutation.Record
 	s.invalidateCachesForResource(ctx.Request.Context(), "files")
-	key := fileStorageKey(record)
-	if key != "" {
-		err = s.fileStorage.Delete(ctx.Request.Context(), key)
-	}
-	if err != nil && !errors.Is(err, storage.ErrObjectNotFound) {
-		s.recordInternalError(ctx, "ADMIN_FILE_DELETE_FAILED", err)
-		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_DELETE_FAILED", "file delete failed")
-		return
-	}
-	if _, err := s.resources.PurgeTombstonedFileWithAudit(id, s.mutationAuditEvent(ctx, "file.delete", "files", "deleted")); err != nil {
-		writeAdminResourceError(ctx, err)
-		return
-	}
-	s.invalidateCachesForResource(ctx.Request.Context(), "files")
-	ctx.JSON(http.StatusOK, Response[gin.H]{Data: gin.H{"resource": "files", "deleted": true}})
+	ctx.JSON(http.StatusOK, Response[gin.H]{Data: gin.H{
+		"resource":   "files",
+		"deleted":    true,
+		"mode":       capability.AdminDeletionTombstone,
+		"purgeAfter": mutation.Record.PurgeAfter,
+	}})
 }
 
 func (s *Server) adminResourceRecordByID(resource string, id string) (adminresource.Record, error) {
@@ -2255,6 +2310,10 @@ func permissionForAction(permissions adminresource.ActionPermissions, action str
 		return permissions.Update
 	case "delete":
 		return permissions.Delete
+	case "restore":
+		return permissions.Restore
+	case "purge":
+		return permissions.Purge
 	default:
 		return ""
 	}
@@ -2577,6 +2636,18 @@ func writeAdminResourceError(ctx *gin.Context, err error) {
 		status = http.StatusConflict
 		code = "ADMIN_RESOURCE_REVISION_CONFLICT"
 		message = "admin resource revision conflict"
+	case errors.Is(err, adminresource.ErrDeletionDisabled),
+		errors.Is(err, adminresource.ErrDeletionRequiresAdapter),
+		errors.Is(err, adminresource.ErrDeletionCleanupStarted),
+		errors.Is(err, adminresource.ErrRecordDeleted),
+		errors.Is(err, adminresource.ErrRecordNotDeleted),
+		errors.Is(err, adminresource.ErrRecordReferenced),
+		errors.Is(err, adminresource.ErrRestoreWindowExpired),
+		errors.Is(err, adminresource.ErrRetentionNotConfigured),
+		errors.Is(err, adminresource.ErrRetentionNotElapsed):
+		status = http.StatusConflict
+		code = "ADMIN_RESOURCE_LIFECYCLE_CONFLICT"
+		message = err.Error()
 	case errors.Is(err, adminresource.ErrInvalidRecord):
 		status = http.StatusBadRequest
 		code = "ADMIN_RESOURCE_INVALID_RECORD"

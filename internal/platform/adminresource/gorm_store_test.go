@@ -12,6 +12,19 @@ import (
 	"platform-go/internal/platform/storage"
 )
 
+func TestOpenGORMAdminResourceRepositoryDoesNotCreateSchema(t *testing.T) {
+	db, err := storage.OpenGORM(storage.Config{Driver: "sqlite", DSN: filepath.Join(t.TempDir(), "admin-open.db")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenGORMAdminResourceRepository(context.Background(), db); err == nil {
+		t.Fatal("OpenGORMAdminResourceRepository() error = nil, want missing schema failure")
+	}
+	if db.Migrator().HasTable(&gormAdminResourceRecord{}) {
+		t.Fatal("OpenGORMAdminResourceRepository() created schema")
+	}
+}
+
 func TestGORMAdminResourceRepositoryPersistsSnapshots(t *testing.T) {
 	db := openAdminResourceGORMDB(t)
 	repository, err := NewGORMAdminResourceRepository(context.Background(), db)
@@ -22,7 +35,10 @@ func TestGORMAdminResourceRepositoryPersistsSnapshots(t *testing.T) {
 		NextID: 1042,
 		Resources: map[string][]Record{
 			"tenants": {
-				{ID: "tenant-1042", Code: "acme", Name: "Acme Tenant", Status: "enabled", Description: "GORM tenant", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"isolation": "sandbox"}},
+				{
+					ID: "tenant-1042", Code: "acme", Name: "Acme Tenant", Status: "enabled", Description: "GORM tenant", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"isolation": "sandbox"},
+					DeletedAt: "2026-07-14T00:00:00Z", DeletedBy: "user-admin", DeleteReason: "retired", PurgeAfter: "2026-08-13T00:00:00Z", DeletionPolicyVersion: 1,
+				},
 			},
 			"roles": {
 				{ID: "role-operator", Code: "operator", Name: "Operator", Status: "enabled", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"permissions": "admin:user:read"}},

@@ -16,6 +16,7 @@ import (
 	"platform-go/internal/platform/bootstrap"
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/config"
+	"platform-go/internal/platform/datalifecycle"
 	"platform-go/internal/platform/dataprotection"
 	"platform-go/internal/platform/httpapi"
 	"platform-go/internal/platform/sensitivemigration"
@@ -24,6 +25,10 @@ import (
 const (
 	bindAdminOIDCCommand          = "bind-admin-oidc"
 	sensitiveDataMigrationCommand = "sensitive-data-migrate"
+	dataLifecycleCommand          = "data-lifecycle"
+	dataLifecyclePrepareOperation = "prepare"
+	dataLifecyclePromoteOperation = "promote"
+	maximumLifecyclePolicyBytes   = 1 << 20
 )
 
 type adminResourcesLoader func(config.Config, []capability.Manifest, dataprotection.Runtime) (*adminresource.Store, error)
@@ -36,6 +41,17 @@ type sensitiveMigrationSession interface {
 
 type sensitiveMigrationOpener func(config.Config, ...capability.Manifest) (sensitiveMigrationSession, error)
 
+type dataLifecycleSession interface {
+	Policy() datalifecycle.PolicySnapshot
+	PolicyFingerprint() string
+	Run(context.Context, datalifecycle.Options) (datalifecycle.Report, error)
+	Promote(context.Context, datalifecycle.PromotionRequest) (datalifecycle.Promotion, error)
+	Close() error
+}
+
+type dataLifecyclePreparer func(context.Context, config.Config) error
+type dataLifecycleOpener func(config.Config, ...capability.Manifest) (dataLifecycleSession, error)
+
 func main() {
 	if err := run(context.Background(), os.Args[1:], os.Stdin, os.Stdout, os.Stderr, config.Load); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
@@ -44,9 +60,12 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, loadConfig func() config.Config) error {
-	return runWithDependencies(ctx, args, stdin, stdout, stderr, loadConfig, bootstrap.AdminResourcesFromConfig,
+	return runWithPlatformDependencies(ctx, args, stdin, stdout, stderr, loadConfig, bootstrap.AdminResourcesFromConfig,
 		func(cfg config.Config, manifests ...capability.Manifest) (sensitiveMigrationSession, error) {
 			return bootstrap.OpenSensitiveDataMigration(cfg, manifests...)
+		}, bootstrap.PrepareDataLifecycle,
+		func(cfg config.Config, manifests ...capability.Manifest) (dataLifecycleSession, error) {
+			return bootstrap.OpenDataLifecycle(cfg, manifests...)
 		})
 }
 
@@ -59,16 +78,26 @@ func runWithAdminResources(ctx context.Context, args []string, stdin io.Reader, 
 }
 
 func runWithDependencies(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, loadConfig func() config.Config, loadAdminResources adminResourcesLoader, openSensitiveMigration sensitiveMigrationOpener) error {
+	return runWithPlatformDependencies(ctx, args, stdin, stdout, stderr, loadConfig, loadAdminResources, openSensitiveMigration,
+		bootstrap.PrepareDataLifecycle,
+		func(cfg config.Config, manifests ...capability.Manifest) (dataLifecycleSession, error) {
+			return bootstrap.OpenDataLifecycle(cfg, manifests...)
+		})
+}
+
+func runWithPlatformDependencies(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, loadConfig func() config.Config, loadAdminResources adminResourcesLoader, openSensitiveMigration sensitiveMigrationOpener, prepareDataLifecycle dataLifecyclePreparer, openDataLifecycle dataLifecycleOpener) error {
 	if len(args) == 0 {
-		return errors.New("expected bind-admin-oidc or sensitive-data-migrate command")
+		return errors.New("expected bind-admin-oidc, sensitive-data-migrate, or data-lifecycle command")
 	}
 	switch args[0] {
 	case bindAdminOIDCCommand:
 		return runBindAdminOIDC(ctx, args, stdin, stdout, loadConfig, loadAdminResources)
 	case sensitiveDataMigrationCommand:
 		return runSensitiveDataMigration(ctx, args, stdout, stderr, loadConfig, openSensitiveMigration)
+	case dataLifecycleCommand:
+		return runDataLifecycle(ctx, args, stdout, stderr, loadConfig, prepareDataLifecycle, openDataLifecycle)
 	default:
-		return errors.New("expected bind-admin-oidc or sensitive-data-migrate command")
+		return errors.New("expected bind-admin-oidc, sensitive-data-migrate, or data-lifecycle command")
 	}
 }
 
@@ -222,6 +251,369 @@ func runSensitiveDataMigration(ctx context.Context, args []string, stdout, stder
 	closed = true
 	if closeErr != nil {
 		return errors.New("close sensitive data migration storage")
+	}
+	return nil
+}
+
+type lifecycleOperationOutput struct {
+	Operation string `json:"operation"`
+	Status    string `json:"status"`
+}
+
+type lifecyclePromotionOutput struct {
+	Operation           string    `json:"operation"`
+	Status              string    `json:"status"`
+	DatasourceID        string    `json:"datasourceId"`
+	CurrentFingerprint  string    `json:"currentFingerprint"`
+	PromotedFingerprint string    `json:"promotedFingerprint"`
+	ImpactReportHash    string    `json:"impactReportHash"`
+	PromotedAt          time.Time `json:"promotedAt"`
+}
+
+func runDataLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer, loadConfig func() config.Config, prepareDataLifecycle dataLifecyclePreparer, openDataLifecycle dataLifecycleOpener) error {
+	_ = stderr
+	flags := flag.NewFlagSet(dataLifecycleCommand, flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	operation := flags.String("operation", "", "maintenance operation")
+	runID := flags.String("run-id", "", "immutable maintenance run ID")
+	dryRunID := flags.String("dry-run-id", "", "completed dry-run ID approved for apply")
+	owner := flags.String("owner", "", "maintenance lease owner ID")
+	batchSize := flags.Int("batch-size", datalifecycle.DefaultBatchSize, "maintenance batch size")
+	maxRetries := flags.Int("max-retries", 0, "bounded retry count")
+	currentPolicyFile := flags.String("current-policy-file", "", "reviewed current policy JSON file")
+	promotedFingerprint := flags.String("promoted-fingerprint", "", "exact proposed policy fingerprint")
+	impactReportHash := flags.String("impact-report-hash", "", "immutable impact report hash")
+	actor := flags.String("actor", "", "operator actor ID")
+	reason := flags.String("reason", "", "approved promotion reason")
+	approvalRef := flags.String("approval-ref", "", "approval reference")
+	confirmApply := flags.Bool("confirm-apply", false, "confirm destructive apply")
+	if err := flags.Parse(args[1:]); err != nil {
+		return errors.New("invalid data-lifecycle arguments")
+	}
+	if len(flags.Args()) != 0 || !validDataLifecycleOperation(*operation) ||
+		*batchSize < 1 || *batchSize > datalifecycle.MaximumBatchSize || *maxRetries < 0 || *maxRetries > datalifecycle.MaximumRetries ||
+		!dataLifecycleFlagsAllowed(flags, *operation) {
+		return errors.New("invalid data-lifecycle arguments")
+	}
+	if loadConfig == nil {
+		return errors.New("data lifecycle bootstrap is unavailable")
+	}
+
+	if *operation == dataLifecyclePrepareOperation {
+		if prepareDataLifecycle == nil {
+			return errors.New("data lifecycle bootstrap is unavailable")
+		}
+		if err := prepareDataLifecycle(ctx, loadConfig()); err != nil {
+			return errors.New("data lifecycle prepare failed")
+		}
+		return encodeDataLifecycleJSON(stdout, lifecycleOperationOutput{Operation: *operation, Status: datalifecycle.StatusCompleted})
+	}
+	if *operation == string(datalifecycle.ModeApply) && !*confirmApply {
+		return errors.New("data lifecycle apply confirmation is required")
+	}
+
+	var currentPolicy *datalifecycle.PolicySnapshot
+	var currentFingerprint string
+	if *operation == dataLifecyclePromoteOperation || *operation == string(datalifecycle.ModeApply) {
+		if !validLifecyclePromotionInputs(*currentPolicyFile, *promotedFingerprint, *impactReportHash, *actor, *reason, *approvalRef) {
+			return errors.New("data lifecycle promotion evidence is required")
+		}
+		policy, err := readLifecyclePolicyFile(*currentPolicyFile)
+		if err != nil {
+			return errors.New("invalid data lifecycle current policy file")
+		}
+		currentPolicy = &policy
+		currentFingerprint, err = datalifecycle.PolicyFingerprint(policy)
+		if err != nil {
+			return errors.New("invalid data lifecycle current policy file")
+		}
+	}
+	if *operation != dataLifecyclePromoteOperation && (!validLifecycleIdentity(*runID) || !validLifecycleIdentity(*owner)) {
+		return errors.New("data lifecycle run identity is required")
+	}
+	if *operation == string(datalifecycle.ModeApply) && !validLifecycleIdentity(*dryRunID) {
+		return errors.New("data lifecycle dry-run identity is required")
+	}
+	if openDataLifecycle == nil {
+		return errors.New("data lifecycle bootstrap is unavailable")
+	}
+
+	session, err := openDataLifecycle(loadConfig(), apps.DefaultManifests()...)
+	if err != nil || session == nil {
+		return errors.New("data lifecycle bootstrap failed")
+	}
+	closed := false
+	defer func() {
+		if !closed {
+			_ = session.Close()
+		}
+	}()
+
+	policy := session.Policy()
+	fingerprint, err := datalifecycle.PolicyFingerprint(policy)
+	if err != nil || fingerprint != session.PolicyFingerprint() {
+		return errors.New("data lifecycle policy unavailable")
+	}
+	if currentPolicy != nil && *promotedFingerprint != fingerprint {
+		return errors.New("data lifecycle promoted fingerprint mismatch")
+	}
+
+	var output any
+	if *operation == dataLifecyclePromoteOperation {
+		promotion, promoteErr := session.Promote(ctx, datalifecycle.PromotionRequest{
+			Enabled: true, DatasourceID: datalifecycle.DefaultDatasourceID,
+			CurrentPolicy: *currentPolicy, ProposedPolicy: policy,
+			ImpactReportHash: *impactReportHash, ActorID: *actor, Reason: *reason,
+			ApprovalRef: *approvalRef, PromotedFingerprint: *promotedFingerprint,
+		})
+		if promoteErr != nil {
+			return errors.New("data lifecycle promotion failed")
+		}
+		output = lifecyclePromotionOutput{
+			Operation: *operation, Status: datalifecycle.StatusCompleted,
+			DatasourceID: promotion.DatasourceID, CurrentFingerprint: promotion.CurrentFingerprint,
+			PromotedFingerprint: promotion.PromotedFingerprint, ImpactReportHash: promotion.ImpactReportHash,
+			PromotedAt: promotion.PromotedAt,
+		}
+	} else {
+		options := datalifecycle.Options{
+			Enabled: true, Mode: datalifecycle.Mode(*operation), RunID: *runID, OwnerID: *owner,
+			DatasourceID: datalifecycle.DefaultDatasourceID, BatchSize: *batchSize, MaxRetries: *maxRetries,
+			Policy: policy, PolicyFingerprint: fingerprint,
+		}
+		if *operation == string(datalifecycle.ModeApply) {
+			options.Promotion = datalifecycle.PromotionApproval{
+				ImpactReportHash: *impactReportHash, ActorID: *actor, Reason: *reason,
+				ApprovalRef: *approvalRef, PromotedFingerprint: *promotedFingerprint,
+				CurrentFingerprint: currentFingerprint, DryRunID: *dryRunID,
+			}
+		}
+		report, runErr := session.Run(ctx, options)
+		if runErr != nil {
+			return errors.New("data lifecycle operation failed")
+		}
+		output = report
+	}
+	if err := session.Close(); err != nil {
+		closed = true
+		return errors.New("close data lifecycle storage")
+	}
+	closed = true
+	return encodeDataLifecycleJSON(stdout, output)
+}
+
+func validDataLifecycleOperation(operation string) bool {
+	switch operation {
+	case dataLifecyclePrepareOperation, dataLifecyclePromoteOperation,
+		string(datalifecycle.ModeImpact), string(datalifecycle.ModeDryRun), string(datalifecycle.ModeApply):
+		return true
+	default:
+		return false
+	}
+}
+
+func dataLifecycleFlagsAllowed(flags *flag.FlagSet, operation string) bool {
+	allowed := map[string]struct{}{"operation": {}}
+	switch operation {
+	case dataLifecyclePrepareOperation:
+	case string(datalifecycle.ModeImpact), string(datalifecycle.ModeDryRun):
+		for _, name := range []string{"run-id", "owner", "batch-size", "max-retries"} {
+			allowed[name] = struct{}{}
+		}
+	case dataLifecyclePromoteOperation:
+		for _, name := range []string{"current-policy-file", "promoted-fingerprint", "impact-report-hash", "actor", "reason", "approval-ref"} {
+			allowed[name] = struct{}{}
+		}
+	case string(datalifecycle.ModeApply):
+		for _, name := range []string{
+			"run-id", "dry-run-id", "owner", "batch-size", "max-retries", "current-policy-file", "promoted-fingerprint",
+			"impact-report-hash", "actor", "reason", "approval-ref", "confirm-apply",
+		} {
+			allowed[name] = struct{}{}
+		}
+	}
+	valid := true
+	flags.Visit(func(value *flag.Flag) {
+		if _, ok := allowed[value.Name]; !ok {
+			valid = false
+		}
+	})
+	return valid
+}
+
+func validLifecyclePromotionInputs(policyFile, fingerprint, impactHash, actor, reason, approvalRef string) bool {
+	return validLifecycleText(policyFile) && validLifecycleDigest(fingerprint) && validLifecycleDigest(impactHash) &&
+		validLifecycleIdentity(actor) && validLifecycleEvidenceText(reason) && validLifecycleEvidenceText(approvalRef)
+}
+
+func validLifecycleIdentity(value string) bool {
+	if value == "" || len(value) > 128 || value != strings.TrimSpace(value) {
+		return false
+	}
+	for _, character := range value {
+		if character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z' ||
+			character >= '0' && character <= '9' || character == '-' || character == '_' || character == '.' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func validLifecycleText(value string) bool {
+	return value != "" && value == strings.TrimSpace(value)
+}
+
+func validLifecycleEvidenceText(value string) bool {
+	return validLifecycleText(value) && len(value) <= 191
+}
+
+func validLifecycleDigest(value string) bool {
+	if len(value) != 71 || !strings.HasPrefix(value, "sha256:") {
+		return false
+	}
+	for _, character := range value[len("sha256:"):] {
+		if character < '0' || character > '9' && character < 'a' || character > 'f' {
+			return false
+		}
+	}
+	return true
+}
+
+func readLifecyclePolicyFile(path string) (datalifecycle.PolicySnapshot, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return datalifecycle.PolicySnapshot{}, err
+	}
+	defer func() { _ = file.Close() }()
+	payload, err := io.ReadAll(io.LimitReader(file, maximumLifecyclePolicyBytes+1))
+	if err != nil || len(payload) > maximumLifecyclePolicyBytes {
+		return datalifecycle.PolicySnapshot{}, errors.New("invalid policy file")
+	}
+	if err := rejectDuplicateLifecycleJSONKeys(payload); err != nil {
+		return datalifecycle.PolicySnapshot{}, err
+	}
+	var document map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &document); err != nil || !exactLifecycleJSONKeys(document, "version", "resources") {
+		return datalifecycle.PolicySnapshot{}, errors.New("invalid policy document")
+	}
+	var version uint32
+	var resources []json.RawMessage
+	if err := json.Unmarshal(document["version"], &version); err != nil {
+		return datalifecycle.PolicySnapshot{}, errors.New("invalid policy version")
+	}
+	if err := json.Unmarshal(document["resources"], &resources); err != nil {
+		return datalifecycle.PolicySnapshot{}, errors.New("invalid policy resources")
+	}
+	policy := datalifecycle.PolicySnapshot{Version: version, Resources: make([]datalifecycle.ResourcePolicy, 0, len(resources))}
+	for _, rawResource := range resources {
+		var resource map[string]json.RawMessage
+		if err := json.Unmarshal(rawResource, &resource); err != nil ||
+			!exactLifecycleJSONKeys(resource, "resource", "mode", "policyVersion", "retentionDays", "autoPurge") {
+			return datalifecycle.PolicySnapshot{}, errors.New("invalid policy resource")
+		}
+		var item datalifecycle.ResourcePolicy
+		if err := json.Unmarshal(resource["resource"], &item.Resource); err != nil {
+			return datalifecycle.PolicySnapshot{}, errors.New("invalid policy resource name")
+		}
+		if err := json.Unmarshal(resource["mode"], &item.Mode); err != nil {
+			return datalifecycle.PolicySnapshot{}, errors.New("invalid policy resource deletion mode")
+		}
+		if err := json.Unmarshal(resource["policyVersion"], &item.PolicyVersion); err != nil {
+			return datalifecycle.PolicySnapshot{}, errors.New("invalid resource policy version")
+		}
+		if err := json.Unmarshal(resource["retentionDays"], &item.RetentionDays); err != nil {
+			return datalifecycle.PolicySnapshot{}, errors.New("invalid resource retention")
+		}
+		if err := json.Unmarshal(resource["autoPurge"], &item.AutoPurge); err != nil {
+			return datalifecycle.PolicySnapshot{}, errors.New("invalid resource purge policy")
+		}
+		policy.Resources = append(policy.Resources, datalifecycle.ResourcePolicy{
+			Resource: item.Resource, Mode: item.Mode, PolicyVersion: item.PolicyVersion,
+			RetentionDays: item.RetentionDays, AutoPurge: item.AutoPurge,
+		})
+	}
+	if _, err := datalifecycle.PolicyFingerprint(policy); err != nil {
+		return datalifecycle.PolicySnapshot{}, err
+	}
+	return policy, nil
+}
+
+func exactLifecycleJSONKeys(document map[string]json.RawMessage, expected ...string) bool {
+	if len(document) != len(expected) {
+		return false
+	}
+	for _, key := range expected {
+		if _, ok := document[key]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func rejectDuplicateLifecycleJSONKeys(payload []byte) error {
+	decoder := json.NewDecoder(strings.NewReader(string(payload)))
+	var readValue func() error
+	readValue = func() error {
+		token, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		delimiter, ok := token.(json.Delim)
+		if !ok {
+			return nil
+		}
+		switch delimiter {
+		case '{':
+			seen := map[string]struct{}{}
+			for decoder.More() {
+				keyToken, err := decoder.Token()
+				if err != nil {
+					return err
+				}
+				key, ok := keyToken.(string)
+				if !ok {
+					return errors.New("invalid object key")
+				}
+				if _, duplicate := seen[key]; duplicate {
+					return errors.New("duplicate object key")
+				}
+				seen[key] = struct{}{}
+				if err := readValue(); err != nil {
+					return err
+				}
+			}
+			closing, err := decoder.Token()
+			if err != nil || closing != json.Delim('}') {
+				return errors.New("invalid object")
+			}
+		case '[':
+			for decoder.More() {
+				if err := readValue(); err != nil {
+					return err
+				}
+			}
+			closing, err := decoder.Token()
+			if err != nil || closing != json.Delim(']') {
+				return errors.New("invalid array")
+			}
+		default:
+			return errors.New("invalid JSON delimiter")
+		}
+		return nil
+	}
+	if err := readValue(); err != nil {
+		return err
+	}
+	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
+		return errors.New("invalid trailing JSON content")
+	}
+	return nil
+}
+
+func encodeDataLifecycleJSON(stdout io.Writer, value any) error {
+	if err := json.NewEncoder(stdout).Encode(value); err != nil {
+		return errors.New("write data lifecycle report")
 	}
 	return nil
 }

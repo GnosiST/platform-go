@@ -4203,8 +4203,11 @@ func TestFileDeleteTombstoneKeepsContentHiddenUntilObjectCleanupCompletes(t *tes
 	fileStore.deleteErr = errors.New("object-delete-private-detail")
 	deleted := httptest.NewRecorder()
 	server.Router().ServeHTTP(deleted, httptest.NewRequest(http.MethodDelete, "/api/admin/resources/files/"+payload.Data.Record.ID, nil))
-	if deleted.Code != http.StatusInternalServerError {
-		t.Fatalf("DELETE file status = %d body = %s, want 500", deleted.Code, deleted.Body.String())
+	if deleted.Code != http.StatusOK {
+		t.Fatalf("DELETE file status = %d body = %s, want 200", deleted.Code, deleted.Body.String())
+	}
+	if fileStore.deleteCalls != 0 {
+		t.Fatalf("interactive DELETE object calls = %d, want 0", fileStore.deleteCalls)
 	}
 	content := httptest.NewRecorder()
 	server.Router().ServeHTTP(content, httptest.NewRequest(http.MethodGet, "/api/admin/files/"+payload.Data.Record.ID+"/content", nil))
@@ -4220,7 +4223,127 @@ func TestFileDeleteTombstoneKeepsContentHiddenUntilObjectCleanupCompletes(t *tes
 	}
 }
 
-func TestFileDeleteRetriesObjectCleanupAfterObjectOrAuditFailure(t *testing.T) {
+func TestAdminResourceSoftDeleteRestoreAndNoOnlinePurgeRoute(t *testing.T) {
+	softPolicy := capability.AdminResourceDeletionPolicy{Mode: capability.AdminDeletionSoftDelete, PolicyVersion: 1, RetentionDays: 7}
+	appendOnly := capability.AdminResourceDeletionPolicy{Mode: capability.AdminDeletionAppendOnly, PolicyVersion: 1}
+	manifests := []capability.Manifest{{ID: "lifecycle-test", Admin: capability.AdminSurface{Resources: []capability.AdminResource{
+		{
+			Resource: "lifecycle-records", Title: capability.Text("生命周期记录", "Lifecycle Records"), Description: capability.Text("生命周期测试记录。", "Lifecycle test records."),
+			PermissionPrefix: "admin:lifecycle-record", Deletion: &softPolicy, Menu: capability.AdminMenu{Route: "/lifecycle-records", Group: "test", Icon: "test", Order: 1},
+		},
+		{
+			Resource: "audit-logs", Title: capability.Text("审计日志", "Audit Logs"), Description: capability.Text("审计日志。", "Audit logs."),
+			PermissionPrefix: "admin:audit-log", Deletion: &appendOnly, Menu: capability.AdminMenu{Route: "/audit-logs", Group: "test", Icon: "audit", Order: 2},
+		},
+	}}}}
+	resources := adminresource.NewStoreFromCapabilities(manifests)
+	record, err := resources.Create("lifecycle-records", adminresource.WriteInput{Code: "record-1", Name: "Record 1", Status: "enabled"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := newTestServer(ServerOptions{Capabilities: manifests, Resources: resources})
+
+	deleted := httptest.NewRecorder()
+	deleteRequest := httptest.NewRequest(http.MethodDelete, "/api/admin/resources/lifecycle-records/"+record.ID, nil)
+	deleteRequest.Header.Set("X-Platform-User", "admin")
+	server.Router().ServeHTTP(deleted, deleteRequest)
+	if deleted.Code != http.StatusOK {
+		t.Fatalf("DELETE lifecycle record status = %d body = %s", deleted.Code, deleted.Body.String())
+	}
+	if items, _ := resources.List("lifecycle-records"); len(items) != 0 {
+		t.Fatalf("soft-deleted record remains visible: %+v", items)
+	}
+
+	restored := httptest.NewRecorder()
+	restoreRequest := httptest.NewRequest(http.MethodPost, "/api/admin/resources/lifecycle-records/"+record.ID+"/restore", nil)
+	restoreRequest.Header.Set("X-Platform-User", "admin")
+	server.Router().ServeHTTP(restored, restoreRequest)
+	if restored.Code != http.StatusOK || !strings.Contains(restored.Body.String(), `"restored":true`) {
+		t.Fatalf("POST restore status = %d body = %s", restored.Code, restored.Body.String())
+	}
+	if items, _ := resources.List("lifecycle-records"); len(items) != 1 || items[0].ID != record.ID {
+		t.Fatalf("restored records = %+v", items)
+	}
+
+	purge := httptest.NewRecorder()
+	purgeRequest := httptest.NewRequest(http.MethodDelete, "/api/admin/resources/lifecycle-records/"+record.ID+"/purge", nil)
+	purgeRequest.Header.Set("X-Platform-User", "admin")
+	server.Router().ServeHTTP(purge, purgeRequest)
+	if purge.Code != http.StatusNotFound {
+		t.Fatalf("online purge status = %d body = %s, want 404", purge.Code, purge.Body.String())
+	}
+}
+
+func TestAdminResourceRestoreEnforcesPrincipalDataScope(t *testing.T) {
+	softPolicy := capability.AdminResourceDeletionPolicy{Mode: capability.AdminDeletionSoftDelete, PolicyVersion: 1, RetentionDays: 7}
+	manifests := append(capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "admin-shell"}), capability.Manifest{
+		ID: "lifecycle-scope-test",
+		Admin: capability.AdminSurface{Resources: []capability.AdminResource{{
+			Resource: "scoped-lifecycle-records", Title: capability.Text("范围生命周期记录", "Scoped Lifecycle Records"),
+			Description:      capability.Text("范围生命周期测试记录。", "Scoped lifecycle test records."),
+			PermissionPrefix: "admin:scoped-lifecycle", Deletion: &softPolicy,
+			Menu: capability.AdminMenu{Route: "/scoped-lifecycle-records", Group: "test", Icon: "test", Order: 1},
+			Fields: []capability.AdminField{
+				{Key: "code", Label: capability.Text("编码", "Code"), Type: "text", Source: "record", Required: true, InForm: true},
+				{Key: "name", Label: capability.Text("名称", "Name"), Type: "text", Source: "record", Required: true, InForm: true},
+				{Key: "status", Label: capability.Text("状态", "Status"), Type: "text", Source: "record", InForm: true},
+				{Key: "tenantCode", Label: capability.Text("租户", "Tenant"), Type: "text", Source: "values", Required: true},
+				{Key: "orgUnitCode", Label: capability.Text("机构", "Org Unit"), Type: "text", Source: "values", Required: true},
+			},
+		}}},
+	})
+	resources := adminresource.NewStoreFromCapabilities(manifests)
+	inScope, err := resources.Create("scoped-lifecycle-records", adminresource.WriteInput{
+		Code: "in-scope", Name: "In Scope", Status: "enabled",
+		Values: map[string]string{"tenantCode": "platform", "orgUnitCode": "platform-ops"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	outOfScope, err := resources.Create("scoped-lifecycle-records", adminresource.WriteInput{
+		Code: "out-of-scope", Name: "Out Of Scope", Status: "enabled",
+		Values: map[string]string{"tenantCode": "platform", "orgUnitCode": "platform-root"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, record := range []adminresource.Record{inScope, outOfScope} {
+		if _, err := resources.DeleteWithAudit("scoped-lifecycle-records", record.ID, adminresource.AuditEvent{
+			Actor: "admin", Action: "admin_resource.delete", Result: "success", ReasonCode: "test",
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	server := newTestServer(ServerOptions{
+		Capabilities: manifests, Resources: resources,
+		Authorizer: permissionSetAuthorizer{"admin:scoped-lifecycle:restore": true},
+	})
+
+	denied := httptest.NewRecorder()
+	deniedRequest := httptest.NewRequest(http.MethodPost, "/api/admin/resources/scoped-lifecycle-records/"+outOfScope.ID+"/restore", nil)
+	deniedRequest.Header.Set("X-Platform-User", "ops")
+	server.Router().ServeHTTP(denied, deniedRequest)
+	if denied.Code != http.StatusNotFound {
+		t.Fatalf("out-of-scope restore status = %d body = %s, want 404", denied.Code, denied.Body.String())
+	}
+	allScope := httptest.NewRecorder()
+	allScopeRequest := httptest.NewRequest(http.MethodPost, "/api/admin/resources/scoped-lifecycle-records/"+outOfScope.ID+"/restore", nil)
+	allScopeRequest.Header.Set("X-Platform-User", "admin")
+	server.Router().ServeHTTP(allScope, allScopeRequest)
+	if allScope.Code != http.StatusOK {
+		t.Fatalf("all-scope restore status = %d body = %s, want 200", allScope.Code, allScope.Body.String())
+	}
+
+	allowed := httptest.NewRecorder()
+	allowedRequest := httptest.NewRequest(http.MethodPost, "/api/admin/resources/scoped-lifecycle-records/"+inScope.ID+"/restore", nil)
+	allowedRequest.Header.Set("X-Platform-User", "ops")
+	server.Router().ServeHTTP(allowed, allowedRequest)
+	if allowed.Code != http.StatusOK {
+		t.Fatalf("in-scope restore status = %d body = %s, want 200", allowed.Code, allowed.Body.String())
+	}
+}
+
+func TestFileDeleteIsIdempotentAndDefersObjectCleanup(t *testing.T) {
 	fileStore := &recordingObjectStore{}
 	server := newTestServer(ServerOptions{
 		Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"}),
@@ -4238,18 +4361,31 @@ func TestFileDeleteRetriesObjectCleanupAfterObjectOrAuditFailure(t *testing.T) {
 	fileStore.deleteErr = errors.New("temporary delete failure")
 	first := httptest.NewRecorder()
 	server.Router().ServeHTTP(first, httptest.NewRequest(http.MethodDelete, "/api/admin/resources/files/"+payload.Data.Record.ID, nil))
-	fileStore.deleteErr = nil
+	if first.Code != http.StatusOK {
+		t.Fatalf("first DELETE status = %d body = %s", first.Code, first.Body.String())
+	}
+	before, err := server.resources.InternalRecord("files", payload.Data.Record.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	second := httptest.NewRecorder()
 	server.Router().ServeHTTP(second, httptest.NewRequest(http.MethodDelete, "/api/admin/resources/files/"+payload.Data.Record.ID, nil))
 	if second.Code != http.StatusOK {
 		t.Fatalf("retry DELETE status = %d body = %s", second.Code, second.Body.String())
 	}
-	if fileStore.deleteCalls != 2 {
-		t.Fatalf("object delete calls = %d, want 2", fileStore.deleteCalls)
+	after, err := server.resources.InternalRecord("files", payload.Data.Record.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.DeletedAt != after.DeletedAt || before.PurgeAfter != after.PurgeAfter {
+		t.Fatalf("repeated DELETE changed retention window: before=%+v after=%+v", before, after)
+	}
+	if fileStore.deleteCalls != 0 {
+		t.Fatalf("interactive DELETE object calls = %d, want 0", fileStore.deleteCalls)
 	}
 }
 
-func TestFileDeleteRetryAfterPurgeAuditFailureKeepsRecoverableTombstone(t *testing.T) {
+func TestRepeatedFileDeleteKeepsRecoverableTombstone(t *testing.T) {
 	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"})
 	repository := &controllableAdminResourceRepository{}
 	resources, err := adminresource.NewRepositoryBackedStoreFromCapabilities(repository, capabilities)
@@ -4267,12 +4403,10 @@ func TestFileDeleteRetryAfterPurgeAuditFailureKeepsRecoverableTombstone(t *testi
 	if err := json.Unmarshal(upload.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode upload: %v", err)
 	}
-	repository.failAuditAction = "file.delete"
-	repository.saveErr = errors.New("purge-audit-private-detail")
 	first := httptest.NewRecorder()
 	server.Router().ServeHTTP(first, httptest.NewRequest(http.MethodDelete, "/api/admin/resources/files/"+payload.Data.Record.ID, nil))
-	if first.Code != http.StatusInternalServerError {
-		t.Fatalf("first DELETE status = %d body = %s, want 500", first.Code, first.Body.String())
+	if first.Code != http.StatusOK {
+		t.Fatalf("first DELETE status = %d body = %s, want 200", first.Code, first.Body.String())
 	}
 	internal, err := resources.InternalRecord("files", payload.Data.Record.ID)
 	if err != nil {
@@ -4285,14 +4419,13 @@ func TestFileDeleteRetryAfterPurgeAuditFailureKeepsRecoverableTombstone(t *testi
 	if err != nil || hasAdminResourceRecordID(visible, payload.Data.Record.ID) {
 		t.Fatalf("tombstone visibility after purge audit failure = %+v err=%v", visible, err)
 	}
-	repository.saveErr = nil
 	second := httptest.NewRecorder()
 	server.Router().ServeHTTP(second, httptest.NewRequest(http.MethodDelete, "/api/admin/resources/files/"+payload.Data.Record.ID, nil))
 	if second.Code != http.StatusOK {
 		t.Fatalf("retry DELETE status = %d body = %s", second.Code, second.Body.String())
 	}
-	if _, err := resources.InternalRecord("files", payload.Data.Record.ID); !errors.Is(err, adminresource.ErrRecordNotFound) {
-		t.Fatalf("InternalRecord(files) after retry error = %v, want not found", err)
+	if record, err := resources.InternalRecord("files", payload.Data.Record.ID); err != nil || record.Values["deletionState"] != "pending" {
+		t.Fatalf("InternalRecord(files) after retry = %+v, %v; want pending tombstone", record, err)
 	}
 }
 
@@ -5284,8 +5417,25 @@ func TestAdminFileUploadContentAndDelete(t *testing.T) {
 	if deleteRecorder.Code != http.StatusOK {
 		t.Fatalf("DELETE file status = %d body = %s", deleteRecorder.Code, deleteRecorder.Body.String())
 	}
-	if _, err := fileStore.Open(deleteRequest.Context(), storageKey); !errors.Is(err, storage.ErrObjectNotFound) {
-		t.Fatalf("Open(deleted file object) error = %v, want ErrObjectNotFound", err)
+	retained, err := fileStore.Open(deleteRequest.Context(), storageKey)
+	if err != nil {
+		t.Fatalf("Open(tombstoned file object) error = %v", err)
+	}
+	_ = retained.Close()
+	hiddenContent := httptest.NewRecorder()
+	server.Router().ServeHTTP(hiddenContent, httptest.NewRequest(http.MethodGet, "/api/admin/files/"+record.ID+"/content", nil))
+	if hiddenContent.Code != http.StatusNotFound {
+		t.Fatalf("GET tombstoned file content status = %d body = %s, want 404", hiddenContent.Code, hiddenContent.Body.String())
+	}
+	restoreRecorder := httptest.NewRecorder()
+	server.Router().ServeHTTP(restoreRecorder, httptest.NewRequest(http.MethodPost, "/api/admin/resources/files/"+record.ID+"/restore", nil))
+	if restoreRecorder.Code != http.StatusOK {
+		t.Fatalf("POST file restore status = %d body = %s", restoreRecorder.Code, restoreRecorder.Body.String())
+	}
+	restoredContent := httptest.NewRecorder()
+	server.Router().ServeHTTP(restoredContent, httptest.NewRequest(http.MethodGet, "/api/admin/files/"+record.ID+"/content", nil))
+	if restoredContent.Code != http.StatusOK || restoredContent.Body.String() != "hello file storage" {
+		t.Fatalf("GET restored file content status/body = %d/%q", restoredContent.Code, restoredContent.Body.String())
 	}
 
 	auditRequest := httptest.NewRequest(http.MethodGet, "/api/admin/resources/audit-logs", nil)
@@ -5298,7 +5448,7 @@ func TestAdminFileUploadContentAndDelete(t *testing.T) {
 	if err := json.Unmarshal(auditRecorder.Body.Bytes(), &audits); err != nil {
 		t.Fatalf("decode audit logs: %v body = %s", err, auditRecorder.Body.String())
 	}
-	for _, action := range []string{"file.upload", "file.content", "file.delete"} {
+	for _, action := range []string{"file.upload", "file.content", "file.delete.request", "file.restore"} {
 		if !hasAdminResourceAuditRecord(audits.Data.Items, action, "files", record.ID, record.Code, "user-admin") {
 			t.Fatalf("audit logs missing %s for uploaded file: %+v", action, audits.Data.Items)
 		}
@@ -5650,7 +5800,7 @@ func TestAdminAndAppFileOpenErrorsDoNotLeakObjectStoreDetails(t *testing.T) {
 	}
 }
 
-func TestAdminFileDeleteErrorDoesNotLeakObjectStoreDetails(t *testing.T) {
+func TestAdminFileDeleteDefersObjectStoreErrorsUntilRetentionCleanup(t *testing.T) {
 	const marker = "delete-secret-local-path-bucket-object-key"
 	fileStore := &recordingObjectStore{}
 	internalErrors := &recordingInternalErrorSink{}
@@ -5677,11 +5827,13 @@ func TestAdminFileDeleteErrorDoesNotLeakObjectStoreDetails(t *testing.T) {
 
 	server.Router().ServeHTTP(recorder, request)
 
-	if recorder.Code != http.StatusInternalServerError || !strings.Contains(recorder.Body.String(), `"code":"ADMIN_FILE_DELETE_FAILED"`) {
-		t.Fatalf("DELETE file failure status/body = %d/%s", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("DELETE file status/body = %d/%s", recorder.Code, recorder.Body.String())
 	}
 	assertHTTPResponseRedacts(t, recorder, marker)
-	assertInternalErrorRecorded(t, internalErrors.events, "ADMIN_FILE_DELETE_FAILED", marker)
+	if fileStore.deleteCalls != 0 || len(internalErrors.events) != 0 {
+		t.Fatalf("interactive DELETE touched object storage: calls=%d errors=%+v", fileStore.deleteCalls, internalErrors.events)
+	}
 }
 
 func TestAdminFileUploadRejectsSpoofedOrDisallowedMIME(t *testing.T) {
@@ -5765,6 +5917,11 @@ func TestAdminFileDeleteTreatsMissingObjectAsIdempotentCleanup(t *testing.T) {
 	if deleteRecorder.Code != http.StatusOK {
 		t.Fatalf("DELETE file with missing object status = %d body = %s, want 200", deleteRecorder.Code, deleteRecorder.Body.String())
 	}
+	restoreRecorder := httptest.NewRecorder()
+	server.Router().ServeHTTP(restoreRecorder, httptest.NewRequest(http.MethodPost, "/api/admin/resources/files/"+record.ID+"/restore", nil))
+	if restoreRecorder.Code != http.StatusConflict || !strings.Contains(restoreRecorder.Body.String(), `"code":"ADMIN_FILE_RESTORE_UNAVAILABLE"`) {
+		t.Fatalf("POST missing-object restore status/body = %d/%s", restoreRecorder.Code, restoreRecorder.Body.String())
+	}
 	auditRequest := httptest.NewRequest(http.MethodGet, "/api/admin/resources/audit-logs", nil)
 	auditRecorder := httptest.NewRecorder()
 	server.Router().ServeHTTP(auditRecorder, auditRequest)
@@ -5775,7 +5932,7 @@ func TestAdminFileDeleteTreatsMissingObjectAsIdempotentCleanup(t *testing.T) {
 	if err := json.Unmarshal(auditRecorder.Body.Bytes(), &audits); err != nil {
 		t.Fatalf("decode audit logs: %v body = %s", err, auditRecorder.Body.String())
 	}
-	if !hasAdminResourceAuditRecord(audits.Data.Items, "file.delete", "files", record.ID, record.Code, "user-admin") {
+	if !hasAdminResourceAuditRecord(audits.Data.Items, "file.delete.request", "files", record.ID, record.Code, "user-admin") {
 		t.Fatalf("audit logs missing idempotent file delete: %+v", audits.Data.Items)
 	}
 }

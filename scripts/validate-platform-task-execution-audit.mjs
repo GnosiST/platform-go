@@ -29,6 +29,7 @@ const requiredValidatorPaths = [
   "scripts/validate-platform-refresh-token-family-promotion.mjs",
   "scripts/validate-platform-goal-completion-audit.mjs",
   "scripts/validate-platform-node-closeout-audit.mjs",
+  "scripts/validate-platform-data-lifecycle-retention.mjs",
   "scripts/validate-platform-objective-conformance.mjs",
   "scripts/validate-platform-promotion-evidence-templates.mjs",
   "scripts/validate-platform-promotion-evidence-package.mjs",

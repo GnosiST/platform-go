@@ -81,7 +81,7 @@ func (s *Store) QueryForPrincipal(resource string, input QueryInput, principal r
 	if !ok {
 		return QueryResult{}, ErrUnknownResource
 	}
-	return s.queryRecordsLocked(resource, input, visibleRecords(resource, s.filterRecordsForPrincipalLocked(resource, items, principal)))
+	return s.queryRecordsLocked(resource, input, s.filterRecordsForPrincipalLocked(resource, visibleRecords(resource, items), principal))
 }
 
 func (s *Store) queryRecordsLocked(resource string, input QueryInput, items []Record) (QueryResult, error) {

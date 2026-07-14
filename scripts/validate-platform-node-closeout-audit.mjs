@@ -77,6 +77,15 @@ const requiredCleanupEvidenceByTask = new Map([
       "scripts/platform-production-preflight-runner.test.mjs",
     ],
   ],
+  [
+    "data-lifecycle-retention",
+    [
+      "docs/platform-data-lifecycle-retention.md",
+      "internal/platform/datalifecycle/runner_test.go",
+      "scripts/validate-platform-data-lifecycle-retention.mjs",
+      "scripts/platform-data-lifecycle-retention.test.mjs",
+    ],
+  ],
 ]);
 
 const requiredVisualEvidenceByTask = new Map([

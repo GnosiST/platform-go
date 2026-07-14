@@ -37,7 +37,7 @@ func (s *Store) validateAdminPrincipalLocked(username string) (rbac.Principal, e
 
 func (s *Store) hasSingleEnabledUserLocked(username string) bool {
 	matches := 0
-	for _, user := range s.resources["users"] {
+	for _, user := range visibleRecords("users", s.resources["users"]) {
 		if user.Code != username {
 			continue
 		}
@@ -70,7 +70,7 @@ func (s *Store) currentPrincipalLocked(username string) rbac.Principal {
 	if username == "" {
 		username = "admin"
 	}
-	user := findRecordByCode(s.resources["users"], username)
+	user := findRecordByCode(visibleRecords("users", s.resources["users"]), username)
 	if user == nil {
 		return rbac.Principal{User: rbac.User{Username: username}}
 	}
@@ -78,7 +78,7 @@ func (s *Store) currentPrincipalLocked(username string) rbac.Principal {
 	permissions := make([]string, 0)
 	deniedPermissions := make([]string, 0)
 	for _, role := range roles {
-		roleRecord := findRecordByCode(s.resources["roles"], role)
+		roleRecord := findRecordByCode(visibleRecords("roles", s.resources["roles"]), role)
 		if roleRecord == nil || roleRecord.Status == "disabled" {
 			continue
 		}

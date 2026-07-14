@@ -21,9 +21,9 @@ The `zshenmez` project is only external reference evidence for reusable capabili
 
 ## Active Completion Program
 
-The original 37-node foundation baseline remains implemented and closed. The active completion program now contains 16 controlled nodes beyond that baseline; `runtime-security-containment`, `admin-watermark-export-governance`, `sensitive-data-protection-runtime`, `sensitive-data-historical-migration`, `mask-strategy-runtime` and `sensitive-data-reveal-step-up` are `implemented`, so the current governance state is `53 total / 43 implemented / 10 controlled unfinished` with `completionStatus=not-complete-controlled`.
+The original 37-node foundation baseline remains implemented and closed. The active completion program now contains 16 controlled nodes beyond that baseline; `runtime-security-containment`, `admin-watermark-export-governance`, `sensitive-data-protection-runtime`, `sensitive-data-historical-migration`, `mask-strategy-runtime`, `sensitive-data-reveal-step-up` and `data-lifecycle-retention` are `implemented`, so the current governance state is `53 total / 44 implemented / 9 controlled unfinished` with `completionStatus=not-complete-controlled`.
 
-The six newly governed pending nodes, in task-graph order, are `data-lifecycle-retention`, `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`. This does not reopen the baseline, mark any of the ten pending nodes implemented, certify MySQL/PostgreSQL migration without real integration rehearsal evidence, claim Oracle or KingbaseES support, enable MQ/search adapters by default, or approve production auth promotion, refresh-token-family default runtime, source writing or external publication.
+The five remaining data/integration nodes, in task-graph order, are `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`. Lifecycle closeout does not reopen the baseline, certify MySQL/PostgreSQL without real integration evidence, claim Oracle or KingbaseES support, enable MQ/search adapters by default, or approve production auth promotion, refresh-token-family default runtime, source writing or external publication.
 
 `mask-strategy-runtime` provides manifest-driven `partial-v1`, `phone-v1`, `email-v1`, `identity-cn-v1` and `address-cn-v1` strategies for arbitrary encrypted fields. Response, query and export projections decrypt only inside the backend, mask once and fail closed; Admin editing keeps encrypted fields blank and status updates exclude projected encrypted values. `sensitive-data-reveal-step-up` adds a separate manifest-declared, permission-checked flow with OIDC reauthentication and Admin SMS OTP, short-lived single-use grants, rate limits, append-only audit and plaintext confined to an expiring modal.
 
@@ -94,6 +94,7 @@ GET /api/admin/resources/:resource
 POST /api/admin/resources/:resource
 PUT /api/admin/resources/:resource/:id
 DELETE /api/admin/resources/:resource/:id
+POST /api/admin/resources/:resource/:id/restore
 POST /api/admin/policy-reviews/:id/request
 POST /api/admin/policy-reviews/:id/reject
 POST /api/admin/policy-reviews/:id/approve
@@ -107,7 +108,7 @@ GET /api/app/files/:id/content
 GET /api/app/session/current
 ```
 
-See `docs/platform-auth.md`, `docs/admin-rbac-menu.md`, `docs/admin-resource-schema.md`, `docs/platform-sensitive-data-migration.md`, `docs/platform-branding.md`, `docs/platform-cache.md` and `docs/platform-capability-development.md` for detailed contracts and the offline migration runbook.
+See `docs/platform-auth.md`, `docs/admin-rbac-menu.md`, `docs/admin-resource-schema.md`, `docs/platform-data-lifecycle-retention.md`, `docs/platform-sensitive-data-migration.md`, `docs/platform-branding.md`, `docs/platform-cache.md` and `docs/platform-capability-development.md` for detailed contracts and maintenance runbooks.
 
 ## Contract Gates
 
@@ -215,6 +216,10 @@ PLATFORM_SESSION_DRIVER=mysql
 PLATFORM_SESSION_DSN=$PLATFORM_SESSION_DSN_SECRET
 PLATFORM_LIFECYCLE_HISTORY_DRIVER=mysql
 PLATFORM_LIFECYCLE_HISTORY_DSN=$PLATFORM_LIFECYCLE_HISTORY_DSN_SECRET
+PLATFORM_RETENTION_RUNNER_ENABLED=false
+PLATFORM_RETENTION_RUNNER_INTERVAL=24h
+PLATFORM_RETENTION_RUNNER_BATCH_SIZE=100
+PLATFORM_RETENTION_RUNNER_MAX_RETRIES=3
 PLATFORM_CACHE_DRIVER=redis
 PLATFORM_REDIS_ADDR=127.0.0.1:6379
 PLATFORM_RATE_LIMIT_HMAC_KEY=replace-with-dedicated-rate-limit-key
@@ -273,6 +278,7 @@ Deployment scheme A is selected as the default: build and run `cmd/platform-api`
 - `docs/admin-ui-foundation.md`: admin shell, shared UI components, themes and visual QA.
 - `docs/platform-cache.md`: noop/memory/Redis cache and invalidation behavior.
 - `docs/platform-deployment.md`: deployment topology, Vercel boundary and production API runtime requirements.
+- `docs/platform-data-lifecycle-retention.md`: resource deletion policies, restore, final purge, promotion and runner operations.
 - `docs/platform-demo-data.md`: demo dataset contract.
 - `docs/platform-branding.md`: branding API and settings resource.
 - `docs/platform-roadmap.md`: broader extraction roadmap and remaining work.

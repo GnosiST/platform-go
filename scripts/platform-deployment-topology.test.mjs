@@ -360,6 +360,19 @@ describe("validate-platform-deployment-topology", () => {
     assert.match(result.stderr, /platform-api must receive PLATFORM_RATE_LIMIT_HMAC_KEY/);
   });
 
+  it("rejects production Compose without the retention runner control", () => {
+    const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
+    const composePath = tempText(
+      "docker-compose.prod.yml",
+      current.replace(/^\s+PLATFORM_RETENTION_RUNNER_ENABLED:.*\n/m, ""),
+    );
+
+    const result = runValidator(["--compose", composePath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /platform-api must receive PLATFORM_RETENTION_RUNNER_ENABLED/);
+  });
+
   it("rejects production Compose without data protection mappings", () => {
     const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
     const mapping = "      PLATFORM_DATA_ENCRYPTION_KEYRING_JSON: ${PLATFORM_DATA_ENCRYPTION_KEYRING_JSON:?required}\n";

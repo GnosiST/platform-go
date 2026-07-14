@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -17,6 +18,7 @@ import (
 	"platform-go/internal/platform/bootstrap"
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/config"
+	"platform-go/internal/platform/datalifecycle"
 	"platform-go/internal/platform/dataprotection"
 	"platform-go/internal/platform/sensitivemigration"
 )
@@ -369,6 +371,399 @@ func TestRunSensitiveDataMigrationEmitsReportBeforeNormalizedCloseFailure(t *tes
 	}
 	if report != session.report || session.closes != 1 {
 		t.Fatalf("report=%+v closes=%d, want %+v and one close", report, session.closes, session.report)
+	}
+}
+
+func TestRunDataLifecycleAcceptsExactOperationsAndEmitsOneSanitizedJSONObject(t *testing.T) {
+	proposed := lifecycleTestPolicy(30)
+	proposedFingerprint, err := datalifecycle.PolicyFingerprint(proposed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current := lifecycleTestPolicy(90)
+	currentPolicyFile := writeLifecyclePolicyFile(t, `{
+		"version": 1,
+		"resources": [{"resource":"files","mode":"tombstone","policyVersion":1,"retentionDays":90,"autoPurge":true}]
+	}`)
+	impactHash := "sha256:" + strings.Repeat("a", 64)
+	promotion := datalifecycle.Promotion{
+		DatasourceID: datalifecycle.DefaultDatasourceID, CurrentFingerprint: lifecyclePolicyFingerprint(t, current),
+		PromotedFingerprint: proposedFingerprint, ImpactReportHash: impactHash,
+		ActorID: "security-admin", Reason: "approved-retention-change", ApprovalRef: "CAB-2026-0714",
+		PromotedAt: time.Date(2026, 7, 14, 9, 0, 0, 0, time.UTC),
+	}
+
+	t.Run("prepare", func(t *testing.T) {
+		var prepareCalls int
+		result := executeWithDataLifecycle(t, []string{"data-lifecycle", "--operation", "prepare"}, nil, nil,
+			func(context.Context, config.Config) error {
+				prepareCalls++
+				return nil
+			})
+		if result.err != nil || prepareCalls != 1 {
+			t.Fatalf("result=%+v prepareCalls=%d", result, prepareCalls)
+		}
+		assertSingleLifecycleJSON(t, result, map[string]any{"operation": "prepare", "status": "completed"})
+	})
+
+	for _, mode := range []datalifecycle.Mode{datalifecycle.ModeImpact, datalifecycle.ModeDryRun} {
+		t.Run(string(mode), func(t *testing.T) {
+			session := &fakeDataLifecycleSession{
+				policy: proposed, fingerprint: proposedFingerprint,
+				report: datalifecycle.Report{
+					DatasourceID: datalifecycle.DefaultDatasourceID, RunID: "retention-run-1",
+					Mode: mode, Status: datalifecycle.StatusCompleted, PolicyFingerprint: proposedFingerprint,
+				},
+			}
+			result := executeWithDataLifecycle(t, []string{
+				"data-lifecycle", "--operation", string(mode), "--run-id", "retention-run-1",
+				"--owner", "maintenance-1", "--batch-size", "25", "--max-retries", "2",
+			}, session, nil, nil)
+			if result.err != nil {
+				t.Fatalf("run() error = %v", result.err)
+			}
+			if !session.options.Enabled || session.options.Mode != mode || session.options.RunID != "retention-run-1" ||
+				session.options.OwnerID != "maintenance-1" || session.options.BatchSize != 25 || session.options.MaxRetries != 2 {
+				t.Fatalf("options = %+v", session.options)
+			}
+			assertSingleLifecycleReport(t, result, session.report)
+			if session.closes != 1 {
+				t.Fatalf("Close() calls = %d, want 1", session.closes)
+			}
+		})
+	}
+
+	t.Run("promote", func(t *testing.T) {
+		session := &fakeDataLifecycleSession{policy: proposed, fingerprint: proposedFingerprint, promotion: promotion}
+		result := executeWithDataLifecycle(t, append([]string{
+			"data-lifecycle", "--operation", "promote",
+		}, lifecyclePromotionArgs(currentPolicyFile, proposedFingerprint, impactHash)...), session, nil, nil)
+		if result.err != nil {
+			t.Fatalf("run() error = %v", result.err)
+		}
+		if !session.promotionRequest.Enabled || session.promotionRequest.DatasourceID != datalifecycle.DefaultDatasourceID ||
+			session.promotionRequest.CurrentPolicy.Version != current.Version ||
+			session.promotionRequest.CurrentPolicy.Resources[0].Mode != capability.AdminDeletionTombstone ||
+			session.promotionRequest.PromotedFingerprint != proposedFingerprint ||
+			session.promotionRequest.ImpactReportHash != impactHash {
+			t.Fatalf("promotion request = %+v", session.promotionRequest)
+		}
+		if session.promotionRequest.ActorID != "security-admin" || session.promotionRequest.Reason != "approved-retention-change" ||
+			session.promotionRequest.ApprovalRef != "CAB-2026-0714" {
+			t.Fatalf("promotion evidence = %+v", session.promotionRequest)
+		}
+		var output lifecyclePromotionOutput
+		assertSingleLifecycleJSONInto(t, result, &output)
+		if output.PromotedFingerprint != proposedFingerprint || output.ImpactReportHash != impactHash {
+			t.Fatalf("promotion output = %+v", output)
+		}
+		if strings.Contains(result.stdout, "security-admin") || strings.Contains(result.stdout, "CAB-2026-0714") || strings.Contains(result.stdout, "approved-retention-change") {
+			t.Fatalf("promotion output exposed approval evidence: %s", result.stdout)
+		}
+	})
+
+	t.Run("apply", func(t *testing.T) {
+		session := &fakeDataLifecycleSession{
+			policy: proposed, fingerprint: proposedFingerprint,
+			report: datalifecycle.Report{
+				DatasourceID: datalifecycle.DefaultDatasourceID, RunID: "apply-run-1", Mode: datalifecycle.ModeApply,
+				Status: datalifecycle.StatusCompleted, PolicyFingerprint: proposedFingerprint,
+			},
+		}
+		args := []string{
+			"data-lifecycle", "--operation", "apply", "--run-id", "apply-run-1", "--owner", "maintenance-1",
+			"--dry-run-id", "dry-run-1", "--batch-size", "50", "--max-retries", "1", "--confirm-apply",
+		}
+		args = append(args, lifecyclePromotionArgs(currentPolicyFile, proposedFingerprint, impactHash)...)
+		result := executeWithDataLifecycle(t, args, session, nil, nil)
+		if result.err != nil {
+			t.Fatalf("run() error = %v", result.err)
+		}
+		if session.options.Mode != datalifecycle.ModeApply ||
+			session.options.Promotion.PromotedFingerprint != proposedFingerprint ||
+			session.options.Promotion.CurrentFingerprint != lifecyclePolicyFingerprint(t, current) ||
+			session.options.Promotion.DryRunID != "dry-run-1" ||
+			session.options.Promotion.ImpactReportHash != impactHash || session.options.Promotion.ActorID != "security-admin" {
+			t.Fatalf("apply options = %+v", session.options)
+		}
+		assertSingleLifecycleReport(t, result, session.report)
+	})
+}
+
+func TestRunDataLifecycleRejectsMalformedIncompleteAndOperationIncompatibleArguments(t *testing.T) {
+	policy := lifecycleTestPolicy(30)
+	fingerprint := lifecyclePolicyFingerprint(t, policy)
+	policyFile := writeLifecyclePolicyFile(t, `{"version":1,"resources":[{"resource":"files","mode":"tombstone","policyVersion":1,"retentionDays":90,"autoPurge":true}]}`)
+	impactHash := "sha256:" + strings.Repeat("a", 64)
+	secret := "sensitive-lifecycle-cli-value"
+	validApply := []string{
+		"data-lifecycle", "--operation", "apply", "--run-id", "apply-run-1", "--dry-run-id", "dry-run-1", "--owner", "maintenance-1", "--confirm-apply",
+	}
+	validApply = append(validApply, lifecyclePromotionArgs(policyFile, fingerprint, impactHash)...)
+
+	tests := []struct {
+		name           string
+		args           []string
+		expectedCloses int
+	}{
+		{name: "unknown operation", args: []string{"data-lifecycle", "--operation", secret}},
+		{name: "unknown flag", args: []string{"data-lifecycle", "--operation", "impact", "--unknown-" + secret}},
+		{name: "positional", args: []string{"data-lifecycle", "--operation", "impact", secret}},
+		{name: "missing operation", args: []string{"data-lifecycle"}},
+		{name: "impact missing run", args: []string{"data-lifecycle", "--operation", "impact", "--owner", "maintenance-1"}},
+		{name: "dry run missing owner", args: []string{"data-lifecycle", "--operation", "dry-run", "--run-id", "run-1"}},
+		{name: "zero batch", args: []string{"data-lifecycle", "--operation", "impact", "--run-id", "run-1", "--owner", "owner-1", "--batch-size", "0"}},
+		{name: "large batch", args: []string{"data-lifecycle", "--operation", "impact", "--run-id", "run-1", "--owner", "owner-1", "--batch-size", "1001"}},
+		{name: "negative retries", args: []string{"data-lifecycle", "--operation", "impact", "--run-id", "run-1", "--owner", "owner-1", "--max-retries", "-1"}},
+		{name: "large retries", args: []string{"data-lifecycle", "--operation", "impact", "--run-id", "run-1", "--owner", "owner-1", "--max-retries", "6"}},
+		{name: "prepare with run", args: []string{"data-lifecycle", "--operation", "prepare", "--run-id", "run-1"}},
+		{name: "impact with promotion", args: append([]string{"data-lifecycle", "--operation", "impact", "--run-id", "run-1", "--owner", "owner-1"}, lifecyclePromotionArgs(policyFile, fingerprint, impactHash)...)},
+		{name: "promote with run", args: append([]string{"data-lifecycle", "--operation", "promote", "--run-id", "run-1"}, lifecyclePromotionArgs(policyFile, fingerprint, impactHash)...)},
+		{name: "promote missing policy", args: []string{"data-lifecycle", "--operation", "promote", "--promoted-fingerprint", fingerprint, "--impact-report-hash", impactHash, "--actor", "actor-1", "--reason", "approved", "--approval-ref", "CAB-1"}},
+		{name: "apply without confirmation", args: removeLifecycleArgument(validApply, "--confirm-apply")},
+		{name: "apply missing dry run", args: removeLifecycleArgument(validApply, "--dry-run-id", "dry-run-1")},
+		{name: "apply missing exact field", args: removeLifecycleArgument(validApply, "--approval-ref", "CAB-2026-0714")},
+		{name: "apply fingerprint mismatch", args: replaceLifecycleArgument(validApply, fingerprint, "sha256:"+strings.Repeat("b", 64)), expectedCloses: 1},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			session := &fakeDataLifecycleSession{policy: policy, fingerprint: fingerprint}
+			result := executeWithDataLifecycle(t, tc.args, session, nil, func(context.Context, config.Config) error { return nil })
+			assertDataLifecycleRejected(t, result, secret)
+			if session.runCalls != 0 || session.promoteCalls != 0 || session.closes != tc.expectedCloses {
+				t.Fatalf("session was used for rejected input: %+v", session)
+			}
+		})
+	}
+}
+
+func TestRunDataLifecycleStrictlyBoundsAndDecodesCurrentPolicyFile(t *testing.T) {
+	policy := lifecycleTestPolicy(30)
+	fingerprint := lifecyclePolicyFingerprint(t, policy)
+	impactHash := "sha256:" + strings.Repeat("a", 64)
+	oversized := writeLifecyclePolicyFile(t, strings.Repeat(" ", maximumLifecyclePolicyBytes+1))
+	for _, tc := range []struct {
+		name    string
+		content string
+		path    string
+	}{
+		{name: "unknown field", content: `{"version":1,"resources":[],"dsn":"secret-dsn"}`},
+		{name: "case variant field", content: `{"Version":1,"resources":[]}`},
+		{name: "duplicate field", content: `{"version":1,"version":2,"resources":[]}`},
+		{name: "duplicate resource field", content: `{"version":1,"resources":[{"resource":"files","resource":"users","policyVersion":1,"retentionDays":90,"autoPurge":true}]}`},
+		{name: "missing deletion mode", content: `{"version":1,"resources":[{"resource":"files","policyVersion":1,"retentionDays":90,"autoPurge":true}]}`},
+		{name: "invalid deletion mode", content: `{"version":1,"resources":[{"resource":"files","mode":"physical-delete","policyVersion":1,"retentionDays":90,"autoPurge":true}]}`},
+		{name: "trailing object", content: `{"version":1,"resources":[]} {"version":2}`},
+		{name: "wrong shape", content: `{"version":"1","resources":[]}`},
+		{name: "oversized", path: oversized},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := tc.path
+			if path == "" {
+				path = writeLifecyclePolicyFile(t, tc.content)
+			}
+			args := append([]string{"data-lifecycle", "--operation", "promote"}, lifecyclePromotionArgs(path, fingerprint, impactHash)...)
+			session := &fakeDataLifecycleSession{policy: policy, fingerprint: fingerprint}
+			result := executeWithDataLifecycle(t, args, session, nil, nil)
+			assertDataLifecycleRejected(t, result, "secret-dsn", tc.content)
+			if session.promoteCalls != 0 || session.closes != 0 {
+				t.Fatalf("session was used for invalid policy: %+v", session)
+			}
+		})
+	}
+}
+
+func TestRunDataLifecycleNormalizesOperationalErrorsAndClosesSession(t *testing.T) {
+	policy := lifecycleTestPolicy(30)
+	fingerprint := lifecyclePolicyFingerprint(t, policy)
+	secret := "sensitive-lifecycle-dependency-error"
+	baseArgs := []string{"data-lifecycle", "--operation", "impact", "--run-id", "run-1", "--owner", "owner-1"}
+	currentPolicyFile := writeLifecyclePolicyFile(t, `{"version":1,"resources":[{"resource":"files","mode":"tombstone","policyVersion":1,"retentionDays":90,"autoPurge":true}]}`)
+	impactHash := "sha256:" + strings.Repeat("a", 64)
+
+	t.Run("prepare", func(t *testing.T) {
+		result := executeWithDataLifecycle(t, []string{"data-lifecycle", "--operation", "prepare"}, nil, nil,
+			func(context.Context, config.Config) error { return errors.New(secret) })
+		assertDataLifecycleRejected(t, result, secret)
+	})
+	t.Run("open", func(t *testing.T) {
+		result := executeWithDataLifecycle(t, baseArgs, nil, errors.New(secret), nil)
+		assertDataLifecycleRejected(t, result, secret)
+	})
+	t.Run("run", func(t *testing.T) {
+		session := &fakeDataLifecycleSession{policy: policy, fingerprint: fingerprint, runErr: errors.New(secret)}
+		result := executeWithDataLifecycle(t, baseArgs, session, nil, nil)
+		assertDataLifecycleRejected(t, result, secret)
+		if session.closes != 1 {
+			t.Fatalf("Close() calls = %d, want 1", session.closes)
+		}
+	})
+	t.Run("promote", func(t *testing.T) {
+		session := &fakeDataLifecycleSession{policy: policy, fingerprint: fingerprint, promoteErr: errors.New(secret)}
+		args := append([]string{"data-lifecycle", "--operation", "promote"}, lifecyclePromotionArgs(currentPolicyFile, fingerprint, impactHash)...)
+		result := executeWithDataLifecycle(t, args, session, nil, nil)
+		assertDataLifecycleRejected(t, result, secret)
+		if session.closes != 1 {
+			t.Fatalf("Close() calls = %d, want 1", session.closes)
+		}
+	})
+	t.Run("close", func(t *testing.T) {
+		session := &fakeDataLifecycleSession{
+			policy: policy, fingerprint: fingerprint,
+			report:   datalifecycle.Report{DatasourceID: "default", RunID: "run-1", Mode: datalifecycle.ModeImpact, Status: datalifecycle.StatusCompleted},
+			closeErr: errors.New(secret),
+		}
+		result := executeWithDataLifecycle(t, baseArgs, session, nil, nil)
+		assertDataLifecycleRejected(t, result, secret)
+		if session.closes != 1 {
+			t.Fatalf("Close() calls = %d, want 1", session.closes)
+		}
+	})
+}
+
+type fakeDataLifecycleSession struct {
+	policy           datalifecycle.PolicySnapshot
+	fingerprint      string
+	options          datalifecycle.Options
+	report           datalifecycle.Report
+	promotionRequest datalifecycle.PromotionRequest
+	promotion        datalifecycle.Promotion
+	runErr           error
+	promoteErr       error
+	closeErr         error
+	runCalls         int
+	promoteCalls     int
+	closes           int
+}
+
+func (s *fakeDataLifecycleSession) Policy() datalifecycle.PolicySnapshot { return s.policy }
+func (s *fakeDataLifecycleSession) PolicyFingerprint() string            { return s.fingerprint }
+
+func (s *fakeDataLifecycleSession) Run(_ context.Context, options datalifecycle.Options) (datalifecycle.Report, error) {
+	s.runCalls++
+	s.options = options
+	return s.report, s.runErr
+}
+
+func (s *fakeDataLifecycleSession) Promote(_ context.Context, request datalifecycle.PromotionRequest) (datalifecycle.Promotion, error) {
+	s.promoteCalls++
+	s.promotionRequest = request
+	return s.promotion, s.promoteErr
+}
+
+func (s *fakeDataLifecycleSession) Close() error {
+	s.closes++
+	return s.closeErr
+}
+
+func executeWithDataLifecycle(t *testing.T, args []string, session dataLifecycleSession, openErr error, prepare dataLifecyclePreparer) executionResult {
+	t.Helper()
+	if prepare == nil {
+		prepare = func(context.Context, config.Config) error { return nil }
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := runWithPlatformDependencies(context.Background(), args, strings.NewReader(""), &stdout, &stderr,
+		func() config.Config { return config.Config{} }, nil, nil, prepare,
+		func(config.Config, ...capability.Manifest) (dataLifecycleSession, error) { return session, openErr })
+	return executionResult{stdout: stdout.String(), stderr: stderr.String(), err: err}
+}
+
+func lifecycleTestPolicy(retentionDays int) datalifecycle.PolicySnapshot {
+	return datalifecycle.PolicySnapshot{Version: 1, Resources: []datalifecycle.ResourcePolicy{{
+		Resource: "files", Mode: capability.AdminDeletionTombstone, PolicyVersion: 1, RetentionDays: retentionDays, AutoPurge: true,
+	}}}
+}
+
+func lifecyclePolicyFingerprint(t *testing.T, policy datalifecycle.PolicySnapshot) string {
+	t.Helper()
+	fingerprint, err := datalifecycle.PolicyFingerprint(policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fingerprint
+}
+
+func writeLifecyclePolicyFile(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "current-policy.json")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func lifecyclePromotionArgs(policyFile, fingerprint, impactHash string) []string {
+	return []string{
+		"--current-policy-file", policyFile,
+		"--promoted-fingerprint", fingerprint,
+		"--impact-report-hash", impactHash,
+		"--actor", "security-admin",
+		"--reason", "approved-retention-change",
+		"--approval-ref", "CAB-2026-0714",
+	}
+}
+
+func removeLifecycleArgument(args []string, target ...string) []string {
+	result := append([]string(nil), args...)
+	for index := 0; index <= len(result)-len(target); index++ {
+		if strings.Join(result[index:index+len(target)], "\x00") == strings.Join(target, "\x00") {
+			return append(result[:index], result[index+len(target):]...)
+		}
+	}
+	return result
+}
+
+func replaceLifecycleArgument(args []string, oldValue, newValue string) []string {
+	result := append([]string(nil), args...)
+	for index, value := range result {
+		if value == oldValue {
+			result[index] = newValue
+			break
+		}
+	}
+	return result
+}
+
+func assertSingleLifecycleReport(t *testing.T, result executionResult, expected datalifecycle.Report) {
+	t.Helper()
+	var report datalifecycle.Report
+	assertSingleLifecycleJSONInto(t, result, &report)
+	if !reflect.DeepEqual(report, expected) {
+		t.Fatalf("report = %+v, want %+v", report, expected)
+	}
+}
+
+func assertSingleLifecycleJSON(t *testing.T, result executionResult, expected map[string]any) {
+	t.Helper()
+	var output map[string]any
+	assertSingleLifecycleJSONInto(t, result, &output)
+	for key, value := range expected {
+		if output[key] != value {
+			t.Fatalf("output[%q] = %#v, want %#v", key, output[key], value)
+		}
+	}
+}
+
+func assertSingleLifecycleJSONInto(t *testing.T, result executionResult, target any) {
+	t.Helper()
+	if result.err != nil || result.stderr != "" || strings.Count(result.stdout, "\n") != 1 {
+		t.Fatalf("result = %+v, want one JSON line", result)
+	}
+	if err := json.Unmarshal([]byte(result.stdout), target); err != nil {
+		t.Fatalf("stdout is not valid JSON: %v", err)
+	}
+}
+
+func assertDataLifecycleRejected(t *testing.T, result executionResult, values ...string) {
+	t.Helper()
+	if result.err == nil || result.stdout != "" || result.stderr != "" {
+		t.Fatalf("result = %+v, want normalized failure and empty output", result)
+	}
+	for _, value := range values {
+		if value != "" && strings.Contains(result.err.Error()+result.stdout+result.stderr, value) {
+			t.Fatalf("result exposed sensitive value %q: %+v", value, result)
+		}
 	}
 }
 

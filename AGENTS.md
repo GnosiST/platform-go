@@ -69,6 +69,7 @@ rtk node scripts/validate-platform-deployment-topology.mjs
 rtk node scripts/validate-platform-task-execution-audit.mjs
 rtk node scripts/validate-platform-goal-completion-audit.mjs
 rtk node scripts/validate-platform-node-closeout-audit.mjs
+rtk node scripts/validate-platform-data-lifecycle-retention.mjs
 rtk node scripts/validate-platform-objective-conformance.mjs
 rtk node scripts/validate-platform-promotion-evidence-templates.mjs
 rtk node scripts/validate-admin-i18n.mjs
@@ -118,6 +119,7 @@ rtk node scripts/validate-platform-production-env.mjs
 rtk node scripts/validate-platform-task-execution-audit.mjs
 rtk node scripts/validate-platform-goal-completion-audit.mjs
 rtk node scripts/validate-platform-node-closeout-audit.mjs
+rtk node scripts/validate-platform-data-lifecycle-retention.mjs
 rtk node scripts/validate-platform-objective-conformance.mjs
 rtk node scripts/validate-platform-promotion-evidence-templates.mjs
 rtk node scripts/validate-platform-file-storage-experience.mjs

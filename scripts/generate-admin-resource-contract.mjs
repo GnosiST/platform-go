@@ -116,6 +116,9 @@ function runtimeRoute(resource, route) {
   if (route.path === `${legacyBase}/:id`) {
     return { ...route, path: `${runtimeBase}/:id` };
   }
+  if (route.path === `${legacyBase}/:id/restore`) {
+    return { ...route, path: `${runtimeBase}/:id/restore` };
+  }
   return route;
 }
 
@@ -155,6 +158,14 @@ function capabilityRoutes(resource) {
       auditAction: `${auditBase}.delete`,
     },
   ];
+  if (resource.permissions?.restore) {
+    routes.push({
+      method: "POST",
+      path: `${base}/:id/restore`,
+      permission: resource.permissions.restore,
+      auditAction: `${auditBase}.restore`,
+    });
+  }
   if (resource.resource === "policy-reviews" && resource.permissions?.update) {
     for (const action of ["request", "approve", "reject"]) {
       routes.push({
@@ -226,6 +237,7 @@ function capabilityResourceToManifestResource(resource) {
     },
     apiBase: `/api/admin/${resource.resource}`,
     permissions: resource.permissions ?? {},
+    deletion: resource.deletion,
     actions: resource.actions ?? [],
     panels: resource.panels ?? [],
     routes: capabilityRoutes(resource),
@@ -247,13 +259,51 @@ function capabilityResourceToManifestResource(resource) {
   };
 }
 
+function mergeStaticResourceWithCapability(resource, capabilityResource) {
+  if (!capabilityResource) {
+    return resource;
+  }
+  const permissions = { ...(resource.permissions ?? {}) };
+  for (const action of ["delete", "restore", "purge"]) {
+    delete permissions[action];
+  }
+  Object.assign(permissions, capabilityResource.permissions ?? {});
+
+  const routes = [...(resource.routes ?? [])].filter((route) => {
+    if (route.method === "DELETE" && !capabilityResource.permissions?.delete) {
+      return false;
+    }
+    return !route.path.endsWith("/restore");
+  });
+  if (capabilityResource.permissions?.restore) {
+    const base = resource.apiBase ?? `/api/admin/${resource.code ?? resource.name}`;
+    routes.push({
+      method: "POST",
+      path: `${base}/:id/restore`,
+      permission: capabilityResource.permissions.restore,
+      auditAction: `${auditActionBase(capabilityResource.resource)}.restore`,
+    });
+  }
+  return {
+    ...resource,
+    permissions,
+    routes,
+    deletion: capabilityResource.deletion,
+  };
+}
+
 function mergedResources() {
-  const staticKeys = new Set(resources.flatMap((resource) => [resource.name, resource.code].filter(Boolean)));
   const capabilityContract = loadCapabilityResourceContract();
-  const capabilityResources = (capabilityContract.resources ?? [])
+  const declaredResources = (capabilityContract.resources ?? []).filter((resource) => resource.resource);
+  const capabilityByResource = new Map(declaredResources.map((resource) => [resource.resource, resource]));
+  const mergedStaticResources = resources.map((resource) =>
+    mergeStaticResourceWithCapability(resource, capabilityByResource.get(resource.code) ?? capabilityByResource.get(resource.name)),
+  );
+  const staticKeys = new Set(mergedStaticResources.flatMap((resource) => [resource.name, resource.code].filter(Boolean)));
+  const capabilityResources = declaredResources
     .filter((resource) => resource.resource && !staticKeys.has(resource.resource))
     .map(capabilityResourceToManifestResource);
-  return [...resources, ...capabilityResources];
+  return [...mergedStaticResources, ...capabilityResources];
 }
 
 function normalizeResource(resource) {
@@ -285,6 +335,7 @@ function normalizeResource(resource) {
     },
     apiBase: resource.apiBase,
     permissions: resource.permissions ?? {},
+    ...(resource.deletion ? { deletion: { ...resource.deletion } } : {}),
     permissionCodes,
     actions: resource.actions ?? [],
     panels: resource.panels ?? [],

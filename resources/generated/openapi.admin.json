@@ -1901,70 +1901,6 @@
       }
     },
     "/api/admin/resources/app-identities/{id}": {
-      "delete": {
-        "tags": [
-          "appIdentities"
-        ],
-        "operationId": "deleteAppIdentitiesById",
-        "summary": "DELETE App Identities",
-        "description": "Resource: appIdentities\nPermission: admin:app-identity:delete\nAudit action: app_identity.delete",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/DeleteResult"
-                    },
-                    "error": {
-                      "$ref": "#/components/schemas/ErrorBody"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        },
-        "x-platform-resource": "appIdentities",
-        "x-platform-resource-code": "app-identities",
-        "x-platform-permission": "admin:app-identity:delete",
-        "x-platform-codegen-mode": "scaffold",
-        "x-platform-audit-action": "app_identity.delete"
-      },
       "put": {
         "tags": [
           "appIdentities"
@@ -3503,6 +3439,75 @@
         }
       }
     },
+    "/api/admin/resources/dictionary-parameters/{id}/restore": {
+      "post": {
+        "tags": [
+          "dictionary-parameters"
+        ],
+        "operationId": "restoreDictionaryParametersById",
+        "summary": "POST Dictionary Parameters",
+        "description": "Resource: dictionary-parameters\nPermission: admin:dictionary-parameter:restore\nAudit action: dictionary_parameter.restore",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomOperationData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-resource": "dictionary-parameters",
+        "x-platform-resource-code": "dictionary-parameters",
+        "x-platform-permission": "admin:dictionary-parameter:restore",
+        "x-platform-codegen-mode": "custom",
+        "x-platform-audit-action": "dictionary_parameter.restore"
+      }
+    },
     "/api/admin/resources/dictionary-parameters/query": {
       "post": {
         "tags": [
@@ -3866,6 +3871,75 @@
         "x-platform-permission": "admin:file:delete",
         "x-platform-codegen-mode": "custom",
         "x-platform-audit-action": "file.delete"
+      }
+    },
+    "/api/admin/resources/files/{id}/restore": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "operationId": "restoreFilesById",
+        "summary": "POST Files",
+        "description": "Resource: files\nPermission: admin:file:restore\nAudit action: file.restore",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomOperationData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-resource": "files",
+        "x-platform-resource-code": "files",
+        "x-platform-permission": "admin:file:restore",
+        "x-platform-codegen-mode": "custom",
+        "x-platform-audit-action": "file.restore"
       }
     },
     "/api/admin/resources/files/query": {
@@ -4337,6 +4411,88 @@
         }
       }
     },
+    "/api/admin/resources/menus/{id}/restore": {
+      "post": {
+        "tags": [
+          "menus"
+        ],
+        "operationId": "restoreMenusById",
+        "summary": "POST Menus",
+        "description": "Resource: menus\nPermission: admin:menu:restore\nAudit action: menu.restore",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "resource",
+                        "record"
+                      ],
+                      "properties": {
+                        "resource": {
+                          "type": "string",
+                          "const": "menus"
+                        },
+                        "record": {
+                          "$ref": "#/components/schemas/MenusRecord"
+                        }
+                      }
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-resource": "menus",
+        "x-platform-resource-code": "menus",
+        "x-platform-permission": "admin:menu:restore",
+        "x-platform-codegen-mode": "scaffold",
+        "x-platform-audit-action": "menu.restore"
+      }
+    },
     "/api/admin/resources/menus/query": {
       "post": {
         "tags": [
@@ -4672,6 +4828,75 @@
             }
           }
         }
+      }
+    },
+    "/api/admin/resources/monitoring/{id}/restore": {
+      "post": {
+        "tags": [
+          "monitoring"
+        ],
+        "operationId": "restoreMonitoringById",
+        "summary": "POST Monitoring",
+        "description": "Resource: monitoring\nPermission: admin:monitoring:restore\nAudit action: monitoring.restore",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomOperationData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-resource": "monitoring",
+        "x-platform-resource-code": "monitoring",
+        "x-platform-permission": "admin:monitoring:restore",
+        "x-platform-codegen-mode": "custom",
+        "x-platform-audit-action": "monitoring.restore"
       }
     },
     "/api/admin/resources/monitoring/query": {
@@ -5019,6 +5244,88 @@
             }
           }
         }
+      }
+    },
+    "/api/admin/resources/org-units/{id}/restore": {
+      "post": {
+        "tags": [
+          "orgUnits"
+        ],
+        "operationId": "restoreOrgUnitsById",
+        "summary": "POST Org Units",
+        "description": "Resource: orgUnits\nPermission: admin:org-unit:restore\nAudit action: org_unit.restore",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "resource",
+                        "record"
+                      ],
+                      "properties": {
+                        "resource": {
+                          "type": "string",
+                          "const": "orgUnits"
+                        },
+                        "record": {
+                          "$ref": "#/components/schemas/OrgUnitsRecord"
+                        }
+                      }
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-resource": "orgUnits",
+        "x-platform-resource-code": "org-units",
+        "x-platform-permission": "admin:org-unit:restore",
+        "x-platform-codegen-mode": "scaffold",
+        "x-platform-audit-action": "org_unit.restore"
       }
     },
     "/api/admin/resources/org-units/query": {
@@ -5448,6 +5755,88 @@
             }
           }
         }
+      }
+    },
+    "/api/admin/resources/parameters/{id}/restore": {
+      "post": {
+        "tags": [
+          "parameters"
+        ],
+        "operationId": "restoreParametersById",
+        "summary": "POST Parameters",
+        "description": "Resource: parameters\nPermission: admin:parameter:restore\nAudit action: parameter.restore",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "resource",
+                        "record"
+                      ],
+                      "properties": {
+                        "resource": {
+                          "type": "string",
+                          "const": "parameters"
+                        },
+                        "record": {
+                          "$ref": "#/components/schemas/ParametersRecord"
+                        }
+                      }
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-resource": "parameters",
+        "x-platform-resource-code": "parameters",
+        "x-platform-permission": "admin:parameter:restore",
+        "x-platform-codegen-mode": "scaffold",
+        "x-platform-audit-action": "parameter.restore"
       }
     },
     "/api/admin/resources/parameters/query": {
@@ -6158,6 +6547,88 @@
         }
       }
     },
+    "/api/admin/resources/role-groups/{id}/restore": {
+      "post": {
+        "tags": [
+          "roleGroups"
+        ],
+        "operationId": "restoreRoleGroupsById",
+        "summary": "POST Role Groups",
+        "description": "Resource: roleGroups\nPermission: admin:role-group:restore\nAudit action: role_group.restore",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "resource",
+                        "record"
+                      ],
+                      "properties": {
+                        "resource": {
+                          "type": "string",
+                          "const": "roleGroups"
+                        },
+                        "record": {
+                          "$ref": "#/components/schemas/RoleGroupsRecord"
+                        }
+                      }
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-resource": "roleGroups",
+        "x-platform-resource-code": "role-groups",
+        "x-platform-permission": "admin:role-group:restore",
+        "x-platform-codegen-mode": "scaffold",
+        "x-platform-audit-action": "role_group.restore"
+      }
+    },
     "/api/admin/resources/role-groups/query": {
       "post": {
         "tags": [
@@ -6520,6 +6991,88 @@
         }
       }
     },
+    "/api/admin/resources/roles/{id}/restore": {
+      "post": {
+        "tags": [
+          "roles"
+        ],
+        "operationId": "restoreRolesById",
+        "summary": "POST Roles",
+        "description": "Resource: roles\nPermission: admin:role:restore\nAudit action: role.restore",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "resource",
+                        "record"
+                      ],
+                      "properties": {
+                        "resource": {
+                          "type": "string",
+                          "const": "roles"
+                        },
+                        "record": {
+                          "$ref": "#/components/schemas/RolesRecord"
+                        }
+                      }
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-resource": "roles",
+        "x-platform-resource-code": "roles",
+        "x-platform-permission": "admin:role:restore",
+        "x-platform-codegen-mode": "scaffold",
+        "x-platform-audit-action": "role.restore"
+      }
+    },
     "/api/admin/resources/roles/query": {
       "post": {
         "tags": [
@@ -6659,72 +7212,6 @@
             }
           }
         }
-      }
-    },
-    "/api/admin/resources/sessions/{id}": {
-      "delete": {
-        "tags": [
-          "sessions"
-        ],
-        "operationId": "deleteSessionsById",
-        "summary": "DELETE Sessions",
-        "description": "Resource: sessions\nPermission: admin:session:delete\nAudit action: session.delete",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/DeleteResult"
-                    },
-                    "error": {
-                      "$ref": "#/components/schemas/ErrorBody"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        },
-        "x-platform-resource": "sessions",
-        "x-platform-resource-code": "sessions",
-        "x-platform-permission": "admin:session:delete",
-        "x-platform-codegen-mode": "readOnly",
-        "x-platform-audit-action": "session.delete"
       }
     },
     "/api/admin/resources/sessions/query": {
@@ -7201,6 +7688,88 @@
         }
       }
     },
+    "/api/admin/resources/tenants/{id}/restore": {
+      "post": {
+        "tags": [
+          "tenants"
+        ],
+        "operationId": "restoreTenantsById",
+        "summary": "POST Tenants",
+        "description": "Resource: tenants\nPermission: admin:tenant:restore\nAudit action: tenant.restore",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "resource",
+                        "record"
+                      ],
+                      "properties": {
+                        "resource": {
+                          "type": "string",
+                          "const": "tenants"
+                        },
+                        "record": {
+                          "$ref": "#/components/schemas/TenantsRecord"
+                        }
+                      }
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-resource": "tenants",
+        "x-platform-resource-code": "tenants",
+        "x-platform-permission": "admin:tenant:restore",
+        "x-platform-codegen-mode": "scaffold",
+        "x-platform-audit-action": "tenant.restore"
+      }
+    },
     "/api/admin/resources/tenants/query": {
       "post": {
         "tags": [
@@ -7563,6 +8132,88 @@
             }
           }
         }
+      }
+    },
+    "/api/admin/resources/users/{id}/restore": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "operationId": "restoreUsersById",
+        "summary": "POST Users",
+        "description": "Resource: users\nPermission: admin:user:restore\nAudit action: user.restore",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "resource",
+                        "record"
+                      ],
+                      "properties": {
+                        "resource": {
+                          "type": "string",
+                          "const": "users"
+                        },
+                        "record": {
+                          "$ref": "#/components/schemas/UsersRecord"
+                        }
+                      }
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-resource": "users",
+        "x-platform-resource-code": "users",
+        "x-platform-permission": "admin:user:restore",
+        "x-platform-codegen-mode": "scaffold",
+        "x-platform-audit-action": "user.restore"
       }
     },
     "/api/admin/resources/users/query": {

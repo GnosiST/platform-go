@@ -57,18 +57,19 @@ type adminResourceContractDocument struct {
 }
 
 type adminResourceContractEntry struct {
-	CapabilityID     string                              `json:"capabilityId"`
-	Resource         string                              `json:"resource"`
-	Title            capability.LocalizedText            `json:"title"`
-	Description      capability.LocalizedText            `json:"description"`
-	PermissionPrefix string                              `json:"permissionPrefix"`
-	Permissions      map[string]string                   `json:"permissions"`
-	Menu             adminMenuContract                   `json:"menu"`
-	FormGroups       []adminFormGroupContract            `json:"formGroups,omitempty"`
-	Fields           []adminFieldContract                `json:"fields,omitempty"`
-	SearchFields     []string                            `json:"searchFields,omitempty"`
-	DefaultSortKey   string                              `json:"defaultSortKey,omitempty"`
-	Protection       *capability.AdminResourceProtection `json:"protection,omitempty"`
+	CapabilityID     string                                  `json:"capabilityId"`
+	Resource         string                                  `json:"resource"`
+	Title            capability.LocalizedText                `json:"title"`
+	Description      capability.LocalizedText                `json:"description"`
+	PermissionPrefix string                                  `json:"permissionPrefix"`
+	Permissions      map[string]string                       `json:"permissions"`
+	Menu             adminMenuContract                       `json:"menu"`
+	FormGroups       []adminFormGroupContract                `json:"formGroups,omitempty"`
+	Fields           []adminFieldContract                    `json:"fields,omitempty"`
+	SearchFields     []string                                `json:"searchFields,omitempty"`
+	DefaultSortKey   string                                  `json:"defaultSortKey,omitempty"`
+	Protection       *capability.AdminResourceProtection     `json:"protection,omitempty"`
+	Deletion         *capability.AdminResourceDeletionPolicy `json:"deletion"`
 }
 
 type adminMenuContract struct {
@@ -357,13 +358,14 @@ func buildAdminResourceContractDocument(manifests []capability.Manifest) (adminR
 				Title:            resource.Title,
 				Description:      resource.Description,
 				PermissionPrefix: resource.PermissionPrefix,
-				Permissions:      adminResourcePermissions(resource.PermissionPrefix),
+				Permissions:      adminResourcePermissions(resource),
 				Menu:             adminMenuFromCapability(resource.Menu),
 				FormGroups:       adminFormGroupsFromCapability(resource.FormGroups),
 				Fields:           adminFieldsFromCapability(resource.Fields),
 				SearchFields:     append([]string(nil), resource.SearchFields...),
 				DefaultSortKey:   resource.DefaultSortKey,
 				Protection:       resource.Protection,
+				Deletion:         resource.Deletion,
 			})
 		}
 	}
@@ -454,13 +456,31 @@ func buildPlatformAuditDocument(manifests []capability.Manifest) (platformAuditD
 	}, nil
 }
 
-func adminResourcePermissions(prefix string) map[string]string {
-	return map[string]string{
+func adminResourcePermissions(resource capability.AdminResource) map[string]string {
+	prefix := resource.PermissionPrefix
+	permissions := map[string]string{
 		"read":   prefix + ":read",
 		"create": prefix + ":create",
 		"update": prefix + ":update",
-		"delete": prefix + ":delete",
 	}
+	if resource.Deletion == nil {
+		return permissions
+	}
+	switch resource.Deletion.Mode {
+	case capability.AdminDeletionDisabled, capability.AdminDeletionAppendOnly:
+	case capability.AdminDeletionSoftDelete, capability.AdminDeletionTombstone:
+		permissions["delete"] = prefix + ":delete"
+		permissions["restore"] = prefix + ":restore"
+		permissions["purge"] = prefix + ":purge"
+	case capability.AdminDeletionRevoke:
+		permissions["delete"] = prefix + ":delete"
+		if resource.Deletion.RetentionDays > 0 {
+			permissions["purge"] = prefix + ":purge"
+		}
+	default:
+		permissions["delete"] = prefix + ":delete"
+	}
+	return permissions
 }
 
 func adminMenuFromCapability(menu capability.AdminMenu) adminMenuContract {

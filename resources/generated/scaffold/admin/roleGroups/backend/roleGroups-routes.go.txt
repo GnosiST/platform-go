@@ -8,6 +8,7 @@ package httpapi
 
 // DELETE /api/admin/resources/role-groups/:id -> admin:role-group:delete
 // POST /api/admin/resources/role-groups -> admin:role-group:create
+// POST /api/admin/resources/role-groups/:id/restore -> admin:role-group:restore
 // POST /api/admin/resources/role-groups/query -> admin:role-group:read
 // PUT /api/admin/resources/role-groups/:id -> admin:role-group:update
 

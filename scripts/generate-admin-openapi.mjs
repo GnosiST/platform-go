@@ -58,6 +58,8 @@ function uniqueOperationId(resource, route) {
     action = "reject";
   } else if (route.path.endsWith("/export")) {
     action = "export";
+  } else if (route.path.endsWith("/restore")) {
+    action = "restore";
   } else if (route.method === "GET") {
     action = params.length > 0 ? "get" : "list";
   } else if (route.method === "POST") {
@@ -367,7 +369,7 @@ function operationRequestBody(resource, route) {
         },
       };
     }
-    if (route.path.endsWith("/apply") || route.path.endsWith("/request") || route.path.endsWith("/approve")) {
+    if (route.path.endsWith("/apply") || route.path.endsWith("/request") || route.path.endsWith("/approve") || route.path.endsWith("/restore")) {
       return undefined;
     }
     return {
@@ -429,6 +431,7 @@ function operation(resource, route) {
     responses: {
       "200": successResponse("Successful response", operationSuccessSchema(resource, route)),
       ...errorResponses(),
+      ...(route.path.endsWith("/restore") ? { "409": { $ref: "#/components/responses/Conflict" } } : {}),
     },
     "x-platform-resource": resource.name,
     "x-platform-resource-code": resource.code,

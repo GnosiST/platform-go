@@ -3,10 +3,12 @@ package config
 import (
 	"encoding/base64"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLoadUsesDefaults(t *testing.T) {
@@ -26,6 +28,10 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_LIFECYCLE_HISTORY_FILE", "")
 	t.Setenv("PLATFORM_LIFECYCLE_HISTORY_DRIVER", "")
 	t.Setenv("PLATFORM_LIFECYCLE_HISTORY_DSN", "")
+	t.Setenv("PLATFORM_RETENTION_RUNNER_ENABLED", "")
+	t.Setenv("PLATFORM_RETENTION_RUNNER_INTERVAL", "")
+	t.Setenv("PLATFORM_RETENTION_RUNNER_BATCH_SIZE", "")
+	t.Setenv("PLATFORM_RETENTION_RUNNER_MAX_RETRIES", "")
 	t.Setenv("PLATFORM_DATABASE_DRIVER", "")
 	t.Setenv("PLATFORM_DATABASE_DSN", "")
 	t.Setenv("PLATFORM_OPENAPI_FILE", "")
@@ -100,6 +106,12 @@ func TestLoadUsesDefaults(t *testing.T) {
 	}
 	if cfg.AdminResourceDSN != "" {
 		t.Fatalf("AdminResourceDSN = %q, want empty by default", cfg.AdminResourceDSN)
+	}
+	if cfg.RetentionRunnerEnabled {
+		t.Fatal("RetentionRunnerEnabled = true, want disabled by default")
+	}
+	if cfg.RetentionRunnerInterval != 24*time.Hour || cfg.RetentionRunnerBatchSize != 100 || cfg.RetentionRunnerMaxRetries != 3 {
+		t.Fatalf("retention runner defaults = %s/%d/%d, want 24h/100/3", cfg.RetentionRunnerInterval, cfg.RetentionRunnerBatchSize, cfg.RetentionRunnerMaxRetries)
 	}
 	if cfg.SessionFile != "" {
 		t.Fatalf("SessionFile = %q, want empty by default", cfg.SessionFile)
@@ -184,6 +196,105 @@ func TestLoadUsesDefaults(t *testing.T) {
 	}
 	if cfg.AdminStepUpPhoneSourceConfigured() {
 		t.Fatal("admin step-up phone source must be disabled by default")
+	}
+}
+
+func TestRetentionRunnerRequiresPersistentGORMAdminStorage(t *testing.T) {
+	cfg := validDataProtectionConfig(RuntimeEnvironmentDevelopment, "local-test")
+	cfg.RetentionRunnerEnabled = true
+	cfg.RetentionRunnerInterval = 24 * time.Hour
+	cfg.RetentionRunnerBatchSize = 100
+	cfg.RetentionRunnerMaxRetries = 3
+	if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "PLATFORM_RETENTION_RUNNER_ENABLED") {
+		t.Fatalf("ValidateRuntime(memory retention runner) error = %v", err)
+	}
+	cfg.AdminResourceDriver = "sqlite"
+	cfg.AdminResourceDSN = filepath.Join(t.TempDir(), "admin.db")
+	if err := cfg.ValidateRuntime(); err != nil {
+		t.Fatalf("ValidateRuntime(persistent retention runner) error = %v", err)
+	}
+	cfg.AdminResourceFile = filepath.Join(t.TempDir(), "admin.json")
+	if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "PLATFORM_RETENTION_RUNNER_ENABLED") {
+		t.Fatalf("ValidateRuntime(conflicting file repository) error = %v", err)
+	}
+}
+
+func TestLoadParsesRetentionRunnerEnabled(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  bool
+	}{
+		{name: "default disabled", value: "", want: false},
+		{name: "explicitly enabled", value: "true", want: true},
+		{name: "invalid fails closed", value: "not-a-boolean", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("PLATFORM_RETENTION_RUNNER_ENABLED", tt.value)
+
+			cfg := Load()
+			if cfg.RetentionRunnerEnabled != tt.want {
+				t.Fatalf("RetentionRunnerEnabled = %t, want %t", cfg.RetentionRunnerEnabled, tt.want)
+			}
+			if tt.name == "invalid fails closed" {
+				if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "PLATFORM_RETENTION_RUNNER_ENABLED is invalid") {
+					t.Fatalf("ValidateRuntime() error = %v, want invalid enabled value", err)
+				}
+			}
+		})
+	}
+}
+
+func TestLoadParsesRetentionRunnerSchedule(t *testing.T) {
+	t.Setenv("PLATFORM_RETENTION_RUNNER_INTERVAL", "6h")
+	t.Setenv("PLATFORM_RETENTION_RUNNER_BATCH_SIZE", "250")
+	t.Setenv("PLATFORM_RETENTION_RUNNER_MAX_RETRIES", "4")
+
+	cfg := Load()
+	if cfg.RetentionRunnerInterval != 6*time.Hour || cfg.RetentionRunnerBatchSize != 250 || cfg.RetentionRunnerMaxRetries != 4 {
+		t.Fatalf("retention runner schedule = %s/%d/%d", cfg.RetentionRunnerInterval, cfg.RetentionRunnerBatchSize, cfg.RetentionRunnerMaxRetries)
+	}
+}
+
+func TestRetentionRunnerScheduleValidationFailsClosed(t *testing.T) {
+	tests := []struct {
+		key   string
+		value string
+	}{
+		{key: "PLATFORM_RETENTION_RUNNER_INTERVAL", value: "not-a-duration"},
+		{key: "PLATFORM_RETENTION_RUNNER_BATCH_SIZE", value: "many"},
+		{key: "PLATFORM_RETENTION_RUNNER_MAX_RETRIES", value: "several"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			t.Setenv(tt.key, tt.value)
+			cfg := Load()
+			if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), tt.key+" is invalid") {
+				t.Fatalf("ValidateRuntime() error = %v, want %s invalid", err, tt.key)
+			}
+		})
+	}
+}
+
+func TestRetentionRunnerEnabledRejectsUnsafeScheduleBounds(t *testing.T) {
+	cfg := validDataProtectionConfig(RuntimeEnvironmentDevelopment, "local-test")
+	cfg.AdminResourceDriver = "sqlite"
+	cfg.AdminResourceDSN = filepath.Join(t.TempDir(), "admin.db")
+	cfg.RetentionRunnerEnabled = true
+	cfg.RetentionRunnerInterval = time.Second
+	cfg.RetentionRunnerBatchSize = 1001
+	cfg.RetentionRunnerMaxRetries = 6
+
+	err := cfg.ValidateRuntime()
+	for _, want := range []string{
+		"PLATFORM_RETENTION_RUNNER_INTERVAL",
+		"PLATFORM_RETENTION_RUNNER_BATCH_SIZE",
+		"PLATFORM_RETENTION_RUNNER_MAX_RETRIES",
+	} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Fatalf("ValidateRuntime() error = %v, want %s bound failure", err, want)
+		}
 	}
 }
 

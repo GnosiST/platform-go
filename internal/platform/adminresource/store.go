@@ -33,13 +33,18 @@ func (e ValidationError) Is(target error) bool {
 }
 
 type Record struct {
-	ID          string            `json:"id"`
-	Code        string            `json:"code"`
-	Name        string            `json:"name"`
-	Status      string            `json:"status"`
-	Description string            `json:"description,omitempty"`
-	UpdatedAt   string            `json:"updatedAt"`
-	Values      map[string]string `json:"values,omitempty"`
+	ID                    string            `json:"id"`
+	Code                  string            `json:"code"`
+	Name                  string            `json:"name"`
+	Status                string            `json:"status"`
+	Description           string            `json:"description,omitempty"`
+	UpdatedAt             string            `json:"updatedAt"`
+	Values                map[string]string `json:"values,omitempty"`
+	DeletedAt             string            `json:"deletedAt,omitempty"`
+	DeletedBy             string            `json:"deletedBy,omitempty"`
+	DeleteReason          string            `json:"deleteReason,omitempty"`
+	PurgeAfter            string            `json:"purgeAfter,omitempty"`
+	DeletionPolicyVersion uint32            `json:"deletionPolicyVersion,omitempty"`
 }
 
 type WriteInput struct {
@@ -262,6 +267,9 @@ func (s *Store) update(resource string, id string, input WriteInput, origin Writ
 	if index < 0 {
 		return Record{}, ErrRecordNotFound
 	}
+	if isLifecycleDeleted(items[index]) {
+		return Record{}, ErrRecordDeleted
+	}
 	if strings.TrimSpace(input.Code) == "" {
 		input.Code = items[index].Code
 	}
@@ -292,17 +300,10 @@ func (s *Store) Delete(resource string, id string) error {
 	if err != nil {
 		return err
 	}
-	items, ok := s.resources[resource]
-	if !ok {
-		return ErrUnknownResource
+	_, nextItems, err := s.deletionMutationLocked(resource, id, "system", "deleted")
+	if err != nil {
+		return err
 	}
-	index := slices.IndexFunc(items, func(record Record) bool {
-		return record.ID == id
-	})
-	if index < 0 {
-		return ErrRecordNotFound
-	}
-	nextItems := slices.Delete(append([]Record(nil), items...), index, index+1)
 	s.resources[resource] = nextItems
 	if err := s.persistLocked(); err != nil {
 		s.restoreSnapshotLocked(previous)

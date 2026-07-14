@@ -103,7 +103,6 @@ function validateCurrentRuntime(contract, errors) {
       "func (s *Server) adminFileContent",
       "func (s *Server) deleteAdminFile",
       "TombstoneFileWithAudit",
-      "PurgeTombstonedFileWithAudit",
       "func (s *Server) recordFileAudit",
       'api.POST("/admin/files/upload", s.adminFileUpload)',
       'api.GET("/admin/files/:id/content", s.adminFileContent)',
@@ -115,6 +114,13 @@ function validateCurrentRuntime(contract, errors) {
       if (!server.includes(snippet)) {
         errors.push(`${serverPath} must include file-storage runtime evidence ${snippet}`);
       }
+    }
+  }
+  const lifecycleApplierPath = "internal/platform/datalifecycle/adminresource_adapter.go";
+  if (relativeExistingPath(lifecycleApplierPath)) {
+    const lifecycleApplier = fs.readFileSync(path.resolve(repoRoot, lifecycleApplierPath), "utf8");
+    if (!lifecycleApplier.includes("PurgeTombstonedFileWithPolicyAndAudit")) {
+      errors.push(`${lifecycleApplierPath} must include file-storage lifecycle purge evidence PurgeTombstonedFileWithPolicyAndAudit`);
     }
   }
 

@@ -3,6 +3,7 @@ package capability
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestValidateAdminSurfaceAcceptsUniqueEnabledResources(t *testing.T) {
@@ -16,6 +17,7 @@ func TestValidateAdminSurfaceAcceptsUniqueEnabledResources(t *testing.T) {
 						Title:            Text("反馈工单", "Feedback Tickets"),
 						Description:      Text("用户反馈与处理记录。", "User feedback and handling records."),
 						PermissionPrefix: "admin:feedback-ticket",
+						Deletion:         &AdminResourceDeletionPolicy{Mode: AdminDeletionSoftDelete, PolicyVersion: 1},
 						Menu:             AdminMenu{Route: "/feedback-tickets", Group: "operations", Icon: "audit", Order: 250},
 					},
 				},
@@ -110,6 +112,7 @@ func TestValidateAdminSurfaceAcceptsExternalMenuURL(t *testing.T) {
 						Title:            Text("外部文档", "External Docs"),
 						Description:      Text("外部文档入口。", "External documentation entry."),
 						PermissionPrefix: "admin:external-doc",
+						Deletion:         &AdminResourceDeletionPolicy{Mode: AdminDeletionDisabled, PolicyVersion: 1},
 						Menu: AdminMenu{
 							Route:    "https://docs.example.com/platform",
 							Group:    "foundation",
@@ -205,6 +208,69 @@ func TestValidateAdminSurfaceRejectsInvalidPermissionPrefix(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "permission prefix must match admin:<resource>") {
 		t.Fatalf("ValidateAdminSurface() error = %v, want invalid permission prefix", err)
+	}
+}
+
+func TestValidateAdminSurfaceRequiresSafeDeletionPolicy(t *testing.T) {
+	base := validAdminResource("demo-resources", "/demo-resources", "admin:demo")
+	tests := []struct {
+		name    string
+		mutate  func(*AdminResource)
+		wantErr string
+	}{
+		{name: "missing", mutate: func(resource *AdminResource) { resource.Deletion = nil }, wantErr: "deletion policy is required"},
+		{name: "unknown mode", mutate: func(resource *AdminResource) { resource.Deletion.Mode = "archive" }, wantErr: "deletion mode must be one of"},
+		{name: "missing version", mutate: func(resource *AdminResource) { resource.Deletion.PolicyVersion = 0 }, wantErr: "policy version"},
+		{name: "negative retention", mutate: func(resource *AdminResource) { resource.Deletion.RetentionDays = -1 }, wantErr: "retention days"},
+		{name: "retention exceeds maximum", mutate: func(resource *AdminResource) { resource.Deletion.RetentionDays = MaximumAdminRetentionDays + 1 }, wantErr: "must not exceed"},
+		{name: "automatic purge without retention", mutate: func(resource *AdminResource) { resource.Deletion.AutoPurge = true }, wantErr: "positive retention window"},
+		{name: "automatic purge on append only", mutate: func(resource *AdminResource) {
+			resource.Deletion.Mode = AdminDeletionAppendOnly
+			resource.Deletion.RetentionDays = 1
+			resource.Deletion.AutoPurge = true
+		}, wantErr: "automatic purge is unsupported"},
+		{name: "automatic purge on custom tombstone", mutate: func(resource *AdminResource) {
+			resource.Deletion.Mode = AdminDeletionTombstone
+			resource.Deletion.RetentionDays = 1
+			resource.Deletion.AutoPurge = true
+		}, wantErr: "automatic purge is unsupported"},
+		{name: "automatic purge on custom revoke", mutate: func(resource *AdminResource) {
+			resource.Deletion.Mode = AdminDeletionRevoke
+			resource.Deletion.RetentionDays = 1
+			resource.Deletion.AutoPurge = true
+		}, wantErr: "automatic purge is unsupported"},
+		{name: "retention on hard delete", mutate: func(resource *AdminResource) {
+			resource.Deletion.Mode = AdminDeletionHardDelete
+			resource.Deletion.RetentionDays = 1
+		}, wantErr: "retention window is unsupported"},
+		{name: "reference guard on revoke", mutate: func(resource *AdminResource) {
+			resource.Deletion.Mode = AdminDeletionRevoke
+			resource.Deletion.RestrictReferences = true
+		}, wantErr: "reference restriction is unsupported"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resource := base
+			policy := *base.Deletion
+			resource.Deletion = &policy
+			test.mutate(&resource)
+			err := ValidateAdminSurface([]Manifest{{ID: "demo", Admin: AdminSurface{Resources: []AdminResource{resource}}}})
+			if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+				t.Fatalf("ValidateAdminSurface() error = %v, want %q", err, test.wantErr)
+			}
+		})
+	}
+}
+
+func TestAdminRetentionDurationIsBounded(t *testing.T) {
+	duration, ok := AdminRetentionDuration(MaximumAdminRetentionDays)
+	if !ok || duration != 36500*24*time.Hour {
+		t.Fatalf("AdminRetentionDuration(maximum) = %v, %t", duration, ok)
+	}
+	for _, days := range []int{-1, MaximumAdminRetentionDays + 1} {
+		if duration, ok := AdminRetentionDuration(days); ok || duration != 0 {
+			t.Fatalf("AdminRetentionDuration(%d) = %v, %t; want rejected", days, duration, ok)
+		}
 	}
 }
 
@@ -1243,6 +1309,7 @@ func validAdminResource(resource string, route string, permissionPrefix string) 
 		Title:            Text("标题", "Title"),
 		Description:      Text("描述", "Description"),
 		PermissionPrefix: permissionPrefix,
+		Deletion:         &AdminResourceDeletionPolicy{Mode: AdminDeletionSoftDelete, PolicyVersion: 1},
 		Menu:             AdminMenu{Route: route, Group: "foundation", Icon: "overview", Order: 10},
 	}
 }

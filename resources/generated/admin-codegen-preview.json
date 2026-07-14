@@ -89,64 +89,92 @@
       "permissions",
       "roleGroups",
       "roles",
-      "sessions",
       "settings",
       "tenants",
       "users",
       "versions"
     ],
     "permissions": [
+      "admin:api-docs:create",
       "admin:api-docs:read",
+      "admin:api-docs:update",
       "admin:api-resource:create",
       "admin:api-resource:delete",
       "admin:api-resource:read",
       "admin:api-resource:update",
       "admin:api-token:create",
       "admin:api-token:delete",
+      "admin:api-token:purge",
       "admin:api-token:read",
+      "admin:api-token:update",
       "admin:app-identity:create",
-      "admin:app-identity:delete",
       "admin:app-identity:read",
       "admin:app-identity:update",
       "admin:area-code:create",
       "admin:area-code:delete",
       "admin:area-code:read",
       "admin:area-code:update",
+      "admin:audit-log:create",
       "admin:audit-log:read",
+      "admin:audit-log:update",
+      "admin:branding:create",
       "admin:branding:read",
       "admin:branding:update",
+      "admin:capability:create",
       "admin:capability:read",
+      "admin:capability:update",
       "admin:demo-data:apply",
+      "admin:demo-data:create",
       "admin:demo-data:read",
+      "admin:demo-data:update",
       "admin:dictionary-parameter:create",
       "admin:dictionary-parameter:delete",
+      "admin:dictionary-parameter:purge",
       "admin:dictionary-parameter:read",
+      "admin:dictionary-parameter:restore",
       "admin:dictionary-parameter:update",
       "admin:dictionary:create",
       "admin:dictionary:delete",
       "admin:dictionary:read",
       "admin:dictionary:update",
+      "admin:error-log:create",
       "admin:error-log:read",
+      "admin:error-log:update",
       "admin:file:create",
       "admin:file:delete",
+      "admin:file:purge",
       "admin:file:read",
+      "admin:file:restore",
+      "admin:file:update",
+      "admin:login-log:create",
       "admin:login-log:read",
+      "admin:login-log:update",
       "admin:menu:create",
       "admin:menu:delete",
+      "admin:menu:purge",
       "admin:menu:read",
+      "admin:menu:restore",
       "admin:menu:update",
       "admin:monitoring:create",
       "admin:monitoring:delete",
+      "admin:monitoring:purge",
       "admin:monitoring:read",
+      "admin:monitoring:restore",
       "admin:monitoring:update",
       "admin:org-unit:create",
       "admin:org-unit:delete",
+      "admin:org-unit:purge",
       "admin:org-unit:read",
+      "admin:org-unit:restore",
       "admin:org-unit:update",
+      "admin:overview:create",
       "admin:overview:read",
+      "admin:overview:update",
       "admin:parameter:create",
       "admin:parameter:delete",
+      "admin:parameter:purge",
       "admin:parameter:read",
+      "admin:parameter:restore",
       "admin:parameter:update",
       "admin:permission:create",
       "admin:permission:delete",
@@ -154,29 +182,39 @@
       "admin:permission:update",
       "admin:role-group:create",
       "admin:role-group:delete",
+      "admin:role-group:purge",
       "admin:role-group:read",
+      "admin:role-group:restore",
       "admin:role-group:update",
       "admin:role:create",
       "admin:role:delete",
+      "admin:role:purge",
       "admin:role:read",
+      "admin:role:restore",
       "admin:role:update",
-      "admin:session:delete",
+      "admin:session:create",
       "admin:session:read",
+      "admin:session:update",
+      "admin:settings:create",
       "admin:settings:read",
       "admin:settings:update",
       "admin:tenant:create",
       "admin:tenant:delete",
+      "admin:tenant:purge",
       "admin:tenant:read",
+      "admin:tenant:restore",
       "admin:tenant:update",
       "admin:user:create",
       "admin:user:delete",
+      "admin:user:purge",
       "admin:user:read",
+      "admin:user:restore",
       "admin:user:update",
       "admin:version:create",
       "admin:version:read",
       "admin:version:update"
     ],
-    "routeCount": 82,
+    "routeCount": 90,
     "schemaCount": 27
   },
   "guardrails": [
@@ -474,14 +512,6 @@
         "repositoryPackage": "internal/platform/repository",
         "routes": [
           {
-            "method": "DELETE",
-            "path": "/api/admin/resources/app-identities/:id",
-            "permission": "admin:app-identity:delete",
-            "operationId": "appIdentities.delete",
-            "mutates": true,
-            "auditActionCandidate": "app_identity.delete"
-          },
-          {
             "method": "POST",
             "path": "/api/admin/resources/app-identities",
             "permission": "admin:app-identity:create",
@@ -573,7 +603,6 @@
         "required": true,
         "actionCandidates": [
           "app_identity.create",
-          "app_identity.delete",
           "app_identity.update"
         ]
       }
@@ -1159,6 +1188,14 @@
           },
           {
             "method": "POST",
+            "path": "/api/admin/resources/dictionary-parameters/:id/restore",
+            "permission": "admin:dictionary-parameter:restore",
+            "operationId": "dictionary-parameters.restore",
+            "mutates": true,
+            "auditActionCandidate": "dictionary_parameter.restore"
+          },
+          {
+            "method": "POST",
             "path": "/api/admin/resources/dictionary-parameters/query",
             "permission": "admin:dictionary-parameter:read",
             "operationId": "dictionary-parameters.query",
@@ -1244,6 +1281,7 @@
         "actionCandidates": [
           "dictionary_parameter.create",
           "dictionary_parameter.delete",
+          "dictionary_parameter.restore",
           "dictionary_parameter.update"
         ]
       }
@@ -1371,6 +1409,14 @@
           },
           {
             "method": "POST",
+            "path": "/api/admin/resources/files/:id/restore",
+            "permission": "admin:file:restore",
+            "operationId": "files.restore",
+            "mutates": true,
+            "auditActionCandidate": "file.restore"
+          },
+          {
+            "method": "POST",
             "path": "/api/admin/resources/files/query",
             "permission": "admin:file:read",
             "operationId": "files.query",
@@ -1444,6 +1490,7 @@
         "actionCandidates": [
           "file.create",
           "file.delete",
+          "file.restore",
           "file.upload"
         ]
       }
@@ -1564,6 +1611,14 @@
           },
           {
             "method": "POST",
+            "path": "/api/admin/resources/menus/:id/restore",
+            "permission": "admin:menu:restore",
+            "operationId": "menus.restore",
+            "mutates": true,
+            "auditActionCandidate": "menu.restore"
+          },
+          {
+            "method": "POST",
             "path": "/api/admin/resources/menus/query",
             "permission": "admin:menu:read",
             "operationId": "menus.query",
@@ -1641,6 +1696,7 @@
         "actionCandidates": [
           "menu.create",
           "menu.delete",
+          "menu.restore",
           "menu.update"
         ]
       }
@@ -1678,6 +1734,14 @@
             "operationId": "monitoring.create",
             "mutates": true,
             "auditActionCandidate": "monitoring.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/monitoring/:id/restore",
+            "permission": "admin:monitoring:restore",
+            "operationId": "monitoring.restore",
+            "mutates": true,
+            "auditActionCandidate": "monitoring.restore"
           },
           {
             "method": "POST",
@@ -1768,6 +1832,7 @@
         "actionCandidates": [
           "monitoring.create",
           "monitoring.delete",
+          "monitoring.restore",
           "monitoring.update"
         ]
       }
@@ -1805,6 +1870,14 @@
             "operationId": "orgUnits.create",
             "mutates": true,
             "auditActionCandidate": "org_unit.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/org-units/:id/restore",
+            "permission": "admin:org-unit:restore",
+            "operationId": "orgUnits.restore",
+            "mutates": true,
+            "auditActionCandidate": "org_unit.restore"
           },
           {
             "method": "POST",
@@ -1897,6 +1970,7 @@
         "actionCandidates": [
           "org_unit.create",
           "org_unit.delete",
+          "org_unit.restore",
           "org_unit.update"
         ]
       }
@@ -1996,6 +2070,14 @@
           },
           {
             "method": "POST",
+            "path": "/api/admin/resources/parameters/:id/restore",
+            "permission": "admin:parameter:restore",
+            "operationId": "parameters.restore",
+            "mutates": true,
+            "auditActionCandidate": "parameter.restore"
+          },
+          {
+            "method": "POST",
             "path": "/api/admin/resources/parameters/query",
             "permission": "admin:parameter:read",
             "operationId": "parameters.query",
@@ -2060,6 +2142,7 @@
         "actionCandidates": [
           "parameter.create",
           "parameter.delete",
+          "parameter.restore",
           "parameter.update"
         ]
       }
@@ -2205,6 +2288,14 @@
           },
           {
             "method": "POST",
+            "path": "/api/admin/resources/role-groups/:id/restore",
+            "permission": "admin:role-group:restore",
+            "operationId": "roleGroups.restore",
+            "mutates": true,
+            "auditActionCandidate": "role_group.restore"
+          },
+          {
+            "method": "POST",
             "path": "/api/admin/resources/role-groups/query",
             "permission": "admin:role-group:read",
             "operationId": "roleGroups.query",
@@ -2279,6 +2370,7 @@
         "actionCandidates": [
           "role_group.create",
           "role_group.delete",
+          "role_group.restore",
           "role_group.update"
         ]
       }
@@ -2316,6 +2408,14 @@
             "operationId": "roles.create",
             "mutates": true,
             "auditActionCandidate": "role.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/roles/:id/restore",
+            "permission": "admin:role:restore",
+            "operationId": "roles.restore",
+            "mutates": true,
+            "auditActionCandidate": "role.restore"
           },
           {
             "method": "POST",
@@ -2403,6 +2503,7 @@
         "actionCandidates": [
           "role.create",
           "role.delete",
+          "role.restore",
           "role.update"
         ]
       }
@@ -2425,14 +2526,6 @@
         "modelPackage": "internal/platform/model",
         "repositoryPackage": "internal/platform/repository",
         "routes": [
-          {
-            "method": "DELETE",
-            "path": "/api/admin/resources/sessions/:id",
-            "permission": "admin:session:delete",
-            "operationId": "sessions.delete",
-            "mutates": true,
-            "auditActionCandidate": "session.delete"
-          },
           {
             "method": "POST",
             "path": "/api/admin/resources/sessions/query",
@@ -2483,10 +2576,8 @@
         "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
       },
       "audit": {
-        "required": true,
-        "actionCandidates": [
-          "session.delete"
-        ]
+        "required": false,
+        "actionCandidates": []
       }
     },
     {
@@ -2607,6 +2698,14 @@
           },
           {
             "method": "POST",
+            "path": "/api/admin/resources/tenants/:id/restore",
+            "permission": "admin:tenant:restore",
+            "operationId": "tenants.restore",
+            "mutates": true,
+            "auditActionCandidate": "tenant.restore"
+          },
+          {
+            "method": "POST",
             "path": "/api/admin/resources/tenants/query",
             "permission": "admin:tenant:read",
             "operationId": "tenants.query",
@@ -2680,6 +2779,7 @@
         "actionCandidates": [
           "tenant.create",
           "tenant.delete",
+          "tenant.restore",
           "tenant.update"
         ]
       }
@@ -2717,6 +2817,14 @@
             "operationId": "users.create",
             "mutates": true,
             "auditActionCandidate": "user.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/users/:id/restore",
+            "permission": "admin:user:restore",
+            "operationId": "users.restore",
+            "mutates": true,
+            "auditActionCandidate": "user.restore"
           },
           {
             "method": "POST",
@@ -2804,6 +2912,7 @@
         "actionCandidates": [
           "user.create",
           "user.delete",
+          "user.restore",
           "user.update"
         ]
       }

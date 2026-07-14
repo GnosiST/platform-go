@@ -33,6 +33,17 @@ describe("validate-platform-production-readiness", () => {
     assert.match(result.stdout, /Validated \d+ production readiness checks/);
   });
 
+  it("requires the retention runner control contract", () => {
+    const readiness = readJSON("resources/platform-production-readiness.json");
+    readiness.conditionalEnv = readiness.conditionalEnv.filter((item) => item.name !== "PLATFORM_RETENTION_RUNNER_ENABLED");
+    const readinessPath = tempJSON("platform-production-readiness.json", readiness);
+
+    const result = runValidator(["--readiness", readinessPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /conditionalEnv must include PLATFORM_RETENTION_RUNNER_ENABLED/);
+  });
+
   it("rejects production environment variables that are not loaded by config", () => {
     const readiness = readJSON("resources/platform-production-readiness.json");
     readiness.requiredEnv.push({

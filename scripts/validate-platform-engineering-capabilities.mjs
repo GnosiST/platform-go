@@ -58,9 +58,9 @@ const requiredImplementedCapabilityIDs = [
   "sensitive-data-protection",
   "mask-strategy-runtime",
   "sensitive-data-reveal-step-up",
+  "data-lifecycle-retention",
 ];
 const requiredPartialCapabilityIDs = [
-  "data-lifecycle-retention",
   "multi-datasource-contract-and-runtime",
   "database-certification-matrix",
   "integration-ports-disabled-default",

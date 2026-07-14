@@ -8,6 +8,7 @@ package httpapi
 
 // DELETE /api/admin/resources/tenants/:id -> admin:tenant:delete
 // POST /api/admin/resources/tenants -> admin:tenant:create
+// POST /api/admin/resources/tenants/:id/restore -> admin:tenant:restore
 // POST /api/admin/resources/tenants/query -> admin:tenant:read
 // PUT /api/admin/resources/tenants/:id -> admin:tenant:update
 

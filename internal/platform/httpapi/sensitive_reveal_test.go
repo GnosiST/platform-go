@@ -597,6 +597,7 @@ func sensitiveRevealHTTPManifests(t *testing.T, policyMode string) []capability.
 				Resource: sensitiveRevealHTTPResource,
 				Title:    capability.Text("敏感记录", "Sensitive Records"), Description: capability.Text("HTTP 测试。", "HTTP tests."),
 				PermissionPrefix: "admin:sensitive-record",
+				Deletion:         &capability.AdminResourceDeletionPolicy{Mode: capability.AdminDeletionSoftDelete, PolicyVersion: 1},
 				Protection:       &capability.AdminResourceProtection{SchemaVersion: 1, Scope: "tenant-field", TenantField: "tenantCode"},
 				Fields: []capability.AdminField{
 					{Key: "code", Label: capability.Text("编码", "Code"), Type: "text", Source: "record", Required: true, InTable: true, InDetail: true},

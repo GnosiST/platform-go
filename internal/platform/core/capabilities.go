@@ -32,7 +32,39 @@ func DefaultManifests() []capability.Manifest {
 }
 
 func adminSurface(resources ...capability.AdminResource) capability.AdminSurface {
+	for index := range resources {
+		resources[index].Deletion = coreDeletionPolicy(resources[index].Resource)
+	}
 	return capability.AdminSurface{Resources: resources}
+}
+
+func coreDeletionPolicy(resource string) *capability.AdminResourceDeletionPolicy {
+	policy := &capability.AdminResourceDeletionPolicy{PolicyVersion: 1}
+	switch resource {
+	case "api-docs", "branding", "capabilities", "demo-data", "overview", "settings":
+		policy.Mode = capability.AdminDeletionDisabled
+	case "app-phone-verifications", "audit-logs", "error-logs", "job-run-attempts", "job-runs", "login-logs", "notification-deliveries", "policy-reviews", "versions":
+		policy.Mode = capability.AdminDeletionAppendOnly
+	case "api-resources", "area-codes", "dictionaries", "permissions":
+		policy.Mode = capability.AdminDeletionRestrict
+		policy.RestrictReferences = true
+	case "dictionary-parameters", "job-definitions", "menus", "monitoring", "notification-templates", "notifications", "org-units", "parameters", "personnel-profiles", "position-assignments", "positions", "role-groups", "roles", "tenants", "users":
+		policy.Mode = capability.AdminDeletionSoftDelete
+		policy.RestrictReferences = true
+	case "admin-identities", "app-identities", "app-phone-bindings", "sessions":
+		policy.Mode = capability.AdminDeletionDisabled
+	case "api-tokens":
+		policy.Mode = capability.AdminDeletionRevoke
+		policy.RetentionDays = 90
+		policy.AutoPurge = true
+	case "files":
+		policy.Mode = capability.AdminDeletionTombstone
+		policy.RetentionDays = 30
+		policy.AutoPurge = true
+	default:
+		panic("core admin resource missing deletion policy: " + resource)
+	}
+	return policy
 }
 
 func appSurface(routes ...capability.AppRoute) capability.AppSurface {

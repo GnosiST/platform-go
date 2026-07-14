@@ -12,6 +12,8 @@
           "TestValidateRuntimeRejectsProductionWithoutPersistentRuntime",
           "TestValidateRuntimeRejectsProductionShortJWTSecret",
           "TestValidateRuntimeRejectsProductionNonGORMDrivers",
+          "TestRetentionRunnerRequiresPersistentGORMAdminStorage",
+          "TestRetentionRunnerScheduleValidationFailsClosed",
           "TestValidateRuntimeRejectsProductionRedisWithoutAddress",
           "TestValidateRuntimeRejectsProductionDemoAuthProvider",
           "TestValidateRuntimeRejectsProductionNonHTTPSPublicBaseURL",
@@ -27,6 +29,7 @@
       "production runtime requires PLATFORM_ADMIN_RESOURCE_DRIVER to be mysql, postgres, or sqlite",
       "production runtime requires PLATFORM_SESSION_DRIVER to be mysql, postgres, or sqlite",
       "production runtime requires PLATFORM_LIFECYCLE_HISTORY_DRIVER to be mysql, postgres, or sqlite",
+      "PLATFORM_RETENTION_RUNNER_ENABLED requires persistent GORM Admin resource storage and no file repository",
       "production runtime requires PLATFORM_CACHE_DRIVER=redis",
       "production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY to be at least 32 bytes",
       "production runtime requires PLATFORM_RATE_LIMIT_HMAC_KEY to be distinct from phone and code HMAC keys",
@@ -213,6 +216,46 @@
     }
   ],
   "conditionalEnv": [
+    {
+      "name": "PLATFORM_RETENTION_RUNNER_ENABLED",
+      "condition": "explicitly false by default; enable only after lifecycle tables, impact, dry-run and exact policy promotion evidence exist",
+      "purpose": "Controls the destructive retention scheduler and requires persistent GORM Admin resource storage when true.",
+      "docs": [
+        "README.md",
+        "docs/platform-data-lifecycle-retention.md",
+        "docs/platform-deployment.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_RETENTION_RUNNER_INTERVAL",
+      "condition": "applies when PLATFORM_RETENTION_RUNNER_ENABLED=true",
+      "purpose": "Sets the bounded scheduler interval; accepted values are between 1 minute and 720 hours.",
+      "docs": [
+        "README.md",
+        "docs/platform-data-lifecycle-retention.md",
+        "docs/platform-deployment.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_RETENTION_RUNNER_BATCH_SIZE",
+      "condition": "applies when PLATFORM_RETENTION_RUNNER_ENABLED=true",
+      "purpose": "Sets the bounded number of lifecycle candidates planned per batch.",
+      "docs": [
+        "README.md",
+        "docs/platform-data-lifecycle-retention.md",
+        "docs/platform-deployment.md"
+      ]
+    },
+    {
+      "name": "PLATFORM_RETENTION_RUNNER_MAX_RETRIES",
+      "condition": "applies when PLATFORM_RETENTION_RUNNER_ENABLED=true",
+      "purpose": "Sets the bounded retry count for planner and applier failures without exposing dependency errors.",
+      "docs": [
+        "README.md",
+        "docs/platform-data-lifecycle-retention.md",
+        "docs/platform-deployment.md"
+      ]
+    },
     {
       "name": "PLATFORM_SENSITIVE_REVEAL_HMAC_KEY",
       "condition": "required when enabled capability manifests declare Admin reveal policies",

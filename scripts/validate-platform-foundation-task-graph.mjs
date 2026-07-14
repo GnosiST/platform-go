@@ -390,6 +390,14 @@ function validateTask(task, context, errors) {
   if (task.id === "sensitive-data-reveal-step-up" && task.status === "implemented") {
     requireIncludes(task.evidence?.screenshots, [requiredSensitiveRevealEvidenceManifest], `${task.id} evidence.screenshots`, errors);
   }
+  if (task.id === "data-lifecycle-retention") {
+    if (task.status !== "implemented") {
+      errors.push("data-lifecycle-retention must stay implemented after closeout");
+    }
+    requireIncludes(task.evidence?.docs, ["docs/platform-data-lifecycle-retention.md"], `${task.id} evidence.docs`, errors);
+    requireIncludes(task.evidence?.validators, ["scripts/validate-platform-data-lifecycle-retention.mjs"], `${task.id} evidence.validators`, errors);
+    requireIncludes(task.evidence?.tests, ["internal/platform/datalifecycle/runner_test.go", "scripts/platform-data-lifecycle-retention.test.mjs"], `${task.id} evidence.tests`, errors);
+  }
   if (task.status === "implemented" || task.status === "preview") {
     const evidence = task.evidence ?? {};
     const evidencePaths = evidencePathKeys.flatMap((key) => values(evidence[key]));

@@ -36,6 +36,7 @@ type AdminResource struct {
 	Title            LocalizedText
 	Description      LocalizedText
 	PermissionPrefix string
+	Deletion         *AdminResourceDeletionPolicy
 	Menu             AdminMenu
 	FormGroups       []AdminFormGroup
 	FormLayout       string
@@ -46,6 +47,14 @@ type AdminResource struct {
 	SearchFields     []string
 	DefaultSortKey   string
 	Protection       *AdminResourceProtection
+}
+
+type AdminResourceDeletionPolicy struct {
+	Mode               string `json:"mode"`
+	PolicyVersion      uint32 `json:"policyVersion"`
+	RetentionDays      int    `json:"retentionDays,omitempty"`
+	AutoPurge          bool   `json:"autoPurge,omitempty"`
+	RestrictReferences bool   `json:"restrictReferences,omitempty"`
 }
 
 type AdminMenu struct {
@@ -149,6 +158,14 @@ const (
 
 	AdminRevealFactorOIDCReauthentication = "oidc-reauth-v1"
 	AdminRevealFactorSMSOTP               = "admin-sms-otp-v1"
+
+	AdminDeletionDisabled   = "disabled"
+	AdminDeletionAppendOnly = "append-only"
+	AdminDeletionRestrict   = "restrict"
+	AdminDeletionSoftDelete = "soft-delete"
+	AdminDeletionRevoke     = "revoke"
+	AdminDeletionTombstone  = "tombstone"
+	AdminDeletionHardDelete = "hard-delete"
 )
 
 type AdminFieldRelation struct {

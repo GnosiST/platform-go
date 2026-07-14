@@ -36,7 +36,33 @@ func (s *Store) ListForPrincipal(resource string, principal rbac.Principal) ([]R
 	if !ok {
 		return nil, ErrUnknownResource
 	}
-	return cloneRecords(s.filterRecordsForPrincipalLocked(resource, items, principal)), nil
+	return cloneRecords(s.filterRecordsForPrincipalLocked(resource, visibleRecords(resource, items), principal)), nil
+}
+
+func (s *Store) InternalRecordForPrincipal(resource string, id string, principal rbac.Principal) (Record, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	items, ok := s.resources[resource]
+	if !ok {
+		return Record{}, ErrUnknownResource
+	}
+	index := recordIndexByID(items, id)
+	if index < 0 {
+		return Record{}, ErrRecordNotFound
+	}
+	record := items[index]
+	schema, ok := s.schemas[resource]
+	if !ok {
+		return Record{}, ErrUnknownResource
+	}
+	if resourceHasDataScopeFields(resource, schema) {
+		policy := s.dataScopePolicyLocked(principal)
+		if !policy.all && !policy.allowsRecord(resource, schema, record) {
+			return Record{}, ErrRecordNotFound
+		}
+	}
+	return cloneRecord(record), nil
 }
 
 func (s *Store) filterRecordsForPrincipalLocked(resource string, items []Record, principal rbac.Principal) []Record {
@@ -69,7 +95,7 @@ func (s *Store) dataScopePolicyLocked(principal rbac.Principal) dataScopePolicy 
 		userID:     strings.TrimSpace(principal.User.ID),
 	}
 	for _, roleCode := range principal.Roles {
-		role := findRecordByCode(s.resources["roles"], roleCode)
+		role := findRecordByCode(visibleRecords("roles", s.resources["roles"]), roleCode)
 		if role == nil || role.Status == "disabled" {
 			continue
 		}
@@ -137,7 +163,7 @@ func (s *Store) orgUnitAndDescendantCodesLocked(root string) []string {
 	seen := map[string]struct{}{root: {}}
 	for {
 		added := false
-		for _, org := range s.resources["org-units"] {
+		for _, org := range visibleRecords("org-units", s.resources["org-units"]) {
 			parentCode := strings.TrimSpace(org.Values["parentCode"])
 			if parentCode == "" {
 				continue
@@ -167,7 +193,7 @@ func (s *Store) areaCodeAndDescendantCodesLocked(root string) []string {
 	seen := map[string]struct{}{root: {}}
 	for {
 		added := false
-		for _, area := range s.resources["area-codes"] {
+		for _, area := range visibleRecords("area-codes", s.resources["area-codes"]) {
 			parentCode := strings.TrimSpace(area.Values["parentCode"])
 			if parentCode == "" {
 				continue

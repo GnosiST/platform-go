@@ -1,7 +1,7 @@
 # Platform UI Optimization Assessment
 
 Date: 2026-07-12
-Governance updated: 2026-07-13
+Governance updated: 2026-07-14
 Status: Candidate A implemented; Candidate B deferred; completion program active
 
 ## Purpose
@@ -13,9 +13,9 @@ This assessment records how two design aids are routed without disrupting the pl
 
 Candidate A has completed that activation path as `admin-ui-system-quality-hardening`. Candidate B's broader brand-entry redesign remains deferred until a real public or brand brief is approved. The bounded `admin-watermark-export-governance` and `sensitive-data-reveal-step-up` visual nodes have completed implementation and fresh browser acceptance; `public-docs-site` remains pending and still requires `superpowers:brainstorming`, Product Design and fresh browser evidence.
 
-The original 37-node foundation baseline remains closed. `runtime-security-containment`, `admin-watermark-export-governance`, `sensitive-data-protection-runtime`, the non-visual `sensitive-data-historical-migration` node, `mask-strategy-runtime` and `sensitive-data-reveal-step-up` are `implemented`, so current governance is `53 total / 43 implemented / 10 controlled unfinished` with `completionStatus=not-complete-controlled`.
+The original 37-node foundation baseline remains closed. `runtime-security-containment`, `admin-watermark-export-governance`, `sensitive-data-protection-runtime`, the non-visual `sensitive-data-historical-migration` and `data-lifecycle-retention` nodes, `mask-strategy-runtime` and `sensitive-data-reveal-step-up` are `implemented`, so current governance is `53 total / 44 implemented / 9 controlled unfinished` with `completionStatus=not-complete-controlled`.
 
-The six newly governed pending nodes are `data-lifecycle-retention`, `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`. `public-docs-site` is the remaining visual node and may not advance without the required design gates and fresh browser evidence. Approved specifications also include [mask strategy runtime](superpowers/specs/2026-07-13-mask-strategy-runtime-design.md) and [sensitive data reveal step-up](superpowers/specs/2026-07-13-sensitive-data-reveal-step-up-design.md).
+The five remaining data/integration nodes are `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`. `public-docs-site` is the remaining visual node and may not advance without the required design gates and fresh browser evidence. Approved specifications also include [mask strategy runtime](superpowers/specs/2026-07-13-mask-strategy-runtime-design.md) and [sensitive data reveal step-up](superpowers/specs/2026-07-13-sensitive-data-reveal-step-up-design.md).
 
 ## Current Evidence
 
@@ -158,6 +158,6 @@ Completion gate:
 
 1. Production persistence correctness and Candidate A are implemented.
 2. Keep Candidate B deferred until there is a real brand/public-surface brief. If only the admin console changes, use the existing quiet operational design language and the implemented Candidate A contracts.
-3. Any future visual candidate requires an explicit task-graph node, design gates, resource locks and fresh screenshot evidence. Candidate A and production Admin OIDC remain closed in the original 37-node baseline; `admin-watermark-export-governance` and `sensitive-data-reveal-step-up` are implemented with Product Design, `ui-ux-pro-max` and browser evidence, while `public-docs-site` remains the controlled pending visual node in the active `53 total / 43 implemented / 10 controlled unfinished` completion program.
+3. Any future visual candidate requires an explicit task-graph node, design gates, resource locks and fresh screenshot evidence. Candidate A and production Admin OIDC remain closed in the original 37-node baseline; `admin-watermark-export-governance` and `sensitive-data-reveal-step-up` are implemented with Product Design, `ui-ux-pro-max` and browser evidence, while `public-docs-site` remains the controlled pending visual node in the active `53 total / 44 implemented / 9 controlled unfinished` completion program.
 
 Evidence remains scoped: screenshots, DOM measurements and keyboard checks support this implementation but do not certify WCAG conformance. Screen-reader announcements, high zoom/reflow and platform-specific assistive technology require separate evidence.

@@ -2,9 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"platform-go/internal/apps"
@@ -16,6 +20,8 @@ import (
 )
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 	cfg := config.Load()
 	if err := cfg.ValidateRuntime(); err != nil {
 		log.Fatalf("invalid configuration: %v", err)
@@ -131,8 +137,68 @@ func main() {
 		RateLimiter:              rateLimitRuntime.Limiter,
 		RateLimitKeyBuilder:      rateLimitRuntime.KeyBuilder,
 	})
-	if err := server.Run(cfg.HTTPAddr); err != nil {
+	dataLifecycle, scheduler, err := startRetentionRuntime(ctx, cfg, apps.DefaultManifests(), bootstrap.OpenDataLifecycle)
+	if err != nil {
+		log.Fatalf("start retention runtime: %v", err)
+	}
+	if dataLifecycle != nil {
+		defer func() { _ = dataLifecycle.Close() }()
+	}
+	if scheduler != nil {
+		defer func() { _ = scheduler.Close() }()
+	}
+	if err := runHTTPServer(ctx, cfg.HTTPAddr, server.Router()); err != nil {
+		if scheduler != nil {
+			_ = scheduler.Close()
+		}
+		if dataLifecycle != nil {
+			_ = dataLifecycle.Close()
+		}
 		log.Fatalf("run platform api: %v", err)
+	}
+}
+
+type openDataLifecycleFunc func(config.Config, ...capability.Manifest) (*bootstrap.DataLifecycle, error)
+
+func startRetentionRuntime(ctx context.Context, cfg config.Config, manifests []capability.Manifest, open openDataLifecycleFunc) (*bootstrap.DataLifecycle, *bootstrap.DataLifecycleScheduler, error) {
+	if !cfg.RetentionRunnerEnabled {
+		return nil, nil, nil
+	}
+	lifecycle, err := open(cfg, manifests...)
+	if err != nil {
+		return nil, nil, err
+	}
+	scheduler, err := bootstrap.StartDataLifecycleScheduler(ctx, lifecycle, bootstrap.DataLifecycleScheduleOptions{
+		Interval: cfg.RetentionRunnerInterval, BatchSize: cfg.RetentionRunnerBatchSize, MaxRetries: cfg.RetentionRunnerMaxRetries,
+	})
+	if err != nil {
+		_ = lifecycle.Close()
+		return nil, nil, err
+	}
+	return lifecycle, scheduler, nil
+}
+
+func runHTTPServer(ctx context.Context, addr string, handler http.Handler) error {
+	server := &http.Server{Addr: addr, Handler: handler}
+	errCh := make(chan error, 1)
+	go func() { errCh <- server.ListenAndServe() }()
+	select {
+	case err := <-errCh:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			return err
+		}
+		err := <-errCh
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
 	}
 }
 

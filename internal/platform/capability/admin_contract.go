@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"platform-go/internal/platform/masking"
 )
@@ -22,6 +23,33 @@ var adminFieldProtectionNormalizations = []string{"raw-v1", "trim-v1", "email-v1
 var adminResourceProtectionScopes = []string{"global", "tenant-field"}
 var adminRevealModes = []string{AdminRevealModeAnyOf, AdminRevealModeAllOf}
 var adminRevealFactors = []string{AdminRevealFactorOIDCReauthentication, AdminRevealFactorSMSOTP}
+var adminDeletionModes = []string{AdminDeletionDisabled, AdminDeletionAppendOnly, AdminDeletionRestrict, AdminDeletionSoftDelete, AdminDeletionRevoke, AdminDeletionTombstone, AdminDeletionHardDelete}
+
+const MaximumAdminRetentionDays = 36500
+
+func AdminRetentionDuration(days int) (time.Duration, bool) {
+	if days < 0 || days > MaximumAdminRetentionDays {
+		return 0, false
+	}
+	return time.Duration(days) * 24 * time.Hour, true
+}
+
+func IsAdminDeletionMode(mode string) bool {
+	return slices.Contains(adminDeletionModes, mode)
+}
+
+func SupportsAdminAutoPurge(resource string, mode string) bool {
+	switch mode {
+	case AdminDeletionSoftDelete:
+		return resource != "files" && resource != "api-tokens"
+	case AdminDeletionTombstone:
+		return resource == "files"
+	case AdminDeletionRevoke:
+		return resource == "api-tokens"
+	default:
+		return false
+	}
+}
 
 func ValidateAdminSurface(manifests []Manifest) error {
 	resources := map[string]ID{}
@@ -162,6 +190,9 @@ func validateAdminResource(owner ID, resource AdminResource, revealPolicies map[
 	if !validAdminPermissionPrefix(resource.PermissionPrefix) {
 		return fmt.Errorf("capability %q admin resource %q permission prefix must match admin:<resource>", owner, resource.Resource)
 	}
+	if err := validateAdminResourceDeletion(owner, resource); err != nil {
+		return err
+	}
 	if layout := strings.TrimSpace(resource.FormLayout); layout != "" && !slices.Contains(adminFormLayouts, layout) {
 		return fmt.Errorf("capability %q admin resource %q form layout must be one of %s", owner, resource.Resource, strings.Join(adminFormLayouts, ","))
 	}
@@ -185,6 +216,36 @@ func validateAdminResource(owner ID, resource AdminResource, revealPolicies map[
 	}
 	if err := validateAdminRuntimeSlots(owner, resource); err != nil {
 		return err
+	}
+	return nil
+}
+
+func validateAdminResourceDeletion(owner ID, resource AdminResource) error {
+	if resource.Deletion == nil {
+		return fmt.Errorf("capability %q admin resource %q deletion policy is required", owner, resource.Resource)
+	}
+	policy := *resource.Deletion
+	mode := strings.TrimSpace(policy.Mode)
+	if !IsAdminDeletionMode(mode) {
+		return fmt.Errorf("capability %q admin resource %q deletion mode must be one of %s", owner, resource.Resource, strings.Join(adminDeletionModes, ","))
+	}
+	if policy.PolicyVersion == 0 {
+		return fmt.Errorf("capability %q admin resource %q deletion policy version must be greater than zero", owner, resource.Resource)
+	}
+	if _, ok := AdminRetentionDuration(policy.RetentionDays); !ok {
+		return fmt.Errorf("capability %q admin resource %q deletion retention days must be between 0 and %d and must not exceed the supported maximum", owner, resource.Resource, MaximumAdminRetentionDays)
+	}
+	if policy.AutoPurge && policy.RetentionDays == 0 {
+		return fmt.Errorf("capability %q admin resource %q automatic purge requires a positive retention window", owner, resource.Resource)
+	}
+	if policy.AutoPurge && !SupportsAdminAutoPurge(resource.Resource, mode) {
+		return fmt.Errorf("capability %q admin resource %q automatic purge is unsupported for deletion mode %q", owner, resource.Resource, mode)
+	}
+	if policy.RestrictReferences && mode != AdminDeletionSoftDelete && mode != AdminDeletionRestrict {
+		return fmt.Errorf("capability %q admin resource %q reference restriction is unsupported for deletion mode %q", owner, resource.Resource, mode)
+	}
+	if policy.RetentionDays > 0 && mode != AdminDeletionSoftDelete && mode != AdminDeletionTombstone && mode != AdminDeletionRevoke && mode != AdminDeletionAppendOnly {
+		return fmt.Errorf("capability %q admin resource %q retention window is unsupported for deletion mode %q", owner, resource.Resource, mode)
 	}
 	return nil
 }

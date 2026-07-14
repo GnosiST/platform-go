@@ -8,6 +8,7 @@ package httpapi
 
 // DELETE /api/admin/resources/users/:id -> admin:user:delete
 // POST /api/admin/resources/users -> admin:user:create
+// POST /api/admin/resources/users/:id/restore -> admin:user:restore
 // POST /api/admin/resources/users/query -> admin:user:read
 // PUT /api/admin/resources/users/:id -> admin:user:update
 

@@ -8,7 +8,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "data-lifecycle-retention",
   "multi-datasource-contract-and-runtime",
   "database-certification-matrix",
   "integration-ports-disabled-default",

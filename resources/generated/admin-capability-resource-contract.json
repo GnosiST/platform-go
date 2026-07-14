@@ -21,7 +21,6 @@
   ],
   "permissions": [
     "admin:api-docs:create",
-    "admin:api-docs:delete",
     "admin:api-docs:read",
     "admin:api-docs:update",
     "admin:api-resource:create",
@@ -30,10 +29,10 @@
     "admin:api-resource:update",
     "admin:api-token:create",
     "admin:api-token:delete",
+    "admin:api-token:purge",
     "admin:api-token:read",
     "admin:api-token:update",
     "admin:app-identity:create",
-    "admin:app-identity:delete",
     "admin:app-identity:read",
     "admin:app-identity:update",
     "admin:area-code:create",
@@ -41,60 +40,65 @@
     "admin:area-code:read",
     "admin:area-code:update",
     "admin:audit-log:create",
-    "admin:audit-log:delete",
     "admin:audit-log:read",
     "admin:audit-log:update",
     "admin:branding:create",
-    "admin:branding:delete",
     "admin:branding:read",
     "admin:branding:update",
     "admin:capability:create",
-    "admin:capability:delete",
     "admin:capability:read",
     "admin:capability:update",
     "admin:demo-data:create",
-    "admin:demo-data:delete",
     "admin:demo-data:read",
     "admin:demo-data:update",
     "admin:dictionary-parameter:create",
     "admin:dictionary-parameter:delete",
+    "admin:dictionary-parameter:purge",
     "admin:dictionary-parameter:read",
+    "admin:dictionary-parameter:restore",
     "admin:dictionary-parameter:update",
     "admin:dictionary:create",
     "admin:dictionary:delete",
     "admin:dictionary:read",
     "admin:dictionary:update",
     "admin:error-log:create",
-    "admin:error-log:delete",
     "admin:error-log:read",
     "admin:error-log:update",
     "admin:file:create",
     "admin:file:delete",
+    "admin:file:purge",
     "admin:file:read",
+    "admin:file:restore",
     "admin:file:update",
     "admin:login-log:create",
-    "admin:login-log:delete",
     "admin:login-log:read",
     "admin:login-log:update",
     "admin:menu:create",
     "admin:menu:delete",
+    "admin:menu:purge",
     "admin:menu:read",
+    "admin:menu:restore",
     "admin:menu:update",
     "admin:monitoring:create",
     "admin:monitoring:delete",
+    "admin:monitoring:purge",
     "admin:monitoring:read",
+    "admin:monitoring:restore",
     "admin:monitoring:update",
     "admin:org-unit:create",
     "admin:org-unit:delete",
+    "admin:org-unit:purge",
     "admin:org-unit:read",
+    "admin:org-unit:restore",
     "admin:org-unit:update",
     "admin:overview:create",
-    "admin:overview:delete",
     "admin:overview:read",
     "admin:overview:update",
     "admin:parameter:create",
     "admin:parameter:delete",
+    "admin:parameter:purge",
     "admin:parameter:read",
+    "admin:parameter:restore",
     "admin:parameter:update",
     "admin:permission:create",
     "admin:permission:delete",
@@ -102,30 +106,35 @@
     "admin:permission:update",
     "admin:role-group:create",
     "admin:role-group:delete",
+    "admin:role-group:purge",
     "admin:role-group:read",
+    "admin:role-group:restore",
     "admin:role-group:update",
     "admin:role:create",
     "admin:role:delete",
+    "admin:role:purge",
     "admin:role:read",
+    "admin:role:restore",
     "admin:role:update",
     "admin:session:create",
-    "admin:session:delete",
     "admin:session:read",
     "admin:session:update",
     "admin:settings:create",
-    "admin:settings:delete",
     "admin:settings:read",
     "admin:settings:update",
     "admin:tenant:create",
     "admin:tenant:delete",
+    "admin:tenant:purge",
     "admin:tenant:read",
+    "admin:tenant:restore",
     "admin:tenant:update",
     "admin:user:create",
     "admin:user:delete",
+    "admin:user:purge",
     "admin:user:read",
+    "admin:user:restore",
     "admin:user:update",
     "admin:version:create",
-    "admin:version:delete",
     "admin:version:read",
     "admin:version:update"
   ],
@@ -144,7 +153,6 @@
       "permissionPrefix": "admin:api-docs",
       "permissions": {
         "create": "admin:api-docs:create",
-        "delete": "admin:api-docs:delete",
         "read": "admin:api-docs:read",
         "update": "admin:api-docs:update"
       },
@@ -153,6 +161,10 @@
         "group": "governance",
         "icon": "book",
         "order": 125
+      },
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
       }
     },
     {
@@ -178,6 +190,11 @@
         "group": "governance",
         "icon": "apiResources",
         "order": 120
+      },
+      "deletion": {
+        "mode": "restrict",
+        "policyVersion": 1,
+        "restrictReferences": true
       }
     },
     {
@@ -195,6 +212,7 @@
       "permissions": {
         "create": "admin:api-token:create",
         "delete": "admin:api-token:delete",
+        "purge": "admin:api-token:purge",
         "read": "admin:api-token:read",
         "update": "admin:api-token:update"
       },
@@ -419,7 +437,13 @@
         "tokenPrefix",
         "expiresAt"
       ],
-      "defaultSortKey": "createdAt"
+      "defaultSortKey": "createdAt",
+      "deletion": {
+        "mode": "revoke",
+        "policyVersion": 1,
+        "retentionDays": 90,
+        "autoPurge": true
+      }
     },
     {
       "capabilityId": "identity",
@@ -435,7 +459,6 @@
       "permissionPrefix": "admin:app-identity",
       "permissions": {
         "create": "admin:app-identity:create",
-        "delete": "admin:app-identity:delete",
         "read": "admin:app-identity:read",
         "update": "admin:app-identity:update"
       },
@@ -753,7 +776,11 @@
         "createdAt",
         "lastLoginAt"
       ],
-      "defaultSortKey": "lastLoginAt"
+      "defaultSortKey": "lastLoginAt",
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
+      }
     },
     {
       "capabilityId": "dictionary",
@@ -1074,7 +1101,12 @@
         "level",
         "path"
       ],
-      "defaultSortKey": "sortOrder"
+      "defaultSortKey": "sortOrder",
+      "deletion": {
+        "mode": "restrict",
+        "policyVersion": 1,
+        "restrictReferences": true
+      }
     },
     {
       "capabilityId": "audit",
@@ -1090,7 +1122,6 @@
       "permissionPrefix": "admin:audit-log",
       "permissions": {
         "create": "admin:audit-log:create",
-        "delete": "admin:audit-log:delete",
         "read": "admin:audit-log:read",
         "update": "admin:audit-log:update"
       },
@@ -1099,6 +1130,10 @@
         "group": "governance",
         "icon": "audit",
         "order": 110
+      },
+      "deletion": {
+        "mode": "append-only",
+        "policyVersion": 1
       }
     },
     {
@@ -1115,7 +1150,6 @@
       "permissionPrefix": "admin:branding",
       "permissions": {
         "create": "admin:branding:create",
-        "delete": "admin:branding:delete",
         "read": "admin:branding:read",
         "update": "admin:branding:update"
       },
@@ -1415,7 +1449,11 @@
         "defaultTheme",
         "loginTitle"
       ],
-      "defaultSortKey": "updatedAt"
+      "defaultSortKey": "updatedAt",
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
+      }
     },
     {
       "capabilityId": "admin-shell",
@@ -1431,7 +1469,6 @@
       "permissionPrefix": "admin:capability",
       "permissions": {
         "create": "admin:capability:create",
-        "delete": "admin:capability:delete",
         "read": "admin:capability:read",
         "update": "admin:capability:update"
       },
@@ -1440,6 +1477,10 @@
         "group": "foundation",
         "icon": "capabilities",
         "order": 20
+      },
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
       }
     },
     {
@@ -1456,7 +1497,6 @@
       "permissionPrefix": "admin:demo-data",
       "permissions": {
         "create": "admin:demo-data:create",
-        "delete": "admin:demo-data:delete",
         "read": "admin:demo-data:read",
         "update": "admin:demo-data:update"
       },
@@ -1465,6 +1505,10 @@
         "group": "operations",
         "icon": "dictParams",
         "order": 205
+      },
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
       }
     },
     {
@@ -1653,7 +1697,12 @@
         "status",
         "description"
       ],
-      "defaultSortKey": "updatedAt"
+      "defaultSortKey": "updatedAt",
+      "deletion": {
+        "mode": "restrict",
+        "policyVersion": 1,
+        "restrictReferences": true
+      }
     },
     {
       "capabilityId": "dictionary",
@@ -1670,7 +1719,9 @@
       "permissions": {
         "create": "admin:dictionary-parameter:create",
         "delete": "admin:dictionary-parameter:delete",
+        "purge": "admin:dictionary-parameter:purge",
         "read": "admin:dictionary-parameter:read",
+        "restore": "admin:dictionary-parameter:restore",
         "update": "admin:dictionary-parameter:update"
       },
       "menu": {
@@ -1959,7 +2010,12 @@
         "value",
         "valueType"
       ],
-      "defaultSortKey": "sortOrder"
+      "defaultSortKey": "sortOrder",
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
+      }
     },
     {
       "capabilityId": "audit",
@@ -1975,7 +2031,6 @@
       "permissionPrefix": "admin:error-log",
       "permissions": {
         "create": "admin:error-log:create",
-        "delete": "admin:error-log:delete",
         "read": "admin:error-log:read",
         "update": "admin:error-log:update"
       },
@@ -1984,6 +2039,10 @@
         "group": "operations",
         "icon": "warning",
         "order": 330
+      },
+      "deletion": {
+        "mode": "append-only",
+        "policyVersion": 1
       }
     },
     {
@@ -2001,7 +2060,9 @@
       "permissions": {
         "create": "admin:file:create",
         "delete": "admin:file:delete",
+        "purge": "admin:file:purge",
         "read": "admin:file:read",
+        "restore": "admin:file:restore",
         "update": "admin:file:update"
       },
       "menu": {
@@ -2363,7 +2424,13 @@
         "storageDriver",
         "createdAt"
       ],
-      "defaultSortKey": "createdAt"
+      "defaultSortKey": "createdAt",
+      "deletion": {
+        "mode": "tombstone",
+        "policyVersion": 1,
+        "retentionDays": 30,
+        "autoPurge": true
+      }
     },
     {
       "capabilityId": "audit",
@@ -2379,7 +2446,6 @@
       "permissionPrefix": "admin:login-log",
       "permissions": {
         "create": "admin:login-log:create",
-        "delete": "admin:login-log:delete",
         "read": "admin:login-log:read",
         "update": "admin:login-log:update"
       },
@@ -2388,6 +2454,10 @@
         "group": "operations",
         "icon": "desktop",
         "order": 320
+      },
+      "deletion": {
+        "mode": "append-only",
+        "policyVersion": 1
       }
     },
     {
@@ -2405,7 +2475,9 @@
       "permissions": {
         "create": "admin:menu:create",
         "delete": "admin:menu:delete",
+        "purge": "admin:menu:purge",
         "read": "admin:menu:read",
+        "restore": "admin:menu:restore",
         "update": "admin:menu:update"
       },
       "menu": {
@@ -2413,6 +2485,11 @@
         "group": "foundation",
         "icon": "menus",
         "order": 60
+      },
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
       }
     },
     {
@@ -2430,7 +2507,9 @@
       "permissions": {
         "create": "admin:monitoring:create",
         "delete": "admin:monitoring:delete",
+        "purge": "admin:monitoring:purge",
         "read": "admin:monitoring:read",
+        "restore": "admin:monitoring:restore",
         "update": "admin:monitoring:update"
       },
       "menu": {
@@ -2772,7 +2851,12 @@
         "endpoint",
         "lastSeenAt"
       ],
-      "defaultSortKey": "lastSeenAt"
+      "defaultSortKey": "lastSeenAt",
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
+      }
     },
     {
       "capabilityId": "identity",
@@ -2789,7 +2873,9 @@
       "permissions": {
         "create": "admin:org-unit:create",
         "delete": "admin:org-unit:delete",
+        "purge": "admin:org-unit:purge",
         "read": "admin:org-unit:read",
+        "restore": "admin:org-unit:restore",
         "update": "admin:org-unit:update"
       },
       "menu": {
@@ -3163,7 +3249,12 @@
         "parentCode",
         "areaCode"
       ],
-      "defaultSortKey": "sortOrder"
+      "defaultSortKey": "sortOrder",
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
+      }
     },
     {
       "capabilityId": "admin-shell",
@@ -3179,7 +3270,6 @@
       "permissionPrefix": "admin:overview",
       "permissions": {
         "create": "admin:overview:create",
-        "delete": "admin:overview:delete",
         "read": "admin:overview:read",
         "update": "admin:overview:update"
       },
@@ -3188,6 +3278,10 @@
         "group": "foundation",
         "icon": "overview",
         "order": 10
+      },
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
       }
     },
     {
@@ -3205,7 +3299,9 @@
       "permissions": {
         "create": "admin:parameter:create",
         "delete": "admin:parameter:delete",
+        "purge": "admin:parameter:purge",
         "read": "admin:parameter:read",
+        "restore": "admin:parameter:restore",
         "update": "admin:parameter:update"
       },
       "menu": {
@@ -3403,7 +3499,12 @@
         "value",
         "group"
       ],
-      "defaultSortKey": "updatedAt"
+      "defaultSortKey": "updatedAt",
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
+      }
     },
     {
       "capabilityId": "rbac",
@@ -3428,6 +3529,11 @@
         "group": "foundation",
         "icon": "roles",
         "order": 55
+      },
+      "deletion": {
+        "mode": "restrict",
+        "policyVersion": 1,
+        "restrictReferences": true
       }
     },
     {
@@ -3445,7 +3551,9 @@
       "permissions": {
         "create": "admin:role-group:create",
         "delete": "admin:role-group:delete",
+        "purge": "admin:role-group:purge",
         "read": "admin:role-group:read",
+        "restore": "admin:role-group:restore",
         "update": "admin:role-group:update"
       },
       "menu": {
@@ -3634,7 +3742,12 @@
         "description",
         "parentCode"
       ],
-      "defaultSortKey": "sortOrder"
+      "defaultSortKey": "sortOrder",
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
+      }
     },
     {
       "capabilityId": "rbac",
@@ -3651,7 +3764,9 @@
       "permissions": {
         "create": "admin:role:create",
         "delete": "admin:role:delete",
+        "purge": "admin:role:purge",
         "read": "admin:role:read",
+        "restore": "admin:role:restore",
         "update": "admin:role:update"
       },
       "menu": {
@@ -4035,7 +4150,12 @@
         "dataScopeAreaCodes",
         "denyPermissions"
       ],
-      "defaultSortKey": "updatedAt"
+      "defaultSortKey": "updatedAt",
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
+      }
     },
     {
       "capabilityId": "session",
@@ -4051,7 +4171,6 @@
       "permissionPrefix": "admin:session",
       "permissions": {
         "create": "admin:session:create",
-        "delete": "admin:session:delete",
         "read": "admin:session:read",
         "update": "admin:session:update"
       },
@@ -4060,6 +4179,10 @@
         "group": "operations",
         "icon": "wifi",
         "order": 350
+      },
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
       }
     },
     {
@@ -4076,7 +4199,6 @@
       "permissionPrefix": "admin:settings",
       "permissions": {
         "create": "admin:settings:create",
-        "delete": "admin:settings:delete",
         "read": "admin:settings:read",
         "update": "admin:settings:update"
       },
@@ -4085,6 +4207,10 @@
         "group": "security",
         "icon": "settings",
         "order": 310
+      },
+      "deletion": {
+        "mode": "disabled",
+        "policyVersion": 1
       }
     },
     {
@@ -4102,7 +4228,9 @@
       "permissions": {
         "create": "admin:tenant:create",
         "delete": "admin:tenant:delete",
+        "purge": "admin:tenant:purge",
         "read": "admin:tenant:read",
+        "restore": "admin:tenant:restore",
         "update": "admin:tenant:update"
       },
       "menu": {
@@ -4332,7 +4460,12 @@
         "isolation",
         "areaCode"
       ],
-      "defaultSortKey": "updatedAt"
+      "defaultSortKey": "updatedAt",
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
+      }
     },
     {
       "capabilityId": "identity",
@@ -4349,7 +4482,9 @@
       "permissions": {
         "create": "admin:user:create",
         "delete": "admin:user:delete",
+        "purge": "admin:user:purge",
         "read": "admin:user:read",
+        "restore": "admin:user:restore",
         "update": "admin:user:update"
       },
       "menu": {
@@ -4657,7 +4792,12 @@
         "areaCode",
         "roles"
       ],
-      "defaultSortKey": "updatedAt"
+      "defaultSortKey": "updatedAt",
+      "deletion": {
+        "mode": "soft-delete",
+        "policyVersion": 1,
+        "restrictReferences": true
+      }
     },
     {
       "capabilityId": "system-admin",
@@ -4673,7 +4813,6 @@
       "permissionPrefix": "admin:version",
       "permissions": {
         "create": "admin:version:create",
-        "delete": "admin:version:delete",
         "read": "admin:version:read",
         "update": "admin:version:update"
       },
@@ -4682,6 +4821,10 @@
         "group": "operations",
         "icon": "cluster",
         "order": 360
+      },
+      "deletion": {
+        "mode": "append-only",
+        "policyVersion": 1
       }
     }
   ]

@@ -575,6 +575,9 @@ function validateDeploymentPackage(contract, errors) {
       if (!hasComposeEnvironment(apiService?.environment, "PLATFORM_RATE_LIMIT_HMAC_KEY")) {
         errors.push("platform-api must receive PLATFORM_RATE_LIMIT_HMAC_KEY");
       }
+      if (!hasComposeEnvironment(apiService?.environment, "PLATFORM_RETENTION_RUNNER_ENABLED")) {
+        errors.push("platform-api must receive PLATFORM_RETENTION_RUNNER_ENABLED");
+      }
       for (const name of [
         "PLATFORM_DATA_KEY_PROVIDER",
         "PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID",

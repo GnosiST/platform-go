@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/dataprotection"
@@ -279,6 +280,9 @@ func (s *Store) validateSnapshot(snapshot ResourceSnapshot) error {
 			return fmt.Errorf("%w: snapshot contains unknown resource %s", ErrInvalidRecord, resource)
 		}
 		for _, record := range records {
+			if err := validateLifecycleRecord(record); err != nil {
+				return fmt.Errorf("%w: resource %s record %s", err, resource, record.ID)
+			}
 			if err := s.validateWriteValues(resource, record.Values, WriteOriginInternal); err != nil {
 				return fmt.Errorf("%w: resource %s record %s", err, resource, record.ID)
 			}
@@ -289,6 +293,31 @@ func (s *Store) validateSnapshot(snapshot ResourceSnapshot) error {
 				return fmt.Errorf("%w: resource %s record %s", err, resource, record.ID)
 			}
 		}
+	}
+	return nil
+}
+
+func validateLifecycleRecord(record Record) error {
+	deletedAt := strings.TrimSpace(record.DeletedAt)
+	if deletedAt == "" {
+		if record.DeletedBy != "" || record.DeleteReason != "" || record.PurgeAfter != "" || record.DeletionPolicyVersion != 0 {
+			return fmt.Errorf("%w: active record contains lifecycle metadata", ErrInvalidRecord)
+		}
+		return nil
+	}
+	deletedTime, err := time.Parse(time.RFC3339, deletedAt)
+	if err != nil {
+		return fmt.Errorf("%w: deletedAt must be RFC3339", ErrInvalidRecord)
+	}
+	if strings.TrimSpace(record.DeletedBy) == "" || strings.TrimSpace(record.DeleteReason) == "" || record.DeletionPolicyVersion == 0 {
+		return fmt.Errorf("%w: deleted record lifecycle metadata is incomplete", ErrInvalidRecord)
+	}
+	if strings.TrimSpace(record.PurgeAfter) == "" {
+		return nil
+	}
+	purgeAfter, err := time.Parse(time.RFC3339, record.PurgeAfter)
+	if err != nil || purgeAfter.Before(deletedTime) {
+		return fmt.Errorf("%w: purgeAfter must be RFC3339 and not precede deletedAt", ErrInvalidRecord)
 	}
 	return nil
 }

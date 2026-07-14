@@ -19,7 +19,7 @@ func (s *Store) casbinPolicySnapshot() ([]authz.RolePolicy, []authz.UserRole) {
 	defer s.mu.Unlock()
 
 	policies := make([]authz.RolePolicy, 0)
-	for _, role := range s.resources["roles"] {
+	for _, role := range visibleRecords("roles", s.resources["roles"]) {
 		if role.Status == "disabled" {
 			continue
 		}
@@ -44,7 +44,7 @@ func (s *Store) casbinPolicySnapshot() ([]authz.RolePolicy, []authz.UserRole) {
 	}
 
 	roles := make([]authz.UserRole, 0)
-	for _, user := range s.resources["users"] {
+	for _, user := range visibleRecords("users", s.resources["users"]) {
 		if user.Status == "disabled" {
 			continue
 		}

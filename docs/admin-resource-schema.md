@@ -308,7 +308,7 @@ PLATFORM_ADMIN_RESOURCE_DSN=$PLATFORM_ADMIN_RESOURCE_DSN_SECRET
 
 Selection order is GORM driver, file, then memory. The GORM adapter creates `platform_admin_resource_records` and `platform_admin_resource_state`, and persists generic resource snapshots through the shared GORM storage opener. The older `database/sql` adapter remains behind the same repository port for compatibility tests, but the target runtime path is GORM.
 
-Mutation-plus-audit APIs use this snapshot as their transaction boundary. Create/update/delete either save both records and advance the revision, or restore the complete prior in-memory snapshot when `Save` fails. File deletion additionally stores its internal tombstone and delete-request audit in one snapshot before object cleanup starts.
+Mutation-plus-audit APIs use this snapshot as their transaction boundary. Create/update/delete either save both records and advance the revision, or restore the complete prior in-memory snapshot when `Save` fails. Recoverable delete writes platform-owned lifecycle state and its audit atomically; normal reads omit the record until a dedicated restore clears that state or maintenance performs final purge. File delete only tombstones metadata during the request. Object cleanup is claimed later by maintenance, and metadata is retained until object deletion or an idempotent not-found result is durably recorded.
 
 The GORM adapter now stores core system resources in normalized tables while preserving the same `ResourceSnapshot` API:
 

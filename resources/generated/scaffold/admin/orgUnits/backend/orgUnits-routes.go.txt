@@ -8,6 +8,7 @@ package httpapi
 
 // DELETE /api/admin/resources/org-units/:id -> admin:org-unit:delete
 // POST /api/admin/resources/org-units -> admin:org-unit:create
+// POST /api/admin/resources/org-units/:id/restore -> admin:org-unit:restore
 // POST /api/admin/resources/org-units/query -> admin:org-unit:read
 // PUT /api/admin/resources/org-units/:id -> admin:org-unit:update
 

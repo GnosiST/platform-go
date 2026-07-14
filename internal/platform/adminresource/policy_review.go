@@ -80,6 +80,9 @@ func (s *Store) ApprovePolicyReview(reviewID string, reviewerCode string, auditA
 	if roleIndex < 0 {
 		return PolicyReviewResult{}, ErrRecordNotFound
 	}
+	if isLifecycleDeleted(roles[roleIndex]) {
+		return PolicyReviewResult{}, ErrRecordDeleted
+	}
 
 	audits, ok := s.resources["audit-logs"]
 	if !ok {

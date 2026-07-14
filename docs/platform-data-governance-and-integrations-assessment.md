@@ -1,15 +1,15 @@
 # Platform Data Governance And Integrations Assessment
 
 Date: 2026-07-12
-Governance updated: 2026-07-13
+Governance updated: 2026-07-14
 
 ## Purpose
 
 This assessment records the current implementation truth and a proposed delivery order for sensitive-data display and controlled reveal, deletion and retention, multi-datasource portability, and optional messaging/search integrations.
 
-It does not mark every assessed capability as implemented. Governance approval has expanded the completion task graph to `53 total / 43 implemented / 10 controlled unfinished`; `mask-strategy-runtime` and `sensitive-data-reveal-step-up` are implemented and closed, while lifecycle, datasource, database certification and optional integration work remain pending.
+It does not mark every assessed capability as implemented. Governance now records `53 total / 44 implemented / 9 controlled unfinished`; `mask-strategy-runtime`, `sensitive-data-reveal-step-up` and `data-lifecycle-retention` are implemented and closed, while datasource, database certification and optional integration work remain pending.
 
-The six newly governed pending nodes are `data-lifecycle-retention`, `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`.
+The five remaining data/integration nodes are `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`.
 
 ## Current-State Summary
 
@@ -17,7 +17,7 @@ The six newly governed pending nodes are `data-lifecycle-retention`, `multi-data
 | --- | --- | --- |
 | Sensitive display | Field contracts support versioned field-configurable masking and explicit reveal policy. Encrypted `masked` projections return only the masked value; an authorized detail-field action can create a scoped challenge, satisfy OIDC reauthentication and/or Admin SMS OTP, consume one short-lived grant and show plaintext only in the expiring modal. | Existing pre-masked or hashed records cannot be revealed because the original plaintext is unavailable. Email OTP, TOTP, WebAuthn and CAPTCHA risk gates are not implemented factors. |
 | Passwords and transport | The default platform has no local-password provider or password repository. Production configuration requires HTTPS and HSTS. | A future local-password capability still needs a dedicated Argon2id repository and must never use generic resource values or reversible encryption. |
-| Deletion | Generic resources use physical deletion. Sessions and API tokens use domain-specific expiration or revocation. Files use tombstone, object deletion and purge in one request path. | There is no platform-wide deletion policy, recycle bin, restore window, retention runner or historical purge strategy. |
+| Deletion | Every enabled Admin resource declares an explicit mode. Supported behavior includes restricted terminal removal, soft delete/restore, API-token revocation with 90-day retained metadata, and file tombstone recovery with 30-day cleanup eligibility. Final purge is maintenance-only. | The scheduler is disabled by default and initially supports only the default datasource. There is no online purge, universal recycle bin, general archive tier or substitute for external backups. |
 | Databases | GORM openers are wired for MySQL, PostgreSQL and SQLite. Admin resources, sessions and lifecycle history can use separate DSNs. | This is subsystem separation, not named business datasources or tenant/capability routing. The three wired drivers do not yet have a full-platform certification matrix; `PLATFORM_DATABASE_DRIVER` and `PLATFORM_DATABASE_DSN` are not wired into process composition. Oracle and KingbaseES are not implemented or certified. |
 | Messaging and search | Redis Pub/Sub distributes cache invalidation and triggers resource/session reload paths. Notification and job profiles provide resource contracts only. | This is best-effort cache coherence, not a durable message bus. There is no transactional outbox, worker engine, Kafka/RabbitMQ/NATS adapter, Elasticsearch/OpenSearch adapter or replay/DLQ runtime. |
 
@@ -64,7 +64,7 @@ Three approaches were considered:
 2. Resource-declared deletion policy. Each capability declares the supported deletion mode and retention behavior. This is recommended.
 3. Event sourcing for all resources. Strong history, but disproportionate to the current platform and not recommended for the foundation.
 
-The recommended deletion contract supports explicit modes:
+The implemented deletion contract supports explicit modes:
 
 - `disabled` or `append-only` for audit and immutable evidence;
 - `restrict` for referenced master data;
@@ -73,11 +73,11 @@ The recommended deletion contract supports explicit modes:
 - `tombstone` for files and asynchronous external cleanup;
 - `hard-delete` only for explicitly approved low-risk records or final purge.
 
-Soft-deleted records use `deletedAt`, `deletedBy`, `deleteReason` and optional `purgeAfter`. Normal queries exclude them. Restore and purge use separate permissions and audit actions. The maintenance runner is disabled by default, supports dry-run, bounded batches, resumable cursors, a lease, retries and per-policy retention windows.
+Soft-deleted records use `deletedAt`, `deletedBy`, `deleteReason` and optional `purgeAfter`. Normal queries exclude them. Restore and purge use separate permissions and audit actions. File deletion creates a recoverable tombstone without deleting the object in the HTTP request; maintenance claims external cleanup after the restore window and retains restart-safe state until object deletion or not-found is durable. The maintenance runner is disabled by default, uses `24h / 100 / 3` schedule defaults, and supports bounded batches, resumable cursors, a lease, retries and per-policy retention windows.
 
-Retention changes are audited. Shortening a policy cannot immediately purge existing records: it first produces a dry-run impact report and requires an explicit promotion decision. Audit and immutable evidence resources remain append-only even when other resources use recovery windows.
+Retention changes are audited. Apply requires a completed dry-run checkpoint, the exact current and proposed fingerprints, and matching persisted promotion evidence. Shortening a policy cannot immediately purge existing records merely because a new manifest is deployed. Audit and immutable evidence resources remain append-only even when other resources use recovery windows.
 
-Default policy should be conservative: master data is recoverable and not auto-purged, sessions and verification records have bounded retention, files have a configurable recovery window, and audit data follows hot storage, archive and compliance purge stages.
+The shipped policy is conservative: referenced master data is restricted or recoverable without automatic purge, API-token revocation is immediate with retained sanitized metadata, files have a 30-day recovery window, and audit/evidence resources are append-only. There is no built-in archive stage; any archive, legal-hold or compliance purge process is a separate governed system.
 
 ### Multi-Datasource And Database Portability
 
@@ -117,8 +117,8 @@ The work should be decomposed into four independent specifications and detailed 
 1. `sensitive-data-reveal-step-up` (implemented)
    - Depends on the implemented protection, migration, masking and production Admin OIDC nodes.
    - Adds manifest reveal policy, OIDC/SMS factor orchestration, short-lived single-use grants, rate limits, append-only audit and the accessible Admin reveal modal.
-2. `data-lifecycle-retention`
-   - Adds deletion policy contracts, reference guards, soft-delete/recycle-bin runtime, file recovery, session/token linkage and the maintenance retention runner.
+2. `data-lifecycle-retention` (implemented)
+   - Adds deletion policy contracts, reference guards, soft-delete/restore runtime, file tombstone recovery, API-token retention and the disabled-by-default maintenance runner.
 3. `multi-datasource-database-portability`
    - Adds named datasource configuration, capability binding, transaction boundaries and the certified database matrix. KingbaseES and Oracle remain separate certification milestones.
 4. `optional-messaging-search-integrations`
@@ -146,17 +146,17 @@ Stage gates:
 2. Keep the implemented `sensitive-data-historical-migration` contract stable: no HTTP route or plaintext dual-read, prepare-only journal creation, bounded resumable batches, verification, encrypted escrow and hash-guarded rollback. Require external backup/restore evidence and real MySQL/PostgreSQL integration certification before production promotion.
 3. Keep the implemented `mask-strategy-runtime` contract stable: arbitrary sensitive fields remain manifest-driven; response, query, detail, Tooltip and export consume the same backend-owned projection; duplicate projection and plaintext fallback remain forbidden.
 4. Keep the implemented `sensitive-data-reveal-step-up` contract stable: OIDC re-authentication and SMS OTP use short-lived single-use grants, rate limits, response-terminal audit and registered adapters. SMS delivery failures atomically cancel the factor transaction so the same challenge can retry; production startup fails when an SMS factor lacks a verified phone source or registered non-debug sender.
-5. Add `data-lifecycle-retention`; declare deletion semantics per resource, then implement restore, final purge and a disabled-by-default maintenance runner.
+5. Keep `data-lifecycle-retention` stable: final purge remains maintenance-only, apply requires completed dry-run plus exact promotion evidence, and the runner remains disabled by default and single-datasource.
 6. Add `multi-datasource-contract-and-runtime`; provide named sources, capability binding, health checks and one-datasource transaction boundaries without XA.
 7. Add `database-certification-matrix`; certify MySQL, PostgreSQL and SQLite across repositories, migrations, transactions, pagination and locking. Run separate KingbaseES and Oracle milestones before labeling either supported.
 8. Add disabled/no-op messaging and search ports, then a transactional outbox. Promote exactly one MQ adapter for the first real workload and build search as an asynchronous projection with rebuild and replay paths.
 9. Synchronize the open-source manuals, operator runbook, compatibility matrix and public docs site before GitHub publication. Experimental adapters must remain clearly labeled.
 
-The four sensitive-data predecessor nodes are implemented in the completion program. The remaining six data/integration nodes and four open-source nodes are controlled pending scope, and must not silently reuse existing closeouts or be described as runtime capability. The task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation must remain synchronized as each node advances. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
+The four sensitive-data predecessor nodes and `data-lifecycle-retention` are implemented in the completion program. The remaining five data/integration nodes and four open-source nodes are controlled pending scope, and must not silently reuse existing closeouts or be described as runtime capability. The task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation must remain synchronized as each node advances. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
 
 ## Release Recommendation
 
-Before a public v0.1 release, retain the historical-migration runbook and external promotion evidence boundary, publish honest deletion semantics, and avoid claiming database or integration support without a passing matrix. Configurable encryption, offline historical migration, manifest-driven masking and controlled reveal are implemented; named datasources and disabled integration ports remain future foundation capabilities. Vendor-specific Oracle, KingbaseES, MQ and search adapters may ship in staged releases only when their experimental status and verification limits are explicit.
+Before a public v0.1 release, retain the historical-migration and lifecycle runbooks and external promotion evidence boundary, publish honest deletion semantics, and avoid claiming database or integration support without a passing matrix. Configurable encryption, offline historical migration, manifest-driven masking, controlled reveal and lifecycle retention are implemented; named datasources and disabled integration ports remain future foundation capabilities. Vendor-specific Oracle, KingbaseES, MQ and search adapters may ship in staged releases only when their experimental status and verification limits are explicit.
 
 ## Source Evidence
 
@@ -165,7 +165,7 @@ Before a public v0.1 release, retain the historical-migration runbook and extern
 - Admin value rendering: `admin/src/platform/resources/GenericResourceConsole.tsx`, `admin/src/platform/ui/AdminPrimitives.tsx`.
 - Phone masking and verification: `internal/platform/httpapi/app_phone.go`, `internal/platform/httpapi/phone_protection.go`.
 - Password and transport boundaries: `cmd/platform-api/main.go`, `internal/platform/httpapi/security_headers.go`.
-- Generic deletion and file tombstones: `internal/platform/adminresource/store.go`, `internal/platform/adminresource/audit.go`, `internal/platform/httpapi/server.go`.
+- Lifecycle policies, runner and file tombstones: `internal/platform/capability/manifest.go`, `internal/platform/adminresource/lifecycle.go`, `internal/platform/datalifecycle/`, `internal/platform/bootstrap/data_lifecycle.go`, `internal/platform/httpapi/server.go`.
 - Session and token revocation: `internal/platform/session/store.go`, `internal/platform/httpapi/server.go`.
 - Database openers and configuration: `internal/platform/storage/gorm.go`, `internal/platform/config/config.go`, `internal/platform/bootstrap/`.
 - Cache-coherence Pub/Sub and optional profiles: `internal/platform/cache/invalidation.go`, `internal/platform/cache/redis_invalidation.go`, `internal/platform/httpapi/server.go`, `resources/platform-capability-profiles.json`.

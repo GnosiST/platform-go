@@ -110,6 +110,39 @@ function validateAdminResourceContract(contract) {
 }
 
 describe("admin resource contract generators", () => {
+  it("projects lifecycle routes without exposing maintenance purge over HTTP", () => {
+    const contract = runAdminResourceContract();
+    const openapi = runAdminOpenAPIForContract(contract);
+    const byCode = (code) => contract.resources.find((resource) => resource.code === code);
+
+    assert.deepEqual(byCode("app-identities").deletion, { mode: "disabled", policyVersion: 1 });
+    assert.equal(byCode("app-identities").routes.some((route) => route.method === "DELETE"), false);
+
+    assert.deepEqual(byCode("api-tokens").deletion, {
+      mode: "revoke",
+      policyVersion: 1,
+      retentionDays: 90,
+      autoPurge: true,
+    });
+    assert.equal(byCode("api-tokens").routes.some((route) => route.method === "DELETE"), true);
+    assert.equal(byCode("api-tokens").routes.some((route) => route.path.endsWith("/restore")), false);
+
+    assert.deepEqual(byCode("files").deletion, {
+      mode: "tombstone",
+      policyVersion: 1,
+      retentionDays: 30,
+      autoPurge: true,
+    });
+    assert.equal(byCode("files").routes.some((route) => route.path === "/api/admin/resources/files/:id/restore"), true);
+    assert.equal(contract.routes.some((route) => route.path.includes("/purge")), false);
+
+    assert.equal(openapi.paths["/api/admin/resources/app-identities/{id}"].delete, undefined);
+    assert.equal(openapi.paths["/api/admin/resources/api-tokens/{id}"].delete["x-platform-permission"], "admin:api-token:delete");
+    assert.equal(openapi.paths["/api/admin/resources/files/{id}/restore"].post.operationId, "restoreFilesById");
+    assert.equal(openapi.paths["/api/admin/resources/files/{id}/restore"].post["x-platform-permission"], "admin:file:restore");
+    assert.equal(Object.keys(openapi.paths).some((route) => route.includes("/purge")), false);
+  });
+
   it("keeps optional policy-review routes out of the default generated contract", () => {
     const contract = runAdminResourceContract();
     const openapi = runAdminOpenAPIForContract(contract);
