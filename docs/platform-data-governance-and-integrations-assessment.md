@@ -5,11 +5,11 @@ Governance updated: 2026-07-14
 
 ## Purpose
 
-This assessment records the current implementation truth and a proposed delivery order for sensitive-data display and controlled reveal, deletion and retention, multi-datasource portability, and optional messaging/search integrations.
+This assessment records the current implementation truth for sensitive-data display and controlled reveal, deletion and retention, multi-datasource portability, and optional messaging/search integrations.
 
 It does not mark every assessed capability as implemented. Governance now records `53 total / 44 implemented / 9 controlled unfinished`; `mask-strategy-runtime`, `sensitive-data-reveal-step-up` and `data-lifecycle-retention` are implemented and closed, while datasource, database certification and optional integration work remain pending.
 
-The five remaining data/integration nodes are `multi-datasource-contract-and-runtime`, `database-certification-matrix`, `integration-ports-disabled-default`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. The four existing open-source pending nodes are `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`.
+The current graph still contains five remaining data/integration nodes and four open-source nodes. Their approved expansion and ordering is defined only by the [remaining-task topology adjustment](superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md). Until the separate graph-activation change is committed, this assessment preserves the effective `53 / 44 / 9` counts and does not describe proposed nodes as active work.
 
 ## Current-State Summary
 
@@ -81,13 +81,15 @@ The shipped policy is conservative: referenced master data is restricted or reco
 
 ### Multi-Datasource And Database Portability
 
-Three approaches were considered:
+The target is a configuration-driven SaaS data plane. Three architectural levels were considered:
 
 1. Keep one global DSN. Lowest complexity, but does not meet reporting, replica or capability-isolation needs.
-2. Named datasource registry with capability bindings. This is recommended.
-3. Transparent cross-database federation and XA transactions. High operational cost and incompatible behavior across target databases; not recommended.
+2. Named Datasource and DatasourceGroup registry with capability bindings. This is the required runtime foundation, but it is not sufficient for tenant placement, read/write routing or sharding.
+3. Configuration-driven tenant placement and routing with separately governed sharding, controlled federation and optional XA. This is the approved target, delivered as independent nodes rather than one oversized datasource task.
 
-The recommended registry defines named sources such as `primary`, `read` and `reporting`. Capabilities bind to a datasource name instead of opening arbitrary DSNs. One business transaction stays within one datasource. Cross-source workflows use outbox plus saga or compensating actions rather than XA.
+Datasource, DatasourceGroup, TenantPlacement, shard, read/write and consistency policies are explicitly declared through configuration or an authorized control plane. Runtime selection is deterministic from trusted identity, TenantContext, capability, operation type, request purpose and configuration version. Ordinary clients cannot submit DSNs, physical datasource names, databases, schemas or shards; privileged overrides require scoped authorization and audit.
+
+One normal business transaction remains pinned to one datasource and shard. Writes and transactions use primary; configured read-after-write consistency uses a bounded primary-sticky window. Cross-source mutation defaults to transactional outbox plus saga or explicit compensation. Cross-database joins are allowed only as controlled read-only persisted report queries with tenant, field, row, timeout and cost limits. XA is an advanced, default-off adapter with compatibility and recovery gates; it is supported as an optional capability, not used as the foundation transaction path.
 
 Support claims must be evidence-based:
 
@@ -110,49 +112,36 @@ Only one MQ adapter should be implemented for the first real workload. RabbitMQ 
 
 ## Feasibility And Implementation Plan
 
-All four requested capability groups are feasible within the current Gin/GORM/capability-manifest architecture, but none is a one-file switch. The work crosses shared contracts, persistence, authorization, operations and Admin UI. Each stage must be independently testable and must not claim vendor support before its runtime and compatibility matrix pass.
+The remaining work is feasible within the Gin/GORM/capability-manifest architecture, but it crosses shared contracts, identity, persistence, authorization, operations and Admin UI. Each node must be independently testable and must not claim driver or feature support before the applicable certification lane passes.
 
-The work should be decomposed into four independent specifications and detailed implementation plans:
-
-1. `sensitive-data-reveal-step-up` (implemented)
-   - Depends on the implemented protection, migration, masking and production Admin OIDC nodes.
-   - Adds manifest reveal policy, OIDC/SMS factor orchestration, short-lived single-use grants, rate limits, append-only audit and the accessible Admin reveal modal.
-2. `data-lifecycle-retention` (implemented)
-   - Adds deletion policy contracts, reference guards, soft-delete/restore runtime, file tombstone recovery, API-token retention and the disabled-by-default maintenance runner.
-3. `multi-datasource-database-portability`
-   - Adds named datasource configuration, capability binding, transaction boundaries and the certified database matrix. KingbaseES and Oracle remain separate certification milestones.
-4. `optional-messaging-search-integrations`
-   - Adds disabled ports first, then transactional outbox, one MQ adapter and Elasticsearch/OpenSearch projections.
-
-Recommended execution sequence:
+The unique approved decomposition and all dependency, lock and completion-gate decisions live in the [remaining-task topology adjustment](superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md). The governing sequence is:
 
 ```text
-sensitive-data-protection-runtime
-  -> sensitive-data-historical-migration
-  -> mask-strategy-runtime
-  -> sensitive-data-reveal-step-up
-  -> data-lifecycle-retention
-  -> multi-datasource-contract-and-runtime
+platform-service-contract-standard
+  -> [persisted-query-command-object-runtime || integration-ports-disabled-default]
+  -> [organization-rbac-menu governance lane || datasource registry and routing lane]
   -> database-certification-matrix
-  -> integration-ports-disabled-default
   -> transactional-outbox-and-one-mq-adapter
   -> asynchronous-search-projection
   -> open-source-docs-and-release
 ```
 
-Stage gates:
+`integration-ports-disabled-default` may run in parallel with the Query/Command runtime after the Service Contract standard. The organization UI lane may later run in parallel with the datasource backend lane when their contract and file locks do not overlap.
+
+Stable and future stage gates:
 
 1. Keep the implemented `sensitive-data-protection-runtime` contract stable: versioned encryption, explicit normalizers, key-provider configuration, protected persistence and authorized internal projection are now available.
 2. Keep the implemented `sensitive-data-historical-migration` contract stable: no HTTP route or plaintext dual-read, prepare-only journal creation, bounded resumable batches, verification, encrypted escrow and hash-guarded rollback. Require external backup/restore evidence and real MySQL/PostgreSQL integration certification before production promotion.
 3. Keep the implemented `mask-strategy-runtime` contract stable: arbitrary sensitive fields remain manifest-driven; response, query, detail, Tooltip and export consume the same backend-owned projection; duplicate projection and plaintext fallback remain forbidden.
 4. Keep the implemented `sensitive-data-reveal-step-up` contract stable: OIDC re-authentication and SMS OTP use short-lived single-use grants, rate limits, response-terminal audit and registered adapters. SMS delivery failures atomically cancel the factor transaction so the same challenge can retry; production startup fails when an SMS factor lacks a verified phone source or registered non-debug sender.
 5. Keep `data-lifecycle-retention` stable: final purge remains maintenance-only, apply requires completed dry-run plus exact promotion evidence, and the runner remains disabled by default and single-datasource.
-6. Add `multi-datasource-contract-and-runtime`; provide named sources, capability binding, health checks and one-datasource transaction boundaries without XA.
-7. Add `database-certification-matrix`; certify MySQL, PostgreSQL and SQLite across repositories, migrations, transactions, pagination and locking. Run separate KingbaseES and Oracle milestones before labeling either supported.
-8. Add disabled/no-op messaging and search ports, then a transactional outbox. Promote exactly one MQ adapter for the first real workload and build search as an asynchronous projection with rebuild and replay paths.
-9. Synchronize the open-source manuals, operator runbook, compatibility matrix and public docs site before GitHub publication. Experimental adapters must remain clearly labeled.
+6. Establish the executable Platform Service Contract and persisted Query/Command Object runtime before organization authorization or SaaS routing consumes them.
+7. Keep `multi-datasource-contract-and-runtime` narrow: versioned Datasource/DatasourceGroup configuration, capability binding, health and transaction pinning. Tenant placement, read/write routing, sharding, federation and XA have independent completion gates.
+8. Certify MySQL, PostgreSQL, SQLite, KingbaseES and Oracle by driver, version and feature. Unverified routing, sharding, federation or XA combinations remain experimental or unsupported.
+9. Add disabled/no-op messaging and search ports early, then transactional Outbox, one MQ adapter and asynchronous search projection after the required transaction and event contracts are stable.
+10. Synchronize the open-source manuals, operator runbook, compatibility matrix and public docs site before GitHub publication. Experimental adapters must remain clearly labeled.
 
-The four sensitive-data predecessor nodes and `data-lifecycle-retention` are implemented in the completion program. The remaining five data/integration nodes and four open-source nodes are controlled pending scope, and must not silently reuse existing closeouts or be described as runtime capability. The task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation must remain synchronized as each node advances. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
+The four sensitive-data predecessor nodes and `data-lifecycle-retention` are implemented in the completion program. The currently effective five data/integration nodes and four open-source nodes remain controlled pending scope until graph activation. Proposed service-contract, organization and SaaS data-plane nodes must not silently reuse existing closeouts or be described as runtime capability. The task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation must remain synchronized as each node advances. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
 
 ## Release Recommendation
 
