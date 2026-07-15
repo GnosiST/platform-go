@@ -13,6 +13,7 @@ import (
 
 	"platform-go/internal/platform/adminresource"
 	"platform-go/internal/platform/capability"
+	"platform-go/internal/platform/errorcode"
 	"platform-go/internal/platform/ratelimit"
 	"platform-go/internal/platform/rbac"
 	"platform-go/internal/platform/sensitivereveal"
@@ -133,13 +134,14 @@ type adminSensitiveRevealTarget struct {
 }
 
 func (s *Server) adminSensitiveRevealPolicy(ctx *gin.Context) {
+	noStoreSensitiveReveal(ctx)
 	target, ok := s.resolveAdminSensitiveRevealTarget(ctx, "", false)
 	if !ok {
 		return
 	}
 	policy, ok := s.findSensitiveRevealPolicy(target.field.Reveal.PolicyID)
 	if !ok {
-		writeSensitiveRevealError(ctx, sensitivereveal.ErrPolicyNotFound)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, sensitivereveal.ErrPolicyNotFound)
 		return
 	}
 	factors := make([]adminSensitiveRevealFactor, 0, len(policy.Factors))
@@ -174,9 +176,10 @@ func (s *Server) adminSensitiveRevealPolicy(ctx *gin.Context) {
 }
 
 func (s *Server) adminSensitiveRevealChallenge(ctx *gin.Context) {
+	noStoreSensitiveReveal(ctx)
 	var input adminSensitiveRevealChallengeRequest
 	if err := bindSensitiveRevealJSON(ctx, &input); err != nil {
-		writeSensitiveRevealError(ctx, sensitivereveal.ErrInvalidScope)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, sensitivereveal.ErrInvalidScope)
 		return
 	}
 	target, ok := s.resolveAdminSensitiveRevealTarget(ctx, input.Purpose, true)
@@ -191,14 +194,14 @@ func (s *Server) adminSensitiveRevealChallenge(ctx *gin.Context) {
 		Scope:    target.scope,
 	})
 	if err != nil {
-		writeSensitiveRevealError(ctx, err)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, err)
 		return
 	}
 	factors := make([]string, 0, len(result.Factors))
 	for _, factor := range result.Factors {
 		publicFactor, ok := publicAdminSensitiveRevealFactor(factor.Factor)
 		if !ok {
-			writeSensitiveRevealError(ctx, sensitivereveal.ErrInvalidConfiguration)
+			writeSensitiveRevealError(ctx, s.internalErrorSink, sensitivereveal.ErrInvalidConfiguration)
 			return
 		}
 		factors = append(factors, publicFactor)
@@ -211,9 +214,10 @@ func (s *Server) adminSensitiveRevealChallenge(ctx *gin.Context) {
 }
 
 func (s *Server) adminSensitiveRevealOIDCStart(ctx *gin.Context) {
+	noStoreSensitiveReveal(ctx)
 	var input adminSensitiveRevealOIDCStartRequest
 	if err := bindSensitiveRevealJSON(ctx, &input); err != nil {
-		writeSensitiveRevealError(ctx, sensitivereveal.ErrInvalidScope)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, sensitivereveal.ErrInvalidScope)
 		return
 	}
 	target, ok := s.resolveAdminSensitiveRevealTarget(ctx, input.Purpose, true)
@@ -226,21 +230,21 @@ func (s *Server) adminSensitiveRevealOIDCStart(ctx *gin.Context) {
 	provider, ok := s.findAuthProvider(input.Provider, capability.AuthProviderAudienceAdmin)
 	resolver, resolverOK := s.adminIdentityResolver.(AdminStepUpIdentityResolver)
 	if !ok || provider.Kind != "oidc" || !provider.Configured || !resolverOK {
-		writeSensitiveRevealError(ctx, ErrAdminIdentityInvalid)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, ErrAdminIdentityInvalid)
 		return
 	}
 	started, err := resolver.StartAdminStepUpIdentity(ctx.Request.Context(), AdminIdentityStartInput{
 		Provider: provider, CodeChallenge: strings.TrimSpace(input.CodeChallenge),
 	})
 	if err != nil {
-		writeSensitiveRevealError(ctx, err)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, err)
 		return
 	}
 	factor, err := s.sensitiveReveal.BeginFactor(ctx.Request.Context(), sensitivereveal.BeginFactorRequest{
 		ChallengeToken: strings.TrimSpace(input.ChallengeToken), ExpectedChallengeID: strings.TrimSpace(ctx.Param("challenge")), Factor: sensitivereveal.FactorOIDCReauthentication,
 	})
 	if err != nil {
-		writeSensitiveRevealError(ctx, err)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, err)
 		return
 	}
 	noStoreSensitiveReveal(ctx)
@@ -251,9 +255,10 @@ func (s *Server) adminSensitiveRevealOIDCStart(ctx *gin.Context) {
 }
 
 func (s *Server) adminSensitiveRevealOIDCComplete(ctx *gin.Context) {
+	noStoreSensitiveReveal(ctx)
 	var input adminSensitiveRevealOIDCCompleteRequest
 	if err := bindSensitiveRevealJSON(ctx, &input); err != nil {
-		writeSensitiveRevealError(ctx, sensitivereveal.ErrInvalidScope)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, sensitivereveal.ErrInvalidScope)
 		return
 	}
 	target, ok := s.resolveAdminSensitiveRevealTarget(ctx, input.Purpose, true)
@@ -266,37 +271,38 @@ func (s *Server) adminSensitiveRevealOIDCComplete(ctx *gin.Context) {
 	provider, ok := s.findAuthProvider(input.Provider, capability.AuthProviderAudienceAdmin)
 	resolver, resolverOK := s.adminIdentityResolver.(AdminStepUpIdentityResolver)
 	if !ok || provider.Kind != "oidc" || !provider.Configured || !resolverOK {
-		writeSensitiveRevealError(ctx, ErrAdminIdentityInvalid)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, ErrAdminIdentityInvalid)
 		return
 	}
 	identity, err := resolver.ResolveAdminStepUpIdentity(ctx.Request.Context(), AdminIdentityResolveInput{
 		Provider: provider, Code: strings.TrimSpace(input.Code), State: strings.TrimSpace(input.State), CodeVerifier: strings.TrimSpace(input.CodeVerifier),
 	})
 	if err != nil {
-		writeSensitiveRevealError(ctx, err)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, err)
 		return
 	}
 	binding, err := s.adminIdentityBindings.ResolveAdminIdentityBinding(ctx.Request.Context(), AdminIdentityBindingInput{
 		Provider: provider, Issuer: identity.Issuer, ProviderSubject: identity.ProviderSubject, Now: s.now().UTC(),
 	})
 	if err != nil || strings.TrimSpace(binding.Username) != strings.TrimSpace(target.principal.User.Username) {
-		writeSensitiveRevealError(ctx, sensitivereveal.ErrVerificationFailed)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, sensitivereveal.ErrVerificationFailed)
 		return
 	}
 	result, err := s.sensitiveReveal.CompleteFactor(ctx.Request.Context(), sensitivereveal.CompleteFactorRequest{
 		ChallengeToken: strings.TrimSpace(input.ChallengeToken), ExpectedChallengeID: strings.TrimSpace(ctx.Param("challenge")), TransactionToken: strings.TrimSpace(input.TransactionToken), Verified: true,
 	})
 	if err != nil {
-		writeSensitiveRevealError(ctx, err)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, err)
 		return
 	}
 	writeSensitiveRevealFactorComplete(ctx, result)
 }
 
 func (s *Server) adminSensitiveRevealSMSStart(ctx *gin.Context) {
+	noStoreSensitiveReveal(ctx)
 	var input adminSensitiveRevealFactorRequest
 	if err := bindSensitiveRevealJSON(ctx, &input); err != nil {
-		writeSensitiveRevealError(ctx, sensitivereveal.ErrInvalidScope)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, sensitivereveal.ErrInvalidScope)
 		return
 	}
 	target, ok := s.resolveAdminSensitiveRevealTarget(ctx, input.Purpose, true)
@@ -307,34 +313,34 @@ func (s *Server) adminSensitiveRevealSMSStart(ctx *gin.Context) {
 		return
 	}
 	if s.adminStepUpPhoneResolver == nil || s.phoneProtector == nil || s.phoneVerificationSender == nil {
-		writeSensitiveRevealUnavailable(ctx)
+		writeSensitiveRevealUnavailable(ctx, s.internalErrorSink, nil)
 		return
 	}
 	phone, err := s.adminStepUpPhoneResolver.ResolveVerifiedAdminPhone(ctx.Request.Context(), target.principal.User.Username)
 	if err != nil {
-		writeSensitiveRevealUnavailable(ctx)
+		writeSensitiveRevealUnavailable(ctx, s.internalErrorSink, err)
 		return
 	}
 	phoneDigest, err := s.phoneProtector.PhoneDigest(phone.Phone)
 	if err != nil {
-		writeSensitiveRevealUnavailable(ctx)
+		writeSensitiveRevealUnavailable(ctx, s.internalErrorSink, err)
 		return
 	}
 	verificationCode, err := newAppPhoneDebugCode()
 	if err != nil {
-		writeSensitiveRevealError(ctx, err)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, err)
 		return
 	}
 	codeDigest, err := s.phoneProtector.CodeDigest(phoneDigest, sensitiveRevealSMSCodePurpose(target.scope.Purpose), verificationCode)
 	if err != nil {
-		writeSensitiveRevealUnavailable(ctx)
+		writeSensitiveRevealUnavailable(ctx, s.internalErrorSink, err)
 		return
 	}
 	factor, err := s.sensitiveReveal.BeginFactor(ctx.Request.Context(), sensitivereveal.BeginFactorRequest{
 		ChallengeToken: strings.TrimSpace(input.ChallengeToken), ExpectedChallengeID: strings.TrimSpace(ctx.Param("challenge")), Factor: sensitivereveal.FactorSMSOTP, VerificationSecret: codeDigest,
 	})
 	if err != nil {
-		writeSensitiveRevealError(ctx, err)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, err)
 		return
 	}
 	if err := s.phoneVerificationSender.Send(ctx.Request.Context(), phone.Phone, adminSensitiveRevealSMSPurpose, verificationCode); err != nil {
@@ -345,11 +351,10 @@ func (s *Server) adminSensitiveRevealSMSStart(ctx *gin.Context) {
 			Reason:              sensitivereveal.FactorCancelReasonDeliveryFailed,
 		})
 		if cancelErr != nil {
-			writeSensitiveRevealError(ctx, cancelErr)
+			writeSensitiveRevealError(ctx, s.internalErrorSink, cancelErr)
 			return
 		}
-		noStoreSensitiveReveal(ctx)
-		writeAuthError(ctx, http.StatusBadGateway, "ADMIN_SENSITIVE_REVEAL_DELIVERY_FAILED", "sensitive reveal verification delivery failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAdminSensitiveRevealDeliveryFailed, err)
 		return
 	}
 	response := adminSensitiveRevealSMSStartResponse{
@@ -363,9 +368,10 @@ func (s *Server) adminSensitiveRevealSMSStart(ctx *gin.Context) {
 }
 
 func (s *Server) adminSensitiveRevealSMSComplete(ctx *gin.Context) {
+	noStoreSensitiveReveal(ctx)
 	var input adminSensitiveRevealSMSCompleteRequest
 	if err := bindSensitiveRevealJSON(ctx, &input); err != nil {
-		writeSensitiveRevealError(ctx, sensitivereveal.ErrInvalidScope)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, sensitivereveal.ErrInvalidScope)
 		return
 	}
 	target, ok := s.resolveAdminSensitiveRevealTarget(ctx, input.Purpose, true)
@@ -376,38 +382,39 @@ func (s *Server) adminSensitiveRevealSMSComplete(ctx *gin.Context) {
 		return
 	}
 	if s.adminStepUpPhoneResolver == nil || s.phoneProtector == nil {
-		writeSensitiveRevealUnavailable(ctx)
+		writeSensitiveRevealUnavailable(ctx, s.internalErrorSink, nil)
 		return
 	}
 	phone, err := s.adminStepUpPhoneResolver.ResolveVerifiedAdminPhone(ctx.Request.Context(), target.principal.User.Username)
 	if err != nil {
-		writeSensitiveRevealUnavailable(ctx)
+		writeSensitiveRevealUnavailable(ctx, s.internalErrorSink, err)
 		return
 	}
 	phoneDigest, err := s.phoneProtector.PhoneDigest(phone.Phone)
 	if err != nil {
-		writeSensitiveRevealUnavailable(ctx)
+		writeSensitiveRevealUnavailable(ctx, s.internalErrorSink, err)
 		return
 	}
 	codeDigest, err := s.phoneProtector.CodeDigest(phoneDigest, sensitiveRevealSMSCodePurpose(target.scope.Purpose), input.Code)
 	if err != nil {
-		writeSensitiveRevealError(ctx, sensitivereveal.ErrVerificationFailed)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, sensitivereveal.ErrVerificationFailed)
 		return
 	}
 	result, err := s.sensitiveReveal.CompleteFactor(ctx.Request.Context(), sensitivereveal.CompleteFactorRequest{
 		ChallengeToken: strings.TrimSpace(input.ChallengeToken), ExpectedChallengeID: strings.TrimSpace(ctx.Param("challenge")), TransactionToken: strings.TrimSpace(input.TransactionToken), VerificationProof: codeDigest,
 	})
 	if err != nil {
-		writeSensitiveRevealError(ctx, err)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, err)
 		return
 	}
 	writeSensitiveRevealFactorComplete(ctx, result)
 }
 
 func (s *Server) adminSensitiveReveal(ctx *gin.Context) {
+	noStoreSensitiveReveal(ctx)
 	var input adminSensitiveRevealRequest
 	if err := bindSensitiveRevealJSON(ctx, &input); err != nil {
-		writeSensitiveRevealError(ctx, sensitivereveal.ErrInvalidScope)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, sensitivereveal.ErrInvalidScope)
 		return
 	}
 	target, ok := s.resolveAdminSensitiveRevealTarget(ctx, input.Purpose, true)
@@ -421,7 +428,7 @@ func (s *Server) adminSensitiveReveal(ctx *gin.Context) {
 		GrantToken: strings.TrimSpace(input.GrantToken), Scope: target.scope,
 	})
 	if err != nil {
-		writeSensitiveRevealError(ctx, err)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, err)
 		return
 	}
 	value, revealErr := s.resources.RevealProtectedField(ctx.Request.Context(), adminresource.ProtectedFieldRevealRequest{
@@ -433,7 +440,7 @@ func (s *Server) adminSensitiveReveal(ctx *gin.Context) {
 			reason = sensitivereveal.RevealReasonDecryptionFailed
 		}
 		_ = s.recordSensitiveRevealResult(ctx.Request.Context(), grant.GrantID, target.scope, false, reason)
-		writeSensitiveRevealError(ctx, revealErr)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, revealErr)
 		return
 	}
 	payload, err := json.Marshal(Response[adminSensitiveRevealResponse]{Data: adminSensitiveRevealResponse{
@@ -441,7 +448,7 @@ func (s *Server) adminSensitiveReveal(ctx *gin.Context) {
 	}})
 	if err != nil {
 		_ = s.recordSensitiveRevealResult(ctx.Request.Context(), grant.GrantID, target.scope, false, sensitivereveal.RevealReasonProjectionFailed)
-		writeSensitiveRevealError(ctx, err)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, err)
 		return
 	}
 	noStoreSensitiveReveal(ctx)
@@ -469,15 +476,15 @@ func (s *Server) recordSensitiveRevealResult(requestCtx context.Context, grantID
 
 func (s *Server) resolveAdminSensitiveRevealTarget(ctx *gin.Context, purpose string, requirePurpose bool) (adminSensitiveRevealTarget, bool) {
 	if s.sensitiveReveal == nil {
-		writeSensitiveRevealUnavailable(ctx)
+		writeSensitiveRevealUnavailable(ctx, s.internalErrorSink, nil)
 		return adminSensitiveRevealTarget{}, false
 	}
-	if !s.refreshAdminResourceState(ctx, "ADMIN_SENSITIVE_REVEAL_STATE_REFRESH_FAILED", "sensitive reveal authorization state is unavailable") {
+	if !s.refreshSensitiveRevealState(ctx) {
 		return adminSensitiveRevealTarget{}, false
 	}
 	authSession, ok, err := s.authSessionFromBearerContext(ctx)
 	if err != nil {
-		writeSensitiveRevealError(ctx, err)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, err)
 		return adminSensitiveRevealTarget{}, false
 	}
 	if !ok {
@@ -494,12 +501,12 @@ func (s *Server) resolveAdminSensitiveRevealTarget(ctx *gin.Context, purpose str
 	fieldKey := strings.TrimSpace(ctx.Param("field"))
 	schema, err := s.resources.Schema(resource)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return adminSensitiveRevealTarget{}, false
 	}
 	field, found := sensitiveRevealField(schema, fieldKey)
 	if !found || field.Reveal == nil {
-		writeSensitiveRevealError(ctx, adminresource.ErrRecordNotFound)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, adminresource.ErrRecordNotFound)
 		return adminSensitiveRevealTarget{}, false
 	}
 	if !s.can(principal, schema.Permissions.Read) || !s.can(principal, field.Reveal.Permission) {
@@ -508,16 +515,16 @@ func (s *Server) resolveAdminSensitiveRevealTarget(ctx *gin.Context, purpose str
 	}
 	items, err := s.resources.ListForPrincipal(resource, principal)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return adminSensitiveRevealTarget{}, false
 	}
 	if !sensitiveRevealRecordExists(items, recordID) {
-		writeAdminResourceError(ctx, adminresource.ErrRecordNotFound)
+		writeAdminResourceError(ctx, s.internalErrorSink, adminresource.ErrRecordNotFound)
 		return adminSensitiveRevealTarget{}, false
 	}
 	purpose = strings.TrimSpace(purpose)
 	if requirePurpose && purpose == "" {
-		writeSensitiveRevealError(ctx, sensitivereveal.ErrInvalidScope)
+		writeSensitiveRevealError(ctx, s.internalErrorSink, sensitivereveal.ErrInvalidScope)
 		return adminSensitiveRevealTarget{}, false
 	}
 	tenant := strings.TrimSpace(principal.User.TenantCode)
@@ -532,6 +539,21 @@ func (s *Server) resolveAdminSensitiveRevealTarget(ctx *gin.Context, purpose str
 		},
 	}
 	return target, true
+}
+
+func (s *Server) refreshSensitiveRevealState(ctx *gin.Context) bool {
+	changed, err := s.resources.RefreshContext(ctx.Request.Context())
+	if err != nil {
+		noStoreSensitiveReveal(ctx)
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAdminSensitiveRevealStateRefreshFailed, err)
+		return false
+	}
+	if changed {
+		s.invalidatePolicyAuthorizer()
+		_ = s.cache.DeletePrefix(ctx.Request.Context(), cacheKeyPrincipalPrefix)
+		_ = s.cache.DeletePrefix(ctx.Request.Context(), cacheKeyMenusPrefix)
+	}
+	return true
 }
 
 func (s *Server) findSensitiveRevealPolicy(policyID string) (capability.AdminRevealPolicy, bool) {
@@ -625,32 +647,4 @@ func writeSensitiveRevealFactorComplete(ctx *gin.Context, result sensitivereveal
 func noStoreSensitiveReveal(ctx *gin.Context) {
 	ctx.Header("Cache-Control", "no-store")
 	ctx.Header("Pragma", "no-cache")
-}
-
-func writeSensitiveRevealUnavailable(ctx *gin.Context) {
-	writeAuthError(ctx, http.StatusServiceUnavailable, "ADMIN_SENSITIVE_REVEAL_UNAVAILABLE", "sensitive field reveal is unavailable")
-}
-
-func writeSensitiveRevealError(ctx *gin.Context, err error) {
-	noStoreSensitiveReveal(ctx)
-	switch {
-	case errors.Is(err, adminresource.ErrRecordNotFound), errors.Is(err, sensitivereveal.ErrPolicyNotFound), errors.Is(err, sensitivereveal.ErrChallengeNotFound), errors.Is(err, sensitivereveal.ErrFactorTransactionNotFound), errors.Is(err, sensitivereveal.ErrGrantNotFound):
-		writeAuthError(ctx, http.StatusNotFound, "ADMIN_SENSITIVE_REVEAL_NOT_FOUND", "sensitive reveal request was not found")
-	case errors.Is(err, sensitivereveal.ErrChallengeExpired), errors.Is(err, sensitivereveal.ErrChallengeClosed), errors.Is(err, sensitivereveal.ErrGrantExpired), errors.Is(err, sensitivereveal.ErrGrantConsumed), errors.Is(err, sensitivereveal.ErrFactorLocked):
-		writeAuthError(ctx, http.StatusGone, "ADMIN_SENSITIVE_REVEAL_EXPIRED", "sensitive reveal request has expired")
-	case errors.Is(err, sensitivereveal.ErrFactorAlreadyStarted), errors.Is(err, sensitivereveal.ErrFactorAlreadyCompleted), errors.Is(err, sensitivereveal.ErrRevealResultRecorded):
-		writeAuthError(ctx, http.StatusConflict, "ADMIN_SENSITIVE_REVEAL_CONFLICT", "sensitive reveal request conflicts with its current state")
-	case errors.Is(err, sensitivereveal.ErrVerificationFailed), errors.Is(err, ErrAdminIdentityInvalid), errors.Is(err, ErrAdminIdentityTransaction), errors.Is(err, ErrAdminIdentityBindingInvalid):
-		writeAuthError(ctx, http.StatusUnprocessableEntity, "ADMIN_SENSITIVE_REVEAL_VERIFICATION_FAILED", "sensitive reveal verification failed")
-	case errors.Is(err, sensitivereveal.ErrScopeMismatch), errors.Is(err, sensitivereveal.ErrPurposeNotAllowed), errors.Is(err, sensitivereveal.ErrFactorNotAllowed):
-		writeForbidden(ctx)
-	case errors.Is(err, ErrAdminIdentityProviderExchange):
-		writeAuthError(ctx, http.StatusBadGateway, "ADMIN_SENSITIVE_REVEAL_PROVIDER_FAILED", "sensitive reveal identity provider failed")
-	case errors.Is(err, adminresource.ErrProtectedFieldUnavailable), errors.Is(err, adminresource.ErrProtectedFieldDecryptionFailed):
-		writeSensitiveRevealUnavailable(ctx)
-	case errors.Is(err, sensitivereveal.ErrInvalidScope), errors.Is(err, adminresource.ErrInvalidRecord):
-		writeAuthError(ctx, http.StatusBadRequest, "ADMIN_SENSITIVE_REVEAL_INVALID", "invalid sensitive reveal request")
-	default:
-		writeAuthError(ctx, http.StatusInternalServerError, "ADMIN_SENSITIVE_REVEAL_FAILED", "sensitive field reveal failed")
-	}
 }

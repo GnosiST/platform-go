@@ -5151,7 +5151,7 @@ func TestWriteAdminResourceErrorMapsRevisionConflict(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 
-	writeAdminResourceError(ctx, &adminresource.RevisionConflictError{Expected: 3, Actual: 4})
+	writeAdminResourceError(ctx, nil, &adminresource.RevisionConflictError{Expected: 3, Actual: 4})
 
 	if recorder.Code != http.StatusConflict {
 		t.Fatalf("revision conflict status = %d body = %s, want 409", recorder.Code, recorder.Body.String())
@@ -5165,7 +5165,7 @@ func TestWriteAdminResourceErrorMapsDomainOwnedMutation(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 
-	writeAdminResourceError(ctx, fmt.Errorf("%w: users", adminresource.ErrDomainOwnedMutation))
+	writeAdminResourceError(ctx, nil, fmt.Errorf("%w: users", adminresource.ErrDomainOwnedMutation))
 
 	if recorder.Code != http.StatusConflict {
 		t.Fatalf("domain-owned mutation status = %d body = %s, want 409", recorder.Code, recorder.Body.String())
@@ -5321,8 +5321,10 @@ func TestAdminResourceCreateValidatesSchemaRequiredValueFields(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("POST api resource without required method status = %d body = %s", recorder.Code, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), "method is required") {
-		t.Fatalf("missing required method error body = %s", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"code":"ADMIN_RESOURCE_INVALID_RECORD"`) ||
+		!strings.Contains(recorder.Body.String(), `"message":"invalid admin resource record"`) ||
+		strings.Contains(recorder.Body.String(), "method") {
+		t.Fatalf("missing required method error body = %s, want canonical non-enumerating validation error", recorder.Body.String())
 	}
 }
 
@@ -5440,8 +5442,10 @@ func TestAdminAPITokenCreateRejectsUnknownScope(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("POST api token with unknown scope status = %d body = %s, want 400", recorder.Code, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), "unknown api token scope") {
-		t.Fatalf("unknown scope body = %s", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"code":"ADMIN_RESOURCE_INVALID_RECORD"`) ||
+		!strings.Contains(recorder.Body.String(), `"message":"invalid admin resource record"`) ||
+		strings.Contains(recorder.Body.String(), "admin:missing:read") || strings.Contains(recorder.Body.String(), "unknown api token scope") {
+		t.Fatalf("unknown scope body = %s, want canonical non-enumerating validation error", recorder.Body.String())
 	}
 }
 

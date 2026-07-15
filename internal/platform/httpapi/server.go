@@ -465,17 +465,17 @@ func (s *Server) adminServiceObjectQuery(ctx *gin.Context) {
 		return
 	}
 	if s.serviceObjects == nil {
-		writeServiceObjectError(ctx, serviceobject.ErrObjectUnavailable)
+		writeServiceObjectError(ctx, s.internalErrorSink, serviceobject.ErrObjectUnavailable)
 		return
 	}
 	request, err := serviceobject.DecodeQueryRequest(ctx.Request.Body)
 	if err != nil {
-		writeServiceObjectError(ctx, err)
+		writeServiceObjectError(ctx, s.internalErrorSink, err)
 		return
 	}
 	result, err := s.serviceObjects.ExecuteQuery(invocation, request)
 	if err != nil {
-		writeServiceObjectError(ctx, err)
+		writeServiceObjectError(ctx, s.internalErrorSink, err)
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[serviceobject.QueryResult]{Data: result})
@@ -490,17 +490,17 @@ func (s *Server) adminServiceObjectCommand(ctx *gin.Context) {
 		return
 	}
 	if s.serviceObjects == nil {
-		writeServiceObjectError(ctx, serviceobject.ErrObjectUnavailable)
+		writeServiceObjectError(ctx, s.internalErrorSink, serviceobject.ErrObjectUnavailable)
 		return
 	}
 	request, err := serviceobject.DecodeCommandRequest(ctx.Request.Body)
 	if err != nil {
-		writeServiceObjectError(ctx, err)
+		writeServiceObjectError(ctx, s.internalErrorSink, err)
 		return
 	}
 	result, err := s.serviceObjects.ExecuteCommand(invocation, request)
 	if err != nil {
-		writeServiceObjectError(ctx, err)
+		writeServiceObjectError(ctx, s.internalErrorSink, err)
 		return
 	}
 	if isAuthorizationServiceObjectCommand(request.CommandID) {
@@ -1108,7 +1108,7 @@ func (s *Server) adminResourceSchema(ctx *gin.Context) {
 		return s.resources.Schema(resource)
 	})
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	if !s.authorize(ctx, schema.Permissions.Read) {
@@ -1128,12 +1128,12 @@ func (s *Server) adminResourceList(ctx *gin.Context) {
 			return s.resources.List(resource)
 		})
 		if err != nil {
-			writeAdminResourceError(ctx, err)
+			writeAdminResourceError(ctx, s.internalErrorSink, err)
 			return
 		}
 		items, err = s.projectAdminResourceRecords(resource, items, adminresource.ProjectionResponse)
 		if err != nil {
-			writeAdminResourceError(ctx, err)
+			writeAdminResourceError(ctx, s.internalErrorSink, err)
 			return
 		}
 		ctx.JSON(http.StatusOK, Response[adminResourceListResponse]{
@@ -1151,12 +1151,12 @@ func (s *Server) adminResourceList(ctx *gin.Context) {
 		items, err = s.resources.List(resource)
 	}
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	items, err = s.projectAdminResourceRecords(resource, items, adminresource.ProjectionResponse)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[adminResourceListResponse]{
@@ -1172,7 +1172,7 @@ func (s *Server) adminResourceQuery(ctx *gin.Context) {
 	}
 	var input adminresource.QueryInput
 	if err := ctx.ShouldBindJSON(&input); err != nil {
-		writeAdminResourceError(ctx, adminresource.ErrInvalidRecord)
+		writeAdminResourceError(ctx, s.internalErrorSink, adminresource.ErrInvalidRecord)
 		return
 	}
 	var (
@@ -1185,7 +1185,7 @@ func (s *Server) adminResourceQuery(ctx *gin.Context) {
 		result, err = s.resources.Query(resource, input)
 	}
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[adminResourceQueryResponse]{
@@ -1206,19 +1206,19 @@ func (s *Server) adminResourceCreate(ctx *gin.Context) {
 	}
 	var input adminresource.WriteInput
 	if err := ctx.ShouldBindJSON(&input); err != nil {
-		writeAdminResourceError(ctx, adminresource.ErrInvalidRecord)
+		writeAdminResourceError(ctx, s.internalErrorSink, adminresource.ErrInvalidRecord)
 		return
 	}
 	if resource == apiTokensResource {
 		issued, token, err := s.issueAdminAPIToken(ctx.Request.Context(), s.auditActorID(ctx), input)
 		if err != nil {
-			writeAdminResourceError(ctx, err)
+			writeAdminResourceError(ctx, s.internalErrorSink, err)
 			return
 		}
 		s.invalidateCachesForResource(ctx.Request.Context(), resource)
 		projected, err := s.resources.ProjectRecord(resource, issued, adminresource.ProjectionResponse)
 		if err != nil {
-			writeAdminResourceError(ctx, err)
+			writeAdminResourceError(ctx, s.internalErrorSink, err)
 			return
 		}
 		ctx.JSON(http.StatusCreated, Response[adminResourceRecordResponse]{
@@ -1228,7 +1228,7 @@ func (s *Server) adminResourceCreate(ctx *gin.Context) {
 	}
 	mutation, err := s.resources.CreateWithAudit(resource, input, s.mutationAuditEvent(ctx, "admin_resource.create", resource, "created"))
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	record := mutation.Record
@@ -1246,19 +1246,19 @@ func (s *Server) adminResourceUpdate(ctx *gin.Context) {
 	}
 	var input adminresource.WriteInput
 	if err := ctx.ShouldBindJSON(&input); err != nil {
-		writeAdminResourceError(ctx, adminresource.ErrInvalidRecord)
+		writeAdminResourceError(ctx, s.internalErrorSink, adminresource.ErrInvalidRecord)
 		return
 	}
 	if resource == apiTokensResource {
 		record, err := s.updateAdminAPIToken(ctx.Request.Context(), s.auditActorID(ctx), id, input)
 		if err != nil {
-			writeAdminResourceError(ctx, err)
+			writeAdminResourceError(ctx, s.internalErrorSink, err)
 			return
 		}
 		s.invalidateCachesForResource(ctx.Request.Context(), resource)
 		projected, err := s.resources.ProjectRecord(resource, record, adminresource.ProjectionResponse)
 		if err != nil {
-			writeAdminResourceError(ctx, err)
+			writeAdminResourceError(ctx, s.internalErrorSink, err)
 			return
 		}
 		ctx.JSON(http.StatusOK, Response[adminResourceRecordResponse]{
@@ -1268,7 +1268,7 @@ func (s *Server) adminResourceUpdate(ctx *gin.Context) {
 	}
 	mutation, err := s.resources.UpdateWithAudit(resource, id, input, s.mutationAuditEvent(ctx, "admin_resource.update", resource, "updated"))
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	record := mutation.Record
@@ -1289,7 +1289,7 @@ func (s *Server) adminPolicyReviewApprove(ctx *gin.Context) {
 	}
 	result, err := s.resources.ApprovePolicyReview(ctx.Param("id"), userCode, s.auditActorID(ctx))
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	for _, resource := range []string{"policy-reviews", "roles", "audit-logs"} {
@@ -1297,17 +1297,17 @@ func (s *Server) adminPolicyReviewApprove(ctx *gin.Context) {
 	}
 	review, err := s.resources.ProjectRecord("policy-reviews", result.Review, adminresource.ProjectionResponse)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	role, err := s.resources.ProjectRecord("roles", result.Role, adminresource.ProjectionResponse)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	audit, err := s.resources.ProjectRecord("audit-logs", result.Audit, adminresource.ProjectionResponse)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[policyReviewApproveResponse]{
@@ -1330,7 +1330,7 @@ func (s *Server) adminPolicyReviewRequest(ctx *gin.Context) {
 	}
 	result, err := s.resources.RequestPolicyReview(ctx.Param("id"), userCode, s.auditActorID(ctx))
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	for _, resource := range []string{"policy-reviews", "audit-logs"} {
@@ -1338,12 +1338,12 @@ func (s *Server) adminPolicyReviewRequest(ctx *gin.Context) {
 	}
 	review, err := s.resources.ProjectRecord("policy-reviews", result.Review, adminresource.ProjectionResponse)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	audit, err := s.resources.ProjectRecord("audit-logs", result.Audit, adminresource.ProjectionResponse)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[policyReviewActionResponse]{
@@ -1360,7 +1360,7 @@ func (s *Server) adminPolicyReviewReject(ctx *gin.Context) {
 	}
 	var input policyReviewRejectRequest
 	if err := ctx.ShouldBindJSON(&input); err != nil {
-		writeAdminResourceError(ctx, adminresource.ErrInvalidRecord)
+		writeAdminResourceError(ctx, s.internalErrorSink, adminresource.ErrInvalidRecord)
 		return
 	}
 	userCode := s.businessUserCode(ctx)
@@ -1370,7 +1370,7 @@ func (s *Server) adminPolicyReviewReject(ctx *gin.Context) {
 	}
 	result, err := s.resources.RejectPolicyReview(ctx.Param("id"), userCode, s.auditActorID(ctx), input.Reason)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	for _, resource := range []string{"policy-reviews", "audit-logs"} {
@@ -1378,12 +1378,12 @@ func (s *Server) adminPolicyReviewReject(ctx *gin.Context) {
 	}
 	review, err := s.resources.ProjectRecord("policy-reviews", result.Review, adminresource.ProjectionResponse)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	audit, err := s.resources.ProjectRecord("audit-logs", result.Audit, adminresource.ProjectionResponse)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[policyReviewActionResponse]{
@@ -1418,7 +1418,7 @@ func (s *Server) adminPolicyReviewExport(ctx *gin.Context) {
 	}
 	result, err := s.resources.ExportPolicyReviews(userCode, s.auditActorID(ctx), watermarkApplied)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	s.invalidateCachesForResource(ctx.Request.Context(), "audit-logs")
@@ -1439,7 +1439,7 @@ func (s *Server) adminResourceDelete(ctx *gin.Context) {
 		return
 	}
 	if adminresource.RequiresGovernedLifecycleCommand(resource) {
-		writeAdminResourceError(ctx, adminresource.ErrDomainOwnedMutation)
+		writeAdminResourceError(ctx, s.internalErrorSink, adminresource.ErrDomainOwnedMutation)
 		return
 	}
 	if resource == "files" {
@@ -1448,7 +1448,7 @@ func (s *Server) adminResourceDelete(ctx *gin.Context) {
 	}
 	if resource == apiTokensResource {
 		if err := s.revokeAdminAPIToken(ctx.Request.Context(), s.auditActorID(ctx), ctx.Param("id")); err != nil {
-			writeAdminResourceError(ctx, err)
+			writeAdminResourceError(ctx, s.internalErrorSink, err)
 			return
 		}
 		s.invalidateCachesForResource(ctx.Request.Context(), resource)
@@ -1456,7 +1456,7 @@ func (s *Server) adminResourceDelete(ctx *gin.Context) {
 		return
 	}
 	if _, err := s.resources.DeleteWithAudit(resource, ctx.Param("id"), s.mutationAuditEvent(ctx, "admin_resource.delete", resource, "deleted")); err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	s.invalidateCachesForResource(ctx.Request.Context(), resource)
@@ -1470,12 +1470,12 @@ func (s *Server) adminResourceRestore(ctx *gin.Context) {
 		return
 	}
 	if adminresource.RequiresGovernedLifecycleCommand(resource) {
-		writeAdminResourceError(ctx, adminresource.ErrDomainOwnedMutation)
+		writeAdminResourceError(ctx, s.internalErrorSink, adminresource.ErrDomainOwnedMutation)
 		return
 	}
 	if hasPrincipal {
 		if _, err := s.resources.InternalRecordForPrincipal(resource, ctx.Param("id"), principal); err != nil {
-			writeAdminResourceError(ctx, err)
+			writeAdminResourceError(ctx, s.internalErrorSink, err)
 			return
 		}
 	}
@@ -1485,7 +1485,7 @@ func (s *Server) adminResourceRestore(ctx *gin.Context) {
 	}
 	result, err := s.resources.RestoreWithAudit(resource, ctx.Param("id"), s.mutationAuditEvent(ctx, "admin_resource.restore", resource, "restored"))
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	s.invalidateCachesForResource(ctx.Request.Context(), resource)
@@ -1499,7 +1499,7 @@ func (s *Server) adminResourceRestore(ctx *gin.Context) {
 func (s *Server) restoreAdminFile(ctx *gin.Context, id string) {
 	record, err := s.resources.InternalRecord("files", id)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	key := fileStorageKey(record)
@@ -1520,7 +1520,7 @@ func (s *Server) restoreAdminFile(ctx *gin.Context, id string) {
 	_ = body.Close()
 	result, err := s.resources.RestoreWithAudit("files", id, s.mutationAuditEvent(ctx, "file.restore", "files", "restored"))
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	s.invalidateCachesForResource(ctx.Request.Context(), "files")
@@ -1576,14 +1576,14 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 			writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_ROLLBACK_FAILED", "file upload rollback failed")
 			return
 		}
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	record := mutation.Record
 	s.invalidateCachesForResource(ctx.Request.Context(), "files")
 	projected, err := s.resources.ProjectRecord("files", record, adminresource.ProjectionResponse)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	ctx.JSON(http.StatusCreated, Response[adminResourceRecordResponse]{
@@ -1597,7 +1597,7 @@ func (s *Server) adminFileContent(ctx *gin.Context) {
 	}
 	record, err := s.adminResourceRecordByID("files", ctx.Param("id"))
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	key := fileStorageKey(record)
@@ -1617,7 +1617,7 @@ func (s *Server) adminFileContent(ctx *gin.Context) {
 	}
 	defer body.Close()
 	if err := s.recordFileAudit(ctx, "file.content", record); err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 
@@ -1680,14 +1680,14 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 			writeFileError(ctx, http.StatusInternalServerError, "APP_FILE_ROLLBACK_FAILED", "file upload rollback failed")
 			return
 		}
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	record := mutation.Record
 	s.invalidateCachesForResource(ctx.Request.Context(), "files")
 	projected, err := s.resources.ProjectRecord("files", record, adminresource.ProjectionResponse)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	ctx.JSON(http.StatusCreated, Response[adminResourceRecordResponse]{
@@ -1731,7 +1731,7 @@ func (s *Server) appFileContent(ctx *gin.Context) {
 	}
 	defer body.Close()
 	if err := s.recordFileAuditForActor("file.content", appUserID(username), record); err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 
@@ -1762,7 +1762,7 @@ func legacyAppUserID(username string) string {
 func (s *Server) deleteAdminFile(ctx *gin.Context, id string) {
 	mutation, err := s.resources.TombstoneFileWithAudit(id, s.mutationAuditEvent(ctx, "file.delete.request", "files", "cleanup-pending"))
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	s.invalidateCachesForResource(ctx.Request.Context(), "files")
@@ -2166,7 +2166,7 @@ func (s *Server) adminDemoDataApply(ctx *gin.Context) {
 	}
 	result, err := s.resources.ApplyDemoDataSet(dataset)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
 	s.invalidateCachesForResource(ctx.Request.Context(), result.Resource)
@@ -2417,7 +2417,7 @@ func (s *Server) authorizeAdminResourcePrincipal(ctx *gin.Context, resource stri
 	}
 	schema, err := s.resources.Schema(resource)
 	if err != nil {
-		writeAdminResourceError(ctx, err)
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return rbac.Principal{}, false, false
 	}
 	permission := permissionForAction(schema.Permissions, action)
@@ -2621,25 +2621,6 @@ func writeAuthError(ctx *gin.Context, status int, code string, message string) {
 	})
 }
 
-func writeServiceObjectError(ctx *gin.Context, err error) {
-	switch {
-	case errors.Is(err, serviceobject.ErrObjectUnavailable):
-		writeAuthError(ctx, http.StatusNotFound, "SERVICE_OBJECT_UNAVAILABLE", "service object is unavailable")
-	case errors.Is(err, serviceobject.ErrRequestInvalid):
-		writeAuthError(ctx, http.StatusBadRequest, "SERVICE_OBJECT_REQUEST_INVALID", "service object request is invalid")
-	case errors.Is(err, serviceobject.ErrCostLimitExceeded):
-		writeAuthError(ctx, http.StatusUnprocessableEntity, "SERVICE_OBJECT_COST_LIMIT", "service object cost limit exceeded")
-	case errors.Is(err, serviceobject.ErrIdempotencyConflict):
-		writeAuthError(ctx, http.StatusConflict, "SERVICE_OBJECT_IDEMPOTENCY_CONFLICT", "service object idempotency conflict")
-	case errors.Is(err, serviceobject.ErrConflict):
-		writeAuthError(ctx, http.StatusConflict, "SERVICE_OBJECT_STATE_CONFLICT", "service object state conflict")
-	case errors.Is(err, serviceobject.ErrValidation):
-		writeAuthError(ctx, http.StatusUnprocessableEntity, "SERVICE_OBJECT_DOMAIN_VALIDATION", "service object domain validation failed")
-	default:
-		writeAuthError(ctx, http.StatusInternalServerError, "SERVICE_OBJECT_EXECUTION_FAILED", "service object execution failed")
-	}
-}
-
 func bearerToken(header string) (string, bool) {
 	const prefix = "Bearer "
 	if !strings.HasPrefix(header, prefix) {
@@ -2794,49 +2775,4 @@ func writeUploadPolicyError(ctx *gin.Context, err error) {
 		return
 	}
 	writeFileError(ctx, http.StatusBadRequest, "FILE_UPLOAD_INVALID", "invalid file upload")
-}
-
-func writeAdminResourceError(ctx *gin.Context, err error) {
-	status := http.StatusInternalServerError
-	code := "ADMIN_RESOURCE_ERROR"
-	message := "admin resource operation failed"
-	switch {
-	case errors.Is(err, adminresource.ErrUnknownResource):
-		status = http.StatusNotFound
-		code = "ADMIN_RESOURCE_NOT_FOUND"
-		message = "admin resource not found"
-	case errors.Is(err, adminresource.ErrRecordNotFound):
-		status = http.StatusNotFound
-		code = "ADMIN_RESOURCE_RECORD_NOT_FOUND"
-		message = "admin resource record not found"
-	case errors.Is(err, adminresource.ErrRevisionConflict):
-		status = http.StatusConflict
-		code = "ADMIN_RESOURCE_REVISION_CONFLICT"
-		message = "admin resource revision conflict"
-	case errors.Is(err, adminresource.ErrDomainOwnedMutation):
-		status = http.StatusConflict
-		code = "ADMIN_RESOURCE_DOMAIN_OWNED_MUTATION"
-		message = "resource mutation requires a governed domain command"
-	case errors.Is(err, adminresource.ErrDeletionDisabled),
-		errors.Is(err, adminresource.ErrDeletionRequiresAdapter),
-		errors.Is(err, adminresource.ErrDeletionCleanupStarted),
-		errors.Is(err, adminresource.ErrRecordDeleted),
-		errors.Is(err, adminresource.ErrRecordNotDeleted),
-		errors.Is(err, adminresource.ErrRecordReferenced),
-		errors.Is(err, adminresource.ErrRestoreWindowExpired),
-		errors.Is(err, adminresource.ErrRetentionNotConfigured),
-		errors.Is(err, adminresource.ErrRetentionNotElapsed):
-		status = http.StatusConflict
-		code = "ADMIN_RESOURCE_LIFECYCLE_CONFLICT"
-		message = err.Error()
-	case errors.Is(err, adminresource.ErrInvalidRecord):
-		status = http.StatusBadRequest
-		code = "ADMIN_RESOURCE_INVALID_RECORD"
-		if errors.Is(err, adminresource.ErrInvalidRecord) && err != adminresource.ErrInvalidRecord {
-			message = err.Error()
-		} else {
-			message = "invalid admin resource record"
-		}
-	}
-	ctx.JSON(status, Response[gin.H]{Error: legacyErrorBody(ctx, code, message)})
 }

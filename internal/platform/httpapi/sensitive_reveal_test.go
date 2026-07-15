@@ -194,7 +194,8 @@ func TestSensitiveRevealVerificationFailurePreservesAdminSession(t *testing.T) {
 }
 
 func TestSensitiveRevealSMSDeliveryFailureCancelsTransactionForRetry(t *testing.T) {
-	harness := newSensitiveRevealHTTPHarness(t, sensitiveRevealHTTPHarnessOptions{})
+	sink := &recordingInternalErrorSink{}
+	harness := newSensitiveRevealHTTPHarness(t, sensitiveRevealHTTPHarnessOptions{internalErrorSink: sink})
 	recordID := harness.records["ops"]
 	challenge := harness.beginChallenge(t, recordID, sensitiveRevealHTTPPurpose, harness.token)
 	body := `{"challengeToken":"` + challenge.ChallengeToken + `","purpose":"` + sensitiveRevealHTTPPurpose + `"}`
@@ -204,6 +205,9 @@ func TestSensitiveRevealSMSDeliveryFailureCancelsTransactionForRetry(t *testing.
 	failed := harness.request(http.MethodPost, target, body, harness.token)
 	if failed.Code != http.StatusBadGateway || !strings.Contains(failed.Body.String(), "ADMIN_SENSITIVE_REVEAL_DELIVERY_FAILED") {
 		t.Fatalf("POST SMS start delivery failure status = %d body = %s, want retryable 502", failed.Code, failed.Body.String())
+	}
+	if failed.Header().Get("Cache-Control") != "no-store" || len(sink.events) != 1 || sink.events[0].Code != "ADMIN_SENSITIVE_REVEAL_DELIVERY_FAILED" {
+		t.Fatalf("delivery failure headers/events = %q/%+v, want no-store and one safe event", failed.Header().Get("Cache-Control"), sink.events)
 	}
 
 	harness.sender.err = nil
@@ -462,13 +466,14 @@ func TestSensitiveRevealAppliesChallengeFactorAndConsumeRateLimits(t *testing.T)
 }
 
 type sensitiveRevealHTTPHarnessOptions struct {
-	username         string
-	policyMode       string
-	authorizer       Authorizer
-	limiter          ratelimit.Limiter
-	identityResolver AdminIdentityResolver
-	identityBindings AdminIdentityBindingStore
-	store            sensitivereveal.Store
+	username          string
+	policyMode        string
+	authorizer        Authorizer
+	limiter           ratelimit.Limiter
+	identityResolver  AdminIdentityResolver
+	identityBindings  AdminIdentityBindingStore
+	store             sensitivereveal.Store
+	internalErrorSink InternalErrorSink
 }
 
 type sensitiveRevealHTTPHarness struct {
@@ -556,7 +561,8 @@ func newSensitiveRevealHTTPHarness(t *testing.T, options sensitiveRevealHTTPHarn
 		PhoneVerificationSender: sender, DebugCodeEnabled: true,
 		AdminIdentityResolver: identityResolver, AdminIdentityBindings: identityBindings,
 		Authorizer: options.authorizer, RateLimiter: options.limiter,
-		Now: func() time.Time { return now },
+		InternalErrorSink: options.internalErrorSink,
+		Now:               func() time.Time { return now },
 	})
 	username := strings.TrimSpace(options.username)
 	if username == "" {
