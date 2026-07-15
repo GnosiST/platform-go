@@ -10,7 +10,84 @@ import (
 	"testing"
 
 	"platform-go/internal/platform/capability"
+	"platform-go/internal/platform/errorcode"
 )
+
+func TestRunErrorCodesWritesRegistryDerivedContract(t *testing.T) {
+	outputPath := filepath.Join(t.TempDir(), "platform-error-code-contract.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	if err := run([]string{"error-codes", "--output", outputPath}, &stdout, &stderr); err != nil {
+		t.Fatalf("run(error-codes) error = %v, stderr = %s", err, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty when writing to file", stdout.String())
+	}
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document errorCodeContractDocument
+	if err := json.Unmarshal(data, &document); err != nil {
+		t.Fatal(err)
+	}
+	if document.ContractVersion != "1.0.0" || !strings.HasPrefix(document.ContractHash, "sha256:") {
+		t.Fatalf("contract identity = version:%q hash:%q", document.ContractVersion, document.ContractHash)
+	}
+	if document.CodeCount != len(errorcode.All()) || document.CodeCount != len(document.Definitions) {
+		t.Fatalf("codeCount = %d definitions = %d registry = %d", document.CodeCount, len(document.Definitions), len(errorcode.All()))
+	}
+	for i := 1; i < len(document.Definitions); i++ {
+		if document.Definitions[i-1].Code >= document.Definitions[i].Code {
+			t.Fatalf("definitions are not sorted at %q", document.Definitions[i].Code)
+		}
+	}
+	if definition, ok := contractDefinition(document.Definitions, errorcode.CodeAppForbidden); !ok || definition.HTTPStatus != 403 {
+		t.Fatalf("APP_FORBIDDEN = %+v, %t", definition, ok)
+	}
+}
+
+func TestRunErrorCodesIsDeterministicAndSupportsStdout(t *testing.T) {
+	var first bytes.Buffer
+	var second bytes.Buffer
+	var stderr bytes.Buffer
+	if err := run([]string{"error-codes", "--stdout"}, &first, &stderr); err != nil {
+		t.Fatalf("first run error = %v", err)
+	}
+	if err := run([]string{"error-codes", "--stdout"}, &second, &stderr); err != nil {
+		t.Fatalf("second run error = %v", err)
+	}
+	if !bytes.Equal(first.Bytes(), second.Bytes()) {
+		t.Fatal("error-code contract output is not deterministic")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(first.Bytes()))
+	var document errorCodeContractDocument
+	if err := decoder.Decode(&document); err != nil {
+		t.Fatal(err)
+	}
+	var extra map[string]any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		t.Fatalf("Decode(extra) error = %v, want EOF", err)
+	}
+}
+
+func TestRunErrorCodesRejectsUnexpectedArguments(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := run([]string{"error-codes", "unexpected"}, &stdout, &stderr); err == nil {
+		t.Fatal("run(error-codes unexpected) error = nil")
+	}
+}
+
+func contractDefinition(definitions []errorcode.Definition, code errorcode.Code) (errorcode.Definition, bool) {
+	for _, definition := range definitions {
+		if definition.Code == code {
+			return definition, true
+		}
+	}
+	return errorcode.Definition{}, false
+}
 
 func TestRunAppRoutesWritesManifestDerivedContract(t *testing.T) {
 	outputPath := filepath.Join(t.TempDir(), "app-route-contract.json")

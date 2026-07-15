@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0.0",
+  "contractVersion": "1.0.0",
+  "registryPackage": "internal/platform/errorcode",
+  "initialSourceVersion": "0.1.0",
+  "initialBaseline": {
+    "preContractActiveCodeCount": 114,
+    "stableDefinitionCount": 117,
+    "note": "The inventory count was captured before correcting two upload-open status collisions and the App forbidden namespace."
+  },
+  "catalogs": {
+    "planes": ["admin", "app", "service", "data", "control", "external"],
+    "audiences": ["operator", "internal", "partner", "public"],
+    "categories": ["authorization", "validation", "not-found", "conflict", "rate-cost", "dependency", "internal"],
+    "retryPolicies": ["never", "after-delay", "backoff"],
+    "redactionClasses": ["public-safe", "generic-only", "correlation-only"]
+  },
+  "compatibility": {
+    "immutableWithinMajor": ["owner", "planes", "audiences", "category", "httpStatus", "retryPolicy", "redactionClass"],
+    "additiveDefinitionsAllowed": true,
+    "removalRequiresRetainedDeprecatedDefinition": true,
+    "deprecationRequires": ["sunsetAt", "replacedBy"],
+    "sunsetFormat": "YYYY-MM-DD",
+    "hashAlgorithm": "sha256",
+    "hashExcludes": ["contractHash"]
+  },
+  "preContractCorrections": [
+    {
+      "legacyBehavior": "ADMIN_FILE_OPEN_FAILED represented both upload parsing and stored-object reads.",
+      "stableBehavior": "ADMIN_FILE_UPLOAD_OPEN_FAILED represents upload parsing; ADMIN_FILE_OPEN_FAILED represents stored-object reads."
+    },
+    {
+      "legacyBehavior": "APP_FILE_OPEN_FAILED represented both upload parsing and stored-object reads.",
+      "stableBehavior": "APP_FILE_UPLOAD_OPEN_FAILED represents upload parsing; APP_FILE_OPEN_FAILED represents stored-object reads."
+    },
+    {
+      "legacyBehavior": "ADMIN_FORBIDDEN was emitted from App authorization paths.",
+      "stableBehavior": "ADMIN_FORBIDDEN is Admin-owned and APP_FORBIDDEN is App-owned."
+    },
+    {
+      "legacyBehavior": "AUTH_INVALID_CREDENTIALS exposed different account-specific messages.",
+      "stableBehavior": "AUTH_INVALID_CREDENTIALS uses the non-enumerating message invalid credentials."
+    },
+    {
+      "legacyBehavior": "APP_PHONE_INVALID_REQUEST exposed operation-specific messages.",
+      "stableBehavior": "APP_PHONE_INVALID_REQUEST uses the stable message invalid app phone request."
+    },
+    {
+      "legacyBehavior": "ADMIN_RESOURCE_LIFECYCLE_CONFLICT and ADMIN_RESOURCE_INVALID_RECORD could expose adapter errors.",
+      "stableBehavior": "Both codes use fixed redacted public messages; private causes remain internal."
+    },
+    {
+      "legacyBehavior": "App file metadata paths could emit ADMIN_RESOURCE_* codes.",
+      "stableBehavior": "App paths use App-owned file codes and never depend on Admin resource code aliases."
+    }
+  ]
+}

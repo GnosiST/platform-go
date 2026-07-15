@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -16,6 +17,7 @@ import (
 	"platform-go/internal/platform/bootstrap"
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/config"
+	"platform-go/internal/platform/errorcode"
 	"platform-go/internal/platform/httpapi"
 )
 
@@ -24,7 +26,41 @@ const (
 	defaultAdminResourceContractPath = "resources/generated/admin-capability-resource-contract.json"
 	defaultServiceContractPath       = "resources/generated/platform-service-contract.json"
 	defaultPlatformAuditPath         = "resources/generated/platform-capability-audit.json"
+	defaultErrorCodeContractPath     = "resources/generated/platform-error-code-contract.json"
 )
+
+const errorCodeContractVersion = "1.0.0"
+
+type errorCodeContractDocument struct {
+	GeneratedBy     string                    `json:"generatedBy"`
+	Source          string                    `json:"source"`
+	SourceMode      string                    `json:"sourceMode"`
+	ContractVersion string                    `json:"contractVersion"`
+	SourceVersion   string                    `json:"sourceVersion"`
+	ContractHash    string                    `json:"contractHash"`
+	CodeCount       int                       `json:"codeCount"`
+	Catalogs        errorCodeContractCatalogs `json:"catalogs"`
+	Definitions     []errorcode.Definition    `json:"definitions"`
+}
+
+type errorCodeContractPayload struct {
+	GeneratedBy     string                    `json:"generatedBy"`
+	Source          string                    `json:"source"`
+	SourceMode      string                    `json:"sourceMode"`
+	ContractVersion string                    `json:"contractVersion"`
+	SourceVersion   string                    `json:"sourceVersion"`
+	CodeCount       int                       `json:"codeCount"`
+	Catalogs        errorCodeContractCatalogs `json:"catalogs"`
+	Definitions     []errorcode.Definition    `json:"definitions"`
+}
+
+type errorCodeContractCatalogs struct {
+	Planes           []errorcode.Plane          `json:"planes"`
+	Audiences        []errorcode.Audience       `json:"audiences"`
+	Categories       []errorcode.Category       `json:"categories"`
+	RetryPolicies    []errorcode.RetryPolicy    `json:"retryPolicies"`
+	RedactionClasses []errorcode.RedactionClass `json:"redactionClasses"`
+}
 
 type appRouteContractDocument struct {
 	GeneratedBy   string                  `json:"generatedBy"`
@@ -208,9 +244,86 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runServiceManifests(args[1:], stdout, stderr)
 	case "audit":
 		return runAudit(args[1:], stdout, stderr)
+	case "error-codes":
+		return runErrorCodes(args[1:], stdout, stderr)
 	default:
 		return fmt.Errorf("unknown contract command %q", args[0])
 	}
+}
+
+func runErrorCodes(args []string, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("error-codes", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	outputPath := flags.String("output", defaultErrorCodeContractPath, "output error-code contract path")
+	stdoutMode := flags.Bool("stdout", false, "write error-code contract to stdout")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 0 {
+		return fmt.Errorf("unexpected error-codes arguments: %v", flags.Args())
+	}
+
+	document, err := newErrorCodeContractDocument()
+	if err != nil {
+		return err
+	}
+	var output bytes.Buffer
+	encoder := json.NewEncoder(&output)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(document); err != nil {
+		return err
+	}
+	if *stdoutMode {
+		_, err = stdout.Write(output.Bytes())
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(*outputPath), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(*outputPath, output.Bytes(), 0644)
+}
+
+func newErrorCodeContractDocument() (errorCodeContractDocument, error) {
+	definitions := errorcode.All()
+	payload := errorCodeContractPayload{
+		GeneratedBy:     "cmd/platform-contracts error-codes",
+		Source:          "internal/platform/errorcode",
+		SourceMode:      "go-registry",
+		ContractVersion: errorCodeContractVersion,
+		SourceVersion:   "0.1.0",
+		CodeCount:       len(definitions),
+		Catalogs: errorCodeContractCatalogs{
+			Planes:           []errorcode.Plane{errorcode.PlaneAdmin, errorcode.PlaneApp, errorcode.PlaneService, errorcode.PlaneData, errorcode.PlaneControl, errorcode.PlaneExternal},
+			Audiences:        []errorcode.Audience{errorcode.AudienceOperator, errorcode.AudienceInternal, errorcode.AudiencePartner, errorcode.AudiencePublic},
+			Categories:       []errorcode.Category{errorcode.CategoryAuthorization, errorcode.CategoryValidation, errorcode.CategoryNotFound, errorcode.CategoryConflict, errorcode.CategoryRateCost, errorcode.CategoryDependency, errorcode.CategoryInternal},
+			RetryPolicies:    []errorcode.RetryPolicy{errorcode.RetryNever, errorcode.RetryAfterDelay, errorcode.RetryBackoff},
+			RedactionClasses: []errorcode.RedactionClass{errorcode.RedactionPublicSafe, errorcode.RedactionGenericOnly, errorcode.RedactionCorrelationOnly},
+		},
+		Definitions: definitions,
+	}
+	canonical, err := canonicalJSON(payload)
+	if err != nil {
+		return errorCodeContractDocument{}, err
+	}
+	hash := sha256.Sum256(canonical)
+	return errorCodeContractDocument{
+		GeneratedBy: payload.GeneratedBy, Source: payload.Source, SourceMode: payload.SourceMode,
+		ContractVersion: payload.ContractVersion, SourceVersion: payload.SourceVersion,
+		ContractHash: fmt.Sprintf("sha256:%x", hash), CodeCount: payload.CodeCount,
+		Catalogs: payload.Catalogs, Definitions: payload.Definitions,
+	}, nil
+}
+
+func canonicalJSON(value any) ([]byte, error) {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+	var generic any
+	if err := json.Unmarshal(encoded, &generic); err != nil {
+		return nil, err
+	}
+	return json.Marshal(generic)
 }
 
 func runServiceManifests(args []string, stdout io.Writer, stderr io.Writer) error {

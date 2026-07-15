@@ -1,0 +1,2091 @@
+{
+  "generatedBy": "cmd/platform-contracts error-codes",
+  "source": "internal/platform/errorcode",
+  "sourceMode": "go-registry",
+  "contractVersion": "1.0.0",
+  "sourceVersion": "0.1.0",
+  "contractHash": "sha256:5eb202f201ffb3f652b3db57566428d3667e254e82b01e2c9c8af5ca66e81263",
+  "codeCount": 117,
+  "catalogs": {
+    "planes": [
+      "admin",
+      "app",
+      "service",
+      "data",
+      "control",
+      "external"
+    ],
+    "audiences": [
+      "operator",
+      "internal",
+      "partner",
+      "public"
+    ],
+    "categories": [
+      "authorization",
+      "validation",
+      "not-found",
+      "conflict",
+      "rate-cost",
+      "dependency",
+      "internal"
+    ],
+    "retryPolicies": [
+      "never",
+      "after-delay",
+      "backoff"
+    ],
+    "redactionClasses": [
+      "public-safe",
+      "generic-only",
+      "correlation-only"
+    ]
+  },
+  "definitions": [
+    {
+      "code": "ADMIN_AUTH_STATE_REFRESH_FAILED",
+      "owner": "platform.http",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "dependency",
+      "httpStatus": 503,
+      "retryPolicy": "after-delay",
+      "redactionClass": "generic-only",
+      "publicMessage": "authorization state is unavailable",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_DEMO_DATA_NOT_FOUND",
+      "owner": "platform.http",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "not-found",
+      "httpStatus": 404,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "demo data set not found",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_FILE_MIME_INVALID",
+      "owner": "platform.file",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 415,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "uploaded file MIME type is invalid",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_FILE_MIME_MISMATCH",
+      "owner": "platform.file",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 415,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "declared and detected file MIME types do not match",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_FILE_MIME_NOT_ALLOWED",
+      "owner": "platform.file",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 415,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "uploaded file MIME type is not allowed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_FILE_OBJECT_NOT_FOUND",
+      "owner": "platform.file",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "not-found",
+      "httpStatus": 404,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "file object not found",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_FILE_OPEN_FAILED",
+      "owner": "platform.file",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "file open failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_FILE_READ_FAILED",
+      "owner": "platform.file",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "read uploaded file failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_FILE_REQUIRED",
+      "owner": "platform.file",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "file is required",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_FILE_RESTORE_FAILED",
+      "owner": "platform.file",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "file restore failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_FILE_RESTORE_UNAVAILABLE",
+      "owner": "platform.file",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "conflict",
+      "httpStatus": 409,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "file restore is unavailable",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_FILE_ROLLBACK_FAILED",
+      "owner": "platform.file",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "file upload rollback failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_FILE_SAVE_FAILED",
+      "owner": "platform.file",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "file save failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_FILE_TOO_LARGE",
+      "owner": "platform.file",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 413,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "file exceeds the configured upload limit",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_FILE_UPLOAD_OPEN_FAILED",
+      "owner": "platform.file",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "open uploaded file failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_FORBIDDEN",
+      "owner": "platform.http",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "authorization",
+      "httpStatus": 403,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "permission denied",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_MENU_RESOLUTION_FAILED",
+      "owner": "platform.http",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "dependency",
+      "httpStatus": 503,
+      "retryPolicy": "after-delay",
+      "redactionClass": "generic-only",
+      "publicMessage": "admin menu navigation is unavailable",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_POLICY_REVIEW_WATERMARK_INVALID",
+      "owner": "platform.http",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "watermark must be true or false",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_RESOURCE_DOMAIN_OWNED_MUTATION",
+      "owner": "platform.adminresource",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "conflict",
+      "httpStatus": 409,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "resource mutation requires a governed domain command",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_RESOURCE_ERROR",
+      "owner": "platform.adminresource",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "admin resource operation failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_RESOURCE_INVALID_RECORD",
+      "owner": "platform.adminresource",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "invalid admin resource record",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_RESOURCE_LIFECYCLE_CONFLICT",
+      "owner": "platform.adminresource",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "conflict",
+      "httpStatus": 409,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "admin resource lifecycle conflict",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_RESOURCE_NOT_FOUND",
+      "owner": "platform.adminresource",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "not-found",
+      "httpStatus": 404,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "admin resource not found",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_RESOURCE_RECORD_NOT_FOUND",
+      "owner": "platform.adminresource",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "not-found",
+      "httpStatus": 404,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "admin resource record not found",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_RESOURCE_REVISION_CONFLICT",
+      "owner": "platform.adminresource",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "conflict",
+      "httpStatus": 409,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "admin resource revision conflict",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_SENSITIVE_REVEAL_CONFLICT",
+      "owner": "platform.sensitive",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "conflict",
+      "httpStatus": 409,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "sensitive reveal request conflicts with its current state",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_SENSITIVE_REVEAL_DELIVERY_FAILED",
+      "owner": "platform.sensitive",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "dependency",
+      "httpStatus": 502,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "sensitive reveal verification delivery failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_SENSITIVE_REVEAL_EXPIRED",
+      "owner": "platform.sensitive",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "conflict",
+      "httpStatus": 410,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "sensitive reveal request has expired",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_SENSITIVE_REVEAL_FAILED",
+      "owner": "platform.sensitive",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "sensitive field reveal failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_SENSITIVE_REVEAL_INVALID",
+      "owner": "platform.sensitive",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "invalid sensitive reveal request",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_SENSITIVE_REVEAL_NOT_FOUND",
+      "owner": "platform.sensitive",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "not-found",
+      "httpStatus": 404,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "sensitive reveal request was not found",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_SENSITIVE_REVEAL_PROVIDER_FAILED",
+      "owner": "platform.sensitive",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "dependency",
+      "httpStatus": 502,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "sensitive reveal identity provider failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_SENSITIVE_REVEAL_STATE_REFRESH_FAILED",
+      "owner": "platform.sensitive",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "dependency",
+      "httpStatus": 503,
+      "retryPolicy": "after-delay",
+      "redactionClass": "generic-only",
+      "publicMessage": "sensitive reveal authorization state is unavailable",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_SENSITIVE_REVEAL_UNAVAILABLE",
+      "owner": "platform.sensitive",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "dependency",
+      "httpStatus": 503,
+      "retryPolicy": "after-delay",
+      "redactionClass": "generic-only",
+      "publicMessage": "sensitive field reveal is unavailable",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_SENSITIVE_REVEAL_VERIFICATION_FAILED",
+      "owner": "platform.sensitive",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 422,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "sensitive reveal verification failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_AUTH_AUDIT_FAILED",
+      "owner": "platform.appauth",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "app auth audit failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_AUTH_CODE_REQUIRED",
+      "owner": "platform.appauth",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "app auth code is required",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_AUTH_IDENTITY_BINDING_FAILED",
+      "owner": "platform.appauth",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "app identity binding failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_AUTH_IDENTITY_INVALID",
+      "owner": "platform.appauth",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "authorization",
+      "httpStatus": 401,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "invalid app identity",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_AUTH_INVALID_REQUEST",
+      "owner": "platform.appauth",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "invalid app auth login request",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_AUTH_PROVIDER_NOT_CONFIGURED",
+      "owner": "platform.appauth",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "app auth provider is not configured",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_AUTH_PROVIDER_NOT_FOUND",
+      "owner": "platform.appauth",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "app auth provider not found",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_AUTH_PROVIDER_RESOLVER_NOT_CONFIGURED",
+      "owner": "platform.appauth",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "dependency",
+      "httpStatus": 501,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "app auth provider resolver is not configured",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_AUTH_PROVIDER_RESOLVE_FAILED",
+      "owner": "platform.appauth",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "dependency",
+      "httpStatus": 502,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "app auth provider resolve failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_AUTH_SESSION_CLEANUP_FAILED",
+      "owner": "platform.appauth",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "app session cleanup failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_AUTH_SESSION_ISSUE_FAILED",
+      "owner": "platform.appauth",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "app session issue failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_AUTH_SESSION_REVOKE_FAILED",
+      "owner": "platform.appauth",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "app session revoke failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_AUTH_TOKEN_SIGN_FAILED",
+      "owner": "platform.appauth",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "app auth token sign failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_FILE_MIME_INVALID",
+      "owner": "platform.file",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 415,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "uploaded file MIME type is invalid",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_FILE_MIME_MISMATCH",
+      "owner": "platform.file",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 415,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "declared and detected file MIME types do not match",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_FILE_MIME_NOT_ALLOWED",
+      "owner": "platform.file",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 415,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "uploaded file MIME type is not allowed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_FILE_NOT_FOUND",
+      "owner": "platform.file",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "not-found",
+      "httpStatus": 404,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "file not found",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_FILE_OBJECT_NOT_FOUND",
+      "owner": "platform.file",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "not-found",
+      "httpStatus": 404,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "file object not found",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_FILE_OPEN_FAILED",
+      "owner": "platform.file",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "file open failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_FILE_READ_FAILED",
+      "owner": "platform.file",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "read uploaded file failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_FILE_REQUIRED",
+      "owner": "platform.file",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "file is required",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_FILE_ROLLBACK_FAILED",
+      "owner": "platform.file",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "file upload rollback failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_FILE_SAVE_FAILED",
+      "owner": "platform.file",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "file save failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_FILE_STATE_REFRESH_FAILED",
+      "owner": "platform.file",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "dependency",
+      "httpStatus": 503,
+      "retryPolicy": "after-delay",
+      "redactionClass": "generic-only",
+      "publicMessage": "file authorization state is unavailable",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_FILE_TOO_LARGE",
+      "owner": "platform.file",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 413,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "file exceeds the configured upload limit",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_FILE_UPLOAD_OPEN_FAILED",
+      "owner": "platform.file",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "open uploaded file failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_FORBIDDEN",
+      "owner": "platform.http",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "authorization",
+      "httpStatus": 403,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "permission denied",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_PHONE_ALREADY_BOUND",
+      "owner": "platform.appphone",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "conflict",
+      "httpStatus": 409,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "app phone is already bound",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_PHONE_AUDIT_FAILED",
+      "owner": "platform.appphone",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "app phone audit failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_PHONE_BINDING_CREATE_FAILED",
+      "owner": "platform.appphone",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "app phone binding create failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_PHONE_CODE_GENERATION_FAILED",
+      "owner": "platform.appphone",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "app phone code generation failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_PHONE_CODE_REQUIRED",
+      "owner": "platform.appphone",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "app phone verification code is required",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_PHONE_INVALID_PHONE",
+      "owner": "platform.appphone",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "invalid phone number",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_PHONE_INVALID_REQUEST",
+      "owner": "platform.appphone",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "invalid app phone request",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_PHONE_PURPOSE_UNSUPPORTED",
+      "owner": "platform.appphone",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "app phone purpose is unsupported",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_PHONE_VERIFICATION_CREATE_FAILED",
+      "owner": "platform.appphone",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "app phone verification create failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_PHONE_VERIFICATION_DELIVERY_FAILED",
+      "owner": "platform.appphone",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "dependency",
+      "httpStatus": 502,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "app phone verification delivery failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_PHONE_VERIFICATION_INVALID",
+      "owner": "platform.appphone",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "app phone verification is invalid",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_PHONE_VERIFICATION_UNAVAILABLE",
+      "owner": "platform.appphone",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "dependency",
+      "httpStatus": 503,
+      "retryPolicy": "after-delay",
+      "redactionClass": "generic-only",
+      "publicMessage": "app phone verification is unavailable",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_PHONE_VERIFICATION_UPDATE_FAILED",
+      "owner": "platform.appphone",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "app phone verification update failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_ROUTE_HANDLER_NOT_CONFIGURED",
+      "owner": "platform.http",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "dependency",
+      "httpStatus": 501,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "app route handler is not configured",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_AUDIT_FAILED",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "auth audit failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_IDENTITY_BINDING_FAILED",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "admin identity binding failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_IDENTITY_INVALID",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "invalid admin identity",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_IDENTITY_NOT_BOUND",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "authorization",
+      "httpStatus": 401,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "admin identity is not bound",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_IDENTITY_TRANSACTION_INVALID",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "authorization",
+      "httpStatus": 401,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "invalid admin identity transaction",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_IDENTITY_TRANSACTION_REQUIRED",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "auth identity transaction is required",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_INVALID_CREDENTIALS",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "authorization",
+      "httpStatus": 401,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "invalid credentials",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_INVALID_REQUEST",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "invalid auth login request",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_PROVIDER_NOT_CONFIGURED",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "auth provider is not configured",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_PROVIDER_NOT_FOUND",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "auth provider not found",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_PROVIDER_RESOLVER_NOT_CONFIGURED",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "dependency",
+      "httpStatus": 501,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "auth provider resolver is not configured",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_PROVIDER_RESOLVE_FAILED",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "dependency",
+      "httpStatus": 502,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "auth provider resolve failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_PROVIDER_START_FAILED",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "dependency",
+      "httpStatus": 502,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "auth provider start failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_PROVIDER_START_INVALID",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "invalid auth provider start request",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_PROVIDER_UNSUPPORTED",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "auth provider is not supported",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_SESSION_CLEANUP_FAILED",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "session cleanup failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_SESSION_ISSUE_FAILED",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "session issue failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_SESSION_RENEW_FAILED",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "session renewal failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_SESSION_REVOKE_FAILED",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "session revoke failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_STATE_REFRESH_FAILED",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "dependency",
+      "httpStatus": 503,
+      "retryPolicy": "after-delay",
+      "redactionClass": "generic-only",
+      "publicMessage": "auth state is unavailable",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_TOKEN_SIGN_FAILED",
+      "owner": "platform.auth",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "auth token sign failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "AUTH_UNAUTHORIZED",
+      "owner": "platform.auth",
+      "planes": [
+        "admin",
+        "app"
+      ],
+      "audiences": [
+        "operator",
+        "public"
+      ],
+      "category": "authorization",
+      "httpStatus": 401,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "unauthorized",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "CONFLICT",
+      "owner": "platform.kernel",
+      "planes": [
+        "admin",
+        "app",
+        "service",
+        "data",
+        "control",
+        "external"
+      ],
+      "audiences": [
+        "internal"
+      ],
+      "category": "conflict",
+      "httpStatus": 409,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "resource conflict",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "FILE_UPLOAD_INVALID",
+      "owner": "platform.file",
+      "planes": [
+        "admin",
+        "app"
+      ],
+      "audiences": [
+        "operator",
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "invalid file upload",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "FORBIDDEN",
+      "owner": "platform.kernel",
+      "planes": [
+        "admin",
+        "app",
+        "service",
+        "data",
+        "control",
+        "external"
+      ],
+      "audiences": [
+        "internal"
+      ],
+      "category": "authorization",
+      "httpStatus": 403,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "permission denied",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "INTERNAL_ERROR",
+      "owner": "platform.kernel",
+      "planes": [
+        "admin",
+        "app",
+        "service",
+        "data",
+        "control",
+        "external"
+      ],
+      "audiences": [
+        "internal"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "correlation-only",
+      "publicMessage": "internal server error",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "INVALID_EXECUTION_CONTEXT",
+      "owner": "platform.kernel",
+      "planes": [
+        "admin",
+        "app",
+        "service",
+        "data",
+        "control",
+        "external"
+      ],
+      "audiences": [
+        "internal"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "invalid execution context",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "NOT_FOUND",
+      "owner": "platform.kernel",
+      "planes": [
+        "admin",
+        "app",
+        "service",
+        "data",
+        "control",
+        "external"
+      ],
+      "audiences": [
+        "internal"
+      ],
+      "category": "not-found",
+      "httpStatus": 404,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "resource not found",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "OPENAPI_NOT_CONFIGURED",
+      "owner": "platform.http",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "not-found",
+      "httpStatus": 404,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "openapi document is not configured",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "RATE_LIMITED",
+      "owner": "platform.http",
+      "planes": [
+        "admin",
+        "app"
+      ],
+      "audiences": [
+        "operator",
+        "public"
+      ],
+      "category": "rate-cost",
+      "httpStatus": 429,
+      "retryPolicy": "after-delay",
+      "redactionClass": "public-safe",
+      "publicMessage": "request rate limit exceeded",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "RATE_LIMIT_UNAVAILABLE",
+      "owner": "platform.http",
+      "planes": [
+        "admin",
+        "app"
+      ],
+      "audiences": [
+        "operator",
+        "public"
+      ],
+      "category": "dependency",
+      "httpStatus": 503,
+      "retryPolicy": "after-delay",
+      "redactionClass": "generic-only",
+      "publicMessage": "rate limit service is unavailable",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "REQUEST_BODY_INVALID",
+      "owner": "platform.http",
+      "planes": [
+        "admin",
+        "app"
+      ],
+      "audiences": [
+        "operator",
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "request body is invalid",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "REQUEST_BODY_TOO_LARGE",
+      "owner": "platform.http",
+      "planes": [
+        "admin",
+        "app"
+      ],
+      "audiences": [
+        "operator",
+        "public"
+      ],
+      "category": "validation",
+      "httpStatus": 413,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "request body exceeds configured limit",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "SERVICE_OBJECT_COST_LIMIT",
+      "owner": "platform.serviceobject",
+      "planes": [
+        "admin",
+        "service"
+      ],
+      "audiences": [
+        "operator",
+        "internal"
+      ],
+      "category": "rate-cost",
+      "httpStatus": 422,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "service object cost limit exceeded",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "SERVICE_OBJECT_DOMAIN_VALIDATION",
+      "owner": "platform.serviceobject",
+      "planes": [
+        "admin",
+        "service"
+      ],
+      "audiences": [
+        "operator",
+        "internal"
+      ],
+      "category": "validation",
+      "httpStatus": 422,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "service object domain validation failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "SERVICE_OBJECT_EXECUTION_FAILED",
+      "owner": "platform.serviceobject",
+      "planes": [
+        "admin",
+        "service"
+      ],
+      "audiences": [
+        "operator",
+        "internal"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "service object execution failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "SERVICE_OBJECT_IDEMPOTENCY_CONFLICT",
+      "owner": "platform.serviceobject",
+      "planes": [
+        "admin",
+        "service"
+      ],
+      "audiences": [
+        "operator",
+        "internal"
+      ],
+      "category": "conflict",
+      "httpStatus": 409,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "service object idempotency conflict",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "SERVICE_OBJECT_REQUEST_INVALID",
+      "owner": "platform.serviceobject",
+      "planes": [
+        "admin",
+        "service"
+      ],
+      "audiences": [
+        "operator",
+        "internal"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "service object request is invalid",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "SERVICE_OBJECT_STATE_CONFLICT",
+      "owner": "platform.serviceobject",
+      "planes": [
+        "admin",
+        "service"
+      ],
+      "audiences": [
+        "operator",
+        "internal"
+      ],
+      "category": "conflict",
+      "httpStatus": 409,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "service object state conflict",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "SERVICE_OBJECT_UNAVAILABLE",
+      "owner": "platform.serviceobject",
+      "planes": [
+        "admin",
+        "service"
+      ],
+      "audiences": [
+        "operator",
+        "internal"
+      ],
+      "category": "not-found",
+      "httpStatus": 404,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "service object is unavailable",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "owner": "platform.kernel",
+      "planes": [
+        "admin",
+        "app",
+        "service",
+        "data",
+        "control",
+        "external"
+      ],
+      "audiences": [
+        "internal"
+      ],
+      "category": "validation",
+      "httpStatus": 400,
+      "retryPolicy": "never",
+      "redactionClass": "public-safe",
+      "publicMessage": "validation failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    }
+  ]
+}
