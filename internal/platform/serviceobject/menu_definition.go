@@ -11,6 +11,7 @@ import (
 const MaximumMenuParameters = 32
 
 var forbiddenMenuParameterWordPattern = regexp.MustCompile(`\b(?:select|insert|update|delete|drop|alter|create|truncate|merge|exec|execute|union|datasource|shard|database|schema|sql|script|expression)\b`)
+var menuParameterKeyPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.-]{0,63}$`)
 
 type MenuNodeType string
 
@@ -156,7 +157,7 @@ func validateMenuPageNode(node MenuNode) error {
 	}
 	parameterKeys := make(map[string]struct{}, len(node.Parameters))
 	for _, parameter := range node.Parameters {
-		if !validMenuValue(parameter.Key) || forbiddenMenuParameterKey(parameter.Key) {
+		if !IsValidMenuParameterKey(parameter.Key) {
 			return ErrRequestInvalid
 		}
 		if _, duplicate := parameterKeys[parameter.Key]; duplicate {
@@ -209,6 +210,11 @@ func forbiddenMenuParameterKey(key string) bool {
 	default:
 		return false
 	}
+}
+
+// IsValidMenuParameterKey reports whether a static parameter key is safe and portable across Admin and service contracts.
+func IsValidMenuParameterKey(key string) bool {
+	return menuParameterKeyPattern.MatchString(key) && !forbiddenMenuParameterKey(key)
 }
 
 // IsForbiddenMenuParameterStringValue reports whether a static menu parameter carries executable or physical-routing input.

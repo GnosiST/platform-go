@@ -990,13 +990,13 @@ Audit candidates: `permission.create`, `permission.delete`, `permission.update`
 
 ### Schema
 
-- Field count: 4
-- Search: `code`, `module`, `name`
-- Filter: `code`, `module`, `name`
-- Sort: `code`, `module`, `name`
-- Table: `code`, `name`, `module`
-- Form: `code`, `name`, `module`, `description`
-- Localized fields: `description`, `name`
+- Field count: 11
+- Search: `action`, `capability`, `code`, `description`, `name`, `prefix`, `resource`, `resourceType`, `status`
+- Filter: `action`, `capability`, `code`, `name`, `prefix`, `resource`, `resourceType`, `status`
+- Sort: `action`, `capability`, `code`, `name`, `prefix`, `resource`, `resourceType`, `status`
+- Table: `code`, `name`, `resourceType`, `capability`, `resource`, `action`, `prefix`, `status`
+- Form: `code`, `name`, `resourceType`, `capability`, `resource`, `action`, `prefix`, `status`, `description`
+- Localized fields: -
 
 ### Dry-run Candidate Files
 

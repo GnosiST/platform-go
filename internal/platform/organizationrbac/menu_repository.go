@@ -228,7 +228,7 @@ func validatePageNode(node MenuNode) error {
 	}
 	parameterKeys := make(map[string]struct{}, len(node.Parameters))
 	for _, parameter := range node.Parameters {
-		if !validCode(parameter.Key) || forbiddenMenuParameterKey(parameter.Key) {
+		if !serviceobject.IsValidMenuParameterKey(parameter.Key) {
 			return ErrInvalid
 		}
 		if _, duplicate := parameterKeys[parameter.Key]; duplicate {
@@ -268,15 +268,6 @@ func validatePageNode(node MenuNode) error {
 		return ErrInvalid
 	}
 	return nil
-}
-
-func forbiddenMenuParameterKey(key string) bool {
-	switch strings.ToLower(strings.TrimSpace(key)) {
-	case "datasource", "shard", "database", "schema", "sql", "script", "expression", "route-template", "physical-routing":
-		return true
-	default:
-		return false
-	}
 }
 
 func (r *GORMRepository) ReplaceMenuDefinition(ctx context.Context, request ReplaceMenuDefinitionRequest) (uint64, error) {

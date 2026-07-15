@@ -27,6 +27,7 @@ const files = {
   organizationUserExperience: readSource("admin/src/platform/resources/organizationUserExperience.tsx"),
   roleGovernance: readSource("admin/src/platform/resources/RoleGovernanceConsole.tsx"),
   menuGovernance: readSourceOptional("admin/src/platform/resources/MenuGovernanceConsole.tsx"),
+  menuGovernanceValidation: readSourceOptional("admin/src/platform/resources/menuGovernanceValidation.ts"),
   resourceRoute: readSource("admin/src/platform/refine/ResourceRoutePage.tsx"),
   sensitiveRevealModal: readSource("admin/src/platform/resources/SensitiveFieldRevealModal.tsx"),
   sensitiveRevealOIDC: readSource("admin/src/platform/security/sensitiveRevealOIDC.ts"),
@@ -46,6 +47,7 @@ const files = {
 
 const failures = [];
 const mobileStyles = extractCssBlock(files.styles, "@media (max-width: 767px)");
+const tabletWorkbenchStyles = extractCssBlock(files.styles, "@media (max-width: 1023px)");
 const tabletLoginStyles = extractCssBlock(files.styles, "@media (max-width: 1024px)");
 
 requireIncludes(files.app, "readStoredUIConfig", "App must keep persisted admin UI configuration.");
@@ -265,7 +267,12 @@ requireIncludes(files.organizationRBAC, "arguments: { definition, expectedRevisi
 requireIncludes(files.menuGovernance, "createMenuDefinition(definition, selectedRevision)", "Menu creation must use the most recent trusted global menu revision.");
 requireIncludes(files.menuGovernance, 'type MenuParameterType = "string" | "number" | "boolean";', "Page parameters must use the bounded string, number, or boolean type set.");
 requireIncludes(files.menuGovernance, "SAFE_PARAMETER_KEY", "Page parameter keys must use an explicit safe-key contract.");
-requireIncludes(files.menuGovernance, "FORBIDDEN_PARAMETER_INPUT", "Page parameters must reject scripts, expressions, SQL, and physical routing inputs.");
+requireIncludes(files.menuGovernance, "isForbiddenMenuParameterStringValue(value)", "Page parameters must reject scripts, expressions, SQL, and physical routing inputs.");
+requireIncludes(files.menuGovernanceValidation, "FORBIDDEN_PARAMETER_WORD", "Menu parameter validation must keep an explicit forbidden-word contract aligned with the backend.");
+requireIncludes(files.menuGovernanceValidation, '"vbscript:"', "Menu parameter validation must reject executable URI schemes aligned with the backend.");
+requireIncludes(files.menuGovernanceValidation, '"data:text/html"', "Menu parameter validation must reject executable data URLs aligned with the backend.");
+requireIncludes(files.menuGovernance, "isSafeInternalMenuRoute(route)", "Internal menu routes must use route-specific validation instead of parameter-value keyword blocking.");
+requireNotIncludes(files.menuGovernance, "FORBIDDEN_PARAMETER_INPUT", "Menu governance must not reuse parameter keyword blocking for literal routes.");
 requireIncludes(files.menuGovernance, "duplicateParameterKey", "Page parameters must reject duplicate keys.");
 requireIncludes(files.menuGovernance, '<Form.List name="parameters"', "Page parameters must be controlled typed form rows.");
 requireIncludes(files.menuGovernance, "parameterValueControl(parameterType", "Page parameter values must render controls that preserve their selected type.");
@@ -276,6 +283,11 @@ requireIncludes(files.menuGovernance, '<Form.List name="buttons">', "Page button
 requireIncludes(files.menuGovernance, "dictionary.menuButtonAuthorizationBoundary", "Page-button editing must state that visibility metadata does not authorize APIs.");
 requireIncludes(files.menuGovernance, "const menuListRequest = useRef(0);", "Menu governance must track the latest tree search request.");
 requireIncludes(files.menuGovernance, "const definitionRequest = useRef(0);", "Menu governance must track the latest selected-definition request.");
+requireIncludes(files.menuGovernance, "const editorSession = useRef(0);", "Menu saves must ignore stale mutation completions from a closed or replaced editor session.");
+requireIncludes(files.menuGovernance, "if (editorSession.current !== sessionID) return;", "Menu saves must ignore stale mutation completions from a closed or replaced editor session.");
+requireIncludes(files.menuGovernance, "const savingRef = useRef(false);", "Menu saves must acquire a synchronous single-flight lock before confirmation or mutation awaits.");
+requireIncludes(files.menuGovernance, "if (savingRef.current) return;", "Menu saves must acquire a synchronous single-flight lock before confirmation or mutation awaits.");
+requireIncludes(files.menuGovernance, "savingRef.current = true;", "Menu saves must acquire a synchronous single-flight lock before confirmation or mutation awaits.");
 requireIncludes(files.menuGovernance, "setDefinitionRefresh((current) => current + 1);", "Menu saves must reload the normalized definition and its new global revision even when selection stays unchanged.");
 requireIncludes(files.menuGovernance, "if (!canRead || menuListRequest.current !== requestID) return;", "Menu governance must fail closed before requesting records without read access.");
 requireCountAtLeast(files.menuGovernance, "if (menuListRequest.current !== requestID) return;", 2, "Menu search must discard stale responses before changing loading, error, data, or selection.");
@@ -283,12 +295,20 @@ requireCountAtLeast(files.menuGovernance, "if (definitionRequest.current !== req
 requireIncludes(files.menuGovernance, "setDefinitionLoading(false);\n      setSelectedDefinition(null);\n      setSelectedRevision(0);", "Clearing menu selection must also clear loading and revision state.");
 requireIncludes(files.menuGovernance, "setSelectedDefinition(null);\n    setSelectedRevision(0);\n    setDefinitionLoading(true);", "Starting a menu definition load must clear stale detail and revision state.");
 requireIncludes(files.menuGovernance, "returnFocusRef.current?.focus({ preventScroll: true });", "Closing the menu editor must restore focus without scrolling.");
+requireIncludes(files.menuGovernance, "returnFocusRef.current = detailFocusRef.current;", "Successful menu saves must restore focus to a stable detail target that survives definition refresh.");
 requireIncludes(files.menuGovernance, "await confirmMenuParentChange(modal.confirm, dictionary, editor.definition, definition, records)", "Menu parent changes must require an explicit localized structural confirmation.");
 requireIncludes(files.menuGovernance, "duplicateButtonPermission(form, index, dictionary.menuButtonPermissionDuplicate)", "Page-button permission codes must expose duplicate validation before submission.");
 requireRegex(files.styles, /\.menu-governance-detail \.admin-list-actions \.ant-btn,[\s\S]*?min-height:\s*44px;/, "Menu governance actions must expose 44px targets.");
 requireRegex(files.styles, /\.menu-governance-modal \.ant-modal-close,[\s\S]*?\.menu-governance-modal \.ant-modal-footer \.ant-btn,[\s\S]*?\.menu-governance-modal \.ant-checkbox-wrapper,[\s\S]*?min-height:\s*44px;/, "Menu governance modal controls must expose 44px targets.");
+requireRegex(files.styles, /\.admin-tree-workbench-tree \.ant-tree-switcher\s*\{[\s\S]*?min-width:\s*44px;[\s\S]*?min-height:\s*44px;/, "Tree workbench expanders must expose a 44px pointer target.");
 requireRegex(files.styles, /\.menu-governance-form-list-row\s*\{[\s\S]*?grid-template-columns:/, "Menu parameter and button rows must use a stable responsive grid.");
 requireRegex(files.styles, /@media screen and \(max-width:\s*767px\)[\s\S]*?\.menu-governance-form-list-row\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);/, "Menu parameter and button rows must stack without horizontal overflow on mobile.");
+requireCssRule(
+  tabletWorkbenchStyles,
+  ".admin-tree-workbench-navigation .admin-list-toolbar .ant-input-affix-wrapper",
+  ["min-height: 44px;"],
+  "Tree workbench search must expose a 44px tablet touch target.",
+);
 for (const key of [
   "menuGovernanceTitle",
   "menuTreeAriaLabel",

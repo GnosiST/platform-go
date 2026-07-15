@@ -3694,6 +3694,48 @@
           "exportMode": "full"
         },
         {
+          "key": "menuCode",
+          "label": {
+            "zh": "菜单编码",
+            "en": "Menu Code"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "buttonKey",
+          "label": {
+            "zh": "按钮标识",
+            "en": "Button Key"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inDetail": true,
+          "width": 160,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
           "key": "prefix",
           "label": {
             "zh": "前缀",

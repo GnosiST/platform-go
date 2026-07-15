@@ -157,8 +157,10 @@ func TestMenuDefinitionArgumentRequiresTypedValidDTO(t *testing.T) {
 	}
 
 	invalid := map[string]func(*MenuDefinition){
-		"empty metadata": func(definition *MenuDefinition) { definition.Name = "" },
-		"dynamic route":  func(definition *MenuDefinition) { definition.Node.Route = "/users/:id" },
+		"empty metadata":                  func(definition *MenuDefinition) { definition.Name = "" },
+		"dynamic route":                   func(definition *MenuDefinition) { definition.Node.Route = "/users/:id" },
+		"parameter key starts with digit": func(definition *MenuDefinition) { definition.Node.Parameters[0].Key = "1mode" },
+		"parameter key exceeds limit":     func(definition *MenuDefinition) { definition.Node.Parameters[0].Key = "a" + strings.Repeat("b", 64) },
 		"insecure external URL": func(definition *MenuDefinition) {
 			definition.Node.External = true
 			definition.Node.ExternalURL = "http://example.com/users"

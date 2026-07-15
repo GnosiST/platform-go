@@ -376,6 +376,8 @@ func permissionAdminResource() capability.AdminResource {
 			adminField("capability", "能力", "Capability", "text", "values", true, false, true, true, true, true, 150, nil),
 			adminField("resource", "资源", "Resource", "text", "values", true, false, true, true, true, true, 160, nil),
 			adminField("action", "动作", "Action", "text", "values", true, false, true, true, true, true, 120, nil),
+			adminField("menuCode", "菜单编码", "Menu Code", "text", "values", false, true, false, false, false, true, 180, nil),
+			adminField("buttonKey", "按钮标识", "Button Key", "text", "values", false, true, false, false, false, true, 160, nil),
 			adminField("prefix", "前缀", "Prefix", "text", "values", true, false, true, true, true, true, 180, nil),
 			adminField("status", "状态", "Status", "select", "record", false, false, true, true, true, true, 120, enabledDisabledOptions()),
 			adminField("description", "说明", "Description", "textarea", "record", false, false, false, false, true, true, 220, nil),

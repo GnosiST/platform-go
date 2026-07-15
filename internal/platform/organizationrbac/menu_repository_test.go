@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -109,7 +110,7 @@ func TestValidateMenuSnapshotRejectsExecutableRoutesAndPhysicalParameters(t *tes
 			t.Fatalf("route %q error = %v, want ErrInvalid", route, err)
 		}
 	}
-	for _, key := range []string{"datasource", "shard", "database", "schema", "sql", "script", "expression", "route-template", "physical-routing"} {
+	for _, key := range []string{"datasource", "shard", "database", "schema", "sql", "script", "expression", "route-template", "physical-database", "physical-schema", "physical-routing", "1mode", "a" + strings.Repeat("b", 64)} {
 		node := base
 		node.Parameters = []MenuParameter{{Key: key, Type: MenuParameterTypeString, Value: "unsafe"}}
 		if err := ValidateMenuSnapshot([]MenuNode{node}, nil, nil); !errors.Is(err, ErrInvalid) {

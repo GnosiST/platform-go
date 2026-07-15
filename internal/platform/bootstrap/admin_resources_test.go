@@ -259,6 +259,53 @@ func TestAdminResourcesFromConfigRequiresPreparedOrganizationRBACTarget(t *testi
 	if _, err := store.Update("menus", usersMenu.ID, adminresource.WriteInput{Code: usersMenu.Code, Name: "Users Updated", Status: usersMenu.Status, Description: usersMenu.Description, Values: legacyMutationValues}); err == nil {
 		t.Fatalf("Update(target legacy menu permission) error = %v, want ErrDomainOwnedMutation", err)
 	}
+	usersDefinition, menuRevision, err := organizationRepository.LoadMenuDefinition(context.Background(), "users")
+	if err != nil {
+		t.Fatalf("LoadMenuDefinition(users) error = %v", err)
+	}
+	pageButtonDefinition := usersDefinition
+	pageButtonDefinition.ID = "menu-page-button-refresh"
+	pageButtonDefinition.Name = "Page Button Refresh"
+	pageButtonDefinition.Node.Code = "page-button-refresh"
+	pageButtonDefinition.Node.TitleZH = "页面按钮刷新"
+	pageButtonDefinition.Node.TitleEN = "Page Button Refresh"
+	pageButtonDefinition.Node.ParentCode = ""
+	pageButtonDefinition.Node.Route = "/page-button-refresh"
+	pageButtonDefinition.Node.ActiveMenuCode = ""
+	pageButtonDefinition.Node.LegacyPermission = ""
+	pageButtonDefinition.Buttons = []organizationrbac.PageButton{{
+		MenuCode: "page-button-refresh", ButtonKey: "approve", LabelZH: "批准", LabelEN: "Approve",
+		Action: "approve", Status: organizationrbac.StatusEnabled, PermissionCode: "admin:page-button-refresh:approve",
+	}}
+	if _, err := organizationRepository.ReplaceMenuDefinition(context.Background(), organizationrbac.ReplaceMenuDefinitionRequest{
+		Definition: pageButtonDefinition, ExpectedRevision: menuRevision, ActorID: "admin", ChangedAt: time.Now(),
+	}); err != nil {
+		t.Fatalf("ReplaceMenuDefinition(page button refresh) error = %v", err)
+	}
+	changed, err := store.RefreshContext(context.Background())
+	if err != nil {
+		t.Fatalf("RefreshContext(page button permission) error = %v", err)
+	}
+	if !changed {
+		t.Fatal("RefreshContext(page button permission) changed = false, want true")
+	}
+	permissionRecords, err := store.List("permissions")
+	if err != nil {
+		t.Fatalf("List(permissions) error = %v", err)
+	}
+	permissionFound := false
+	for _, permissionRecord := range permissionRecords {
+		if permissionRecord.Code != "admin:page-button-refresh:approve" {
+			continue
+		}
+		permissionFound = true
+		if permissionRecord.Values["menuCode"] != "page-button-refresh" || permissionRecord.Values["buttonKey"] != "approve" {
+			t.Fatalf("page button permission values = %+v", permissionRecord.Values)
+		}
+	}
+	if !permissionFound {
+		t.Fatal("refreshed permissions missing admin:page-button-refresh:approve")
+	}
 	if _, err := organizationRepository.ReplaceOrgUnitRoleGroups(context.Background(), organizationrbac.ReplaceOrgUnitRoleGroupsRequest{
 		OrgUnitCode: "tenant-hq", RoleGroupCodes: []string{"tenant-ops"}, ExpectedRevision: 0, ActorID: "admin", ChangedAt: time.Now(),
 	}); err != nil {

@@ -4,6 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { describe, it } from "node:test";
+
+import "./admin-menu-governance-behavior.test.mjs";
 import { pathToFileURL } from "node:url";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
@@ -137,12 +139,32 @@ describe("validate-admin-ui-contracts", () => {
 
   it("rejects menu parameter rows without the forbidden-input guard", () => {
     const tempRoot = tempAdminRoot();
-    replaceInTemp(tempRoot, "admin/src/platform/resources/MenuGovernanceConsole.tsx", "FORBIDDEN_PARAMETER_INPUT", "ALLOW_ANY_PARAMETER_INPUT");
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "isForbiddenMenuParameterStringValue(value)",
+      "false",
+    );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /must reject scripts, expressions, SQL, and physical routing inputs/);
+  });
+
+  it("rejects internal routes that reuse parameter keyword blocking", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "isSafeInternalMenuRoute(route)",
+      "!isForbiddenMenuParameterStringValue(route)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must use route-specific validation instead of parameter-value keyword blocking/);
   });
 
   it("rejects menu page buttons without current-menu metadata binding", () => {
@@ -235,6 +257,51 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /permission codes must expose duplicate validation/);
   });
 
+  it("rejects menu saves without editor-session isolation", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "const editorSession = useRef(0);",
+      "const editorSessionMissing = useRef(0);",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Menu saves must ignore stale mutation completions/);
+  });
+
+  it("rejects menu saves without a synchronous submission lock", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "const savingRef = useRef(false);",
+      "const savingRefMissing = useRef(false);",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Menu saves must acquire a synchronous single-flight lock/);
+  });
+
+  it("rejects menu save focus restoration without a stable detail target", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "returnFocusRef.current = detailFocusRef.current;",
+      "returnFocusRef.current = returnFocusRef.current;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Successful menu saves must restore focus to a stable detail target/);
+  });
+
   it("rejects menu modal controls without complete 44px targets", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
@@ -248,6 +315,36 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /Menu governance modal controls must expose 44px targets/);
+  });
+
+  it("rejects tree workbench search without a tablet touch target", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTempIfPresent(
+      tempRoot,
+      "admin/src/styles.css",
+      ".admin-tree-workbench-navigation .admin-list-toolbar .ant-input-affix-wrapper {",
+      ".admin-tree-workbench-navigation .admin-list-toolbar .ant-input-affix-wrapper-missing {",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Tree workbench search must expose a 44px tablet touch target/);
+  });
+
+  it("rejects tree workbench expanders without a 44px target", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/styles.css",
+      ".admin-tree-workbench-tree .ant-tree-switcher {",
+      ".admin-tree-workbench-tree .ant-tree-switcher-missing {",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Tree workbench expanders must expose a 44px pointer target/);
   });
 
   it("rejects menu governance that bypasses generated menu-definition service objects", () => {

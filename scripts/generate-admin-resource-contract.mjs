@@ -263,6 +263,12 @@ function mergeStaticResourceWithCapability(resource, capabilityResource) {
   if (!capabilityResource) {
     return resource;
   }
+  const capabilityManifestResource = capabilityResourceToManifestResource(capabilityResource);
+  const staticFieldsByKey = new Map((resource.schema?.fields ?? []).map((field) => [field.key, field]));
+  const capabilityFields = capabilityManifestResource.schema.fields.map((field) => ({
+    ...(staticFieldsByKey.get(field.key) ?? {}),
+    ...field,
+  }));
   const permissions = { ...(resource.permissions ?? {}) };
   for (const action of ["delete", "restore", "purge"]) {
     delete permissions[action];
@@ -289,6 +295,15 @@ function mergeStaticResourceWithCapability(resource, capabilityResource) {
     permissions,
     routes,
     deletion: capabilityResource.deletion,
+    ...(resource.codegen?.mode === "readOnlySeeded" && capabilityFields.length > 0 ? {
+      schema: {
+        ...(resource.schema ?? {}),
+        ...capabilityManifestResource.schema,
+        fields: capabilityFields,
+        filter: undefined,
+        sort: undefined,
+      },
+    } : {}),
   };
 }
 

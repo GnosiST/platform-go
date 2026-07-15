@@ -45,6 +45,11 @@ import {
   type AdminTreeWorkbenchNode,
 } from "../ui";
 import type { AdminResourceDefinition } from "./registry";
+import {
+  isForbiddenMenuParameterKey,
+  isForbiddenMenuParameterStringValue,
+  isSafeInternalMenuRoute,
+} from "./menuGovernanceValidation";
 
 type MenuGovernanceConsoleProps = {
   resource: AdminResourceDefinition;
@@ -103,11 +108,11 @@ type MenuEditorState = {
   mode: MenuEditorMode;
   definition?: MenuDefinition;
   revision: number;
+  sessionID: number;
 };
 
 const SAFE_PARAMETER_KEY = /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/;
 const SAFE_CODE = /^[A-Za-z0-9][A-Za-z0-9:._/-]{0,190}$/;
-const FORBIDDEN_PARAMETER_INPUT = /(?:<script|javascript:|\$\{|\{\{|\}\}|\b(?:select|insert|update|delete|drop|alter|exec|union|datasource|shard|database|schema|sql|script|expression)\b|(?:^|\/)[:*][A-Za-z])/i;
 
 export function MenuGovernanceConsole({ resource, availableResourceRoutes, language, dictionary, permissions, deniedPermissions }: MenuGovernanceConsoleProps) {
   const { modal } = App.useApp();
@@ -126,7 +131,10 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
   const [form] = Form.useForm<MenuEditorValues>();
   const menuListRequest = useRef(0);
   const definitionRequest = useRef(0);
+  const editorSession = useRef(0);
+  const savingRef = useRef(false);
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  const detailFocusRef = useRef<HTMLDivElement | null>(null);
   const canRead = hasPermission(permissions, "admin:menu:read", deniedPermissions);
   const canCreate = hasPermission(permissions, "admin:menu:create", deniedPermissions);
   const canUpdate = hasPermission(permissions, "admin:menu:update", deniedPermissions);
@@ -217,40 +225,55 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
 
   const openEditor = (mode: MenuEditorMode, trigger: HTMLElement, definition?: MenuDefinition, revision = 0) => {
     returnFocusRef.current = trigger;
-    setEditor({ mode, definition, revision });
+    setEditor({ mode, definition, revision, sessionID: ++editorSession.current });
     form.setFieldsValue(definition ? editorValues(definition) : defaultEditorValues(mode, currentDefinition));
   };
 
   const closeEditor = () => {
+    editorSession.current += 1;
+    savingRef.current = false;
+    setSaving(false);
     setEditor(null);
     form.resetFields();
   };
 
   const restoreEditorFocus = () => {
+    const target = returnFocusRef.current?.isConnected ? returnFocusRef.current : detailFocusRef.current;
+    returnFocusRef.current = target;
     returnFocusRef.current?.focus({ preventScroll: true });
   };
 
   const saveMenu = async (values: MenuEditorValues) => {
     if (!editor) return;
-    const definition = buildMenuDefinition(values, directoryMode, editor.definition);
-    if (editor.definition && editor.definition.node.parentCode !== definition.node.parentCode &&
-      !await confirmMenuParentChange(modal.confirm, dictionary, editor.definition, definition, records)) return;
+    if (savingRef.current) return;
+    savingRef.current = true;
+    const sessionID = editor.sessionID;
     setSaving(true);
     try {
+      const definition = buildMenuDefinition(values, directoryMode, editor.definition);
+      if (editor.definition && editor.definition.node.parentCode !== definition.node.parentCode &&
+        !await confirmMenuParentChange(modal.confirm, dictionary, editor.definition, definition, records)) return;
+      if (editorSession.current !== sessionID) return;
       if (editor.mode.startsWith("create-")) {
         await createMenuDefinition(definition, selectedRevision);
       } else {
         await replaceMenuDefinition(definition, editor.revision);
       }
+      if (editorSession.current !== sessionID) return;
+      returnFocusRef.current = detailFocusRef.current;
       closeEditor();
       setNotice(dictionary.menuSaveSucceeded);
       setSelectedKey(definition.node.code);
       await loadMenus(search);
       setDefinitionRefresh((current) => current + 1);
     } catch (nextError) {
+      if (editorSession.current !== sessionID) return;
       setError(errorMessage(nextError, dictionary.menuSaveFailed));
     } finally {
-      setSaving(false);
+      if (editorSession.current === sessionID) {
+        savingRef.current = false;
+        setSaving(false);
+      }
     }
   };
 
@@ -311,7 +334,11 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
         selectedKey={selectedKey}
         searchValue={search}
         loading={loading}
-        detail={detail}
+        detail={(
+          <div ref={detailFocusRef} className="menu-governance-detail-focus-target" tabIndex={-1} aria-label={dictionary.menuDetailTitle}>
+            {detail}
+          </div>
+        )}
         onSearchChange={setSearch}
         onSelect={setSelectedKey}
       />
@@ -324,7 +351,11 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
         okText={dictionary.save}
         cancelText={dictionary.cancel}
         confirmLoading={saving}
-        onCancel={closeEditor}
+        cancelButtonProps={{ disabled: saving }}
+        closable={!saving}
+        keyboard={!saving}
+        maskClosable={!saving}
+        onCancel={() => { if (!saving) closeEditor(); }}
         onOk={() => form.submit()}
         afterClose={restoreEditorFocus}
       >
@@ -783,14 +814,14 @@ function safeCodeRule(message: string) {
 
 function safeParameterKeyRule(message: string) {
   return { validator: async (_: unknown, value?: string) => {
-    if (!value || SAFE_PARAMETER_KEY.test(value.trim()) && !FORBIDDEN_PARAMETER_INPUT.test(value.trim())) return;
+    if (!value || SAFE_PARAMETER_KEY.test(value.trim()) && !isForbiddenMenuParameterKey(value)) return;
     throw new Error(message);
   } };
 }
 
 function staticValueRule(message: string) {
   return { validator: async (_: unknown, value?: string) => {
-    if (typeof value !== "string" || !FORBIDDEN_PARAMETER_INPUT.test(value)) return;
+    if (typeof value !== "string" || !isForbiddenMenuParameterStringValue(value)) return;
     throw new Error(message);
   } };
 }
@@ -850,7 +881,7 @@ function confirmMenuParentChange(confirm: ConfirmModal, dictionary: Dictionary, 
 function routeRule(message: string) {
   return { validator: async (_: unknown, value?: string) => {
     const route = normalizeRoute(value ?? "");
-    if (!route || route.startsWith("/") && !/[?#{}:*]/.test(route) && !FORBIDDEN_PARAMETER_INPUT.test(route)) return;
+    if (!route || isSafeInternalMenuRoute(route)) return;
     throw new Error(message);
   } };
 }

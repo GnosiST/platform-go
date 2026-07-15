@@ -6290,29 +6290,48 @@
                 ],
                 "x-platform-resource": "permissions",
                 "x-platform-allowed-fields": [
+                  "action",
+                  "capability",
                   "code",
-                  "module",
-                  "name"
+                  "description",
+                  "name",
+                  "prefix",
+                  "resource",
+                  "resourceType",
+                  "status"
                 ],
                 "x-platform-search-fields": [
+                  "action",
+                  "capability",
                   "code",
-                  "module",
-                  "name"
+                  "description",
+                  "name",
+                  "prefix",
+                  "resource",
+                  "resourceType",
+                  "status"
                 ],
                 "x-platform-filter-fields": [
+                  "action",
+                  "capability",
                   "code",
-                  "module",
-                  "name"
+                  "name",
+                  "prefix",
+                  "resource",
+                  "resourceType",
+                  "status"
                 ],
                 "x-platform-sort-fields": [
+                  "action",
+                  "capability",
                   "code",
-                  "module",
-                  "name"
+                  "name",
+                  "prefix",
+                  "resource",
+                  "resourceType",
+                  "status"
                 ],
-                "x-platform-localized-fields": [
-                  "description",
-                  "name"
-                ]
+                "x-platform-localized-fields": []
               }
             }
           }
@@ -18556,12 +18575,12 @@
             "type": "string"
           },
           "code": {
-            "description": "en: Code; zh: 权限码",
+            "description": "en: Permission Code; zh: 权限编码",
             "x-platform-field-type": "text",
-            "x-platform-field-source": "values",
+            "x-platform-field-source": "record",
             "x-platform-label": {
-              "zh": "权限码",
-              "en": "Code"
+              "zh": "权限编码",
+              "en": "Permission Code"
             },
             "x-platform-searchable": true,
             "x-platform-filterable": false,
@@ -18574,12 +18593,12 @@
             "type": "string"
           },
           "name": {
-            "description": "en: Name; zh: 名称",
+            "description": "en: Permission Name; zh: 权限名称",
             "x-platform-field-type": "text",
-            "x-platform-field-source": "values",
+            "x-platform-field-source": "record",
             "x-platform-label": {
-              "zh": "名称",
-              "en": "Name"
+              "zh": "权限名称",
+              "en": "Permission Name"
             },
             "x-platform-searchable": true,
             "x-platform-filterable": false,
@@ -18592,12 +18611,31 @@
             "type": "string"
           },
           "status": {
-            "type": "string"
+            "description": "en: Status; zh: 状态",
+            "x-platform-field-type": "select",
+            "x-platform-field-source": "record",
+            "x-platform-label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled"
+            ]
           },
           "description": {
             "description": "en: Description; zh: 说明",
             "x-platform-field-type": "textarea",
-            "x-platform-field-source": "values",
+            "x-platform-field-source": "record",
             "x-platform-label": {
               "zh": "说明",
               "en": "Description"
@@ -18623,13 +18661,13 @@
             },
             "description": "Extensible values for plugin or business fields that have not been promoted to first-class columns."
           },
-          "module": {
-            "description": "en: Module; zh: 模块",
+          "action": {
+            "description": "en: Action; zh: 动作",
             "x-platform-field-type": "text",
             "x-platform-field-source": "values",
             "x-platform-label": {
-              "zh": "模块",
-              "en": "Module"
+              "zh": "动作",
+              "en": "Action"
             },
             "x-platform-searchable": true,
             "x-platform-filterable": false,
@@ -18640,6 +18678,118 @@
             "x-platform-response-mode": "full",
             "x-platform-export-mode": "full",
             "type": "string"
+          },
+          "buttonKey": {
+            "description": "en: Button Key; zh: 按钮标识",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "按钮标识",
+              "en": "Button Key"
+            },
+            "x-platform-searchable": false,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "capability": {
+            "description": "en: Capability; zh: 能力",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "能力",
+              "en": "Capability"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "menuCode": {
+            "description": "en: Menu Code; zh: 菜单编码",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "菜单编码",
+              "en": "Menu Code"
+            },
+            "x-platform-searchable": false,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "prefix": {
+            "description": "en: Prefix; zh: 前缀",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "前缀",
+              "en": "Prefix"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "resource": {
+            "description": "en: Resource; zh: 资源",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "资源",
+              "en": "Resource"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "resourceType": {
+            "description": "en: Resource Type; zh: 资源类型",
+            "x-platform-field-type": "select",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "资源类型",
+              "en": "Resource Type"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string",
+            "enum": [
+              "api",
+              "page-button"
+            ]
           }
         },
         "x-platform-resource": "permissions",
@@ -18650,12 +18800,12 @@
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "en: Code; zh: 权限码",
+            "description": "en: Permission Code; zh: 权限编码",
             "x-platform-field-type": "text",
-            "x-platform-field-source": "values",
+            "x-platform-field-source": "record",
             "x-platform-label": {
-              "zh": "权限码",
-              "en": "Code"
+              "zh": "权限编码",
+              "en": "Permission Code"
             },
             "x-platform-searchable": true,
             "x-platform-filterable": false,
@@ -18668,12 +18818,12 @@
             "type": "string"
           },
           "name": {
-            "description": "en: Name; zh: 名称",
+            "description": "en: Permission Name; zh: 权限名称",
             "x-platform-field-type": "text",
-            "x-platform-field-source": "values",
+            "x-platform-field-source": "record",
             "x-platform-label": {
-              "zh": "名称",
-              "en": "Name"
+              "zh": "权限名称",
+              "en": "Permission Name"
             },
             "x-platform-searchable": true,
             "x-platform-filterable": false,
@@ -18685,13 +18835,35 @@
             "x-platform-export-mode": "full",
             "type": "string"
           },
-          "module": {
-            "description": "en: Module; zh: 模块",
+          "resourceType": {
+            "description": "en: Resource Type; zh: 资源类型",
+            "x-platform-field-type": "select",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "资源类型",
+              "en": "Resource Type"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string",
+            "enum": [
+              "api",
+              "page-button"
+            ]
+          },
+          "capability": {
+            "description": "en: Capability; zh: 能力",
             "x-platform-field-type": "text",
             "x-platform-field-source": "values",
             "x-platform-label": {
-              "zh": "模块",
-              "en": "Module"
+              "zh": "能力",
+              "en": "Capability"
             },
             "x-platform-searchable": true,
             "x-platform-filterable": false,
@@ -18702,11 +18874,87 @@
             "x-platform-response-mode": "full",
             "x-platform-export-mode": "full",
             "type": "string"
+          },
+          "resource": {
+            "description": "en: Resource; zh: 资源",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "资源",
+              "en": "Resource"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "action": {
+            "description": "en: Action; zh: 动作",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "动作",
+              "en": "Action"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "prefix": {
+            "description": "en: Prefix; zh: 前缀",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "前缀",
+              "en": "Prefix"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "status": {
+            "description": "en: Status; zh: 状态",
+            "x-platform-field-type": "select",
+            "x-platform-field-source": "record",
+            "x-platform-label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled"
+            ]
           },
           "description": {
             "description": "en: Description; zh: 说明",
             "x-platform-field-type": "textarea",
-            "x-platform-field-source": "values",
+            "x-platform-field-source": "record",
             "x-platform-label": {
               "zh": "说明",
               "en": "Description"
@@ -18724,7 +18972,12 @@
         },
         "required": [
           "code",
-          "name"
+          "name",
+          "resourceType",
+          "capability",
+          "resource",
+          "action",
+          "prefix"
         ],
         "x-platform-resource": "permissions"
       },

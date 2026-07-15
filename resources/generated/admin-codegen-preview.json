@@ -3139,37 +3139,60 @@
         "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
       },
       "schema": {
-        "fieldCount": 4,
+        "fieldCount": 11,
         "search": [
+          "action",
+          "capability",
           "code",
-          "module",
-          "name"
+          "description",
+          "name",
+          "prefix",
+          "resource",
+          "resourceType",
+          "status"
         ],
         "filter": [
+          "action",
+          "capability",
           "code",
-          "module",
-          "name"
+          "name",
+          "prefix",
+          "resource",
+          "resourceType",
+          "status"
         ],
         "sort": [
+          "action",
+          "capability",
           "code",
-          "module",
-          "name"
+          "name",
+          "prefix",
+          "resource",
+          "resourceType",
+          "status"
         ],
         "table": [
           "code",
           "name",
-          "module"
+          "resourceType",
+          "capability",
+          "resource",
+          "action",
+          "prefix",
+          "status"
         ],
         "form": [
           "code",
           "name",
-          "module",
+          "resourceType",
+          "capability",
+          "resource",
+          "action",
+          "prefix",
+          "status",
           "description"
         ],
-        "localizedFields": [
-          "description",
-          "name"
-        ]
+        "localizedFields": []
       },
       "docs": {
         "openapi": "resources/generated/openapi.admin.json",

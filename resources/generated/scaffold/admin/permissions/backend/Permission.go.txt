@@ -15,6 +15,10 @@ type Permission struct {
 	Name string `gorm:"size:255" json:"name"`
 	Status string `gorm:"size:64;index" json:"status"`
 	Description string `gorm:"type:text" json:"description"`
-	Module string `json:"module"`
+	ResourceType string `json:"resourceType"`
+	Capability string `json:"capability"`
+	Resource string `json:"resource"`
+	Action string `json:"action"`
+	Prefix string `json:"prefix"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }

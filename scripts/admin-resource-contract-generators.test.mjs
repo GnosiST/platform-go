@@ -811,6 +811,41 @@ describe("admin resource contract generators", () => {
     }
   });
 
+  it("uses capability-owned schema fields for overlapping read-only seeded resources", () => {
+    const contract = runAdminResourceContract();
+    const permissionResource = contract.resources.find((resource) => resource.name === "permissions");
+    const expectedFields = [
+      "action",
+      "buttonKey",
+      "capability",
+      "code",
+      "description",
+      "menuCode",
+      "name",
+      "prefix",
+      "resource",
+      "resourceType",
+      "status",
+    ];
+
+    assert.ok(permissionResource, "expected permissions resource");
+    assert.deepEqual(permissionResource.schema.fields.map((field) => field.key), expectedFields);
+    assert.deepEqual(contract.schemas.permissions.fields.map((field) => field.key), expectedFields);
+    assert.equal(permissionResource.schema.fields.some((field) => field.key === "module"), false);
+
+    const openapi = runAdminOpenAPIForContract(contract);
+    assert.deepEqual(
+      Object.keys(openapi.components.schemas.PermissionsRecord.properties).filter((key) => expectedFields.includes(key)).sort(),
+      expectedFields,
+    );
+    assert.equal(openapi.components.schemas.PermissionsRecord.properties.module, undefined);
+
+    const preview = runAdminCodegenPreviewForContract(contract);
+    const permissionPreview = preview.resources.find((resource) => resource.resource === "permissions");
+    assert.equal(permissionPreview.schema.fieldCount, expectedFields.length);
+    assert.deepEqual(permissionPreview.schema.table, ["code", "name", "resourceType", "capability", "resource", "action", "prefix", "status"]);
+  });
+
   it("adds policy-review approve route when enterprise governance is enabled", () => {
     const contract = runAdminResourceContract({
       PLATFORM_CAPABILITIES:

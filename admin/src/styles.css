@@ -76,6 +76,19 @@
   padding-block: 8px;
 }
 
+.admin-tree-workbench-tree .ant-tree-switcher {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-governance-detail-focus-target:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .admin-tree-workbench-node,
 .platform-tree-transfer-node {
   display: flex;
@@ -360,6 +373,10 @@
 @media (max-width: 1023px) {
   .admin-tree-workbench {
     grid-template-columns: minmax(250px, 0.9fr) minmax(0, 1.1fr);
+  }
+
+  .admin-tree-workbench-navigation .admin-list-toolbar .ant-input-affix-wrapper {
+    min-height: 44px;
   }
 
   .role-governance-command-bar .ant-btn {

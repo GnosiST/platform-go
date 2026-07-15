@@ -4645,16 +4645,108 @@
       "formGroups": [],
       "fields": [
         {
+          "key": "action",
+          "label": {
+            "zh": "动作",
+            "en": "Action"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": false,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": true,
+          "detail": true,
+          "width": 120,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "buttonKey",
+          "label": {
+            "zh": "按钮标识",
+            "en": "Button Key"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": false,
+          "readOnly": true,
+          "search": false,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": false,
+          "form": false,
+          "detail": true,
+          "width": 160,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "capability",
+          "label": {
+            "zh": "能力",
+            "en": "Capability"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": false,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": true,
+          "detail": true,
+          "width": 150,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
           "key": "code",
           "label": {
-            "zh": "权限码",
-            "en": "Code"
+            "zh": "权限编码",
+            "en": "Permission Code"
           },
           "type": "text",
           "required": true,
           "search": true,
           "table": true,
           "form": true,
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": false,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "detail": true,
+          "width": 220,
           "sensitivity": "public",
           "storageMode": "plain",
           "responseMode": "full",
@@ -4669,21 +4761,46 @@
           "type": "textarea",
           "form": true,
           "detail": true,
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": false,
+          "readOnly": false,
+          "search": false,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": false,
+          "width": 220,
           "sensitivity": "public",
           "storageMode": "plain",
           "responseMode": "full",
           "exportMode": "full"
         },
         {
-          "key": "module",
+          "key": "menuCode",
           "label": {
-            "zh": "模块",
-            "en": "Module"
+            "zh": "菜单编码",
+            "en": "Menu Code"
           },
           "type": "text",
-          "search": true,
-          "table": true,
-          "form": true,
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": false,
+          "readOnly": true,
+          "search": false,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": false,
+          "form": false,
+          "detail": true,
+          "width": 180,
           "sensitivity": "public",
           "storageMode": "plain",
           "responseMode": "full",
@@ -4692,50 +4809,224 @@
         {
           "key": "name",
           "label": {
-            "zh": "名称",
-            "en": "Name"
+            "zh": "权限名称",
+            "en": "Permission Name"
           },
           "type": "text",
           "required": true,
           "search": true,
           "table": true,
           "form": true,
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": false,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "detail": true,
+          "width": 180,
           "sensitivity": "public",
           "storageMode": "plain",
           "responseMode": "full",
           "exportMode": "full"
+        },
+        {
+          "key": "prefix",
+          "label": {
+            "zh": "前缀",
+            "en": "Prefix"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": false,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": true,
+          "detail": true,
+          "width": 180,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "resource",
+          "label": {
+            "zh": "资源",
+            "en": "Resource"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": false,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": true,
+          "detail": true,
+          "width": 160,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "resourceType",
+          "label": {
+            "zh": "资源类型",
+            "en": "Resource Type"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": false,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": true,
+          "detail": true,
+          "width": 130,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full",
+          "options": [
+            {
+              "value": "api",
+              "label": {
+                "zh": "接口权限",
+                "en": "API"
+              }
+            },
+            {
+              "value": "page-button",
+              "label": {
+                "zh": "页面按钮",
+                "en": "Page Button"
+              }
+            }
+          ]
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": false,
+          "readOnly": false,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": true,
+          "detail": true,
+          "width": 120,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full",
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ]
         }
       ],
       "search": [
+        "action",
+        "capability",
         "code",
-        "module",
-        "name"
+        "description",
+        "name",
+        "prefix",
+        "resource",
+        "resourceType",
+        "status"
       ],
       "filter": [
+        "action",
+        "capability",
         "code",
-        "module",
-        "name"
+        "name",
+        "prefix",
+        "resource",
+        "resourceType",
+        "status"
       ],
       "sort": [
+        "action",
+        "capability",
         "code",
-        "module",
-        "name"
+        "name",
+        "prefix",
+        "resource",
+        "resourceType",
+        "status"
       ],
       "table": [
         "code",
         "name",
-        "module"
+        "resourceType",
+        "capability",
+        "resource",
+        "action",
+        "prefix",
+        "status"
       ],
       "form": [
         "code",
         "name",
-        "module",
+        "resourceType",
+        "capability",
+        "resource",
+        "action",
+        "prefix",
+        "status",
         "description"
       ],
-      "localizedFields": [
-        "description",
-        "name"
-      ],
+      "localizedFields": [],
       "actions": [],
       "panels": []
     },
@@ -10372,19 +10663,111 @@
       ],
       "schema": {
         "formGroups": [],
-        "formLayout": "grouped-sections",
+        "formLayout": "two-column-density",
         "fields": [
+          {
+            "key": "action",
+            "label": {
+              "zh": "动作",
+              "en": "Action"
+            },
+            "type": "text",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": true,
+            "readOnly": false,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "width": 120,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "buttonKey",
+            "label": {
+              "zh": "按钮标识",
+              "en": "Button Key"
+            },
+            "type": "text",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": false,
+            "readOnly": true,
+            "search": false,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": false,
+            "form": false,
+            "detail": true,
+            "width": 160,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "capability",
+            "label": {
+              "zh": "能力",
+              "en": "Capability"
+            },
+            "type": "text",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": true,
+            "readOnly": false,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "width": 150,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
           {
             "key": "code",
             "label": {
-              "zh": "权限码",
-              "en": "Code"
+              "zh": "权限编码",
+              "en": "Permission Code"
             },
             "type": "text",
             "required": true,
             "search": true,
             "table": true,
             "form": true,
+            "source": "record",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "readOnly": false,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "detail": true,
+            "width": 220,
             "sensitivity": "public",
             "storageMode": "plain",
             "responseMode": "full",
@@ -10399,21 +10782,46 @@
             "type": "textarea",
             "form": true,
             "detail": true,
+            "source": "record",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": false,
+            "readOnly": false,
+            "search": false,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": false,
+            "width": 220,
             "sensitivity": "public",
             "storageMode": "plain",
             "responseMode": "full",
             "exportMode": "full"
           },
           {
-            "key": "module",
+            "key": "menuCode",
             "label": {
-              "zh": "模块",
-              "en": "Module"
+              "zh": "菜单编码",
+              "en": "Menu Code"
             },
             "type": "text",
-            "search": true,
-            "table": true,
-            "form": true,
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": false,
+            "readOnly": true,
+            "search": false,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": false,
+            "form": false,
+            "detail": true,
+            "width": 180,
             "sensitivity": "public",
             "storageMode": "plain",
             "responseMode": "full",
@@ -10422,50 +10830,224 @@
           {
             "key": "name",
             "label": {
-              "zh": "名称",
-              "en": "Name"
+              "zh": "权限名称",
+              "en": "Permission Name"
             },
             "type": "text",
             "required": true,
             "search": true,
             "table": true,
             "form": true,
+            "source": "record",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "readOnly": false,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "detail": true,
+            "width": 180,
             "sensitivity": "public",
             "storageMode": "plain",
             "responseMode": "full",
             "exportMode": "full"
+          },
+          {
+            "key": "prefix",
+            "label": {
+              "zh": "前缀",
+              "en": "Prefix"
+            },
+            "type": "text",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": true,
+            "readOnly": false,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "width": 180,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "resource",
+            "label": {
+              "zh": "资源",
+              "en": "Resource"
+            },
+            "type": "text",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": true,
+            "readOnly": false,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "width": 160,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "resourceType",
+            "label": {
+              "zh": "资源类型",
+              "en": "Resource Type"
+            },
+            "type": "select",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": true,
+            "readOnly": false,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "width": 130,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full",
+            "options": [
+              {
+                "value": "api",
+                "label": {
+                  "zh": "接口权限",
+                  "en": "API"
+                }
+              },
+              {
+                "value": "page-button",
+                "label": {
+                  "zh": "页面按钮",
+                  "en": "Page Button"
+                }
+              }
+            ]
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "source": "record",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": false,
+            "readOnly": false,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "width": 120,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full",
+            "options": [
+              {
+                "value": "enabled",
+                "label": {
+                  "zh": "已启用",
+                  "en": "Enabled"
+                }
+              },
+              {
+                "value": "disabled",
+                "label": {
+                  "zh": "已停用",
+                  "en": "Disabled"
+                }
+              }
+            ]
           }
         ],
         "search": [
+          "action",
+          "capability",
           "code",
-          "module",
-          "name"
+          "description",
+          "name",
+          "prefix",
+          "resource",
+          "resourceType",
+          "status"
         ],
         "filter": [
+          "action",
+          "capability",
           "code",
-          "module",
-          "name"
+          "name",
+          "prefix",
+          "resource",
+          "resourceType",
+          "status"
         ],
         "sort": [
+          "action",
+          "capability",
           "code",
-          "module",
-          "name"
+          "name",
+          "prefix",
+          "resource",
+          "resourceType",
+          "status"
         ],
         "table": [
           "code",
           "name",
-          "module"
+          "resourceType",
+          "capability",
+          "resource",
+          "action",
+          "prefix",
+          "status"
         ],
         "form": [
           "code",
           "name",
-          "module",
+          "resourceType",
+          "capability",
+          "resource",
+          "action",
+          "prefix",
+          "status",
           "description"
         ],
-        "localizedFields": [
-          "description",
-          "name"
-        ]
+        "localizedFields": []
       },
       "codegen": {
         "mode": "readOnlySeeded",
