@@ -1,112 +1,131 @@
-# Task 2 Report: Digest-Only Session Persistence
+# Task 2 Report: Correlation Context And One Error Response Writer
 
 ## Status
 
-Implemented. Public Store and HTTP/JWT call sites still use the opaque raw session handle, while every in-memory repository key and persistence adapter now uses `sha256:v1` digests only.
+Implemented and verified in commit `b5d96cd` (`feat: unify error response correlation`).
 
-## Changes
+## Scope
 
-- Added `session.DigestToken(raw)` with the domain separator `platform-session\x00` and SHA-256 hex output prefixed by `sha256:v1:`.
-- Added repository-only `StoredSession` with persisted `TokenDigest`; changed `Repository` methods and `Snapshot` to use `StoredSession` and digest lookup values.
-- Changed `Session.Token` to `json:"-"`. Store issue/resolve/renew/revoke computes the digest before every map or repository operation and restores the raw token only for the immediate public return value.
-- Changed File, SQL and GORM repositories to persist `tokenDigest` / `token_digest`, never the raw token.
-- Silenced the GORM session repository logger so SQL error logging cannot interpolate session digests.
-- Removed session credential arguments from `recordAudit`, removed `shortSessionID`, and updated all auth, app phone and API-token audit call sites.
-- Updated the production-auth contract, validator, tests and auth documentation to forbid raw handles, digests and shortened derivatives in auth audits and to require digest-only session persistence.
+- Added cross-plane `kernel.Correlation` context helpers.
+- Added server-owned request IDs and strict W3C version `00` traceparent handling.
+- Added one registry-backed HTTP error writer with unknown-code fallback.
+- Replaced `gin.Recovery()` with a safe recovery middleware.
+- Routed global request-body invalid/too-large failures through the registry writer.
+- Extended the existing internal error event with safe registry metadata and server correlation.
+- Added a narrow legacy response-body helper for unmigrated auth, file and resource helpers required to preserve current behavior during Tasks 3-4.
+- Did not change organization runtime/UI or deferred datasource, XA, MQ, outbox or search nodes.
 
 ## RED Evidence
 
-- `rtk go test ./internal/platform/session -run 'Test.*(Digest|RawSessionToken|RepositoryBacked|LegacyV1|LegacyRawToken)' -count=1`
-  - Failed to compile because `DigestToken` did not exist. The new file, SQL, GORM and Store tests therefore exercised a missing contract rather than an already-working path.
-- `rtk node --test scripts/platform-production-auth-hardening.test.mjs`
-  - The credential-free audit policy was rejected by the old `shortSessionID` validator.
-  - A later mutation test proved the validator incorrectly accepted `raw-token`, `rawTokenPersistenceAllowed=true` and `legacyRawSessionMigration=preserve` before the new persistence gates were added.
+Command:
+
+```text
+rtk go test ./internal/platform/kernel ./internal/platform/httpapi -run 'Test.*(Correlation|ErrorResponse|Recovery)' -count=1
+```
+
+Observed expected build failures:
+
+- `undefined: Correlation`
+- `undefined: CorrelationFromContext`
+- `undefined: WithCorrelation`
+- `undefined: requestCorrelation`
+- `undefined: writePlatformError`
+- `ErrorBody` missing `RequestID` and `TraceID`
+
+This failed because the Task 2 contracts did not exist, before production implementation was added.
 
 ## GREEN Evidence
 
-- Focused digest/raw/legacy tests: 8 passed.
-- Full `internal/platform/session`: 35 passed.
-- Focused Session/Audit tests across session and httpapi: 47 passed.
-- Full session and httpapi packages: 185 passed.
-- Production-auth validator tests: 33 passed.
-- Full Go repository: 617 passed in 23 packages.
-- `rtk node scripts/validate-platform-production-auth-hardening.mjs`: passed.
+Focused behavior:
+
+```text
+rtk go test ./internal/platform/kernel ./internal/platform/httpapi -run 'Test.*(Correlation|RequestBody|Recovery|ErrorResponse)' -count=1
+Go test: 20 passed in 2 packages
+```
+
+Complete affected packages:
+
+```text
+rtk go test ./internal/platform/kernel ./internal/platform/httpapi -count=1
+Go test: 346 passed in 2 packages
+```
+
+Full Go repository:
+
+```text
+rtk go test ./... -count=1
+Go test: 1828 passed in 35 packages
+```
+
+Registry governance:
+
+```text
+rtk node --test scripts/platform-error-code-registry.test.mjs
+19 passed
+rtk node scripts/validate-platform-error-code-registry.mjs
+platform error-code registry valid: 117 definitions
+```
+
+Task graph governance:
+
+```text
+rtk node --test scripts/platform-foundation-task-graph.test.mjs
+41 passed
+rtk node scripts/validate-platform-foundation-task-graph.mjs
+Validated 67 platform foundation task nodes
+```
+
+Repository checks:
+
 - `rtk git diff --check`: passed.
+- `rtk codegraph sync .`: synchronized 11 changed files.
+- `rtk codegraph status`: index up to date.
 
-## Migration Semantics
+## Files
 
-### File
+Created:
 
-- v2 snapshots contain only digest-keyed `StoredSession` records.
-- Loading a v1 snapshot atomically rewrites the file to an empty v2 snapshot before returning. Historical raw-token sessions are intentionally revoked and the raw marker is removed from disk.
-- Unknown snapshot versions fail closed.
+- `internal/platform/kernel/correlation.go`
+- `internal/platform/kernel/correlation_test.go`
+- `internal/platform/httpapi/request_correlation.go`
+- `internal/platform/httpapi/request_correlation_test.go`
+- `internal/platform/httpapi/error_response.go`
+- `internal/platform/httpapi/error_response_test.go`
 
-### SQL Repository
+Modified:
 
-- Initialization starts a transaction, inspects the current columns, and transactionally drops/recreates `platform_sessions` when a legacy `token` column exists or `token_digest` is missing.
-- Replacement intentionally contains no historical rows, revoking all legacy sessions.
+- `internal/platform/httpapi/response.go`
+- `internal/platform/httpapi/security_headers.go`
+- `internal/platform/httpapi/server.go`
+- `internal/platform/httpapi/server_test.go`
+- `internal/platform/httpapi/service_objects_test.go`
 
-### GORM Repository
+The service-object test now compares status/code/public message instead of byte-equal JSON because independently generated request/trace IDs intentionally differ per request.
 
-- SQLite and PostgreSQL replace a legacy table inside a GORM transaction and verify that `token_digest` exists and `token` does not.
-- MySQL creates `platform_sessions_digest_v2`, atomically swaps it with the legacy table using one `RENAME TABLE` statement, then removes `platform_sessions_legacy_v1`.
-- Startup recovery handles interrupted cleanup: it promotes an orphan replacement when the main table is missing, restores a legacy table only when it is the sole recoverable table so migration can rerun, and removes orphan replacement/legacy tables when the main table exists.
-- Repository construction succeeds only after the final schema verification confirms that the raw `token` column is absent.
+## Security And Contract Decisions
 
-## Residual Risks
+- `X-Request-ID` is always generated as `req_` plus 32 lowercase hex characters. A client value is never reflected or used for internal event IDs.
+- Only one exact lowercase W3C `00-<trace>-<parent>-<flags>` header is accepted. Duplicate, uppercase, non-00, all-zero trace ID and all-zero parent ID inputs fail closed to a new context.
+- A valid incoming trace ID and flags are preserved, while a new non-zero server span ID is always generated.
+- `writePlatformError` resolves status and public message exclusively from the frozen registry and falls back to `INTERNAL_ERROR` for unknown codes.
+- Error responses written by the registry writer contain only `error.code`, `error.message`, `error.requestId` and `error.traceId`; no success `data` is emitted.
+- `writePlatformErrorWithCause` intentionally ignores the raw cause after the call boundary. This is a security invariant, not an omission: the response, Gin metadata and `InternalErrorSink` receive only the registered code/owner/category/retry/redaction metadata plus opaque server correlation.
+- Recovery never formats or forwards the panic value, stack, authorization header, request body or other request details.
+- `InternalErrorEvent.Err` remains for compatibility but contains only `errorcode.New(definition.Code)`, whose rendered value is the stable code.
 
-- Live MySQL/PostgreSQL migration tests are opt-in through `PLATFORM_TEST_MYSQL_DSN` and `PLATFORM_TEST_POSTGRES_DSN`; default CI still needs database services and these environment variables before the production-driver evidence runs automatically.
-- `internal/platform/refreshtoken` still persists its `SessionID`. The refresh-token-family runtime remains implemented-disabled and was intentionally not enabled or expanded in this task. It must be digest-hardened before any production promotion.
-- The App current-session response continues returning the immediate raw server-side handle as explicitly retained by the task decision; persistence, logs and audits do not receive it.
+## Self-Review
 
-## Live Database Verification
+- Middleware order is correlation, recovery, security headers, then body limit, so every server error source after construction has correlation and is covered by safe recovery.
+- Registry body-limit statuses remain 400 and 413; recovery remains 500.
+- Unknown typed codes fail closed to registered `INTERNAL_ERROR`.
+- Traceparent parsing rejects ambiguous multiple headers and never accepts zero trace/span identifiers.
+- Generated trace and span identifiers are forced non-zero even in the cryptographic-random all-zero edge case.
+- Kernel context helpers reject incomplete request/trace pairs and do not read HTTP headers.
+- Existing direct unit-test Gin contexts without an HTTP request remain supported and do not panic.
+- No production code reads client `X-Request-ID`; the final targeted search returned no matches.
 
-- Added opt-in GORM integration tests that create real legacy raw-token tables and verify migration removes the raw marker, removes the `token` column, installs `token_digest`, empties legacy sessions and leaves no replacement/legacy tables.
-- Integration tests refuse to run destructive table setup unless the connected database name starts with `platform_session_integration_`.
-- MySQL 8.4.10 passed five recovery states: legacy current table, replacement-only, legacy-only, digest current with both leftovers, and legacy current with replacement.
-- PostgreSQL 17.10 passed the transactional legacy-table replacement path.
-- Both database suites were rerun after persisted-digest validation was added and passed against isolated temporary containers.
+## Concerns / Follow-Up Boundaries
 
-## Scope Notes
-
-- `docs/platform-auth.md` changed only to synchronize the implemented digest-only persistence and removal of `shortSessionID` from auth audits.
-- No refresh-token-family enablement and no source-writing capability were introduced.
-
-## Review Remediation: Persisted Digest Validation
-
-The follow-up review identified that `StoredSession.TokenDigest` was trusted by name rather than validated at runtime. A repository implementation, malformed database row or damaged file snapshot could therefore return a raw handle or malformed digest and have the Store cache it.
-
-The remediation adds one fail-closed digest boundary shared by the Store and all session repositories:
-
-- canonical persisted identifiers are exactly `sha256:v1:` followed by 64 lowercase hexadecimal characters;
-- File, SQL and GORM repositories reject malformed Create and lookup inputs before persistence access;
-- File v2 snapshots reject malformed values and map keys that differ from `StoredSession.TokenDigest`;
-- SQL and GORM scans reject malformed persisted rows before returning them;
-- Store construction and Reload validate the complete snapshot before replacing the last valid cache;
-- repository Resolve, Renew and Revoke results are validated against the requested digest before caching;
-- validation errors use a fixed message and do not interpolate the rejected raw or malformed value.
-
-The session-policy, OIDC and Admin resource-schema documents now agree that auth audits do not persist raw session handles, digests or shortened derivatives, and that the generic audit schema has no `sessionId` field. The production-auth validator has mutation coverage for these statements and for the exact canonical digest format.
-
-### Follow-up RED Evidence
-
-- `rtk go test ./internal/platform/session -run 'Test(RepositoriesRejectNonCanonicalSessionDigests|FileRepositoryRejectsMalformedV2Snapshots|SQLRepositoryRejectsMalformedPersistedDigest|GORMRepositoryRejectsMalformedPersistedDigest|RepositoryBackedStoreRejectsInvalid)' -count=1`
-  - 1 existing unknown-version assertion passed and 35 new digest-boundary assertions failed before implementation.
-- `rtk node --test --test-name-pattern 'rejects session and OIDC documentation' scripts/platform-production-auth-hardening.test.mjs`
-  - Failed because the validator ignored the mutated session-policy, OIDC and Admin resource-schema documents.
-
-### Follow-up GREEN Evidence
-
-- Focused digest-boundary tests: 36 passed.
-- Full `internal/platform/session`: 71 passed.
-- Session and HTTP API packages: 221 passed.
-- Full Go repository: 653 passed in 23 packages.
-- Production-auth validator mutation suite: 34 passed.
-- `rtk node scripts/validate-platform-production-auth-hardening.mjs`: passed.
-- `rtk git diff --check`: passed.
-
-### Follow-up Scope
-
-- This remediation does not change or enable `internal/platform/refreshtoken`.
-- It does not enable source writing.
-- Live MySQL/PostgreSQL integration coverage is committed separately so the digest/docs fix remains reviewable.
+- Tasks 3-4 still own migration of remaining legacy string call sites to the typed registry writer. `legacyErrorBody` is deliberately limited to existing auth/file/resource helper compatibility; it must be removed when those tasks complete.
+- Some direct legacy `ErrorBody` constructions outside those helpers are not migrated in Task 2. Their JSON shape includes the new fields, but full registry-backed correlation behavior remains a Task 3-4 completion gate.
+- Task 6 owns durable logging/audit correlation. Task 2 only establishes a safe in-process event contract and intentionally does not retain raw causes or panic diagnostics.
