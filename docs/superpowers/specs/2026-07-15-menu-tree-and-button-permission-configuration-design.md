@@ -23,7 +23,7 @@ Rejected alternatives are a new navigation authorization package, which would du
 
 ## Page Buttons
 
-Page buttons are edited inside the selected page detail, not as a separate top-level Admin resource. Each row has a stable `buttonKey`, localized label, action, sort order, status and exactly one `page-button` permission code whose metadata points back to the same menu and button. Creating, updating or removing a button and its permission relation is one native transaction. Button visibility never authorizes an API; the UI shows a coherence warning when the role lacks useful API permissions but never grants or hides access implicitly.
+Page buttons are edited inside the selected page detail, not as a separate top-level Admin resource. Each row has a stable `buttonKey`, localized label, action, sort order, status and exactly one `page-button` permission code whose metadata points back to the same menu and button. `platform.navigation.menu-definition.get` returns the complete menu/button definition and revision, while `platform.navigation.menu-definition.replace` creates, updates or removes the menu, buttons and managed page-button permission relations in one native transaction. The Admin must not compose this operation from generic menu and permission CRUD calls. Button visibility never authorizes an API; the UI shows a coherence warning when the role lacks useful API permissions but never grants or hides access implicitly.
 
 ## Role Menu Assignment
 
