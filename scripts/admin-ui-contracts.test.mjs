@@ -610,6 +610,49 @@ describe("validate-admin-ui-contracts", () => {
     assert.equal(result.status, 0, result.stderr);
   });
 
+  it("avoids a dangling parent code when projecting the historical branch", () => {
+    const result = runTypeScriptProbe("admin/src/platform/resources/menuTreeProjection.ts", (moduleURL) => `
+      import assert from "node:assert/strict";
+      import { projectMenuTreeNodes } from ${JSON.stringify(moduleURL)};
+      const nodes = projectMenuTreeNodes(
+        [{ code: "orphan-page", name: "Orphan Page", status: "enabled", nodeType: "page", parentCode: "menu-history" }],
+        ["missing-a"],
+        { historicalLabel: "Historical", disabledReason: "Disabled", missingReason: "Missing" },
+      );
+      const historyBranch = nodes.find((node) => node.kind === "branch" && node.code === undefined);
+      const orphan = nodes.find((node) => node.key === "orphan-page");
+      assert.ok(historyBranch);
+      assert.equal(orphan?.parentKey, "menu-history");
+      assert.notEqual(historyBranch.key, "menu-history");
+      assert.notEqual(orphan?.parentKey, historyBranch.key);
+    `);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  it("advances the historical branch suffix past dangling parent candidates", () => {
+    const result = runTypeScriptProbe("admin/src/platform/resources/menuTreeProjection.ts", (moduleURL) => `
+      import assert from "node:assert/strict";
+      import { projectMenuTreeNodes } from ${JSON.stringify(moduleURL)};
+      const nodes = projectMenuTreeNodes(
+        [
+          { code: "orphan-a", name: "Orphan A", status: "enabled", nodeType: "page", parentCode: "menu-history" },
+          { code: "orphan-b", name: "Orphan B", status: "enabled", nodeType: "page", parentCode: "menu-history:1" },
+        ],
+        ["missing-a"],
+        { historicalLabel: "Historical", disabledReason: "Disabled", missingReason: "Missing" },
+      );
+      const historyBranch = nodes.find((node) => node.kind === "branch" && node.code === undefined);
+      const catalogNodes = nodes.filter((node) => node.code === "orphan-a" || node.code === "orphan-b");
+      assert.ok(historyBranch);
+      assert.equal(historyBranch.key, "menu-history:2");
+      assert.deepEqual(catalogNodes.map((node) => node.parentKey), ["menu-history", "menu-history:1"]);
+      assert.ok(catalogNodes.every((node) => node.parentKey !== historyBranch.key));
+    `);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
+
   it("derives directory full and half state from each pane eligible descendants", () => {
     const treeTransfer = adminSource("admin/src/platform/ui/PlatformTreeTransfer.tsx");
 

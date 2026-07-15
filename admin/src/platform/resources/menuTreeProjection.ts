@@ -40,7 +40,7 @@ export function projectMenuTreeNodes(
   }));
   if (missingCodes.length === 0) return nodes;
 
-  const occupiedKeys = new Set([...catalogCodes, ...historicalCodes]);
+  const occupiedKeys = new Set([...catalogCodes, ...historicalCodes, ...records.flatMap((record) => record.parentCode ? [record.parentCode] : [])]);
   let historicalBranchKey = "menu-history";
   let suffix = 0;
   while (occupiedKeys.has(historicalBranchKey)) {
