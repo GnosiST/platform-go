@@ -603,6 +603,29 @@ function validateTask(task, context, errors) {
     if (task.status !== "implemented") {
       errors.push("menu-tree-and-button-permission-configuration must stay implemented after menu governance closeout");
     }
+    const statusReasonZH = task.statusReason?.zh ?? "";
+    const statusReasonEN = task.statusReason?.en ?? "";
+    if (/尚未区分|未实现/.test(statusReasonZH) || /do not distinguish|not implemented/i.test(statusReasonEN)) {
+      errors.push("menu-tree-and-button-permission-configuration statusReason contradicts its implemented state");
+    }
+    const implementationBoundary = task.implementationBoundary ?? {};
+    if (
+      !sameList(values(implementationBoundary.implementedScope), [
+        "directory-page-menu",
+        "route-metadata",
+        "page-buttons",
+        "role-menu-assignment-contract",
+      ])
+      || !sameList(values(implementationBoundary.closedGates), [
+        "target-menu-serving",
+        "role-menu-migration-writes",
+        "all-principal-dual-read",
+        "cutover-rollback",
+      ])
+      || implementationBoundary.ownerTask !== "organization-rbac-menu-e2e-qa"
+    ) {
+      errors.push("menu-tree-and-button-permission-configuration implementationBoundary must preserve implemented scope, closed gates and owner task");
+    }
     requireIncludes(
       task.evidence?.validators,
       [
@@ -837,6 +860,9 @@ function validateParallelBatches(graph, tasksByID, context, errors) {
       if (!task) {
         errors.push(`parallel batch ${batch.id} references unknown task ${taskID}`);
         continue;
+      }
+      if (task.status === "deferred") {
+        errors.push(`parallel batch ${batch.id} must not schedule deferred task ${taskID}`);
       }
       const taskLocks = values(task.resourceLocks);
       for (const lock of taskLocks) {

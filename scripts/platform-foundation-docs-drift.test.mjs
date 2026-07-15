@@ -26,10 +26,11 @@ describe("platform foundation documentation drift", () => {
       "docs/platform-foundation-task-map.md",
       "docs/platform-roadmap.md",
       "docs/platform-ui-optimization-assessment.md",
+      "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
     ]) {
       const source = read(relativePath);
       assert.ok(source.includes(graphSummary), `${relativePath} must include ${graphSummary}`);
-      assert.doesNotMatch(source, /45 total \/ (?:37|38) implemented \/ (?:8|7) controlled unfinished|45\/(?:37\/8|38\/7)|66 total \/ (?:51|52) implemented \/ (?:15|14) controlled unfinished/);
+      assert.doesNotMatch(source, /45 total \/ (?:37|38) implemented \/ (?:8|7) controlled unfinished|45\/(?:37\/8|38\/7)|66 total \/ \d+ implemented \/ \d+ controlled unfinished|66\/\d+\/\d+/);
     }
   });
 
@@ -59,6 +60,15 @@ describe("platform foundation documentation drift", () => {
 
     assert.ok(topology.includes(`v0.1.0 release blockers: ${release}.`));
     assert.ok(topology.includes(`Post-release optional deferred nodes: ${optional}.`));
+    assert.match(topology, /Current Remaining Node Order/);
+    assert.doesNotMatch(topology, /Open-source publication remains serial after search closeout/);
+    assert.doesNotMatch(topology, /keeps all 22 nodes controlled unfinished/);
+    assert.doesNotMatch(topology, /The original activation preserved the then-current 44 implemented nodes and replaced the former nine-node unfinished projection with this ordered 22-node activation snapshot/);
+    assert.doesNotMatch(topology, /22-node (?:current|unfinished) projection/i);
+    assert.match(topology, /there is no whole-node parallel batch/i);
+    assert.doesNotMatch(topology, /Public manuals and compatibility claims must reflect the final service, query, routing, database, messaging and search matrices/);
+    assert.match(topology, /v0\.1\.0 manuals and compatibility claims must state the current one-datasource, one-native-transaction boundary/);
+    assert.match(readme, /persistent full-scope unfinished inventory/i);
     assert.match(readme, /one datasource and one native transaction boundary/);
     assert.match(readme, /SQLite is development\/test-only by support policy/);
     assert.match(readme, /Oracle and KingbaseES are unsupported/);

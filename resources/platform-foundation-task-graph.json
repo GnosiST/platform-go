@@ -2844,8 +2844,23 @@
       "scope": "admin-ui",
       "status": "implemented",
       "statusReason": {
-        "zh": "菜单尚未区分目录与页面，路由元信息、页面按钮和独立 role_menu 分配合同也未实现。",
-        "en": "Menus do not distinguish directories and pages, and route metadata, page buttons and independent role_menu assignment are not implemented."
+        "zh": "目录/页面菜单、路由元信息、页面按钮和独立 role_menu 分配合同已实现；目标菜单服务、迁移写入、全主体双读等价和切换/回滚仍保持关闭，由组织权限与菜单全链路验收节点负责。",
+        "en": "Directory/page menus, route metadata, page buttons and the independent role_menu assignment contract are implemented; target menu serving, migration writes, all-principal dual-read equivalence and cutover/rollback remain closed under the organization RBAC and menu end-to-end QA node."
+      },
+      "implementationBoundary": {
+        "implementedScope": [
+          "directory-page-menu",
+          "route-metadata",
+          "page-buttons",
+          "role-menu-assignment-contract"
+        ],
+        "closedGates": [
+          "target-menu-serving",
+          "role-menu-migration-writes",
+          "all-principal-dual-read",
+          "cutover-rollback"
+        ],
+        "ownerTask": "organization-rbac-menu-e2e-qa"
       },
       "completionGate": {
         "zh": "完成目录/页面菜单树、路由与参数配置、页面按钮资源和独立角色菜单分配，保持 API 权限为后端最终边界。",
@@ -2921,10 +2936,17 @@
         "menu-permission-contract",
         "rbac-policy",
         "casbin-policy",
+        "service-contract",
+        "query-command-contract",
+        "admin-resource-api",
+        "openapi",
+        "codegen",
+        "audit-policy",
         "admin-ui",
         "i18n",
         "browser-qa",
-        "identity-governance-docs"
+        "identity-governance-docs",
+        "docs"
       ],
       "dependsOn": [
         "organization-user-admin-experience",
@@ -3464,14 +3486,6 @@
       "taskIds": [
         "persisted-query-command-object-runtime",
         "integration-ports-disabled-default"
-      ]
-    },
-    {
-      "id": "organization-ui-and-datasource-registry",
-      "description": "Organization/user UI and datasource registry may proceed in parallel after organization backend contracts freeze.",
-      "taskIds": [
-        "organization-user-admin-experience",
-        "multi-datasource-contract-and-runtime"
       ]
     }
   ],

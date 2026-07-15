@@ -21,18 +21,17 @@ Task 6 closes `menu-tree-and-button-permission-configuration`, adds `unified-err
 - The organization/RBAC/menu decision remains active: one role belongs to one role group; an organization may bind multiple role groups; role groups classify and isolate roles but do not grant permissions.
 - `data-lifecycle-retention` remains closed at commit `0de9f2d7`. This activated topology may reuse its contracts but must not reopen or expand that node.
 
-## Current Conflict Summary
+## Boundary Rationale
 
-The original nine unfinished nodes remain valid program areas, but activation expands and reorders them because their previous boundaries were insufficient:
+The program keeps these areas separate because their contracts, runtime risks and evidence gates are materially different:
 
-- `multi-datasource-contract-and-runtime` only describes named sources and capability bindings. It cannot also own TenantPlacement, trusted request routing, read/write routing, sharding, federation and XA.
-- `integration-ports-disabled-default` is incorrectly placed after database certification even though Event Plane contracts and disabled ports can be completed earlier.
-- the repository has Admin and App contracts but no executable standard for Admin, Service/Data, Control, External/Partner and Event planes;
-- high-risk queries still lack server-persisted QueryDefinition contracts and a database-native QueryExecutor;
-- organization, role-group, role, menu and permission contracts conflict with the confirmed target model and require a migration rather than an in-place visual rewrite;
-- a broad exclusive `docs` lock makes otherwise independent contract and runtime work serial.
+- `multi-datasource-contract-and-runtime` owns named sources and capability bindings; TenantPlacement, trusted request routing, read/write routing, sharding, federation and XA retain separate post-release gates.
+- `integration-ports-disabled-default` owns only disabled business-neutral ports; it does not imply an implemented Outbox, MQ adapter or search projection.
+- the implemented Service Contract and persisted Query/Command runtime are shared foundations, not permission to activate the deferred data-plane lane.
+- organization, role-group, role, menu and permission migration keeps cutover and rollback separate from the already-implemented authoring surfaces.
+- domain documentation locks remain narrow until the serial open-source publication lane begins.
 
-## Stable Data Plane
+## Post-Release Stable Data Plane Target
 
 The target request path is:
 
@@ -50,36 +49,36 @@ Request / Service Call
 
 Runtime routing is configuration-driven and deterministic. Datasource, DatasourceGroup, TenantPlacement, shard, read/write and consistency policies are declared through configuration or an authorized control plane. Ordinary clients cannot submit a DSN, physical datasource, database, schema or shard.
 
-## Adjusted Unfinished Node Order
+## Current Remaining Node Order
 
-The original activation preserved the then-current 44 implemented nodes and replaced the former nine-node unfinished projection with this ordered 22-node activation snapshot. The 2026-07-16 release overlay above is the current projection:
+The only current projection is `67 total / 52 implemented / 15 controlled unfinished`. Release blockers and deferred nodes remain disjoint while preserving task-graph order.
 
-1. `platform-service-contract-standard`
-2. `persisted-query-command-object-runtime`
-3. `integration-ports-disabled-default`
-4. `organization-rbac-menu-contract-and-migration-design`
-5. `organization-role-pool-backend-and-migration`
-6. `organization-user-admin-experience`
-7. `role-tree-and-authorization-entry`
-8. `menu-tree-and-button-permission-configuration`
-9. `organization-rbac-menu-e2e-qa`
-10. `multi-datasource-contract-and-runtime`
-11. `tenant-placement-and-request-routing`
-12. `datasource-read-write-routing`
-13. `sharding-and-tenant-migration`
-14. `federated-read-query`
-15. `xa-optional-adapter`
-16. `database-certification-matrix`
-17. `transactional-outbox-and-one-mq-adapter`
-18. `asynchronous-search-projection`
-19. `open-source-portability`
-20. `public-docs-community`
-21. `public-docs-site`
-22. `github-release-publication`
+v0.1.0 release path:
 
-The existing IDs in this list remain stable. `multi-datasource-contract-and-runtime` is deliberately narrowed rather than renamed so current governance references do not create a second identity.
+1. `organization-rbac-menu-e2e-qa`
+2. `unified-error-code-governance`
+3. `open-source-portability`
+4. `public-docs-community`
+5. `public-docs-site`
+6. `github-release-publication`
 
-## Node Boundaries And Completion Gates
+Post-release optional deferred path:
+
+1. `multi-datasource-contract-and-runtime`
+2. `tenant-placement-and-request-routing`
+3. `datasource-read-write-routing`
+4. `sharding-and-tenant-migration`
+5. `federated-read-query`
+6. `xa-optional-adapter`
+7. `database-certification-matrix`
+8. `transactional-outbox-and-one-mq-adapter`
+9. `asynchronous-search-projection`
+
+The deferred IDs and their dependency contracts remain stable but dormant. They do not enter a current implementation batch until a post-release objective explicitly reactivates them.
+
+## Program Node Boundaries And Completion Gates
+
+The group labels below preserve stable program ownership only. Current status, release order and activation state are defined exclusively by the current remaining-node projection above and the task graph.
 
 ### 1. Platform Service Contract Standard
 
@@ -204,29 +203,31 @@ The existing node depends on the early integration-port contract plus the certif
 
 The existing node consumes Outbox events and persisted query contracts. It adds rebuild, replay, delete synchronization, field allowlists, tenant isolation, cost limits and relational-source-of-truth boundaries. Search never becomes the authority for permissions, restore or audit.
 
-### 19-22. Open Source And Publication
+### Open Source And Publication
 
-The existing portability, community docs, docs site and GitHub publication nodes remain in order. Public manuals and compatibility claims must reflect the final service, query, routing, database, messaging and search matrices. The documentation site remains the only visual/marketing surface that uses `design-taste-frontend`; Admin workflows use Product Design, platform wrappers and `ui-ux-pro-max` quality gates.
+The portability, community docs, docs site and GitHub publication nodes remain serial. v0.1.0 manuals and compatibility claims must state the current one-datasource, one-native-transaction boundary and mark deferred routing, sharding, federation, XA, MQ and search capabilities unsupported or default-off as applicable; later releases update those claims only after their own certification gates close. The documentation site remains the only visual/marketing surface that uses `design-taste-frontend`; Admin workflows use Product Design, platform wrappers and `ui-ux-pro-max` quality gates.
 
 ## Dependencies And Parallel Windows
 
-Required order:
+Current v0.1.0 order:
 
 ```text
-platform-service-contract-standard
-  -> persisted-query-command-object-runtime
-  -> organization-rbac-menu-contract-and-migration-design
-  -> organization-role-pool-backend-and-migration
-  -> organization-user-admin-experience
-  -> role-tree-and-authorization-entry
-  -> menu-tree-and-button-permission-configuration
-  -> organization-rbac-menu-e2e-qa
+unified-error-code-governance
+organization-rbac-menu-e2e-qa
 
-platform-service-contract-standard
-  -> integration-ports-disabled-default
+[after both close]
+  -> open-source-portability
+  -> public-docs-community
+  -> public-docs-site
+  -> github-release-publication
+```
 
-platform-service-contract-standard
-  -> multi-datasource-contract-and-runtime
+The implementation briefs found shared HTTP, OpenAPI/codegen, audit-correlation and governance files, so there is no whole-node parallel batch. The organization E2E node declares those real shared locks in addition to its identity/UI locks. Freeze the unified error-code registry and response-envelope contract first. After that contract is stable, non-overlapping organization migration comparison and Tree Transfer performance work may overlap error-adapter migration, while shared HTTP integration, generated artifacts and both closeouts remain serial. Publication starts only after both nodes close and does not wait for deferred search work.
+
+Dormant post-release dependency contracts:
+
+```text
+multi-datasource-contract-and-runtime
   -> tenant-placement-and-request-routing
   -> datasource-read-write-routing
   -> sharding-and-tenant-migration
@@ -241,7 +242,7 @@ platform-service-contract-standard
   -> asynchronous-search-projection
 ```
 
-Additional cross-lane dependencies are mandatory:
+Cross-lane dependency contracts remain mandatory when the deferred lane is reactivated:
 
 - `organization-rbac-menu-contract-and-migration-design` depends on `persisted-query-command-object-runtime` so high-risk role-pool, impact and migration queries use the approved authorization and cost model;
 - `tenant-placement-and-request-routing` depends on `organization-role-pool-backend-and-migration` for Admin user TenantContext derivation; before that dependency closes, datasource registry work may accept only service identities whose TenantContext provenance is already trusted;
@@ -251,12 +252,7 @@ Additional cross-lane dependencies are mandatory:
 - `asynchronous-search-projection` depends on both Outbox/MQ and the persisted query runtime.
 - `open-source-portability` depends on both `organization-rbac-menu-e2e-qa` and `unified-error-code-governance`, and no longer depends on `asynchronous-search-projection` for v0.1.0 release eligibility.
 
-Approved parallelism:
-
-1. After Service Contract: `persisted-query-command-object-runtime` and `integration-ports-disabled-default` may run in parallel.
-2. After organization backend contracts freeze: the three organization UI nodes form one serial UI lane while the datasource lane continues from the already-started registry into tenant placement and read/write routing. The two lanes may run in parallel when their file and lock sets do not overlap. Tenant placement cannot start before the organization backend freeze when Admin user TenantContext is in scope.
-3. Database certification executes driver/version lanes in parallel and aggregates them into one matrix.
-4. Open-source publication remains serial after search closeout because module-path migration, public docs, Pages and release evidence share release state.
+Post-release parallelism remains dormant with the nodes themselves. When reactivated, database certification may use independent driver/version lanes and aggregate them into one matrix.
 
 No parallel batch may share `capability-manifest`, `admin-resource-contract`, `storage-runtime`, `migration-runtime`, `OpenAPI/codegen`, `admin-ui` or publication locks. Each activated node must retain its complete lock set, not only the new domain locks. Query and integration-port work may run in parallel only after Service Contract freezes their separate query and event extension seams; if they still edit the same manifest, generator or generated contract, the graph must serialize them.
 
@@ -299,13 +295,13 @@ Later nodes may not move TenantPlacement, sharding, federation, XA, Query Object
 
 ## Activation State
 
-The governance activation:
+The current governance state:
 
-1. adds 13 new task IDs and reorders the 9 existing unfinished IDs into the exact 22-node projection above;
-2. records the required dependencies, completion gates, full resource locks and approved parallel windows;
-3. projects execution, goal, closeout, objective, alignment and engineering governance as `66/44/22` while preserving all 44 implemented closeouts;
-4. records the current direct-tenant, nested-role-group and `menu.permission` behavior as migration source rather than retained target behavior;
-5. requires the governance-topology contract, Admin resource schema, tests and validators to migrate with the organization/RBAC/menu nodes;
-6. keeps all 22 nodes controlled unfinished until their own implementation and evidence closeouts pass.
+1. preserves 67 stable task IDs with 52 implemented closeouts and 15 controlled unfinished nodes;
+2. keeps six v0.1.0 release blockers separate from nine post-release optional deferred nodes;
+3. requires both active release blockers to close before portability and publication work begins;
+4. retains the deferred contracts as full-scope goal blockers without scheduling their implementation for v0.1.0;
+5. keeps target menu serving, role-menu migration writes, principal dual-read cutover and rollback closed until `organization-rbac-menu-e2e-qa` completes;
+6. keeps the canonical error registry pending until `unified-error-code-governance` completes.
 
-The activation commit established the prerequisite for runtime implementation. It does not authorize an implementation node to bypass its dependency, resource-lock or completion gate.
+No node may bypass its dependency, resource-lock or completion gate, and release eligibility must not be interpreted as persistent full-scope completion.

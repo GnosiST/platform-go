@@ -167,7 +167,7 @@ type Report struct { Mode Mode; Status string; Counts Counts; Cursor Cursor; Pol
 - [x] Regenerate Admin contracts and OpenAPI.
 - [x] Update the node from pending to implemented only after code, tests, operations docs and closeout evidence pass.
 - [x] Keep the next node `multi-datasource-contract-and-runtime` pending and do not claim database certification.
-- [x] After this node was verified and committed, complete the unified remaining-task topology review and activate `docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md` as the only authoritative `66/44/22` continuation.
+- [x] After this node was verified and committed, complete the unified remaining-task topology review and activate `docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md`. The `66/44/22` count is the historical activation snapshot; the specification's current release overlay and task graph are the only authoritative current projection.
 - [x] Run one phase-level `neat-freak` cleanup after all lifecycle code and documentation are synchronized.
 
 ### Task 10: Independent Review And Full Verification

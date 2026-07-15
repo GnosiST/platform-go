@@ -240,6 +240,18 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /parallel batch non-visual-contract-gates contains dependent tasks openapi-app-contracts and resource-schema-contract/);
   });
 
+  it("rejects deferred tasks in active parallel batches", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const batch = graph.parallelBatches.find((item) => item.id === "service-contract-extension-lanes");
+    batch.taskIds[1] = "multi-datasource-contract-and-runtime";
+    const graphPath = tempJSON("deferred-parallel-batch.json", graph);
+
+    const result = runValidator(["--graph", graphPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /parallel batch service-contract-extension-lanes must not schedule deferred task multi-datasource-contract-and-runtime/);
+  });
+
   it("rejects missing screenshot evidence paths", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const visualTask = graph.tasks.find((task) => task.id === "visual-product-design-qa");
@@ -344,10 +356,18 @@ describe("validate-platform-foundation-task-graph", () => {
 
   it("enforces the v0.1 release blocker and post-release optional partition", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const menuTask = graph.tasks.find((item) => item.id === "menu-tree-and-button-permission-configuration");
 
     assert.deepEqual(graph.releaseBlockingNodes, releaseBlockingNodes);
     assert.deepEqual(graph.postReleaseOptionalNodes, postReleaseOptionalNodes);
-    assert.equal(graph.tasks.find((item) => item.id === "menu-tree-and-button-permission-configuration")?.status, "implemented");
+    assert.equal(menuTask?.status, "implemented");
+    assert.doesNotMatch(menuTask?.statusReason?.zh ?? "", /尚未区分|未实现/);
+    assert.doesNotMatch(menuTask?.statusReason?.en ?? "", /do not distinguish|not implemented/i);
+    assert.deepEqual(menuTask?.implementationBoundary, {
+      implementedScope: ["directory-page-menu", "route-metadata", "page-buttons", "role-menu-assignment-contract"],
+      closedGates: ["target-menu-serving", "role-menu-migration-writes", "all-principal-dual-read", "cutover-rollback"],
+      ownerTask: "organization-rbac-menu-e2e-qa",
+    });
     assert.equal(graph.tasks.find((item) => item.id === "unified-error-code-governance")?.status, "pending");
     assert.ok(postReleaseOptionalNodes.every((id) => graph.tasks.find((item) => item.id === id)?.status === "deferred"));
     assert.deepEqual(graph.tasks.find((item) => item.id === "open-source-portability")?.dependsOn, [
@@ -395,6 +415,31 @@ describe("validate-platform-foundation-task-graph", () => {
     result = runValidator(["--graph", tempJSON("blocker-depends-on-optional.json", transitive)]);
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /release blocker unified-error-code-governance must not depend on post-release optional task multi-datasource-contract-and-runtime/);
+  });
+
+  it("rejects stale unimplemented rationale on the implemented menu node", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const menuTask = graph.tasks.find((item) => item.id === "menu-tree-and-button-permission-configuration");
+    menuTask.statusReason = {
+      zh: "菜单尚未区分目录与页面，相关合同未实现。",
+      en: "Directory and page menus are not implemented.",
+    };
+
+    const result = runValidator(["--graph", tempJSON("stale-menu-status-reason.json", graph)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /menu-tree-and-button-permission-configuration statusReason contradicts its implemented state/);
+  });
+
+  it("rejects menu closeout without a structured implementation boundary", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const menuTask = graph.tasks.find((item) => item.id === "menu-tree-and-button-permission-configuration");
+    delete menuTask.implementationBoundary;
+
+    const result = runValidator(["--graph", tempJSON("missing-menu-implementation-boundary.json", graph)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /menu-tree-and-button-permission-configuration implementationBoundary must preserve implemented scope, closed gates and owner task/);
   });
 
   it("preserves the closed 37-node baseline, implements fifteen completion nodes, and tracks 15 controlled unfinished nodes", () => {
@@ -498,14 +543,19 @@ describe("validate-platform-foundation-task-graph", () => {
       "organization-rbac-menu-e2e-qa",
       "unified-error-code-governance",
     ]);
+    const organizationE2ETask = graph.tasks.find((item) => item.id === "organization-rbac-menu-e2e-qa");
+    for (const lock of ["service-contract", "query-command-contract", "admin-resource-api", "openapi", "codegen", "audit-policy", "docs"]) {
+      assert.ok(organizationE2ETask?.resourceLocks.includes(lock), `organization-rbac-menu-e2e-qa must declare real shared lock ${lock}`);
+    }
     assert.deepEqual(graph.parallelBatches.find((item) => item.id === "service-contract-extension-lanes")?.taskIds, [
       "persisted-query-command-object-runtime",
       "integration-ports-disabled-default",
     ]);
-    assert.deepEqual(graph.parallelBatches.find((item) => item.id === "organization-ui-and-datasource-registry")?.taskIds, [
-      "organization-user-admin-experience",
-      "multi-datasource-contract-and-runtime",
-    ]);
+    assert.ok(
+      graph.parallelBatches.every((batch) => batch.taskIds.every((id) => graph.tasks.find((item) => item.id === id)?.status !== "deferred")),
+      "active parallel batches must not schedule deferred tasks",
+    );
+    assert.equal(graph.parallelBatches.find((item) => item.id === "release-blocker-contract-lanes"), undefined);
     assert.deepEqual(pending.map((item) => item.id), releaseBlockingNodes);
     assert.deepEqual(deferred.map((item) => item.id), postReleaseOptionalNodes);
     assert.equal(blocked.length, 0);
