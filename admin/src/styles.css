@@ -162,6 +162,26 @@
   overflow: auto;
 }
 
+.menu-governance-modal .ant-modal-close,
+.menu-governance-modal .ant-modal-footer .ant-btn,
+.menu-governance-modal .ant-checkbox-wrapper,
+.menu-governance-modal .ant-input:not(textarea),
+.menu-governance-modal .ant-input-number,
+.menu-governance-modal .ant-select-single .ant-select-selector {
+  min-height: 44px;
+}
+
+.menu-governance-modal .ant-modal-close,
+.menu-governance-modal .ant-checkbox-wrapper {
+  min-width: 44px;
+}
+
+.menu-governance-modal .ant-checkbox-wrapper {
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 8px;
+}
+
 .menu-governance-form-section {
   min-width: 0;
   margin: 0 0 16px;

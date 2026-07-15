@@ -175,6 +175,81 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /Menu search must discard stale responses/);
   });
 
+  it("rejects menu governance that requests records without menu read access", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "if (!canRead || menuListRequest.current !== requestID) return;",
+      "if (menuListRequest.current !== requestID) return;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must fail closed before requesting records without read access/);
+  });
+
+  it("rejects menu definition loading that can retain stale detail state", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "setDefinitionLoading(false);\n      setSelectedDefinition(null);\n      setSelectedRevision(0);",
+      "setSelectedDefinition(null);",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Clearing menu selection must also clear loading and revision state/);
+  });
+
+  it("rejects menu parent changes without structural confirmation", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "await confirmMenuParentChange(modal.confirm, dictionary, editor.definition, definition, records)",
+      "true",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must require an explicit localized structural confirmation/);
+  });
+
+  it("rejects page-button rows without duplicate permission-code validation", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "duplicateButtonPermission(form, index, dictionary.menuButtonPermissionDuplicate)",
+      "safeCodeRule(dictionary.menuButtonPermissionInvalid)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /permission codes must expose duplicate validation/);
+  });
+
+  it("rejects menu modal controls without complete 44px targets", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/styles.css",
+      ".menu-governance-modal .ant-modal-close,",
+      ".menu-governance-modal .ant-modal-close-missing,",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Menu governance modal controls must expose 44px targets/);
+  });
+
   it("rejects menu governance that bypasses generated menu-definition service objects", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(

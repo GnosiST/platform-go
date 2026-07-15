@@ -4,8 +4,11 @@ import {
   FileAddOutlined,
   FolderAddOutlined,
   PlusOutlined,
+  SwapOutlined,
 } from "@ant-design/icons";
 import {
+  App,
+  Checkbox,
   Descriptions,
   Form,
   Input,
@@ -13,7 +16,6 @@ import {
   Select,
   Space,
   Spin,
-  Switch,
   Tag,
   Typography,
 } from "antd";
@@ -108,6 +110,7 @@ const SAFE_CODE = /^[A-Za-z0-9][A-Za-z0-9:._/-]{0,190}$/;
 const FORBIDDEN_PARAMETER_INPUT = /(?:<script|javascript:|\$\{|\{\{|\}\}|\b(?:select|insert|update|delete|drop|alter|exec|union|datasource|shard|database|schema|sql|script|expression)\b|(?:^|\/)[:*][A-Za-z])/i;
 
 export function MenuGovernanceConsole({ resource, availableResourceRoutes, language, dictionary, permissions, deniedPermissions }: MenuGovernanceConsoleProps) {
+  const { modal } = App.useApp();
   const [records, setRecords] = useState<AdminResourceRecord[]>([]);
   const [selectedKey, setSelectedKey] = useState("");
   const [selectedDefinition, setSelectedDefinition] = useState<MenuDefinition | null>(null);
@@ -129,9 +132,10 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
   const canUpdate = hasPermission(permissions, "admin:menu:update", deniedPermissions);
   const directoryMode = editor?.mode === "create-directory" || editor?.mode === "edit-directory";
   const externalPage = Form.useWatch("external", form) ?? false;
+  const currentDefinition = selectedDefinition?.node.code === selectedKey ? selectedDefinition : null;
 
   const loadMenus = useCallback(async (query = "", requestID = ++menuListRequest.current) => {
-    if (menuListRequest.current !== requestID) return;
+    if (!canRead || menuListRequest.current !== requestID) return;
     setLoading(true);
     try {
       const nextRecords = await loadAllMenus();
@@ -149,22 +153,32 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
     } finally {
       if (menuListRequest.current === requestID) setLoading(false);
     }
-  }, [dictionary.menuLoadFailed]);
+  }, [canRead, dictionary.menuLoadFailed]);
 
   useEffect(() => {
     const requestID = ++menuListRequest.current;
+    if (!canRead) {
+      setLoading(false);
+      setRecords([]);
+      setSelectedKey("");
+      return;
+    }
     const timer = window.setTimeout(() => void loadMenus(search, requestID), 250);
     return () => window.clearTimeout(timer);
-  }, [loadMenus, search]);
+  }, [canRead, loadMenus, search]);
 
   useEffect(() => {
     if (!selectedKey || !canRead) {
       definitionRequest.current += 1;
+      setDefinitionLoading(false);
       setSelectedDefinition(null);
+      setSelectedRevision(0);
       return;
     }
     const requestID = ++definitionRequest.current;
     if (definitionRequest.current !== requestID) return;
+    setSelectedDefinition(null);
+    setSelectedRevision(0);
     setDefinitionLoading(true);
     void getMenuDefinition(selectedKey)
       .then((result) => {
@@ -204,7 +218,7 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
   const openEditor = (mode: MenuEditorMode, trigger: HTMLElement, definition?: MenuDefinition, revision = 0) => {
     returnFocusRef.current = trigger;
     setEditor({ mode, definition, revision });
-    form.setFieldsValue(definition ? editorValues(definition) : defaultEditorValues(mode, selectedDefinition));
+    form.setFieldsValue(definition ? editorValues(definition) : defaultEditorValues(mode, currentDefinition));
   };
 
   const closeEditor = () => {
@@ -219,6 +233,8 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
   const saveMenu = async (values: MenuEditorValues) => {
     if (!editor) return;
     const definition = buildMenuDefinition(values, directoryMode, editor.definition);
+    if (editor.definition && editor.definition.node.parentCode !== definition.node.parentCode &&
+      !await confirmMenuParentChange(modal.confirm, dictionary, editor.definition, definition, records)) return;
     setSaving(true);
     try {
       if (editor.mode.startsWith("create-")) {
@@ -246,16 +262,16 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
     <AdminListPanel className="menu-governance-detail" title={dictionary.menuDetailTitle}>
       <div className="loading-panel" aria-live="polite"><Spin size="small" /></div>
     </AdminListPanel>
-  ) : selectedDefinition ? (
+  ) : currentDefinition ? (
     <MenuDefinitionDetail
-      definition={selectedDefinition}
+      definition={currentDefinition}
       dictionary={dictionary}
       language={language}
       canUpdate={canUpdate}
       onEdit={(trigger) => openEditor(
-        selectedDefinition.node.nodeType === "directory" ? "edit-directory" : "edit-page",
+        currentDefinition.node.nodeType === "directory" ? "edit-directory" : "edit-page",
         trigger,
-        selectedDefinition,
+        currentDefinition,
         selectedRevision,
       )}
     />
@@ -273,13 +289,13 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
         actions={canCreate ? (
           <Space size={6} wrap>
             <AdminActionButton
-              disabled={records.length > 0 && !selectedDefinition}
+              disabled={definitionLoading || records.length > 0 && !currentDefinition}
               icon={<FolderAddOutlined />}
               label={dictionary.menuAddDirectory}
               onClick={(event) => openEditor("create-directory", event.currentTarget)}
             >{dictionary.menuAddDirectory}</AdminActionButton>
             <AdminActionButton
-              disabled={records.length > 0 && !selectedDefinition}
+              disabled={definitionLoading || records.length > 0 && !currentDefinition}
               icon={<FileAddOutlined />}
               label={dictionary.menuAddPage}
               onClick={(event) => openEditor("create-page", event.currentTarget)}
@@ -362,10 +378,10 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
               <fieldset className="menu-governance-form-section">
                 <legend>{dictionary.menuPageSettings}</legend>
                 <div className="menu-governance-switch-row">
-                  <Form.Item name="external" label={dictionary.menuExternal} valuePropName="checked"><Switch /></Form.Item>
-                  <Form.Item name="cacheEnabled" label={dictionary.menuCacheEnabled} valuePropName="checked"><Switch disabled={externalPage} /></Form.Item>
-                  <Form.Item name="hidden" label={dictionary.menuHidden} valuePropName="checked"><Switch /></Form.Item>
-                  <Form.Item name="breadcrumbVisible" label={dictionary.menuBreadcrumbVisible} valuePropName="checked"><Switch /></Form.Item>
+                  <Form.Item name="external" valuePropName="checked"><Checkbox>{dictionary.menuExternal}</Checkbox></Form.Item>
+                  <Form.Item name="cacheEnabled" valuePropName="checked"><Checkbox disabled={externalPage}>{dictionary.menuCacheEnabled}</Checkbox></Form.Item>
+                  <Form.Item name="hidden" valuePropName="checked"><Checkbox>{dictionary.menuHidden}</Checkbox></Form.Item>
+                  <Form.Item name="breadcrumbVisible" valuePropName="checked"><Checkbox>{dictionary.menuBreadcrumbVisible}</Checkbox></Form.Item>
                 </div>
                 {externalPage ? (
                   <div className="menu-governance-form-grid">
@@ -462,7 +478,7 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
                           <Form.Item name={[field.name, "labelZh"]} label={dictionary.menuButtonLabelZh} rules={[requiredRule(dictionary.requiredField)]}><Input autoComplete="off" /></Form.Item>
                           <Form.Item name={[field.name, "labelEn"]} label={dictionary.menuButtonLabelEn} rules={[requiredRule(dictionary.requiredField)]}><Input autoComplete="off" /></Form.Item>
                           <Form.Item name={[field.name, "action"]} label={dictionary.actions} rules={[requiredRule(dictionary.requiredField), safeCodeRule(dictionary.menuButtonActionInvalid)]}><Input autoComplete="off" /></Form.Item>
-                          <Form.Item name={[field.name, "permissionCode"]} label={dictionary.menuButtonPermission} rules={[requiredRule(dictionary.requiredField), safeCodeRule(dictionary.menuButtonPermissionInvalid)]}><Input autoComplete="off" /></Form.Item>
+                          <Form.Item name={[field.name, "permissionCode"]} label={dictionary.menuButtonPermission} rules={[requiredRule(dictionary.requiredField), safeCodeRule(dictionary.menuButtonPermissionInvalid), duplicateButtonPermission(form, index, dictionary.menuButtonPermissionDuplicate)]}><Input autoComplete="off" /></Form.Item>
                           <Form.Item name={[field.name, "sortOrder"]} label={dictionary.menuSortOrder}><InputNumber min={0} max={1_000_000} precision={0} /></Form.Item>
                           <Form.Item name={[field.name, "status"]} label={dictionary.status} rules={[requiredRule(dictionary.requiredField)]}><Select getPopupContainer={platformPopupContainer} options={statusOptions(dictionary)} /></Form.Item>
                           <AdminActionButton danger icon={<DeleteOutlined />} label={dictionary.remove} onClick={() => remove(field.name)} />
@@ -795,6 +811,40 @@ function duplicateButtonKey(form: ReturnType<typeof Form.useForm<MenuEditorValue
     const duplicate = buttons.some((button, buttonIndex) => buttonIndex !== index && button?.buttonKey?.trim() === value.trim());
     if (duplicate) throw new Error(message);
   } };
+}
+
+function duplicateButtonPermission(form: ReturnType<typeof Form.useForm<MenuEditorValues>>[0], index: number, message: string) {
+  return { validator: async (_: unknown, value?: string) => {
+    if (!value) return;
+    const buttons = (form.getFieldValue("buttons") ?? []) as MenuButtonValue[];
+    const duplicate = buttons.some((button, buttonIndex) => buttonIndex !== index && button?.permissionCode?.trim() === value.trim());
+    if (duplicate) throw new Error(message);
+  } };
+}
+
+type ConfirmModal = ReturnType<typeof App.useApp>["modal"]["confirm"];
+
+function confirmMenuParentChange(confirm: ConfirmModal, dictionary: Dictionary, existing: MenuDefinition, proposed: MenuDefinition, records: AdminResourceRecord[]) {
+  const from = existing.node.parentCode || dictionary.menuRootDirectory;
+  const to = proposed.node.parentCode || dictionary.menuRootDirectory;
+  const descendants = existing.node.nodeType === "directory" ? descendantCodes(existing.node.code, records).length : 0;
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (value: boolean) => { if (!settled) { settled = true; resolve(value); } };
+    confirm({
+      title: dictionary.menuParentChangeTitle,
+      content: dictionary.menuParentChangeDescription
+        .replace("{from}", from)
+        .replace("{to}", to)
+        .replace("{descendants}", String(descendants)),
+      okText: dictionary.menuParentChangeConfirm,
+      cancelText: dictionary.cancel,
+      icon: <SwapOutlined />,
+      onOk: () => finish(true),
+      onCancel: () => finish(false),
+      afterClose: () => finish(false),
+    });
+  });
 }
 
 function routeRule(message: string) {

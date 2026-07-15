@@ -277,10 +277,16 @@ requireIncludes(files.menuGovernance, "dictionary.menuButtonAuthorizationBoundar
 requireIncludes(files.menuGovernance, "const menuListRequest = useRef(0);", "Menu governance must track the latest tree search request.");
 requireIncludes(files.menuGovernance, "const definitionRequest = useRef(0);", "Menu governance must track the latest selected-definition request.");
 requireIncludes(files.menuGovernance, "setDefinitionRefresh((current) => current + 1);", "Menu saves must reload the normalized definition and its new global revision even when selection stays unchanged.");
+requireIncludes(files.menuGovernance, "if (!canRead || menuListRequest.current !== requestID) return;", "Menu governance must fail closed before requesting records without read access.");
 requireCountAtLeast(files.menuGovernance, "if (menuListRequest.current !== requestID) return;", 2, "Menu search must discard stale responses before changing loading, error, data, or selection.");
 requireCountAtLeast(files.menuGovernance, "if (definitionRequest.current !== requestID) return;", 2, "Selected menu loading must discard stale responses before changing detail state.");
+requireIncludes(files.menuGovernance, "setDefinitionLoading(false);\n      setSelectedDefinition(null);\n      setSelectedRevision(0);", "Clearing menu selection must also clear loading and revision state.");
+requireIncludes(files.menuGovernance, "setSelectedDefinition(null);\n    setSelectedRevision(0);\n    setDefinitionLoading(true);", "Starting a menu definition load must clear stale detail and revision state.");
 requireIncludes(files.menuGovernance, "returnFocusRef.current?.focus({ preventScroll: true });", "Closing the menu editor must restore focus without scrolling.");
+requireIncludes(files.menuGovernance, "await confirmMenuParentChange(modal.confirm, dictionary, editor.definition, definition, records)", "Menu parent changes must require an explicit localized structural confirmation.");
+requireIncludes(files.menuGovernance, "duplicateButtonPermission(form, index, dictionary.menuButtonPermissionDuplicate)", "Page-button permission codes must expose duplicate validation before submission.");
 requireRegex(files.styles, /\.menu-governance-detail \.admin-list-actions \.ant-btn,[\s\S]*?min-height:\s*44px;/, "Menu governance actions must expose 44px targets.");
+requireRegex(files.styles, /\.menu-governance-modal \.ant-modal-close,[\s\S]*?\.menu-governance-modal \.ant-modal-footer \.ant-btn,[\s\S]*?\.menu-governance-modal \.ant-checkbox-wrapper,[\s\S]*?min-height:\s*44px;/, "Menu governance modal controls must expose 44px targets.");
 requireRegex(files.styles, /\.menu-governance-form-list-row\s*\{[\s\S]*?grid-template-columns:/, "Menu parameter and button rows must use a stable responsive grid.");
 requireRegex(files.styles, /@media screen and \(max-width:\s*767px\)[\s\S]*?\.menu-governance-form-list-row\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);/, "Menu parameter and button rows must stack without horizontal overflow on mobile.");
 for (const key of [
