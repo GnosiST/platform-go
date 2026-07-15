@@ -9313,6 +9313,286 @@
           }
         }
       },
+      "AdminServiceObjectStringSet": {
+        "type": "array",
+        "uniqueItems": true,
+        "maxItems": 2000,
+        "items": {
+          "type": "string"
+        }
+      },
+      "AdminServiceObjectMenuParameter": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "key",
+              "type",
+              "value"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "const": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "key",
+              "type",
+              "value"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "const": "number"
+              },
+              "value": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "key",
+              "type",
+              "value"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "const": "boolean"
+              },
+              "value": {
+                "type": "boolean"
+              }
+            }
+          }
+        ]
+      },
+      "AdminServiceObjectMenuNode": {
+        "type": "object",
+        "required": [
+          "code",
+          "parentCode",
+          "nodeType",
+          "titleZh",
+          "titleEn",
+          "descriptionZh",
+          "descriptionEn",
+          "status",
+          "icon",
+          "sortOrder",
+          "route",
+          "componentKey",
+          "resourceCode",
+          "external",
+          "externalUrl",
+          "openMode",
+          "parameters",
+          "cacheEnabled",
+          "hidden",
+          "activeMenuCode",
+          "breadcrumbVisible"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "parentCode": {
+            "type": "string"
+          },
+          "nodeType": {
+            "type": "string",
+            "enum": [
+              "directory",
+              "page"
+            ]
+          },
+          "titleZh": {
+            "type": "string"
+          },
+          "titleEn": {
+            "type": "string"
+          },
+          "descriptionZh": {
+            "type": "string"
+          },
+          "descriptionEn": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled"
+            ]
+          },
+          "icon": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "integer"
+          },
+          "route": {
+            "oneOf": [
+              {
+                "const": ""
+              },
+              {
+                "type": "string",
+                "pattern": "^/(?!/)[^{}*:]*$"
+              }
+            ]
+          },
+          "componentKey": {
+            "type": "string"
+          },
+          "resourceCode": {
+            "type": "string"
+          },
+          "external": {
+            "type": "boolean"
+          },
+          "externalUrl": {
+            "oneOf": [
+              {
+                "const": ""
+              },
+              {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://"
+              }
+            ]
+          },
+          "openMode": {
+            "type": "string",
+            "enum": [
+              "",
+              "same-tab",
+              "new-tab"
+            ]
+          },
+          "parameters": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "$ref": "#/components/schemas/AdminServiceObjectMenuParameter"
+            }
+          },
+          "cacheEnabled": {
+            "type": "boolean"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "activeMenuCode": {
+            "type": "string"
+          },
+          "breadcrumbVisible": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AdminServiceObjectPageButton": {
+        "type": "object",
+        "required": [
+          "menuCode",
+          "buttonKey",
+          "labelZh",
+          "labelEn",
+          "action",
+          "sortOrder",
+          "status",
+          "permissionCode"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "menuCode": {
+            "type": "string"
+          },
+          "buttonKey": {
+            "type": "string"
+          },
+          "labelZh": {
+            "type": "string"
+          },
+          "labelEn": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled"
+            ]
+          },
+          "permissionCode": {
+            "type": "string"
+          }
+        }
+      },
+      "AdminServiceObjectMenuDefinition": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "updatedAt",
+          "node",
+          "buttons"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "node": {
+            "$ref": "#/components/schemas/AdminServiceObjectMenuNode"
+          },
+          "buttons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminServiceObjectPageButton"
+            }
+          }
+        }
+      },
       "ReferenceRecordsListV1_0_0Arguments": {
         "type": "object",
         "additionalProperties": false,
@@ -9423,6 +9703,7 @@
           "resource": "reference-records",
           "permission": "admin:reference-records:read",
           "action": "read",
+          "additionalPermissions": [],
           "tenantMode": "required",
           "dataScope": "tenant",
           "cost": {
@@ -9573,6 +9854,7 @@
           "resource": "org-units",
           "permission": "admin:org-unit:read",
           "action": "read",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -9703,6 +9985,7 @@
           "resource": "org-units",
           "permission": "admin:org-unit:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -9813,6 +10096,7 @@
           "resource": "org-units",
           "permission": "admin:org-unit:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -9943,6 +10227,7 @@
           "resource": "users",
           "permission": "admin:user:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -10073,6 +10358,7 @@
           "resource": "roles",
           "permission": "admin:role:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -10183,6 +10469,7 @@
           "resource": "roles",
           "permission": "admin:role:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -10313,6 +10600,7 @@
           "resource": "roles",
           "permission": "admin:role:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -10463,6 +10751,7 @@
           "resource": "authorization-lifecycle",
           "permission": "admin:authorization-lifecycle:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -10551,6 +10840,7 @@
           "resource": "reference-records",
           "permission": "admin:reference-records:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "required",
           "dataScope": "tenant",
           "cost": {
@@ -10718,6 +11008,7 @@
           "resource": "org-units",
           "permission": "admin:org-unit:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -10821,6 +11112,7 @@
           "resource": "org-units",
           "permission": "admin:org-unit:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -10994,6 +11286,7 @@
           "resource": "users",
           "permission": "admin:user:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -11161,6 +11454,7 @@
           "resource": "roles",
           "permission": "admin:role:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -11264,6 +11558,7 @@
           "resource": "users",
           "permission": "admin:user:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -11367,6 +11662,7 @@
           "resource": "roles",
           "permission": "admin:role:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -11470,6 +11766,7 @@
           "resource": "roles",
           "permission": "admin:role:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -11611,6 +11908,7 @@
           "resource": "roles",
           "permission": "admin:role:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -11714,6 +12012,7 @@
           "resource": "roles",
           "permission": "admin:role:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -11892,6 +12191,7 @@
           "resource": "authorization-lifecycle",
           "permission": "admin:authorization-lifecycle:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {
@@ -11995,6 +12295,7 @@
           "resource": "authorization-lifecycle",
           "permission": "admin:authorization-lifecycle:update",
           "action": "update",
+          "additionalPermissions": [],
           "tenantMode": "platform",
           "dataScope": "platform",
           "cost": {

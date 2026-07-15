@@ -17,6 +17,7 @@ const valueTypes = new Map([
   ["ValueInteger", "integer"],
   ["ValueBoolean", "boolean"],
   ["ValueStringSet", "string-set"],
+  ["ValueMenuDefinition", "menu-definition"],
   ["ValueRoleRemediations", "role-remediations"],
 ]);
 const tenantModes = new Map([
@@ -131,6 +132,12 @@ function parseResultFields(block, source) {
   return parseFields(namedComposite(block, "ResultSchema")).map(({ name, type }) => ({ name, type }));
 }
 
+function parseAdditionalPermissions(block) {
+  return [...namedComposite(block, "AdditionalPermissions").matchAll(/\{Permission:\s*"([^"]+)",\s*Action:\s*"([^"]+)"\}/g)].map(
+    (match) => ({ permission: match[1], action: match[2] }),
+  );
+}
+
 function stringField(block, name) {
   return new RegExp(`${name}:\\s*"([^"]+)"`).exec(block)?.[1] ?? "";
 }
@@ -201,6 +208,7 @@ function parseGoDefinition(definition, source, costSource = source, resultSource
       identifierField(block, "Permission") === "permission" ? definition.permission : "",
     ),
     action: stringField(block, "Action"),
+    additionalPermissions: parseAdditionalPermissions(block),
     tenantMode: tenantModes.get(identifierField(block, "TenantMode")) ?? identifierField(block, "TenantMode"),
     dataScope: stringField(block, "DataScope"),
     arguments: parseFields(argumentsBlock, definitionSource),
@@ -221,6 +229,7 @@ function comparableJSDefinition(kind, definition) {
     resource: definition.resource,
     permission: definition.permission,
     action: definition.action,
+    additionalPermissions: (definition.additionalPermissions ?? []).map(({ permission, action }) => ({ permission, action })),
     tenantMode: definition.tenantMode,
     dataScope: definition.dataScope,
     arguments: definition.arguments.map(({ name, type, required, maxLength, minimum, maximum }) => ({

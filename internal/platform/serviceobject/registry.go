@@ -9,10 +9,11 @@ import (
 )
 
 var (
-	objectIDPattern    = regexp.MustCompile(`^[a-z][a-z0-9.-]*$`)
-	versionPattern     = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
-	resourcePattern    = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
-	logicalNamePattern = regexp.MustCompile(`^[a-z][A-Za-z0-9]*$`)
+	objectIDPattern              = regexp.MustCompile(`^[a-z][a-z0-9.-]*$`)
+	versionPattern               = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
+	resourcePattern              = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+	logicalNamePattern           = regexp.MustCompile(`^[a-z][A-Za-z0-9]*$`)
+	permissionRequirementPattern = regexp.MustCompile(`^[A-Za-z0-9*][A-Za-z0-9._:*/-]*$`)
 )
 
 const maximumQueryOffset = 10000
@@ -106,7 +107,7 @@ func definitionKey(id string, version string) string {
 }
 
 func validateQueryDefinition(definition QueryDefinition) error {
-	if err := validateDefinitionBase(definition.ID, definition.Version, definition.Resource, definition.Permission, definition.Action, definition.TenantMode, definition.DataScope, definition.Arguments, definition.Cost, definition.Timeout, definition.ResultSchema); err != nil {
+	if err := validateDefinitionBase(definition.ID, definition.Version, definition.Resource, definition.Permission, definition.Action, definition.AdditionalPermissions, definition.TenantMode, definition.DataScope, definition.Arguments, definition.Cost, definition.Timeout, definition.ResultSchema); err != nil {
 		return fmt.Errorf("%w: query %s: %v", ErrDefinitionInvalid, definition.ID, err)
 	}
 	if definition.Build == nil {
@@ -135,7 +136,7 @@ func validateQueryDefinition(definition QueryDefinition) error {
 }
 
 func validateCommandDefinition(definition CommandDefinition) error {
-	if err := validateDefinitionBase(definition.ID, definition.Version, definition.Resource, definition.Permission, definition.Action, definition.TenantMode, definition.DataScope, definition.Arguments, definition.Cost, definition.Timeout, definition.ResultSchema); err != nil {
+	if err := validateDefinitionBase(definition.ID, definition.Version, definition.Resource, definition.Permission, definition.Action, definition.AdditionalPermissions, definition.TenantMode, definition.DataScope, definition.Arguments, definition.Cost, definition.Timeout, definition.ResultSchema); err != nil {
 		return fmt.Errorf("%w: command %s: %v", ErrDefinitionInvalid, definition.ID, err)
 	}
 	if definition.Build == nil {
@@ -185,10 +186,10 @@ func validateDomainDefinitionBase(definition DomainCommandDefinition) error {
 			scalarArguments = append(scalarArguments, argument)
 		}
 	}
-	return validateDefinitionBase(definition.ID, definition.Version, definition.Resource, definition.Permission, definition.Action, definition.TenantMode, definition.DataScope, scalarArguments, definition.Cost, definition.Timeout, definition.ResultSchema)
+	return validateDefinitionBase(definition.ID, definition.Version, definition.Resource, definition.Permission, definition.Action, definition.AdditionalPermissions, definition.TenantMode, definition.DataScope, scalarArguments, definition.Cost, definition.Timeout, definition.ResultSchema)
 }
 
-func validateDefinitionBase(id string, version string, resource string, permission string, action string, tenantMode TenantMode, dataScope string, arguments []ArgumentDefinition, cost CostPolicy, timeout time.Duration, result []ResultField) error {
+func validateDefinitionBase(id string, version string, resource string, permission string, action string, additionalPermissions []PermissionRequirement, tenantMode TenantMode, dataScope string, arguments []ArgumentDefinition, cost CostPolicy, timeout time.Duration, result []ResultField) error {
 	if !objectIDPattern.MatchString(id) || strings.TrimSpace(id) != id {
 		return fmt.Errorf("id must be a stable lowercase identifier")
 	}
@@ -200,6 +201,9 @@ func validateDefinitionBase(id string, version string, resource string, permissi
 	}
 	if strings.TrimSpace(permission) == "" || strings.TrimSpace(action) == "" {
 		return fmt.Errorf("permission and action are required")
+	}
+	if err := validateAdditionalPermissions(permission, action, additionalPermissions); err != nil {
+		return err
 	}
 	if tenantMode != TenantRequired && tenantMode != TenantPlatform {
 		return fmt.Errorf("tenant mode is invalid")
@@ -225,7 +229,7 @@ func validateDefinitionBase(id string, version string, resource string, permissi
 			return fmt.Errorf("argument %q is duplicated", argument.Name)
 		}
 		seen[argument.Name] = struct{}{}
-		if !slices.Contains([]ValueType{ValueString, ValueInteger, ValueBoolean}, argument.Type) {
+		if !slices.Contains([]ValueType{ValueString, ValueInteger, ValueBoolean, ValueMenuDefinition}, argument.Type) {
 			return fmt.Errorf("argument %q type is invalid", argument.Name)
 		}
 		if argument.Type == ValueString && argument.MaxLength <= 0 {
@@ -241,9 +245,29 @@ func validateDefinitionBase(id string, version string, resource string, permissi
 			return fmt.Errorf("result field %q is duplicated", field.Name)
 		}
 		seen[field.Name] = struct{}{}
-		if !slices.Contains([]ValueType{ValueString, ValueInteger, ValueBoolean}, field.Type) {
+		if !slices.Contains([]ValueType{ValueString, ValueInteger, ValueBoolean, ValueStringSet, ValueMenuDefinition}, field.Type) {
 			return fmt.Errorf("result field %q type is invalid", field.Name)
 		}
+	}
+	return nil
+}
+
+func validateAdditionalPermissions(primaryPermission string, primaryAction string, requirements []PermissionRequirement) error {
+	seen := make(map[string]struct{}, len(requirements))
+	primary := primaryPermission + "\x00" + primaryAction
+	for _, requirement := range requirements {
+		if requirement.Permission != strings.TrimSpace(requirement.Permission) || requirement.Action != strings.TrimSpace(requirement.Action) ||
+			len(requirement.Permission) > 191 || len(requirement.Action) > 191 || !permissionRequirementPattern.MatchString(requirement.Permission) || !permissionRequirementPattern.MatchString(requirement.Action) {
+			return fmt.Errorf("additional permission requirement is malformed")
+		}
+		key := requirement.Permission + "\x00" + requirement.Action
+		if key == primary {
+			return fmt.Errorf("additional permission requirement duplicates the primary requirement")
+		}
+		if _, duplicate := seen[key]; duplicate {
+			return fmt.Errorf("additional permission requirement is duplicated")
+		}
+		seen[key] = struct{}{}
 	}
 	return nil
 }
@@ -259,6 +283,7 @@ func forbiddenName(name string) bool {
 }
 
 func cloneQueryDefinition(definition QueryDefinition) QueryDefinition {
+	definition.AdditionalPermissions = append([]PermissionRequirement(nil), definition.AdditionalPermissions...)
 	definition.Arguments = append([]ArgumentDefinition(nil), definition.Arguments...)
 	cloneArgumentBoundaries(definition.Arguments)
 	definition.AllowedSort = append([]SortDefinition(nil), definition.AllowedSort...)
@@ -267,6 +292,7 @@ func cloneQueryDefinition(definition QueryDefinition) QueryDefinition {
 }
 
 func cloneCommandDefinition(definition CommandDefinition) CommandDefinition {
+	definition.AdditionalPermissions = append([]PermissionRequirement(nil), definition.AdditionalPermissions...)
 	definition.Arguments = append([]ArgumentDefinition(nil), definition.Arguments...)
 	cloneArgumentBoundaries(definition.Arguments)
 	definition.ResultSchema = append([]ResultField(nil), definition.ResultSchema...)
@@ -274,6 +300,7 @@ func cloneCommandDefinition(definition CommandDefinition) CommandDefinition {
 }
 
 func cloneDomainCommandDefinition(definition DomainCommandDefinition) DomainCommandDefinition {
+	definition.AdditionalPermissions = append([]PermissionRequirement(nil), definition.AdditionalPermissions...)
 	definition.Arguments = append([]ArgumentDefinition(nil), definition.Arguments...)
 	cloneArgumentBoundaries(definition.Arguments)
 	definition.ResultSchema = append([]ResultField(nil), definition.ResultSchema...)

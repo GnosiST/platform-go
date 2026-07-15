@@ -275,6 +275,27 @@ describe("admin resource contract generators", () => {
     assert.ok(commandRequest.required.includes("idempotencyKey"));
     assert.deepEqual(queryRequest["x-platform-definition"].cost, queryDefinition.cost);
     assert.equal(commandRequest["x-platform-definition"].maxAffectedRows, commandDefinition.maxAffectedRows);
+    assert.deepEqual(queryRequest["x-platform-definition"].additionalPermissions, []);
+    assert.deepEqual(commandRequest["x-platform-definition"].additionalPermissions, []);
+
+    const stringSet = openapi.components.schemas.AdminServiceObjectStringSet;
+    assert.equal(stringSet.type, "array");
+    assert.equal(stringSet.uniqueItems, true);
+    assert.equal(stringSet.maxItems, 2000);
+    assert.equal(stringSet.items.type, "string");
+
+    const menuDefinition = openapi.components.schemas.AdminServiceObjectMenuDefinition;
+    assert.equal(menuDefinition.additionalProperties, false);
+    assert.ok(menuDefinition.required.includes("node"));
+    assert.ok(menuDefinition.required.includes("buttons"));
+    assert.equal(menuDefinition.properties.node.$ref, "#/components/schemas/AdminServiceObjectMenuNode");
+    assert.equal(menuDefinition.properties.buttons.items.$ref, "#/components/schemas/AdminServiceObjectPageButton");
+    const menuNode = openapi.components.schemas.AdminServiceObjectMenuNode;
+    assert.equal(menuNode.properties.parameters.maxItems, 32);
+    assert.equal(menuNode.properties.parameters.items.$ref, "#/components/schemas/AdminServiceObjectMenuParameter");
+    assert.equal(menuNode.properties.externalUrl.oneOf[1].pattern, "^https://");
+    assert.match(menuNode.properties.route.oneOf[1].pattern, /\[\^\{\}\*:\]/);
+    assert.equal(openapi.components.schemas.AdminServiceObjectMenuParameter.oneOf.length, 3);
 
     const queryArguments = openapi.components.schemas[queryRequest.properties.arguments.$ref.split("/").pop()];
     const commandArguments = openapi.components.schemas[commandRequest.properties.arguments.$ref.split("/").pop()];
@@ -422,6 +443,10 @@ describe("admin resource contract generators", () => {
     assert.match(source, /"denyPermissionCodes": ReadonlyArray<string>/);
     assert.match(source, /"dataScope": string/);
     assert.match(source, /ReadonlyArray<AdminServiceObjectRoleRemediation>/);
+    assert.match(source, /export type AdminServiceObjectStringSet = ReadonlyArray<string>/);
+    assert.match(source, /export type AdminServiceObjectMenuDefinition =/);
+    assert.match(source, /readonly node: AdminServiceObjectMenuNode/);
+    assert.match(source, /readonly parameters: ReadonlyArray<AdminServiceObjectMenuParameter>/);
     assert.match(source, /replaceOrganizationRoleGroups/);
     assert.match(source, /prepareAuthorizationResourceLifecycle/);
     assert.match(source, /applyAuthorizationResourceLifecycle/);

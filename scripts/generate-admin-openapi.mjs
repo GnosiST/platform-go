@@ -461,6 +461,7 @@ function serviceObjectSchemaPrefix(definition) {
 
 function serviceObjectValueSchema(field) {
   if (field.type === "string-set") {
+    if (!field.maxLength) return { $ref: "#/components/schemas/AdminServiceObjectStringSet" };
     return {
       type: "array",
       uniqueItems: true,
@@ -506,6 +507,9 @@ function serviceObjectValueSchema(field) {
         ],
       },
     };
+  }
+  if (field.type === "menu-definition") {
+    return { $ref: "#/components/schemas/AdminServiceObjectMenuDefinition" };
   }
   const schema = { type: field.type };
   if (field.maxLength) schema.maxLength = field.maxLength;
@@ -585,6 +589,7 @@ function serviceObjectQuerySchemas(definition) {
         resource: definition.resource,
         permission: definition.permission,
         action: definition.action,
+        additionalPermissions: definition.additionalPermissions ?? [],
         tenantMode: definition.tenantMode,
         dataScope: definition.dataScope,
         cost: definition.cost,
@@ -639,6 +644,7 @@ function serviceObjectCommandSchemas(definition) {
         resource: definition.resource,
         permission: definition.permission,
         action: definition.action,
+        additionalPermissions: definition.additionalPermissions ?? [],
         tenantMode: definition.tenantMode,
         dataScope: definition.dataScope,
         cost: definition.cost,
@@ -686,6 +692,98 @@ function serviceObjectDataUnionSchema(definitions, suffix) {
 
 function serviceObjectSchemas() {
   return {
+    AdminServiceObjectStringSet: {
+      type: "array",
+      uniqueItems: true,
+      maxItems: 2000,
+      items: { type: "string" },
+    },
+    AdminServiceObjectMenuParameter: {
+      oneOf: [
+        {
+          type: "object",
+          required: ["key", "type", "value"],
+          additionalProperties: false,
+          properties: { key: { type: "string" }, type: { type: "string", const: "string" }, value: { type: "string" } },
+        },
+        {
+          type: "object",
+          required: ["key", "type", "value"],
+          additionalProperties: false,
+          properties: { key: { type: "string" }, type: { type: "string", const: "number" }, value: { type: "number" } },
+        },
+        {
+          type: "object",
+          required: ["key", "type", "value"],
+          additionalProperties: false,
+          properties: { key: { type: "string" }, type: { type: "string", const: "boolean" }, value: { type: "boolean" } },
+        },
+      ],
+    },
+    AdminServiceObjectMenuNode: {
+      type: "object",
+      required: [
+        "code", "parentCode", "nodeType", "titleZh", "titleEn", "descriptionZh", "descriptionEn", "status", "icon", "sortOrder",
+        "route", "componentKey", "resourceCode", "external", "externalUrl", "openMode", "parameters", "cacheEnabled", "hidden",
+        "activeMenuCode", "breadcrumbVisible",
+      ],
+      additionalProperties: false,
+      properties: {
+        code: { type: "string" },
+        parentCode: { type: "string" },
+        nodeType: { type: "string", enum: ["directory", "page"] },
+        titleZh: { type: "string" },
+        titleEn: { type: "string" },
+        descriptionZh: { type: "string" },
+        descriptionEn: { type: "string" },
+        status: { type: "string", enum: ["enabled", "disabled"] },
+        icon: { type: "string" },
+        sortOrder: { type: "integer" },
+        route: { oneOf: [{ const: "" }, { type: "string", pattern: "^/(?!/)[^{}*:]*$" }] },
+        componentKey: { type: "string" },
+        resourceCode: { type: "string" },
+        external: { type: "boolean" },
+        externalUrl: { oneOf: [{ const: "" }, { type: "string", format: "uri", pattern: "^https://" }] },
+        openMode: { type: "string", enum: ["", "same-tab", "new-tab"] },
+        parameters: {
+          type: "array",
+          maxItems: 32,
+          items: { $ref: "#/components/schemas/AdminServiceObjectMenuParameter" },
+        },
+        cacheEnabled: { type: "boolean" },
+        hidden: { type: "boolean" },
+        activeMenuCode: { type: "string" },
+        breadcrumbVisible: { type: "boolean" },
+      },
+    },
+    AdminServiceObjectPageButton: {
+      type: "object",
+      required: ["menuCode", "buttonKey", "labelZh", "labelEn", "action", "sortOrder", "status", "permissionCode"],
+      additionalProperties: false,
+      properties: {
+        menuCode: { type: "string" },
+        buttonKey: { type: "string" },
+        labelZh: { type: "string" },
+        labelEn: { type: "string" },
+        action: { type: "string" },
+        sortOrder: { type: "integer" },
+        status: { type: "string", enum: ["enabled", "disabled"] },
+        permissionCode: { type: "string" },
+      },
+    },
+    AdminServiceObjectMenuDefinition: {
+      type: "object",
+      required: ["id", "name", "description", "updatedAt", "node", "buttons"],
+      additionalProperties: false,
+      properties: {
+        id: { type: "string" },
+        name: { type: "string" },
+        description: { type: "string" },
+        updatedAt: { type: "string" },
+        node: { $ref: "#/components/schemas/AdminServiceObjectMenuNode" },
+        buttons: { type: "array", items: { $ref: "#/components/schemas/AdminServiceObjectPageButton" } },
+      },
+    },
     ...Object.assign({}, ...adminServiceObjectDefinitions.queries.map(serviceObjectQuerySchemas)),
     ...Object.assign({}, ...adminServiceObjectDefinitions.commands.map(serviceObjectCommandSchemas)),
     AdminServiceObjectQueryRequest: serviceObjectUnionSchema("query", adminServiceObjectDefinitions.queries, "QueryRequest"),

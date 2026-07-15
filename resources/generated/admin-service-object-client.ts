@@ -29,6 +29,57 @@ export type AdminServiceObjectRoleRemediation =
       readonly replacementRoleCode: string;
     };
 
+export type AdminServiceObjectStringSet = ReadonlyArray<string>;
+
+export type AdminServiceObjectMenuParameter =
+  | { readonly key: string; readonly type: "string"; readonly value: string }
+  | { readonly key: string; readonly type: "number"; readonly value: number }
+  | { readonly key: string; readonly type: "boolean"; readonly value: boolean };
+
+export type AdminServiceObjectMenuNode = {
+  readonly code: string;
+  readonly parentCode: string;
+  readonly nodeType: "directory" | "page";
+  readonly titleZh: string;
+  readonly titleEn: string;
+  readonly descriptionZh: string;
+  readonly descriptionEn: string;
+  readonly status: "enabled" | "disabled";
+  readonly icon: string;
+  readonly sortOrder: number;
+  readonly route: string;
+  readonly componentKey: string;
+  readonly resourceCode: string;
+  readonly external: boolean;
+  readonly externalUrl: string;
+  readonly openMode: "" | "same-tab" | "new-tab";
+  readonly parameters: ReadonlyArray<AdminServiceObjectMenuParameter>;
+  readonly cacheEnabled: boolean;
+  readonly hidden: boolean;
+  readonly activeMenuCode: string;
+  readonly breadcrumbVisible: boolean;
+};
+
+export type AdminServiceObjectPageButton = {
+  readonly menuCode: string;
+  readonly buttonKey: string;
+  readonly labelZh: string;
+  readonly labelEn: string;
+  readonly action: string;
+  readonly sortOrder: number;
+  readonly status: "enabled" | "disabled";
+  readonly permissionCode: string;
+};
+
+export type AdminServiceObjectMenuDefinition = {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly updatedAt: string;
+  readonly node: AdminServiceObjectMenuNode;
+  readonly buttons: ReadonlyArray<AdminServiceObjectPageButton>;
+};
+
 export type ReferenceRecordsListV1_0_0Arguments = {
   "status"?: string;
   "codePrefix"?: string;

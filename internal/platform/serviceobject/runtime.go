@@ -49,7 +49,7 @@ func (r *Runtime) WithAuthorizer(authorizer Authorizer) *Runtime {
 func (r *Runtime) ExecuteQuery(invocation Invocation, request QueryRequest) (QueryResult, error) {
 	execution := invocation.Execution
 	definition, ok := r.registry.query(request.QueryID, request.Version)
-	if !ok || !r.allowed(execution, definition.Permission, definition.Action) {
+	if !ok || !r.allowed(execution, definition.Permission, definition.Action) || !r.allowedAdditional(execution, definition.AdditionalPermissions) {
 		return QueryResult{}, ErrObjectUnavailable
 	}
 	if r.queryExecutor == nil || !validExecutionScope(invocation, definition.TenantMode) {
@@ -106,7 +106,7 @@ func (r *Runtime) ExecuteCommand(invocation Invocation, request CommandRequest) 
 		return r.executeGenericCommand(invocation, request, definition)
 	}
 	domainDefinition, ok := r.registry.domainCommand(request.CommandID, request.Version)
-	if !ok || !r.allowed(execution, domainDefinition.Permission, domainDefinition.Action) {
+	if !ok || !r.allowed(execution, domainDefinition.Permission, domainDefinition.Action) || !r.allowedAdditional(execution, domainDefinition.AdditionalPermissions) {
 		return CommandResult{}, ErrObjectUnavailable
 	}
 	return r.executeDomainCommand(invocation, request, domainDefinition)
@@ -114,7 +114,7 @@ func (r *Runtime) ExecuteCommand(invocation Invocation, request CommandRequest) 
 
 func (r *Runtime) executeGenericCommand(invocation Invocation, request CommandRequest, definition CommandDefinition) (CommandResult, error) {
 	execution := invocation.Execution
-	if !r.allowed(execution, definition.Permission, definition.Action) {
+	if !r.allowed(execution, definition.Permission, definition.Action) || !r.allowedAdditional(execution, definition.AdditionalPermissions) {
 		return CommandResult{}, ErrObjectUnavailable
 	}
 	if r.commandExecutor == nil || !validExecutionScope(invocation, definition.TenantMode) {
@@ -265,6 +265,15 @@ func (r *Runtime) allowed(execution kernel.ExecutionContext, permission string, 
 	return r.authorizer.Can(execution.BaseContext(), execution, permission, action)
 }
 
+func (r *Runtime) allowedAdditional(execution kernel.ExecutionContext, requirements []PermissionRequirement) bool {
+	for _, requirement := range requirements {
+		if !r.authorizer.Can(execution.BaseContext(), execution, requirement.Permission, requirement.Action) {
+			return false
+		}
+	}
+	return true
+}
+
 func validExecutionScope(invocation Invocation, mode TenantMode) bool {
 	execution := invocation.Execution
 	switch mode {
@@ -329,6 +338,8 @@ func validateValue(definition ArgumentDefinition, value any) (any, error) {
 		return normalizeStringSet(value, definition.MaxLength)
 	case ValueRoleRemediations:
 		return normalizeRoleRemediations(value, definition.MaxLength)
+	case ValueMenuDefinition:
+		return normalizeMenuDefinition(value)
 	default:
 		return nil, ErrRequestInvalid
 	}
@@ -469,6 +480,22 @@ func resultValueMatches(valueType ValueType, value any) bool {
 	case ValueInteger:
 		_, ok := integerValue(value)
 		return ok
+	case ValueStringSet:
+		values, ok := value.([]string)
+		if !ok || len(values) > maximumDomainCommandItems {
+			return false
+		}
+		seen := make(map[string]struct{}, len(values))
+		for _, item := range values {
+			if _, duplicate := seen[item]; duplicate {
+				return false
+			}
+			seen[item] = struct{}{}
+		}
+		return true
+	case ValueMenuDefinition:
+		definition, ok := value.(MenuDefinition)
+		return ok && validateMenuDefinition(definition) == nil
 	default:
 		return false
 	}

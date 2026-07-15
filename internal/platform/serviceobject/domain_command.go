@@ -150,6 +150,8 @@ func cloneValidatedArguments(arguments ValidatedArguments) ValidatedArguments {
 			clone[name] = append([]string(nil), typed...)
 		case []RoleRemediation:
 			clone[name] = cloneRoleRemediations(typed)
+		case MenuDefinition:
+			clone[name] = cloneMenuDefinition(typed)
 		default:
 			clone[name] = value
 		}

@@ -251,6 +251,7 @@
           "status",
           "codePrefix"
         ],
+        "additionalPermissions": [],
         "logicalSortNames": [
           "code",
           "name"
@@ -282,6 +283,7 @@
         "argumentNames": [
           "orgUnitCode"
         ],
+        "additionalPermissions": [],
         "logicalSortNames": [],
         "limits": {
           "timeoutMs": 3000,
@@ -310,6 +312,7 @@
         "argumentNames": [
           "previewId"
         ],
+        "additionalPermissions": [],
         "logicalSortNames": [],
         "limits": {
           "timeoutMs": 2000,
@@ -338,6 +341,7 @@
         "argumentNames": [
           "previewId"
         ],
+        "additionalPermissions": [],
         "logicalSortNames": [],
         "limits": {
           "timeoutMs": 3000,
@@ -366,6 +370,7 @@
         "argumentNames": [
           "previewId"
         ],
+        "additionalPermissions": [],
         "logicalSortNames": [],
         "limits": {
           "timeoutMs": 2000,
@@ -394,6 +399,7 @@
         "argumentNames": [
           "previewId"
         ],
+        "additionalPermissions": [],
         "logicalSortNames": [],
         "limits": {
           "timeoutMs": 2000,
@@ -422,6 +428,7 @@
         "argumentNames": [
           "previewId"
         ],
+        "additionalPermissions": [],
         "logicalSortNames": [],
         "limits": {
           "timeoutMs": 3000,
@@ -450,6 +457,7 @@
         "argumentNames": [
           "previewId"
         ],
+        "additionalPermissions": [],
         "logicalSortNames": [],
         "limits": {
           "timeoutMs": 2000,
@@ -478,6 +486,7 @@
         "argumentNames": [
           "previewId"
         ],
+        "additionalPermissions": [],
         "logicalSortNames": [],
         "limits": {
           "timeoutMs": 2000,
@@ -507,6 +516,7 @@
           "code",
           "name"
         ],
+        "additionalPermissions": [],
         "limits": {
           "timeoutMs": 2000,
           "cost": {
@@ -536,6 +546,7 @@
           "roleGroupCodes",
           "remediations"
         ],
+        "additionalPermissions": [],
         "operationPhase": "prepare",
         "limits": {
           "timeoutMs": 5000,
@@ -566,6 +577,7 @@
           "expectedRevision",
           "impactHash"
         ],
+        "additionalPermissions": [],
         "operationPhase": "apply",
         "limits": {
           "timeoutMs": 10000,
@@ -597,6 +609,7 @@
           "roleCodes",
           "remediations"
         ],
+        "additionalPermissions": [],
         "operationPhase": "prepare",
         "limits": {
           "timeoutMs": 5000,
@@ -628,6 +641,7 @@
           "targetGroupCode",
           "remediations"
         ],
+        "additionalPermissions": [],
         "operationPhase": "prepare",
         "limits": {
           "timeoutMs": 5000,
@@ -658,6 +672,7 @@
           "expectedRevision",
           "impactHash"
         ],
+        "additionalPermissions": [],
         "operationPhase": "apply",
         "limits": {
           "timeoutMs": 10000,
@@ -688,6 +703,7 @@
           "expectedRevision",
           "impactHash"
         ],
+        "additionalPermissions": [],
         "operationPhase": "apply",
         "limits": {
           "timeoutMs": 10000,
@@ -718,6 +734,7 @@
           "expectedRevision",
           "impactHash"
         ],
+        "additionalPermissions": [],
         "operationPhase": "apply",
         "limits": {
           "timeoutMs": 10000,
@@ -751,6 +768,7 @@
           "dataScopeOrgCodes",
           "dataScopeAreaCodes"
         ],
+        "additionalPermissions": [],
         "operationPhase": "prepare",
         "limits": {
           "timeoutMs": 5000,
@@ -781,6 +799,7 @@
           "expectedRevision",
           "impactHash"
         ],
+        "additionalPermissions": [],
         "operationPhase": "apply",
         "limits": {
           "timeoutMs": 10000,
@@ -814,6 +833,7 @@
           "policyVersion",
           "remediations"
         ],
+        "additionalPermissions": [],
         "operationPhase": "prepare",
         "limits": {
           "timeoutMs": 5000,
@@ -844,6 +864,7 @@
           "expectedRevision",
           "impactHash"
         ],
+        "additionalPermissions": [],
         "operationPhase": "apply",
         "limits": {
           "timeoutMs": 10000,

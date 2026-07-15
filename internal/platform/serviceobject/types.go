@@ -14,8 +14,14 @@ const (
 	ValueInteger          ValueType = "integer"
 	ValueBoolean          ValueType = "boolean"
 	ValueStringSet        ValueType = "string-set"
+	ValueMenuDefinition   ValueType = "menu-definition"
 	ValueRoleRemediations ValueType = "role-remediations"
 )
+
+type PermissionRequirement struct {
+	Permission string `json:"permission"`
+	Action     string `json:"action"`
+}
 
 type TenantMode string
 
@@ -62,54 +68,57 @@ type CostPolicy struct {
 }
 
 type QueryDefinition struct {
-	ID           string
-	Version      string
-	Resource     string
-	Permission   string
-	Action       string
-	TenantMode   TenantMode
-	DataScope    string
-	Arguments    []ArgumentDefinition
-	AllowedSort  []SortDefinition
-	Cost         CostPolicy
-	Timeout      time.Duration
-	MaxPageSize  int
-	ExposeTotal  bool
-	ResultSchema []ResultField
-	Build        QueryBuilder
+	ID                    string
+	Version               string
+	Resource              string
+	Permission            string
+	Action                string
+	AdditionalPermissions []PermissionRequirement
+	TenantMode            TenantMode
+	DataScope             string
+	Arguments             []ArgumentDefinition
+	AllowedSort           []SortDefinition
+	Cost                  CostPolicy
+	Timeout               time.Duration
+	MaxPageSize           int
+	ExposeTotal           bool
+	ResultSchema          []ResultField
+	Build                 QueryBuilder
 }
 
 type CommandDefinition struct {
-	ID              string
-	Version         string
-	Resource        string
-	Permission      string
-	Action          string
-	TenantMode      TenantMode
-	DataScope       string
-	Arguments       []ArgumentDefinition
-	Cost            CostPolicy
-	Timeout         time.Duration
-	Idempotency     IdempotencyMode
-	MaxAffectedRows int64
-	ResultSchema    []ResultField
-	Build           CommandBuilder
+	ID                    string
+	Version               string
+	Resource              string
+	Permission            string
+	Action                string
+	AdditionalPermissions []PermissionRequirement
+	TenantMode            TenantMode
+	DataScope             string
+	Arguments             []ArgumentDefinition
+	Cost                  CostPolicy
+	Timeout               time.Duration
+	Idempotency           IdempotencyMode
+	MaxAffectedRows       int64
+	ResultSchema          []ResultField
+	Build                 CommandBuilder
 }
 
 type DomainCommandDefinition struct {
-	ID              string
-	Version         string
-	Resource        string
-	Permission      string
-	Action          string
-	TenantMode      TenantMode
-	DataScope       string
-	Arguments       []ArgumentDefinition
-	Cost            CostPolicy
-	Timeout         time.Duration
-	Idempotency     IdempotencyMode
-	MaxAffectedRows int64
-	ResultSchema    []ResultField
+	ID                    string
+	Version               string
+	Resource              string
+	Permission            string
+	Action                string
+	AdditionalPermissions []PermissionRequirement
+	TenantMode            TenantMode
+	DataScope             string
+	Arguments             []ArgumentDefinition
+	Cost                  CostPolicy
+	Timeout               time.Duration
+	Idempotency           IdempotencyMode
+	MaxAffectedRows       int64
+	ResultSchema          []ResultField
 }
 
 type QueryRequest struct {

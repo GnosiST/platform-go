@@ -904,10 +904,11 @@ export const adminServiceObjectDefinitions = Object.freeze({
   ]),
 });
 
-const supportedArgumentTypes = new Set(["string", "integer", "boolean", "string-set", "role-remediations"]);
-const supportedResultTypes = new Set(["string", "integer", "boolean"]);
+const supportedArgumentTypes = new Set(["string", "integer", "boolean", "string-set", "menu-definition", "role-remediations"]);
+const supportedResultTypes = new Set(["string", "integer", "boolean", "string-set", "menu-definition"]);
 const applyArgumentNames = new Set(["previewId", "expectedRevision", "impactHash"]);
 const versionPattern = /^[0-9]+\.[0-9]+\.[0-9]+$/;
+const permissionRequirementPattern = /^[A-Za-z0-9*][A-Za-z0-9._:*/-]*$/;
 
 function assertDefinition(kind, definition, keys, codegenKeys, clientMethods) {
   if (!definition.id || !versionPattern.test(definition.version) || !definition.codegenName || !definition.clientMethod) {
@@ -927,6 +928,30 @@ function assertDefinition(kind, definition, keys, codegenKeys, clientMethods) {
     throw new Error(`invalid or duplicate Admin service object client method: ${definition.clientMethod}`);
   }
   clientMethods.add(definition.clientMethod);
+
+  const requirementKeys = new Set();
+  const primaryRequirement = `${definition.permission}\u0000${definition.action}`;
+  for (const requirement of definition.additionalPermissions ?? []) {
+    if (
+      !requirement ||
+      requirement.permission !== String(requirement.permission ?? "").trim() ||
+      requirement.action !== String(requirement.action ?? "").trim() ||
+      requirement.permission.length > 191 ||
+      requirement.action.length > 191 ||
+      !permissionRequirementPattern.test(requirement.permission) ||
+      !permissionRequirementPattern.test(requirement.action)
+    ) {
+      throw new Error(`malformed additional permission in ${key}`);
+    }
+    const requirementKey = `${requirement.permission}\u0000${requirement.action}`;
+    if (requirementKey === primaryRequirement) {
+      throw new Error(`additional permission duplicates the primary requirement in ${key}`);
+    }
+    if (requirementKeys.has(requirementKey)) {
+      throw new Error(`duplicate additional permission in ${key}`);
+    }
+    requirementKeys.add(requirementKey);
+  }
 
   if (!definition.goSource || !definition.goIDSymbol || !definition.goVersionSymbol) {
     throw new Error(`missing Go definition metadata in ${key}`);
@@ -958,6 +983,10 @@ function assertDefinition(kind, definition, keys, codegenKeys, clientMethods) {
       throw new Error(`forbidden physical sort input in ${key}: ${sortName || "<missing>"}`);
     }
   }
+}
+
+export function validateAdminServiceObjectDefinition(kind, definition) {
+  assertDefinition(kind, definition, new Set(), new Set(), new Set());
 }
 
 const definitionKeys = new Set();

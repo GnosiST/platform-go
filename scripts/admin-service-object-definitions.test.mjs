@@ -4,6 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { describe, it } from "node:test";
+import {
+  adminServiceObjectDefinitions,
+  validateAdminServiceObjectDefinition,
+} from "./admin-service-object-definitions.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
@@ -22,6 +26,46 @@ function temporarySource(name, content) {
 }
 
 describe("validate-admin-service-object-definitions", () => {
+  it("accepts typed menu definitions, string-set results and additional permissions", () => {
+    const definition = {
+      ...adminServiceObjectDefinitions.queries[0],
+      id: "platform.navigation.menu-definition.contract-test",
+      codegenName: "MenuDefinitionContractTest",
+      clientMethod: "menuDefinitionContractTest",
+      arguments: [{ name: "definition", type: "menu-definition", required: true }],
+      result: [
+        { name: "definition", type: "menu-definition" },
+        { name: "permissionCodes", type: "string-set" },
+      ],
+      additionalPermissions: [{ permission: "admin:permission:read", action: "read" }],
+    };
+
+    assert.doesNotThrow(() => validateAdminServiceObjectDefinition("query", definition));
+  });
+
+  it("rejects malformed, duplicated and primary-duplicating additional permissions", () => {
+    const base = {
+      ...adminServiceObjectDefinitions.queries[0],
+      id: "platform.navigation.menu-definition.permission-test",
+      codegenName: "MenuDefinitionPermissionTest",
+      clientMethod: "menuDefinitionPermissionTest",
+    };
+    for (const additionalPermissions of [
+      [{ permission: "", action: "read" }],
+      [{ permission: "admin:permission read", action: "read" }],
+      [
+        { permission: "admin:permission:read", action: "read" },
+        { permission: "admin:permission:read", action: "read" },
+      ],
+      [{ permission: base.permission, action: base.action }],
+    ]) {
+      assert.throws(
+        () => validateAdminServiceObjectDefinition("query", { ...base, additionalPermissions }),
+        /additional permission/i,
+      );
+    }
+  });
+
   it("accepts the Go and JS service-object registry", () => {
     const result = runValidator();
 
@@ -48,6 +92,18 @@ describe("validate-admin-service-object-definitions", () => {
       'Name: "roleGroupCodes", Type: serviceobject.ValueString',
     );
     const result = runValidator(["--organization-source", temporarySource("service_objects.go", changed)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Go and JS definition fields differ/);
+  });
+
+  it("rejects additional permission drift between Go and JS", () => {
+    const source = fs.readFileSync(path.join(repoRoot, "internal/platform/serviceobject/reference.go"), "utf8");
+    const changed = source.replace(
+      'Permission: "admin:reference-records:read", Action: "read",',
+      'Permission: "admin:reference-records:read", Action: "read", AdditionalPermissions: []PermissionRequirement{{Permission: "admin:permission:read", Action: "read"}},',
+    );
+    const result = runValidator(["--reference-source", temporarySource("reference.go", changed)]);
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /Go and JS definition fields differ/);
