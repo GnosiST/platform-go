@@ -29,6 +29,7 @@
 
 - `internal/platform/organizationrbac/principal_equivalence.go`: canonical legacy/candidate/persisted target principal snapshots and all-principal comparison.
 - `internal/platform/organizationrbac/migration.go`: migration orchestration, immutable execution evidence and role-menu candidate application.
+- `internal/platform/organizationrbac/role_menu_repository.go`: transaction-bound page-leaf replacement used by normal CAS writes and migration backfill without nested transactions or per-role global revision bumps.
 - `internal/platform/organizationrbac/migration_cutover.go`: promotion-state validation, dual-read observation aggregation and rollback verification.
 - `internal/platform/httpapi/menu_serving.go`: request-time legacy/target menu comparison and comparison sink contract.
 - `internal/platform/config/config.go`: syntactic mode compatibility; database-backed promotion evidence stays in bootstrap/repository validation.
@@ -50,10 +51,11 @@
 - Create: `internal/platform/organizationrbac/principal_equivalence_test.go`
 - Modify: `internal/platform/organizationrbac/migration.go`
 - Modify: `internal/platform/organizationrbac/navigation_repository.go`
+- Modify: `internal/platform/organizationrbac/role_menu_repository.go`
 - Modify: `internal/platform/organizationrbac/migration_test.go`
 
 **Interfaces:**
-- Consumes: `MigrationManifest`, normalized GORM organization/role/user/menu relations, legacy `ValuesJSON`, legacy `menus.permission`, native `role_menu`, role allow/deny policies and data-scope fields.
+- Consumes: `MigrationManifest`, normalized GORM organization/role/user/menu relations, trusted user/org/area scope columns and hierarchy used by current Admin data-scope enforcement, legacy `ValuesJSON`, legacy `menus.permission`, native `role_menu`, role allow/deny policies and data-scope fields.
 - Produces:
 
 ```go
@@ -72,18 +74,21 @@ type PrincipalAuthorizationSnapshot struct {
 	RoleCodes          []string
 	AllowPermissions   []string
 	DeniedPermissions  []string
-	DataScope          string
+	DataScopeAll       bool
 	DataScopeOrgCodes  []string
 	DataScopeAreaCodes []string
+	DataScopeSelf      bool
 	MenuCodes          []string
 }
 
 type PrincipalAuthorizationDifference struct {
-	UserCode    string
-	LegacyHash  string
-	TargetHash  string
-	AddedMenus  int
-	RemovedMenus int
+	UserCode        string
+	LegacyHash      string
+	TargetHash      string
+	ChangedFields   []string
+	BlockingReasons []string
+	AddedMenus      int
+	RemovedMenus    int
 }
 
 type PrincipalEquivalenceReport struct {
@@ -98,28 +103,133 @@ func (r *GORMRepository) CompareAllActivePrincipals(
 	manifest MigrationManifest,
 	mode PrincipalComparisonMode,
 ) (PrincipalEquivalenceReport, error)
+
+type principalComparisonState struct {
+	Manifest                MigrationManifest
+	Users                   []gormUser
+	AssignmentsByUserID     map[string][]string
+	RolesByCode             map[string]gormRole
+	RoleValuesByCode        map[string]map[string]string
+	AllowByRoleCode         map[string][]string
+	EnabledPermissions      []string
+	EnabledPages            []gormMenu
+	PersistedLeavesByRole   map[string][]string
+	RoleMenuRevisionByRole  map[string]uint64
+	OrganizationsByCode     map[string]gormOrganization
+	OrgParentByCode         map[string]string
+	OrgAreaByCode           map[string]string
+	AreaParentByCode        map[string]string
+	UserAreaByID            map[string]string
+}
+
+type intendedPrincipalIdentity struct {
+	ScopeType   ScopeType
+	TenantCode  string
+	OrgUnitCode string
+	AreaCode    string
+}
+
+func loadPrincipalComparisonState(
+	db *gorm.DB,
+	manifest MigrationManifest,
+	mode PrincipalComparisonMode,
+) (principalComparisonState, error)
+
+func intendedIdentityForPrincipal(
+	state principalComparisonState,
+	user gormUser,
+) (intendedPrincipalIdentity, string)
+
+func legacyPrincipalSnapshot(
+	state principalComparisonState,
+	user gormUser,
+) (PrincipalAuthorizationSnapshot, error)
+
+func targetPrincipalSnapshot(
+	state principalComparisonState,
+	user gormUser,
+	mode PrincipalComparisonMode,
+) (PrincipalAuthorizationSnapshot, error)
+
+func aggregateLegacyPrincipalPageLeaves(
+	state principalComparisonState,
+	roleCodes []string,
+) []string
+
+func candidatePageLeavesForRoles(
+	state principalComparisonState,
+	roleCodes []string,
+) []string
+
+func persistedPageLeavesForRoles(
+	state principalComparisonState,
+	roleCodes []string,
+) []string
+
+func remediatedRoleCodes(
+	user gormUser,
+	assignedRoleCodes []string,
+	manifest MigrationManifest,
+) ([]string, error)
+
+func replaceRoleMenusTx(
+	tx *gorm.DB,
+	request ReplaceRoleMenusRequest,
+	bumpGlobal bool,
+) (RoleMenuSet, error)
 ```
 
-- Snapshot hashes must use canonical sorted sets and stable field ordering. Do not hash display names, arbitrary `ValuesJSON`, PII or adapter errors.
-- Candidate mode derives role-menu leaves from each role's legacy allow/deny policy without writing them. Persisted mode resolves native `role_menu` plus directory ancestors.
+- `loadPrincipalComparisonState` performs one manifest-aware bulk load. It includes every enabled, non-logically-deleted user, sorted by code, even when the user has no effective enabled permission; disabled or logically deleted users are not active principals.
+- Parse trusted user area data and organization/area parent relationships from the same persisted schema fields used by current Admin data-scope enforcement. Expand `current_and_children` and `current_and_children_areas`, union organization/area scopes across roles, preserve `self`, and let any `all` role set `DataScopeAll`.
+- `intendedIdentityForPrincipal` applies the explicit platform allowlist or the manifest's tenant-user organization mapping once and supplies the same intended scope/tenant/org/area identity to both legacy and target snapshots. Raw pre-migration identity integrity remains an `inventoryMigration` validation responsibility and must not create a false equivalence hash difference.
+- A non-allowlisted user without an explicit valid tenant organization produces a deterministic difference with blocking reason `target-organization-required`; it is never inferred as platform scope.
+- Allow and deny snapshots contain canonical enabled exact permission codes after wildcard expansion. A zero-permission active user contributes one comparison with empty allow, deny and menu sets.
+- Snapshot hashes use canonical sorted sets and stable field ordering. Do not hash display names, arbitrary `ValuesJSON`, PII or adapter errors.
+- Legacy menu visibility uses one aggregate deny-first principal policy across the user's currently assigned enabled roles. Do not union `legacyRoleMenuCandidate` results. Fix its wildcard branch so permissionless pages remain invisible, matching current Admin menu semantics.
+- Candidate mode applies manifest role-assignment remediations in memory, then unions page-leaf candidates derived independently from each resulting enabled role's legacy allow/deny policy. Persisted mode uses the assignments already stored in the transaction/database and reads native `role_menu` page leaves for those enabled roles; it must not apply the manifest remediations a second time.
+- Equivalence hashes page leaves only on all three paths. Directory ancestors remain runtime rendering behavior in `ResolveRoleMenuNodes` and never enter the equivalence hash.
+- `replaceRoleMenusTx` contains the existing role-menu validation, CAS, relation and per-role revision work. `ReplaceRoleMenus` keeps its current public transaction and calls it with `bumpGlobal=true`; migration calls it on the existing apply transaction with `bumpGlobal=false` and performs one existing global revision bump after persisted verification.
 
 - [ ] **Step 1: Write the failing cross-role and platform-principal tests**
 
-Add table-driven tests that create these exact cases:
+Add table-driven tests over a shared seed containing enabled `users` and `reports` pages, one disabled page, one logically deleted page, enabled exact user/report permissions, enabled wildcard `*`, one disabled permission, enabled and disabled roles, enabled and disabled users, and one logically deleted user:
 
 ```go
 tests := []struct {
-	name             string
-	platformAllowlist []string
-	wantDifference   bool
+	name                  string
+	platformAllowlist     []string
+	wantActivePrincipals  int
+	wantDifferences       int
+	wantBlockingReason    string
 }{
-	{name: "two roles with a cross-role deny do not equal per-role menu union", wantDifference: true},
-	{name: "wildcard platform principal equals all enabled page leaves", platformAllowlist: []string{"platform-admin"}},
-	{name: "empty organization without allowlist remains a blocking tenant principal", wantDifference: true},
+	{
+		name: "aggregate legacy cross-role deny differs from post-role candidate union",
+		wantActivePrincipals: 1,
+		wantDifferences: 1,
+	},
+	{
+		name: "explicit wildcard platform principal equals every enabled permission-backed page leaf",
+		platformAllowlist: []string{"platform-admin"},
+		wantActivePrincipals: 1,
+	},
+	{
+		name: "missing tenant organization without allowlist is blocking and never platform",
+		wantActivePrincipals: 1,
+		wantDifferences: 1,
+		wantBlockingReason: "target-organization-required",
+	},
+	{
+		name: "enabled zero-permission user contributes an empty snapshot",
+		wantActivePrincipals: 1,
+	},
 }
 ```
 
-Assert that inactive users, disabled roles, disabled permissions and logically deleted pages are excluded, while every enabled active principal contributes exactly one comparison row.
+For the cross-role case, assign role A `allow=admin:user:read, deny=admin:report:read` and role B `allow=admin:report:read`; assert legacy leaves are `users`, candidate leaves are `reports,users`, and `AddedMenus == 1`. Add a remediation fixture that replaces an assigned role and assert candidate roles, permissions, data scope and page leaves use the replacement role.
+
+Add `TestCompareAllActivePrincipalsNormalizesEffectiveDataScope` with two active roles whose scopes are `custom_orgs + self`, and another pair whose scopes are `current_org + custom_areas`. Assert canonical `DataScopeAll`, expanded/sorted org codes, expanded/sorted area codes and `DataScopeSelf`; include current-and-children organization/area descendants from persisted hierarchy rows.
+
+Assert disabled and logically deleted users are excluded from `ActivePrincipals`; disabled roles and disabled permissions contribute nothing; logically deleted pages are absent; every enabled non-logically-deleted user contributes exactly one result even when all effective sets are empty.
 
 - [ ] **Step 2: Run the focused test and verify RED**
 
@@ -129,39 +239,117 @@ Run:
 rtk go test ./internal/platform/organizationrbac -run 'TestCompareAllActivePrincipals|TestOrganizationRBACMigration' -count=1
 ```
 
-Expected: FAIL because `CompareAllActivePrincipals` and the canonical snapshot types do not exist.
+Expected: FAIL because `CompareAllActivePrincipals`, the manifest-aware comparison state and effective data-scope snapshot fields do not exist.
 
 - [ ] **Step 3: Implement canonical legacy, candidate and persisted snapshots**
 
-Implement one loader for the shared identity/role inputs and separate menu resolvers:
+Implement the manifest-aware bulk loader and canonical derivation functions declared in the interface block. Use these exact derivation rules:
 
 ```go
 func canonicalPrincipalSnapshot(snapshot PrincipalAuthorizationSnapshot) PrincipalAuthorizationSnapshot
 func principalAuthorizationHash(snapshot PrincipalAuthorizationSnapshot) string
-func (r *GORMRepository) legacyPrincipalSnapshot(context.Context, gormUser) (PrincipalAuthorizationSnapshot, error)
-func (r *GORMRepository) targetPrincipalSnapshot(context.Context, gormUser, PrincipalComparisonMode) (PrincipalAuthorizationSnapshot, error)
+
+func (r *GORMRepository) CompareAllActivePrincipals(
+	ctx context.Context,
+	manifest MigrationManifest,
+	mode PrincipalComparisonMode,
+) (PrincipalEquivalenceReport, error) {
+	if !r.ready(ctx) {
+		return PrincipalEquivalenceReport{}, ErrRepositoryFailed
+	}
+	state, err := loadPrincipalComparisonState(r.db.WithContext(ctx), manifest, mode)
+	if err != nil {
+		return PrincipalEquivalenceReport{}, err
+	}
+	return compareLoadedPrincipals(state, mode)
+}
 ```
 
-Use deny-first evaluation for menus. A page is legacy-visible only when its legacy permission is allowed by the aggregate principal policy and not denied. A candidate/persisted target page is visible only through an enabled role and enabled page binding; directory ancestors are derived after page selection.
+`compareLoadedPrincipals` derives the intended identity once per user and uses it in both snapshots. If identity derivation returns `target-organization-required`, append one blocking difference rather than constructing platform scope. For valid principals, legacy uses current assigned roles and aggregate deny-first menu evaluation; candidate target uses `remediatedRoleCodes`, while persisted target uses the assignments already loaded from the database. Compare canonical page-leaf sets and all authorization fields, append the changed field names, and compute the report hash from sorted per-principal hashes and blocking reasons.
 
-- [ ] **Step 4: Make migration verify and apply consume the comparison**
+- [ ] **Step 4: Extract the transaction-bound role-menu writer**
+
+Move the existing `ReplaceRoleMenus` transaction body into `replaceRoleMenusTx`. Preserve public CAS/no-op/revision behavior:
+
+```go
+func (r *GORMRepository) ReplaceRoleMenus(ctx context.Context, request ReplaceRoleMenusRequest) (RoleMenuSet, error) {
+	if !r.ready(ctx) {
+		return RoleMenuSet{}, ErrInvalid
+	}
+	var committed RoleMenuSet
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var err error
+		committed, err = replaceRoleMenusTx(tx, request, true)
+		return err
+	})
+	return committed, repositoryError(err)
+}
+```
+
+Inside `replaceRoleMenusTx`, call `bumpGlobalRevision(tx)` only when `bumpGlobal` is true. Migration passes `false`, so all role candidate backfills share the outer transaction and the existing migration-level global revision bump.
+
+- [ ] **Step 5: Make migration verify and apply consume the comparison**
 
 Update `RunMigration` so:
 
 ```go
 case MigrationVerify:
-	report, err := r.CompareAllActivePrincipals(ctx, manifest, PrincipalComparisonCandidate)
-	if err != nil || len(report.Differences) != 0 {
-		return MigrationReport{Status: "blocked"}, ErrRolePoolViolation
+	comparison, compareErr := r.CompareAllActivePrincipals(ctx, manifest, PrincipalComparisonCandidate)
+	if compareErr != nil || len(comparison.Differences) != 0 {
+		report.Status = "blocked"
+		if compareErr != nil {
+			return report, compareErr
+		}
+		return report, ErrRolePoolViolation
 	}
-case MigrationApply:
-	// Compare candidate before mutation, write page-only role_menu candidates,
-	// then compare persisted target inside the same transaction before commit.
+	report.Status = "verified"
+	return report, nil
 ```
 
-Do not silently approve added or removed menus. The manifest must be corrected or the legacy policies/target relations remediated before apply.
+Inside the existing `applyMigration` transaction, bind comparison and writes to `tx`:
 
-- [ ] **Step 5: Re-run focused tests and verify GREEN**
+```go
+txRepository := &GORMRepository{db: tx}
+candidate, err := txRepository.CompareAllActivePrincipals(ctx, manifest, PrincipalComparisonCandidate)
+if err != nil {
+	return err
+}
+if len(candidate.Differences) != 0 {
+	return ErrRolePoolViolation
+}
+
+// Apply intended identity, organization bindings and role remediations first.
+// Then persist page-leaf candidates for every enabled, non-deleted role.
+state, err := loadPrincipalComparisonState(tx, manifest, PrincipalComparisonCandidate)
+if err != nil {
+	return err
+}
+for _, roleCode := range sortedComparisonRoleCodes(state) {
+	_, err = replaceRoleMenusTx(tx, ReplaceRoleMenusRequest{
+		RoleCode: roleCode,
+		MenuCodes: candidatePageLeavesForRoles(state, []string{roleCode}),
+		ExpectedRevision: state.RoleMenuRevisionByRole[roleCode],
+		ActorID: evidence.ActorID,
+		ChangedAt: evidence.AppliedAt,
+	}, false)
+	if err != nil {
+		return err
+	}
+}
+
+persisted, err := txRepository.CompareAllActivePrincipals(ctx, manifest, PrincipalComparisonPersisted)
+if err != nil {
+	return err
+}
+if len(persisted.Differences) != 0 {
+	return ErrRolePoolViolation
+}
+// Continue with ValidateCutover, one global revision bump and applied run state.
+```
+
+Populate `RoleMenuRevisionByRole` in candidate mode so the transaction-bound writer uses the actual per-role CAS revision. Candidate comparison must occur before any mutation; persisted comparison must occur after identity/remediation/menu writes and before `ValidateCutover`, the single global revision bump and commit. Do not silently approve added/removed menus, permission/data-scope drift or blocking identity reasons. The manifest or source relations must be corrected first.
+
+- [ ] **Step 6: Re-run focused tests and verify GREEN**
 
 Run:
 
@@ -169,12 +357,12 @@ Run:
 rtk go test ./internal/platform/organizationrbac -run 'TestCompareAllActivePrincipals|TestOrganizationRBACMigration|TestGORMRepositoryComparesDeterministicLegacyRoleMenuCandidate' -count=1
 ```
 
-Expected: PASS, including the cross-role deny counterexample and explicit platform allowlist case.
+Expected: PASS, including cross-role deny, post-remediation target roles, explicit platform allowlist, missing-organization blocking, zero-permission active users, effective mixed data-scope union, page-leaf-only equality and transaction rollback on persisted mismatch.
 
-- [ ] **Step 6: Commit Task 1**
+- [ ] **Step 7: Commit Task 1**
 
 ```bash
-rtk git add internal/platform/organizationrbac/principal_equivalence.go internal/platform/organizationrbac/principal_equivalence_test.go internal/platform/organizationrbac/migration.go internal/platform/organizationrbac/navigation_repository.go internal/platform/organizationrbac/migration_test.go
+rtk git add internal/platform/organizationrbac/principal_equivalence.go internal/platform/organizationrbac/principal_equivalence_test.go internal/platform/organizationrbac/migration.go internal/platform/organizationrbac/navigation_repository.go internal/platform/organizationrbac/role_menu_repository.go internal/platform/organizationrbac/migration_test.go
 rtk git commit -m "feat: compare organization authorization principals"
 ```
 
@@ -891,4 +1079,3 @@ The node is complete only when all of the following are true at the same revisio
 - keyboard, ARIA, focus, reduced motion, 44px targets, six viewports and 200% zoom are proven in the Browser evidence;
 - the organization node is removed from release blockers without changing deferred datasource/integration capabilities;
 - `unified-error-code-governance` shared files and generators were serialized rather than edited concurrently.
-
