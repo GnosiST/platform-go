@@ -21,23 +21,31 @@ var forbiddenClientNames = []string{"dsn", "datasource", "database", "schema", "
 var forbiddenPhysicalPrefixes = []string{"dsn", "datasource", "database", "schema", "shard", "field", "operator", "sql", "join"}
 
 type Registry struct {
-	queries  map[string]QueryDefinition
-	commands map[string]CommandDefinition
+	queries        map[string]QueryDefinition
+	commands       map[string]CommandDefinition
+	domainCommands map[string]DomainCommandDefinition
 }
 
 func NewRegistry(queries []QueryDefinition, commands []CommandDefinition) (*Registry, error) {
+	return NewRegistryWithDomainCommands(queries, commands, nil)
+}
+
+func NewRegistryWithDomainCommands(queries []QueryDefinition, commands []CommandDefinition, domainCommands []DomainCommandDefinition) (*Registry, error) {
 	registry := &Registry{
-		queries:  make(map[string]QueryDefinition, len(queries)),
-		commands: make(map[string]CommandDefinition, len(commands)),
+		queries:        make(map[string]QueryDefinition, len(queries)),
+		commands:       make(map[string]CommandDefinition, len(commands)),
+		domainCommands: make(map[string]DomainCommandDefinition, len(domainCommands)),
 	}
+	registered := make(map[string]string, len(queries)+len(commands)+len(domainCommands))
 	for _, definition := range queries {
 		if err := validateQueryDefinition(definition); err != nil {
 			return nil, err
 		}
 		key := definitionKey(definition.ID, definition.Version)
-		if _, exists := registry.queries[key]; exists {
-			return nil, fmt.Errorf("%w: query %s@%s", ErrDefinitionConflict, definition.ID, definition.Version)
+		if kind, exists := registered[key]; exists {
+			return nil, definitionConflict("query", definition.ID, definition.Version, kind)
 		}
+		registered[key] = "query"
 		registry.queries[key] = cloneQueryDefinition(definition)
 	}
 	for _, definition := range commands {
@@ -45,12 +53,28 @@ func NewRegistry(queries []QueryDefinition, commands []CommandDefinition) (*Regi
 			return nil, err
 		}
 		key := definitionKey(definition.ID, definition.Version)
-		if _, exists := registry.commands[key]; exists {
-			return nil, fmt.Errorf("%w: command %s@%s", ErrDefinitionConflict, definition.ID, definition.Version)
+		if kind, exists := registered[key]; exists {
+			return nil, definitionConflict("command", definition.ID, definition.Version, kind)
 		}
+		registered[key] = "command"
 		registry.commands[key] = cloneCommandDefinition(definition)
 	}
+	for _, definition := range domainCommands {
+		if err := validateDomainCommandDefinition(definition); err != nil {
+			return nil, err
+		}
+		key := definitionKey(definition.ID, definition.Version)
+		if kind, exists := registered[key]; exists {
+			return nil, definitionConflict("domain command", definition.ID, definition.Version, kind)
+		}
+		registered[key] = "domain command"
+		registry.domainCommands[key] = cloneDomainCommandDefinition(definition)
+	}
 	return registry, nil
+}
+
+func definitionConflict(kind string, id string, version string, existingKind string) error {
+	return fmt.Errorf("%w: %s %s@%s conflicts with %s", ErrDefinitionConflict, kind, id, version, existingKind)
 }
 
 func (r *Registry) query(id string, version string) (QueryDefinition, bool) {
@@ -67,6 +91,14 @@ func (r *Registry) command(id string, version string) (CommandDefinition, bool) 
 	}
 	definition, ok := r.commands[definitionKey(id, version)]
 	return cloneCommandDefinition(definition), ok
+}
+
+func (r *Registry) domainCommand(id string, version string) (DomainCommandDefinition, bool) {
+	if r == nil {
+		return DomainCommandDefinition{}, false
+	}
+	definition, ok := r.domainCommands[definitionKey(id, version)]
+	return cloneDomainCommandDefinition(definition), ok
 }
 
 func definitionKey(id string, version string) string {
@@ -119,6 +151,41 @@ func validateCommandDefinition(definition CommandDefinition) error {
 		return fmt.Errorf("%w: command %s: row and predicate costs must be positive", ErrDefinitionInvalid, definition.ID)
 	}
 	return nil
+}
+
+func validateDomainCommandDefinition(definition DomainCommandDefinition) error {
+	if err := validateDomainDefinitionBase(definition); err != nil {
+		return fmt.Errorf("%w: domain command %s: %v", ErrDefinitionInvalid, definition.ID, err)
+	}
+	if definition.Idempotency != IdempotencyRequiredKey {
+		return fmt.Errorf("%w: domain command %s: idempotency must be required-key", ErrDefinitionInvalid, definition.ID)
+	}
+	if definition.MaxAffectedRows < 1 || definition.MaxAffectedRows > maximumDomainCommandItems {
+		return fmt.Errorf("%w: domain command %s: max affected rows must be between 1 and %d", ErrDefinitionInvalid, definition.ID, maximumDomainCommandItems)
+	}
+	if definition.Cost.PerRowCost < 1 {
+		return fmt.Errorf("%w: domain command %s: row cost must be positive", ErrDefinitionInvalid, definition.ID)
+	}
+	return nil
+}
+
+func validateDomainDefinitionBase(definition DomainCommandDefinition) error {
+	scalarArguments := make([]ArgumentDefinition, 0, len(definition.Arguments))
+	for _, argument := range definition.Arguments {
+		switch argument.Type {
+		case ValueStringSet, ValueRoleRemediations:
+			if !logicalNamePattern.MatchString(argument.Name) || forbiddenName(argument.Name) {
+				return fmt.Errorf("argument %q is invalid or reserved", argument.Name)
+			}
+			if argument.MaxLength <= 0 {
+				return fmt.Errorf("collection argument %q requires item max length", argument.Name)
+			}
+			scalarArguments = append(scalarArguments, ArgumentDefinition{Name: argument.Name, Type: ValueString, Required: argument.Required, MaxLength: argument.MaxLength})
+		default:
+			scalarArguments = append(scalarArguments, argument)
+		}
+	}
+	return validateDefinitionBase(definition.ID, definition.Version, definition.Resource, definition.Permission, definition.Action, definition.TenantMode, definition.DataScope, scalarArguments, definition.Cost, definition.Timeout, definition.ResultSchema)
 }
 
 func validateDefinitionBase(id string, version string, resource string, permission string, action string, tenantMode TenantMode, dataScope string, arguments []ArgumentDefinition, cost CostPolicy, timeout time.Duration, result []ResultField) error {
@@ -200,6 +267,13 @@ func cloneQueryDefinition(definition QueryDefinition) QueryDefinition {
 }
 
 func cloneCommandDefinition(definition CommandDefinition) CommandDefinition {
+	definition.Arguments = append([]ArgumentDefinition(nil), definition.Arguments...)
+	cloneArgumentBoundaries(definition.Arguments)
+	definition.ResultSchema = append([]ResultField(nil), definition.ResultSchema...)
+	return definition
+}
+
+func cloneDomainCommandDefinition(definition DomainCommandDefinition) DomainCommandDefinition {
 	definition.Arguments = append([]ArgumentDefinition(nil), definition.Arguments...)
 	cloneArgumentBoundaries(definition.Arguments)
 	definition.ResultSchema = append([]ResultField(nil), definition.ResultSchema...)

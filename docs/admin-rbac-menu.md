@@ -7,7 +7,7 @@ Last updated: 2026-07-15
 
 The admin foundation now has a runtime RBAC slice for platform menus and generic admin resources. Menu records are generated from enabled capability manifests, then filtered by the current principal.
 
-The current behavior below is the migration source. The frozen target contract is `docs/platform-organization-rbac-menu-contract.md`: role groups become non-nested and scoped, organizations bind tenant role groups, tenant users derive tenant from one primary organization, role menus become independent page bindings, and API/page-button permissions remain separate. The five downstream migration, UI and E2E nodes are still pending; do not describe the target as current runtime behavior.
+The current Admin behavior below remains the migration-source experience. The target backend contract in `docs/platform-organization-rbac-menu-contract.md` is implemented behind `PLATFORM_ORGANIZATION_RBAC_MODE=target`: role groups are non-nested and scoped, organizations bind tenant role groups, tenant users derive tenant from one primary organization, and API/page-button permission resources are separated. The organization/user Admin UI, role tree, independent role-menu runtime and browser E2E remain pending; do not describe those screens or navigation semantics as delivered.
 
 This slice turns resource permission codes into executable behavior:
 

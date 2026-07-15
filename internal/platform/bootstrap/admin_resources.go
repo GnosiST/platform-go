@@ -9,6 +9,7 @@ import (
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/config"
 	"platform-go/internal/platform/dataprotection"
+	"platform-go/internal/platform/organizationrbac"
 	"platform-go/internal/platform/storage"
 )
 
@@ -22,7 +23,15 @@ func AdminResourcesFromConfig(cfg config.Config, manifests []capability.Manifest
 			if err != nil {
 				return nil, err
 			}
-			repository, err := adminresource.NewGORMAdminResourceRepository(context.Background(), db)
+			var repository *adminresource.GORMAdminResourceRepository
+			if cfg.OrganizationRBACMode == config.OrganizationRBACModeTarget {
+				repository, err = adminresource.OpenGORMAdminResourceRepository(context.Background(), db)
+				if err == nil {
+					repository = repository.WithOrganizationRBACOwnership(organizationrbac.NewAdminUserSnapshotWriter())
+				}
+			} else {
+				repository, err = adminresource.NewGORMAdminResourceRepository(context.Background(), db)
+			}
 			if err != nil {
 				sqlDB, dbErr := db.DB()
 				if dbErr == nil {

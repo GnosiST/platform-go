@@ -111,6 +111,9 @@ func TestLoadUsesDefaults(t *testing.T) {
 	if cfg.AdminResourceDSN != "" {
 		t.Fatalf("AdminResourceDSN = %q, want empty by default", cfg.AdminResourceDSN)
 	}
+	if cfg.OrganizationRBACMode != OrganizationRBACModeLegacy {
+		t.Fatalf("OrganizationRBACMode = %q, want legacy by default", cfg.OrganizationRBACMode)
+	}
 	if cfg.RetentionRunnerEnabled {
 		t.Fatal("RetentionRunnerEnabled = true, want disabled by default")
 	}
@@ -497,6 +500,7 @@ func TestLoadParsesAdminResourceFile(t *testing.T) {
 func TestLoadParsesAdminResourceSQLConfig(t *testing.T) {
 	t.Setenv("PLATFORM_ADMIN_RESOURCE_DRIVER", "sqlite")
 	t.Setenv("PLATFORM_ADMIN_RESOURCE_DSN", "file:platform.db")
+	t.Setenv("PLATFORM_ORGANIZATION_RBAC_MODE", "TARGET")
 
 	cfg := Load()
 	if cfg.AdminResourceDriver != "sqlite" {
@@ -504,6 +508,9 @@ func TestLoadParsesAdminResourceSQLConfig(t *testing.T) {
 	}
 	if cfg.AdminResourceDSN != "file:platform.db" {
 		t.Fatalf("AdminResourceDSN = %q", cfg.AdminResourceDSN)
+	}
+	if cfg.OrganizationRBACMode != OrganizationRBACModeTarget {
+		t.Fatalf("OrganizationRBACMode = %q", cfg.OrganizationRBACMode)
 	}
 }
 
@@ -1079,6 +1086,20 @@ func TestValidateRuntimeRejectsDriverWithoutDSN(t *testing.T) {
 	}
 }
 
+func TestValidateRuntimeRequiresGORMStorageForOrganizationRBACTarget(t *testing.T) {
+	cfg := Config{
+		RuntimeEnvironment:   RuntimeEnvironmentDevelopment,
+		JWTSecret:            "development-secret",
+		CacheDefaultTTL:      time.Second,
+		OrganizationRBACMode: OrganizationRBACModeTarget,
+	}
+
+	err := cfg.ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "PLATFORM_ORGANIZATION_RBAC_MODE=target requires persistent GORM Admin resource storage") {
+		t.Fatalf("ValidateRuntime() error = %v, want organization RBAC storage error", err)
+	}
+}
+
 func TestValidateRuntimeRejectsUnsupportedRuntimeEnvironment(t *testing.T) {
 	cfg := Config{RuntimeEnvironment: "demo", JWTSecret: "development-secret", CacheDefaultTTL: 1}
 
@@ -1444,6 +1465,7 @@ func validProductionRuntimeConfig() Config {
 		HTTPMaxBodyBytes:                  1 << 20,
 		AdminResourceDriver:               "postgres",
 		AdminResourceDSN:                  "postgres://platform:secret@localhost:5432/platform",
+		OrganizationRBACMode:              OrganizationRBACModeTarget,
 		SessionDriver:                     "postgres",
 		SessionDSN:                        "postgres://platform:secret@localhost:5432/platform",
 		LifecycleHistoryDriver:            "postgres",
@@ -1538,6 +1560,7 @@ func setValidProductionLoadEnvironment(t *testing.T) {
 		"PLATFORM_JWT_SECRET":                             "0123456789abcdef0123456789abcdef",
 		"PLATFORM_ADMIN_RESOURCE_DRIVER":                  "postgres",
 		"PLATFORM_ADMIN_RESOURCE_DSN":                     "postgres://platform:secret@localhost:5432/platform",
+		"PLATFORM_ORGANIZATION_RBAC_MODE":                 "target",
 		"PLATFORM_SESSION_DRIVER":                         "postgres",
 		"PLATFORM_SESSION_DSN":                            "postgres://platform:secret@localhost:5432/platform",
 		"PLATFORM_LIFECYCLE_HISTORY_DRIVER":               "postgres",

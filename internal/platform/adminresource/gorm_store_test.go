@@ -177,7 +177,7 @@ func TestGORMAdminResourceRepositoryNormalizesSystemResources(t *testing.T) {
 				{ID: "role-auditor", Code: "auditor-role", Name: "Auditor Role", Status: "enabled", Description: "Audit role", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"permissions": "admin:audit-log:read,admin:menu:read", "nameZh": "审计角色"}},
 			},
 			"permissions": {
-				{ID: "permission-audit-log-read", Code: "admin:audit-log:read", Name: "Audit Log Read", Status: "enabled", Description: "Audit log read permission", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"capability": "audit", "resource": "audit-logs", "action": "read", "prefix": "admin:audit-log", "nameZh": "审计日志读取"}},
+				{ID: "permission-audit-log-read", Code: "admin:audit-log:read", Name: "Audit Log Read", Status: "enabled", Description: "Audit log read permission", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"capability": "audit", "resource": "audit-logs", "action": "read", "prefix": "admin:audit-log", "resourceType": "api", "nameZh": "审计日志读取"}},
 			},
 			"menus": {
 				{ID: "menu-audit-logs", Code: "audit-logs", Name: "Audit Logs", Status: "enabled", Description: "Audit logs menu", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"route": "/audit-logs", "parent": "audit", "resource": "audit-logs", "permission": "admin:audit-log:read", "group": "governance", "icon": "audit", "order": "110", "titleZh": "审计日志", "titleEn": "Audit Logs", "descriptionZh": "审计记录", "descriptionEn": "Audit records", "cacheEnabled": "true"}},
@@ -360,6 +360,84 @@ func TestGORMBackedStorePersistsRolePermissionsForDynamicMenus(t *testing.T) {
 	}
 	if hasMenuRoute(menus, "/tenants") {
 		t.Fatalf("menus after GORM reload = %+v, want /tenants removed", menus)
+	}
+}
+
+func TestGORMAdminResourceRepositoryProtectsOrganizationRBACOwnedResources(t *testing.T) {
+	ctx := context.Background()
+	repository, err := NewGORMAdminResourceRepository(ctx, openAdminResourceGORMDB(t))
+	if err != nil {
+		t.Fatalf("NewGORMAdminResourceRepository() error = %v", err)
+	}
+	snapshot := ResourceSnapshot{
+		NextID: 10,
+		Resources: map[string][]Record{
+			"users":       {{ID: "user-admin", Code: "admin", Name: "Admin", Status: "enabled", Values: map[string]string{"roles": "super-admin"}}},
+			"org-units":   {{ID: "org-hq", Code: "hq", Name: "HQ", Status: "enabled", Values: map[string]string{"type": "organization", "tenantCode": "tenant-a"}}},
+			"roles":       {{ID: "role-super-admin", Code: "super-admin", Name: "Super Admin", Status: "enabled", Values: map[string]string{"groupCode": "system", "permissions": "*"}}},
+			"role-groups": {{ID: "group-system", Code: "system", Name: "System", Status: "enabled", Values: map[string]string{"sortOrder": "10"}}},
+			"settings":    {{ID: "setting-brand", Code: "brand", Name: "Brand", Status: "enabled"}},
+		},
+	}
+	committed, err := repository.Save(ctx, snapshot)
+	if err != nil {
+		t.Fatalf("Save(seed) error = %v", err)
+	}
+	snapshot, err = repository.Load(ctx)
+	if err != nil {
+		t.Fatalf("Load(seed) error = %v", err)
+	}
+	if snapshot.Revision != committed {
+		t.Fatalf("seed revision = %d, want %d", snapshot.Revision, committed)
+	}
+	owned := repository.WithOrganizationRBACOwnership()
+
+	snapshot.Resources["settings"][0].Name = "Updated Brand"
+	committed, err = owned.Save(ctx, snapshot)
+	if err != nil {
+		t.Fatalf("Save(unrelated) error = %v", err)
+	}
+	snapshot.Revision = committed
+
+	mutated := snapshot
+	mutated.Resources = cloneResourceMap(snapshot.Resources)
+	mutated.Resources["users"][0].Name = "Changed Outside Domain"
+	if _, err := owned.Save(ctx, mutated); !errors.Is(err, ErrDomainOwnedMutation) {
+		t.Fatalf("Save(domain-owned mutation) error = %v, want ErrDomainOwnedMutation", err)
+	}
+	loaded, err := owned.Load(ctx)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got := loaded.Resources["users"][0].Name; got != "Admin" {
+		t.Fatalf("owned user name = %q, want Admin", got)
+	}
+	if loaded.Revision != committed {
+		t.Fatalf("revision = %d, want %d", loaded.Revision, committed)
+	}
+}
+
+func TestGORMOrganizationRBACRepositoryExcludesGenericCapabilitySeeds(t *testing.T) {
+	repository, err := NewGORMAdminResourceRepository(context.Background(), openAdminResourceGORMDB(t))
+	if err != nil {
+		t.Fatalf("NewGORMAdminResourceRepository() error = %v", err)
+	}
+	store, err := NewRepositoryBackedStoreFromCapabilities(repository.WithOrganizationRBACOwnership(), core.DefaultManifests())
+	if err != nil {
+		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+	}
+	for _, resource := range organizationRBACOwnedResources {
+		records, err := store.List(resource)
+		if err != nil {
+			t.Fatalf("List(%s) error = %v", resource, err)
+		}
+		if len(records) != 0 {
+			t.Fatalf("List(%s) = %+v, want no generic capability seeds", resource, records)
+		}
+	}
+	permissions, err := store.List("permissions")
+	if err != nil || len(permissions) == 0 {
+		t.Fatalf("List(permissions) = %+v, %v; want non-domain capability seeds", permissions, err)
 	}
 }
 

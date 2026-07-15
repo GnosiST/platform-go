@@ -2654,15 +2654,7 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
-      "statusReason": {
-        "zh": "组织尚不能绑定角色组，所有用户写入入口也未强制角色池、租户派生和同租户完整性。",
-        "en": "Organizations cannot bind role groups and user write paths do not enforce role pools, tenant derivation or same-tenant integrity."
-      },
-      "completionGate": {
-        "zh": "完成关系迁移、公共领域校验、影响分析、乐观并发、审计以及创建、更新、批量和导入入口的一致约束。",
-        "en": "Complete relational migrations, shared domain validation, impact analysis, optimistic concurrency, audit and consistent constraints across create, update, bulk and import paths."
-      },
+      "status": "implemented",
       "resourceLocks": [
         "organization-rbac-contract",
         "organization-rbac-migration",
@@ -2682,7 +2674,25 @@
       "evidence": {
         "docs": [
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
-          "docs/platform-foundation-task-map.md"
+          "docs/platform-foundation-task-map.md",
+          "docs/platform-organization-rbac-menu-contract.md",
+          "docs/platform-service-objects.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs"
+        ],
+        "tests": [
+          "internal/platform/organizationrbac/validation_test.go",
+          "internal/platform/organizationrbac/gorm_repository_test.go",
+          "internal/platform/organizationrbac/migration_test.go",
+          "internal/platform/organizationrbac/service_objects_test.go",
+          "internal/platform/organizationrbac/authorization_service_objects_test.go",
+          "internal/platform/organizationrbac/lifecycle_mutations_test.go",
+          "internal/platform/organizationrbac/admin_user_snapshot_test.go",
+          "internal/platform/bootstrap/organization_rbac_test.go",
+          "internal/platform/bootstrap/admin_resources_test.go",
+          "internal/platform/httpapi/service_objects_test.go"
         ]
       }
     },

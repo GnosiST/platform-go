@@ -9,7 +9,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "organization-role-pool-backend-and-migration",
   "organization-user-admin-experience",
   "role-tree-and-authorization-entry",
   "menu-tree-and-button-permission-configuration",
@@ -97,7 +96,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("preserves 37 baseline closeouts, closes eleven completion nodes, and tracks 18 pending nodes", () => {
+  it("preserves 37 baseline closeouts, closes twelve completion nodes, and tracks 17 pending nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -105,7 +104,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(task, "task graph must include production-admin-oidc-auth");
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
-    assert.equal(audit.nodeCloseouts.length, 48);
+    assert.equal(audit.nodeCloseouts.length, 49);
     assert.deepEqual(audit.nodeCloseouts.slice(0, 37).map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
     assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts.slice(0, 37))).digest("hex"), foundationBaselineCloseoutDigest);
     const runtimeSecurityCloseout = audit.nodeCloseouts[37];
@@ -179,6 +178,15 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(organizationDesignCloseout.visualEvidence.includes("product-design"));
     assert.ok(organizationDesignCloseout.visualEvidence.includes("ui-ux-pro-max"));
     assert.equal(organizationDesignCloseout.visualEvidence.includes("browser:control-in-app-browser"), false);
+    const organizationBackendCloseout = audit.nodeCloseouts.find(
+      (item) => item.taskId === "organization-role-pool-backend-and-migration",
+    );
+    assert.equal(organizationBackendCloseout.status, "closed");
+    assert.equal(organizationBackendCloseout.neatFreak, true);
+    assert.equal(organizationBackendCloseout.cleanupMode, "phase-level");
+    assert.ok(organizationBackendCloseout.cleanupEvidence.includes("internal/platform/organizationrbac/migration_test.go"));
+    assert.ok(organizationBackendCloseout.cleanupEvidence.includes("scripts/validate-admin-service-object-definitions.mjs"));
+    assert.equal("visualEvidence" in organizationBackendCloseout, false);
     assert.deepEqual(audit.pendingNodeEvidence, completionProgramTaskIDs);
   });
 

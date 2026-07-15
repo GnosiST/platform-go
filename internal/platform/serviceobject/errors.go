@@ -10,4 +10,6 @@ var (
 	ErrCostLimitExceeded   = errors.New("service object cost limit exceeded")
 	ErrExecutionFailed     = errors.New("service object execution failed")
 	ErrIdempotencyConflict = errors.New("service object idempotency conflict")
+	ErrConflict            = errors.New("service object state conflict")
+	ErrValidation          = errors.New("service object domain validation failed")
 )

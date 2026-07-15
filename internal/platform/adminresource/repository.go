@@ -10,6 +10,16 @@ import (
 )
 
 var ErrRevisionConflict = errors.New("admin resource revision conflict")
+var ErrDomainOwnedMutation = errors.New("admin resource is owned by a domain repository")
+
+func RequiresGovernedLifecycleCommand(resource string) bool {
+	switch resource {
+	case "org-units", "role-groups", "roles", "users", "menus", "permissions":
+		return true
+	default:
+		return false
+	}
+}
 
 type RevisionConflictError struct {
 	Expected uint64
@@ -39,8 +49,12 @@ type AdminResourceRevisionReader interface {
 	CurrentRevision(context.Context) (uint64, error)
 }
 
+type AdminResourceCapabilitySeedPolicy interface {
+	ExcludeCapabilitySeed(resource string) bool
+}
+
 func NewRepositoryBackedStoreFromCapabilities(repository AdminResourceRepository, manifests []capability.Manifest) (*Store, error) {
-	baseResources := seedResourcesFromCapabilities(manifests)
+	baseResources := repositoryCapabilitySeeds(repository, manifests)
 	schemas := seedResourceSchemasFromCapabilities(manifests)
 	store := newStore(baseResources, schemas)
 	store.repository = repository
@@ -54,7 +68,7 @@ func NewRepositoryBackedStoreFromCapabilities(repository AdminResourceRepository
 }
 
 func NewRepositoryBackedStoreFromCapabilitiesWithProtection(repository AdminResourceRepository, manifests []capability.Manifest, runtime dataprotection.Runtime) (*Store, error) {
-	baseResources := seedResourcesFromCapabilities(manifests)
+	baseResources := repositoryCapabilitySeeds(repository, manifests)
 	schemas := seedResourceSchemasFromCapabilities(manifests)
 	store := newStore(baseResources, schemas)
 	store.repository = repository
@@ -72,6 +86,20 @@ func NewRepositoryBackedStoreFromCapabilitiesWithProtection(repository AdminReso
 		return nil, err
 	}
 	return store, nil
+}
+
+func repositoryCapabilitySeeds(repository AdminResourceRepository, manifests []capability.Manifest) map[string][]Record {
+	resources := seedResourcesFromCapabilities(manifests)
+	policy, ok := repository.(AdminResourceCapabilitySeedPolicy)
+	if !ok {
+		return resources
+	}
+	for resource := range resources {
+		if policy.ExcludeCapabilitySeed(resource) {
+			resources[resource] = nil
+		}
+	}
+	return resources
 }
 
 func (s *Store) snapshotLocked() ResourceSnapshot {

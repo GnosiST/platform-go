@@ -3514,8 +3514,8 @@
         "en": "Permissions"
       },
       "description": {
-        "zh": "能力、资源、菜单和接口共用的权限码目录。",
-        "en": "Permission catalog shared by capabilities, resources, menus, and APIs."
+        "zh": "平台级 API 与页面按钮权限资源目录。",
+        "en": "Platform-wide API and page-button permission resource catalog."
       },
       "permissionPrefix": "admin:permission",
       "permissions": {
@@ -3526,10 +3526,270 @@
       },
       "menu": {
         "route": "/permissions",
+        "parent": "access",
         "group": "foundation",
         "icon": "roles",
-        "order": 55
+        "order": 55,
+        "cache": true
       },
+      "fields": [
+        {
+          "key": "code",
+          "label": {
+            "zh": "权限编码",
+            "en": "Permission Code"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "name",
+          "label": {
+            "zh": "权限名称",
+            "en": "Permission Name"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "resourceType",
+          "label": {
+            "zh": "资源类型",
+            "en": "Resource Type"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 130,
+          "options": [
+            {
+              "value": "api",
+              "label": {
+                "zh": "接口权限",
+                "en": "API"
+              }
+            },
+            {
+              "value": "page-button",
+              "label": {
+                "zh": "页面按钮",
+                "en": "Page Button"
+              }
+            }
+          ],
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "capability",
+          "label": {
+            "zh": "能力",
+            "en": "Capability"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 150,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "resource",
+          "label": {
+            "zh": "资源",
+            "en": "Resource"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "action",
+          "label": {
+            "zh": "动作",
+            "en": "Action"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "prefix",
+          "label": {
+            "zh": "前缀",
+            "en": "Prefix"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 120,
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ],
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "description",
+          "label": {
+            "zh": "说明",
+            "en": "Description"
+          },
+          "type": "textarea",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "status",
+        "description",
+        "resourceType",
+        "capability",
+        "resource",
+        "action",
+        "prefix"
+      ],
+      "defaultSortKey": "updatedAt",
       "deletion": {
         "mode": "restrict",
         "policyVersion": 1,

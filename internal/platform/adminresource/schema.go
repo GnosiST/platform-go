@@ -684,6 +684,10 @@ func userResourceSchema() Schema {
 		"admin:user",
 	)
 	schema.Fields = append(schema.Fields,
+		readOnlyValueField("scopeType", text("账号范围", "Account Scope"), "select", false, false, true, 130, []FieldOption{
+			option("platform", "平台", "Platform"),
+			option("tenant", "租户", "Tenant"),
+		}),
 		withRelation(valueField("tenantCode", text("租户", "Tenant"), "select", true, true, true, true, true, 150, nil), fieldRelation("tenants", "code", "name", false, enabledRelationFilter())),
 		withRelation(valueField("orgUnitCode", text("机构", "Org Unit"), "select", false, true, true, true, true, 160, nil), treeFieldRelation("org-units", "code", "name", "parentCode", enabledRelationFilter())),
 		withRelation(valueField("areaCode", text("地址码", "Area Code"), "select", false, true, true, true, true, 140, nil), areaCodeFieldRelation(enabledRelationFilter())),
@@ -705,6 +709,7 @@ func orgUnitResourceSchema() Schema {
 		withRelation(valueField("tenantCode", text("租户", "Tenant"), "select", true, true, true, true, true, 150, nil), fieldRelation("tenants", "code", "name", false, enabledRelationFilter())),
 		withRelation(valueField("parentCode", text("上级机构", "Parent"), "select", false, true, true, true, true, 160, nil), treeFieldRelation("org-units", "code", "name", "parentCode", enabledRelationFilter())),
 		withRelation(valueField("areaCode", text("地址码", "Area Code"), "select", false, true, true, true, true, 140, nil), areaCodeFieldRelation(enabledRelationFilter())),
+		withRelation(readOnlyValueField("roleGroupCodes", text("角色组", "Role Groups"), "multiselect", false, false, true, 220, nil), fieldRelation("role-groups", "code", "name", true, enabledRelationFilter())),
 		valueField("sortOrder", text("排序", "Sort Order"), "number", false, false, false, true, true, 110, nil),
 	)
 	schema.SearchFields = []string{"name", "code", "status", "description", "type", "tenantCode", "parentCode", "areaCode"}
@@ -720,6 +725,11 @@ func roleGroupResourceSchema() Schema {
 		"admin:role-group",
 	)
 	schema.Fields = append(schema.Fields,
+		readOnlyValueField("scopeType", text("归属范围", "Ownership Scope"), "select", false, false, true, 130, []FieldOption{
+			option("platform", "平台", "Platform"),
+			option("tenant", "租户", "Tenant"),
+		}),
+		withRelation(readOnlyValueField("tenantCode", text("租户", "Tenant"), "select", false, false, true, 150, nil), fieldRelation("tenants", "code", "name", false, enabledRelationFilter())),
 		withRelation(valueField("parentCode", text("上级角色组", "Parent Group"), "select", false, true, true, true, true, 160, nil), treeFieldRelation("role-groups", "code", "name", "parentCode", enabledRelationFilter())),
 		valueField("sortOrder", text("排序", "Sort Order"), "number", false, false, false, true, true, 110, nil),
 	)
@@ -957,6 +967,10 @@ func permissionResourceSchema() Schema {
 		"admin:permission",
 	)
 	schema.Fields = append(schema.Fields,
+		valueField("resourceType", text("资源类型", "Resource Type"), "select", true, true, true, true, true, 130, []FieldOption{
+			option("api", "接口权限", "API"),
+			option("page-button", "页面按钮", "Page Button"),
+		}),
 		valueField("capability", text("能力", "Capability"), "text", true, true, true, true, true, 150, nil),
 		valueField("resource", text("资源", "Resource"), "text", true, true, true, true, true, 160, nil),
 		valueField("action", text("动作", "Action"), "select", true, true, true, true, true, 120, []FieldOption{
@@ -967,7 +981,7 @@ func permissionResourceSchema() Schema {
 		}),
 		valueField("prefix", text("前缀", "Prefix"), "text", true, true, true, true, true, 180, nil),
 	)
-	schema.SearchFields = []string{"name", "code", "status", "description", "capability", "resource", "action", "prefix"}
+	schema.SearchFields = []string{"name", "code", "status", "description", "resourceType", "capability", "resource", "action", "prefix"}
 	return schema
 }
 
@@ -1060,6 +1074,12 @@ func recordField(key string, label LocalizedText, fieldType string, required boo
 
 func valueField(key string, label LocalizedText, fieldType string, required bool, searchable bool, inTable bool, inForm bool, inDetail bool, width int, options []FieldOption) FieldDefinition {
 	return field(key, label, fieldType, "values", required, searchable, inTable, inForm, inDetail, width, options)
+}
+
+func readOnlyValueField(key string, label LocalizedText, fieldType string, searchable bool, inTable bool, inDetail bool, width int, options []FieldOption) FieldDefinition {
+	field := valueField(key, label, fieldType, false, searchable, inTable, false, inDetail, width, options)
+	field.ReadOnly = true
+	return field
 }
 
 func auditLogField(key string, label LocalizedText, fieldType string, searchable bool, inTable bool, width int) FieldDefinition {

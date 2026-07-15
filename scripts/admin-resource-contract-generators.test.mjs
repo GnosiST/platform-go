@@ -71,6 +71,45 @@ client.renameReferenceRecord({
   idempotencyKey: "rename-ref-1",
 }).then((response) => response.data?.values.affected);
 
+client.prepareOrganizationRoleGroupChange({
+  arguments: {
+    orgUnitCode: "org-1",
+    roleGroupCodes: ["group-1", "group-2"],
+    remediations: [
+      { userCode: "user-1", roleCode: "role-1", action: "remove-role" },
+      { userCode: "user-2", roleCode: "role-2", action: "replace-role", replacementRoleCode: "role-3" },
+    ],
+  },
+  idempotencyKey: "prepare-org-role-groups-1",
+}).then((response) => response.data?.values.previewId);
+
+client.replaceOrganizationRoleGroups({
+  arguments: { previewId: "preview-1", expectedRevision: 7, impactHash: "impact-1" },
+  idempotencyKey: "apply-org-role-groups-1",
+}).then((response) => response.data?.values.revision);
+
+client.prepareRolePermissionChange({
+  arguments: { roleCode: "operator", permissionCodes: ["admin:user:read", "admin:user:update"] },
+  idempotencyKey: "prepare-role-permissions-1",
+}).then((response) => response.data?.values.previewId);
+
+client.prepareAuthorizationResourceLifecycle({
+  arguments: {
+    resource: "roles",
+    resourceCode: "operator",
+    operation: "delete",
+    retentionDays: 90,
+    policyVersion: 1,
+    remediations: [{ userCode: "user-1", roleCode: "operator", action: "remove-role" }],
+  },
+  idempotencyKey: "prepare-resource-lifecycle-1",
+}).then((response) => response.data?.values.previewId);
+
+client.applyAuthorizationResourceLifecycle({
+  arguments: { previewId: "preview-lifecycle-1", expectedRevision: 9, impactHash: "impact-lifecycle-1" },
+  idempotencyKey: "apply-resource-lifecycle-1",
+}).then((response) => response.data?.values.applied);
+
 // @ts-expect-error physical fields are not part of persisted query input
 client.listReferenceRecords({ field: "status" });
 // @ts-expect-error operators are compiled by the server-side definition
@@ -79,6 +118,10 @@ client.listReferenceRecords({ arguments: { operator: "equal" } });
 client.listReferenceRecords({ arguments: { datasource: "primary" } });
 // @ts-expect-error idempotency keys are required by this command definition
 client.renameReferenceRecord({ arguments: { code: "REF-1", name: "Renamed" } });
+// @ts-expect-error apply inputs reload server-owned targets from the preview
+client.replaceOrganizationRoleGroups({ arguments: { previewId: "preview-1", expectedRevision: 7, impactHash: "impact-1", roleGroupCodes: ["group-1"] }, idempotencyKey: "apply-org-role-groups-2" });
+// @ts-expect-error replace-role remediations require an explicit replacement role
+client.prepareOrganizationRoleGroupChange({ arguments: { orgUnitCode: "org-1", roleGroupCodes: [], remediations: [{ userCode: "user-1", roleCode: "role-1", action: "replace-role" }] }, idempotencyKey: "prepare-org-role-groups-2" });
 `,
   );
   const result = spawnSync(
@@ -245,6 +288,99 @@ describe("admin resource contract generators", () => {
     assert.equal(item.additionalProperties, false);
     assert.deepEqual(Object.keys(item.properties), queryDefinition.result.map((field) => field.name));
     assert.equal(queryData.properties.total, undefined, "total must follow the definition exposeTotal policy");
+
+    const prepareDefinition = adminServiceObjectDefinitions.commands.find(
+      (definition) => definition.id === "platform.identity.organization-role-group-change.prepare",
+    );
+    const prepareRequestName = commandUnion.oneOf
+      .map((entry) => entry.$ref.split("/").pop())
+      .find((name) => openapi.components.schemas[name].properties.commandId.const === prepareDefinition.id);
+    const prepareRequest = openapi.components.schemas[prepareRequestName];
+    const prepareArguments = openapi.components.schemas[prepareRequest.properties.arguments.$ref.split("/").pop()];
+    assert.deepEqual(Object.keys(prepareArguments.properties), ["orgUnitCode", "roleGroupCodes", "remediations"]);
+    assert.deepEqual(prepareArguments.properties.roleGroupCodes, {
+      type: "array",
+      uniqueItems: true,
+      maxItems: 2000,
+      items: { type: "string", maxLength: 191 },
+    });
+    assert.equal(prepareArguments.properties.remediations.type, "array");
+    assert.equal(prepareArguments.properties.remediations.uniqueItems, true);
+    assert.equal(prepareArguments.properties.remediations.maxItems, 2000);
+    assert.equal(prepareArguments.properties.remediations.items.oneOf.length, 2);
+    assert.ok(
+      prepareArguments.properties.remediations.items.oneOf.every((schema) => schema.additionalProperties === false),
+      "remediation variants must remain closed objects",
+    );
+
+    const rolePermissionDefinition = adminServiceObjectDefinitions.commands.find(
+      (definition) => definition.id === "platform.authorization.role-permission-change.prepare",
+    );
+    const rolePermissionRequestName = commandUnion.oneOf
+      .map((entry) => entry.$ref.split("/").pop())
+      .find((name) => openapi.components.schemas[name].properties.commandId.const === rolePermissionDefinition.id);
+    const rolePermissionRequest = openapi.components.schemas[rolePermissionRequestName];
+    const rolePermissionArguments =
+      openapi.components.schemas[rolePermissionRequest.properties.arguments.$ref.split("/").pop()];
+    assert.deepEqual(rolePermissionArguments.properties.permissionCodes, {
+      type: "array",
+      uniqueItems: true,
+      maxItems: 2000,
+      items: { type: "string", maxLength: 191 },
+    });
+
+    const lifecyclePrepareDefinition = adminServiceObjectDefinitions.commands.find(
+      (definition) => definition.id === "platform.authorization.resource-lifecycle.prepare",
+    );
+    const lifecyclePrepareRequestName = commandUnion.oneOf
+      .map((entry) => entry.$ref.split("/").pop())
+      .find((name) => openapi.components.schemas[name].properties.commandId.const === lifecyclePrepareDefinition.id);
+    const lifecyclePrepareRequest = openapi.components.schemas[lifecyclePrepareRequestName];
+    const lifecyclePrepareArguments =
+      openapi.components.schemas[lifecyclePrepareRequest.properties.arguments.$ref.split("/").pop()];
+    assert.deepEqual(Object.keys(lifecyclePrepareArguments.properties), [
+      "resource",
+      "resourceCode",
+      "operation",
+      "retentionDays",
+      "policyVersion",
+      "remediations",
+    ]);
+    assert.deepEqual(lifecyclePrepareArguments.properties.retentionDays, {
+      type: "integer",
+      minimum: 1,
+      maximum: 36500,
+    });
+    assert.deepEqual(lifecyclePrepareArguments.properties.policyVersion, {
+      type: "integer",
+      minimum: 1,
+      maximum: 4294967295,
+    });
+
+    const lifecycleImpactDefinition = adminServiceObjectDefinitions.queries.find(
+      (definition) => definition.id === "platform.authorization.resource-lifecycle.impact",
+    );
+    const lifecycleImpactRequestName = queryUnion.oneOf
+      .map((entry) => entry.$ref.split("/").pop())
+      .find((name) => openapi.components.schemas[name].properties.queryId.const === lifecycleImpactDefinition.id);
+    const lifecycleImpactData = openapi.components.schemas[lifecycleImpactRequestName.replace("QueryRequest", "QueryData")];
+    const lifecycleImpactItem =
+      openapi.components.schemas[lifecycleImpactData.properties.items.items.$ref.split("/").pop()];
+    assert.deepEqual(Object.keys(lifecycleImpactItem.properties), lifecycleImpactDefinition.result.map((field) => field.name));
+
+    for (const applyDefinition of adminServiceObjectDefinitions.commands.filter(
+      (definition) => definition.operationPhase === "apply",
+    )) {
+      const applyRequestName = commandUnion.oneOf
+        .map((entry) => entry.$ref.split("/").pop())
+        .find((name) => openapi.components.schemas[name].properties.commandId.const === applyDefinition.id);
+      const applyRequest = openapi.components.schemas[applyRequestName];
+      const applyArguments = openapi.components.schemas[applyRequest.properties.arguments.$ref.split("/").pop()];
+      assert.deepEqual(Object.keys(applyArguments.properties), ["previewId", "expectedRevision", "impactHash"]);
+      for (const forbidden of [...forbiddenServiceObjectClientInputs, "tenantCode", "roleGroupCodes", "roleCodes", "remediations"]) {
+        assert.equal(applyArguments.properties[forbidden], undefined, `${applyDefinition.id} must not expose ${forbidden}`);
+      }
+    }
   });
 
   it("generates a consumable strongly typed Admin service object client from the same definitions", () => {
@@ -267,6 +403,12 @@ describe("admin resource contract generators", () => {
     assert.match(source, /class AdminServiceObjectClient/);
     assert.match(source, /queryId: "platform\.reference-records\.list"/);
     assert.match(source, /commandId: "platform\.reference-records\.rename"/);
+    assert.match(source, /"roleGroupCodes": ReadonlyArray<string>/);
+    assert.match(source, /"permissionCodes": ReadonlyArray<string>/);
+    assert.match(source, /ReadonlyArray<AdminServiceObjectRoleRemediation>/);
+    assert.match(source, /replaceOrganizationRoleGroups/);
+    assert.match(source, /prepareAuthorizationResourceLifecycle/);
+    assert.match(source, /applyAuthorizationResourceLifecycle/);
     assert.doesNotMatch(source, /\[key: string\]/);
     compileAdminServiceObjectClient(source);
   });

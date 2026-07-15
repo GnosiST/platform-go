@@ -49,10 +49,11 @@ func permissionCatalogFromCapabilities(manifests []capability.Manifest, updatedA
 					title.EN+" "+action.LabelEN+" permission.",
 					updatedAt,
 					withLocalizedValues(map[string]string{
-						"capability": string(manifest.ID),
-						"resource":   resource.Resource,
-						"action":     action.Key,
-						"prefix":     resource.PermissionPrefix,
+						"capability":   string(manifest.ID),
+						"resource":     resource.Resource,
+						"action":       action.Key,
+						"prefix":       resource.PermissionPrefix,
+						"resourceType": "api",
 					}, title.ZH+action.LabelZH, title.EN+" "+action.LabelEN, title.ZH+action.LabelZH+"权限。", title.EN+" "+action.LabelEN+" permission."),
 				))
 			}
@@ -75,10 +76,11 @@ func permissionCatalogFromCapabilities(manifests []capability.Manifest, updatedA
 					title.EN+" "+label.EN+" permission.",
 					updatedAt,
 					withLocalizedValues(map[string]string{
-						"capability": string(manifest.ID),
-						"resource":   resource.Resource,
-						"action":     actionKey,
-						"prefix":     resource.PermissionPrefix,
+						"capability":   string(manifest.ID),
+						"resource":     resource.Resource,
+						"action":       actionKey,
+						"prefix":       resource.PermissionPrefix,
+						"resourceType": "api",
 					}, title.ZH+label.ZH, title.EN+" "+label.EN, title.ZH+label.ZH+"权限。", title.EN+" "+label.EN+" permission."),
 				))
 			}
@@ -103,10 +105,11 @@ func permissionCatalogFromCapabilities(manifests []capability.Manifest, updatedA
 					title.EN+" "+label.EN+" sensitive reveal permission.",
 					updatedAt,
 					withLocalizedValues(map[string]string{
-						"capability": string(manifest.ID),
-						"resource":   resource.Resource,
-						"action":     "reveal",
-						"prefix":     resource.PermissionPrefix,
+						"capability":   string(manifest.ID),
+						"resource":     resource.Resource,
+						"action":       "reveal",
+						"prefix":       resource.PermissionPrefix,
+						"resourceType": "api",
 					}, title.ZH+label.ZH+"查看明文", title.EN+" "+label.EN+" Reveal", title.ZH+label.ZH+"敏感明文查看权限。", title.EN+" "+label.EN+" sensitive reveal permission."),
 				))
 			}

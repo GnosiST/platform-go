@@ -260,14 +260,21 @@ function validateRuntimeEvidence(contract, errors) {
   const serverLabel = displayPath(serverPath);
   if (fs.existsSync(serverPath)) {
     const server = fs.readFileSync(serverPath, "utf8");
+    for (const [pattern, label] of [
+      [/cacheKeyBranding\s*=\s*"admin:branding"/, 'cacheKeyBranding = "admin:branding"'],
+      [/cacheKeyAuthProviders\s*=\s*"admin:auth-providers"/, 'cacheKeyAuthProviders = "admin:auth-providers"'],
+      [/cacheKeyMenusPrefix\s*=\s*"admin:menus:"/, 'cacheKeyMenusPrefix = "admin:menus:"'],
+      [/cacheKeyPrincipalPrefix\s*=\s*"admin:principal:"/, 'cacheKeyPrincipalPrefix = "admin:principal:"'],
+      [/cacheKeySchemaPrefix\s*=\s*"admin:schema:"/, 'cacheKeySchemaPrefix = "admin:schema:"'],
+      [/cacheKeyPermissionsList\s*=\s*"admin:permissions:list"/, 'cacheKeyPermissionsList = "admin:permissions:list"'],
+      [/sessionInvalidationResource\s*=\s*"sessions"/, 'sessionInvalidationResource = "sessions"'],
+      [/case [^:\n]*"roles",\s*"permissions",\s*"users":/, 'authorization cache invalidation case including roles, permissions and users'],
+    ]) {
+      if (!pattern.test(server)) {
+        errors.push(`${serverLabel} must include cache invalidation runtime evidence ${label}`);
+      }
+    }
     for (const snippet of [
-      'cacheKeyBranding            = "admin:branding"',
-      'cacheKeyAuthProviders       = "admin:auth-providers"',
-      'cacheKeyMenusPrefix         = "admin:menus:"',
-      'cacheKeyPrincipalPrefix     = "admin:principal:"',
-      'cacheKeySchemaPrefix        = "admin:schema:"',
-      'cacheKeyPermissionsList     = "admin:permissions:list"',
-      'sessionInvalidationResource = "sessions"',
       "s.invalidateCachesForResourceLocal(ctx, resource)",
       "PublishInvalidation(ctx, cache.InvalidationEvent{Resource: resource})",
       "PublishInvalidation(ctx, cache.InvalidationEvent{Resource: sessionInvalidationResource})",
@@ -277,7 +284,6 @@ function validateRuntimeEvidence(contract, errors) {
       "_ = s.cache.Delete(ctx, cacheKeyBranding)",
       'case "menus":',
       "_ = s.cache.DeletePrefix(ctx, cacheKeyMenusPrefix)",
-      'case "roles", "permissions", "users":',
       "s.invalidatePolicyAuthorizer()",
       "_ = s.cache.DeletePrefix(ctx, cacheKeyPrincipalPrefix)",
       "_ = s.cache.Delete(ctx, cacheKeyPermissionsList)",

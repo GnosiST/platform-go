@@ -9,6 +9,19 @@ import (
 	"platform-go/internal/platform/rbac"
 )
 
+func TestRequiresGovernedLifecycleCommandCoversAuthorizationEntities(t *testing.T) {
+	for _, resource := range []string{"org-units", "role-groups", "roles", "users", "menus", "permissions"} {
+		if !RequiresGovernedLifecycleCommand(resource) {
+			t.Fatalf("RequiresGovernedLifecycleCommand(%q) = false, want true", resource)
+		}
+	}
+	for _, resource := range []string{"", "tenants", "files", " users"} {
+		if RequiresGovernedLifecycleCommand(resource) {
+			t.Fatalf("RequiresGovernedLifecycleCommand(%q) = true, want false", resource)
+		}
+	}
+}
+
 func TestSoftDeleteHidesRecordsUntilRestore(t *testing.T) {
 	now := time.Date(2026, 7, 14, 9, 0, 0, 0, time.UTC)
 	store := lifecycleTestStore(capability.AdminResourceDeletionPolicy{

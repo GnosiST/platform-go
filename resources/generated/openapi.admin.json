@@ -9462,6 +9462,798 @@
           }
         }
       },
+      "OrganizationRolePoolGetV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "orgUnitCode": {
+            "type": "string",
+            "maxLength": 191
+          }
+        },
+        "required": [
+          "orgUnitCode"
+        ]
+      },
+      "OrganizationRolePoolGetV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleCode": {
+            "type": "string"
+          },
+          "roleGroupCode": {
+            "type": "string"
+          },
+          "roleGroupName": {
+            "type": "string"
+          },
+          "tenantCode": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "roleCode",
+          "roleGroupCode",
+          "roleGroupName",
+          "tenantCode",
+          "status"
+        ]
+      },
+      "OrganizationRolePoolGetV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationRolePoolGetV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        }
+      },
+      "OrganizationRolePoolGetV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version",
+          "arguments"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.identity.organization-role-pool.get"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/OrganizationRolePoolGetV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              }
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "org-units",
+          "permission": "admin:org-unit:read",
+          "action": "read",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 2,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2050
+          },
+          "timeoutMs": 3000
+        }
+      },
+      "OrganizationRoleGroupChangeImpactV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "previewId"
+        ]
+      },
+      "OrganizationRoleGroupChangeImpactV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "affectedUsers": {
+            "type": "integer"
+          },
+          "conflictCount": {
+            "type": "integer"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "previewId",
+          "severity",
+          "affectedUsers",
+          "conflictCount",
+          "expectedRevision",
+          "impactHash",
+          "expiresAt"
+        ]
+      },
+      "OrganizationRoleGroupChangeImpactV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationRoleGroupChangeImpactV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1
+          }
+        }
+      },
+      "OrganizationRoleGroupChangeImpactV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version",
+          "arguments"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.identity.organization-role-group-change.impact"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/OrganizationRoleGroupChangeImpactV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "org-units",
+          "permission": "admin:org-unit:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "timeoutMs": 2000
+        }
+      },
+      "UserOrganizationChangeImpactV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "previewId"
+        ]
+      },
+      "UserOrganizationChangeImpactV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "affectedUsers": {
+            "type": "integer"
+          },
+          "conflictCount": {
+            "type": "integer"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "previewId",
+          "severity",
+          "affectedUsers",
+          "conflictCount",
+          "expectedRevision",
+          "impactHash",
+          "expiresAt"
+        ]
+      },
+      "UserOrganizationChangeImpactV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserOrganizationChangeImpactV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1
+          }
+        }
+      },
+      "UserOrganizationChangeImpactV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version",
+          "arguments"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.identity.user-organization-change.impact"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/UserOrganizationChangeImpactV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "users",
+          "permission": "admin:user:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "timeoutMs": 2000
+        }
+      },
+      "RoleStateOrGroupChangeImpactV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "previewId"
+        ]
+      },
+      "RoleStateOrGroupChangeImpactV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "affectedUsers": {
+            "type": "integer"
+          },
+          "conflictCount": {
+            "type": "integer"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "previewId",
+          "severity",
+          "affectedUsers",
+          "conflictCount",
+          "expectedRevision",
+          "impactHash",
+          "expiresAt"
+        ]
+      },
+      "RoleStateOrGroupChangeImpactV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleStateOrGroupChangeImpactV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1
+          }
+        }
+      },
+      "RoleStateOrGroupChangeImpactV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version",
+          "arguments"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.identity.role-state-or-group-change.impact"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/RoleStateOrGroupChangeImpactV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "roles",
+          "permission": "admin:role:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "timeoutMs": 2000
+        }
+      },
+      "RolePermissionChangeImpactV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "previewId"
+        ]
+      },
+      "RolePermissionChangeImpactV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "affectedUsers": {
+            "type": "integer"
+          },
+          "conflictCount": {
+            "type": "integer"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "previewId",
+          "severity",
+          "affectedUsers",
+          "conflictCount",
+          "expectedRevision",
+          "impactHash",
+          "expiresAt"
+        ]
+      },
+      "RolePermissionChangeImpactV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RolePermissionChangeImpactV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1
+          }
+        }
+      },
+      "RolePermissionChangeImpactV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version",
+          "arguments"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.authorization.role-permission-change.impact"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/RolePermissionChangeImpactV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "roles",
+          "permission": "admin:role:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "timeoutMs": 2000
+        }
+      },
+      "AuthorizationResourceLifecycleImpactV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "previewId"
+        ]
+      },
+      "AuthorizationResourceLifecycleImpactV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "affectedUsers": {
+            "type": "integer"
+          },
+          "conflictCount": {
+            "type": "integer"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "string"
+          },
+          "resourceCode": {
+            "type": "string"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "referenceCount": {
+            "type": "integer"
+          },
+          "retentionElapsed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "previewId",
+          "severity",
+          "affectedUsers",
+          "conflictCount",
+          "expectedRevision",
+          "impactHash",
+          "expiresAt",
+          "resource",
+          "resourceCode",
+          "operation",
+          "referenceCount",
+          "retentionElapsed"
+        ]
+      },
+      "AuthorizationResourceLifecycleImpactV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthorizationResourceLifecycleImpactV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1
+          }
+        }
+      },
+      "AuthorizationResourceLifecycleImpactV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version",
+          "arguments"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.authorization.resource-lifecycle.impact"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/AuthorizationResourceLifecycleImpactV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "authorization-lifecycle",
+          "permission": "admin:authorization-lifecycle:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "timeoutMs": 2000
+        }
+      },
       "ReferenceRecordsRenameV1_0_0Arguments": {
         "type": "object",
         "additionalProperties": false,
@@ -9552,10 +10344,1440 @@
           "maxAffectedRows": 1
         }
       },
+      "OrganizationRoleGroupChangePrepareV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "orgUnitCode": {
+            "type": "string",
+            "maxLength": 191
+          },
+          "roleGroupCodes": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 2000,
+            "items": {
+              "type": "string",
+              "maxLength": 191
+            }
+          },
+          "remediations": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 2000,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "userCode",
+                    "roleCode",
+                    "action"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "userCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "roleCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "action": {
+                      "type": "string",
+                      "const": "remove-role"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "userCode",
+                    "roleCode",
+                    "action",
+                    "replacementRoleCode"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "userCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "roleCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "action": {
+                      "type": "string",
+                      "const": "replace-role"
+                    },
+                    "replacementRoleCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "orgUnitCode",
+          "roleGroupCodes"
+        ]
+      },
+      "OrganizationRoleGroupChangePrepareV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "previewId",
+          "expectedRevision",
+          "impactHash",
+          "expiresAt"
+        ]
+      },
+      "OrganizationRoleGroupChangePrepareV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/OrganizationRoleGroupChangePrepareV1_0_0Values"
+          }
+        }
+      },
+      "OrganizationRoleGroupChangePrepareV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.identity.organization-role-group-change.prepare"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/OrganizationRoleGroupChangePrepareV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "org-units",
+          "permission": "admin:org-unit:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 5000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000,
+          "operationPhase": "prepare"
+        }
+      },
+      "OrganizationRoleGroupsReplaceV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "previewId",
+          "expectedRevision",
+          "impactHash"
+        ]
+      },
+      "OrganizationRoleGroupsReplaceV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "previewId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "applied",
+          "revision",
+          "previewId"
+        ]
+      },
+      "OrganizationRoleGroupsReplaceV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/OrganizationRoleGroupsReplaceV1_0_0Values"
+          }
+        }
+      },
+      "OrganizationRoleGroupsReplaceV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.identity.organization-role-groups.replace"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/OrganizationRoleGroupsReplaceV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "org-units",
+          "permission": "admin:org-unit:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 10000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000,
+          "operationPhase": "apply"
+        }
+      },
+      "UserOrganizationChangePrepareV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userCode": {
+            "type": "string",
+            "maxLength": 191
+          },
+          "orgUnitCode": {
+            "type": "string",
+            "maxLength": 191
+          },
+          "roleCodes": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 2000,
+            "items": {
+              "type": "string",
+              "maxLength": 191
+            }
+          },
+          "remediations": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 2000,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "userCode",
+                    "roleCode",
+                    "action"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "userCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "roleCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "action": {
+                      "type": "string",
+                      "const": "remove-role"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "userCode",
+                    "roleCode",
+                    "action",
+                    "replacementRoleCode"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "userCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "roleCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "action": {
+                      "type": "string",
+                      "const": "replace-role"
+                    },
+                    "replacementRoleCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "userCode",
+          "orgUnitCode",
+          "roleCodes"
+        ]
+      },
+      "UserOrganizationChangePrepareV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "previewId",
+          "expectedRevision",
+          "impactHash",
+          "expiresAt"
+        ]
+      },
+      "UserOrganizationChangePrepareV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/UserOrganizationChangePrepareV1_0_0Values"
+          }
+        }
+      },
+      "UserOrganizationChangePrepareV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.identity.user-organization-change.prepare"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/UserOrganizationChangePrepareV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "users",
+          "permission": "admin:user:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 5000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000,
+          "operationPhase": "prepare"
+        }
+      },
+      "RoleStateOrGroupChangePrepareV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleCode": {
+            "type": "string",
+            "maxLength": 191
+          },
+          "operation": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "targetGroupCode": {
+            "type": "string",
+            "maxLength": 191
+          },
+          "remediations": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 2000,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "userCode",
+                    "roleCode",
+                    "action"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "userCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "roleCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "action": {
+                      "type": "string",
+                      "const": "remove-role"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "userCode",
+                    "roleCode",
+                    "action",
+                    "replacementRoleCode"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "userCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "roleCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "action": {
+                      "type": "string",
+                      "const": "replace-role"
+                    },
+                    "replacementRoleCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "roleCode",
+          "operation"
+        ]
+      },
+      "RoleStateOrGroupChangePrepareV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "previewId",
+          "expectedRevision",
+          "impactHash",
+          "expiresAt"
+        ]
+      },
+      "RoleStateOrGroupChangePrepareV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/RoleStateOrGroupChangePrepareV1_0_0Values"
+          }
+        }
+      },
+      "RoleStateOrGroupChangePrepareV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.identity.role-state-or-group-change.prepare"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/RoleStateOrGroupChangePrepareV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "roles",
+          "permission": "admin:role:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 5000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000,
+          "operationPhase": "prepare"
+        }
+      },
+      "UserOrganizationChangeV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "previewId",
+          "expectedRevision",
+          "impactHash"
+        ]
+      },
+      "UserOrganizationChangeV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "previewId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "applied",
+          "revision",
+          "previewId"
+        ]
+      },
+      "UserOrganizationChangeV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/UserOrganizationChangeV1_0_0Values"
+          }
+        }
+      },
+      "UserOrganizationChangeV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.identity.user-organization.change"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/UserOrganizationChangeV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "users",
+          "permission": "admin:user:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 10000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000,
+          "operationPhase": "apply"
+        }
+      },
+      "RoleMoveV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "previewId",
+          "expectedRevision",
+          "impactHash"
+        ]
+      },
+      "RoleMoveV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "previewId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "applied",
+          "revision",
+          "previewId"
+        ]
+      },
+      "RoleMoveV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/RoleMoveV1_0_0Values"
+          }
+        }
+      },
+      "RoleMoveV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.identity.role.move"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/RoleMoveV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "roles",
+          "permission": "admin:role:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 10000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000,
+          "operationPhase": "apply"
+        }
+      },
+      "RoleDisableV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "previewId",
+          "expectedRevision",
+          "impactHash"
+        ]
+      },
+      "RoleDisableV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "previewId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "applied",
+          "revision",
+          "previewId"
+        ]
+      },
+      "RoleDisableV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/RoleDisableV1_0_0Values"
+          }
+        }
+      },
+      "RoleDisableV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.identity.role.disable"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/RoleDisableV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "roles",
+          "permission": "admin:role:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 10000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000,
+          "operationPhase": "apply"
+        }
+      },
+      "RolePermissionChangePrepareV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleCode": {
+            "type": "string",
+            "maxLength": 191
+          },
+          "permissionCodes": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 2000,
+            "items": {
+              "type": "string",
+              "maxLength": 191
+            }
+          }
+        },
+        "required": [
+          "roleCode",
+          "permissionCodes"
+        ]
+      },
+      "RolePermissionChangePrepareV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "previewId",
+          "expectedRevision",
+          "impactHash",
+          "expiresAt"
+        ]
+      },
+      "RolePermissionChangePrepareV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/RolePermissionChangePrepareV1_0_0Values"
+          }
+        }
+      },
+      "RolePermissionChangePrepareV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.authorization.role-permission-change.prepare"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/RolePermissionChangePrepareV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "roles",
+          "permission": "admin:role:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 5000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000,
+          "operationPhase": "prepare"
+        }
+      },
+      "RolePermissionsReplaceV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "previewId",
+          "expectedRevision",
+          "impactHash"
+        ]
+      },
+      "RolePermissionsReplaceV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "previewId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "applied",
+          "revision",
+          "previewId"
+        ]
+      },
+      "RolePermissionsReplaceV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/RolePermissionsReplaceV1_0_0Values"
+          }
+        }
+      },
+      "RolePermissionsReplaceV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.authorization.role-permissions.replace"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/RolePermissionsReplaceV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "roles",
+          "permission": "admin:role:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 10000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000,
+          "operationPhase": "apply"
+        }
+      },
+      "AuthorizationResourceLifecyclePrepareV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "resource": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "resourceCode": {
+            "type": "string",
+            "maxLength": 191
+          },
+          "operation": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "retentionDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 36500
+          },
+          "policyVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "remediations": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 2000,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "userCode",
+                    "roleCode",
+                    "action"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "userCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "roleCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "action": {
+                      "type": "string",
+                      "const": "remove-role"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "userCode",
+                    "roleCode",
+                    "action",
+                    "replacementRoleCode"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "userCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "roleCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    },
+                    "action": {
+                      "type": "string",
+                      "const": "replace-role"
+                    },
+                    "replacementRoleCode": {
+                      "type": "string",
+                      "maxLength": 191
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "resource",
+          "resourceCode",
+          "operation"
+        ]
+      },
+      "AuthorizationResourceLifecyclePrepareV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "previewId",
+          "expectedRevision",
+          "impactHash",
+          "expiresAt"
+        ]
+      },
+      "AuthorizationResourceLifecyclePrepareV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/AuthorizationResourceLifecyclePrepareV1_0_0Values"
+          }
+        }
+      },
+      "AuthorizationResourceLifecyclePrepareV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.authorization.resource-lifecycle.prepare"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/AuthorizationResourceLifecyclePrepareV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "authorization-lifecycle",
+          "permission": "admin:authorization-lifecycle:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 5000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000,
+          "operationPhase": "prepare"
+        }
+      },
+      "AuthorizationResourceLifecycleApplyV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "previewId",
+          "expectedRevision",
+          "impactHash"
+        ]
+      },
+      "AuthorizationResourceLifecycleApplyV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "previewId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "applied",
+          "revision",
+          "previewId"
+        ]
+      },
+      "AuthorizationResourceLifecycleApplyV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/AuthorizationResourceLifecycleApplyV1_0_0Values"
+          }
+        }
+      },
+      "AuthorizationResourceLifecycleApplyV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.authorization.resource-lifecycle.apply"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/AuthorizationResourceLifecycleApplyV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "authorization-lifecycle",
+          "permission": "admin:authorization-lifecycle:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 10000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000,
+          "operationPhase": "apply"
+        }
+      },
       "AdminServiceObjectQueryRequest": {
         "oneOf": [
           {
             "$ref": "#/components/schemas/ReferenceRecordsListV1_0_0QueryRequest"
+          },
+          {
+            "$ref": "#/components/schemas/OrganizationRolePoolGetV1_0_0QueryRequest"
+          },
+          {
+            "$ref": "#/components/schemas/OrganizationRoleGroupChangeImpactV1_0_0QueryRequest"
+          },
+          {
+            "$ref": "#/components/schemas/UserOrganizationChangeImpactV1_0_0QueryRequest"
+          },
+          {
+            "$ref": "#/components/schemas/RoleStateOrGroupChangeImpactV1_0_0QueryRequest"
+          },
+          {
+            "$ref": "#/components/schemas/RolePermissionChangeImpactV1_0_0QueryRequest"
+          },
+          {
+            "$ref": "#/components/schemas/AuthorizationResourceLifecycleImpactV1_0_0QueryRequest"
           }
         ],
         "x-platform-discriminator": {
@@ -9567,13 +11789,43 @@
             {
               "queryId": "platform.reference-records.list",
               "version": "1.0.0"
+            },
+            {
+              "queryId": "platform.identity.organization-role-pool.get",
+              "version": "1.0.0"
+            },
+            {
+              "queryId": "platform.identity.organization-role-group-change.impact",
+              "version": "1.0.0"
+            },
+            {
+              "queryId": "platform.identity.user-organization-change.impact",
+              "version": "1.0.0"
+            },
+            {
+              "queryId": "platform.identity.role-state-or-group-change.impact",
+              "version": "1.0.0"
+            },
+            {
+              "queryId": "platform.authorization.role-permission-change.impact",
+              "version": "1.0.0"
+            },
+            {
+              "queryId": "platform.authorization.resource-lifecycle.impact",
+              "version": "1.0.0"
             }
           ]
         },
         "discriminator": {
           "propertyName": "queryId",
           "mapping": {
-            "platform.reference-records.list": "#/components/schemas/ReferenceRecordsListV1_0_0QueryRequest"
+            "platform.reference-records.list": "#/components/schemas/ReferenceRecordsListV1_0_0QueryRequest",
+            "platform.identity.organization-role-pool.get": "#/components/schemas/OrganizationRolePoolGetV1_0_0QueryRequest",
+            "platform.identity.organization-role-group-change.impact": "#/components/schemas/OrganizationRoleGroupChangeImpactV1_0_0QueryRequest",
+            "platform.identity.user-organization-change.impact": "#/components/schemas/UserOrganizationChangeImpactV1_0_0QueryRequest",
+            "platform.identity.role-state-or-group-change.impact": "#/components/schemas/RoleStateOrGroupChangeImpactV1_0_0QueryRequest",
+            "platform.authorization.role-permission-change.impact": "#/components/schemas/RolePermissionChangeImpactV1_0_0QueryRequest",
+            "platform.authorization.resource-lifecycle.impact": "#/components/schemas/AuthorizationResourceLifecycleImpactV1_0_0QueryRequest"
           }
         }
       },
@@ -9581,6 +11833,39 @@
         "oneOf": [
           {
             "$ref": "#/components/schemas/ReferenceRecordsRenameV1_0_0CommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/OrganizationRoleGroupChangePrepareV1_0_0CommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/OrganizationRoleGroupsReplaceV1_0_0CommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/UserOrganizationChangePrepareV1_0_0CommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/RoleStateOrGroupChangePrepareV1_0_0CommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/UserOrganizationChangeV1_0_0CommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/RoleMoveV1_0_0CommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/RoleDisableV1_0_0CommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/RolePermissionChangePrepareV1_0_0CommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/RolePermissionsReplaceV1_0_0CommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/AuthorizationResourceLifecyclePrepareV1_0_0CommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/AuthorizationResourceLifecycleApplyV1_0_0CommandRequest"
           }
         ],
         "x-platform-discriminator": {
@@ -9592,13 +11877,68 @@
             {
               "commandId": "platform.reference-records.rename",
               "version": "1.0.0"
+            },
+            {
+              "commandId": "platform.identity.organization-role-group-change.prepare",
+              "version": "1.0.0"
+            },
+            {
+              "commandId": "platform.identity.organization-role-groups.replace",
+              "version": "1.0.0"
+            },
+            {
+              "commandId": "platform.identity.user-organization-change.prepare",
+              "version": "1.0.0"
+            },
+            {
+              "commandId": "platform.identity.role-state-or-group-change.prepare",
+              "version": "1.0.0"
+            },
+            {
+              "commandId": "platform.identity.user-organization.change",
+              "version": "1.0.0"
+            },
+            {
+              "commandId": "platform.identity.role.move",
+              "version": "1.0.0"
+            },
+            {
+              "commandId": "platform.identity.role.disable",
+              "version": "1.0.0"
+            },
+            {
+              "commandId": "platform.authorization.role-permission-change.prepare",
+              "version": "1.0.0"
+            },
+            {
+              "commandId": "platform.authorization.role-permissions.replace",
+              "version": "1.0.0"
+            },
+            {
+              "commandId": "platform.authorization.resource-lifecycle.prepare",
+              "version": "1.0.0"
+            },
+            {
+              "commandId": "platform.authorization.resource-lifecycle.apply",
+              "version": "1.0.0"
             }
           ]
         },
         "discriminator": {
           "propertyName": "commandId",
           "mapping": {
-            "platform.reference-records.rename": "#/components/schemas/ReferenceRecordsRenameV1_0_0CommandRequest"
+            "platform.reference-records.rename": "#/components/schemas/ReferenceRecordsRenameV1_0_0CommandRequest",
+            "platform.identity.organization-role-group-change.prepare": "#/components/schemas/OrganizationRoleGroupChangePrepareV1_0_0CommandRequest",
+            "platform.identity.organization-role-groups.replace": "#/components/schemas/OrganizationRoleGroupsReplaceV1_0_0CommandRequest",
+            "platform.identity.user-organization-change.prepare": "#/components/schemas/UserOrganizationChangePrepareV1_0_0CommandRequest",
+            "platform.identity.role-state-or-group-change.prepare": "#/components/schemas/RoleStateOrGroupChangePrepareV1_0_0CommandRequest",
+            "platform.identity.user-organization.change": "#/components/schemas/UserOrganizationChangeV1_0_0CommandRequest",
+            "platform.identity.role.move": "#/components/schemas/RoleMoveV1_0_0CommandRequest",
+            "platform.identity.role.disable": "#/components/schemas/RoleDisableV1_0_0CommandRequest",
+            "platform.authorization.role-permission-change.prepare": "#/components/schemas/RolePermissionChangePrepareV1_0_0CommandRequest",
+            "platform.authorization.role-permissions.replace": "#/components/schemas/RolePermissionsReplaceV1_0_0CommandRequest",
+            "platform.authorization.resource-lifecycle.prepare": "#/components/schemas/AuthorizationResourceLifecyclePrepareV1_0_0CommandRequest",
+            "platform.authorization.resource-lifecycle.apply": "#/components/schemas/AuthorizationResourceLifecycleApplyV1_0_0CommandRequest"
           }
         }
       },
@@ -9606,6 +11946,24 @@
         "oneOf": [
           {
             "$ref": "#/components/schemas/ReferenceRecordsListV1_0_0QueryData"
+          },
+          {
+            "$ref": "#/components/schemas/OrganizationRolePoolGetV1_0_0QueryData"
+          },
+          {
+            "$ref": "#/components/schemas/OrganizationRoleGroupChangeImpactV1_0_0QueryData"
+          },
+          {
+            "$ref": "#/components/schemas/UserOrganizationChangeImpactV1_0_0QueryData"
+          },
+          {
+            "$ref": "#/components/schemas/RoleStateOrGroupChangeImpactV1_0_0QueryData"
+          },
+          {
+            "$ref": "#/components/schemas/RolePermissionChangeImpactV1_0_0QueryData"
+          },
+          {
+            "$ref": "#/components/schemas/AuthorizationResourceLifecycleImpactV1_0_0QueryData"
           }
         ]
       },
@@ -9613,6 +11971,39 @@
         "oneOf": [
           {
             "$ref": "#/components/schemas/ReferenceRecordsRenameV1_0_0CommandData"
+          },
+          {
+            "$ref": "#/components/schemas/OrganizationRoleGroupChangePrepareV1_0_0CommandData"
+          },
+          {
+            "$ref": "#/components/schemas/OrganizationRoleGroupsReplaceV1_0_0CommandData"
+          },
+          {
+            "$ref": "#/components/schemas/UserOrganizationChangePrepareV1_0_0CommandData"
+          },
+          {
+            "$ref": "#/components/schemas/RoleStateOrGroupChangePrepareV1_0_0CommandData"
+          },
+          {
+            "$ref": "#/components/schemas/UserOrganizationChangeV1_0_0CommandData"
+          },
+          {
+            "$ref": "#/components/schemas/RoleMoveV1_0_0CommandData"
+          },
+          {
+            "$ref": "#/components/schemas/RoleDisableV1_0_0CommandData"
+          },
+          {
+            "$ref": "#/components/schemas/RolePermissionChangePrepareV1_0_0CommandData"
+          },
+          {
+            "$ref": "#/components/schemas/RolePermissionsReplaceV1_0_0CommandData"
+          },
+          {
+            "$ref": "#/components/schemas/AuthorizationResourceLifecyclePrepareV1_0_0CommandData"
+          },
+          {
+            "$ref": "#/components/schemas/AuthorizationResourceLifecycleApplyV1_0_0CommandData"
           }
         ]
       },
@@ -16819,6 +19210,11 @@
   "x-source": "resources/generated/admin-resource-contract.json",
   "x-service-object-definition-source": "scripts/admin-service-object-definitions.mjs",
   "x-service-object-runtime-reference": "internal/platform/serviceobject/reference.go",
+  "x-service-object-runtime-sources": [
+    "internal/platform/serviceobject/reference.go",
+    "internal/platform/organizationrbac/service_objects.go",
+    "internal/platform/organizationrbac/lifecycle_service_objects.go"
+  ],
   "x-source-version": "0.1.0",
   "x-source-updated-at": "2026-07-06",
   "x-stack": {

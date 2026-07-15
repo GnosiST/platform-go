@@ -1,7 +1,7 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-organization-rbac-menu-contract.json",
   "capturedAt": "2026-07-15",
-  "status": "design-frozen-runtime-pending",
+  "status": "backend-and-migration-implemented-ui-menu-e2e-pending",
   "taskId": "organization-rbac-menu-contract-and-migration-design",
   "purpose": "Freeze the organization role-pool, derived-tenant, strict role tree, independent menu assignment, permission boundary, conflict and migration contracts before runtime implementation.",
   "designEvidence": [
@@ -417,10 +417,13 @@
     ]
   },
   "runtimeBoundary": {
-    "implementationStatus": "contract-only",
+    "implementationStatus": "backend-and-migration-implemented-ui-menu-e2e-pending",
+    "backendAndMigrationStatus": "implemented",
+    "adminUIStatus": "pending",
+    "menuRuntimeStatus": "pending",
+    "browserQAStatus": "pending",
     "implementedByThisNode": ["design-docs", "machine-contract", "validator", "mutation-tests", "task-governance-closeout"],
     "deferredTaskIds": [
-      "organization-role-pool-backend-and-migration",
       "organization-user-admin-experience",
       "role-tree-and-authorization-entry",
       "menu-tree-and-button-permission-configuration",
@@ -437,6 +440,19 @@
       "docs/superpowers/specs/2026-07-15-organization-rbac-menu-contract-and-migration-design.md"
     ],
     "validators": ["scripts/validate-platform-organization-rbac-menu-contract.mjs"],
-    "tests": ["scripts/platform-organization-rbac-menu-contract.test.mjs"]
+    "tests": [
+      "scripts/platform-organization-rbac-menu-contract.test.mjs",
+      "internal/platform/organizationrbac/validation_test.go",
+      "internal/platform/organizationrbac/gorm_repository_test.go",
+      "internal/platform/organizationrbac/migration_test.go",
+      "internal/platform/organizationrbac/service_objects_test.go",
+      "internal/platform/organizationrbac/authorization_service_objects_test.go",
+      "internal/platform/organizationrbac/lifecycle_mutations_test.go",
+      "internal/platform/organizationrbac/admin_user_snapshot_test.go",
+      "internal/platform/serviceobject/domain_command_test.go",
+      "internal/platform/bootstrap/organization_rbac_test.go",
+      "internal/platform/bootstrap/admin_resources_test.go",
+      "internal/platform/httpapi/service_objects_test.go"
+    ]
   }
 }

@@ -1,9 +1,11 @@
 package bootstrap
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,12 +13,15 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"platform-go/internal/platform/adminresource"
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/config"
 	"platform-go/internal/platform/core"
 	"platform-go/internal/platform/dataprotection"
+	"platform-go/internal/platform/organizationrbac"
+	"platform-go/internal/platform/storage"
 )
 
 func TestAdminResourcesFromConfigUsesMemoryStoreByDefault(t *testing.T) {
@@ -121,6 +126,108 @@ func TestAdminResourcesFromConfigUsesGORMStoreForSupportedDrivers(t *testing.T) 
 		}
 	}
 	t.Fatalf("menus after GORM reload = %+v, want /users", menus)
+}
+
+func TestAdminResourcesFromConfigRequiresPreparedOrganizationRBACTarget(t *testing.T) {
+	dsn := filepath.Join(t.TempDir(), "organization-rbac.db")
+	cfg := config.Config{
+		AdminResourceDriver:  "sqlite",
+		AdminResourceDSN:     dsn,
+		OrganizationRBACMode: config.OrganizationRBACModeTarget,
+	}
+	if _, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), nil); err == nil {
+		t.Fatal("AdminResourcesFromConfig(unprepared target) error = nil")
+	}
+
+	db, err := storage.OpenGORM(storage.Config{Driver: "sqlite", DSN: dsn})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	repository, err := adminresource.NewGORMAdminResourceRepository(context.Background(), db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.Save(context.Background(), adminresource.ResourceSnapshot{
+		NextID: 1000,
+		Resources: map[string][]adminresource.Record{
+			"org-units": {{
+				ID: "org-tenant-hq", Code: "tenant-hq", Name: "Tenant HQ", Status: "enabled",
+				Values: map[string]string{"type": "company", "tenantCode": "tenant-a", "sortOrder": "1"},
+			}},
+			"role-groups": {{
+				ID: "group-tenant-ops", Code: "tenant-ops", Name: "Tenant Ops", Status: "enabled",
+				Values: map[string]string{"sortOrder": "1"},
+			}},
+			"roles": {{
+				ID: "role-operator", Code: "tenant-operator", Name: "Tenant Operator", Status: "enabled",
+				Values: map[string]string{"groupCode": "tenant-ops", "dataScope": "organization", "permissions": "admin:user:read"},
+			}},
+		},
+	}); err != nil {
+		t.Fatalf("seed minimal legacy snapshot: %v", err)
+	}
+	if _, err := organizationrbac.PrepareGORMRepository(context.Background(), db); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Table("platform_admin_role_groups").Where("code = ?", "tenant-ops").Updates(map[string]any{
+		"scope_type": "tenant", "tenant_code": "tenant-a",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), nil)
+	if err != nil {
+		t.Fatalf("AdminResourcesFromConfig(prepared target) error = %v", err)
+	}
+	if _, err := store.Update("roles", "role-operator", adminresource.WriteInput{
+		Name: "Changed Outside Domain", Status: "enabled",
+		Values: map[string]string{"groupCode": "operations", "dataScope": "all", "permissions": "admin:*"},
+	}); !errors.Is(err, adminresource.ErrDomainOwnedMutation) {
+		t.Fatalf("Update(domain-owned role) error = %v, want ErrDomainOwnedMutation", err)
+	}
+	organizationRepository, err := organizationrbac.OpenGORMRepository(context.Background(), db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report, err := organizationRepository.ValidateCutover(context.Background()); err != nil {
+		t.Fatalf("ValidateCutover() error = %v, report = %+v", err, report)
+	}
+	if _, err := organizationRepository.ReplaceOrgUnitRoleGroups(context.Background(), organizationrbac.ReplaceOrgUnitRoleGroupsRequest{
+		OrgUnitCode: "tenant-hq", RoleGroupCodes: []string{"tenant-ops"}, ExpectedRevision: 0, ActorID: "admin", ChangedAt: time.Now(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	derived, err := organizationRepository.DeriveAndValidateUser(context.Background(), organizationrbac.User{
+		Code: "tenant-user", ScopeType: organizationrbac.ScopeTenant, OrgUnitCode: "tenant-hq", Status: "enabled",
+	}, []string{"tenant-operator"})
+	if err != nil {
+		t.Fatalf("DeriveAndValidateUser(target tenant user) error = %v", err)
+	}
+	if derived.TenantCode != "tenant-a" {
+		t.Fatalf("DeriveAndValidateUser(target tenant user).TenantCode = %q, want tenant-a", derived.TenantCode)
+	}
+	created, err := store.Create("users", adminresource.WriteInput{
+		Code: "tenant-user", Name: "Tenant User", Status: "enabled",
+		Values: map[string]string{
+			"tenantCode": "tenant-a", "orgUnitCode": "tenant-hq", "roles": "tenant-operator",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Create(target tenant user) error = %v", err)
+	}
+	if _, err := store.Update("users", created.ID, adminresource.WriteInput{
+		Code: created.Code, Name: created.Name, Status: created.Status,
+		Values: map[string]string{
+			"tenantCode": "tenant-a", "orgUnitCode": "tenant-hq", "roles": "",
+		},
+	}); !errors.Is(err, adminresource.ErrDomainOwnedMutation) {
+		t.Fatalf("Update(target user authorization) error = %v, want ErrDomainOwnedMutation", err)
+	}
 }
 
 func TestAdminResourcesFromConfigRejectsSQLStoreWithoutDSN(t *testing.T) {

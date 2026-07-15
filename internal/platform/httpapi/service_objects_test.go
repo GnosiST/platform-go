@@ -149,6 +149,27 @@ func TestAdminServiceObjectRateLimitCannotBeBypassedByChangingObjectID(t *testin
 	}
 }
 
+func TestAuthorizationServiceObjectCommandsUseOneInvalidationChannel(t *testing.T) {
+	for _, commandID := range []string{
+		"platform.identity.organization-role-groups.replace",
+		"platform.authorization.role-permissions.replace",
+		"platform.navigation.role-menus.replace",
+	} {
+		if !isAuthorizationServiceObjectCommand(commandID) {
+			t.Fatalf("isAuthorizationServiceObjectCommand(%q) = false", commandID)
+		}
+	}
+	for _, commandID := range []string{
+		"platform.identity.organization-role-group-change.prepare",
+		"platform.reference-records.rename",
+		"platform.integration.replay",
+	} {
+		if isAuthorizationServiceObjectCommand(commandID) {
+			t.Fatalf("isAuthorizationServiceObjectCommand(%q) = true", commandID)
+		}
+	}
+}
+
 func loginServiceObjectAdmin(t *testing.T, server *Server) string {
 	t.Helper()
 	recorder := httptest.NewRecorder()

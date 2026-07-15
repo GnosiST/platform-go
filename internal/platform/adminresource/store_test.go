@@ -404,6 +404,10 @@ func TestCoreRuntimeSchemasExposeGovernanceTopology(t *testing.T) {
 	requireRelationField(t, orgUnits, "tenantCode", "tenants", "", false, true)
 	requireRelationField(t, orgUnits, "parentCode", "org-units", "tree", false, false)
 	requireRelationField(t, orgUnits, "areaCode", "area-codes", "tree", false, false)
+	requireRelationField(t, orgUnits, "roleGroupCodes", "role-groups", "", true, false)
+	if field := fieldByKey(orgUnits.Fields, "roleGroupCodes"); field == nil || !field.ReadOnly || field.InForm {
+		t.Fatalf("org-units roleGroupCodes must be a read-only domain projection: %+v", field)
+	}
 
 	roleGroups, err := store.Schema("role-groups")
 	if err != nil {
@@ -412,11 +416,20 @@ func TestCoreRuntimeSchemasExposeGovernanceTopology(t *testing.T) {
 	requireRelationField(t, roleGroups, "parentCode", "role-groups", "tree", false, false)
 	for _, field := range roleGroups.Fields {
 		key := strings.ToLower(field.Key)
-		for _, forbidden := range []string{"permission", "datascope", "scope", "inherit", "membership", "membercodes", "usercodes"} {
+		for _, forbidden := range []string{"permission", "datascope", "inherit", "membership", "membercodes", "usercodes"} {
 			if strings.Contains(key, forbidden) {
 				t.Fatalf("role-groups field %q adds policy semantics; role groups must remain classification-only", field.Key)
 			}
 		}
+	}
+	for _, key := range []string{"scopeType", "tenantCode"} {
+		field := fieldByKey(roleGroups.Fields, key)
+		if field == nil || !field.ReadOnly || field.InForm {
+			t.Fatalf("role-groups %s must be a read-only ownership projection: %+v", key, field)
+		}
+	}
+	if field := fieldByKey(store.schemas["users"].Fields, "scopeType"); field == nil || !field.ReadOnly || field.InForm {
+		t.Fatalf("users scopeType must be a read-only ownership projection: %+v", field)
 	}
 
 	roles, err := store.Schema("roles")

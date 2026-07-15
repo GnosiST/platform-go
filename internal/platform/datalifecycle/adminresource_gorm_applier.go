@@ -31,7 +31,7 @@ func (a *GORMAdminResourceApplier) ApplyAndCheckpoint(ctx context.Context, reque
 		return ApplyResult{}, ErrApplyFailed
 	}
 	resource := request.Batch.Candidates[0].Resource
-	if resource == "" || resource == "files" {
+	if resource == "" || resource == "files" || adminresource.RequiresGovernedLifecycleCommand(resource) {
 		return ApplyResult{}, ErrApplyFailed
 	}
 	for _, candidate := range request.Batch.Candidates {

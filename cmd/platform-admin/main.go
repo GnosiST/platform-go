@@ -19,16 +19,18 @@ import (
 	"platform-go/internal/platform/datalifecycle"
 	"platform-go/internal/platform/dataprotection"
 	"platform-go/internal/platform/httpapi"
+	"platform-go/internal/platform/organizationrbac"
 	"platform-go/internal/platform/sensitivemigration"
 )
 
 const (
-	bindAdminOIDCCommand          = "bind-admin-oidc"
-	sensitiveDataMigrationCommand = "sensitive-data-migrate"
-	dataLifecycleCommand          = "data-lifecycle"
-	dataLifecyclePrepareOperation = "prepare"
-	dataLifecyclePromoteOperation = "promote"
-	maximumLifecyclePolicyBytes   = 1 << 20
+	bindAdminOIDCCommand             = "bind-admin-oidc"
+	sensitiveDataMigrationCommand    = "sensitive-data-migrate"
+	dataLifecycleCommand             = "data-lifecycle"
+	organizationRBACMigrationCommand = "organization-rbac-migrate"
+	dataLifecyclePrepareOperation    = "prepare"
+	dataLifecyclePromoteOperation    = "promote"
+	maximumLifecyclePolicyBytes      = 1 << 20
 )
 
 type adminResourcesLoader func(config.Config, []capability.Manifest, dataprotection.Runtime) (*adminresource.Store, error)
@@ -52,6 +54,14 @@ type dataLifecycleSession interface {
 type dataLifecyclePreparer func(context.Context, config.Config) error
 type dataLifecycleOpener func(config.Config, ...capability.Manifest) (dataLifecycleSession, error)
 
+type organizationRBACMigrationSession interface {
+	RunMigration(context.Context, organizationrbac.MigrationMode, organizationrbac.MigrationManifest, organizationrbac.MigrationEvidence) (organizationrbac.MigrationReport, error)
+	Close() error
+}
+
+type organizationRBACPreparer func(context.Context, config.Config) error
+type organizationRBACMigrationOpener func(context.Context, config.Config) (organizationRBACMigrationSession, error)
+
 func main() {
 	if err := run(context.Background(), os.Args[1:], os.Stdin, os.Stdout, os.Stderr, config.Load); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
@@ -60,6 +70,16 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, loadConfig func() config.Config) error {
+	if len(args) > 0 && args[0] == organizationRBACMigrationCommand {
+		return runOrganizationRBACMigration(ctx, args, stdout, loadConfig, bootstrap.PrepareOrganizationRBAC,
+			func(ctx context.Context, cfg config.Config) (organizationRBACMigrationSession, error) {
+				runtime, err := bootstrap.OpenOrganizationRBACMigration(ctx, cfg)
+				if err != nil {
+					return nil, err
+				}
+				return &organizationRBACMigrationAdapter{runtime: runtime}, nil
+			})
+	}
 	return runWithPlatformDependencies(ctx, args, stdin, stdout, stderr, loadConfig, bootstrap.AdminResourcesFromConfig,
 		func(cfg config.Config, manifests ...capability.Manifest) (sensitiveMigrationSession, error) {
 			return bootstrap.OpenSensitiveDataMigration(cfg, manifests...)
@@ -68,6 +88,16 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 			return bootstrap.OpenDataLifecycle(cfg, manifests...)
 		})
 }
+
+type organizationRBACMigrationAdapter struct {
+	runtime *bootstrap.OrganizationRBACMigration
+}
+
+func (a *organizationRBACMigrationAdapter) RunMigration(ctx context.Context, mode organizationrbac.MigrationMode, manifest organizationrbac.MigrationManifest, evidence organizationrbac.MigrationEvidence) (organizationrbac.MigrationReport, error) {
+	return a.runtime.Repository.RunMigration(ctx, mode, manifest, evidence)
+}
+
+func (a *organizationRBACMigrationAdapter) Close() error { return a.runtime.Close() }
 
 func runWithAdminResources(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, loadConfig func() config.Config, loadAdminResources adminResourcesLoader) error {
 	return runWithDependencies(ctx, args, stdin, stdout, stderr, loadConfig, loadAdminResources,
@@ -252,6 +282,86 @@ func runSensitiveDataMigration(ctx context.Context, args []string, stdout, stder
 	if closeErr != nil {
 		return errors.New("close sensitive data migration storage")
 	}
+	return nil
+}
+
+func runOrganizationRBACMigration(ctx context.Context, args []string, stdout io.Writer, loadConfig func() config.Config, prepare organizationRBACPreparer, open organizationRBACMigrationOpener) error {
+	flags := flag.NewFlagSet(organizationRBACMigrationCommand, flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	modeValue := flags.String("mode", "", "prepare, inventory, verify, apply, or rollback")
+	manifestPath := flags.String("manifest", "", "versioned migration manifest JSON")
+	runID := flags.String("run-id", "", "immutable migration run ID")
+	actor := flags.String("actor", "", "operator actor ID")
+	reason := flags.String("reason", "", "approved migration reason")
+	approvalRef := flags.String("approval-ref", "", "approval reference")
+	backupURI := flags.String("backup-uri", "", "external backup URI")
+	backupHash := flags.String("backup-sha256", "", "external backup SHA-256")
+	checkpointRef := flags.String("checkpoint-ref", "", "reviewed database checkpoint or restore rehearsal reference")
+	if err := flags.Parse(args[1:]); err != nil || len(flags.Args()) != 0 {
+		return errors.New("invalid organization-rbac-migrate arguments")
+	}
+	if loadConfig == nil || prepare == nil || open == nil {
+		return errors.New("organization rbac migration bootstrap is unavailable")
+	}
+	cfg := loadConfig()
+	if *modeValue == "prepare" {
+		if strings.TrimSpace(*manifestPath) != "" || strings.TrimSpace(*runID) != "" {
+			return errors.New("organization rbac prepare does not accept manifest or run identity")
+		}
+		if err := prepare(ctx, cfg); err != nil {
+			return errors.New("organization rbac migration prepare failed")
+		}
+		return json.NewEncoder(stdout).Encode(map[string]string{"mode": "prepare", "status": "prepared"})
+	}
+	mode := organizationrbac.MigrationMode(*modeValue)
+	switch mode {
+	case organizationrbac.MigrationInventory, organizationrbac.MigrationVerify, organizationrbac.MigrationApply, organizationrbac.MigrationRollback:
+	default:
+		return errors.New("invalid organization rbac migration mode")
+	}
+	if strings.TrimSpace(*manifestPath) == "" {
+		return errors.New("organization rbac migration manifest is required")
+	}
+	manifestFile, err := os.Open(*manifestPath)
+	if err != nil {
+		return errors.New("open organization rbac migration manifest")
+	}
+	defer func() { _ = manifestFile.Close() }()
+	var manifest organizationrbac.MigrationManifest
+	decoder := json.NewDecoder(io.LimitReader(manifestFile, maximumLifecyclePolicyBytes))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&manifest); err != nil {
+		return errors.New("decode organization rbac migration manifest")
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		return errors.New("decode organization rbac migration manifest")
+	}
+	session, err := open(ctx, cfg)
+	if err != nil || session == nil {
+		return errors.New("organization rbac migration bootstrap failed")
+	}
+	closed := false
+	defer func() {
+		if !closed {
+			_ = session.Close()
+		}
+	}()
+	evidence := organizationrbac.MigrationEvidence{
+		RunID: *runID, ActorID: *actor, Reason: *reason, ApprovalRef: *approvalRef,
+		BackupURI: *backupURI, BackupSHA256: *backupHash, CheckpointRef: *checkpointRef, AppliedAt: time.Now().UTC(),
+	}
+	report, err := session.RunMigration(ctx, mode, manifest, evidence)
+	if err != nil {
+		return errors.New("organization rbac migration failed")
+	}
+	if err := json.NewEncoder(stdout).Encode(report); err != nil {
+		return errors.New("write organization rbac migration report")
+	}
+	if err := session.Close(); err != nil {
+		return errors.New("close organization rbac migration storage")
+	}
+	closed = true
 	return nil
 }
 

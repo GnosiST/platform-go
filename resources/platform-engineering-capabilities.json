@@ -3141,17 +3141,53 @@
         "zh": "组织角色池后端约束与迁移",
         "en": "Organization Role Pool Backend And Migration"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Enforce organization role-group bindings, derived tenant integrity, assignable role pools and conflict-aware migrations across every backend entry point.",
       "dependsOn": [
         "organization-rbac-menu-contract-and-migration-design"
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "internal/platform/organizationrbac/model.go",
+          "internal/platform/organizationrbac/validation.go",
+          "internal/platform/organizationrbac/gorm_repository.go",
+          "internal/platform/organizationrbac/migration.go",
+          "internal/platform/organizationrbac/service_objects.go",
+          "internal/platform/organizationrbac/authorization_service_objects.go",
+          "internal/platform/organizationrbac/lifecycle_service_objects.go",
+          "internal/platform/organizationrbac/admin_user_snapshot.go",
+          "internal/platform/serviceobject/domain_command.go",
+          "internal/platform/bootstrap/organization_rbac.go",
+          "resources/platform-organization-rbac-menu-contract.json",
+          "docs/platform-organization-rbac-menu-contract.md",
+          "docs/platform-service-objects.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
+        "validators": [
+          "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+          "scripts/validate-platform-engineering-capabilities.mjs",
+          "scripts/validate-platform-foundation-task-graph.mjs"
+        ],
+        "tests": [
+          "internal/platform/organizationrbac/validation_test.go",
+          "internal/platform/organizationrbac/gorm_repository_test.go",
+          "internal/platform/organizationrbac/migration_test.go",
+          "internal/platform/organizationrbac/service_objects_test.go",
+          "internal/platform/organizationrbac/authorization_service_objects_test.go",
+          "internal/platform/organizationrbac/lifecycle_mutations_test.go",
+          "internal/platform/organizationrbac/admin_user_snapshot_test.go",
+          "internal/platform/serviceobject/domain_command_test.go",
+          "internal/platform/bootstrap/organization_rbac_test.go",
+          "internal/platform/bootstrap/admin_resources_test.go",
+          "internal/platform/httpapi/service_objects_test.go"
+        ],
+        "runtimeBoundary": {
+          "implementationStatus": "backend-and-migration-implemented",
+          "adminUI": "deferred-to-three-admin-ui-nodes",
+          "menuRuntime": "deferred-to-menu-tree-and-button-permission-configuration",
+          "browserQA": "deferred-to-organization-rbac-menu-e2e-qa"
+        },
         "taskIds": [
           "organization-role-pool-backend-and-migration"
         ]

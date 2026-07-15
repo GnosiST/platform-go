@@ -183,11 +183,19 @@ describe("platform organization RBAC menu contract", () => {
     assert.match(result.stderr, /accessibility\.keyboard must include Space/);
   });
 
-  it("rejects claiming a downstream runtime node is already implemented", () => {
+  it("rejects regressing the backend and migration node after closeout", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
-    graph.tasks.find((task) => task.id === "organization-role-pool-backend-and-migration").status = "implemented";
+    graph.tasks.find((task) => task.id === "organization-role-pool-backend-and-migration").status = "pending";
     const result = runValidator(["--task-graph", tempJSON("task-graph.json", graph)]);
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /downstream runtime\/UI task organization-role-pool-backend-and-migration must remain unfinished/);
+    assert.match(result.stderr, /organization-role-pool-backend-and-migration status must be implemented/);
+  });
+
+  it("rejects claiming a downstream UI node is already implemented", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    graph.tasks.find((task) => task.id === "organization-user-admin-experience").status = "implemented";
+    const result = runValidator(["--task-graph", tempJSON("task-graph.json", graph)]);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /downstream runtime\/UI task organization-user-admin-experience must remain unfinished/);
   });
 });

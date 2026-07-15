@@ -315,8 +315,8 @@ function validateGovernanceEvaluation(topology, errors) {
 
 function validateOrganizationRbacMenuMigration(topology, errors) {
   const migration = topology.organizationRbacMenuMigration ?? {};
-  if (migration.status !== "planned") {
-    errors.push("organizationRbacMenuMigration.status must stay planned until the migration node closes");
+  if (migration.status !== "backend-and-migration-implemented-ui-menu-e2e-pending") {
+    errors.push("organizationRbacMenuMigration.status must keep backend and migration implemented while UI, menu and E2E remain pending");
   }
   if (migration.designStatus !== "frozen") {
     errors.push("organizationRbacMenuMigration.designStatus must stay frozen after the contract node closes");

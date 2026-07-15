@@ -17,6 +17,7 @@ import (
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/config"
 	"platform-go/internal/platform/httpapi"
+	"platform-go/internal/platform/serviceobject"
 )
 
 func main() {
@@ -57,6 +58,14 @@ func main() {
 	}
 	if err := resources.ValidateProtectedData(context.Background()); err != nil {
 		log.Fatalf("validate protected admin resources: %v", err)
+	}
+	var organizationRBAC *bootstrap.OrganizationRBAC
+	if cfg.OrganizationRBACMode == config.OrganizationRBACModeTarget {
+		organizationRBAC, err = bootstrap.OpenOrganizationRBAC(ctx, cfg)
+		if err != nil {
+			log.Fatalf("open organization rbac runtime: %v", err)
+		}
+		defer func() { _ = organizationRBAC.Close() }()
 	}
 	adminIdentityResolver, err := authprovider.AdminIdentityResolverFromConfig(cfg)
 	if err != nil {
@@ -118,6 +127,10 @@ func main() {
 			log.Fatalf("build admin step-up phone resolver: %v", err)
 		}
 	}
+	var serviceObjects *serviceobject.Runtime
+	if organizationRBAC != nil {
+		serviceObjects = organizationRBAC.ServiceObjects
+	}
 	server := httpapi.New(httpapi.ServerOptions{
 		Capabilities:             ordered,
 		Resources:                resources,
@@ -136,6 +149,7 @@ func main() {
 		PhoneVerificationSender:  phoneVerification.Sender,
 		AdminStepUpPhoneResolver: adminStepUpPhoneResolver,
 		SensitiveReveal:          sensitiveReveal,
+		ServiceObjects:           serviceObjects,
 		DebugCodeEnabled:         phoneVerification.DebugCodeEnabled,
 		JWTSecret:                cfg.JWTSecret,
 		OpenAPIDocument:          openAPIDocument,

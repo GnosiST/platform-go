@@ -18,7 +18,6 @@ const serviceRuntimePath = path.resolve(repoRoot, argValue("--service-runtime", 
 
 const taskId = "organization-rbac-menu-contract-and-migration-design";
 const downstreamTaskIds = [
-  "organization-role-pool-backend-and-migration",
   "organization-user-admin-experience",
   "role-tree-and-authorization-entry",
   "menu-tree-and-button-permission-configuration",
@@ -73,7 +72,7 @@ function serviceObjectKeys(items) {
 }
 
 function validateContract(contract, serviceRuntime, errors) {
-  requireEqual(contract.status, "design-frozen-runtime-pending", "status", errors);
+  requireEqual(contract.status, "backend-and-migration-implemented-ui-menu-e2e-pending", "status", errors);
   requireEqual(contract.taskId, taskId, "taskId", errors);
   requireIncludes(contract.designEvidence, ["superpowers:brainstorming", "product-design", "ui-ux-pro-max"], "designEvidence", errors);
 
@@ -269,9 +268,13 @@ function validateContract(contract, serviceRuntime, errors) {
     "legacy-role-menu-dual-read-equivalence-and-rollback",
   ], "browserAcceptance.scenarios", errors);
 
-  requireEqual(contract.runtimeBoundary?.implementationStatus, "contract-only", "runtimeBoundary.implementationStatus", errors);
+  requireEqual(contract.runtimeBoundary?.implementationStatus, "backend-and-migration-implemented-ui-menu-e2e-pending", "runtimeBoundary.implementationStatus", errors);
+  requireEqual(contract.runtimeBoundary?.backendAndMigrationStatus, "implemented", "runtimeBoundary.backendAndMigrationStatus", errors);
+  requireEqual(contract.runtimeBoundary?.adminUIStatus, "pending", "runtimeBoundary.adminUIStatus", errors);
+  requireEqual(contract.runtimeBoundary?.menuRuntimeStatus, "pending", "runtimeBoundary.menuRuntimeStatus", errors);
+  requireEqual(contract.runtimeBoundary?.browserQAStatus, "pending", "runtimeBoundary.browserQAStatus", errors);
   if (!sameList(values(contract.runtimeBoundary?.deferredTaskIds), downstreamTaskIds)) {
-    errors.push("runtimeBoundary.deferredTaskIds must match the five downstream organization/RBAC/menu nodes");
+    errors.push("runtimeBoundary.deferredTaskIds must match the four downstream organization/RBAC/menu UI nodes");
   }
   requireIncludes(contract.runtimeBoundary?.notOwned, ["datasource-routing", "federated-query", "xa", "outbox", "mq", "search-projection", "workload-identity"], "runtimeBoundary.notOwned", errors);
 
@@ -282,7 +285,7 @@ function validateContract(contract, serviceRuntime, errors) {
 
 function validateTopology(contract, topology, errors) {
   const migration = topology.organizationRbacMenuMigration ?? {};
-  requireEqual(migration.status, "planned", "topology organization migration status", errors);
+  requireEqual(migration.status, "backend-and-migration-implemented-ui-menu-e2e-pending", "topology organization migration status", errors);
   requireEqual(migration.designStatus, "frozen", "topology organization migration designStatus", errors);
   requireEqual(migration.designContract, "resources/platform-organization-rbac-menu-contract.json", "topology organization migration designContract", errors);
   requireEqual(migration.targetModel?.roleOwnership, contract.targetModel?.roleOwnership, "topology target roleOwnership", errors);
@@ -300,16 +303,26 @@ function validateTaskGovernance(contract, graph, matrix, errors) {
     requireIncludes(task.designGate, ["superpowers:brainstorming", "product-design"], `task ${taskId} designGate`, errors);
     requireIncludes(task.evidence?.docs, contract.evidence?.docs, `task ${taskId} evidence.docs`, errors);
     requireIncludes(task.evidence?.validators, contract.evidence?.validators, `task ${taskId} evidence.validators`, errors);
-    requireIncludes(task.evidence?.tests, contract.evidence?.tests, `task ${taskId} evidence.tests`, errors);
+    requireIncludes(task.evidence?.tests, ["scripts/platform-organization-rbac-menu-contract.test.mjs"], `task ${taskId} evidence.tests`, errors);
   }
   const backendTask = values(graph.tasks).find((item) => item.id === "organization-role-pool-backend-and-migration");
+  requireEqual(backendTask?.status, "implemented", "organization-role-pool-backend-and-migration status", errors);
   requireIncludes(backendTask?.resourceLocks, ["query-command-contract"], "organization-role-pool-backend-and-migration resourceLocks", errors);
+  requireIncludes(backendTask?.evidence?.tests, [
+    "internal/platform/organizationrbac/validation_test.go",
+    "internal/platform/organizationrbac/gorm_repository_test.go",
+    "internal/platform/organizationrbac/migration_test.go",
+  ], "organization-role-pool-backend-and-migration evidence.tests", errors);
   for (const id of downstreamTaskIds) {
     const downstream = values(graph.tasks).find((item) => item.id === id);
     if (!downstream || downstream.status === "implemented") {
       errors.push(`downstream runtime/UI task ${id} must remain unfinished`);
     }
   }
+
+  const backendCapability = values(matrix.capabilities).find((item) => item.id === "organization-role-pool-backend-and-migration");
+  requireEqual(backendCapability?.status, "implemented", "engineering capability organization-role-pool-backend-and-migration status", errors);
+  requireEqual(backendCapability?.evidence?.runtimeBoundary?.implementationStatus, "backend-and-migration-implemented", "engineering capability organization-role-pool-backend-and-migration runtimeBoundary.implementationStatus", errors);
 
   const capability = values(matrix.capabilities).find((item) => item.id === taskId);
   if (!capability) {

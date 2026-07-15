@@ -37,7 +37,6 @@ const completionProgramCapabilityIDs = [
 ];
 
 const partialCapabilityDependencies = {
-  "organization-role-pool-backend-and-migration": ["organization-rbac-menu-contract-and-migration-design"],
   "organization-user-admin-experience": ["organization-role-pool-backend-and-migration"],
   "role-tree-and-authorization-entry": ["organization-user-admin-experience"],
   "menu-tree-and-button-permission-configuration": ["role-tree-and-authorization-entry"],
@@ -149,6 +148,7 @@ describe("validate-platform-engineering-capabilities", () => {
       "persisted-query-command-object-runtime",
       "integration-ports-disabled-default",
       "organization-rbac-menu-contract-and-migration-design",
+      "organization-role-pool-backend-and-migration",
     ]);
     for (const capability of capabilities.filter((item) => implementedCapabilityIDs.has(item.id))) {
       assert.equal(capability.status, "implemented");

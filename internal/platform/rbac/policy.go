@@ -9,6 +9,7 @@ type User struct {
 	ID          string `json:"id"`
 	Username    string `json:"username"`
 	Name        string `json:"name"`
+	ScopeType   string `json:"scopeType"`
 	TenantCode  string `json:"tenantCode,omitempty"`
 	OrgUnitCode string `json:"orgUnitCode,omitempty"`
 	AreaCode    string `json:"areaCode,omitempty"`

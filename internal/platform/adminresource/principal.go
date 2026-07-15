@@ -74,7 +74,7 @@ func (s *Store) currentPrincipalLocked(username string) rbac.Principal {
 	if user == nil {
 		return rbac.Principal{User: rbac.User{Username: username}}
 	}
-	roles := roleValuesFromUser(*user)
+	roles := s.effectiveRoleCodesLocked(*user)
 	permissions := make([]string, 0)
 	deniedPermissions := make([]string, 0)
 	for _, role := range roles {
@@ -100,6 +100,7 @@ func (s *Store) currentPrincipalLocked(username string) rbac.Principal {
 			ID:          user.ID,
 			Username:    user.Code,
 			Name:        user.Name,
+			ScopeType:   principalScopeType(*user),
 			TenantCode:  strings.TrimSpace(user.Values["tenantCode"]),
 			OrgUnitCode: strings.TrimSpace(user.Values["orgUnitCode"]),
 			AreaCode:    strings.TrimSpace(user.Values["areaCode"]),
@@ -108,6 +109,69 @@ func (s *Store) currentPrincipalLocked(username string) rbac.Principal {
 		Permissions:       permissions,
 		DeniedPermissions: deniedPermissions,
 	}
+}
+
+func principalScopeType(user Record) string {
+	scopeType := strings.TrimSpace(user.Values["scopeType"])
+	if scopeType != "" {
+		return scopeType
+	}
+	if strings.TrimSpace(user.Values["tenantCode"]) == platformTenant {
+		return "platform"
+	}
+	if strings.TrimSpace(user.Values["orgUnitCode"]) != "" {
+		return "tenant"
+	}
+	return ""
+}
+
+func (s *Store) effectiveRoleCodesLocked(user Record) []string {
+	requested := roleValuesFromUser(user)
+	scopeType := principalScopeType(user)
+	tenantCode := strings.TrimSpace(user.Values["tenantCode"])
+	orgUnitCode := strings.TrimSpace(user.Values["orgUnitCode"])
+	eligibleGroups := map[string]struct{}{}
+	switch scopeType {
+	case "platform":
+		for _, group := range visibleRecords("role-groups", s.resources["role-groups"]) {
+			groupScope := strings.TrimSpace(group.Values["scopeType"])
+			if groupScope == "" {
+				groupScope = "platform"
+			}
+			if group.Status == "enabled" && groupScope == "platform" && strings.TrimSpace(group.Values["tenantCode"]) == "" {
+				eligibleGroups[group.Code] = struct{}{}
+			}
+		}
+	case "tenant":
+		organization := findRecordByCode(visibleRecords("org-units", s.resources["org-units"]), orgUnitCode)
+		if organization == nil || organization.Status != "enabled" || strings.TrimSpace(organization.Values["tenantCode"]) != tenantCode {
+			return nil
+		}
+		for _, groupCode := range rbac.ParsePermissionList(organization.Values["roleGroupCodes"]) {
+			group := findRecordByCode(visibleRecords("role-groups", s.resources["role-groups"]), groupCode)
+			if group != nil && group.Status == "enabled" && strings.TrimSpace(group.Values["scopeType"]) == "tenant" && strings.TrimSpace(group.Values["tenantCode"]) == tenantCode {
+				eligibleGroups[groupCode] = struct{}{}
+			}
+		}
+	default:
+		return nil
+	}
+	roles := make([]string, 0, len(requested))
+	for _, roleCode := range requested {
+		role := findRecordByCode(visibleRecords("roles", s.resources["roles"]), roleCode)
+		if role == nil || role.Status != "enabled" {
+			continue
+		}
+		groupCode := strings.TrimSpace(role.Values["groupCode"])
+		if scopeType == "platform" && (groupCode == "" || findRecordByCode(visibleRecords("role-groups", s.resources["role-groups"]), groupCode) == nil) {
+			roles = append(roles, roleCode)
+			continue
+		}
+		if _, eligible := eligibleGroups[groupCode]; eligible {
+			roles = append(roles, roleCode)
+		}
+	}
+	return roles
 }
 
 func roleValuesFromUser(user Record) []string {

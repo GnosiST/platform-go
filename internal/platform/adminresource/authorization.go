@@ -23,10 +23,14 @@ func (s *Store) casbinPolicySnapshot() ([]authz.RolePolicy, []authz.UserRole) {
 		if role.Status == "disabled" {
 			continue
 		}
+		roleTenant, ok := s.roleTenantLocked(role)
+		if !ok {
+			continue
+		}
 		for _, permission := range rbac.ParsePermissionList(role.Values["permissions"]) {
 			policies = append(policies, authz.RolePolicy{
 				RoleCode:   role.Code,
-				Tenant:     platformTenant,
+				Tenant:     roleTenant,
 				Permission: permission,
 				Action:     actionFromPermission(permission),
 				Effect:     authz.PolicyEffectAllow,
@@ -35,7 +39,7 @@ func (s *Store) casbinPolicySnapshot() ([]authz.RolePolicy, []authz.UserRole) {
 		for _, permission := range rbac.ParsePermissionList(role.Values["denyPermissions"]) {
 			policies = append(policies, authz.RolePolicy{
 				RoleCode:   role.Code,
-				Tenant:     platformTenant,
+				Tenant:     roleTenant,
 				Permission: permission,
 				Action:     actionFromPermission(permission),
 				Effect:     authz.PolicyEffectDeny,
@@ -48,15 +52,53 @@ func (s *Store) casbinPolicySnapshot() ([]authz.RolePolicy, []authz.UserRole) {
 		if user.Status == "disabled" {
 			continue
 		}
-		for _, role := range roleValuesFromUser(user) {
+		userTenant, ok := principalTenant(user)
+		if !ok {
+			continue
+		}
+		for _, role := range s.effectiveRoleCodesLocked(user) {
 			roles = append(roles, authz.UserRole{
 				User:     user.Code,
 				RoleCode: role,
-				Tenant:   platformTenant,
+				Tenant:   userTenant,
 			})
 		}
 	}
 	return policies, roles
+}
+
+func (s *Store) roleTenantLocked(role Record) (string, bool) {
+	groupCode := strings.TrimSpace(role.Values["groupCode"])
+	group := findRecordByCode(visibleRecords("role-groups", s.resources["role-groups"]), groupCode)
+	if group == nil {
+		return platformTenant, true
+	}
+	if group == nil || group.Status != "enabled" {
+		return "", false
+	}
+	switch scopeType := strings.TrimSpace(group.Values["scopeType"]); scopeType {
+	case "platform":
+		return platformTenant, strings.TrimSpace(group.Values["tenantCode"]) == ""
+	case "tenant":
+		tenant := strings.TrimSpace(group.Values["tenantCode"])
+		return tenant, tenant != ""
+	case "":
+		return platformTenant, true
+	default:
+		return "", false
+	}
+}
+
+func principalTenant(user Record) (string, bool) {
+	switch principalScopeType(user) {
+	case "platform":
+		return platformTenant, strings.TrimSpace(user.Values["tenantCode"]) == "" || strings.TrimSpace(user.Values["tenantCode"]) == platformTenant
+	case "tenant":
+		tenant := strings.TrimSpace(user.Values["tenantCode"])
+		return tenant, tenant != ""
+	default:
+		return "", false
+	}
 }
 
 func actionFromPermission(permission string) string {

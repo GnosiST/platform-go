@@ -229,6 +229,11 @@
     "transportFile": "internal/platform/httpapi/server.go",
     "definitionSource": "scripts/admin-service-object-definitions.mjs",
     "runtimeDefinitionSource": "internal/platform/serviceobject/reference.go",
+    "runtimeDefinitionSources": [
+      "internal/platform/serviceobject/reference.go",
+      "internal/platform/organizationrbac/service_objects.go",
+      "internal/platform/organizationrbac/lifecycle_service_objects.go"
+    ],
     "typescriptClient": "resources/generated/admin-service-object-client.ts",
     "transportContract": "AdminServiceObjectTransport",
     "runtime": "conditional",
@@ -267,6 +272,174 @@
         }
       },
       {
+        "kind": "query",
+        "id": "platform.identity.organization-role-pool.get",
+        "version": "1.0.0",
+        "clientMethod": "getOrganizationRolePool",
+        "requestType": "OrganizationRolePoolGetV1_0_0QueryRequest",
+        "inputType": "OrganizationRolePoolGetV1_0_0QueryInput",
+        "responseType": "OrganizationRolePoolGetV1_0_0QueryData",
+        "argumentNames": [
+          "orgUnitCode"
+        ],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 3000,
+          "cost": {
+            "baseCost": 2,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2050
+          },
+          "maxPageSize": 1000,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "query",
+        "id": "platform.identity.organization-role-group-change.impact",
+        "version": "1.0.0",
+        "clientMethod": "getOrganizationRoleGroupChangeImpact",
+        "requestType": "OrganizationRoleGroupChangeImpactV1_0_0QueryRequest",
+        "inputType": "OrganizationRoleGroupChangeImpactV1_0_0QueryInput",
+        "responseType": "OrganizationRoleGroupChangeImpactV1_0_0QueryData",
+        "argumentNames": [
+          "previewId"
+        ],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 2000,
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "maxPageSize": 1,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "query",
+        "id": "platform.identity.user-organization-change.impact",
+        "version": "1.0.0",
+        "clientMethod": "getUserOrganizationChangeImpact",
+        "requestType": "UserOrganizationChangeImpactV1_0_0QueryRequest",
+        "inputType": "UserOrganizationChangeImpactV1_0_0QueryInput",
+        "responseType": "UserOrganizationChangeImpactV1_0_0QueryData",
+        "argumentNames": [
+          "previewId"
+        ],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 2000,
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "maxPageSize": 1,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "query",
+        "id": "platform.identity.role-state-or-group-change.impact",
+        "version": "1.0.0",
+        "clientMethod": "getRoleStateOrGroupChangeImpact",
+        "requestType": "RoleStateOrGroupChangeImpactV1_0_0QueryRequest",
+        "inputType": "RoleStateOrGroupChangeImpactV1_0_0QueryInput",
+        "responseType": "RoleStateOrGroupChangeImpactV1_0_0QueryData",
+        "argumentNames": [
+          "previewId"
+        ],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 2000,
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "maxPageSize": 1,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "query",
+        "id": "platform.authorization.role-permission-change.impact",
+        "version": "1.0.0",
+        "clientMethod": "getRolePermissionChangeImpact",
+        "requestType": "RolePermissionChangeImpactV1_0_0QueryRequest",
+        "inputType": "RolePermissionChangeImpactV1_0_0QueryInput",
+        "responseType": "RolePermissionChangeImpactV1_0_0QueryData",
+        "argumentNames": [
+          "previewId"
+        ],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 2000,
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "maxPageSize": 1,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "query",
+        "id": "platform.authorization.resource-lifecycle.impact",
+        "version": "1.0.0",
+        "clientMethod": "getAuthorizationResourceLifecycleImpact",
+        "requestType": "AuthorizationResourceLifecycleImpactV1_0_0QueryRequest",
+        "inputType": "AuthorizationResourceLifecycleImpactV1_0_0QueryInput",
+        "responseType": "AuthorizationResourceLifecycleImpactV1_0_0QueryData",
+        "argumentNames": [
+          "previewId"
+        ],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 2000,
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "maxPageSize": 1,
+          "exposeTotal": false
+        }
+      },
+      {
         "kind": "command",
         "id": "platform.reference-records.rename",
         "version": "1.0.0",
@@ -292,6 +465,340 @@
           },
           "idempotency": "required-key",
           "maxAffectedRows": 1
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.identity.organization-role-group-change.prepare",
+        "version": "1.0.0",
+        "clientMethod": "prepareOrganizationRoleGroupChange",
+        "requestType": "OrganizationRoleGroupChangePrepareV1_0_0CommandRequest",
+        "inputType": "OrganizationRoleGroupChangePrepareV1_0_0CommandInput",
+        "responseType": "OrganizationRoleGroupChangePrepareV1_0_0CommandData",
+        "argumentNames": [
+          "orgUnitCode",
+          "roleGroupCodes",
+          "remediations"
+        ],
+        "operationPhase": "prepare",
+        "limits": {
+          "timeoutMs": 5000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.identity.organization-role-groups.replace",
+        "version": "1.0.0",
+        "clientMethod": "replaceOrganizationRoleGroups",
+        "requestType": "OrganizationRoleGroupsReplaceV1_0_0CommandRequest",
+        "inputType": "OrganizationRoleGroupsReplaceV1_0_0CommandInput",
+        "responseType": "OrganizationRoleGroupsReplaceV1_0_0CommandData",
+        "argumentNames": [
+          "previewId",
+          "expectedRevision",
+          "impactHash"
+        ],
+        "operationPhase": "apply",
+        "limits": {
+          "timeoutMs": 10000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.identity.user-organization-change.prepare",
+        "version": "1.0.0",
+        "clientMethod": "prepareUserOrganizationChange",
+        "requestType": "UserOrganizationChangePrepareV1_0_0CommandRequest",
+        "inputType": "UserOrganizationChangePrepareV1_0_0CommandInput",
+        "responseType": "UserOrganizationChangePrepareV1_0_0CommandData",
+        "argumentNames": [
+          "userCode",
+          "orgUnitCode",
+          "roleCodes",
+          "remediations"
+        ],
+        "operationPhase": "prepare",
+        "limits": {
+          "timeoutMs": 5000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.identity.role-state-or-group-change.prepare",
+        "version": "1.0.0",
+        "clientMethod": "prepareRoleStateOrGroupChange",
+        "requestType": "RoleStateOrGroupChangePrepareV1_0_0CommandRequest",
+        "inputType": "RoleStateOrGroupChangePrepareV1_0_0CommandInput",
+        "responseType": "RoleStateOrGroupChangePrepareV1_0_0CommandData",
+        "argumentNames": [
+          "roleCode",
+          "operation",
+          "targetGroupCode",
+          "remediations"
+        ],
+        "operationPhase": "prepare",
+        "limits": {
+          "timeoutMs": 5000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.identity.user-organization.change",
+        "version": "1.0.0",
+        "clientMethod": "changeUserOrganization",
+        "requestType": "UserOrganizationChangeV1_0_0CommandRequest",
+        "inputType": "UserOrganizationChangeV1_0_0CommandInput",
+        "responseType": "UserOrganizationChangeV1_0_0CommandData",
+        "argumentNames": [
+          "previewId",
+          "expectedRevision",
+          "impactHash"
+        ],
+        "operationPhase": "apply",
+        "limits": {
+          "timeoutMs": 10000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.identity.role.move",
+        "version": "1.0.0",
+        "clientMethod": "moveRole",
+        "requestType": "RoleMoveV1_0_0CommandRequest",
+        "inputType": "RoleMoveV1_0_0CommandInput",
+        "responseType": "RoleMoveV1_0_0CommandData",
+        "argumentNames": [
+          "previewId",
+          "expectedRevision",
+          "impactHash"
+        ],
+        "operationPhase": "apply",
+        "limits": {
+          "timeoutMs": 10000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.identity.role.disable",
+        "version": "1.0.0",
+        "clientMethod": "disableRole",
+        "requestType": "RoleDisableV1_0_0CommandRequest",
+        "inputType": "RoleDisableV1_0_0CommandInput",
+        "responseType": "RoleDisableV1_0_0CommandData",
+        "argumentNames": [
+          "previewId",
+          "expectedRevision",
+          "impactHash"
+        ],
+        "operationPhase": "apply",
+        "limits": {
+          "timeoutMs": 10000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.authorization.role-permission-change.prepare",
+        "version": "1.0.0",
+        "clientMethod": "prepareRolePermissionChange",
+        "requestType": "RolePermissionChangePrepareV1_0_0CommandRequest",
+        "inputType": "RolePermissionChangePrepareV1_0_0CommandInput",
+        "responseType": "RolePermissionChangePrepareV1_0_0CommandData",
+        "argumentNames": [
+          "roleCode",
+          "permissionCodes"
+        ],
+        "operationPhase": "prepare",
+        "limits": {
+          "timeoutMs": 5000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.authorization.role-permissions.replace",
+        "version": "1.0.0",
+        "clientMethod": "replaceRolePermissions",
+        "requestType": "RolePermissionsReplaceV1_0_0CommandRequest",
+        "inputType": "RolePermissionsReplaceV1_0_0CommandInput",
+        "responseType": "RolePermissionsReplaceV1_0_0CommandData",
+        "argumentNames": [
+          "previewId",
+          "expectedRevision",
+          "impactHash"
+        ],
+        "operationPhase": "apply",
+        "limits": {
+          "timeoutMs": 10000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.authorization.resource-lifecycle.prepare",
+        "version": "1.0.0",
+        "clientMethod": "prepareAuthorizationResourceLifecycle",
+        "requestType": "AuthorizationResourceLifecyclePrepareV1_0_0CommandRequest",
+        "inputType": "AuthorizationResourceLifecyclePrepareV1_0_0CommandInput",
+        "responseType": "AuthorizationResourceLifecyclePrepareV1_0_0CommandData",
+        "argumentNames": [
+          "resource",
+          "resourceCode",
+          "operation",
+          "retentionDays",
+          "policyVersion",
+          "remediations"
+        ],
+        "operationPhase": "prepare",
+        "limits": {
+          "timeoutMs": 5000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.authorization.resource-lifecycle.apply",
+        "version": "1.0.0",
+        "clientMethod": "applyAuthorizationResourceLifecycle",
+        "requestType": "AuthorizationResourceLifecycleApplyV1_0_0CommandRequest",
+        "inputType": "AuthorizationResourceLifecycleApplyV1_0_0CommandInput",
+        "responseType": "AuthorizationResourceLifecycleApplyV1_0_0CommandData",
+        "argumentNames": [
+          "previewId",
+          "expectedRevision",
+          "impactHash"
+        ],
+        "operationPhase": "apply",
+        "limits": {
+          "timeoutMs": 10000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
         }
       }
     ],

@@ -21,11 +21,12 @@ func (a Actor) Empty() bool {
 
 type TenantScope struct {
 	TenantID     int64
+	TenantCode   string
 	PlatformWide bool
 }
 
 func (s TenantScope) Empty() bool {
-	return s.TenantID == 0 && !s.PlatformWide
+	return s.TenantID == 0 && s.TenantCode == "" && !s.PlatformWide
 }
 
 type PermissionIntent struct {

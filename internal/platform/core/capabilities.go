@@ -11,7 +11,7 @@ func DefaultManifests() []capability.Manifest {
 		{ID: "tenant", Name: "Tenant", Version: "0.1.0", Dependencies: []capability.ID{"dictionary"}, Admin: adminSurface(tenantAdminResource()), Migrations: lifecycleMigrations("tenant"), Seeds: lifecycleSeeds("tenant")},
 		{ID: "identity", Name: "Identity", Version: "0.1.0", Dependencies: []capability.ID{"tenant"}, Admin: adminSurface(userAdminResource(), appIdentityAdminResource(), orgUnitAdminResource()), Migrations: lifecycleMigrations("identity"), Seeds: lifecycleSeeds("identity")},
 		{ID: "session", Name: "Session", Version: "0.1.0", Dependencies: []capability.ID{"identity"}, Admin: adminSurface(adminResource("sessions", "在线会话", "Sessions", "后台和 App 会话、有效期与撤销状态。", "Admin and app sessions, expiration and revocation state.", "admin:session", "/sessions", "operations", "wifi", 350)), App: appSurface(appRoute("POST", "/api/app/auth/login", capability.AppRouteAuthPublic, "", "App 登录。", "App login."), appRoute("GET", "/api/app/session/current", capability.AppRouteAuthSession, "", "读取 App 当前会话。", "Read current app session."), appRoute("POST", "/api/app/auth/logout", capability.AppRouteAuthSession, "", "退出 App 会话。", "Log out app session.")), AuthProviders: []capability.AuthProvider{authProvider("demo", "demo", "演示登录", "Demo Login", "本地开发演示账号登录。", "Local demo account login.", true, []capability.AuthProviderAudience{capability.AuthProviderAudienceAdmin, capability.AuthProviderAudienceApp})}, Migrations: lifecycleMigrations("session"), Seeds: lifecycleSeeds("session")},
-		{ID: "rbac", Name: "RBAC", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity"}, Admin: adminSurface(roleGroupAdminResource(), roleAdminResource(), adminResource("permissions", "权限", "Permissions", "能力、资源、菜单和接口共用的权限码目录。", "Permission catalog shared by capabilities, resources, menus, and APIs.", "admin:permission", "/permissions", "foundation", "roles", 55)), Migrations: lifecycleMigrations("rbac"), Seeds: lifecycleSeeds("rbac")},
+		{ID: "rbac", Name: "RBAC", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity"}, Admin: adminSurface(roleGroupAdminResource(), roleAdminResource(), permissionAdminResource()), Migrations: lifecycleMigrations("rbac"), Seeds: lifecycleSeeds("rbac")},
 		{ID: "menu", Name: "Menu", Version: "0.1.0", Dependencies: []capability.ID{"rbac"}, Admin: adminSurface(adminResource("menus", "菜单", "Menus", "后台菜单和资源入口。", "Admin menus and resource entries.", "admin:menu", "/menus", "foundation", "menus", 60)), Migrations: lifecycleMigrations("menu"), Seeds: lifecycleSeeds("menu")},
 		{ID: "api-resource", Name: "API Resource", Version: "0.1.0", Dependencies: []capability.ID{"rbac"}, Admin: adminSurface(adminResource("api-resources", "API 资源", "API Resources", "接口资源、权限码和调用边界。", "API resources, permission codes, and invocation boundaries.", "admin:api-resource", "/api-resources", "governance", "apiResources", 120), adminResource("api-docs", "API 文档", "API Docs", "OpenAPI 文档、权限码和接口契约。", "OpenAPI docs, permission codes, and API contracts.", "admin:api-docs", "/api-docs", "governance", "book", 125)), Migrations: lifecycleMigrations("api-resource"), Seeds: lifecycleSeeds("api-resource")},
 		{ID: "audit", Name: "Audit", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity"}, Admin: adminSurface(adminResource("audit-logs", "审计日志", "Audit Logs", "操作审计和日志留痕。", "Operation audit and activity trails.", "admin:audit-log", "/audit-logs", "governance", "audit", 110), adminResource("login-logs", "登录日志", "Login Logs", "登录认证记录和安全追踪。", "Login authentication records and security tracing.", "admin:login-log", "/login-logs", "operations", "desktop", 320), adminResource("error-logs", "错误日志", "Error Logs", "运行错误、异常和排查记录。", "Runtime errors, exceptions and troubleshooting records.", "admin:error-log", "/error-logs", "operations", "warning", 330)), Migrations: lifecycleMigrations("audit"), Seeds: lifecycleSeeds("audit")},
@@ -355,6 +355,32 @@ func roleAdminResource() capability.AdminResource {
 			adminField("status", "状态", "Status", "select", "record", false, false, true, true, true, true, 120, enabledDisabledOptions()),
 		},
 		SearchFields:   []string{"name", "code", "status", "groupCode", "dataScope", "dataScopeOrgCodes", "dataScopeAreaCodes", "denyPermissions"},
+		DefaultSortKey: "updatedAt",
+	}
+}
+
+func permissionAdminResource() capability.AdminResource {
+	return capability.AdminResource{
+		Resource:         "permissions",
+		Title:            capability.Text("权限", "Permissions"),
+		Description:      capability.Text("平台级 API 与页面按钮权限资源目录。", "Platform-wide API and page-button permission resource catalog."),
+		PermissionPrefix: "admin:permission",
+		Menu:             capability.AdminMenu{Route: "/permissions", Parent: "access", Group: "foundation", Icon: "roles", Order: 55, Cache: true},
+		Fields: []capability.AdminField{
+			adminField("code", "权限编码", "Permission Code", "text", "record", true, false, true, true, true, true, 220, nil),
+			adminField("name", "权限名称", "Permission Name", "text", "record", true, false, true, true, true, true, 180, nil),
+			adminField("resourceType", "资源类型", "Resource Type", "select", "values", true, false, true, true, true, true, 130, []capability.AdminFieldOption{
+				adminFieldOption("api", "接口权限", "API"),
+				adminFieldOption("page-button", "页面按钮", "Page Button"),
+			}),
+			adminField("capability", "能力", "Capability", "text", "values", true, false, true, true, true, true, 150, nil),
+			adminField("resource", "资源", "Resource", "text", "values", true, false, true, true, true, true, 160, nil),
+			adminField("action", "动作", "Action", "text", "values", true, false, true, true, true, true, 120, nil),
+			adminField("prefix", "前缀", "Prefix", "text", "values", true, false, true, true, true, true, 180, nil),
+			adminField("status", "状态", "Status", "select", "record", false, false, true, true, true, true, 120, enabledDisabledOptions()),
+			adminField("description", "说明", "Description", "textarea", "record", false, false, false, false, true, true, 220, nil),
+		},
+		SearchFields:   []string{"name", "code", "status", "description", "resourceType", "capability", "resource", "action", "prefix"},
 		DefaultSortKey: "updatedAt",
 	}
 }

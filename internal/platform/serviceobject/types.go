@@ -10,9 +10,11 @@ import (
 type ValueType string
 
 const (
-	ValueString  ValueType = "string"
-	ValueInteger ValueType = "integer"
-	ValueBoolean ValueType = "boolean"
+	ValueString           ValueType = "string"
+	ValueInteger          ValueType = "integer"
+	ValueBoolean          ValueType = "boolean"
+	ValueStringSet        ValueType = "string-set"
+	ValueRoleRemediations ValueType = "role-remediations"
 )
 
 type TenantMode string
@@ -94,6 +96,22 @@ type CommandDefinition struct {
 	Build           CommandBuilder
 }
 
+type DomainCommandDefinition struct {
+	ID              string
+	Version         string
+	Resource        string
+	Permission      string
+	Action          string
+	TenantMode      TenantMode
+	DataScope       string
+	Arguments       []ArgumentDefinition
+	Cost            CostPolicy
+	Timeout         time.Duration
+	Idempotency     IdempotencyMode
+	MaxAffectedRows int64
+	ResultSchema    []ResultField
+}
+
 type QueryRequest struct {
 	QueryID    string         `json:"queryId"`
 	Version    string         `json:"version"`
@@ -162,6 +180,7 @@ type CommandAST struct {
 type QueryPlan struct {
 	Definition QueryDefinition
 	AST        QueryAST
+	Execution  kernel.ExecutionContext
 	TenantID   string
 	Scope      ScopeConstraint
 	Page       int
@@ -172,8 +191,31 @@ type QueryPlan struct {
 type CommandPlan struct {
 	Definition CommandDefinition
 	AST        CommandAST
+	Execution  kernel.ExecutionContext
 	TenantID   string
 	Scope      ScopeConstraint
+}
+
+type DomainCommandPlan struct {
+	Definition DomainCommandDefinition
+	Arguments  ValidatedArguments
+	Execution  kernel.ExecutionContext
+	TenantID   string
+	Scope      ScopeConstraint
+}
+
+type RoleRemediationAction string
+
+const (
+	RoleRemediationRemove  RoleRemediationAction = "remove-role"
+	RoleRemediationReplace RoleRemediationAction = "replace-role"
+)
+
+type RoleRemediation struct {
+	UserCode            string                `json:"userCode"`
+	RoleCode            string                `json:"roleCode"`
+	Action              RoleRemediationAction `json:"action"`
+	ReplacementRoleCode string                `json:"replacementRoleCode,omitempty"`
 }
 
 type Invocation struct {
@@ -222,6 +264,10 @@ type QueryExecutor interface {
 
 type CommandExecutor interface {
 	ExecuteCommand(context.Context, CommandPlan) (CommandResult, error)
+}
+
+type DomainCommandExecutor interface {
+	ExecuteDomainCommand(context.Context, DomainCommandPlan) (CommandResult, error)
 }
 
 type IdempotencyStore interface {

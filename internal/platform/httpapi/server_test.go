@@ -4276,6 +4276,48 @@ func TestAdminResourceSoftDeleteRestoreAndNoOnlinePurgeRoute(t *testing.T) {
 	}
 }
 
+func TestAuthorizationLifecycleRequiresGovernedDomainCommand(t *testing.T) {
+	softPolicy := capability.AdminResourceDeletionPolicy{Mode: capability.AdminDeletionSoftDelete, PolicyVersion: 1, RetentionDays: 30}
+	appendOnly := capability.AdminResourceDeletionPolicy{Mode: capability.AdminDeletionAppendOnly, PolicyVersion: 1}
+	manifests := []capability.Manifest{{ID: "authorization-lifecycle-test", Admin: capability.AdminSurface{Resources: []capability.AdminResource{
+		{
+			Resource: "menus", Title: capability.Text("菜单", "Menus"), Description: capability.Text("菜单。", "Menus."),
+			PermissionPrefix: "admin:menu", Deletion: &softPolicy, Menu: capability.AdminMenu{Route: "/menus", Group: "test", Icon: "menu", Order: 1},
+		},
+		{
+			Resource: "audit-logs", Title: capability.Text("审计日志", "Audit Logs"), Description: capability.Text("审计日志。", "Audit logs."),
+			PermissionPrefix: "admin:audit-log", Deletion: &appendOnly, Menu: capability.AdminMenu{Route: "/audit-logs", Group: "test", Icon: "audit", Order: 2},
+		},
+	}}}}
+	resources := adminresource.NewStoreFromCapabilities(manifests)
+	record, err := resources.Create("menus", adminresource.WriteInput{
+		Code: "settings", Name: "Settings", Status: "enabled",
+		Values: map[string]string{
+			"route": "/settings", "permission": "admin:settings:read", "group": "system", "icon": "settings", "order": "1",
+			"titleZh": "设置", "titleEn": "Settings",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := newTestServer(ServerOptions{Capabilities: manifests, Resources: resources})
+
+	for _, request := range []*http.Request{
+		httptest.NewRequest(http.MethodDelete, "/api/admin/resources/menus/"+record.ID, nil),
+		httptest.NewRequest(http.MethodPost, "/api/admin/resources/menus/"+record.ID+"/restore", nil),
+	} {
+		request.Header.Set("X-Platform-User", "admin")
+		response := httptest.NewRecorder()
+		server.Router().ServeHTTP(response, request)
+		if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), `"code":"ADMIN_RESOURCE_DOMAIN_OWNED_MUTATION"`) {
+			t.Fatalf("%s authorization lifecycle status = %d body = %s, want governed-domain 409", request.Method, response.Code, response.Body.String())
+		}
+	}
+	if items, _ := resources.List("menus"); !hasAdminResourceRecordID(items, record.ID) {
+		t.Fatalf("authorization lifecycle mutation changed records: %+v", items)
+	}
+}
+
 func TestAdminResourceRestoreEnforcesPrincipalDataScope(t *testing.T) {
 	softPolicy := capability.AdminResourceDeletionPolicy{Mode: capability.AdminDeletionSoftDelete, PolicyVersion: 1, RetentionDays: 7}
 	manifests := append(capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "admin-shell"}), capability.Manifest{
@@ -4584,7 +4626,7 @@ func TestPermissionCatalogListUsesCacheAndInvalidatesAfterPermissionUpdate(t *te
 		t.Fatalf("permission catalog cache ok = %v err = %v, want cached list", ok, err)
 	}
 
-	updateBody := bytes.NewBufferString(`{"code":"admin:tenant:read","name":"Tenant Read Updated","status":"enabled","description":"Updated permission","values":{"capability":"tenant","resource":"tenants","action":"read","prefix":"admin:tenant"}}`)
+	updateBody := bytes.NewBufferString(`{"code":"admin:tenant:read","name":"Tenant Read Updated","status":"enabled","description":"Updated permission","values":{"resourceType":"api","capability":"tenant","resource":"tenants","action":"read","prefix":"admin:tenant"}}`)
 	updateRecorder := httptest.NewRecorder()
 	updateRequest := httptest.NewRequest(http.MethodPut, "/api/admin/resources/permissions/permission-admin-tenant-read", updateBody)
 	updateRequest.Header.Set("Content-Type", "application/json")
@@ -4990,6 +5032,23 @@ func TestWriteAdminResourceErrorMapsRevisionConflict(t *testing.T) {
 	}
 	if !strings.Contains(recorder.Body.String(), `"code":"ADMIN_RESOURCE_REVISION_CONFLICT"`) {
 		t.Fatalf("revision conflict body = %s, want ADMIN_RESOURCE_REVISION_CONFLICT", recorder.Body.String())
+	}
+}
+
+func TestWriteAdminResourceErrorMapsDomainOwnedMutation(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+
+	writeAdminResourceError(ctx, fmt.Errorf("%w: users", adminresource.ErrDomainOwnedMutation))
+
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("domain-owned mutation status = %d body = %s, want 409", recorder.Code, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"code":"ADMIN_RESOURCE_DOMAIN_OWNED_MUTATION"`) {
+		t.Fatalf("domain-owned mutation body = %s, want ADMIN_RESOURCE_DOMAIN_OWNED_MUTATION", recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), "users") {
+		t.Fatalf("domain-owned mutation body = %s, must not expose repository details", recorder.Body.String())
 	}
 }
 

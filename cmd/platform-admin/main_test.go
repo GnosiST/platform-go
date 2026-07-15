@@ -20,6 +20,7 @@ import (
 	"platform-go/internal/platform/config"
 	"platform-go/internal/platform/datalifecycle"
 	"platform-go/internal/platform/dataprotection"
+	"platform-go/internal/platform/organizationrbac"
 	"platform-go/internal/platform/sensitivemigration"
 )
 
@@ -27,6 +28,96 @@ const (
 	testIssuer  = "https://id.example/realms/platform"
 	testSubject = "subject-raw-value-9f23c"
 )
+
+func TestRunOrganizationRBACMigrationPrepareAndInventory(t *testing.T) {
+	var prepared bool
+	prepare := func(context.Context, config.Config) error { prepared = true; return nil }
+	open := func(context.Context, config.Config) (organizationRBACMigrationSession, error) {
+		return &fakeOrganizationRBACMigrationSession{}, nil
+	}
+	var output bytes.Buffer
+	if err := runOrganizationRBACMigration(context.Background(), []string{organizationRBACMigrationCommand, "--mode", "prepare"}, &output, func() config.Config { return config.Config{} }, prepare, open); err != nil {
+		t.Fatal(err)
+	}
+	if !prepared || !strings.Contains(output.String(), `"status":"prepared"`) {
+		t.Fatalf("prepared=%v output=%s", prepared, output.String())
+	}
+
+	manifestPath := filepath.Join(t.TempDir(), "organization-rbac.json")
+	manifest := organizationrbac.MigrationManifest{
+		Version: "1.0.0", RoleGroupScopeTenantMap: map[string]organizationrbac.RoleGroupPlacement{},
+		OrphanRoleGroupMap: map[string]string{}, TenantUserOrganizationMap: map[string]string{},
+		OrganizationRoleGroupBindingMap: map[string][]string{}, PlatformPrincipalAllowlist: []string{},
+		RolePoolConflictRemediations: []organizationrbac.RoleAssignmentRemediation{},
+	}
+	encoded, _ := json.Marshal(manifest)
+	if err := os.WriteFile(manifestPath, encoded, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output.Reset()
+	if err := runOrganizationRBACMigration(context.Background(), []string{organizationRBACMigrationCommand, "--mode", "inventory", "--manifest", manifestPath}, &output, func() config.Config { return config.Config{} }, prepare, open); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), `"status":"inventoried"`) {
+		t.Fatalf("inventory output=%s", output.String())
+	}
+}
+
+func TestOrganizationRBACMigrationCLIEndToEndSQLite(t *testing.T) {
+	cfg := config.Config{
+		AdminResourceDriver:  "sqlite",
+		AdminResourceDSN:     filepath.Join(t.TempDir(), "organization-rbac-cli.db"),
+		OrganizationRBACMode: config.OrganizationRBACModeTarget,
+	}
+	prepared := execute(t, cfg, []string{organizationRBACMigrationCommand, "--mode", "prepare"}, "")
+	if prepared.err != nil || !strings.Contains(prepared.stdout, `"status":"prepared"`) {
+		t.Fatalf("prepare result = %+v", prepared)
+	}
+
+	manifestPath := filepath.Join(t.TempDir(), "organization-rbac.json")
+	manifest := organizationrbac.MigrationManifest{
+		Version: "1.0.0", RoleGroupScopeTenantMap: map[string]organizationrbac.RoleGroupPlacement{},
+		OrphanRoleGroupMap: map[string]string{}, TenantUserOrganizationMap: map[string]string{},
+		OrganizationRoleGroupBindingMap: map[string][]string{}, PlatformPrincipalAllowlist: []string{},
+		RolePoolConflictRemediations: []organizationrbac.RoleAssignmentRemediation{},
+	}
+	encoded, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(manifestPath, encoded, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	inventory := execute(t, cfg, []string{organizationRBACMigrationCommand, "--mode", "inventory", "--manifest", manifestPath}, "")
+	if inventory.err != nil || !strings.Contains(inventory.stdout, `"status":"inventoried"`) || !strings.Contains(inventory.stdout, `"runId":"inventory-`) {
+		t.Fatalf("inventory result = %+v", inventory)
+	}
+	applyArgs := []string{
+		organizationRBACMigrationCommand, "--mode", "apply", "--manifest", manifestPath,
+		"--run-id", "cli-org-rbac-1", "--actor", "migration-admin", "--reason", "approved cutover",
+		"--approval-ref", "change-123", "--backup-uri", "file:///tmp/org-rbac-backup",
+		"--backup-sha256", strings.Repeat("a", 64), "--checkpoint-ref", "restore-rehearsal-123",
+	}
+	for attempt := 1; attempt <= 2; attempt++ {
+		applied := execute(t, cfg, applyArgs, "")
+		if applied.err != nil || !strings.Contains(applied.stdout, `"status":"applied"`) || !strings.Contains(applied.stdout, `"runId":"cli-org-rbac-1"`) {
+			t.Fatalf("apply attempt %d result = %+v", attempt, applied)
+		}
+	}
+	verified := execute(t, cfg, []string{organizationRBACMigrationCommand, "--mode", "verify", "--manifest", manifestPath}, "")
+	if verified.err != nil || !strings.Contains(verified.stdout, `"status":"verified"`) {
+		t.Fatalf("verify result = %+v", verified)
+	}
+}
+
+type fakeOrganizationRBACMigrationSession struct{}
+
+func (*fakeOrganizationRBACMigrationSession) RunMigration(_ context.Context, mode organizationrbac.MigrationMode, _ organizationrbac.MigrationManifest, _ organizationrbac.MigrationEvidence) (organizationrbac.MigrationReport, error) {
+	return organizationrbac.MigrationReport{Mode: mode, Status: "inventoried"}, nil
+}
+
+func (*fakeOrganizationRBACMigrationSession) Close() error { return nil }
 
 func TestRunBindAdminOIDCRequiresSubjectStdin(t *testing.T) {
 	cfg := testConfig(t)

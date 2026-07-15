@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -13,8 +16,16 @@ import (
 )
 
 type GORMAdminResourceRepository struct {
-	db *gorm.DB
+	db                    *gorm.DB
+	organizationRBACOwned bool
+	organizationRBACUsers OrganizationRBACUserSnapshotWriter
 }
+
+type OrganizationRBACUserSnapshotWriter interface {
+	ApplyUserSnapshot(context.Context, *gorm.DB, []Record, []Record) error
+}
+
+var organizationRBACOwnedResources = []string{"users", "org-units", "roles", "role-groups"}
 
 const (
 	adminUsersTable             = "platform_admin_users"
@@ -44,6 +55,8 @@ var normalizedGORMResourceLayouts = map[string]gormAdminResourceLayout{
 		Table: adminUsersTable,
 		ValueProjections: map[string][]string{
 			"role": {adminUserRolesTable + ".role_code"}, "roles": {adminUserRolesTable + ".role_code"},
+			"scopeType": {adminUsersTable + ".scope_type"}, "tenantCode": {adminUsersTable + ".tenant_code"},
+			"orgUnitCode": {adminUsersTable + ".org_unit_code"},
 		},
 	},
 	"tenants": {
@@ -59,13 +72,16 @@ var normalizedGORMResourceLayouts = map[string]gormAdminResourceLayout{
 		},
 	},
 	"roles": {
-		Table:            adminRolesTable,
-		ValueProjections: map[string][]string{"permissions": {adminRolePermissionsTable + ".permission"}},
+		Table: adminRolesTable,
+		ValueProjections: map[string][]string{
+			"groupCode": {adminRolesTable + ".group_code"}, "permissions": {adminRolePermissionsTable + ".permission"},
+		},
 	},
 	"role-groups": {
 		Table: adminRoleGroupsTable,
 		ValueProjections: map[string][]string{
 			"parentCode": {adminRoleGroupsTable + ".parent_code"}, "sortOrder": {adminRoleGroupsTable + ".sort_order"},
+			"scopeType": {adminRoleGroupsTable + ".scope_type"}, "tenantCode": {adminRoleGroupsTable + ".tenant_code"},
 		},
 	},
 	"permissions": {
@@ -158,6 +174,9 @@ type gormAdminUser struct {
 	Status      string `gorm:"column:status;not null"`
 	Description string `gorm:"column:description;not null"`
 	UpdatedAt   string `gorm:"column:updated_at;not null"`
+	ScopeType   string `gorm:"column:scope_type;index;not null"`
+	TenantCode  string `gorm:"column:tenant_code;index;not null"`
+	OrgUnitCode string `gorm:"column:org_unit_code;index;not null"`
 	ValuesJSON  string `gorm:"column:values_json;not null"`
 }
 
@@ -165,6 +184,13 @@ type gormAdminUserRole struct {
 	UserID   string `gorm:"column:user_id;primaryKey"`
 	RoleCode string `gorm:"column:role_code;primaryKey"`
 }
+
+type gormAdminOrgUnitRoleGroup struct {
+	OrgUnitCode   string `gorm:"column:org_unit_code;primaryKey"`
+	RoleGroupCode string `gorm:"column:role_group_code;primaryKey"`
+}
+
+func (gormAdminOrgUnitRoleGroup) TableName() string { return "platform_admin_org_unit_role_groups" }
 
 type gormAdminTenant struct {
 	ID          string `gorm:"column:id;primaryKey"`
@@ -199,6 +225,7 @@ type gormAdminRole struct {
 	Status      string `gorm:"column:status;not null"`
 	Description string `gorm:"column:description;not null"`
 	UpdatedAt   string `gorm:"column:updated_at;not null"`
+	GroupCode   string `gorm:"column:group_code;index;not null"`
 	ValuesJSON  string `gorm:"column:values_json;not null"`
 }
 
@@ -209,6 +236,9 @@ type gormAdminRoleGroup struct {
 	Status      string `gorm:"column:status;not null"`
 	Description string `gorm:"column:description;not null"`
 	UpdatedAt   string `gorm:"column:updated_at;not null"`
+	ScopeType   string `gorm:"column:scope_type;index;not null"`
+	TenantCode  string `gorm:"column:tenant_code;index;not null"`
+	Revision    uint64 `gorm:"column:revision;not null"`
 	ParentCode  string `gorm:"column:parent_code;index;not null"`
 	SortOrder   int    `gorm:"column:sort_order;index;not null"`
 	ValuesJSON  string `gorm:"column:values_json;not null"`
@@ -220,17 +250,18 @@ type gormAdminRolePermission struct {
 }
 
 type gormAdminPermission struct {
-	ID          string `gorm:"column:id;primaryKey"`
-	Code        string `gorm:"column:code;uniqueIndex;not null"`
-	Name        string `gorm:"column:name;not null"`
-	Status      string `gorm:"column:status;not null"`
-	Description string `gorm:"column:description;not null"`
-	UpdatedAt   string `gorm:"column:updated_at;not null"`
-	Capability  string `gorm:"column:capability;not null"`
-	Resource    string `gorm:"column:resource;not null"`
-	Action      string `gorm:"column:action;not null"`
-	Prefix      string `gorm:"column:prefix;not null"`
-	ValuesJSON  string `gorm:"column:values_json;not null"`
+	ID           string `gorm:"column:id;primaryKey"`
+	Code         string `gorm:"column:code;uniqueIndex;not null"`
+	Name         string `gorm:"column:name;not null"`
+	Status       string `gorm:"column:status;not null"`
+	Description  string `gorm:"column:description;not null"`
+	UpdatedAt    string `gorm:"column:updated_at;not null"`
+	Capability   string `gorm:"column:capability;not null"`
+	Resource     string `gorm:"column:resource;not null"`
+	Action       string `gorm:"column:action;not null"`
+	Prefix       string `gorm:"column:prefix;not null"`
+	ResourceType string `gorm:"column:resource_type;size:32;not null;default:api"`
+	ValuesJSON   string `gorm:"column:values_json;not null"`
 }
 
 type gormAdminMenu struct {
@@ -333,6 +364,10 @@ func NewGORMAdminResourceRepository(ctx context.Context, db *gorm.DB) (*GORMAdmi
 	if err := db.WithContext(ctx).AutoMigrate(gormAdminResourceModels()...); err != nil {
 		return nil, err
 	}
+	if err := db.WithContext(ctx).Model(&gormAdminPermission{}).
+		Where("resource_type = '' OR resource_type IS NULL").Update("resource_type", "api").Error; err != nil {
+		return nil, err
+	}
 	return repository, nil
 }
 
@@ -345,7 +380,26 @@ func OpenGORMAdminResourceRepository(ctx context.Context, db *gorm.DB) (*GORMAdm
 			return nil, errors.New("gorm admin resource schema is not prepared")
 		}
 	}
+	if !db.WithContext(ctx).Migrator().HasColumn(&gormAdminPermission{}, "ResourceType") {
+		return nil, errors.New("gorm admin resource schema is not prepared")
+	}
 	return &GORMAdminResourceRepository{db: db}, nil
+}
+
+func (r *GORMAdminResourceRepository) WithOrganizationRBACOwnership(userWriter ...OrganizationRBACUserSnapshotWriter) *GORMAdminResourceRepository {
+	if r == nil {
+		return nil
+	}
+	clone := *r
+	clone.organizationRBACOwned = true
+	if len(userWriter) > 0 {
+		clone.organizationRBACUsers = userWriter[0]
+	}
+	return &clone
+}
+
+func (r *GORMAdminResourceRepository) ExcludeCapabilitySeed(resource string) bool {
+	return r != nil && r.organizationRBACOwned && slices.Contains(organizationRBACOwnedResources, resource)
 }
 
 func gormAdminResourceModels() []any {
@@ -497,6 +551,30 @@ func (r *GORMAdminResourceRepository) CurrentRevision(ctx context.Context) (uint
 func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot ResourceSnapshot) (uint64, error) {
 	var committed uint64
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var organizationRBACUsersChanged bool
+		if r.organizationRBACOwned {
+			current := ResourceSnapshot{Resources: map[string][]Record{}}
+			txRepository := &GORMAdminResourceRepository{db: tx}
+			if err := txRepository.loadOrganizationRBACOwnedResources(ctx, &current); err != nil {
+				return err
+			}
+			if err := txRepository.loadLifecycleForResources(ctx, &current, organizationRBACOwnedResources); err != nil {
+				return err
+			}
+			for _, resource := range organizationRBACOwnedResources {
+				if !equalOrganizationRBACProjection(resource, current.Resources[resource], snapshot.Resources[resource]) {
+					if resource != "users" || r.organizationRBACUsers == nil {
+						return fmt.Errorf("%w: %s", ErrDomainOwnedMutation, resource)
+					}
+					organizationRBACUsersChanged = true
+				}
+			}
+			if organizationRBACUsersChanged {
+				if err := r.organizationRBACUsers.ApplyUserSnapshot(ctx, tx, current.Resources["users"], snapshot.Resources["users"]); err != nil {
+					return err
+				}
+			}
+		}
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&gormAdminResourceState{Key: "revision", Value: "0"}).Error; err != nil {
 			return err
 		}
@@ -518,16 +596,9 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 		committed = nextRevision
 
 		deleteAll := tx.Session(&gorm.Session{AllowGlobalUpdate: true})
-		for _, model := range []interface{}{
+		deleteModels := []interface{}{
 			&gormAdminResourceRecord{},
-			&gormAdminResourceLifecycle{},
-			&gormAdminUserRole{},
-			&gormAdminRolePermission{},
-			&gormAdminUser{},
 			&gormAdminTenant{},
-			&gormAdminOrgUnit{},
-			&gormAdminRole{},
-			&gormAdminRoleGroup{},
 			&gormAdminPermission{},
 			&gormAdminMenu{},
 			&gormAdminAreaCode{},
@@ -535,10 +606,24 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 			&gormAdminLoginLog{},
 			&gormAdminErrorLog{},
 			&gormAdminVersion{},
-		} {
+		}
+		if !r.organizationRBACOwned {
+			deleteModels = append(deleteModels,
+				&gormAdminUserRole{}, &gormAdminRolePermission{}, &gormAdminUser{},
+				&gormAdminOrgUnit{}, &gormAdminRole{}, &gormAdminRoleGroup{},
+			)
+		}
+		for _, model := range deleteModels {
 			if err := deleteAll.Delete(model).Error; err != nil {
 				return err
 			}
+		}
+		lifecycleDelete := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Model(&gormAdminResourceLifecycle{})
+		if r.organizationRBACOwned {
+			lifecycleDelete = lifecycleDelete.Where("resource NOT IN ?", organizationRBACOwnedResources)
+		}
+		if err := lifecycleDelete.Delete(&gormAdminResourceLifecycle{}).Error; err != nil {
+			return err
 		}
 		if err := tx.Where("key = ?", "next_id").Delete(&gormAdminResourceState{}).Error; err != nil {
 			return err
@@ -546,7 +631,7 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 		if err := tx.Create(&gormAdminResourceState{Key: "next_id", Value: strconv.Itoa(snapshot.NextID)}).Error; err != nil {
 			return err
 		}
-		if err := saveNormalizedResources(tx, snapshot); err != nil {
+		if err := saveNormalizedResources(tx, snapshot, r.organizationRBACOwned); err != nil {
 			return err
 		}
 		rows := make([]gormAdminResourceRecord, 0)
@@ -576,7 +661,7 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 				return err
 			}
 		}
-		return saveLifecycleRows(tx, snapshot)
+		return saveLifecycleRows(tx, snapshot, r.organizationRBACOwned)
 	})
 	if err != nil {
 		return 0, err
@@ -584,9 +669,61 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 	return committed, nil
 }
 
+func equalOrganizationRBACProjection(resource string, current []Record, proposed []Record) bool {
+	return reflect.DeepEqual(canonicalOrganizationRBACRecords(resource, current), canonicalOrganizationRBACRecords(resource, proposed))
+}
+
+func canonicalOrganizationRBACRecords(resource string, records []Record) []Record {
+	canonical := cloneRecords(records)
+	for index := range canonical {
+		values := canonical[index].Values
+		for key, value := range values {
+			if strings.TrimSpace(value) == "" {
+				delete(values, key)
+			}
+		}
+		if resource == "users" {
+			delete(values, "role")
+		}
+		canonical[index].Values = emptyValuesToNil(values)
+	}
+	sort.Slice(canonical, func(left int, right int) bool { return canonical[left].ID < canonical[right].ID })
+	return canonical
+}
+
+func (r *GORMAdminResourceRepository) loadOrganizationRBACOwnedResources(ctx context.Context, snapshot *ResourceSnapshot) error {
+	loaders := []struct {
+		resource string
+		load     func(context.Context) ([]Record, error)
+	}{
+		{resource: "users", load: r.loadUsers},
+		{resource: "org-units", load: r.loadOrgUnits},
+		{resource: "roles", load: r.loadRoles},
+		{resource: "role-groups", load: r.loadRoleGroups},
+	}
+	for _, loader := range loaders {
+		records, err := loader.load(ctx)
+		if err != nil {
+			return err
+		}
+		if records != nil {
+			snapshot.Resources[loader.resource] = records
+		}
+	}
+	return nil
+}
+
 func (r *GORMAdminResourceRepository) loadLifecycle(ctx context.Context, snapshot *ResourceSnapshot) error {
+	return r.loadLifecycleForResources(ctx, snapshot, nil)
+}
+
+func (r *GORMAdminResourceRepository) loadLifecycleForResources(ctx context.Context, snapshot *ResourceSnapshot, resources []string) error {
 	var rows []gormAdminResourceLifecycle
-	if err := r.db.WithContext(ctx).Order("resource, record_id").Find(&rows).Error; err != nil {
+	query := r.db.WithContext(ctx).Order("resource, record_id")
+	if len(resources) > 0 {
+		query = query.Where("resource IN ?", resources)
+	}
+	if err := query.Find(&rows).Error; err != nil {
 		return err
 	}
 	for _, row := range rows {
@@ -605,9 +742,12 @@ func (r *GORMAdminResourceRepository) loadLifecycle(ctx context.Context, snapsho
 	return nil
 }
 
-func saveLifecycleRows(tx *gorm.DB, snapshot ResourceSnapshot) error {
+func saveLifecycleRows(tx *gorm.DB, snapshot ResourceSnapshot, organizationRBACOwned bool) error {
 	rows := make([]gormAdminResourceLifecycle, 0)
 	for resource, records := range snapshot.Resources {
+		if organizationRBACOwned && slices.Contains(organizationRBACOwnedResources, resource) {
+			continue
+		}
 		for _, record := range records {
 			if !isLifecycleDeleted(record) {
 				continue
@@ -751,6 +891,9 @@ func (r *GORMAdminResourceRepository) loadUsers(ctx context.Context) ([]Record, 
 			return nil, err
 		}
 		roleValue := strings.Join(rolesByUser[row.ID], ",")
+		values["scopeType"] = row.ScopeType
+		values["tenantCode"] = row.TenantCode
+		values["orgUnitCode"] = row.OrgUnitCode
 		values["roles"] = roleValue
 		if strings.TrimSpace(values["role"]) == "" {
 			values["role"] = roleValue
@@ -796,6 +939,16 @@ func (r *GORMAdminResourceRepository) loadOrgUnits(ctx context.Context) ([]Recor
 	if len(rows) == 0 {
 		return nil, nil
 	}
+	groupsByOrganization := map[string][]string{}
+	if r.db.WithContext(ctx).Migrator().HasTable(&gormAdminOrgUnitRoleGroup{}) {
+		var bindings []gormAdminOrgUnitRoleGroup
+		if err := r.db.WithContext(ctx).Order("org_unit_code, role_group_code").Find(&bindings).Error; err != nil {
+			return nil, err
+		}
+		for _, binding := range bindings {
+			groupsByOrganization[binding.OrgUnitCode] = append(groupsByOrganization[binding.OrgUnitCode], binding.RoleGroupCode)
+		}
+	}
 	records := make([]Record, 0, len(rows))
 	for _, row := range rows {
 		values, err := valuesFromJSON(row.ValuesJSON)
@@ -807,6 +960,9 @@ func (r *GORMAdminResourceRepository) loadOrgUnits(ctx context.Context) ([]Recor
 		values["parentCode"] = row.ParentCode
 		values["areaCode"] = row.AreaCode
 		values["sortOrder"] = strconv.Itoa(row.SortOrder)
+		if roleGroups := groupsByOrganization[row.Code]; len(roleGroups) > 0 {
+			values["roleGroupCodes"] = strings.Join(roleGroups, ",")
+		}
 		records = append(records, recordFromNormalized(row.ID, row.Code, row.Name, row.Status, row.Description, row.UpdatedAt, values))
 	}
 	return records, nil
@@ -835,6 +991,7 @@ func (r *GORMAdminResourceRepository) loadRoles(ctx context.Context) ([]Record, 
 			return nil, err
 		}
 		values["permissions"] = strings.Join(permissionsByRole[row.Code], ",")
+		values["groupCode"] = row.GroupCode
 		records = append(records, Record{
 			ID:          row.ID,
 			Code:        row.Code,
@@ -864,6 +1021,8 @@ func (r *GORMAdminResourceRepository) loadRoleGroups(ctx context.Context) ([]Rec
 		}
 		values["parentCode"] = row.ParentCode
 		values["sortOrder"] = strconv.Itoa(row.SortOrder)
+		values["scopeType"] = row.ScopeType
+		values["tenantCode"] = row.TenantCode
 		records = append(records, recordFromNormalized(row.ID, row.Code, row.Name, row.Status, row.Description, row.UpdatedAt, values))
 	}
 	return records, nil
@@ -887,6 +1046,7 @@ func (r *GORMAdminResourceRepository) loadPermissions(ctx context.Context) ([]Re
 		values["resource"] = row.Resource
 		values["action"] = row.Action
 		values["prefix"] = row.Prefix
+		values["resourceType"] = row.ResourceType
 		records = append(records, Record{
 			ID:          row.ID,
 			Code:        row.Code,
@@ -1058,21 +1218,25 @@ func (r *GORMAdminResourceRepository) loadVersions(ctx context.Context) ([]Recor
 	return records, nil
 }
 
-func saveNormalizedResources(tx *gorm.DB, snapshot ResourceSnapshot) error {
-	if err := saveUsers(tx, snapshot.Resources["users"]); err != nil {
-		return err
+func saveNormalizedResources(tx *gorm.DB, snapshot ResourceSnapshot, organizationRBACOwned bool) error {
+	if !organizationRBACOwned {
+		if err := saveUsers(tx, snapshot.Resources["users"]); err != nil {
+			return err
+		}
 	}
 	if err := saveTenants(tx, snapshot.Resources["tenants"]); err != nil {
 		return err
 	}
-	if err := saveOrgUnits(tx, snapshot.Resources["org-units"]); err != nil {
-		return err
-	}
-	if err := saveRoles(tx, snapshot.Resources["roles"]); err != nil {
-		return err
-	}
-	if err := saveRoleGroups(tx, snapshot.Resources["role-groups"]); err != nil {
-		return err
+	if !organizationRBACOwned {
+		if err := saveOrgUnits(tx, snapshot.Resources["org-units"]); err != nil {
+			return err
+		}
+		if err := saveRoles(tx, snapshot.Resources["roles"]); err != nil {
+			return err
+		}
+		if err := saveRoleGroups(tx, snapshot.Resources["role-groups"]); err != nil {
+			return err
+		}
 	}
 	if err := savePermissions(tx, snapshot.Resources["permissions"]); err != nil {
 		return err
@@ -1110,6 +1274,9 @@ func saveUsers(tx *gorm.DB, records []Record) error {
 			Status:      record.Status,
 			Description: record.Description,
 			UpdatedAt:   record.UpdatedAt,
+			ScopeType:   record.Values["scopeType"],
+			TenantCode:  record.Values["tenantCode"],
+			OrgUnitCode: record.Values["orgUnitCode"],
 			ValuesJSON:  valuesJSON,
 		})
 		for _, role := range roleValuesFromUser(record) {
@@ -1194,6 +1361,7 @@ func saveRoles(tx *gorm.DB, records []Record) error {
 			Status:      record.Status,
 			Description: record.Description,
 			UpdatedAt:   record.UpdatedAt,
+			GroupCode:   record.Values["groupCode"],
 			ValuesJSON:  valuesJSON,
 		})
 		for _, permission := range parseCSV(record.Values["permissions"]) {
@@ -1225,6 +1393,8 @@ func saveRoleGroups(tx *gorm.DB, records []Record) error {
 			Status:      record.Status,
 			Description: record.Description,
 			UpdatedAt:   record.UpdatedAt,
+			ScopeType:   record.Values["scopeType"],
+			TenantCode:  record.Values["tenantCode"],
 			ParentCode:  record.Values["parentCode"],
 			SortOrder:   parseOrder(record.Values["sortOrder"]),
 			ValuesJSON:  valuesJSON,
@@ -1243,18 +1413,26 @@ func savePermissions(tx *gorm.DB, records []Record) error {
 		if err != nil {
 			return err
 		}
+		resourceType := strings.TrimSpace(record.Values["resourceType"])
+		if resourceType == "" {
+			resourceType = "api"
+		}
+		if resourceType != "api" && resourceType != "page-button" {
+			return errors.New("permission resource type is invalid")
+		}
 		rows = append(rows, gormAdminPermission{
-			ID:          record.ID,
-			Code:        record.Code,
-			Name:        record.Name,
-			Status:      record.Status,
-			Description: record.Description,
-			UpdatedAt:   record.UpdatedAt,
-			Capability:  record.Values["capability"],
-			Resource:    record.Values["resource"],
-			Action:      record.Values["action"],
-			Prefix:      record.Values["prefix"],
-			ValuesJSON:  valuesJSON,
+			ID:           record.ID,
+			Code:         record.Code,
+			Name:         record.Name,
+			Status:       record.Status,
+			Description:  record.Description,
+			UpdatedAt:    record.UpdatedAt,
+			Capability:   record.Values["capability"],
+			Resource:     record.Values["resource"],
+			Action:       record.Values["action"],
+			Prefix:       record.Values["prefix"],
+			ResourceType: resourceType,
+			ValuesJSON:   valuesJSON,
 		})
 	}
 	if len(rows) == 0 {

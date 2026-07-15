@@ -131,6 +131,19 @@ const requiredCleanupEvidenceByTask = new Map([
       "scripts/platform-organization-rbac-menu-contract.test.mjs",
     ],
   ],
+  [
+    "organization-role-pool-backend-and-migration",
+    [
+      "docs/platform-organization-rbac-menu-contract.md",
+      "internal/platform/organizationrbac/validation_test.go",
+      "internal/platform/organizationrbac/gorm_repository_test.go",
+      "internal/platform/organizationrbac/migration_test.go",
+      "internal/platform/bootstrap/organization_rbac_test.go",
+      "scripts/validate-admin-service-object-definitions.mjs",
+      "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+      "scripts/platform-organization-rbac-menu-contract.test.mjs",
+    ],
+  ],
 ]);
 
 const requiredVisualEvidenceByTask = new Map([

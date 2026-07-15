@@ -59,6 +59,22 @@ func TestGORMIdempotencyStorePersistsCompletedReplay(t *testing.T) {
 	}
 }
 
+func TestOpenGORMIdempotencyStoreRequiresPreparedSchema(t *testing.T) {
+	db := openGORMIdempotencyTestDB(t)
+	if _, err := OpenGORMIdempotencyStore(context.Background(), db, GORMIdempotencyStoreOptions{}); !errors.Is(err, ErrObjectUnavailable) {
+		t.Fatalf("OpenGORMIdempotencyStore(unprepared) error = %v", err)
+	}
+	if db.Migrator().HasTable(&gormIdempotencyRecord{}) {
+		t.Fatal("OpenGORMIdempotencyStore created schema")
+	}
+	if _, err := NewGORMIdempotencyStore(context.Background(), db, GORMIdempotencyStoreOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenGORMIdempotencyStore(context.Background(), db, GORMIdempotencyStoreOptions{}); err != nil {
+		t.Fatalf("OpenGORMIdempotencyStore(prepared) error = %v", err)
+	}
+}
+
 func TestGORMIdempotencyStoreCoordinatesConcurrentClaimAcrossStores(t *testing.T) {
 	db := openGORMIdempotencyTestDB(t)
 	firstStore := newGORMIdempotencyTestStore(t, db, GORMIdempotencyStoreOptions{})

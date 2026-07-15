@@ -79,7 +79,7 @@ const completionProgramTaskIDs = [
   "github-release-publication",
 ];
 
-const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(11);
+const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(12);
 
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-foundation-task-graph.mjs", ...args], {
@@ -322,7 +322,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /task production-auth-provider-hardening must declare at least one evidence\.docs path/);
   });
 
-  it("preserves the closed 37-node baseline, implements eleven completion nodes, and tracks 18 pending program nodes", () => {
+  it("preserves the closed 37-node baseline, implements twelve completion nodes, and tracks 17 pending program nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
@@ -355,7 +355,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
     assert.equal(graph.tasks.length, 66);
-    assert.equal(implemented.length, 48);
+    assert.equal(implemented.length, 49);
     assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "admin-watermark-export-governance")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-protection-runtime")?.status, "implemented");
@@ -379,6 +379,9 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.equal(organizationContract?.status, "implemented");
     assert.equal(organizationContract?.contractGateOnly, true);
     assert.ok(organizationContract?.evidence?.validators?.includes("scripts/validate-platform-organization-rbac-menu-contract.mjs"));
+    const organizationBackend = graph.tasks.find((item) => item.id === "organization-role-pool-backend-and-migration");
+    assert.equal(organizationBackend?.status, "implemented");
+    assert.ok(organizationBackend?.evidence?.tests?.includes("internal/platform/organizationrbac/migration_test.go"));
     assert.ok(
       graph.tasks
         .find((item) => item.id === "organization-role-pool-backend-and-migration")

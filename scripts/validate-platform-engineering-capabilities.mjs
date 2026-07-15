@@ -63,9 +63,9 @@ const requiredImplementedCapabilityIDs = [
   "persisted-query-command-object-runtime",
   "integration-ports-disabled-default",
   "organization-rbac-menu-contract-and-migration-design",
+  "organization-role-pool-backend-and-migration",
 ];
 const requiredPartialCapabilityIDs = [
-  "organization-role-pool-backend-and-migration",
   "organization-user-admin-experience",
   "role-tree-and-authorization-entry",
   "menu-tree-and-button-permission-configuration",
@@ -83,7 +83,6 @@ const requiredPartialCapabilityIDs = [
   "public-documentation-and-release",
 ];
 const requiredPartialCapabilityDependencies = {
-  "organization-role-pool-backend-and-migration": ["organization-rbac-menu-contract-and-migration-design"],
   "organization-user-admin-experience": ["organization-role-pool-backend-and-migration"],
   "role-tree-and-authorization-entry": ["organization-user-admin-experience"],
   "menu-tree-and-button-permission-configuration": ["role-tree-and-authorization-entry"],

@@ -137,22 +137,23 @@ type Server struct {
 }
 
 const (
-	cacheKeyBranding            = "admin:branding"
-	cacheKeyAuthProviders       = "admin:auth-providers"
-	cacheKeyMenusPrefix         = "admin:menus:"
-	cacheKeyPrincipalPrefix     = "admin:principal:"
-	cacheKeySchemaPrefix        = "admin:schema:"
-	cacheKeyPermissionsList     = "admin:permissions:list"
-	defaultPlatformCacheTTL     = 5 * time.Minute
-	defaultJWTSecret            = "dev-platform-go-secret"
-	defaultRateLimitHMACKey     = "dev-platform-rate-limit-key-00001"
-	platformTenant              = "platform"
-	appTenant                   = "app"
-	apiTokensResource           = "api-tokens"
-	apiTokenPrefix              = "pgo_"
-	sessionInvalidationResource = "sessions"
-	appLogoutResolveErrorKey    = "platform.app.logout.session.resolve-error"
-	systemActorID               = "system:platform"
+	cacheKeyBranding                  = "admin:branding"
+	cacheKeyAuthProviders             = "admin:auth-providers"
+	cacheKeyMenusPrefix               = "admin:menus:"
+	cacheKeyPrincipalPrefix           = "admin:principal:"
+	cacheKeySchemaPrefix              = "admin:schema:"
+	cacheKeyPermissionsList           = "admin:permissions:list"
+	defaultPlatformCacheTTL           = 5 * time.Minute
+	defaultJWTSecret                  = "dev-platform-go-secret"
+	defaultRateLimitHMACKey           = "dev-platform-rate-limit-key-00001"
+	platformTenant                    = "platform"
+	appTenant                         = "app"
+	apiTokensResource                 = "api-tokens"
+	apiTokenPrefix                    = "pgo_"
+	sessionInvalidationResource       = "sessions"
+	authorizationInvalidationResource = "authorization"
+	appLogoutResolveErrorKey          = "platform.app.logout.session.resolve-error"
+	systemActorID                     = "system:platform"
 )
 
 func New(options ServerOptions) *Server {
@@ -429,8 +430,15 @@ func (a adminServiceObjectAuthorizer) Can(_ context.Context, execution kernel.Ex
 	if a.server == nil || strings.TrimSpace(execution.Actor.Username) == "" {
 		return false
 	}
+	tenant := strings.TrimSpace(execution.TenantScope.TenantCode)
+	if execution.TenantScope.PlatformWide {
+		tenant = platformTenant
+	}
+	if tenant == "" {
+		return false
+	}
 	authorizer, ok := a.server.policyAuthorizerForRequest()
-	return ok && authorizer.Can(execution.Actor.Username, platformTenant, permission, action)
+	return ok && authorizer.Can(execution.Actor.Username, tenant, permission, action)
 }
 
 func (s *Server) adminServiceObjectQuery(ctx *gin.Context) {
@@ -480,7 +488,19 @@ func (s *Server) adminServiceObjectCommand(ctx *gin.Context) {
 		writeServiceObjectError(ctx, err)
 		return
 	}
+	if isAuthorizationServiceObjectCommand(request.CommandID) {
+		s.invalidateCachesForResource(ctx.Request.Context(), authorizationInvalidationResource)
+	}
 	ctx.JSON(http.StatusOK, Response[serviceobject.CommandResult]{Data: result})
+}
+
+func isAuthorizationServiceObjectCommand(commandID string) bool {
+	if strings.HasSuffix(commandID, ".prepare") {
+		return false
+	}
+	return strings.HasPrefix(commandID, "platform.identity.") ||
+		strings.HasPrefix(commandID, "platform.authorization.") ||
+		strings.HasPrefix(commandID, "platform.navigation.")
 }
 
 func (s *Server) adminServiceObjectInvocation(ctx *gin.Context) (serviceobject.Invocation, bool) {
@@ -493,12 +513,24 @@ func (s *Server) adminServiceObjectInvocation(ctx *gin.Context) (serviceobject.I
 		return serviceobject.Invocation{}, false
 	}
 	tenantID := strings.TrimSpace(principal.User.TenantCode)
-	platformWide := tenantID == "" || tenantID == platformTenant
-	tenantScope := kernel.TenantScope{PlatformWide: platformWide}
-	if !platformWide {
-		tenantScope.TenantID = 1
-	} else {
+	var tenantScope kernel.TenantScope
+	switch strings.TrimSpace(principal.User.ScopeType) {
+	case "platform":
+		if tenantID != "" && tenantID != platformTenant {
+			writeUnauthorized(ctx)
+			return serviceobject.Invocation{}, false
+		}
 		tenantID = ""
+		tenantScope = kernel.TenantScope{TenantCode: platformTenant, PlatformWide: true}
+	case "tenant":
+		if tenantID == "" || tenantID == platformTenant || strings.TrimSpace(principal.User.OrgUnitCode) == "" {
+			writeUnauthorized(ctx)
+			return serviceobject.Invocation{}, false
+		}
+		tenantScope = kernel.TenantScope{TenantID: 1, TenantCode: tenantID}
+	default:
+		writeUnauthorized(ctx)
+		return serviceobject.Invocation{}, false
 	}
 	principalScope := s.resources.DataScopeForPrincipal(principal)
 	return serviceobject.Invocation{
@@ -1395,6 +1427,10 @@ func (s *Server) adminResourceDelete(ctx *gin.Context) {
 	if !s.authorizeAdminResource(ctx, resource, "delete") {
 		return
 	}
+	if adminresource.RequiresGovernedLifecycleCommand(resource) {
+		writeAdminResourceError(ctx, adminresource.ErrDomainOwnedMutation)
+		return
+	}
 	if resource == "files" {
 		s.deleteAdminFile(ctx, ctx.Param("id"))
 		return
@@ -1420,6 +1456,10 @@ func (s *Server) adminResourceRestore(ctx *gin.Context) {
 	resource := ctx.Param("resource")
 	principal, hasPrincipal, ok := s.authorizeAdminResourcePrincipal(ctx, resource, "restore")
 	if !ok {
+		return
+	}
+	if adminresource.RequiresGovernedLifecycleCommand(resource) {
+		writeAdminResourceError(ctx, adminresource.ErrDomainOwnedMutation)
 		return
 	}
 	if hasPrincipal {
@@ -2533,7 +2573,7 @@ func (s *Server) invalidateCachesForResourceLocal(ctx context.Context, resource 
 		_ = s.cache.Delete(ctx, cacheKeyBranding)
 	case "menus":
 		_ = s.cache.DeletePrefix(ctx, cacheKeyMenusPrefix)
-	case "roles", "permissions", "users":
+	case authorizationInvalidationResource, "org-units", "role-groups", "roles", "permissions", "users":
 		s.invalidatePolicyAuthorizer()
 		_ = s.cache.DeletePrefix(ctx, cacheKeyMenusPrefix)
 		_ = s.cache.DeletePrefix(ctx, cacheKeyPrincipalPrefix)
@@ -2587,6 +2627,10 @@ func writeServiceObjectError(ctx *gin.Context, err error) {
 		writeAuthError(ctx, http.StatusUnprocessableEntity, "SERVICE_OBJECT_COST_LIMIT", "service object cost limit exceeded")
 	case errors.Is(err, serviceobject.ErrIdempotencyConflict):
 		writeAuthError(ctx, http.StatusConflict, "SERVICE_OBJECT_IDEMPOTENCY_CONFLICT", "service object idempotency conflict")
+	case errors.Is(err, serviceobject.ErrConflict):
+		writeAuthError(ctx, http.StatusConflict, "SERVICE_OBJECT_STATE_CONFLICT", "service object state conflict")
+	case errors.Is(err, serviceobject.ErrValidation):
+		writeAuthError(ctx, http.StatusUnprocessableEntity, "SERVICE_OBJECT_DOMAIN_VALIDATION", "service object domain validation failed")
 	default:
 		writeAuthError(ctx, http.StatusInternalServerError, "SERVICE_OBJECT_EXECUTION_FAILED", "service object execution failed")
 	}
@@ -2756,6 +2800,10 @@ func writeAdminResourceError(ctx *gin.Context, err error) {
 		status = http.StatusConflict
 		code = "ADMIN_RESOURCE_REVISION_CONFLICT"
 		message = "admin resource revision conflict"
+	case errors.Is(err, adminresource.ErrDomainOwnedMutation):
+		status = http.StatusConflict
+		code = "ADMIN_RESOURCE_DOMAIN_OWNED_MUTATION"
+		message = "resource mutation requires a governed domain command"
 	case errors.Is(err, adminresource.ErrDeletionDisabled),
 		errors.Is(err, adminresource.ErrDeletionRequiresAdapter),
 		errors.Is(err, adminresource.ErrDeletionCleanupStarted),

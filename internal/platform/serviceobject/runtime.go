@@ -19,16 +19,21 @@ type Runtime struct {
 	authorizer      Authorizer
 	queryExecutor   QueryExecutor
 	commandExecutor CommandExecutor
+	domainExecutor  DomainCommandExecutor
 	idempotency     IdempotencyStore
 }
 
 func NewRuntime(registry *Registry, authorizer Authorizer, queryExecutor QueryExecutor, commandExecutor CommandExecutor, idempotency IdempotencyStore) (*Runtime, error) {
+	return NewRuntimeWithDomainCommands(registry, authorizer, queryExecutor, commandExecutor, nil, idempotency)
+}
+
+func NewRuntimeWithDomainCommands(registry *Registry, authorizer Authorizer, queryExecutor QueryExecutor, commandExecutor CommandExecutor, domainExecutor DomainCommandExecutor, idempotency IdempotencyStore) (*Runtime, error) {
 	if registry == nil || authorizer == nil {
 		return nil, fmt.Errorf("%w: registry and authorizer are required", ErrDefinitionInvalid)
 	}
 	return &Runtime{
 		registry: registry, authorizer: authorizer, queryExecutor: queryExecutor,
-		commandExecutor: commandExecutor, idempotency: idempotency,
+		commandExecutor: commandExecutor, domainExecutor: domainExecutor, idempotency: idempotency,
 	}, nil
 }
 
@@ -72,7 +77,7 @@ func (r *Runtime) ExecuteQuery(invocation Invocation, request QueryRequest) (Que
 	ctx, cancel := context.WithTimeout(execution.BaseContext(), definition.Timeout)
 	defer cancel()
 	result, err := r.queryExecutor.ExecuteQuery(ctx, QueryPlan{
-		Definition: definition, AST: ast, TenantID: strings.TrimSpace(invocation.TenantID),
+		Definition: definition, AST: ast, Execution: execution, TenantID: strings.TrimSpace(invocation.TenantID),
 		Scope: cloneScopeConstraint(invocation.Scope), Page: page, PageSize: pageSize, Sort: sort,
 	})
 	if err != nil {
@@ -97,7 +102,19 @@ func (r *Runtime) ExecuteQuery(invocation Invocation, request QueryRequest) (Que
 func (r *Runtime) ExecuteCommand(invocation Invocation, request CommandRequest) (CommandResult, error) {
 	execution := invocation.Execution
 	definition, ok := r.registry.command(request.CommandID, request.Version)
-	if !ok || !r.allowed(execution, definition.Permission, definition.Action) {
+	if ok {
+		return r.executeGenericCommand(invocation, request, definition)
+	}
+	domainDefinition, ok := r.registry.domainCommand(request.CommandID, request.Version)
+	if !ok || !r.allowed(execution, domainDefinition.Permission, domainDefinition.Action) {
+		return CommandResult{}, ErrObjectUnavailable
+	}
+	return r.executeDomainCommand(invocation, request, domainDefinition)
+}
+
+func (r *Runtime) executeGenericCommand(invocation Invocation, request CommandRequest, definition CommandDefinition) (CommandResult, error) {
+	execution := invocation.Execution
+	if !r.allowed(execution, definition.Permission, definition.Action) {
 		return CommandResult{}, ErrObjectUnavailable
 	}
 	if r.commandExecutor == nil || !validExecutionScope(invocation, definition.TenantMode) {
@@ -118,11 +135,11 @@ func (r *Runtime) ExecuteCommand(invocation Invocation, request CommandRequest) 
 	defer cancel()
 	execute := func(callContext context.Context) (CommandResult, error) {
 		result, executeErr := r.commandExecutor.ExecuteCommand(callContext, CommandPlan{
-			Definition: definition, AST: ast, TenantID: strings.TrimSpace(invocation.TenantID),
+			Definition: definition, AST: ast, Execution: execution, TenantID: strings.TrimSpace(invocation.TenantID),
 			Scope: cloneScopeConstraint(invocation.Scope),
 		})
 		if executeErr != nil {
-			if errors.Is(executeErr, ErrObjectUnavailable) || errors.Is(executeErr, ErrCostLimitExceeded) {
+			if errors.Is(executeErr, ErrObjectUnavailable) || errors.Is(executeErr, ErrCostLimitExceeded) || errors.Is(executeErr, ErrConflict) || errors.Is(executeErr, ErrValidation) {
 				return CommandResult{}, executeErr
 			}
 			return CommandResult{}, ErrExecutionFailed
@@ -141,6 +158,56 @@ func (r *Runtime) ExecuteCommand(invocation Invocation, request CommandRequest) 
 		return CommandResult{}, ErrRequestInvalid
 	}
 	fingerprint, err := commandFingerprint(definition, arguments)
+	if err != nil {
+		return CommandResult{}, ErrRequestInvalid
+	}
+	actor := execution.Actor.Username
+	if actor == "" {
+		actor = strconv.FormatInt(execution.Actor.ID, 10)
+	}
+	return r.idempotency.Execute(ctx, IdempotencyScope{
+		CommandID: definition.ID, Version: definition.Version, Actor: actor,
+		TenantID: strings.TrimSpace(invocation.TenantID), Key: key,
+	}, fingerprint, execute)
+}
+
+func (r *Runtime) executeDomainCommand(invocation Invocation, request CommandRequest, definition DomainCommandDefinition) (CommandResult, error) {
+	if r.domainExecutor == nil || !validExecutionScope(invocation, definition.TenantMode) {
+		return CommandResult{}, ErrObjectUnavailable
+	}
+	arguments, err := validateArguments(definition.Arguments, request.Arguments)
+	if err != nil {
+		return CommandResult{}, err
+	}
+	if domainCommandCostExceeded(definition) {
+		return CommandResult{}, ErrCostLimitExceeded
+	}
+	execution := invocation.Execution
+	ctx, cancel := context.WithTimeout(execution.BaseContext(), definition.Timeout)
+	defer cancel()
+	execute := func(callContext context.Context) (CommandResult, error) {
+		result, executeErr := r.domainExecutor.ExecuteDomainCommand(callContext, DomainCommandPlan{
+			Definition: definition, Arguments: cloneValidatedArguments(arguments),
+			Execution: execution,
+			TenantID:  strings.TrimSpace(invocation.TenantID), Scope: cloneScopeConstraint(invocation.Scope),
+		})
+		if executeErr != nil {
+			if errors.Is(executeErr, ErrObjectUnavailable) || errors.Is(executeErr, ErrCostLimitExceeded) || errors.Is(executeErr, ErrConflict) || errors.Is(executeErr, ErrValidation) {
+				return CommandResult{}, executeErr
+			}
+			return CommandResult{}, ErrExecutionFailed
+		}
+		projected, projectErr := projectValues(result.Values, definition.ResultSchema)
+		if projectErr != nil {
+			return CommandResult{}, ErrExecutionFailed
+		}
+		return CommandResult{Values: projected}, nil
+	}
+	key := strings.TrimSpace(request.IdempotencyKey)
+	if key == "" || len(key) > 128 || r.idempotency == nil {
+		return CommandResult{}, ErrRequestInvalid
+	}
+	fingerprint, err := objectFingerprint(definition.ID, definition.Version, arguments)
 	if err != nil {
 		return CommandResult{}, ErrRequestInvalid
 	}
@@ -174,6 +241,11 @@ func commandCostExceeded(definition CommandDefinition, predicates int) bool {
 	cost := int64(definition.Cost.BaseCost) +
 		int64(definition.Cost.PerRowCost)*definition.MaxAffectedRows +
 		int64(definition.Cost.PredicateCost)*int64(predicates)
+	return cost > int64(definition.Cost.Limit)
+}
+
+func domainCommandCostExceeded(definition DomainCommandDefinition) bool {
+	cost := int64(definition.Cost.BaseCost) + int64(definition.Cost.PerRowCost)*definition.MaxAffectedRows
 	return cost > int64(definition.Cost.Limit)
 }
 
@@ -253,6 +325,10 @@ func validateValue(definition ArgumentDefinition, value any) (any, error) {
 			return nil, ErrRequestInvalid
 		}
 		return integer, nil
+	case ValueStringSet:
+		return normalizeStringSet(value, definition.MaxLength)
+	case ValueRoleRemediations:
+		return normalizeRoleRemediations(value, definition.MaxLength)
 	default:
 		return nil, ErrRequestInvalid
 	}
@@ -399,11 +475,15 @@ func resultValueMatches(valueType ValueType, value any) bool {
 }
 
 func commandFingerprint(definition CommandDefinition, arguments ValidatedArguments) (string, error) {
+	return objectFingerprint(definition.ID, definition.Version, arguments)
+}
+
+func objectFingerprint(id string, version string, arguments ValidatedArguments) (string, error) {
 	payload, err := json.Marshal(struct {
 		ID        string             `json:"id"`
 		Version   string             `json:"version"`
 		Arguments ValidatedArguments `json:"arguments"`
-	}{ID: definition.ID, Version: definition.Version, Arguments: arguments})
+	}{ID: id, Version: version, Arguments: arguments})
 	if err != nil {
 		return "", err
 	}

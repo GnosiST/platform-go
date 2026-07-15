@@ -520,7 +520,20 @@ function validateTask(task, context, errors) {
     requireIncludes(task.evidence?.tests, ["scripts/platform-organization-rbac-menu-contract.test.mjs"], `${task.id} evidence.tests`, errors);
   }
   if (task.id === "organization-role-pool-backend-and-migration") {
+    if (task.status !== "implemented") {
+      errors.push("organization-role-pool-backend-and-migration must stay implemented after backend and migration closeout");
+    }
     requireIncludes(task.resourceLocks, ["query-command-contract"], `${task.id} resourceLocks`, errors);
+    requireIncludes(
+      task.evidence?.tests,
+      [
+        "internal/platform/organizationrbac/validation_test.go",
+        "internal/platform/organizationrbac/gorm_repository_test.go",
+        "internal/platform/organizationrbac/migration_test.go",
+      ],
+      `${task.id} evidence.tests`,
+      errors,
+    );
   }
   if (task.status === "implemented" || task.status === "preview") {
     const evidence = task.evidence ?? {};

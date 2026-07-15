@@ -26,6 +26,7 @@ type Config struct {
 	AdminResourceFile                   string
 	AdminResourceDriver                 string
 	AdminResourceDSN                    string
+	OrganizationRBACMode                string
 	SessionFile                         string
 	SessionDriver                       string
 	SessionDSN                          string
@@ -148,6 +149,8 @@ const (
 	RuntimeEnvironmentTest        = "test"
 	RuntimeEnvironmentStaging     = "staging"
 	RuntimeEnvironmentProduction  = "production"
+	OrganizationRBACModeLegacy    = "legacy"
+	OrganizationRBACModeTarget    = "target"
 
 	defaultJWTSecret   = "dev-platform-go-secret"
 	maxFileUploadBytes = int64(100 << 20)
@@ -185,6 +188,7 @@ func Load() Config {
 		AdminResourceFile:                   env("PLATFORM_ADMIN_RESOURCE_FILE", ""),
 		AdminResourceDriver:                 env("PLATFORM_ADMIN_RESOURCE_DRIVER", ""),
 		AdminResourceDSN:                    env("PLATFORM_ADMIN_RESOURCE_DSN", ""),
+		OrganizationRBACMode:                strings.ToLower(env("PLATFORM_ORGANIZATION_RBAC_MODE", OrganizationRBACModeLegacy)),
 		SessionFile:                         env("PLATFORM_SESSION_FILE", ""),
 		SessionDriver:                       env("PLATFORM_SESSION_DRIVER", ""),
 		SessionDSN:                          env("PLATFORM_SESSION_DSN", ""),
@@ -317,6 +321,19 @@ func (c Config) ValidateRuntime() error {
 	errs = append(errs, validateCapabilities(c.Capabilities)...)
 
 	errs = append(errs, validateDriverPair("admin resource", c.AdminResourceDriver, c.AdminResourceDSN)...)
+	organizationRBACMode := strings.TrimSpace(c.OrganizationRBACMode)
+	if organizationRBACMode == "" {
+		organizationRBACMode = OrganizationRBACModeLegacy
+	}
+	switch organizationRBACMode {
+	case OrganizationRBACModeLegacy:
+	case OrganizationRBACModeTarget:
+		if !isGORMDriver(c.AdminResourceDriver) || strings.TrimSpace(c.AdminResourceDSN) == "" || strings.TrimSpace(c.AdminResourceFile) != "" {
+			errs = append(errs, errors.New("PLATFORM_ORGANIZATION_RBAC_MODE=target requires persistent GORM Admin resource storage and no file repository"))
+		}
+	default:
+		errs = append(errs, errors.New("PLATFORM_ORGANIZATION_RBAC_MODE must be legacy or target"))
+	}
 	errs = append(errs, validateDriverPair("session", c.SessionDriver, c.SessionDSN)...)
 	errs = append(errs, validateDriverPair("lifecycle history", c.LifecycleHistoryDriver, c.LifecycleHistoryDSN)...)
 	for key, state := range map[string]envConfigState{
@@ -573,6 +590,13 @@ func (c Config) validateProductionRuntime() []error {
 	}
 	if !isGORMDriver(c.AdminResourceDriver) {
 		errs = append(errs, errors.New("production runtime requires PLATFORM_ADMIN_RESOURCE_DRIVER to be mysql, postgres, or sqlite"))
+	}
+	organizationRBACMode := strings.TrimSpace(c.OrganizationRBACMode)
+	if organizationRBACMode == "" {
+		organizationRBACMode = OrganizationRBACModeLegacy
+	}
+	if organizationRBACMode != OrganizationRBACModeTarget {
+		errs = append(errs, errors.New("production runtime requires PLATFORM_ORGANIZATION_RBAC_MODE=target"))
 	}
 	if !isGORMDriver(c.SessionDriver) {
 		errs = append(errs, errors.New("production runtime requires PLATFORM_SESSION_DRIVER to be mysql, postgres, or sqlite"))

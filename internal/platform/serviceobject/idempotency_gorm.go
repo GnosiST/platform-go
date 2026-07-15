@@ -78,7 +78,28 @@ func NewGORMIdempotencyStore(ctx context.Context, db *gorm.DB, options GORMIdemp
 	if options.TTL <= 0 || options.LeaseDuration <= 0 || options.PollInterval <= 0 || options.CleanupInterval <= 0 || options.Now == nil {
 		return nil, ErrRequestInvalid
 	}
-	store := &GORMIdempotencyStore{
+	if err := db.WithContext(ctx).AutoMigrate(&gormIdempotencyRecord{}); err != nil {
+		return nil, idempotencyDatabaseError(ctx)
+	}
+	return newGORMIdempotencyStore(db, options), nil
+}
+
+func OpenGORMIdempotencyStore(ctx context.Context, db *gorm.DB, options GORMIdempotencyStoreOptions) (*GORMIdempotencyStore, error) {
+	if ctx == nil || db == nil {
+		return nil, ErrRequestInvalid
+	}
+	options = defaultGORMIdempotencyStoreOptions(options)
+	if options.TTL <= 0 || options.LeaseDuration <= 0 || options.PollInterval <= 0 || options.CleanupInterval <= 0 || options.Now == nil {
+		return nil, ErrRequestInvalid
+	}
+	if !db.WithContext(ctx).Migrator().HasTable(&gormIdempotencyRecord{}) {
+		return nil, ErrObjectUnavailable
+	}
+	return newGORMIdempotencyStore(db, options), nil
+}
+
+func newGORMIdempotencyStore(db *gorm.DB, options GORMIdempotencyStoreOptions) *GORMIdempotencyStore {
+	return &GORMIdempotencyStore{
 		db:              db,
 		ttl:             options.TTL,
 		leaseDuration:   options.LeaseDuration,
@@ -86,10 +107,6 @@ func NewGORMIdempotencyStore(ctx context.Context, db *gorm.DB, options GORMIdemp
 		cleanupInterval: options.CleanupInterval,
 		now:             options.Now,
 	}
-	if err := db.WithContext(ctx).AutoMigrate(&gormIdempotencyRecord{}); err != nil {
-		return nil, idempotencyDatabaseError(ctx)
-	}
-	return store, nil
 }
 
 func (s *GORMIdempotencyStore) Execute(ctx context.Context, scope IdempotencyScope, fingerprint string, execute func(context.Context) (CommandResult, error)) (CommandResult, error) {

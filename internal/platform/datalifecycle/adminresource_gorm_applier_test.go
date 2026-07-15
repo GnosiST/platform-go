@@ -80,6 +80,54 @@ func TestGORMAdminResourceApplierRejectsDeletionModeDrift(t *testing.T) {
 	}
 }
 
+func TestGORMAdminResourceApplierRejectsAuthorizationLifecycleWithoutCheckpoint(t *testing.T) {
+	for _, resource := range []string{"org-units", "role-groups", "roles", "users"} {
+		t.Run(resource, func(t *testing.T) {
+			db := openLifecycleTestDB(t)
+			adminRepository, lifecycleRepository, manifests := prepareAdminLifecycleApplyTest(t, db)
+			snapshot, err := adminRepository.Load(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			recordID := resource + "-1"
+			snapshot.Resources[resource] = []adminresource.Record{{
+				ID: recordID, Code: recordID, Name: "Authorization record", Status: "disabled", UpdatedAt: "2020-01-01T00:00:00Z",
+				DeletedAt: "2020-01-01T00:00:00Z", DeletedBy: "admin", DeleteReason: "deleted",
+				PurgeAfter: "2020-01-31T00:00:00Z", DeletionPolicyVersion: 1,
+			}}
+			if _, err := adminRepository.Save(context.Background(), snapshot); err != nil {
+				t.Fatal(err)
+			}
+			manifests[0].Admin.Resources = append(manifests[0].Admin.Resources, capability.AdminResource{
+				Resource: resource, Title: capability.Text("授权资源", "Authorization resource"), Description: capability.Text("授权资源。", "Authorization resource."),
+				PermissionPrefix: "admin:authorization", Deletion: &capability.AdminResourceDeletionPolicy{
+					Mode: capability.AdminDeletionSoftDelete, PolicyVersion: 1, RetentionDays: 30, AutoPurge: true,
+				},
+				Menu: capability.AdminMenu{Route: "/" + resource, Group: "test", Icon: "shield", Order: 3},
+			})
+			request := databaseApplyRequestForResource(t, lifecycleRepository, resource, recordID, "2020-01-31T00:00:00Z")
+			applier := NewGORMAdminResourceApplier(db, manifests, nil)
+
+			if _, err := applier.ApplyAndCheckpoint(context.Background(), request); !errors.Is(err, ErrApplyFailed) {
+				t.Fatalf("ApplyAndCheckpoint(%s lifecycle) error = %v, want ErrApplyFailed", resource, err)
+			}
+			if _, found, err := lifecycleRepository.LoadCheckpoint(context.Background(), request.Checkpoint.Key); err != nil || found {
+				t.Fatalf("%s lifecycle checkpoint found=%t error=%v, want no checkpoint", resource, found, err)
+			}
+			persisted, err := adminRepository.Load(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if records := persisted.Resources[resource]; len(records) != 1 || records[0].ID != recordID {
+				t.Fatalf("%s lifecycle record changed after rejection: %+v", resource, records)
+			}
+			if audits := persisted.Resources["audit-logs"]; countAuditAction(audits, "admin_resource.purge") != 0 {
+				t.Fatalf("%s lifecycle audit escaped rejection: %+v", resource, audits)
+			}
+		})
+	}
+}
+
 func TestGORMAdminResourceApplierPurgesOnlyRevokedAPITokenMetadata(t *testing.T) {
 	db := openLifecycleTestDB(t)
 	adminRepository, err := adminresource.NewGORMAdminResourceRepository(context.Background(), db)

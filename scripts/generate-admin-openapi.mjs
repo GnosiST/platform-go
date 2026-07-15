@@ -460,6 +460,53 @@ function serviceObjectSchemaPrefix(definition) {
 }
 
 function serviceObjectValueSchema(field) {
+  if (field.type === "string-set") {
+    return {
+      type: "array",
+      uniqueItems: true,
+      maxItems: 2000,
+      items: {
+        type: "string",
+        ...(field.maxLength ? { maxLength: field.maxLength } : {}),
+      },
+    };
+  }
+  if (field.type === "role-remediations") {
+    const codeProperty = {
+      type: "string",
+      ...(field.maxLength ? { maxLength: field.maxLength } : {}),
+    };
+    return {
+      type: "array",
+      uniqueItems: true,
+      maxItems: 2000,
+      items: {
+        oneOf: [
+          {
+            type: "object",
+            required: ["userCode", "roleCode", "action"],
+            additionalProperties: false,
+            properties: {
+              userCode: codeProperty,
+              roleCode: codeProperty,
+              action: { type: "string", const: "remove-role" },
+            },
+          },
+          {
+            type: "object",
+            required: ["userCode", "roleCode", "action", "replacementRoleCode"],
+            additionalProperties: false,
+            properties: {
+              userCode: codeProperty,
+              roleCode: codeProperty,
+              action: { type: "string", const: "replace-role" },
+              replacementRoleCode: codeProperty,
+            },
+          },
+        ],
+      },
+    };
+  }
   const schema = { type: field.type };
   if (field.maxLength) schema.maxLength = field.maxLength;
   if (field.minimum !== undefined) schema.minimum = field.minimum;
@@ -598,6 +645,7 @@ function serviceObjectCommandSchemas(definition) {
         timeoutMs: definition.timeoutMs,
         idempotency: definition.idempotency,
         maxAffectedRows: definition.maxAffectedRows,
+        ...(definition.operationPhase ? { operationPhase: definition.operationPhase } : {}),
       },
     },
   };
@@ -1240,6 +1288,7 @@ const openapi = {
   "x-source": path.relative(repoRoot, contractPath),
   "x-service-object-definition-source": adminServiceObjectDefinitions.source,
   "x-service-object-runtime-reference": adminServiceObjectDefinitions.runtimeSource,
+  "x-service-object-runtime-sources": adminServiceObjectDefinitions.runtimeSources,
   "x-source-version": contract.sourceVersion,
   "x-source-updated-at": contract.updatedAt,
   "x-stack": contract.stack,
