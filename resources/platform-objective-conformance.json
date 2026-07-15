@@ -1,11 +1,20 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-objective-conformance.json",
-  "capturedAt": "2026-07-15",
+  "capturedAt": "2026-07-16",
   "purpose": "Machine-checkable conformance contract for the persistent reusable platform foundation objective. It keeps stack choices, business-neutral reference use, future promotion gates, visual gates, deployment boundaries and closeout discipline aligned before further implementation continues.",
   "objectiveMode": "persistent-full-scope",
   "approvedStack": {
-    "backend": ["Gin", "GORM", "Casbin", "JWT"],
-    "frontend": ["Refine", "React", "Ant Design"]
+    "backend": [
+      "Gin",
+      "GORM",
+      "Casbin",
+      "JWT"
+    ],
+    "frontend": [
+      "Refine",
+      "React",
+      "Ant Design"
+    ]
   },
   "referenceProjectPolicy": {
     "referenceProject": "/Users/irainbow/Documents/DevelopmentSpace/myProject/zshenmez",
@@ -28,8 +37,8 @@
     "requiresDependencyConflictChecks": true,
     "requiresTaskGraphBeforeNewNode": true,
     "requiredUnfinishedNodes": [
-      "menu-tree-and-button-permission-configuration",
       "organization-rbac-menu-e2e-qa",
+      "unified-error-code-governance",
       "multi-datasource-contract-and-runtime",
       "tenant-placement-and-request-routing",
       "datasource-read-write-routing",
@@ -62,12 +71,23 @@
   "closeoutPolicy": {
     "neatFreakRequiredForEveryNodeCloseout": false,
     "neatFreakInvocationPolicy": {
-      "requiredFor": ["phase-closeout", "major-cross-module-task", "release-preparation"],
-      "notRequiredFor": ["small-node", "routine-sub-agent-task"]
+      "requiredFor": [
+        "phase-closeout",
+        "major-cross-module-task",
+        "release-preparation"
+      ],
+      "notRequiredFor": [
+        "small-node",
+        "routine-sub-agent-task"
+      ]
     },
     "knowledgeCleanupBeforeNodeCloseout": true,
     "nodeCloseoutAudit": "resources/platform-node-closeout-audit.json",
-    "docsRoots": ["README.md", "AGENTS.md", "docs/"]
+    "docsRoots": [
+      "README.md",
+      "AGENTS.md",
+      "docs/"
+    ]
   },
   "deploymentPolicy": {
     "vercelRequired": false,
@@ -81,8 +101,8 @@
     "mustNotMarkCompleteWhileBlockersActive": true,
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "controlledBlockers": [
-      "menu-tree-and-button-permission-configuration",
       "organization-rbac-menu-e2e-qa",
+      "unified-error-code-governance",
       "multi-datasource-contract-and-runtime",
       "tenant-placement-and-request-routing",
       "datasource-read-write-routing",

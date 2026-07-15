@@ -1,0 +1,139 @@
+{
+  "$schema": "https://platform-go.local/schemas/product-browser-evidence.json",
+  "capturedAt": "2026-07-15",
+  "taskId": "menu-tree-and-button-permission-configuration",
+  "tool": "in-app-browser",
+  "viewports": [
+    "375x812",
+    "390x844",
+    "768x1024",
+    "1024x768",
+    "1280x720",
+    "1440x1024"
+  ],
+  "verifiedBehavior": {
+    "directoryClickCollapseExpand": true,
+    "pageSelection": true,
+    "editForm": true,
+    "typedPageParameters": true,
+    "pageButtonMetadata": true,
+    "modalFocusReturnsToConnectedEditButton": true,
+    "documentHorizontalOverflow": false,
+    "modalBodyHorizontalOverflow": false,
+    "modalBodyScrollsWhenRequired": true,
+    "consoleWarnings": 0,
+    "consoleErrors": 0,
+    "failedResourceResponses": 0
+  },
+  "accessibility": {
+    "frozenAuditFinding": "Ant Tree screen-reader input did not expand the selected collapsed directory with ArrowRight because the controlled selection was not synchronized to an active keyboard node.",
+    "remediation": "AdminTreeWorkbench synchronizes selectedKey to Ant Tree activeKey and preserves Ant onActiveChange navigation.",
+    "executableCoverage": [
+      "scripts/validate-admin-ui-contracts.mjs",
+      "scripts/admin-ui-contracts.test.mjs"
+    ],
+    "browserRerunStatus": "verified",
+    "browserRerun": {
+      "capturedAt": "2026-07-16",
+      "viewport": "1440x1024",
+      "directoryLabel": "验收治理",
+      "childLabel": "菜单验收页",
+      "inputSelector": ".admin-tree-workbench-tree input[aria-label=\"for screen reader\"]",
+      "sequence": [
+        "collapsed-directory",
+        "selected-directory",
+        "focused-screen-reader-input",
+        "ArrowRight-expanded-and-exposed-child",
+        "ArrowLeft-collapsed-directory"
+      ]
+    }
+  },
+  "screenshots": [
+    {
+      "viewport": "375x812",
+      "scenario": "role-menu-write-gate",
+      "localPath": "tmp/product-audit/menu-task6/03-role-menu-gate-375x812-cdp.png",
+      "sha256": "sha256:20baa78e4ab8a510f3f91e9505d669d75212aca63fd42b0f49b3792547115f99"
+    },
+    {
+      "viewport": "390x844",
+      "scenario": "role-menu-write-gate",
+      "localPath": "tmp/product-audit/menu-task6/04-role-menu-gate-390x844.png",
+      "sha256": "sha256:1965e8e60fd186d4cdae254c002f051e3f2cf119f50299ef8d5a467eddc01b8d"
+    },
+    {
+      "viewport": "768x1024",
+      "scenario": "role-menu-write-gate",
+      "localPath": "tmp/product-audit/menu-task6/05-role-menu-gate-768x1024.png",
+      "sha256": "sha256:17c3936e02afba85140b01729755cf0f815914551f9012886a9c15efc400522c"
+    },
+    {
+      "viewport": "1024x768",
+      "scenario": "role-menu-write-gate",
+      "localPath": "tmp/product-audit/menu-task6/06-role-menu-gate-1024x768.png",
+      "sha256": "sha256:68fb976413ff3a1f9467655336f4ffc679b12f72f4f31f2c8bd6fd6fa5724e43"
+    },
+    {
+      "viewport": "1280x720",
+      "scenario": "role-menu-write-gate",
+      "localPath": "tmp/product-audit/menu-task6/07-role-menu-gate-1280x720.png",
+      "sha256": "sha256:a25ea552ffe56682687e985d61bc04989321175f99c2ed1ecb5118dcdfc89ff1"
+    },
+    {
+      "viewport": "1440x1024",
+      "scenario": "role-menu-write-gate",
+      "localPath": "tmp/product-audit/menu-task6/08-role-menu-gate-1440x1024.png",
+      "sha256": "sha256:1c1af1c39f03700a6bcd6659823efe5e230c04e79f55c698620aebf748b7cf7a"
+    },
+    {
+      "viewport": "375x812",
+      "scenario": "menu-edit",
+      "localPath": "tmp/product-audit/menu-task6/09-menu-edit-375x812.png",
+      "sha256": "sha256:a4a7ed511eb3a4e4d76eb283da2adcdc811f9fe1bd74a96c7a2f5fb8cea11e32"
+    },
+    {
+      "viewport": "390x844",
+      "scenario": "menu-edit",
+      "localPath": "tmp/product-audit/menu-task6/10-menu-edit-390x844.png",
+      "sha256": "sha256:05b6957d91b4b22f0e59732fcec866262cf9af18dc2cbec16f2540ab1ea4fbb3"
+    },
+    {
+      "viewport": "768x1024",
+      "scenario": "menu-edit",
+      "localPath": "tmp/product-audit/menu-task6/11-menu-edit-768x1024.png",
+      "sha256": "sha256:2d0f071c05ddc3a67724ef2ae84209a5166e1e00ffbb2d6d0aefce2aa4e28aa4"
+    },
+    {
+      "viewport": "1024x768",
+      "scenario": "menu-edit",
+      "localPath": "tmp/product-audit/menu-task6/12-menu-edit-1024x768.png",
+      "sha256": "sha256:2ae509053caf5f30170173d25fe805299d2195579d7189b269b9d9f9f6649212"
+    },
+    {
+      "viewport": "1280x720",
+      "scenario": "menu-edit",
+      "localPath": "tmp/product-audit/menu-task6/13-menu-edit-1280x720.png",
+      "sha256": "sha256:0cc6d3e2f553a99ee8a76e6cbfa480d217b2c42017c4e86b4c4b6924083caf0c"
+    },
+    {
+      "viewport": "1440x1024",
+      "scenario": "menu-edit",
+      "localPath": "tmp/product-audit/menu-task6/14-menu-edit-1440x1024.png",
+      "sha256": "sha256:7919170fb97cc7301fa94bfd0e8210ce54e49240d450fa5c2a3a0b9649106f21"
+    },
+    {
+      "viewport": "1440x1024",
+      "scenario": "keyboard-expanded",
+      "localPath": "tmp/product-audit/menu-task6/18-menu-keyboard-expanded-1440x1024.png",
+      "sha256": "sha256:3c8a46adfa1bd7d5a12c3b6ed14698e4784e0cfe79c304624b217ed032e2f89c"
+    }
+  ],
+  "unclaimedGates": [
+    "tree-transfer-10000-node-performance",
+    "full-tree-transfer-acceptance",
+    "dual-read-principal-equivalence",
+    "migration-cutover",
+    "migration-rollback",
+    "organization-rbac-menu-e2e"
+  ]
+}

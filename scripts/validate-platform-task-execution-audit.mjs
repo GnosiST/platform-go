@@ -116,6 +116,7 @@ function validateStatusPolicy(audit, errors) {
     "parallelBatchesMustAvoidResourceLockGroups",
     "parallelBatchesMustAvoidResourceLockConflicts",
     "parallelBatchesMustAvoidDependencyPaths",
+    "releaseLanePartitionRequired",
   ]) {
     if (policy[key] !== true) {
       errors.push(`statusPolicy.${key} must stay true`);

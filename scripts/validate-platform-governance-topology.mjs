@@ -315,8 +315,8 @@ function validateGovernanceEvaluation(topology, errors) {
 
 function validateOrganizationRbacMenuMigration(topology, errors) {
   const migration = topology.organizationRbacMenuMigration ?? {};
-  if (migration.status !== "backend-organization-and-role-admin-implemented-menu-e2e-pending") {
-    errors.push("organizationRbacMenuMigration.status must keep backend, organization Admin and role Admin implemented while menu and full E2E remain pending");
+  if (migration.status !== "backend-organization-role-and-menu-implemented-e2e-pending") {
+    errors.push("organizationRbacMenuMigration.status must keep backend, organization Admin, role Admin and menu governance implemented while full E2E remains pending");
   }
   if (migration.designStatus !== "frozen") {
     errors.push("organizationRbacMenuMigration.designStatus must stay frozen after the contract node closes");

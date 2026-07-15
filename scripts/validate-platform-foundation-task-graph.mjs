@@ -18,6 +18,26 @@ const requiredWatermarkEvidenceManifest = "resources/evidence/admin-watermark-ex
 const requiredSensitiveRevealEvidenceManifest = "resources/evidence/sensitive-data-reveal-step-up-20260713.json";
 const requiredOrganizationUserEvidenceManifest = "resources/evidence/organization-user-admin-experience-20260715.json";
 const requiredRoleTreeEvidenceManifest = "resources/evidence/role-tree-and-authorization-entry-20260715.json";
+const requiredMenuEvidenceManifest = "resources/evidence/menu-tree-and-button-permission-configuration-20260715.json";
+const releaseBlockingNodes = [
+  "organization-rbac-menu-e2e-qa",
+  "unified-error-code-governance",
+  "open-source-portability",
+  "public-docs-community",
+  "public-docs-site",
+  "github-release-publication",
+];
+const postReleaseOptionalNodes = [
+  "multi-datasource-contract-and-runtime",
+  "tenant-placement-and-request-routing",
+  "datasource-read-write-routing",
+  "sharding-and-tenant-migration",
+  "federated-read-query",
+  "xa-optional-adapter",
+  "database-certification-matrix",
+  "transactional-outbox-and-one-mq-adapter",
+  "asynchronous-search-projection",
+];
 const foundationPromotionGateTaskIDs = new Set(["production-auth-provider-hardening", "source-writing-codegen-promotion"]);
 const foundationBaselineTaskIDs = [
   "stack-alignment-and-architecture",
@@ -75,6 +95,7 @@ const approvedCompletionProgramTaskIDs = [
   "role-tree-and-authorization-entry",
   "menu-tree-and-button-permission-configuration",
   "organization-rbac-menu-e2e-qa",
+  "unified-error-code-governance",
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",
   "datasource-read-write-routing",
@@ -99,6 +120,7 @@ const requiredRemainingTaskDependencies = new Map([
   ["role-tree-and-authorization-entry", ["organization-user-admin-experience"]],
   ["menu-tree-and-button-permission-configuration", ["role-tree-and-authorization-entry"]],
   ["organization-rbac-menu-e2e-qa", ["organization-user-admin-experience", "role-tree-and-authorization-entry", "menu-tree-and-button-permission-configuration"]],
+  ["unified-error-code-governance", ["platform-service-contract-standard", "persisted-query-command-object-runtime", "admin-api-boundary-query-security", "openapi-app-contracts", "runtime-security-containment"]],
   ["multi-datasource-contract-and-runtime", ["platform-service-contract-standard", "data-lifecycle-retention", "production-persistence-correctness"]],
   ["tenant-placement-and-request-routing", ["multi-datasource-contract-and-runtime", "organization-role-pool-backend-and-migration"]],
   ["datasource-read-write-routing", ["tenant-placement-and-request-routing"]],
@@ -108,7 +130,7 @@ const requiredRemainingTaskDependencies = new Map([
   ["database-certification-matrix", ["xa-optional-adapter"]],
   ["transactional-outbox-and-one-mq-adapter", ["integration-ports-disabled-default", "database-certification-matrix"]],
   ["asynchronous-search-projection", ["transactional-outbox-and-one-mq-adapter", "persisted-query-command-object-runtime"]],
-  ["open-source-portability", ["admin-watermark-export-governance", "organization-rbac-menu-e2e-qa", "asynchronous-search-projection"]],
+  ["open-source-portability", ["admin-watermark-export-governance", "organization-rbac-menu-e2e-qa", "unified-error-code-governance"]],
   ["public-docs-community", ["open-source-portability"]],
   ["public-docs-site", ["public-docs-community"]],
   ["github-release-publication", ["public-docs-site", "open-source-portability"]],
@@ -577,6 +599,24 @@ function validateTask(task, context, errors) {
     requireIncludes(task.evidence?.screenshots, [requiredRoleTreeEvidenceManifest], `${task.id} evidence.screenshots`, errors);
     requireIncludes(task.evidence?.skills, ["ui-ux-pro-max"], `${task.id} evidence.skills`, errors);
   }
+  if (task.id === "menu-tree-and-button-permission-configuration") {
+    if (task.status !== "implemented") {
+      errors.push("menu-tree-and-button-permission-configuration must stay implemented after menu governance closeout");
+    }
+    requireIncludes(
+      task.evidence?.validators,
+      [
+        "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+        "scripts/validate-admin-i18n.mjs",
+        "scripts/validate-admin-ui-contracts.mjs",
+      ],
+      `${task.id} evidence.validators`,
+      errors,
+    );
+    requireIncludes(task.evidence?.tests, requiredAdminUIContractTests, `${task.id} evidence.tests`, errors);
+    requireIncludes(task.evidence?.screenshots, [requiredMenuEvidenceManifest], `${task.id} evidence.screenshots`, errors);
+    requireIncludes(task.evidence?.skills, ["ui-ux-pro-max"], `${task.id} evidence.skills`, errors);
+  }
   if (task.status === "implemented" || task.status === "preview") {
     const evidence = task.evidence ?? {};
     const evidencePaths = evidencePathKeys.flatMap((key) => values(evidence[key]));
@@ -713,6 +753,74 @@ function validateCompletionProgram(tasks, errors) {
   }
 }
 
+function validateReleaseLanes(graph, tasks, tasksByID, errors) {
+  const release = values(graph.releaseBlockingNodes);
+  const optional = values(graph.postReleaseOptionalNodes);
+  errors.push(...uniqueErrors(release, "releaseBlockingNodes"));
+  errors.push(...uniqueErrors(optional, "postReleaseOptionalNodes"));
+
+  for (const taskID of release) {
+    if (!tasksByID.has(taskID)) {
+      errors.push(`releaseBlockingNodes references unknown task ${taskID}`);
+    }
+  }
+  for (const taskID of optional) {
+    if (!tasksByID.has(taskID)) {
+      errors.push(`postReleaseOptionalNodes references unknown task ${taskID}`);
+    }
+  }
+
+  const releaseSet = new Set(release);
+  const optionalSet = new Set(optional);
+  for (const taskID of releaseSet) {
+    if (optionalSet.has(taskID)) {
+      errors.push(`release lanes overlap at ${taskID}`);
+    }
+  }
+
+  const orderedRelease = tasks.filter((task) => releaseSet.has(task.id)).map((task) => task.id);
+  const orderedOptional = tasks.filter((task) => optionalSet.has(task.id)).map((task) => task.id);
+  if (!sameList(release, orderedRelease)) {
+    errors.push("releaseBlockingNodes must preserve task graph order");
+  }
+  if (!sameList(optional, orderedOptional)) {
+    errors.push("postReleaseOptionalNodes must preserve task graph order");
+  }
+
+  const unfinished = tasks.filter((task) => task.status !== "implemented").map((task) => task.id);
+  const laneUnion = tasks.filter((task) => releaseSet.has(task.id) || optionalSet.has(task.id)).map((task) => task.id);
+  if (!sameList(laneUnion, unfinished) || release.length + optional.length !== unfinished.length) {
+    errors.push("release lane union must exactly match unfinished task graph nodes in graph order");
+  }
+
+  for (const taskID of postReleaseOptionalNodes) {
+    const task = tasksByID.get(taskID);
+    if (!optionalSet.has(taskID)) {
+      errors.push(`postReleaseOptionalNodes must include ${taskID}`);
+    }
+    if (task?.status !== "deferred") {
+      errors.push(`post-release optional task ${taskID} must be deferred`);
+    }
+  }
+  for (const taskID of releaseBlockingNodes) {
+    const task = tasksByID.get(taskID);
+    if (!releaseSet.has(taskID)) {
+      errors.push(`releaseBlockingNodes must include ${taskID}`);
+    }
+    if (task?.status === "deferred") {
+      errors.push(`release blocker ${taskID} must not be deferred`);
+    }
+    if (task?.status === "implemented") {
+      errors.push(`release blocker ${taskID} must remain unfinished while listed`);
+    }
+    for (const optionalTaskID of postReleaseOptionalNodes) {
+      if (hasDependencyPath(tasksByID, taskID, optionalTaskID)) {
+        errors.push(`release blocker ${taskID} must not depend on post-release optional task ${optionalTaskID}`);
+      }
+    }
+  }
+}
+
 function hasLaterPhaseDependencyException(task, dependency) {
   return values(task.phaseDependencyExceptions).some((exception) => exception.dependency === dependency && hasLocalizedText(exception.reason));
 }
@@ -827,6 +935,7 @@ function validate() {
     validateTask(task, context, errors);
   }
   validateCompletionProgram(tasks, errors);
+  validateReleaseLanes(graph, tasks, tasksByID, errors);
   validateProductionAdminOIDCNode(tasks, oidcEvidence, errors);
 
   for (const cycle of detectCycles(tasksByID)) {

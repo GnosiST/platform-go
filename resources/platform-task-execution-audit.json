@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-task-execution-audit.json",
-  "capturedAt": "2026-07-15",
+  "capturedAt": "2026-07-16",
   "purpose": "Machine-checkable execution audit for the active platform foundation goal: every task node, dependency, resource lock, parallel batch, future runtime-promotion gate and visual workflow gate remains explicit after foundation implementation closes.",
   "taskGraph": "resources/platform-foundation-task-graph.json",
   "alignmentAudit": "resources/platform-foundation-alignment-audit.json",
@@ -14,11 +14,12 @@
     "resourceLocksMustDeclarePolicies": true,
     "parallelBatchesMustAvoidResourceLockGroups": true,
     "parallelBatchesMustAvoidResourceLockConflicts": true,
-    "parallelBatchesMustAvoidDependencyPaths": true
+    "parallelBatchesMustAvoidDependencyPaths": true,
+    "releaseLanePartitionRequired": true
   },
   "requiredUnfinishedNodes": [
-    "menu-tree-and-button-permission-configuration",
     "organization-rbac-menu-e2e-qa",
+    "unified-error-code-governance",
     "multi-datasource-contract-and-runtime",
     "tenant-placement-and-request-routing",
     "datasource-read-write-routing",

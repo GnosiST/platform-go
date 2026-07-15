@@ -8,8 +8,8 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "menu-tree-and-button-permission-configuration",
   "organization-rbac-menu-e2e-qa",
+  "unified-error-code-governance",
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",
   "datasource-read-write-routing",
@@ -55,6 +55,18 @@ describe("validate-platform-task-execution-audit", () => {
     const audit = readJSON("resources/platform-task-execution-audit.json");
 
     assert.deepEqual(audit.requiredUnfinishedNodes, completionProgramTaskIDs);
+    assert.equal(audit.statusPolicy.releaseLanePartitionRequired, true);
+  });
+
+  it("rejects execution audits that stop requiring the release-lane partition", () => {
+    const audit = readJSON("resources/platform-task-execution-audit.json");
+    audit.statusPolicy.releaseLanePartitionRequired = false;
+    const auditPath = tempJSON("platform-task-execution-audit.json", audit);
+
+    const result = runValidator(["--audit", auditPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /statusPolicy\.releaseLanePartitionRequired must stay true/);
   });
 
   it("rejects an unfinished task graph node that is missing from the execution audit", () => {

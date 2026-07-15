@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-foundation-task-graph.json",
-  "capturedAt": "2026-07-14",
+  "capturedAt": "2026-07-16",
   "purpose": "Execution dependency and conflict-control graph for the reusable platform foundation.",
   "approvedStack": {
     "backend": [
@@ -2842,7 +2842,7 @@
       },
       "phase": "production-governance",
       "scope": "admin-ui",
-      "status": "pending",
+      "status": "implemented",
       "statusReason": {
         "zh": "菜单尚未区分目录与页面，路由元信息、页面按钮和独立 role_menu 分配合同也未实现。",
         "en": "Menus do not distinguish directories and pages, and route metadata, page buttons and independent role_menu assignment are not implemented."
@@ -2867,8 +2867,30 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
-          "docs/platform-ui-optimization-assessment.md"
+          "docs/platform-organization-rbac-menu-contract.md",
+          "docs/admin-rbac-menu.md",
+          "docs/platform-ui-optimization-assessment.md",
+          "docs/superpowers/plans/2026-07-15-menu-tree-and-button-permission-configuration.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs"
+        ],
+        "tests": [
+          "internal/platform/organizationrbac/menu_repository_test.go",
+          "internal/platform/organizationrbac/navigation_service_objects_test.go",
+          "scripts/platform-organization-rbac-menu-contract.test.mjs",
+          "scripts/admin-ui-contracts.test.mjs"
+        ],
+        "screenshots": [
+          "resources/evidence/menu-tree-and-button-permission-configuration-20260715.json"
+        ],
+        "skills": [
+          "superpowers:brainstorming",
+          "product-design",
+          "ui-ux-pro-max",
+          "browser:control-in-app-browser"
         ]
       }
     },
@@ -2917,6 +2939,46 @@
       }
     },
     {
+      "id": "unified-error-code-governance",
+      "title": {
+        "zh": "统一错误码治理",
+        "en": "Unified Error Code Governance"
+      },
+      "phase": "production-governance",
+      "scope": "governance",
+      "status": "pending",
+      "statusReason": {
+        "zh": "Admin、App、服务、数据、控制面与外部适配器仍使用分散的错误码字面量，尚无统一注册表、生命周期与请求追踪合同。",
+        "en": "Admin, App, service, data, control and external adapter planes still use distributed error-code literals without a canonical registry, lifecycle or request-correlation contract."
+      },
+      "completionGate": {
+        "zh": "建立稳定错误码注册表及所有权、受众、HTTP 映射、重试、脱敏、兼容和弃用元数据；所有响应构造器与适配器统一解析；请求/追踪 ID 贯通响应、日志和审计；OpenAPI 与 Go/TypeScript 代码生成公开合同；重复、重分配、未记录和无弃用删除均由验证器阻断，并覆盖授权、校验、未找到、冲突、限流/成本、依赖与内部失败路径。",
+        "en": "Establish one stable registry with ownership, audience, HTTP mapping, retryability, redaction, compatibility and deprecation metadata; route every response constructor and adapter through it; correlate response, log and audit records with request/trace IDs; expose the public contract through OpenAPI and Go/TypeScript codegen; reject duplicate, reassigned, undocumented and removed-without-deprecation codes; and contract-test authorization, validation, not-found, conflict, rate/cost, dependency and internal failures without leaking schema, credentials, PII or adapter errors."
+      },
+      "resourceLocks": [
+        "service-contract",
+        "admin-resource-api",
+        "app-api-contract",
+        "openapi",
+        "codegen",
+        "audit-policy",
+        "docs"
+      ],
+      "dependsOn": [
+        "platform-service-contract-standard",
+        "persisted-query-command-object-runtime",
+        "admin-api-boundary-query-security",
+        "openapi-app-contracts",
+        "runtime-security-containment"
+      ],
+      "evidence": {
+        "docs": [
+          "docs/platform-service-contract-standard.md",
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md"
+        ]
+      }
+    },
+    {
       "id": "multi-datasource-contract-and-runtime",
       "title": {
         "zh": "数据源注册表运行时基础",
@@ -2924,10 +2986,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
+      "status": "deferred",
       "statusReason": {
-        "zh": "当前 DSN 仅按平台子系统分离，尚无版本化 Datasource/DatasourceGroup、能力绑定、健康状态和事务钉住。",
-        "en": "Current DSNs only separate platform subsystems and provide no versioned Datasource/DatasourceGroup registry, capability binding, health state or transaction pinning."
+        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
+        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
       },
       "completionGate": {
         "zh": "完成版本化数据源与数据源组、能力绑定、加密配置引用、启动验证、健康状态和单数据源/分片事务钉住。",
@@ -2959,10 +3021,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
+      "status": "deferred",
       "statusReason": {
-        "zh": "平台没有版本化 tenant 到 datasource group/shard/schema 的控制面和可信请求解析。",
-        "en": "The platform has no versioned tenant-to-datasource-group/shard/schema control plane or trusted request resolution."
+        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
+        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
       },
       "completionGate": {
         "zh": "完成 TenantPlacement 控制面、状态与迁移审计、可信上下文解析以及高权限限域 override。",
@@ -2995,10 +3057,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
+      "status": "deferred",
       "statusReason": {
-        "zh": "数据源组内部尚无 primary/replica 自动路由、写后读一致性或复制延迟降级策略。",
-        "en": "Datasource groups lack automatic primary/replica routing, read-after-write consistency and replication-lag fallback policy."
+        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
+        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
       },
       "completionGate": {
         "zh": "完成 dbresolver 或等价适配、写与事务强制主库、sticky window、延迟健康、故障回退和路由证据。",
@@ -3028,10 +3090,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
+      "status": "deferred",
       "statusReason": {
-        "zh": "尚无显式分片键、全局 ID、路由版本、扩容再平衡和可恢复租户迁移流程。",
-        "en": "There are no explicit shard keys, global IDs, routing versions, expansion/rebalancing or recoverable tenant migration flows."
+        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
+        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
       },
       "completionGate": {
         "zh": "完成分片路由、全局 ID、版本化放置、扩容再平衡和带检查点、审计与补偿的租户迁移。",
@@ -3063,10 +3125,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
+      "status": "deferred",
       "statusReason": {
-        "zh": "跨库报表查询尚无 persisted query、租户隔离、字段/行数/成本/超时和取消边界。",
-        "en": "Cross-database report queries lack persisted-query, tenant isolation, field/row/cost/timeout and cancellation boundaries."
+        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
+        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
       },
       "completionGate": {
         "zh": "完成仅面向持久化报表定义的只读联邦执行器，禁止普通 OLTP Repository 跨库 Join，并验证隔离与资源限制。",
@@ -3098,10 +3160,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
+      "status": "deferred",
       "statusReason": {
-        "zh": "平台尚无默认关闭的 XA 协调器、资源管理器兼容矩阵和启发式恢复运维能力。",
-        "en": "The platform has no default-off XA coordinator, resource-manager compatibility matrix or heuristic recovery operations."
+        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
+        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
       },
       "completionGate": {
         "zh": "完成默认关闭适配器、超时边界、prepare/commit/rollback 证据、启发式恢复记录和运维处置；不替代 Outbox/Saga 默认路径。",
@@ -3133,10 +3195,10 @@
       },
       "phase": "production-governance",
       "scope": "governance",
-      "status": "pending",
+      "status": "deferred",
       "statusReason": {
-        "zh": "MySQL、PostgreSQL、SQLite、人大金仓和 Oracle 尚无覆盖仓储、迁移、路由、分片、联邦与 XA 的权威认证矩阵。",
-        "en": "MySQL, PostgreSQL, SQLite, KingbaseES and Oracle lack an authoritative matrix covering repositories, migrations, routing, sharding, federation and XA."
+        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
+        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
       },
       "completionGate": {
         "zh": "按驱动、版本和特性聚合自动化认证；任何未通过组合必须明确标记 experimental 或 unsupported。",
@@ -3167,10 +3229,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
+      "status": "deferred",
       "statusReason": {
-        "zh": "当前 Redis Pub/Sub 只承担缓存失效，不具备事务消息、版本化事件、幂等、重试、死信、重放和补偿能力。",
-        "en": "Current Redis Pub/Sub only distributes cache invalidation and provides no transactional messaging, versioned events, idempotency, retries, dead letters, replay or compensation."
+        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
+        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
       },
       "completionGate": {
         "zh": "完成事务 Outbox、版本化事件包络、trace context、幂等消费、重试/死信/重放、Saga 补偿，并只认证一个 MQ 适配器。",
@@ -3204,10 +3266,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "pending",
+      "status": "deferred",
       "statusReason": {
-        "zh": "平台尚无消费 Outbox 的 Elasticsearch/OpenSearch 投影、重建、重放和字段/租户隔离边界。",
-        "en": "The platform has no Outbox-fed Elasticsearch/OpenSearch projection, rebuild, replay or field/tenant isolation boundary."
+        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
+        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
       },
       "completionGate": {
         "zh": "完成可重建投影、重放与删除同步、字段白名单、租户隔离、成本限制和关系数据库事实源边界。",
@@ -3257,7 +3319,7 @@
       "dependsOn": [
         "admin-watermark-export-governance",
         "organization-rbac-menu-e2e-qa",
-        "asynchronous-search-projection"
+        "unified-error-code-governance"
       ],
       "evidence": {
         "docs": [
@@ -3313,8 +3375,8 @@
         "en": "The Chinese-default Docusaurus site, English core guides, real screenshots and GitHub Pages build are not implemented."
       },
       "completionGate": {
-        "zh": "完成 Product Design 方向、design-taste-frontend 审美复核、站点构建、SEO 元数据和移动/桌面浏览器验收。",
-        "en": "Complete Product Design direction, design-taste-frontend art review, site build, SEO metadata and mobile/desktop browser acceptance."
+        "zh": "完成 Product Design 方向、design-taste-frontend 审美复核、站点构建、SEO 元数据和移动/桌面浏览器验收。 alibaba/page-agent 仅可作为站点默认关闭的可选子能力，通过显式构建标志启用；启用前必须完成许可证、NOTICE/SBOM、依赖与密钥扫描、CSP、出站端点、隐私/遥测、最小权限和回滚开关审查，并验证默认构建不包含其包或网络初始化。",
+        "en": "Complete Product Design direction, design-taste-frontend art review, site build, SEO metadata and mobile/desktop browser acceptance. alibaba/page-agent may exist only as a default-off site sub-capability enabled by an explicit build flag; before enablement verify license, NOTICE/SBOM, dependency and secret scans, CSP, outbound endpoints, privacy/telemetry, least privilege and rollback controls, and prove the default build contains no page-agent bundle or network initialization."
       },
       "visual": true,
       "designGate": [
@@ -3412,5 +3474,24 @@
         "multi-datasource-contract-and-runtime"
       ]
     }
+  ],
+  "releaseBlockingNodes": [
+    "organization-rbac-menu-e2e-qa",
+    "unified-error-code-governance",
+    "open-source-portability",
+    "public-docs-community",
+    "public-docs-site",
+    "github-release-publication"
+  ],
+  "postReleaseOptionalNodes": [
+    "multi-datasource-contract-and-runtime",
+    "tenant-placement-and-request-routing",
+    "datasource-read-write-routing",
+    "sharding-and-tenant-migration",
+    "federated-read-query",
+    "xa-optional-adapter",
+    "database-certification-matrix",
+    "transactional-outbox-and-one-mq-adapter",
+    "asynchronous-search-projection"
   ]
 }

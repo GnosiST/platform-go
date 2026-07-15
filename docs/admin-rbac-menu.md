@@ -7,7 +7,7 @@ Last updated: 2026-07-15
 
 The admin foundation now has a runtime RBAC slice for platform menus and generic admin resources. Menu records are generated from enabled capability manifests, then filtered by the current principal.
 
-The default legacy mode below remains the migration-source experience. The target backend contract in `docs/platform-organization-rbac-menu-contract.md` is implemented behind `PLATFORM_ORGANIZATION_RBAC_MODE=target`: role groups are non-nested and scoped, organizations bind tenant role groups, tenant users derive tenant from one primary organization, and API/page-button permission resources are separated. The organization/user Admin UI and strict role-group-to-role workbench are implemented. The workbench owns role/group metadata, reviewed role move/disable remediation, and atomic allow/deny/data-scope authorization. Page-only `role_menu` persistence, menu/page-button schema, service objects and revision-aware target resolution now exist behind closed serving and write gates. The menu entry remains read-only; the dedicated menu governance UI, role assignment wiring and full browser/cutover E2E remain pending.
+The default legacy mode below remains the migration-source experience. The target backend contract in `docs/platform-organization-rbac-menu-contract.md` is implemented behind `PLATFORM_ORGANIZATION_RBAC_MODE=target`: role groups are non-nested and scoped, organizations bind tenant role groups, tenant users derive tenant from one primary organization, and API/page-button permission resources are separated. The organization/user Admin UI, strict role-group-to-role workbench and dedicated menu tree/detail workbench are implemented. Page-only `role_menu` persistence, menu/page-button schema, service objects and revision-aware target resolution exist behind closed serving and write gates. Role menu assignment remains read-only while the migration write gate is closed; full Tree Transfer scale, all-principal dual-read equivalence, cutover/rollback and organization E2E remain pending.
 
 This slice turns resource permission codes into executable behavior:
 
@@ -96,7 +96,7 @@ The legacy migration-source runtime does not use a direct role-menu binding tabl
 user -> roles -> permissions / denyPermissions -> menus/resources/actions
 ```
 
-Menus and resource actions declare permission codes. Roles grant permission codes through `roles.permissions` and can explicitly deny permission codes through `roles.denyPermissions`. A legacy menu is visible when the current principal has the menu's required permission and no deny rule matches it. Target mode keeps this only as a read-only migration view until the next node adds independent page visibility through `role_menu`; API permission remains the backend security boundary.
+Menus and resource actions declare permission codes. Roles grant permission codes through `roles.permissions` and can explicitly deny permission codes through `roles.denyPermissions`. A legacy menu is visible when the current principal has the menu's required permission and no deny rule matches it. Target mode keeps this as a read-only migration view while independent page visibility through `role_menu` remains behind closed serving and write gates; API permission remains the backend security boundary.
 
 The legacy schema can still contain nested role-group compatibility data:
 

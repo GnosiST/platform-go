@@ -15,14 +15,15 @@ const topologyPath = path.resolve(repoRoot, argValue("--topology", "resources/pl
 const taskGraphPath = path.resolve(repoRoot, argValue("--task-graph", "resources/platform-foundation-task-graph.json"));
 const matrixPath = path.resolve(repoRoot, argValue("--matrix", "resources/platform-engineering-capabilities.json"));
 const serviceRuntimePath = path.resolve(repoRoot, argValue("--service-runtime", "resources/platform-service-object-runtime.json"));
+const menuEvidencePath = path.resolve(repoRoot, argValue("--menu-evidence", "resources/evidence/menu-tree-and-button-permission-configuration-20260715.json"));
 
 const taskId = "organization-rbac-menu-contract-and-migration-design";
 const implementedDownstreamTaskIds = [
   "organization-user-admin-experience",
   "role-tree-and-authorization-entry",
+  "menu-tree-and-button-permission-configuration",
 ];
 const deferredDownstreamTaskIds = [
-  "menu-tree-and-button-permission-configuration",
   "organization-rbac-menu-e2e-qa",
 ];
 
@@ -73,8 +74,8 @@ function serviceObjectKeys(items) {
   return values(items).map((item) => `${item.id}@${item.version}`);
 }
 
-function validateContract(contract, serviceRuntime, errors) {
-  requireEqual(contract.status, "backend-organization-and-role-admin-implemented-menu-e2e-pending", "status", errors);
+function validateContract(contract, serviceRuntime, menuEvidence, errors) {
+  requireEqual(contract.status, "backend-organization-role-and-menu-implemented-e2e-pending", "status", errors);
   requireEqual(contract.taskId, taskId, "taskId", errors);
   requireIncludes(contract.designEvidence, ["superpowers:brainstorming", "product-design", "ui-ux-pro-max"], "designEvidence", errors);
 
@@ -310,24 +311,59 @@ function validateContract(contract, serviceRuntime, errors) {
     "legacy-role-menu-dual-read-equivalence-and-rollback",
   ], "browserAcceptance.scenarios", errors);
 
-  requireEqual(contract.runtimeBoundary?.implementationStatus, "backend-organization-and-role-admin-implemented-menu-e2e-pending", "runtimeBoundary.implementationStatus", errors);
+  requireEqual(contract.runtimeBoundary?.implementationStatus, "backend-organization-role-and-menu-implemented-e2e-pending", "runtimeBoundary.implementationStatus", errors);
   requireEqual(contract.runtimeBoundary?.backendAndMigrationStatus, "implemented", "runtimeBoundary.backendAndMigrationStatus", errors);
-  requireEqual(contract.runtimeBoundary?.adminUIStatus, "organization-user-and-role-implemented-menu-pending", "runtimeBoundary.adminUIStatus", errors);
-  requireEqual(contract.runtimeBoundary?.menuRuntimeStatus, "pending", "runtimeBoundary.menuRuntimeStatus", errors);
-  requireEqual(contract.runtimeBoundary?.browserQAStatus, "organization-user-and-role-browser-accepted-full-e2e-pending", "runtimeBoundary.browserQAStatus", errors);
+  requireEqual(contract.runtimeBoundary?.adminUIStatus, "organization-user-role-and-menu-implemented", "runtimeBoundary.adminUIStatus", errors);
+  requireEqual(contract.runtimeBoundary?.menuRuntimeStatus, "implemented", "runtimeBoundary.menuRuntimeStatus", errors);
+  requireEqual(contract.runtimeBoundary?.browserQAStatus, "menu-workbench-browser-accepted-full-organization-e2e-pending", "runtimeBoundary.browserQAStatus", errors);
   if (!sameList(values(contract.runtimeBoundary?.deferredTaskIds), deferredDownstreamTaskIds)) {
-    errors.push("runtimeBoundary.deferredTaskIds must match the two remaining organization/RBAC/menu nodes");
+    errors.push("runtimeBoundary.deferredTaskIds must retain only organization-rbac-menu-e2e-qa");
   }
   requireIncludes(contract.runtimeBoundary?.notOwned, ["datasource-routing", "federated-query", "xa", "outbox", "mq", "search-projection", "workload-identity"], "runtimeBoundary.notOwned", errors);
 
   for (const [kind, paths] of Object.entries(contract.evidence ?? {})) {
     for (const relativePath of values(paths)) requireExisting(relativePath, `evidence.${kind}`, errors);
   }
+  requireIncludes(contract.evidence?.screenshots, ["resources/evidence/menu-tree-and-button-permission-configuration-20260715.json"], "evidence.screenshots", errors);
+  requireIncludes(menuEvidence.viewports, ["375x812", "390x844", "768x1024", "1024x768", "1280x720", "1440x1024"], "menu evidence viewports", errors);
+  requireEqual(menuEvidence.verifiedBehavior?.directoryClickCollapseExpand, true, "menu evidence directoryClickCollapseExpand", errors);
+  requireEqual(menuEvidence.verifiedBehavior?.modalFocusReturnsToConnectedEditButton, true, "menu evidence modal focus return", errors);
+  requireEqual(menuEvidence.verifiedBehavior?.documentHorizontalOverflow, false, "menu evidence document horizontal overflow", errors);
+  requireEqual(menuEvidence.verifiedBehavior?.modalBodyHorizontalOverflow, false, "menu evidence modal horizontal overflow", errors);
+  requireEqual(menuEvidence.verifiedBehavior?.consoleErrors, 0, "menu evidence console errors", errors);
+  requireEqual(menuEvidence.verifiedBehavior?.failedResourceResponses, 0, "menu evidence failed resource responses", errors);
+  requireEqual(menuEvidence.accessibility?.browserRerunStatus, "verified", "menu evidence accessibility browser rerun status", errors);
+  requireEqual(menuEvidence.accessibility?.browserRerun?.capturedAt, "2026-07-16", "menu evidence accessibility browser rerun capturedAt", errors);
+  requireEqual(menuEvidence.accessibility?.browserRerun?.viewport, "1440x1024", "menu evidence accessibility browser rerun viewport", errors);
+  requireEqual(menuEvidence.accessibility?.browserRerun?.directoryLabel, "验收治理", "menu evidence accessibility browser rerun directory label", errors);
+  requireEqual(menuEvidence.accessibility?.browserRerun?.childLabel, "菜单验收页", "menu evidence accessibility browser rerun child label", errors);
+  requireEqual(
+    menuEvidence.accessibility?.browserRerun?.inputSelector,
+    '.admin-tree-workbench-tree input[aria-label="for screen reader"]',
+    "menu evidence accessibility browser rerun input selector",
+    errors,
+  );
+  if (!sameList(values(menuEvidence.accessibility?.browserRerun?.sequence), [
+    "collapsed-directory",
+    "selected-directory",
+    "focused-screen-reader-input",
+    "ArrowRight-expanded-and-exposed-child",
+    "ArrowLeft-collapsed-directory",
+  ])) {
+    errors.push("menu evidence accessibility browser rerun sequence must preserve the verified expand and collapse steps");
+  }
+  requireIncludes(menuEvidence.unclaimedGates, [
+    "tree-transfer-10000-node-performance",
+    "full-tree-transfer-acceptance",
+    "dual-read-principal-equivalence",
+    "migration-cutover",
+    "organization-rbac-menu-e2e",
+  ], "menu evidence unclaimedGates", errors);
 }
 
 function validateTopology(contract, topology, errors) {
   const migration = topology.organizationRbacMenuMigration ?? {};
-  requireEqual(migration.status, "backend-organization-and-role-admin-implemented-menu-e2e-pending", "topology organization migration status", errors);
+  requireEqual(migration.status, "backend-organization-role-and-menu-implemented-e2e-pending", "topology organization migration status", errors);
   requireEqual(migration.designStatus, "frozen", "topology organization migration designStatus", errors);
   requireEqual(migration.designContract, "resources/platform-organization-rbac-menu-contract.json", "topology organization migration designContract", errors);
   requireEqual(migration.targetModel?.roleOwnership, contract.targetModel?.roleOwnership, "topology target roleOwnership", errors);
@@ -364,7 +400,7 @@ function validateTaskGovernance(contract, graph, matrix, errors) {
   for (const id of deferredDownstreamTaskIds) {
     const downstream = values(graph.tasks).find((item) => item.id === id);
     if (!downstream || downstream.status === "implemented") {
-      errors.push(`downstream runtime/UI task ${id} must remain unfinished`);
+      errors.push(`downstream E2E task ${id} must remain unfinished`);
     }
   }
 
@@ -423,9 +459,10 @@ function validate() {
   const graph = readJSON(taskGraphPath);
   const matrix = readJSON(matrixPath);
   const serviceRuntime = readJSON(serviceRuntimePath);
+  const menuEvidence = readJSON(menuEvidencePath);
   const errors = [];
 
-  validateContract(contract, serviceRuntime, errors);
+  validateContract(contract, serviceRuntime, menuEvidence, errors);
   validateTopology(contract, topology, errors);
   validateTaskGovernance(contract, graph, matrix, errors);
   validateDocs(errors);

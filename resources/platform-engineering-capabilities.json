@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-engineering-capabilities.json",
-  "capturedAt": "2026-07-14",
+  "capturedAt": "2026-07-16",
   "purpose": "Machine-checkable engineering capability coverage for the reusable platform foundation.",
   "stack": {
     "backend": [
@@ -3296,16 +3296,29 @@
         "zh": "菜单树与页面按钮权限配置",
         "en": "Menu Tree And Button Permission Configuration"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Model directory and page menus separately from API and button permissions, with migration-safe tree configuration and authorization boundaries.",
       "dependsOn": [
         "role-tree-and-authorization-entry"
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
-          "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+          "admin/src/platform/ui/AdminTreeWorkbench.tsx",
+          "internal/platform/organizationrbac/menu_repository.go",
+          "internal/platform/organizationrbac/navigation_service_objects.go",
+          "resources/evidence/menu-tree-and-button-permission-configuration-20260715.json"
+        ],
+        "tests": [
+          "internal/platform/organizationrbac/menu_repository_test.go",
+          "internal/platform/organizationrbac/navigation_service_objects_test.go",
+          "scripts/platform-organization-rbac-menu-contract.test.mjs",
+          "scripts/admin-ui-contracts.test.mjs"
+        ],
+        "validators": [
+          "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs"
         ],
         "taskIds": [
           "menu-tree-and-button-permission-configuration"
@@ -3337,12 +3350,38 @@
       }
     },
     {
+      "id": "unified-error-code-governance",
+      "label": {
+        "zh": "统一错误码治理",
+        "en": "Unified Error Code Governance"
+      },
+      "status": "partial",
+      "purpose": "Govern stable public error codes, lifecycle metadata, request correlation, redaction and generated Admin/App/service contracts without exposing internal errors.",
+      "dependsOn": [
+        "platform-service-contract-standard",
+        "persisted-query-command-object-runtime",
+        "admin-api-boundary-query-security",
+        "openapi-api-docs",
+        "runtime-security-containment"
+      ],
+      "evidence": {
+        "sourcePaths": [
+          "internal/platform/httpapi/response.go",
+          "docs/platform-service-contract-standard.md",
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md"
+        ],
+        "taskIds": [
+          "unified-error-code-governance"
+        ]
+      }
+    },
+    {
       "id": "multi-datasource-contract-and-runtime",
       "label": {
         "zh": "多数据源合同与运行时",
         "en": "Multi-Datasource Contract And Runtime"
       },
-      "status": "partial",
+      "status": "deferred",
       "purpose": "Route declared resources through isolated, validated datasource configurations without weakening platform contracts.",
       "dependsOn": [
         "platform-service-contract-standard"
@@ -3364,7 +3403,7 @@
         "zh": "租户放置与请求路由",
         "en": "Tenant Placement And Request Routing"
       },
-      "status": "partial",
+      "status": "deferred",
       "purpose": "Resolve trusted tenant context through versioned placement configuration to datasource groups, shards and schemas with controlled override and audit boundaries.",
       "dependsOn": [
         "multi-datasource-contract-and-runtime",
@@ -3387,7 +3426,7 @@
         "zh": "数据源读写路由",
         "en": "Datasource Read Write Routing"
       },
-      "status": "partial",
+      "status": "deferred",
       "purpose": "Route primary and replica operations with transaction-primary enforcement, write-after-read stickiness, replication-lag policy and controlled failover.",
       "dependsOn": [
         "tenant-placement-and-request-routing"
@@ -3409,7 +3448,7 @@
         "zh": "分片与租户迁移",
         "en": "Sharding And Tenant Migration"
       },
-      "status": "partial",
+      "status": "deferred",
       "purpose": "Provide explicit shard keys, global IDs, routing versions, controlled expansion, rebalancing and auditable tenant migration workflows.",
       "dependsOn": [
         "datasource-read-write-routing"
@@ -3431,7 +3470,7 @@
         "zh": "受控联邦只读查询",
         "en": "Controlled Federated Read Query"
       },
-      "status": "partial",
+      "status": "deferred",
       "purpose": "Execute controlled read-only federated persisted queries with tenant isolation, timeout, cost, field and row boundaries outside ordinary OLTP repositories.",
       "dependsOn": [
         "sharding-and-tenant-migration",
@@ -3454,7 +3493,7 @@
         "zh": "可选 XA 适配器",
         "en": "Optional XA Adapter"
       },
-      "status": "partial",
+      "status": "deferred",
       "purpose": "Provide a default-off XA adapter with certified resource-manager compatibility, timeouts, heuristic recovery and explicit operational procedures.",
       "dependsOn": [
         "federated-read-query"
@@ -3476,7 +3515,7 @@
         "zh": "数据库认证矩阵",
         "en": "Database Certification Matrix"
       },
-      "status": "partial",
+      "status": "deferred",
       "purpose": "Publish evidence-backed compatibility tiers for supported and planned relational database targets.",
       "dependsOn": [
         "xa-optional-adapter"
@@ -3498,7 +3537,7 @@
         "zh": "事务发件箱与单消息队列适配器",
         "en": "Transactional Outbox And One MQ Adapter"
       },
-      "status": "partial",
+      "status": "deferred",
       "purpose": "Provide durable transactional event publication with one production-ready message queue adapter.",
       "dependsOn": [
         "integration-ports-disabled-default",
@@ -3521,7 +3560,7 @@
         "zh": "异步搜索投影",
         "en": "Asynchronous Search Projection"
       },
-      "status": "partial",
+      "status": "deferred",
       "purpose": "Build recoverable asynchronous search projections without making search infrastructure a source of truth.",
       "dependsOn": [
         "transactional-outbox-and-one-mq-adapter",
@@ -3551,7 +3590,7 @@
         "admin-watermark-export-governance",
         "sensitive-data-protection",
         "organization-rbac-menu-e2e-qa",
-        "asynchronous-search-projection"
+        "unified-error-code-governance"
       ],
       "evidence": {
         "sourcePaths": [

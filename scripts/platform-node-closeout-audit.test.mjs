@@ -9,8 +9,8 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "menu-tree-and-button-permission-configuration",
   "organization-rbac-menu-e2e-qa",
+  "unified-error-code-governance",
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",
   "datasource-read-write-routing",
@@ -94,7 +94,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("preserves 37 baseline closeouts, closes fourteen completion nodes, and tracks 15 pending nodes", () => {
+  it("preserves 37 baseline closeouts, closes fifteen completion nodes, and tracks 15 unfinished nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -102,7 +102,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(task, "task graph must include production-admin-oidc-auth");
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
-    assert.equal(audit.nodeCloseouts.length, 51);
+    assert.equal(audit.nodeCloseouts.length, 52);
     assert.deepEqual(audit.nodeCloseouts.slice(0, 37).map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
     assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts.slice(0, 37))).digest("hex"), foundationBaselineCloseoutDigest);
     const runtimeSecurityCloseout = audit.nodeCloseouts[37];
@@ -209,7 +209,37 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(roleAdminCloseout.visualEvidence.includes("ui-ux-pro-max"));
     assert.ok(roleAdminCloseout.visualEvidence.includes("playwright-1.55-local-fallback"));
     assert.equal(roleAdminCloseout.visualEvidence.includes("browser:control-in-app-browser"), true);
+    const menuCloseout = audit.nodeCloseouts.find(
+      (item) => item.taskId === "menu-tree-and-button-permission-configuration",
+    );
+    assert.equal(menuCloseout.status, "closed");
+    assert.equal(menuCloseout.neatFreak, true);
+    assert.equal(menuCloseout.cleanupMode, "phase-level");
+    assert.ok(menuCloseout.cleanupEvidence.includes("resources/evidence/menu-tree-and-button-permission-configuration-20260715.json"));
+    assert.ok(menuCloseout.cleanupEvidence.includes("scripts/admin-ui-contracts.test.mjs"));
+    assert.ok(menuCloseout.cleanupEvidence.includes("scripts/validate-admin-i18n.mjs"));
+    assert.ok(menuCloseout.visualEvidence.includes("product-design"));
+    assert.ok(menuCloseout.visualEvidence.includes("ui-ux-pro-max"));
+    assert.ok(menuCloseout.visualEvidence.includes("browser:control-in-app-browser"));
     assert.deepEqual(audit.pendingNodeEvidence, completionProgramTaskIDs);
+  });
+
+  it("rejects menu closeout without browser, design and i18n evidence", () => {
+    const audit = readJSON("resources/platform-node-closeout-audit.json");
+    const closeout = audit.nodeCloseouts.find((item) => item.taskId === "menu-tree-and-button-permission-configuration");
+    closeout.cleanupEvidence = closeout.cleanupEvidence.filter(
+      (item) => item !== "resources/evidence/menu-tree-and-button-permission-configuration-20260715.json" && item !== "scripts/validate-admin-i18n.mjs",
+    );
+    closeout.visualEvidence = ["superpowers:brainstorming"];
+
+    const result = runValidator(["--audit", tempJSON("missing-menu-closeout-evidence.json", audit)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /nodeCloseouts\.menu-tree-and-button-permission-configuration\.cleanupEvidence must include resources\/evidence\/menu-tree-and-button-permission-configuration-20260715\.json/);
+    assert.match(result.stderr, /nodeCloseouts\.menu-tree-and-button-permission-configuration\.cleanupEvidence must include scripts\/validate-admin-i18n\.mjs/);
+    assert.match(result.stderr, /nodeCloseouts\.menu-tree-and-button-permission-configuration\.visualEvidence must include product-design/);
+    assert.match(result.stderr, /nodeCloseouts\.menu-tree-and-button-permission-configuration\.visualEvidence must include ui-ux-pro-max/);
+    assert.match(result.stderr, /nodeCloseouts\.menu-tree-and-button-permission-configuration\.visualEvidence must include browser:control-in-app-browser/);
   });
 
   it("rejects role Admin closeout without UI, browser manifest and design evidence", () => {

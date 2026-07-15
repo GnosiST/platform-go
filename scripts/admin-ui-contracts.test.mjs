@@ -351,6 +351,21 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /Tree workbench expanders must expose a 44px pointer target/);
   });
 
+  it("rejects menu tree keyboard handling without a selected active node", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/ui/AdminTreeWorkbench.tsx",
+      "activeKey={activeKey}",
+      "activeKey={null}",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must expose the selected menu node to Ant Tree keyboard handling/);
+  });
+
   it("rejects menu governance that bypasses generated menu-definition service objects", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(

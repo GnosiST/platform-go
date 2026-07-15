@@ -1,6 +1,6 @@
 # Organization, RBAC And Menu Contract
 
-> Status: backend constraints, migration runtime, organization/user Admin UI and the role tree/authorization entry are implemented; menu tree and full browser E2E remain pending in two downstream nodes.
+> Status: backend constraints, migration runtime, organization/user Admin UI, the role tree/authorization entry and the menu tree/detail workbench are implemented; full browser E2E, serving cutover and role-menu migration writes remain closed.
 
 This document is the implementation contract for organization role pools, tenant derivation, role ownership, menu visibility, permission boundaries and migration. The machine-readable source is `resources/platform-organization-rbac-menu-contract.json`.
 
@@ -22,7 +22,7 @@ Stable role, role-group, organization and menu codes remain globally unique duri
 
 ## Relational Target
 
-The backend migration node introduces native, transactionally managed relations instead of placing the new authorization state only in `ValuesJSON` or the current full-snapshot delete-and-rebuild path. `PLATFORM_ORGANIZATION_RBAC_MODE=target` activates this boundary and is required in production. Page-only role-menu persistence, per-role revisions, menu/page-button definition service objects, deterministic migration comparison and revision-aware target navigation resolution are implemented. `PLATFORM_ADMIN_MENU_SERVING_MODE=legacy` and `PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=false` remain the only accepted production settings until the menu Admin UI and full migration/cutover E2E close.
+The backend migration node introduces native, transactionally managed relations instead of placing the new authorization state only in `ValuesJSON` or the current full-snapshot delete-and-rebuild path. `PLATFORM_ORGANIZATION_RBAC_MODE=target` activates this boundary and is required in production. Page-only role-menu persistence, per-role revisions, menu/page-button definition service objects, deterministic migration comparison and revision-aware target navigation resolution are implemented. `PLATFORM_ADMIN_MENU_SERVING_MODE=legacy` and `PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=false` remain the only accepted production settings until full migration/cutover E2E closes.
 
 | Logical model | Physical target | Required behavior |
 | --- | --- | --- |
@@ -150,7 +150,7 @@ Cutover requires zero unapproved principal differences, a verified checkpoint, a
 
 ## Tree Workbench And Transfer
 
-Role management now uses the shared `AdminTreeWorkbench`; authorization selection uses `PlatformTreeTransfer`. `PlatformTreeSelect` remains appropriate for ordinary bounded relation fields and is not expanded into this control. Menu management will adopt the same primitives in its own node.
+Role and menu management now use the shared `AdminTreeWorkbench`; authorization selection uses `PlatformTreeTransfer`. `PlatformTreeSelect` remains appropriate for ordinary bounded relation fields and is not expanded into this control. The menu workbench implements directory/page authoring, typed parameters and page-button metadata without enabling target serving or role-menu writes.
 
 The implemented role baseline keeps leaf keys plus revision metadata, parent navigation/bulk selection, local filtering over loaded nodes, selected replay, disabled reasons, half selection, counts and virtual tree rendering at 50 visible nodes. It exposes an optional child-loading seam, but does not claim the future server-backed search, selected-value hydration runtime or 10,000-node certification.
 
@@ -162,7 +162,7 @@ At 1024px and above the Transfer is two-pane. At 768-1023px it uses a compact tw
 
 ## Browser Acceptance Contract
 
-The organization/user and focused role nodes already cover their bounded form, role tree, permission save/reload, focus, reduced-motion and responsive scenarios at `375x812`, `390x844`, `768x1024`, `1024x768`, `1280x720` and `1440x1024`. The later menu and full E2E nodes must complete the remaining cross-surface contract:
+The organization/user, focused role and menu nodes cover their bounded form, role tree, menu edit, page-button, focus, reduced-motion and responsive scenarios at `375x812`, `390x844`, `768x1024`, `1024x768`, `1280x720` and `1440x1024`. Menu click expansion, page selection, edit fields, focus return, modal scrolling, zero horizontal overflow and zero console/request failures are tracked in `resources/evidence/menu-tree-and-button-permission-configuration-20260715.json`. The screen-reader input ArrowRight defect found during the frozen audit is fixed through Ant Tree active-key synchronization and executable Admin UI contracts. A scoped post-fix live-browser rerun at `1440x1024` collapsed and selected `验收治理`, focused `.admin-tree-workbench-tree input[aria-label="for screen reader"]`, verified `ArrowRight` exposed `菜单验收页`, and verified `ArrowLeft` collapsed the directory again. Broader keyboard coverage remains unclaimed. The later full E2E node must complete the remaining cross-surface contract:
 
 - bind organization groups and inspect role-pool provenance;
 - derive tenant and load roles after selecting an organization;
@@ -178,11 +178,8 @@ The organization/user and focused role nodes already cover their bounded form, r
 
 ## Implemented And Deferred Boundaries
 
-`organization-role-pool-backend-and-migration` owns the target GORM relations, server-derived tenant and role-pool validation, conflict-aware prepare/impact/apply service objects, authorization lifecycle checks, migration inventory/apply/verify/rollback workflow, target-mode bootstrap and generated Admin service-object contracts. `organization-user-admin-experience` closes organization role-group management, derived tenant display, organization-scoped role selection, explicit invalid-role handling and responsive browser acceptance. `role-tree-and-authorization-entry` closes the strict two-level role workbench, role/group metadata maintenance, reviewed role move/disable remediation, atomic allow/deny/data-scope authorization, and the read-only menu assignment boundary. It does not claim directory/page menu authoring or `role_menu` persistence.
+`organization-role-pool-backend-and-migration` owns the target GORM relations, server-derived tenant and role-pool validation, conflict-aware prepare/impact/apply service objects, authorization lifecycle checks, migration inventory/apply/verify/rollback workflow, target-mode bootstrap and generated Admin service-object contracts. `organization-user-admin-experience` closes organization role-group management, derived tenant display, organization-scoped role selection, explicit invalid-role handling and responsive browser acceptance. `role-tree-and-authorization-entry` closes the strict two-level role workbench, role/group metadata maintenance, reviewed role move/disable remediation, atomic allow/deny/data-scope authorization, and the read-only menu assignment boundary. `menu-tree-and-button-permission-configuration` closes normalized directory/page definitions, native page-button metadata, target-resolution seams and the dedicated Admin menu workbench while preserving closed serving/write gates.
 
-The remaining work is owned by:
-
-1. `menu-tree-and-button-permission-configuration`
-2. `organization-rbac-menu-e2e-qa`
+The remaining organization-lane work is owned only by `organization-rbac-menu-e2e-qa`: complete Tree Transfer 10,000-node acceptance, all-principal dual-read equivalence, cutover, rollback and end-to-end authorization proof.
 
 Datasource routing, federation, XA, Outbox/MQ, search projection and workload identity remain outside this lane.

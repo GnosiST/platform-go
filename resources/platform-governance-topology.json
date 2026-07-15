@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-governance-topology.json",
-  "capturedAt": "2026-07-14",
+  "capturedAt": "2026-07-16",
   "purpose": "Machine-checkable governance topology for tenant, organization, role-group, area-code and optional personnel boundaries.",
   "governanceEvaluation": {
     "tenantOnlySupport": {
@@ -44,7 +44,7 @@
     }
   },
   "organizationRbacMenuMigration": {
-    "status": "backend-organization-and-role-admin-implemented-menu-e2e-pending",
+    "status": "backend-organization-role-and-menu-implemented-e2e-pending",
     "designStatus": "frozen",
     "designContract": "resources/platform-organization-rbac-menu-contract.json",
     "taskIds": [

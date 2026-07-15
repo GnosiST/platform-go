@@ -66,10 +66,15 @@ const requiredImplementedCapabilityIDs = [
   "organization-role-pool-backend-and-migration",
   "organization-user-admin-experience",
   "role-tree-and-authorization-entry",
+  "menu-tree-and-button-permission-configuration",
 ];
 const requiredPartialCapabilityIDs = [
-  "menu-tree-and-button-permission-configuration",
   "organization-rbac-menu-e2e-qa",
+  "unified-error-code-governance",
+  "open-source-portability",
+  "public-documentation-and-release",
+];
+const requiredDeferredCapabilityIDs = [
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",
   "datasource-read-write-routing",
@@ -79,15 +84,20 @@ const requiredPartialCapabilityIDs = [
   "database-certification-matrix",
   "transactional-outbox-and-one-mq-adapter",
   "asynchronous-search-projection",
-  "open-source-portability",
-  "public-documentation-and-release",
 ];
-const requiredPartialCapabilityDependencies = {
+const requiredCapabilityDependencies = {
   "menu-tree-and-button-permission-configuration": ["role-tree-and-authorization-entry"],
   "organization-rbac-menu-e2e-qa": [
     "organization-user-admin-experience",
     "role-tree-and-authorization-entry",
     "menu-tree-and-button-permission-configuration",
+  ],
+  "unified-error-code-governance": [
+    "platform-service-contract-standard",
+    "persisted-query-command-object-runtime",
+    "admin-api-boundary-query-security",
+    "openapi-api-docs",
+    "runtime-security-containment",
   ],
   "multi-datasource-contract-and-runtime": ["platform-service-contract-standard"],
   "tenant-placement-and-request-routing": [
@@ -112,11 +122,11 @@ const requiredPartialCapabilityDependencies = {
     "admin-watermark-export-governance",
     "sensitive-data-protection",
     "organization-rbac-menu-e2e-qa",
-    "asynchronous-search-projection",
+    "unified-error-code-governance",
   ],
   "public-documentation-and-release": ["open-source-portability"],
 };
-const requiredCapabilityIDs = [...requiredImplementedCapabilityIDs, ...requiredPartialCapabilityIDs];
+const requiredCapabilityIDs = [...requiredImplementedCapabilityIDs, ...requiredPartialCapabilityIDs, ...requiredDeferredCapabilityIDs];
 
 function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -568,12 +578,25 @@ function validate() {
       errors.push(`approved completion program capability ${capabilityID} must stay partial until implementation closeout`);
     }
     if (capability) {
-      const expectedDependencies = requiredPartialCapabilityDependencies[capabilityID];
+      const expectedDependencies = requiredCapabilityDependencies[capabilityID];
       const actualDependencies = values(capability.dependsOn);
       if (!sameOrderedValues(actualDependencies, expectedDependencies)) {
         errors.push(
           `approved completion program capability ${capabilityID} dependsOn must equal ${JSON.stringify(expectedDependencies)}`,
         );
+      }
+    }
+  }
+  for (const capabilityID of requiredDeferredCapabilityIDs) {
+    const capability = capabilityByID.get(capabilityID);
+    if (capability && capability.status !== "deferred") {
+      errors.push(`post-release optional capability ${capabilityID} must stay deferred until explicitly activated`);
+    }
+    if (capability) {
+      const expectedDependencies = requiredCapabilityDependencies[capabilityID];
+      const actualDependencies = values(capability.dependsOn);
+      if (!sameOrderedValues(actualDependencies, expectedDependencies)) {
+        errors.push(`post-release optional capability ${capabilityID} dependsOn must equal ${JSON.stringify(expectedDependencies)}`);
       }
     }
   }

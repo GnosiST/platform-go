@@ -22,11 +22,12 @@ const completedProgramTaskIDs = [
   "organization-role-pool-backend-and-migration",
   "organization-user-admin-experience",
   "role-tree-and-authorization-entry",
+  "menu-tree-and-button-permission-configuration",
 ];
 
 const remainingCompletionProgramTaskIDs = [
-  "menu-tree-and-button-permission-configuration",
   "organization-rbac-menu-e2e-qa",
+  "unified-error-code-governance",
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",
   "datasource-read-write-routing",
@@ -61,7 +62,7 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
-  it("migrates fourteen completed program nodes to required work and tracks 15 future nodes", () => {
+  it("migrates fifteen completed program nodes to required work and tracks 15 future nodes", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
     const engineering = readJSON("resources/platform-engineering-capabilities.json");
 
@@ -77,7 +78,7 @@ describe("validate-platform-foundation-alignment", () => {
     for (const capability of engineering.capabilities) {
       assert.ok(audit.requiredEngineeringCapabilities.includes(capability.id), `${capability.id} must be required`);
     }
-    for (const capability of engineering.capabilities.filter((item) => item.status === "partial")) {
+    for (const capability of engineering.capabilities.filter((item) => item.status === "partial" || item.status === "deferred")) {
       assert.ok(audit.nonDroppableEngineeringCapabilities.includes(capability.id), `${capability.id} must be non-droppable`);
     }
   });

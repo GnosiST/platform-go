@@ -29,7 +29,7 @@ describe("platform foundation documentation drift", () => {
     ]) {
       const source = read(relativePath);
       assert.ok(source.includes(graphSummary), `${relativePath} must include ${graphSummary}`);
-      assert.doesNotMatch(source, /45 total \/ (?:37|38) implemented \/ (?:8|7) controlled unfinished|45\/(?:37\/8|38\/7)/);
+      assert.doesNotMatch(source, /45 total \/ (?:37|38) implemented \/ (?:8|7) controlled unfinished|45\/(?:37\/8|38\/7)|66 total \/ (?:51|52) implemented \/ (?:15|14) controlled unfinished/);
     }
   });
 
@@ -49,6 +49,20 @@ describe("platform foundation documentation drift", () => {
 
     assert.ok(source.includes(`Remaining nodes, in task-graph order: ${orderedRemainingSummary}.`));
     assert.doesNotMatch(source, /ordered seven-node remainder/);
+  });
+
+  it("documents the v0.1 release lanes and support boundary", () => {
+    const readme = read("README.md");
+    const topology = read("docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md");
+    const release = graph.releaseBlockingNodes.map((id) => `\`${id}\``).join(", ");
+    const optional = graph.postReleaseOptionalNodes.map((id) => `\`${id}\``).join(", ");
+
+    assert.ok(topology.includes(`v0.1.0 release blockers: ${release}.`));
+    assert.ok(topology.includes(`Post-release optional deferred nodes: ${optional}.`));
+    assert.match(readme, /one datasource and one native transaction boundary/);
+    assert.match(readme, /SQLite is development\/test-only by support policy/);
+    assert.match(readme, /Oracle and KingbaseES are unsupported/);
+    assert.match(readme, /`alibaba\/page-agent` is only a default-off optional `public-docs-site` sub-capability/);
   });
 
   it("records organization and user Admin experience as implemented", () => {

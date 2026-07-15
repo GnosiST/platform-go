@@ -307,11 +307,31 @@ describe("platform organization RBAC menu contract", () => {
     assert.match(result.stderr, /implemented downstream Admin task role-tree-and-authorization-entry must stay implemented/);
   });
 
-  it("rejects closing menu or full E2E nodes before their implementation", () => {
+  it("rejects regressing the implemented menu node", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
-    graph.tasks.find((task) => task.id === "menu-tree-and-button-permission-configuration").status = "implemented";
-    const result = runValidator(["--task-graph", tempJSON("premature-menu-tree.json", graph)]);
+    graph.tasks.find((task) => task.id === "menu-tree-and-button-permission-configuration").status = "pending";
+    const result = runValidator(["--task-graph", tempJSON("regressed-menu-tree.json", graph)]);
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /downstream runtime\/UI task menu-tree-and-button-permission-configuration must remain unfinished/);
+    assert.match(result.stderr, /implemented downstream Admin task menu-tree-and-button-permission-configuration must stay implemented/);
+  });
+
+  it("rejects stale menu-pending wording, keyboard rerun drift and unclaimed-gate drift", () => {
+    const contract = readJSON("resources/platform-organization-rbac-menu-contract.json");
+    contract.runtimeBoundary.menuRuntimeStatus = "pending";
+    let result = runValidator(["--contract", tempJSON("stale-menu-pending.json", contract)]);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /runtimeBoundary\.menuRuntimeStatus must be implemented/);
+
+    const evidence = readJSON("resources/evidence/menu-tree-and-button-permission-configuration-20260715.json");
+    evidence.accessibility.browserRerun.sequence = evidence.accessibility.browserRerun.sequence.slice(0, -1);
+    result = runValidator(["--menu-evidence", tempJSON("incomplete-keyboard-rerun.json", evidence)]);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /browser rerun sequence must preserve the verified expand and collapse steps/);
+
+    evidence.accessibility.browserRerun.sequence.push("ArrowLeft-collapsed-directory");
+    evidence.unclaimedGates = evidence.unclaimedGates.filter((item) => item !== "migration-cutover");
+    result = runValidator(["--menu-evidence", tempJSON("overclaimed-menu-evidence.json", evidence)]);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /menu evidence unclaimedGates must include migration-cutover/);
   });
 });

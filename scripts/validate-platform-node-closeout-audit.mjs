@@ -168,9 +168,30 @@ const requiredCleanupEvidenceByTask = new Map([
       "scripts/platform-organization-rbac-menu-contract.test.mjs",
     ],
   ],
+  [
+    "menu-tree-and-button-permission-configuration",
+    [
+      "docs/platform-organization-rbac-menu-contract.md",
+      "docs/admin-rbac-menu.md",
+      "docs/platform-ui-optimization-assessment.md",
+      "resources/evidence/menu-tree-and-button-permission-configuration-20260715.json",
+      "internal/platform/organizationrbac/menu_repository_test.go",
+      "internal/platform/organizationrbac/navigation_service_objects_test.go",
+      "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+      "scripts/platform-organization-rbac-menu-contract.test.mjs",
+      "scripts/validate-admin-i18n.mjs",
+      "scripts/validate-admin-ui-contracts.mjs",
+      "scripts/admin-ui-contracts.test.mjs",
+      ".superpowers/sdd/menu-task-6-report.md",
+    ],
+  ],
 ]);
 
 const requiredVisualEvidenceByTask = new Map([
+  [
+    "menu-tree-and-button-permission-configuration",
+    ["superpowers:brainstorming", "product-design", "ui-ux-pro-max", "browser:control-in-app-browser"],
+  ],
   [
     "admin-watermark-export-governance",
     ["superpowers:brainstorming", "product-design", "ui-ux-pro-max", "browser:control-in-app-browser"],

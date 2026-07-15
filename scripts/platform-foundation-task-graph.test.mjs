@@ -64,6 +64,7 @@ const completionProgramTaskIDs = [
   "role-tree-and-authorization-entry",
   "menu-tree-and-button-permission-configuration",
   "organization-rbac-menu-e2e-qa",
+  "unified-error-code-governance",
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",
   "datasource-read-write-routing",
@@ -79,7 +80,26 @@ const completionProgramTaskIDs = [
   "github-release-publication",
 ];
 
-const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(14);
+const releaseBlockingNodes = [
+  "organization-rbac-menu-e2e-qa",
+  "unified-error-code-governance",
+  "open-source-portability",
+  "public-docs-community",
+  "public-docs-site",
+  "github-release-publication",
+];
+
+const postReleaseOptionalNodes = [
+  "multi-datasource-contract-and-runtime",
+  "tenant-placement-and-request-routing",
+  "datasource-read-write-routing",
+  "sharding-and-tenant-migration",
+  "federated-read-query",
+  "xa-optional-adapter",
+  "database-certification-matrix",
+  "transactional-outbox-and-one-mq-adapter",
+  "asynchronous-search-projection",
+];
 
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-foundation-task-graph.mjs", ...args], {
@@ -322,11 +342,67 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /task production-auth-provider-hardening must declare at least one evidence\.docs path/);
   });
 
-  it("preserves the closed 37-node baseline, implements fourteen completion nodes, and tracks 15 pending program nodes", () => {
+  it("enforces the v0.1 release blocker and post-release optional partition", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+
+    assert.deepEqual(graph.releaseBlockingNodes, releaseBlockingNodes);
+    assert.deepEqual(graph.postReleaseOptionalNodes, postReleaseOptionalNodes);
+    assert.equal(graph.tasks.find((item) => item.id === "menu-tree-and-button-permission-configuration")?.status, "implemented");
+    assert.equal(graph.tasks.find((item) => item.id === "unified-error-code-governance")?.status, "pending");
+    assert.ok(postReleaseOptionalNodes.every((id) => graph.tasks.find((item) => item.id === id)?.status === "deferred"));
+    assert.deepEqual(graph.tasks.find((item) => item.id === "open-source-portability")?.dependsOn, [
+      "admin-watermark-export-governance",
+      "organization-rbac-menu-e2e-qa",
+      "unified-error-code-governance",
+    ]);
+  });
+
+  it("rejects unknown, duplicate, overlapping or incomplete release lanes", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const cases = [
+      ["unknown", (value) => value.releaseBlockingNodes.push("missing-task"), /releaseBlockingNodes references unknown task missing-task/],
+      ["duplicate", (value) => value.releaseBlockingNodes.push(value.releaseBlockingNodes[0]), /releaseBlockingNodes contains duplicate value/],
+      ["overlap", (value) => value.releaseBlockingNodes.push(value.postReleaseOptionalNodes[0]), /release lanes overlap at/],
+      ["omitted", (value) => value.releaseBlockingNodes.shift(), /release lane union must exactly match unfinished task graph nodes in graph order/],
+    ];
+
+    for (const [name, mutate, expected] of cases) {
+      const value = structuredClone(graph);
+      mutate(value);
+      const result = runValidator(["--graph", tempJSON(`${name}-release-lane.json`, value)]);
+      assert.notEqual(result.status, 0, `${name}: ${result.stdout}`);
+      assert.match(result.stderr, expected);
+    }
+  });
+
+  it("rejects invalid deferred status and release dependencies", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+
+    const optionalPending = structuredClone(graph);
+    optionalPending.tasks.find((item) => item.id === postReleaseOptionalNodes[0]).status = "pending";
+    let result = runValidator(["--graph", tempJSON("optional-pending.json", optionalPending)]);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /post-release optional task multi-datasource-contract-and-runtime must be deferred/);
+
+    const blockerDeferred = structuredClone(graph);
+    blockerDeferred.tasks.find((item) => item.id === releaseBlockingNodes[0]).status = "deferred";
+    result = runValidator(["--graph", tempJSON("blocker-deferred.json", blockerDeferred)]);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /release blocker organization-rbac-menu-e2e-qa must not be deferred/);
+
+    const transitive = structuredClone(graph);
+    transitive.tasks.find((item) => item.id === "unified-error-code-governance").dependsOn.push("multi-datasource-contract-and-runtime");
+    result = runValidator(["--graph", tempJSON("blocker-depends-on-optional.json", transitive)]);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /release blocker unified-error-code-governance must not depend on post-release optional task multi-datasource-contract-and-runtime/);
+  });
+
+  it("preserves the closed 37-node baseline, implements fifteen completion nodes, and tracks 15 controlled unfinished nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
     const pending = graph.tasks.filter((item) => item.status === "pending");
+    const deferred = graph.tasks.filter((item) => item.status === "deferred");
     const blocked = graph.tasks.filter((item) => item.status === "blocked");
 
     assert.ok(task, "task graph must include production-admin-oidc-auth");
@@ -354,8 +430,8 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.ok(task.completionEvidence.every((item) => item.status === "verified"));
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
-    assert.equal(graph.tasks.length, 66);
-    assert.equal(implemented.length, 51);
+    assert.equal(graph.tasks.length, 67);
+    assert.equal(implemented.length, 52);
     assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "admin-watermark-export-governance")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-protection-runtime")?.status, "implemented");
@@ -371,7 +447,10 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.equal(serviceObjects?.status, "implemented");
     assert.deepEqual(serviceObjects?.dependsOn, ["platform-service-contract-standard", "admin-api-boundary-query-security"]);
     assert.ok(serviceObjects?.evidence?.validators?.includes("scripts/validate-platform-service-object-runtime.mjs"));
-    assert.ok(pendingCompletionProgramTaskIDs.every((taskID) => graph.tasks.find((item) => item.id === taskID)?.status === "pending"));
+    const menuTask = graph.tasks.find((item) => item.id === "menu-tree-and-button-permission-configuration");
+    assert.equal(menuTask?.status, "implemented");
+    assert.deepEqual(menuTask?.evidence?.screenshots, ["resources/evidence/menu-tree-and-button-permission-configuration-20260715.json"]);
+    assert.equal(graph.tasks.find((item) => item.id === "unified-error-code-governance")?.status, "pending");
     const integrationPorts = graph.tasks.find((item) => item.id === "integration-ports-disabled-default");
     assert.equal(integrationPorts?.status, "implemented");
     assert.ok(integrationPorts?.evidence?.validators?.includes("scripts/validate-platform-integration-ports.mjs"));
@@ -417,7 +496,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(graph.tasks.find((item) => item.id === "open-source-portability")?.dependsOn, [
       "admin-watermark-export-governance",
       "organization-rbac-menu-e2e-qa",
-      "asynchronous-search-projection",
+      "unified-error-code-governance",
     ]);
     assert.deepEqual(graph.parallelBatches.find((item) => item.id === "service-contract-extension-lanes")?.taskIds, [
       "persisted-query-command-object-runtime",
@@ -427,7 +506,8 @@ describe("validate-platform-foundation-task-graph", () => {
       "organization-user-admin-experience",
       "multi-datasource-contract-and-runtime",
     ]);
-    assert.deepEqual(pending.map((item) => item.id), pendingCompletionProgramTaskIDs);
+    assert.deepEqual(pending.map((item) => item.id), releaseBlockingNodes);
+    assert.deepEqual(deferred.map((item) => item.id), postReleaseOptionalNodes);
     assert.equal(blocked.length, 0);
   });
 

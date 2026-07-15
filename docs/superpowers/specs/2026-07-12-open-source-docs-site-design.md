@@ -88,6 +88,8 @@ Provide a separately built `examples/external-capability` module that consumes o
 
 ## Website Architecture
 
+`alibaba/page-agent` may be evaluated only as a default-off optional sub-capability of `public-docs-site`; it is not a standalone task and must never be injected into Admin or the API process by default. Enablement requires an explicit build-time flag plus license compatibility, NOTICE/SBOM, dependency and secret scans, CSP/outbound endpoint review, PII/telemetry and consent review, least privilege, rollback/kill switch, and a validator proving the default build contains no page-agent bundle or network initialization. No bearer token, sensitive Admin state, revealed field, URL query payload or user-entered data may be exported.
+
 Use Docusaurus under `website/` because it provides React-based landing customization, Markdown/MDX docs, Chinese/English i18n, versioned documentation, sitemap and GitHub Pages support in one package. Do not build a custom documentation engine.
 
 Product Design owns the brief and three visual directions before implementation. `design-taste-frontend` sharpens the selected public-facing direction. The design read is a technical open-source foundation for backend and full-stack developers: trustworthy, precise and product-aware, with restrained motion and real Admin screenshots rather than decorative abstract graphics.

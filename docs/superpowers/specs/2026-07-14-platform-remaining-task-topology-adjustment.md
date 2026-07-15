@@ -1,10 +1,20 @@
 # Platform Remaining Task Topology Adjustment
 
-> **Status:** Activated governance topology. The task graph projection is `66 total / 44 implemented / 22 controlled unfinished`; activation changes governance only and does not mark any new runtime node implemented.
+> **Status:** Activated governance topology with the 2026-07-16 release overlay. The current task graph projection is `67 total / 52 implemented / 15 controlled unfinished` and remains `not-complete-controlled`.
 
 ## Authority
 
 This document is the activated and only authoritative topology for the remaining platform program.
+
+## 2026-07-16 Release Overlay
+
+Task 6 closes `menu-tree-and-button-permission-configuration`, adds `unified-error-code-governance`, and separates current unfinished work into two machine-checkable lanes.
+
+- v0.1.0 release blockers: `organization-rbac-menu-e2e-qa`, `unified-error-code-governance`, `open-source-portability`, `public-docs-community`, `public-docs-site`, `github-release-publication`.
+- Post-release optional deferred nodes: `multi-datasource-contract-and-runtime`, `tenant-placement-and-request-routing`, `datasource-read-write-routing`, `sharding-and-tenant-migration`, `federated-read-query`, `xa-optional-adapter`, `database-certification-matrix`, `transactional-outbox-and-one-mq-adapter`, `asynchronous-search-projection`.
+- `open-source-portability` now depends on `admin-watermark-export-governance`, `organization-rbac-menu-e2e-qa` and `unified-error-code-governance`; no release blocker may depend directly or transitively on a deferred node.
+- Deferred nodes remain full-goal blockers. Release eligibility can become ready when the release-blocker lane is empty, but the persistent foundation objective cannot become complete while deferred nodes remain unfinished.
+- `unified-error-code-governance` owns the future canonical registry, ownership/audience/HTTP/retry/redaction/compatibility/deprecation metadata, request/trace correlation, generated public contracts and duplicate/reassignment/deprecation validation. This overlay registers the node but does not implement the registry.
 
 - The consolidated SaaS data-plane, persisted Query Object and Platform Service Contract input confirmed on 2026-07-14 is authoritative.
 - Earlier cross-session variants describing only static datasources, separate Query Object drafts, SQL-less drafts or partial service-contract drafts are superseded and must not be accumulated as extra requirements.
@@ -42,7 +52,7 @@ Runtime routing is configuration-driven and deterministic. Datasource, Datasourc
 
 ## Adjusted Unfinished Node Order
 
-Activation preserved the 44 implemented nodes and replaced the former nine-node unfinished projection with this ordered 22-node projection:
+The original activation preserved the then-current 44 implemented nodes and replaced the former nine-node unfinished projection with this ordered 22-node activation snapshot. The 2026-07-16 release overlay above is the current projection:
 
 1. `platform-service-contract-standard`
 2. `persisted-query-command-object-runtime`
@@ -239,6 +249,7 @@ Additional cross-lane dependencies are mandatory:
 - all three organization UI nodes are a serial lane after the backend migration, and E2E depends on all three completed UI surfaces;
 - `transactional-outbox-and-one-mq-adapter` depends on the disabled integration ports and the certified single-source transaction path;
 - `asynchronous-search-projection` depends on both Outbox/MQ and the persisted query runtime.
+- `open-source-portability` depends on both `organization-rbac-menu-e2e-qa` and `unified-error-code-governance`, and no longer depends on `asynchronous-search-projection` for v0.1.0 release eligibility.
 
 Approved parallelism:
 

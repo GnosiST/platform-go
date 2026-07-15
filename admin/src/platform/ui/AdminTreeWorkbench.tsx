@@ -1,6 +1,6 @@
 import { SearchOutlined } from "@ant-design/icons";
 import { Empty, Input, Spin, Tree, Typography, type TreeDataNode, type TreeProps } from "antd";
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AdminListPanel } from "./AdminPrimitives";
 
 export type AdminTreeWorkbenchNode = {
@@ -52,6 +52,7 @@ export function AdminTreeWorkbench({
   const nodeByKey = useMemo(() => new Map(nodes.map((node) => [node.key, node])), [nodes]);
   const treeData = useMemo(() => workbenchTreeData(nodes), [nodes]);
   const expandedKeys = useMemo(() => treeData.map((node) => String(node.key)), [treeData]);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
   const virtual = nodes.length >= 50;
   const loadData: TreeProps["loadData"] = onLoadChildren
     ? async (treeNode) => {
@@ -61,6 +62,10 @@ export function AdminTreeWorkbench({
         }
       }
     : undefined;
+
+  useEffect(() => {
+    setActiveKey(selectedKey || firstTreeKey(treeData));
+  }, [selectedKey, treeData]);
 
   return (
     <section className="admin-tree-workbench" aria-label={ariaLabel}>
@@ -86,6 +91,7 @@ export function AdminTreeWorkbench({
             <Empty description={emptyText} image={Empty.PRESENTED_IMAGE_SIMPLE} />
           ) : (
             <Tree
+              activeKey={activeKey}
               aria-label={ariaLabel}
               blockNode
               defaultExpandedKeys={expandedKeys}
@@ -95,6 +101,7 @@ export function AdminTreeWorkbench({
               showLine={{ showLeafIcon: false }}
               treeData={treeData}
               virtual={virtual}
+              onActiveChange={(key) => setActiveKey(String(key))}
               onSelect={(keys) => {
                 const key = keys[0];
                 if (key !== undefined) {
@@ -108,6 +115,10 @@ export function AdminTreeWorkbench({
       <div className="admin-tree-workbench-detail">{detail}</div>
     </section>
   );
+}
+
+function firstTreeKey(treeData: TreeDataNode[]) {
+  return treeData[0] ? String(treeData[0].key) : null;
 }
 
 function workbenchTreeData(nodes: AdminTreeWorkbenchNode[]): TreeDataNode[] {

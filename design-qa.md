@@ -71,6 +71,16 @@ P3 follow-up polish:
 
 final result: passed
 
+## 2026-07-15 Menu Tree And Button Permission Configuration QA
+
+Status: implemented for `menu-tree-and-button-permission-configuration`; full organization E2E and migration cutover remain pending.
+
+The tracked manifest `resources/evidence/menu-tree-and-button-permission-configuration-20260715.json` covers `375x812`, `390x844`, `768x1024`, `1024x768`, `1280x720` and `1440x1024`. Click collapse/expand, page selection, edit forms, typed parameters, page-button metadata, focus return, modal scrolling, zero horizontal overflow, zero console warnings/errors and zero failed resource responses were accepted.
+
+The frozen audit found that focusing Ant Tree's hidden screen-reader input and pressing ArrowRight did not expand the selected collapsed directory. `AdminTreeWorkbench` now synchronizes the selected key to Ant Tree's active keyboard node while preserving Ant's click and arrow navigation, with executable Admin UI contract coverage. A scoped post-fix live-browser rerun at `1440x1024` collapsed and selected `验收治理`, focused `.admin-tree-workbench-tree input[aria-label="for screen reader"]`, verified `ArrowRight` expanded it and exposed `菜单验收页`, then verified `ArrowLeft` collapsed it again. The manifest does not claim broader keyboard coverage, Tree Transfer 10,000-node performance, full Tree Transfer acceptance, principal-level dual-read equivalence, migration cutover/rollback or organization E2E.
+
+final result: passed with scoped post-fix keyboard rerun
+
 ## 2026-07-11 Task 8 Production-Like Admin OIDC Acceptance
 
 Status: implemented and accepted for the reusable production Admin OIDC foundation node. External production promotion remains `not-approved`; runtime mutation and the independent refresh-token-family runtime remain disabled.

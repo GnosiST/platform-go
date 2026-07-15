@@ -8,8 +8,8 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "menu-tree-and-button-permission-configuration",
   "organization-rbac-menu-e2e-qa",
+  "unified-error-code-governance",
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",
   "datasource-read-write-routing",
@@ -58,14 +58,14 @@ describe("validate-platform-goal-completion-audit", () => {
     assert.match(result.stdout, /Validated platform goal completion audit/);
   });
 
-  it("marks the completion program as controlled incomplete at 66/51/15", () => {
+  it("marks the completion program as controlled incomplete at 67/52/15", () => {
     const audit = readJSON("resources/platform-goal-completion-audit.json");
 
     assert.equal(audit.completionStatus, "not-complete-controlled");
     assert.deepEqual(audit.completionPolicy.requiredControlledUnfinishedNodes, completionProgramTaskIDs);
     assert.deepEqual(audit.taskSummary, {
-      expectedTotal: 66,
-      expectedImplemented: 51,
+      expectedTotal: 67,
+      expectedImplemented: 52,
       expectedControlledUnfinished: 15,
     });
   });
@@ -81,7 +81,7 @@ describe("validate-platform-goal-completion-audit", () => {
     const result = runValidator(["--audit", tempJSON("stale-goal-completion-counts.json", audit)]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /taskSummary\.expectedImplemented must match implemented task count 51/);
+    assert.match(result.stderr, /taskSummary\.expectedImplemented must match implemented task count 52/);
     assert.match(result.stderr, /taskSummary\.expectedControlledUnfinished must match unfinished task count 15/);
   });
 
@@ -91,6 +91,33 @@ describe("validate-platform-goal-completion-audit", () => {
     const auditPath = tempJSON("platform-goal-completion-audit.json", audit);
 
     const result = runValidator(["--audit", auditPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /completionStatus must stay not-complete-controlled/);
+  });
+
+  it("rejects full completion when only post-release optional nodes remain deferred", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    for (const id of graph.releaseBlockingNodes) {
+      graph.tasks.find((task) => task.id === id).status = "implemented";
+    }
+    graph.releaseBlockingNodes = [];
+    const unfinished = graph.tasks.filter((task) => task.status !== "implemented").map((task) => task.id);
+    const audit = readJSON("resources/platform-goal-completion-audit.json");
+    audit.completionStatus = "complete";
+    audit.taskSummary = {
+      expectedTotal: graph.tasks.length,
+      expectedImplemented: graph.tasks.length - unfinished.length,
+      expectedControlledUnfinished: unfinished.length,
+    };
+    audit.completionPolicy.requiredControlledUnfinishedNodes = unfinished;
+
+    const result = runValidator([
+      "--audit",
+      tempJSON("deferred-only-goal-completion.json", audit),
+      "--task-graph",
+      tempJSON("deferred-only-task-graph.json", graph),
+    ]);
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /completionStatus must stay not-complete-controlled/);

@@ -252,6 +252,10 @@ requireIncludes(files.menuGovernance, 'nodeType(record) === "directory"', "Page 
 requireIncludes(files.menuGovernance, 'isLeaf: nodeType(record) === "page"', "Page menu nodes must remain tree leaves.");
 requireNotIncludes(files.menuGovernance, 'name="permission"', "Legacy menu permission must remain read-only and absent from authoring.");
 requireIncludes(files.menuGovernance, "AdminTreeWorkbench", "Menu governance must reuse the platform tree workbench wrapper.");
+requireIncludes(files.treeWorkbench, "const [activeKey, setActiveKey] = useState<string | null>(null);", "Tree workbench keyboard focus must track an active node.");
+requireIncludes(files.treeWorkbench, "setActiveKey(selectedKey || firstTreeKey(treeData));", "Tree workbench keyboard focus must synchronize with the selected menu node.");
+requireIncludes(files.treeWorkbench, "activeKey={activeKey}", "Tree workbench must expose the selected menu node to Ant Tree keyboard handling.");
+requireIncludes(files.treeWorkbench, "onActiveChange={(key) => setActiveKey(String(key))}", "Tree workbench must preserve Ant Tree arrow-key navigation after selection synchronization.");
 requireIncludes(files.menuGovernance, 'const canRead = hasPermission(permissions, "admin:menu:read", deniedPermissions);', "Menu governance read access must respect allowed and denied menu permissions.");
 requireIncludes(files.menuGovernance, 'const canCreate = hasPermission(permissions, "admin:menu:create", deniedPermissions);', "Menu creation must require admin:menu:create and respect denied permissions.");
 requireIncludes(files.menuGovernance, 'const canUpdate = hasPermission(permissions, "admin:menu:update", deniedPermissions);', "Menu updates must require admin:menu:update and respect denied permissions.");

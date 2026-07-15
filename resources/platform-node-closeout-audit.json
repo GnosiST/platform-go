@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-node-closeout-audit.json",
-  "capturedAt": "2026-07-15",
+  "capturedAt": "2026-07-16",
   "purpose": "Machine-checkable node closeout audit for the reusable platform foundation. It keeps implemented task nodes tied to focused cleanup evidence, objective-conflict review and visual design gates, while reserving neat-freak for phase, major-task and release closeout.",
   "policy": {
     "taskGraph": "resources/platform-foundation-task-graph.json",
@@ -35,8 +35,8 @@
     "unfinishedTasksMustNotHaveCloseout": true
   },
   "pendingNodeEvidence": [
-    "menu-tree-and-button-permission-configuration",
     "organization-rbac-menu-e2e-qa",
+    "unified-error-code-governance",
     "multi-datasource-contract-and-runtime",
     "tenant-placement-and-request-routing",
     "datasource-read-write-routing",
@@ -1503,6 +1503,45 @@
         "tests-or-validators",
         "resource-lock-review",
         "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "menu-tree-and-button-permission-configuration",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupMode": "phase-level",
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ],
+      "cleanupEvidence": [
+        "README.md",
+        "docs/admin-rbac-menu.md",
+        "docs/platform-foundation-task-map.md",
+        "docs/platform-organization-rbac-menu-contract.md",
+        "docs/platform-roadmap.md",
+        "docs/platform-ui-optimization-assessment.md",
+        "docs/platform-data-governance-and-integrations-assessment.md",
+        "design-qa.md",
+        "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+        "admin/src/platform/ui/AdminTreeWorkbench.tsx",
+        "internal/platform/organizationrbac/menu_repository_test.go",
+        "internal/platform/organizationrbac/navigation_service_objects_test.go",
+        "resources/evidence/menu-tree-and-button-permission-configuration-20260715.json",
+        "scripts/platform-organization-rbac-menu-contract.test.mjs",
+        "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+        "scripts/admin-ui-contracts.test.mjs",
+        "scripts/validate-admin-ui-contracts.mjs",
+        "scripts/validate-admin-i18n.mjs",
+        ".superpowers/sdd/menu-task-6-report.md"
+      ],
+      "visualEvidence": [
+        "superpowers:brainstorming",
+        "product-design",
+        "ui-ux-pro-max",
+        "browser:control-in-app-browser"
       ]
     }
   ]
