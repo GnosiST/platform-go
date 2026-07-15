@@ -15,9 +15,9 @@ Candidate A has completed that activation path as `admin-ui-system-quality-harde
 
 `runtime-security-containment` and `admin-watermark-export-governance` remain `implemented`; this non-visual service-object node does not replace their security or browser-evidence closeouts.
 
-The original 37-node foundation baseline remains closed. Thirteen continuation nodes, including the non-visual `platform-service-contract-standard`, `persisted-query-command-object-runtime`, `integration-ports-disabled-default` and `organization-role-pool-backend-and-migration`, plus the visual nodes `organization-rbac-menu-contract-and-migration-design` and `organization-user-admin-experience`, are `implemented`, so current governance is `66 total / 50 implemented / 16 controlled unfinished` with `completionStatus=not-complete-controlled`.
+The original 37-node foundation baseline remains closed. Fourteen continuation nodes, including the non-visual `platform-service-contract-standard`, `persisted-query-command-object-runtime`, `integration-ports-disabled-default` and `organization-role-pool-backend-and-migration`, plus the visual nodes `organization-rbac-menu-contract-and-migration-design`, `organization-user-admin-experience` and `role-tree-and-authorization-entry`, are `implemented`, so current governance is `66 total / 51 implemented / 15 controlled unfinished` with `completionStatus=not-complete-controlled`.
 
-The activated topology originally introduced four operational Admin UI nodes. `organization-user-admin-experience` is now implemented with Product Design, platform wrappers, `ui-ux-pro-max`, accessibility and responsive browser evidence. The current 16-node remainder retains `role-tree-and-authorization-entry`, `menu-tree-and-button-permission-configuration` and `organization-rbac-menu-e2e-qa`; `public-docs-site` remains the only public marketing/art-direction node and additionally requires `design-taste-frontend`. The exact order and dependencies live in the [activated topology](superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md).
+The activated topology originally introduced four operational Admin UI nodes. `organization-user-admin-experience` and `role-tree-and-authorization-entry` are now implemented with Product Design, platform wrappers, `ui-ux-pro-max`, accessibility and responsive browser evidence. The current 15-node remainder retains `menu-tree-and-button-permission-configuration` and `organization-rbac-menu-e2e-qa`; `public-docs-site` remains the only public marketing/art-direction node and additionally requires `design-taste-frontend`. The exact order and dependencies live in the [activated topology](superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md).
 
 ## Current Evidence
 
@@ -130,6 +130,12 @@ Implemented result:
 - verification failure returns a sanitized message and `422` without clearing the main Admin session;
 - browser evidence under `.superpowers/product-design-audit/sensitive-reveal/` covers factor selection, SMS verification, revealed value and the exact `390x844` mobile result.
 
+## Role Tree And Authorization Entry Closeout
+
+Status: implemented on 2026-07-15.
+
+The role and role-group routes now share one strict two-level workbench. Role movement and disablement use reviewed impact/remediation commands; permission assignment atomically updates allow, deny and data-scope policy. The shared Tree Transfer preserves keyboard focus, reduced motion, virtual tree rendering and at least 44px interactive targets across the frozen six-viewport set. Resource loading follows independent least-privilege checks for roles and role groups. Menu assignment is intentionally read-only in this node; directory/page authoring, `role_menu` persistence and full migration E2E remain owned by the next two nodes.
+
 ## Candidate B: Brand Entry And Public-Surface Visual Redesign
 
 Requested aid: `design-taste-frontend`
@@ -160,6 +166,6 @@ Completion gate:
 
 1. Production persistence correctness and Candidate A are implemented.
 2. Keep Candidate B deferred until there is a real brand/public-surface brief. If only the admin console changes, use the existing quiet operational design language and the implemented Candidate A contracts.
-3. Any future visual candidate requires an explicit task-graph node, design gates, resource locks and fresh screenshot evidence. Candidate A and production Admin OIDC remain closed in the original 37-node baseline; `admin-watermark-export-governance`, `sensitive-data-reveal-step-up`, `organization-rbac-menu-contract-and-migration-design`, the organization backend/migration node and `organization-user-admin-experience` are implemented. The role tree, menu tree, full organization E2E and `public-docs-site` remain controlled pending work in the active `66 total / 50 implemented / 16 controlled unfinished` completion program.
+3. Any future visual candidate requires an explicit task-graph node, design gates, resource locks and fresh screenshot evidence. Candidate A and production Admin OIDC remain closed in the original 37-node baseline; `admin-watermark-export-governance`, `sensitive-data-reveal-step-up`, `organization-rbac-menu-contract-and-migration-design`, the organization backend/migration node, `organization-user-admin-experience` and `role-tree-and-authorization-entry` are implemented. Menu tree, full organization E2E and `public-docs-site` remain controlled pending work in the active `66 total / 51 implemented / 15 controlled unfinished` completion program.
 
 Evidence remains scoped: screenshots, DOM measurements and keyboard checks support this implementation but do not certify WCAG conformance. Screen-reader announcements, high zoom/reflow and platform-specific assistive technology require separate evidence.

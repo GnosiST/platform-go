@@ -199,11 +199,19 @@ describe("platform organization RBAC menu contract", () => {
     assert.match(result.stderr, /implemented downstream Admin task organization-user-admin-experience must stay implemented/);
   });
 
-  it("rejects closing role, menu or full E2E nodes before their implementation", () => {
+  it("rejects regressing the implemented role Admin node", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
-    graph.tasks.find((task) => task.id === "role-tree-and-authorization-entry").status = "implemented";
-    const result = runValidator(["--task-graph", tempJSON("premature-role-tree.json", graph)]);
+    graph.tasks.find((task) => task.id === "role-tree-and-authorization-entry").status = "pending";
+    const result = runValidator(["--task-graph", tempJSON("regressed-role-tree.json", graph)]);
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /downstream runtime\/UI task role-tree-and-authorization-entry must remain unfinished/);
+    assert.match(result.stderr, /implemented downstream Admin task role-tree-and-authorization-entry must stay implemented/);
+  });
+
+  it("rejects closing menu or full E2E nodes before their implementation", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    graph.tasks.find((task) => task.id === "menu-tree-and-button-permission-configuration").status = "implemented";
+    const result = runValidator(["--task-graph", tempJSON("premature-menu-tree.json", graph)]);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /downstream runtime\/UI task menu-tree-and-button-permission-configuration must remain unfinished/);
   });
 });

@@ -34,7 +34,7 @@ func (s *Store) MenuItemsForPrincipal(principal rbac.Principal) []MenuItem {
 			continue
 		}
 		item := menuItemFromRecord(record)
-		if item.Route == "" || item.Permission == "" || !policy.Allows(item.Permission) {
+		if item.Route == "" || item.Permission == "" || !s.permissionCodeEnabledLocked(item.Permission) || !policy.Allows(item.Permission) {
 			continue
 		}
 		items = append(items, item)

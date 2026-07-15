@@ -29,7 +29,8 @@ func AdminResourcesFromConfig(cfg config.Config, manifests []capability.Manifest
 				if err == nil {
 					repository = repository.
 						WithOrganizationRBACOwnership(organizationrbac.NewAdminUserSnapshotWriter()).
-						WithOrganizationRBACOrgUnitWriter(organizationrbac.NewAdminOrgUnitSnapshotWriter())
+						WithOrganizationRBACOrgUnitWriter(organizationrbac.NewAdminOrgUnitSnapshotWriter()).
+						WithOrganizationRBACRoleWriters(organizationrbac.NewAdminRoleSnapshotWriter(), organizationrbac.NewAdminRoleSnapshotWriter())
 				}
 			} else {
 				repository, err = adminresource.NewGORMAdminResourceRepository(context.Background(), db)
@@ -41,7 +42,14 @@ func AdminResourcesFromConfig(cfg config.Config, manifests []capability.Manifest
 				}
 				return nil, err
 			}
-			return adminresource.NewRepositoryBackedStoreFromCapabilitiesWithProtection(repository, manifests, protection)
+			store, err := adminresource.NewRepositoryBackedStoreFromCapabilitiesWithProtection(repository, manifests, protection)
+			if err != nil {
+				return nil, err
+			}
+			if cfg.OrganizationRBACMode == config.OrganizationRBACModeTarget {
+				store.EnableOrganizationRBACRoleGovernanceWrites()
+			}
+			return store, nil
 		}
 		db, err := sql.Open(cfg.AdminResourceDriver, cfg.AdminResourceDSN)
 		if err != nil {

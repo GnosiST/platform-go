@@ -199,6 +199,46 @@ func (s *Store) Schema(resource string) (Schema, error) {
 	return cloneSchema(schema), nil
 }
 
+// EnableOrganizationRBACRoleGovernanceWrites opens only the ownership fields
+// required to create strict role groups in target organization-RBAC mode.
+// Domain snapshot writers remain authoritative for immutability and validation.
+func (s *Store) EnableOrganizationRBACRoleGovernanceWrites() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	schema, ok := s.schemas["role-groups"]
+	if !ok {
+		return
+	}
+	for index := range schema.Fields {
+		switch schema.Fields[index].Key {
+		case "scopeType":
+			schema.Fields[index].Required = true
+			schema.Fields[index].ReadOnly = false
+			schema.Fields[index].InForm = true
+		case "tenantCode":
+			schema.Fields[index].ReadOnly = false
+			schema.Fields[index].InForm = true
+		case "parentCode":
+			schema.Fields[index].ReadOnly = true
+			schema.Fields[index].InForm = false
+		}
+	}
+	s.schemas["role-groups"] = schema
+	roleSchema, ok := s.schemas["roles"]
+	if !ok {
+		return
+	}
+	for index := range roleSchema.Fields {
+		switch roleSchema.Fields[index].Key {
+		case "permissions", "denyPermissions", "dataScope", "dataScopeOrgCodes", "dataScopeAreaCodes":
+			roleSchema.Fields[index].Required = false
+			roleSchema.Fields[index].ReadOnly = true
+			roleSchema.Fields[index].InForm = false
+		}
+	}
+	s.schemas["roles"] = roleSchema
+}
+
 func cloneSchema(schema Schema) Schema {
 	schema.FormGroups = append([]FormGroupDefinition(nil), schema.FormGroups...)
 	schema.Fields = append([]FieldDefinition(nil), schema.Fields...)

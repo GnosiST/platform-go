@@ -485,7 +485,7 @@ func cloneValues(values map[string]string) map[string]string {
 
 func seedResources() map[string][]Record {
 	updatedAt := "2026-07-04T00:00:00Z"
-	return map[string][]Record{
+	resources := map[string][]Record{
 		"overview": {
 			seedLocalized("overview-platform", "platform", "平台运行", "Platform Runtime", "healthy", "平台运行概览。", "Platform runtime overview.", updatedAt, map[string]string{"domain": "foundation"}),
 		},
@@ -555,6 +555,19 @@ func seedResources() map[string][]Record {
 			seedLocalized("setting-branding", "branding", "品牌设置", "Branding Settings", "enabled", "产品名称、Logo 和主题设置。", "Product name, logo and theme settings.", updatedAt, brandingSeedValues()),
 		},
 	}
+	permissionCodes := []string{
+		"admin:api-docs:read",
+		"admin:capability:read",
+		"admin:demo-data:apply",
+		"admin:demo-data:read",
+		"admin:monitoring:read",
+		"admin:policy-review:export",
+	}
+	for _, menu := range resources["menus"] {
+		permissionCodes = append(permissionCodes, menu.Values["permission"])
+	}
+	resources["permissions"] = appendPermissionCatalogCodes(permissionCatalogFromSchemas(seedResourceSchemas(), updatedAt), permissionCodes, updatedAt)
+	return resources
 }
 
 func seedResourcesFromCapabilities(manifests []capability.Manifest) map[string][]Record {

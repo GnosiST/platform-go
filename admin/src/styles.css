@@ -49,6 +49,219 @@
   --selected: #edf4ff;
 }
 
+.admin-tree-workbench {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.75fr) minmax(0, 1.75fr);
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-tree-workbench-navigation,
+.admin-tree-workbench-detail,
+.role-governance-detail {
+  min-width: 0;
+}
+
+.admin-tree-workbench-tree {
+  min-height: 360px;
+  padding: 8px;
+}
+
+.admin-tree-workbench-tree .ant-tree-node-content-wrapper,
+.platform-tree-transfer-pane .ant-tree-node-content-wrapper {
+  min-width: 0;
+  min-height: 44px;
+  padding-block: 8px;
+}
+
+.admin-tree-workbench-node,
+.platform-tree-transfer-node {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.admin-tree-workbench-node-label,
+.platform-tree-transfer-node > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-tree-workbench-node-count {
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.role-governance-detail-body {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.role-governance-detail-heading,
+.role-governance-command-bar,
+.role-authorization-toolbar,
+.platform-tree-transfer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.role-governance-detail-heading .ant-typography {
+  margin: 0;
+}
+
+.role-governance-command-bar .ant-btn,
+.admin-tree-workbench-navigation .admin-list-actions .ant-btn,
+.role-governance-detail .admin-list-actions .ant-btn,
+.platform-tree-transfer-toolbar .ant-btn,
+.platform-tree-transfer-mobile-tabs .ant-tabs-tab {
+  min-height: 44px;
+}
+
+.role-authorization-layout,
+.role-data-scope-panel,
+.platform-tree-transfer {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.role-authorization-modal .ant-modal-body,
+.role-menu-visibility-modal .ant-modal-body {
+  max-height: calc(100dvh - 190px);
+  overflow: auto;
+}
+
+.role-data-scope-panel {
+  grid-template-columns: minmax(140px, 0.35fr) minmax(220px, 0.65fr);
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-elevated);
+}
+
+.role-data-scope-panel > :not(:first-child):not(:nth-child(2)) {
+  grid-column: 2;
+}
+
+.platform-tree-transfer-toolbar .ant-input-affix-wrapper {
+  flex: 1 1 260px;
+  max-width: 420px;
+  min-height: 44px;
+}
+
+.platform-tree-transfer-readonly,
+.platform-tree-transfer-count {
+  overflow-wrap: anywhere;
+}
+
+.platform-tree-transfer-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.platform-tree-transfer-panes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.platform-tree-transfer-panes > div {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.platform-tree-transfer-pane {
+  min-width: 0;
+  min-height: 360px;
+  padding: 6px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.platform-tree-transfer-pane .ant-tree {
+  min-width: 0;
+}
+
+.platform-tree-transfer-pane .ant-tree-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  margin: 0;
+}
+
+.role-conflict-list {
+  max-height: 280px;
+  margin: 0;
+  padding-inline-start: 24px;
+  overflow: auto;
+}
+
+@media (max-width: 1023px) {
+  .admin-tree-workbench {
+    grid-template-columns: minmax(250px, 0.9fr) minmax(0, 1.1fr);
+  }
+
+  .role-governance-command-bar .ant-btn {
+    flex: 1 1 160px;
+  }
+}
+
+@media screen and (max-width: 767px) {
+  .admin-tree-workbench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-tree-workbench-tree {
+    min-height: 260px;
+  }
+
+  .role-governance-detail-body {
+    padding: 12px;
+  }
+
+  .role-governance-detail-heading {
+    align-items: flex-start;
+  }
+
+  .role-governance-command-bar .ant-btn,
+  .platform-tree-transfer-toolbar .ant-btn {
+    width: 100%;
+  }
+
+  .platform-tree-transfer-toolbar .ant-input-affix-wrapper {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .role-data-scope-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .role-data-scope-panel > :not(:first-child):not(:nth-child(2)) {
+    grid-column: 1;
+  }
+
+  .platform-tree-transfer-pane {
+    min-height: 300px;
+  }
+}
+
 @media (max-width: 640px) {
   .sensitive-reveal-modal {
     width: calc(100vw - 24px) !important;

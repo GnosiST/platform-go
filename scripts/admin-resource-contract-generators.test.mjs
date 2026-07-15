@@ -89,7 +89,12 @@ client.replaceOrganizationRoleGroups({
 }).then((response) => response.data?.values.revision);
 
 client.prepareRolePermissionChange({
-  arguments: { roleCode: "operator", permissionCodes: ["admin:user:read", "admin:user:update"] },
+  arguments: {
+    roleCode: "operator",
+    allowPermissionCodes: ["admin:user:read", "admin:user:update"],
+    denyPermissionCodes: [],
+    dataScope: "all",
+  },
   idempotencyKey: "prepare-role-permissions-1",
 }).then((response) => response.data?.values.previewId);
 
@@ -322,12 +327,21 @@ describe("admin resource contract generators", () => {
     const rolePermissionRequest = openapi.components.schemas[rolePermissionRequestName];
     const rolePermissionArguments =
       openapi.components.schemas[rolePermissionRequest.properties.arguments.$ref.split("/").pop()];
-    assert.deepEqual(rolePermissionArguments.properties.permissionCodes, {
+    assert.deepEqual(rolePermissionArguments.properties.allowPermissionCodes, {
       type: "array",
       uniqueItems: true,
       maxItems: 2000,
       items: { type: "string", maxLength: 191 },
     });
+    assert.deepEqual(rolePermissionArguments.properties.denyPermissionCodes, {
+      type: "array",
+      uniqueItems: true,
+      maxItems: 2000,
+      items: { type: "string", maxLength: 191 },
+    });
+    assert.equal(rolePermissionArguments.properties.dataScope.type, "string");
+    assert.equal(rolePermissionArguments.properties.dataScopeOrgCodes.type, "array");
+    assert.equal(rolePermissionArguments.properties.dataScopeAreaCodes.type, "array");
 
     const lifecyclePrepareDefinition = adminServiceObjectDefinitions.commands.find(
       (definition) => definition.id === "platform.authorization.resource-lifecycle.prepare",
@@ -404,7 +418,9 @@ describe("admin resource contract generators", () => {
     assert.match(source, /queryId: "platform\.reference-records\.list"/);
     assert.match(source, /commandId: "platform\.reference-records\.rename"/);
     assert.match(source, /"roleGroupCodes": ReadonlyArray<string>/);
-    assert.match(source, /"permissionCodes": ReadonlyArray<string>/);
+    assert.match(source, /"allowPermissionCodes": ReadonlyArray<string>/);
+    assert.match(source, /"denyPermissionCodes": ReadonlyArray<string>/);
+    assert.match(source, /"dataScope": string/);
     assert.match(source, /ReadonlyArray<AdminServiceObjectRoleRemediation>/);
     assert.match(source, /replaceOrganizationRoleGroups/);
     assert.match(source, /prepareAuthorizationResourceLifecycle/);

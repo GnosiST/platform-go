@@ -12,6 +12,7 @@ import (
 
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/core"
+	"platform-go/internal/platform/rbac"
 )
 
 func TestStoreRegistersAdminResourcesFromEnabledCapabilities(t *testing.T) {
@@ -1226,6 +1227,58 @@ func TestCurrentPrincipalReadsRolesFieldWithLegacyRoleFallback(t *testing.T) {
 	}
 }
 
+func TestCurrentPrincipalIgnoresDisabledPermissionCatalogEntries(t *testing.T) {
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	if _, err := store.Update("roles", "role-operator", WriteInput{
+		Name:   "Operator",
+		Status: "enabled",
+		Values: map[string]string{
+			"groupCode":       "operations",
+			"dataScope":       "current_org",
+			"permissions":     "admin:*",
+			"denyPermissions": "admin:user:update",
+		},
+	}); err != nil {
+		t.Fatalf("Update(role-operator) error = %v", err)
+	}
+	for _, code := range []string{"admin:user:read", "admin:user:update"} {
+		permission := findRecordByCode(store.resources["permissions"], code)
+		if permission == nil {
+			t.Fatalf("permission %q missing from catalog", code)
+		}
+		permission.Status = "disabled"
+	}
+
+	principal := store.CurrentPrincipal("ops")
+	policy := rbac.NewPolicySetWithDeny(principal.Permissions, principal.DeniedPermissions)
+	if policy.Allows("admin:user:read") {
+		t.Fatalf("CurrentPrincipal(ops) policy allows disabled admin:user:read: %+v", principal)
+	}
+	if !policy.Allows("admin:tenant:read") {
+		t.Fatalf("CurrentPrincipal(ops) policy rejects enabled admin:tenant:read: %+v", principal)
+	}
+	if slices.Contains(principal.DeniedPermissions, "admin:user:update") {
+		t.Fatalf("CurrentPrincipal(ops).DeniedPermissions = %v, want disabled deny removed", principal.DeniedPermissions)
+	}
+}
+
+func TestMenuItemsRejectDisabledPermissionThroughWildcard(t *testing.T) {
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	permission := findRecordByCode(store.resources["permissions"], "admin:user:read")
+	if permission == nil {
+		t.Fatal("admin:user:read permission missing")
+	}
+	permission.Status = "disabled"
+
+	items := store.MenuItemsForPrincipal(rbac.Principal{Permissions: []string{"*"}})
+	if hasMenuRoute(items, "/users") {
+		t.Fatalf("menus = %+v, want disabled user permission hidden through wildcard", items)
+	}
+	if !hasMenuRoute(items, "/tenants") {
+		t.Fatalf("menus = %+v, want unrelated enabled tenant menu retained", items)
+	}
+}
+
 func TestValidateAdminPrincipalRequiresEnabledExistingUserWithEffectivePermission(t *testing.T) {
 	t.Run("missing user", func(t *testing.T) {
 		store := NewStoreFromCapabilities(core.DefaultManifests())
@@ -1490,6 +1543,64 @@ func TestStoreBuildsCasbinAuthorizerFromRoleResources(t *testing.T) {
 	}
 	if !authorizer.Can("ops", "platform", "admin:tenant:update", "update") {
 		t.Fatalf("ops cannot update tenants after wildcard allow with read-only deny, want true")
+	}
+	permission := findRecordByCode(store.resources["permissions"], "admin:user:update")
+	if permission == nil {
+		t.Fatal("admin:user:update permission missing")
+	}
+	permission.Status = "disabled"
+	authorizer, err = store.CasbinAuthorizer()
+	if err != nil {
+		t.Fatalf("CasbinAuthorizer() after permission disable error = %v", err)
+	}
+	if authorizer.Can("ops", "platform", "admin:user:update", "update") {
+		t.Fatal("ops can update users through admin:* after admin:user:update was disabled")
+	}
+	if !authorizer.Can("ops", "platform", "admin:tenant:update", "update") {
+		t.Fatal("disabling admin:user:update removed unrelated wildcard permissions")
+	}
+}
+
+func TestStoreInactiveWildcardCatalogEntryStopsExistingRolePolicy(t *testing.T) {
+	for _, policy := range []string{"*", "admin:*", "admin:user:*"} {
+		for _, lifecycle := range []string{"disabled", "deleted"} {
+			t.Run(policy+"/"+lifecycle, func(t *testing.T) {
+				store := NewStoreFromCapabilities(core.DefaultManifests())
+				if findRecordByCode(store.resources["permissions"], policy) == nil {
+					store.resources["permissions"] = append(store.resources["permissions"], Record{
+						ID: "permission-admin-user-all", Code: policy, Name: policy, Status: "enabled",
+						Values: map[string]string{"resourceType": "api"},
+					})
+				}
+				if _, err := store.Update("roles", "role-operator", WriteInput{
+					Name: "Operator", Status: "enabled", Description: "Wildcard operator",
+					Values: map[string]string{"groupCode": "operations", "dataScope": "current_org", "permissions": policy},
+				}); err != nil {
+					t.Fatal(err)
+				}
+				wildcard := findRecordByCode(store.resources["permissions"], policy)
+				if wildcard == nil {
+					t.Fatalf("%s permission missing", policy)
+				}
+				if lifecycle == "disabled" {
+					wildcard.Status = "disabled"
+				} else {
+					wildcard.DeletedAt = "2026-07-15T16:00:00Z"
+				}
+
+				principal := store.CurrentPrincipal("ops")
+				if rbac.NewPolicySet(principal.Permissions).Allows("admin:user:read") {
+					t.Fatalf("CurrentPrincipal permissions = %v, want inactive %s suppressed", principal.Permissions, policy)
+				}
+				authorizer, err := store.CasbinAuthorizer()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if authorizer.Can("ops", "platform", "admin:user:read", "read") {
+					t.Fatalf("inactive %s remains effective through Casbin", policy)
+				}
+			})
+		}
 	}
 }
 

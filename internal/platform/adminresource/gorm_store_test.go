@@ -235,7 +235,7 @@ func TestGORMAdminResourceRepositoryNormalizesGovernanceResources(t *testing.T) 
 		NextID: 1090,
 		Resources: map[string][]Record{
 			"org-units": {
-					{ID: "org-platform-hq", Code: "platform-hq", Name: "Platform HQ", Status: "enabled", Description: "Top org", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"type": "organization", "tenantCode": "platform", "areaCode": "110000", "sortOrder": "10", "roleGroupCount": "0", "effectiveRoleCount": "0"}},
+				{ID: "org-platform-hq", Code: "platform-hq", Name: "Platform HQ", Status: "enabled", Description: "Top org", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"type": "organization", "tenantCode": "platform", "areaCode": "110000", "sortOrder": "10", "roleGroupCount": "0", "effectiveRoleCount": "0"}},
 			},
 			"role-groups": {
 				{ID: "role-group-system-admin", Code: "system-admin", Name: "System Admin", Status: "enabled", Description: "System role group", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"sortOrder": "10"}},
@@ -415,6 +415,15 @@ func TestGORMBackedStorePersistsRolePermissionsForDynamicMenus(t *testing.T) {
 	reloaded, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
 	if err != nil {
 		t.Fatalf("reload store error = %v", err)
+	}
+	permissions, err := reloaded.List("permissions")
+	if err != nil {
+		t.Fatalf("List(permissions) error = %v", err)
+	}
+	for _, policyPrimitive := range []string{"*", "admin:*"} {
+		if findRecordByCode(permissions, policyPrimitive) == nil {
+			t.Fatalf("reloaded permission catalog missing policy primitive %q", policyPrimitive)
+		}
 	}
 	menus := reloaded.MenuItemsForPrincipal(reloaded.CurrentPrincipal("ops"))
 	if !hasMenuRoute(menus, "/users") {

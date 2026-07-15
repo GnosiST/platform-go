@@ -19,9 +19,9 @@ const serviceRuntimePath = path.resolve(repoRoot, argValue("--service-runtime", 
 const taskId = "organization-rbac-menu-contract-and-migration-design";
 const implementedDownstreamTaskIds = [
   "organization-user-admin-experience",
+  "role-tree-and-authorization-entry",
 ];
 const deferredDownstreamTaskIds = [
-  "role-tree-and-authorization-entry",
   "menu-tree-and-button-permission-configuration",
   "organization-rbac-menu-e2e-qa",
 ];
@@ -74,7 +74,7 @@ function serviceObjectKeys(items) {
 }
 
 function validateContract(contract, serviceRuntime, errors) {
-  requireEqual(contract.status, "backend-and-organization-admin-implemented-role-menu-e2e-pending", "status", errors);
+  requireEqual(contract.status, "backend-organization-and-role-admin-implemented-menu-e2e-pending", "status", errors);
   requireEqual(contract.taskId, taskId, "taskId", errors);
   requireIncludes(contract.designEvidence, ["superpowers:brainstorming", "product-design", "ui-ux-pro-max"], "designEvidence", errors);
 
@@ -271,13 +271,13 @@ function validateContract(contract, serviceRuntime, errors) {
     "legacy-role-menu-dual-read-equivalence-and-rollback",
   ], "browserAcceptance.scenarios", errors);
 
-  requireEqual(contract.runtimeBoundary?.implementationStatus, "backend-and-organization-admin-implemented-role-menu-e2e-pending", "runtimeBoundary.implementationStatus", errors);
+  requireEqual(contract.runtimeBoundary?.implementationStatus, "backend-organization-and-role-admin-implemented-menu-e2e-pending", "runtimeBoundary.implementationStatus", errors);
   requireEqual(contract.runtimeBoundary?.backendAndMigrationStatus, "implemented", "runtimeBoundary.backendAndMigrationStatus", errors);
-  requireEqual(contract.runtimeBoundary?.adminUIStatus, "organization-user-implemented-role-menu-pending", "runtimeBoundary.adminUIStatus", errors);
+  requireEqual(contract.runtimeBoundary?.adminUIStatus, "organization-user-and-role-implemented-menu-pending", "runtimeBoundary.adminUIStatus", errors);
   requireEqual(contract.runtimeBoundary?.menuRuntimeStatus, "pending", "runtimeBoundary.menuRuntimeStatus", errors);
-  requireEqual(contract.runtimeBoundary?.browserQAStatus, "organization-user-browser-accepted-full-e2e-pending", "runtimeBoundary.browserQAStatus", errors);
+  requireEqual(contract.runtimeBoundary?.browserQAStatus, "organization-user-and-role-browser-accepted-full-e2e-pending", "runtimeBoundary.browserQAStatus", errors);
   if (!sameList(values(contract.runtimeBoundary?.deferredTaskIds), deferredDownstreamTaskIds)) {
-    errors.push("runtimeBoundary.deferredTaskIds must match the three remaining organization/RBAC/menu nodes");
+    errors.push("runtimeBoundary.deferredTaskIds must match the two remaining organization/RBAC/menu nodes");
   }
   requireIncludes(contract.runtimeBoundary?.notOwned, ["datasource-routing", "federated-query", "xa", "outbox", "mq", "search-projection", "workload-identity"], "runtimeBoundary.notOwned", errors);
 
@@ -288,7 +288,7 @@ function validateContract(contract, serviceRuntime, errors) {
 
 function validateTopology(contract, topology, errors) {
   const migration = topology.organizationRbacMenuMigration ?? {};
-  requireEqual(migration.status, "backend-and-organization-admin-implemented-role-menu-e2e-pending", "topology organization migration status", errors);
+  requireEqual(migration.status, "backend-organization-and-role-admin-implemented-menu-e2e-pending", "topology organization migration status", errors);
   requireEqual(migration.designStatus, "frozen", "topology organization migration designStatus", errors);
   requireEqual(migration.designContract, "resources/platform-organization-rbac-menu-contract.json", "topology organization migration designContract", errors);
   requireEqual(migration.targetModel?.roleOwnership, contract.targetModel?.roleOwnership, "topology target roleOwnership", errors);

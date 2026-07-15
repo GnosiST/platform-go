@@ -7,7 +7,7 @@ Last updated: 2026-07-15
 
 The admin foundation now has a runtime RBAC slice for platform menus and generic admin resources. Menu records are generated from enabled capability manifests, then filtered by the current principal.
 
-The current Admin behavior below remains the migration-source experience. The target backend contract in `docs/platform-organization-rbac-menu-contract.md` is implemented behind `PLATFORM_ORGANIZATION_RBAC_MODE=target`: role groups are non-nested and scoped, organizations bind tenant role groups, tenant users derive tenant from one primary organization, and API/page-button permission resources are separated. The organization/user Admin UI is implemented with derived read-only tenant display, organization-scoped role pools, role-group provenance and explicit invalid-role handling. The role tree, independent role-menu runtime and full browser E2E remain pending; do not describe those navigation and authorization surfaces as delivered.
+The default legacy mode below remains the migration-source experience. The target backend contract in `docs/platform-organization-rbac-menu-contract.md` is implemented behind `PLATFORM_ORGANIZATION_RBAC_MODE=target`: role groups are non-nested and scoped, organizations bind tenant role groups, tenant users derive tenant from one primary organization, and API/page-button permission resources are separated. The organization/user Admin UI and strict role-group-to-role workbench are implemented. The workbench owns role/group metadata, reviewed role move/disable remediation, and atomic allow/deny/data-scope authorization. Its menu entry is read-only; independent `role_menu` persistence, directory/page menu authoring and full browser E2E remain pending.
 
 This slice turns resource permission codes into executable behavior:
 
@@ -38,7 +38,7 @@ Authentication has an audience-aware provider boundary. The bundled `demo` provi
 - `X-Platform-User` is retained only for tests or explicitly controlled local harnesses that set `httpapi.ServerOptions.AllowInsecureHeaderAuth`.
 - The seed `admin` user has `super-admin`, and `super-admin` has `*`.
 - The seed `ops` user has `operator`, and `operator` has read-only permissions for capabilities, tenants, and monitoring.
-- Updating a role record's `permissions` value changes the effective permissions used by sessions, menu filtering and resource authorization.
+- In legacy mode, updating a role record's `permissions` value changes the effective permissions used by sessions, menu filtering and resource authorization. Target mode rejects generic policy-field mutation and requires the reviewed role-permission domain command.
 
 This keeps role-linked menus and backend authorization independent from the concrete login provider. Sessions use a repository-backed store, with memory, file-backed and GORM-backed modes available while keeping the auth provider, JWT, refresh, session, menu and permission APIs stable.
 
@@ -86,24 +86,26 @@ Frontend buttons hide create, edit and delete actions based on the current sessi
 
 The current HTTP enforcement path builds a Casbin authorizer from platform role records and keeps it as a local server cache. Successful writes to `roles`, `users` or `permissions` clear that local authorizer plus principal and dynamic-menu caches, so existing admin sessions see updated role policies without logging in again. When Redis cache mode is enabled, the platform publishes resource invalidation events so peer API instances clear the same local policy and read caches. This keeps the same admin resource contract while moving the execution engine to the target stack. In GORM mode, tenants, org units, users, user-role bindings, role groups, roles, role-permission bindings, permissions, menus and area codes are persisted through normalized tables and mapped back to the generic resource API contract.
 
+Session principals expose enabled exact permission codes, expanding valid role wildcard policies against the active catalog. Casbin retains valid wildcard expressions for enforcement, but an inactive-permission guard prevents disabled or deleted exact permissions from being restored through `*` or `prefix:*`. New role assignments accept global `*`, `admin:*`, or a prefix wildcard backed by at least one enabled exact catalog permission; unsupported expressions such as `evil:*` are rejected. Historical disabled or missing exact entries remain visible only so an operator can remove them; they cannot be newly selected.
+
 ## Configuration Model
 
-The platform does not use a direct role-menu binding table. The model is:
+The legacy migration-source runtime does not use a direct role-menu binding table. Its serving model is:
 
 ```text
 user -> roles -> permissions / denyPermissions -> menus/resources/actions
 ```
 
-Menus, resource actions and future buttons or APIs all declare permission codes. Roles grant permission codes through `roles.permissions` and can explicitly deny permission codes through `roles.denyPermissions`. A menu is visible when the current principal has the menu's required permission and no deny rule matches it.
+Menus and resource actions declare permission codes. Roles grant permission codes through `roles.permissions` and can explicitly deny permission codes through `roles.denyPermissions`. A legacy menu is visible when the current principal has the menu's required permission and no deny rule matches it. Target mode keeps this only as a read-only migration view until the next node adds independent page visibility through `role_menu`; API permission remains the backend security boundary.
 
-Role groups sit beside this chain as management metadata:
+The legacy schema can still contain nested role-group compatibility data:
 
 ```text
 roleGroups.parentCode -> roleGroups
 roleGroups -> roles.groupCode
 ```
 
-They make large role catalogs easier to organize, including multi-level role-group catalogs, but they do not grant permissions by themselves. This keeps Casbin policy evaluation simple and avoids accidental broad access. The admin resource validator requires `role-groups.parentCode` as a tree relation and rejects permission, membership, inheritance and data-scope fields on `role-groups`. `roles.permissions`, `roles.denyPermissions` and `roles.dataScope` remain the only role policy owners; `users.roles` remains the user-to-role membership owner. If a future project needs role inheritance, role templates or grouped membership operations, add that as an explicit policy feature with precedence tests instead of hiding it inside role groups.
+This compatibility shape must not guide new target-mode development. Target mode rejects nested role groups and renders exactly one role-group level with roles as leaves; each role belongs to one group. Role groups never grant permissions, membership, inheritance or data scope. `roles.permissions`, `roles.denyPermissions` and `roles.dataScope` remain the policy owners, but the target workbench changes them only through `prepare -> impact -> apply` with revision, impact hash and idempotency guards. `users.roles` remains the user-to-role membership owner. If a future project needs role inheritance, role templates or grouped membership operations, add that as an explicit RBAC feature with precedence tests instead of hiding it inside role groups.
 
 Permission precedence is explicit:
 
@@ -113,7 +115,7 @@ denyPermissions > permissions > no match
 
 For example, a role can grant `admin:*` while denying `admin:tenant:read`; the user can still access other admin permissions, but tenant reads, tenant menu visibility and tenant resource queries are blocked. Deny rules are action permissions only. They do not create data ownership scopes and do not replace `dataScope`.
 
-Roles also declare `dataScope` as required role metadata for new writes. Supported declaration values are `all`, `current_org`, `current_and_children`, `custom_orgs`, `current_area`, `current_and_children_areas`, `custom_areas` and `self`. This field is persisted and editable through the generic roles resource. It is not an authorization grant: Casbin still decides whether an action is allowed, while the admin resource store applies data-scope filtering to human admin list/query calls after the read action is allowed. Multiple roles are unioned within the same scope dimension, and `all` wins. If organization and area dimensions are both declared, records that carry both fields must pass both dimensions. `custom_orgs` reads `roles.dataScopeOrgCodes`, an org-unit tree relation, and `custom_areas` reads `roles.dataScopeAreaCodes`, an area-code tree relation. Legacy role records without `dataScope` are read with the previous unscoped behavior for compatibility, but role edit/create forms must send an explicit value.
+Roles also declare `dataScope` as required role metadata for new writes. Supported declaration values are `all`, `current_org`, `current_and_children`, `custom_orgs`, `current_area`, `current_and_children_areas`, `custom_areas` and `self`. Legacy mode can persist it through the generic roles resource; target mode edits it only in the atomic role authorization workflow together with allow and deny permissions. It is not an authorization grant: Casbin still decides whether an action is allowed, while the admin resource store applies data-scope filtering to human admin list/query calls after the read action is allowed. Multiple roles are unioned within the same scope dimension, and `all` wins. `custom_orgs` reads `roles.dataScopeOrgCodes`, and `custom_areas` reads `roles.dataScopeAreaCodes`. Legacy role records without `dataScope` retain compatibility behavior, but new target-mode writes require an explicit value.
 
 Organization and area references are available as resource metadata:
 
@@ -128,6 +130,6 @@ These fields support tenant, institution/department, account-principal and regio
 
 The base account model intentionally supports one primary org relation through `users.orgUnitCode`. Reference-project multi-org membership tables such as `user_org_memberships` are classified as an optional extension boundary, not a default RBAC primitive. If a deployment needs users in several org units, add that through an explicit identity/personnel/consumer capability and keep data-scope semantics documented there.
 
-The `permissions` resource is a generated catalog from enabled capability manifests. The `roles` schema exposes the same catalog through `permissions` and `denyPermissions` multiselect fields, so role authorization can be edited through the generic resource console without hard-coding menu names or business pages.
+The `permissions` resource is a generated catalog from enabled capability manifests plus registered platform control-plane permissions. The legacy `roles` schema keeps `permissions` and `denyPermissions` fields for compatibility, while target mode uses the dedicated Tree Transfer and reviewed domain command instead of generic resource mutation. API and page-button permissions are grouped separately; disabled or missing historical entries can be removed but not newly assigned.
 
 Current persistence boundary: tenants, org units, users, role groups, roles, user-role bindings, role-permission bindings, permissions, menus, area codes and operations logs are in-memory by default. Set `PLATFORM_ADMIN_RESOURCE_FILE` to use the file-backed admin resource repository for local persistence, or set `PLATFORM_ADMIN_RESOURCE_DRIVER` and `PLATFORM_ADMIN_RESOURCE_DSN` to use the GORM-backed repository. The GORM adapter stores these standard platform resources in normalized tables while mapping them back to the generic resource API contract.

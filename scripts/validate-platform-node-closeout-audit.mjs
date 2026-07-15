@@ -156,6 +156,18 @@ const requiredCleanupEvidenceByTask = new Map([
       "scripts/platform-organization-rbac-menu-contract.test.mjs",
     ],
   ],
+  [
+    "role-tree-and-authorization-entry",
+    [
+      "docs/superpowers/specs/2026-07-15-role-tree-and-authorization-entry-design.md",
+      "docs/superpowers/plans/2026-07-15-role-tree-and-authorization-entry.md",
+      "resources/evidence/role-tree-and-authorization-entry-20260715.json",
+      "scripts/validate-admin-ui-contracts.mjs",
+      "scripts/admin-ui-contracts.test.mjs",
+      "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+      "scripts/platform-organization-rbac-menu-contract.test.mjs",
+    ],
+  ],
 ]);
 
 const requiredVisualEvidenceByTask = new Map([
@@ -173,6 +185,10 @@ const requiredVisualEvidenceByTask = new Map([
   ],
   [
     "organization-user-admin-experience",
+    ["superpowers:brainstorming", "product-design", "ui-ux-pro-max", "playwright-1.55-local-fallback"],
+  ],
+  [
+    "role-tree-and-authorization-entry",
     ["superpowers:brainstorming", "product-design", "ui-ux-pro-max", "playwright-1.55-local-fallback"],
   ],
 ]);

@@ -20,6 +20,8 @@ type GORMAdminResourceRepository struct {
 	organizationRBACOwned    bool
 	organizationRBACUsers    OrganizationRBACUserSnapshotWriter
 	organizationRBACOrgUnits OrganizationRBACOrgUnitSnapshotWriter
+	organizationRBACRoles    OrganizationRBACRoleSnapshotWriter
+	organizationRBACGroups   OrganizationRBACRoleGroupSnapshotWriter
 }
 
 type OrganizationRBACUserSnapshotWriter interface {
@@ -28,6 +30,14 @@ type OrganizationRBACUserSnapshotWriter interface {
 
 type OrganizationRBACOrgUnitSnapshotWriter interface {
 	ApplyOrgUnitSnapshot(context.Context, *gorm.DB, []Record, []Record) error
+}
+
+type OrganizationRBACRoleSnapshotWriter interface {
+	ApplyRoleSnapshot(context.Context, *gorm.DB, []Record, []Record) error
+}
+
+type OrganizationRBACRoleGroupSnapshotWriter interface {
+	ApplyRoleGroupSnapshot(context.Context, *gorm.DB, []Record, []Record) error
 }
 
 var organizationRBACOwnedResources = []string{"users", "org-units", "roles", "role-groups"}
@@ -412,6 +422,16 @@ func (r *GORMAdminResourceRepository) WithOrganizationRBACOrgUnitWriter(writer O
 	return &clone
 }
 
+func (r *GORMAdminResourceRepository) WithOrganizationRBACRoleWriters(roleWriter OrganizationRBACRoleSnapshotWriter, groupWriter OrganizationRBACRoleGroupSnapshotWriter) *GORMAdminResourceRepository {
+	if r == nil {
+		return nil
+	}
+	clone := *r
+	clone.organizationRBACRoles = roleWriter
+	clone.organizationRBACGroups = groupWriter
+	return &clone
+}
+
 func (r *GORMAdminResourceRepository) ExcludeCapabilitySeed(resource string) bool {
 	return r != nil && r.organizationRBACOwned && slices.Contains(organizationRBACOwnedResources, resource)
 }
@@ -567,6 +587,8 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var organizationRBACUsersChanged bool
 		var organizationRBACOrgUnitsChanged bool
+		var organizationRBACRolesChanged bool
+		var organizationRBACGroupsChanged bool
 		if r.organizationRBACOwned {
 			current := ResourceSnapshot{Resources: map[string][]Record{}}
 			txRepository := &GORMAdminResourceRepository{db: tx}
@@ -589,6 +611,16 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 							return fmt.Errorf("%w: %s", ErrDomainOwnedMutation, resource)
 						}
 						organizationRBACOrgUnitsChanged = true
+					case "roles":
+						if r.organizationRBACRoles == nil {
+							return fmt.Errorf("%w: %s", ErrDomainOwnedMutation, resource)
+						}
+						organizationRBACRolesChanged = true
+					case "role-groups":
+						if r.organizationRBACGroups == nil {
+							return fmt.Errorf("%w: %s", ErrDomainOwnedMutation, resource)
+						}
+						organizationRBACGroupsChanged = true
 					default:
 						return fmt.Errorf("%w: %s", ErrDomainOwnedMutation, resource)
 					}
@@ -601,6 +633,16 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 			}
 			if organizationRBACOrgUnitsChanged {
 				if err := r.organizationRBACOrgUnits.ApplyOrgUnitSnapshot(ctx, tx, current.Resources["org-units"], snapshot.Resources["org-units"]); err != nil {
+					return err
+				}
+			}
+			if organizationRBACGroupsChanged {
+				if err := r.organizationRBACGroups.ApplyRoleGroupSnapshot(ctx, tx, current.Resources["role-groups"], snapshot.Resources["role-groups"]); err != nil {
+					return err
+				}
+			}
+			if organizationRBACRolesChanged {
+				if err := r.organizationRBACRoles.ApplyRoleSnapshot(ctx, tx, current.Resources["roles"], snapshot.Resources["roles"]); err != nil {
 					return err
 				}
 			}

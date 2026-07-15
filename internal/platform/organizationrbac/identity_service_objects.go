@@ -101,7 +101,7 @@ func (e *ServiceObjectExecutor) prepareRoleStateOrGroupChange(ctx context.Contex
 	}
 	summary := organizationRoleGroupImpactSummary{
 		Severity: severity, AffectedUsers: impact.AffectedUsers, ConflictCount: len(impact.Conflicts),
-		CurrentGroupCount: 1, TargetGroupCount: 1,
+		CurrentGroupCount: 1, TargetGroupCount: 1, Conflicts: impact.Conflicts,
 	}
 	return e.storeDomainPreview(ctx, plan, operationKey, impact.ExpectedRevision, changeSet, summary)
 }

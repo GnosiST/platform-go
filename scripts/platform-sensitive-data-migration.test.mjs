@@ -453,6 +453,25 @@ describe("validate-platform-sensitive-data-migration", () => {
     }
   });
 
+  it("ignores canonical JSON integrity metadata while still scanning other JSON values", () => {
+    const integrityOnly = JSON.stringify({
+      sha256: "sha256:a19892762136e000000000000000000000000000000000000000000000000000",
+      sizeBytes: 13800138000,
+      redacted: true,
+    });
+    const safeResult = runValidator(["--evidence-file", tempText("integrity-metadata.json", `${integrityOnly}\n`)]);
+    assert.equal(safeResult.status, 0, safeResult.stderr);
+
+    const unsafe = JSON.stringify({
+      sha256: "sha256:a19892762136e000000000000000000000000000000000000000000000000000",
+      note: "phone=13800138000",
+    });
+    assertRejected(
+      runValidator(["--evidence-file", tempText("unsafe-integrity-metadata.json", `${unsafe}\n`)]),
+      /phone/i,
+    );
+  });
+
   it("rejects any bootstrap driver beyond mysql, postgres and sqlite", () => {
     const source = read("internal/platform/bootstrap/sensitive_migration.go");
     for (const bootstrap of [

@@ -17,6 +17,7 @@ const requiredAdminUIContractTests = ["scripts/admin-ui-contracts.test.mjs"];
 const requiredWatermarkEvidenceManifest = "resources/evidence/admin-watermark-export-governance-20260713.json";
 const requiredSensitiveRevealEvidenceManifest = "resources/evidence/sensitive-data-reveal-step-up-20260713.json";
 const requiredOrganizationUserEvidenceManifest = "resources/evidence/organization-user-admin-experience-20260715.json";
+const requiredRoleTreeEvidenceManifest = "resources/evidence/role-tree-and-authorization-entry-20260715.json";
 const foundationPromotionGateTaskIDs = new Set(["production-auth-provider-hardening", "source-writing-codegen-promotion"]);
 const foundationBaselineTaskIDs = [
   "stack-alignment-and-architecture",
@@ -553,6 +554,27 @@ function validateTask(task, context, errors) {
     );
     requireIncludes(task.evidence?.tests, requiredAdminUIContractTests, `${task.id} evidence.tests`, errors);
     requireIncludes(task.evidence?.screenshots, [requiredOrganizationUserEvidenceManifest], `${task.id} evidence.screenshots`, errors);
+    requireIncludes(task.evidence?.skills, ["ui-ux-pro-max"], `${task.id} evidence.skills`, errors);
+  }
+  if (task.id === "role-tree-and-authorization-entry") {
+    if (task.status !== "implemented") {
+      errors.push("role-tree-and-authorization-entry must stay implemented after role Admin closeout");
+    }
+    requireIncludes(
+      task.evidence?.validators,
+      [
+        "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+        "scripts/validate-platform-governance-topology.mjs",
+        "scripts/validate-platform-admin-api-boundary.mjs",
+        "scripts/validate-admin-service-object-definitions.mjs",
+        "scripts/validate-admin-i18n.mjs",
+        "scripts/validate-admin-ui-contracts.mjs",
+      ],
+      `${task.id} evidence.validators`,
+      errors,
+    );
+    requireIncludes(task.evidence?.tests, requiredAdminUIContractTests, `${task.id} evidence.tests`, errors);
+    requireIncludes(task.evidence?.screenshots, [requiredRoleTreeEvidenceManifest], `${task.id} evidence.screenshots`, errors);
     requireIncludes(task.evidence?.skills, ["ui-ux-pro-max"], `${task.id} evidence.skills`, errors);
   }
   if (task.status === "implemented" || task.status === "preview") {

@@ -25,6 +25,7 @@ const (
 	OrganizationRoleGroupConflictsQueryID       = "platform.identity.organization-role-group-change.conflicts.list"
 	UserOrganizationImpactQueryID               = "platform.identity.user-organization-change.impact"
 	RoleStateOrGroupImpactQueryID               = "platform.identity.role-state-or-group-change.impact"
+	RoleStateOrGroupConflictsQueryID            = "platform.identity.role-state-or-group-change.conflicts.list"
 	RolePermissionImpactQueryID                 = "platform.authorization.role-permission-change.impact"
 	OrganizationRoleGroupPrepareCommandID       = "platform.identity.organization-role-group-change.prepare"
 	UserOrganizationPrepareCommandID            = "platform.identity.user-organization-change.prepare"
@@ -174,6 +175,7 @@ func OrganizationQueryDefinitions() []serviceobject.QueryDefinition {
 		},
 		impactQueryDefinition(UserOrganizationImpactQueryID, "users", "admin:user:update"),
 		impactQueryDefinition(RoleStateOrGroupImpactQueryID, "roles", "admin:role:update"),
+		conflictQueryDefinition(RoleStateOrGroupConflictsQueryID, "roles", "admin:role:update"),
 		impactQueryDefinition(RolePermissionImpactQueryID, "roles", "admin:role:update"),
 		resourceLifecycleImpactQueryDefinition(),
 	}
@@ -236,7 +238,11 @@ func OrganizationDomainCommandDefinitions() []serviceobject.DomainCommandDefinit
 			Permission: "admin:role:update", Action: "update", TenantMode: serviceobject.TenantPlatform, DataScope: "platform",
 			Arguments: []serviceobject.ArgumentDefinition{
 				{Name: "roleCode", Type: serviceobject.ValueString, Required: true, MaxLength: 191},
-				{Name: "permissionCodes", Type: serviceobject.ValueStringSet, Required: true, MaxLength: 191},
+				{Name: "allowPermissionCodes", Type: serviceobject.ValueStringSet, Required: true, MaxLength: 191},
+				{Name: "denyPermissionCodes", Type: serviceobject.ValueStringSet, Required: true, MaxLength: 191},
+				{Name: "dataScope", Type: serviceobject.ValueString, Required: true, MaxLength: 64},
+				{Name: "dataScopeOrgCodes", Type: serviceobject.ValueStringSet, MaxLength: 191},
+				{Name: "dataScopeAreaCodes", Type: serviceobject.ValueStringSet, MaxLength: 191},
 			},
 			Cost: baseCost, Timeout: 5 * time.Second, Idempotency: serviceobject.IdempotencyRequiredKey, MaxAffectedRows: 2000,
 			ResultSchema: previewResultSchema(),
@@ -262,6 +268,24 @@ func impactQueryDefinition(id, resource, permission string) serviceobject.QueryD
 			{Name: "affectedUsers", Type: serviceobject.ValueInteger}, {Name: "conflictCount", Type: serviceobject.ValueInteger},
 			{Name: "expectedRevision", Type: serviceobject.ValueInteger}, {Name: "impactHash", Type: serviceobject.ValueString},
 			{Name: "expiresAt", Type: serviceobject.ValueString},
+		},
+		Build: func(arguments serviceobject.ValidatedArguments) (serviceobject.QueryAST, error) {
+			return serviceobject.QueryAST{Resource: resource, Predicates: []serviceobject.Predicate{{Field: "previewId", Operator: serviceobject.PredicateEqual, Value: arguments["previewId"]}}}, nil
+		},
+	}
+}
+
+func conflictQueryDefinition(id, resource, permission string) serviceobject.QueryDefinition {
+	return serviceobject.QueryDefinition{
+		ID: id, Version: ServiceObjectVersion, Resource: resource, Permission: permission, Action: "update",
+		TenantMode: serviceobject.TenantPlatform, DataScope: "platform",
+		Arguments: []serviceobject.ArgumentDefinition{{Name: "previewId", Type: serviceobject.ValueString, Required: true, MaxLength: 64}},
+		Cost: serviceobject.CostPolicy{
+			BaseCost: 2, PerRowCost: 1, PerOffsetCost: 1, PredicateCost: 1, MaxOffset: 2000, Limit: 3005,
+		}, Timeout: 3 * time.Second,
+		MaxPageSize: 1000,
+		ResultSchema: []serviceobject.ResultField{
+			{Name: "userCode", Type: serviceobject.ValueString}, {Name: "roleCode", Type: serviceobject.ValueString},
 		},
 		Build: func(arguments serviceobject.ValidatedArguments) (serviceobject.QueryAST, error) {
 			return serviceobject.QueryAST{Resource: resource, Predicates: []serviceobject.Predicate{{Field: "previewId", Operator: serviceobject.PredicateEqual, Value: arguments["previewId"]}}}, nil
@@ -337,7 +361,7 @@ func (e *ServiceObjectExecutor) ExecuteQuery(ctx context.Context, plan serviceob
 			item["retentionElapsed"] = summary.RetentionElapsed
 		}
 		return serviceobject.QueryResult{Items: []map[string]any{item}}, nil
-	case OrganizationRoleGroupConflictsQueryID:
+	case OrganizationRoleGroupConflictsQueryID, RoleStateOrGroupConflictsQueryID:
 		previewID, ok := predicateString(plan.AST, "previewId")
 		if !ok {
 			return serviceobject.QueryResult{}, serviceobject.ErrValidation
@@ -346,7 +370,8 @@ func (e *ServiceObjectExecutor) ExecuteQuery(ctx context.Context, plan serviceob
 		if err != nil {
 			return serviceobject.QueryResult{}, err
 		}
-		if preview.Operation != organizationRoleGroupPreviewOperation {
+		if plan.Definition.ID == OrganizationRoleGroupConflictsQueryID && preview.Operation != organizationRoleGroupPreviewOperation ||
+			plan.Definition.ID == RoleStateOrGroupConflictsQueryID && preview.Operation != roleMovePreviewOperation && preview.Operation != roleDisablePreviewOperation {
 			return serviceobject.QueryResult{}, serviceobject.ErrObjectUnavailable
 		}
 		start := (plan.Page - 1) * plan.PageSize

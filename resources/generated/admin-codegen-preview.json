@@ -413,6 +413,34 @@
       },
       {
         "kind": "query",
+        "id": "platform.identity.role-state-or-group-change.conflicts.list",
+        "version": "1.0.0",
+        "clientMethod": "getRoleStateOrGroupChangeConflicts",
+        "requestType": "RoleStateOrGroupChangeConflictsV1_0_0QueryRequest",
+        "inputType": "RoleStateOrGroupChangeConflictsV1_0_0QueryInput",
+        "responseType": "RoleStateOrGroupChangeConflictsV1_0_0QueryData",
+        "argumentNames": [
+          "previewId"
+        ],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 3000,
+          "cost": {
+            "baseCost": 2,
+            "perRowCost": 1,
+            "perOffsetCost": 1,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 2000,
+            "limit": 3005
+          },
+          "maxPageSize": 1000,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "query",
         "id": "platform.authorization.role-permission-change.impact",
         "version": "1.0.0",
         "clientMethod": "getRolePermissionChangeImpact",
@@ -717,7 +745,11 @@
         "responseType": "RolePermissionChangePrepareV1_0_0CommandData",
         "argumentNames": [
           "roleCode",
-          "permissionCodes"
+          "allowPermissionCodes",
+          "denyPermissionCodes",
+          "dataScope",
+          "dataScopeOrgCodes",
+          "dataScopeAreaCodes"
         ],
         "operationPhase": "prepare",
         "limits": {

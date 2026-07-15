@@ -3246,7 +3246,7 @@
         "zh": "角色树与授权入口",
         "en": "Role Tree And Authorization Entry"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Manage the strict role-group and role tree while separating menu assignment from API and button permission assignment through governed transfer controls.",
       "dependsOn": [
         "organization-user-admin-experience"
@@ -3254,8 +3254,36 @@
       "evidence": {
         "sourcePaths": [
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/superpowers/specs/2026-07-15-role-tree-and-authorization-entry-design.md",
+          "docs/superpowers/plans/2026-07-15-role-tree-and-authorization-entry.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/platform-roadmap.md",
+          "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+          "admin/src/platform/ui/AdminTreeWorkbench.tsx",
+          "admin/src/platform/ui/PlatformTreeTransfer.tsx",
+          "internal/platform/organizationrbac/admin_role_snapshot.go",
+          "internal/platform/organizationrbac/authorization_service_objects.go",
+          "internal/platform/organizationrbac/role_permissions.go",
+          "resources/generated/admin-service-object-client.ts",
+          "resources/generated/openapi.admin.json",
+          "resources/evidence/role-tree-and-authorization-entry-20260715.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+          "scripts/validate-platform-governance-topology.mjs",
+          "scripts/validate-platform-admin-api-boundary.mjs",
+          "scripts/validate-admin-service-object-definitions.mjs",
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs"
+        ],
+        "tests": [
+          "internal/platform/organizationrbac/admin_role_snapshot_test.go",
+          "internal/platform/organizationrbac/authorization_service_objects_test.go",
+          "internal/platform/organizationrbac/service_objects_test.go",
+          "internal/platform/bootstrap/admin_resources_test.go",
+          "scripts/admin-resource-contract-generators.test.mjs",
+          "scripts/admin-ui-contracts.test.mjs",
+          "scripts/platform-organization-rbac-menu-contract.test.mjs"
         ],
         "taskIds": [
           "role-tree-and-authorization-entry"

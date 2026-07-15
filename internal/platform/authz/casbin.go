@@ -27,10 +27,15 @@ type UserRole struct {
 }
 
 type CasbinAuthorizer struct {
-	enforcer *casbin.Enforcer
+	enforcer            *casbin.Enforcer
+	inactivePermissions map[string]struct{}
 }
 
 func NewCasbinAuthorizer(policies []RolePolicy, roles []UserRole) (*CasbinAuthorizer, error) {
+	return NewCasbinAuthorizerWithInactivePermissions(policies, roles, nil)
+}
+
+func NewCasbinAuthorizerWithInactivePermissions(policies []RolePolicy, roles []UserRole, inactivePermissions []string) (*CasbinAuthorizer, error) {
 	m, err := model.NewModelFromString(`
 [request_definition]
 r = sub, tenant, obj, act
@@ -65,7 +70,14 @@ m = g(r.sub, p.role, r.tenant) && r.tenant == p.tenant && permissionMatch(r.obj,
 			return nil, err
 		}
 	}
-	return &CasbinAuthorizer{enforcer: enforcer}, nil
+	inactive := make(map[string]struct{}, len(inactivePermissions))
+	for _, permission := range inactivePermissions {
+		permission = strings.TrimSpace(permission)
+		if permission != "" {
+			inactive[permission] = struct{}{}
+		}
+	}
+	return &CasbinAuthorizer{enforcer: enforcer, inactivePermissions: inactive}, nil
 }
 
 func policyEffect(effect string) string {
@@ -79,6 +91,9 @@ func policyEffect(effect string) string {
 
 func (a *CasbinAuthorizer) Can(user string, tenant string, permission string, action string) bool {
 	if a == nil || a.enforcer == nil {
+		return false
+	}
+	if _, inactive := a.inactivePermissions[strings.TrimSpace(permission)]; inactive {
 		return false
 	}
 	ok, err := a.enforcer.Enforce(user, tenant, permission, action)

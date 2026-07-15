@@ -6,6 +6,11 @@ import {
   type OrganizationRoleGroupChangeImpactV1_0_0Item,
   type OrganizationRolePoolGetV1_0_0Item,
   type OrganizationRoleGroupChangePrepareV1_0_0Values,
+  type RolePermissionChangeImpactV1_0_0Item,
+  type RolePermissionChangePrepareV1_0_0Values,
+  type RoleStateOrGroupChangeConflictsV1_0_0Item,
+  type RoleStateOrGroupChangeImpactV1_0_0Item,
+  type RoleStateOrGroupChangePrepareV1_0_0Values,
   type UserOrganizationChangePrepareV1_0_0Values,
 } from "../../../../resources/generated/admin-service-object-client";
 import { request } from "./client";
@@ -27,6 +32,9 @@ export type OrganizationRolePoolItem = OrganizationRolePoolGetV1_0_0Item;
 export type OrganizationChangeImpact = OrganizationRoleGroupChangeImpactV1_0_0Item;
 export type OrganizationChangeConflict = OrganizationRoleGroupChangeConflictsV1_0_0Item;
 export type OrganizationRoleRemediation = AdminServiceObjectRoleRemediation;
+export type RoleChangeImpact = RoleStateOrGroupChangeImpactV1_0_0Item;
+export type RolePermissionImpact = RolePermissionChangeImpactV1_0_0Item;
+export type RoleChangeConflict = RoleStateOrGroupChangeConflictsV1_0_0Item;
 
 export async function getOrganizationRolePool(orgUnitCode: string) {
   return collectPages(async (page, pageSize) => requireData(await client.getOrganizationRolePool({
@@ -98,6 +106,82 @@ export async function changeUserOrganization(preview: UserOrganizationChangePrep
       impactHash: preview.impactHash,
     },
     idempotencyKey: idempotencyKey("user-organization-apply"),
+  })).values;
+}
+
+export async function prepareRoleStateOrGroupChange(
+  roleCode: string,
+  operation: "move" | "disable",
+  targetGroupCode?: string,
+  remediations: ReadonlyArray<OrganizationRoleRemediation> = [],
+) {
+  return requireData(await client.prepareRoleStateOrGroupChange({
+    arguments: { roleCode, operation, targetGroupCode, remediations },
+    idempotencyKey: idempotencyKey(`role-${operation}-prepare`),
+  })).values as RoleStateOrGroupChangePrepareV1_0_0Values;
+}
+
+export async function getRoleStateOrGroupChangeImpact(previewId: string) {
+  return requireData(await client.getRoleStateOrGroupChangeImpact({
+    arguments: { previewId },
+    pagination: { page: 1, pageSize: 1 },
+  })).items[0];
+}
+
+export async function getRoleStateOrGroupChangeConflicts(previewId: string) {
+  return collectPages(async (page, pageSize) => requireData(await client.getRoleStateOrGroupChangeConflicts({
+    arguments: { previewId },
+    pagination: { page, pageSize },
+  })));
+}
+
+export async function applyRoleStateOrGroupChange(
+  preview: RoleStateOrGroupChangePrepareV1_0_0Values,
+  operation: "move" | "disable",
+) {
+  const input = {
+    arguments: {
+      previewId: preview.previewId,
+      expectedRevision: preview.expectedRevision,
+      impactHash: preview.impactHash,
+    },
+    idempotencyKey: idempotencyKey(`role-${operation}-apply`),
+  };
+  return operation === "move"
+    ? requireData(await client.moveRole(input)).values
+    : requireData(await client.disableRole(input)).values;
+}
+
+export type RolePolicyChange = {
+  readonly allowPermissionCodes: string[];
+  readonly denyPermissionCodes: string[];
+  readonly dataScope: string;
+  readonly dataScopeOrgCodes: string[];
+  readonly dataScopeAreaCodes: string[];
+};
+
+export async function prepareRolePermissionChange(roleCode: string, policy: RolePolicyChange) {
+  return requireData(await client.prepareRolePermissionChange({
+    arguments: { roleCode, ...policy },
+    idempotencyKey: idempotencyKey("role-permissions-prepare"),
+  })).values as RolePermissionChangePrepareV1_0_0Values;
+}
+
+export async function getRolePermissionChangeImpact(previewId: string) {
+  return requireData(await client.getRolePermissionChangeImpact({
+    arguments: { previewId },
+    pagination: { page: 1, pageSize: 1 },
+  })).items[0];
+}
+
+export async function replaceRolePermissions(preview: RolePermissionChangePrepareV1_0_0Values) {
+  return requireData(await client.replaceRolePermissions({
+    arguments: {
+      previewId: preview.previewId,
+      expectedRevision: preview.expectedRevision,
+      impactHash: preview.impactHash,
+    },
+    idempotencyKey: idempotencyKey("role-permissions-apply"),
   })).values;
 }
 

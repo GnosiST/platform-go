@@ -2,6 +2,7 @@ package adminresource
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"platform-go/internal/platform/core"
@@ -57,6 +58,15 @@ func TestPermissionCatalogAndPersistenceRequireKnownResourceType(t *testing.T) {
 	for _, permission := range permissions {
 		if permission.Values["resourceType"] != "api" {
 			t.Fatalf("permission %q resource type = %q, want api", permission.Code, permission.Values["resourceType"])
+		}
+	}
+	codes := make([]string, 0, len(permissions))
+	for _, permission := range permissions {
+		codes = append(codes, permission.Code)
+	}
+	for _, policyPrimitive := range []string{"*", "admin:*"} {
+		if !slices.Contains(codes, policyPrimitive) {
+			t.Fatalf("permission catalog codes = %v, want policy primitive %q", codes, policyPrimitive)
 		}
 	}
 	db := openAdminResourceGORMDB(t)

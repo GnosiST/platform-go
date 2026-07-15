@@ -2,6 +2,7 @@ import { Spin } from "antd";
 import { useCan, useResourceParams } from "@refinedev/core";
 import type { Dictionary, Language } from "../i18n";
 import { GenericResourceConsole } from "../resources/GenericResourceConsole";
+import { RoleGovernanceConsole } from "../resources/RoleGovernanceConsole";
 import type { AdminResourceDefinition } from "../resources/registry";
 import type { AdminSensitiveRevealFactorComplete } from "../api/client";
 import type { SensitiveRevealOIDCResume } from "../security/sensitiveRevealOIDC";
@@ -36,6 +37,18 @@ export function ResourceRoutePage({ resource, availableResourceRoutes, language,
 
   if (readAccess.data && !readAccess.data.can) {
     return <AdminFeedback type="warning" message={dictionary.noPermission} description={readAccess.data.reason} />;
+  }
+
+  if (resource.route === "/roles" || resource.route === "/role-groups") {
+    return (
+      <RoleGovernanceConsole
+        resource={resource}
+        language={language}
+        dictionary={dictionary}
+        permissions={permissions}
+        deniedPermissions={deniedPermissions}
+      />
+    );
   }
 
   return (

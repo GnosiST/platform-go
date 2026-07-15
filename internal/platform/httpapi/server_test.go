@@ -3532,8 +3532,8 @@ func TestRoleDenyPermissionsOverrideWildcardAllows(t *testing.T) {
 	if err := json.Unmarshal(sessionRecorder.Body.Bytes(), &session); err != nil {
 		t.Fatalf("decode session after deny update: %v body = %s", err, sessionRecorder.Body.String())
 	}
-	if !containsString(session.Data.Permissions, "admin:*") {
-		t.Fatalf("session permissions after deny update = %+v, want admin:*", session.Data.Permissions)
+	if !containsString(session.Data.Permissions, "admin:user:read") {
+		t.Fatalf("session permissions after deny update = %+v, want expanded user read permission", session.Data.Permissions)
 	}
 	if !containsString(session.Data.DeniedPermissions, "admin:tenant:read") {
 		t.Fatalf("session denied permissions after deny update = %+v, want admin:tenant:read", session.Data.DeniedPermissions)
@@ -3577,6 +3577,61 @@ func TestRoleDenyPermissionsOverrideWildcardAllows(t *testing.T) {
 	server.Router().ServeHTTP(userRecorder, userRequest)
 	if userRecorder.Code != http.StatusOK {
 		t.Fatalf("users query after deny update status = %d body = %s, want 200", userRecorder.Code, userRecorder.Body.String())
+	}
+}
+
+func TestDisabledPermissionImmediatelyOverridesGlobalWildcardAtHTTPBoundary(t *testing.T) {
+	server := newTestServer(ServerOptions{
+		Capabilities: []capability.Manifest{authProviderTestManifest(), {ID: "tenant"}},
+		Cache:        cache.NewMemoryStore(cache.MemoryStoreOptions{}),
+	})
+	login := loginForTest(t, server, "admin")
+	token := login.Data.Token
+
+	updateBody := bytes.NewBufferString(`{"code":"admin:user:read","name":"User Read","status":"disabled","description":"Disabled user read","values":{"resourceType":"api","capability":"platform","resource":"users","action":"read","prefix":"admin:user"}}`)
+	updateRecorder := httptest.NewRecorder()
+	updateRequest := httptest.NewRequest(http.MethodPut, "/api/admin/resources/permissions/permission-admin-user-read", updateBody)
+	updateRequest.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(updateRecorder, updateRequest)
+	if updateRecorder.Code != http.StatusOK {
+		t.Fatalf("disable admin:user:read status = %d body = %s", updateRecorder.Code, updateRecorder.Body.String())
+	}
+
+	usersRecorder := httptest.NewRecorder()
+	usersRequest := httptest.NewRequest(http.MethodPost, "/api/admin/resources/users/query", strings.NewReader(`{"page":1,"pageSize":10}`))
+	usersRequest.Header.Set("Authorization", "Bearer "+token)
+	usersRequest.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(usersRecorder, usersRequest)
+	if usersRecorder.Code != http.StatusForbidden {
+		t.Fatalf("users query after permission disable status = %d body = %s, want 403", usersRecorder.Code, usersRecorder.Body.String())
+	}
+
+	tenantsRecorder := httptest.NewRecorder()
+	tenantsRequest := httptest.NewRequest(http.MethodPost, "/api/admin/resources/tenants/query", strings.NewReader(`{"page":1,"pageSize":10}`))
+	tenantsRequest.Header.Set("Authorization", "Bearer "+token)
+	tenantsRequest.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(tenantsRecorder, tenantsRequest)
+	if tenantsRecorder.Code != http.StatusOK {
+		t.Fatalf("tenant query after unrelated permission disable status = %d body = %s, want 200", tenantsRecorder.Code, tenantsRecorder.Body.String())
+	}
+
+	menuRecorder := httptest.NewRecorder()
+	menuRequest := httptest.NewRequest(http.MethodGet, "/api/admin/menus", nil)
+	menuRequest.Header.Set("Authorization", "Bearer "+token)
+	server.Router().ServeHTTP(menuRecorder, menuRequest)
+	if menuRecorder.Code != http.StatusOK {
+		t.Fatalf("menus after permission disable status = %d body = %s", menuRecorder.Code, menuRecorder.Body.String())
+	}
+	var menus adminMenuListTestPayload
+	if err := json.Unmarshal(menuRecorder.Body.Bytes(), &menus); err != nil {
+		t.Fatalf("decode menus after permission disable: %v body = %s", err, menuRecorder.Body.String())
+	}
+	routes := make([]string, 0, len(menus.Data.Items))
+	for _, item := range menus.Data.Items {
+		routes = append(routes, item.Route)
+	}
+	if containsString(routes, "/users") || !containsString(routes, "/tenants") {
+		t.Fatalf("menu routes after permission disable = %+v, want users hidden and tenants retained", routes)
 	}
 }
 

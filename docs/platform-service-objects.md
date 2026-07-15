@@ -112,6 +112,12 @@ Commands may declare `required-key`. The runtime fingerprints the normalized com
 
 `MemoryIdempotencyStore` is bounded by TTL and capacity and is intended for tests and local harnesses. It coordinates each scope independently and does not serialize unrelated commands.
 
+## Domain Command Extension
+
+The organization/RBAC target runtime extends the generic AST with registered domain handlers for relationship and authorization changes that must be atomic. Role movement or disablement uses `platform.identity.role-state-or-group-change.prepare`, its persisted impact/conflict queries, then `platform.identity.role.move` or `platform.identity.role.disable`. Role authorization uses `platform.authorization.role-permission-change.prepare`, the persisted impact query, then `platform.authorization.role-permissions.replace` to change allow permissions, deny permissions and data scope as one revision.
+
+Prepare stores the normalized change set server-side and returns `previewId`, `expectedRevision` and `impactHash`. Apply accepts those values plus an idempotency key, reloads the reviewed set and rejects stale or changed state. In target mode, generic Admin mutation cannot bypass these handlers for role group ownership, role state or role policy fields.
+
 ## Reference Definition
 
 `internal/platform/serviceobject/reference.go` supplies one query and one command definition plus a GORM binding. The HTTP integration tests prove authenticated Admin execution, permission denial, tenant/data-scope derivation, strict request decoding, rate limiting and sanitized responses. The generated artifacts are:

@@ -2769,15 +2769,7 @@
       },
       "phase": "production-governance",
       "scope": "admin-ui",
-      "status": "pending",
-      "statusReason": {
-        "zh": "角色组和角色仍是分离资源，菜单与权限也没有独立授权入口。",
-        "en": "Role groups and roles remain separate resources and menu and permission assignment lack independent entry points."
-      },
-      "completionGate": {
-        "zh": "完成严格两级角色树、角色移动与停用，以及独立的分配菜单和分配权限 Tree Transfer 入口。",
-        "en": "Complete the strict two-level role tree, role move and disable flows, and separate Assign Menus and Assign Permissions Tree Transfer entry points."
-      },
+      "status": "implemented",
       "visual": true,
       "designGate": [
         "superpowers:brainstorming",
@@ -2795,7 +2787,50 @@
       "evidence": {
         "docs": [
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
-          "docs/platform-ui-optimization-assessment.md"
+          "docs/superpowers/specs/2026-07-15-role-tree-and-authorization-entry-design.md",
+          "docs/superpowers/plans/2026-07-15-role-tree-and-authorization-entry.md",
+          "docs/platform-organization-rbac-menu-contract.md",
+          "docs/platform-ui-optimization-assessment.md",
+          "docs/admin-rbac-menu.md",
+          "docs/admin-resource-schema.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+          "scripts/validate-platform-governance-topology.mjs",
+          "scripts/validate-platform-admin-api-boundary.mjs",
+          "scripts/validate-admin-service-object-definitions.mjs",
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs",
+          "scripts/validate-platform-foundation-task-graph.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs"
+        ],
+        "tests": [
+          "internal/platform/adminresource/store_test.go",
+          "internal/platform/authz/casbin_test.go",
+          "internal/platform/organizationrbac/admin_role_snapshot_test.go",
+          "internal/platform/organizationrbac/authorization_service_objects_test.go",
+          "internal/platform/organizationrbac/service_objects_test.go",
+          "internal/platform/bootstrap/admin_resources_test.go",
+          "scripts/admin-resource-contract-generators.test.mjs",
+          "scripts/admin-ui-contracts.test.mjs",
+          "scripts/platform-organization-rbac-menu-contract.test.mjs",
+          "scripts/platform-foundation-task-graph.test.mjs",
+          "scripts/platform-node-closeout-audit.test.mjs"
+        ],
+        "screenshots": [
+          "resources/evidence/role-tree-and-authorization-entry-20260715.json"
+        ],
+        "skills": [
+          "ui-ux-pro-max"
+        ],
+        "checks": [
+          "rtk go test ./...",
+          "rtk npm --prefix admin run build",
+          "375/390/768/1024/1280/1440 reduced-motion browser acceptance",
+          "permission search, select, review, save and reload",
+          "focus restoration and 44px role and Tree Transfer checkbox touch targets",
+          "no horizontal overflow, console errors or failed first-party requests",
+          "menu assignment remains read-only until the next node"
         ]
       }
     },

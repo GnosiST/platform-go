@@ -37,7 +37,6 @@ const completionProgramCapabilityIDs = [
 ];
 
 const partialCapabilityDependencies = {
-  "role-tree-and-authorization-entry": ["organization-user-admin-experience"],
   "menu-tree-and-button-permission-configuration": ["role-tree-and-authorization-entry"],
   "organization-rbac-menu-e2e-qa": [
     "organization-user-admin-experience",
@@ -149,6 +148,7 @@ describe("validate-platform-engineering-capabilities", () => {
       "organization-rbac-menu-contract-and-migration-design",
       "organization-role-pool-backend-and-migration",
       "organization-user-admin-experience",
+      "role-tree-and-authorization-entry",
     ]);
     for (const capability of capabilities.filter((item) => implementedCapabilityIDs.has(item.id))) {
       assert.equal(capability.status, "implemented");
@@ -210,6 +210,22 @@ describe("validate-platform-engineering-capabilities", () => {
     assert.ok(organizationAdmin.evidence.sourcePaths.includes("resources/evidence/organization-user-admin-experience-20260715.json"));
     assert.ok(organizationAdmin.evidence.tests.includes("scripts/admin-ui-contracts.test.mjs"));
     assert.ok(organizationAdmin.evidence.validators.includes("scripts/validate-admin-ui-contracts.mjs"));
+    const roleAdmin = capabilities.find((item) => item.id === "role-tree-and-authorization-entry");
+    assert.equal(roleAdmin.status, "implemented");
+    assert.ok(roleAdmin.evidence.sourcePaths.includes("admin/src/platform/resources/RoleGovernanceConsole.tsx"));
+    assert.ok(roleAdmin.evidence.sourcePaths.includes("resources/evidence/role-tree-and-authorization-entry-20260715.json"));
+    assert.ok(roleAdmin.evidence.tests.includes("scripts/admin-ui-contracts.test.mjs"));
+    assert.ok(roleAdmin.evidence.validators.includes("scripts/validate-admin-ui-contracts.mjs"));
+  });
+
+  it("rejects regressing role Admin experience after closeout", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities.find((item) => item.id === "role-tree-and-authorization-entry").status = "partial";
+
+    const result = runValidator(["--matrix", tempJSON("partial-role-admin.json", matrix)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /required implemented capability role-tree-and-authorization-entry must stay implemented/);
   });
 
   it("rejects regressing organization and user Admin experience after closeout", () => {

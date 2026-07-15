@@ -555,6 +555,30 @@ function addEvidenceCarrier(carriers, label, filePath) {
   if (!carriers.has(absolutePath)) carriers.set(absolutePath, label);
 }
 
+function evidenceTextForScan(filePath) {
+  const source = readText(filePath);
+  if (path.extname(filePath).toLowerCase() !== ".json") return source;
+  try {
+    return JSON.stringify(normalizeJSONIntegrityMetadata(JSON.parse(source)));
+  } catch {
+    return source;
+  }
+}
+
+function normalizeJSONIntegrityMetadata(value) {
+  if (Array.isArray(value)) return value.map(normalizeJSONIntegrityMetadata);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([key, entry]) => {
+    if (key === "sha256" && typeof entry === "string" && /^sha256:[0-9a-f]{64}$/i.test(entry)) {
+      return [key, "<sha256>"];
+    }
+    if (key === "sizeBytes" && Number.isSafeInteger(entry) && entry >= 0) {
+      return [key, 0];
+    }
+    return [key, normalizeJSONIntegrityMetadata(entry)];
+  }));
+}
+
 function evidenceCarriers(graph, closeout) {
   const carriers = new Map();
   addEvidenceCarrier(carriers, "runbook", paths.runbook);
@@ -582,7 +606,7 @@ function evidenceCarriers(graph, closeout) {
 }
 
 function validateEvidenceFiles(carriers, errors) {
-  for (const [filePath, label] of carriers) validateEvidenceText(label, readText(filePath), errors);
+  for (const [filePath, label] of carriers) validateEvidenceText(label, evidenceTextForScan(filePath), errors);
 }
 
 function validate() {

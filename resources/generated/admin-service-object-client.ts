@@ -255,6 +255,40 @@ export type RoleStateOrGroupChangeImpactV1_0_0QueryData = {
   readonly pageSize: number;
 };
 
+export type RoleStateOrGroupChangeConflictsV1_0_0Arguments = {
+  "previewId": string;
+};
+
+export type RoleStateOrGroupChangeConflictsV1_0_0Sort = {
+  readonly name: never;
+  readonly order: "asc" | "desc";
+};
+
+export type RoleStateOrGroupChangeConflictsV1_0_0Item = {
+  readonly "userCode": string;
+  readonly "roleCode": string;
+};
+
+export type RoleStateOrGroupChangeConflictsV1_0_0QueryInput = {
+  readonly arguments: RoleStateOrGroupChangeConflictsV1_0_0Arguments;
+  readonly pagination?: {
+    readonly page?: number;
+    readonly pageSize?: number;
+  };
+  readonly sort?: ReadonlyArray<RoleStateOrGroupChangeConflictsV1_0_0Sort>;
+};
+
+export type RoleStateOrGroupChangeConflictsV1_0_0QueryRequest = RoleStateOrGroupChangeConflictsV1_0_0QueryInput & {
+  readonly queryId: "platform.identity.role-state-or-group-change.conflicts.list";
+  readonly version: "1.0.0";
+};
+
+export type RoleStateOrGroupChangeConflictsV1_0_0QueryData = {
+  readonly items: ReadonlyArray<RoleStateOrGroupChangeConflictsV1_0_0Item>;
+  readonly page: number;
+  readonly pageSize: number;
+};
+
 export type RolePermissionChangeImpactV1_0_0Arguments = {
   "previewId": string;
 };
@@ -550,7 +584,11 @@ export type RoleDisableV1_0_0CommandData = {
 
 export type RolePermissionChangePrepareV1_0_0Arguments = {
   "roleCode": string;
-  "permissionCodes": ReadonlyArray<string>;
+  "allowPermissionCodes": ReadonlyArray<string>;
+  "denyPermissionCodes": ReadonlyArray<string>;
+  "dataScope": string;
+  "dataScopeOrgCodes"?: ReadonlyArray<string>;
+  "dataScopeAreaCodes"?: ReadonlyArray<string>;
 };
 
 export type RolePermissionChangePrepareV1_0_0Values = {
@@ -711,6 +749,15 @@ export class AdminServiceObjectClient {
       version: "1.0.0",
     };
     return this.transport.post<RoleStateOrGroupChangeImpactV1_0_0QueryData, RoleStateOrGroupChangeImpactV1_0_0QueryRequest>("/api/admin/service-objects/query", request);
+  }
+
+  getRoleStateOrGroupChangeConflicts(input: RoleStateOrGroupChangeConflictsV1_0_0QueryInput): Promise<AdminServiceObjectResponse<RoleStateOrGroupChangeConflictsV1_0_0QueryData>> {
+    const request: RoleStateOrGroupChangeConflictsV1_0_0QueryRequest = {
+      ...input,
+      queryId: "platform.identity.role-state-or-group-change.conflicts.list",
+      version: "1.0.0",
+    };
+    return this.transport.post<RoleStateOrGroupChangeConflictsV1_0_0QueryData, RoleStateOrGroupChangeConflictsV1_0_0QueryRequest>("/api/admin/service-objects/query", request);
   }
 
   getRolePermissionChangeImpact(input: RolePermissionChangeImpactV1_0_0QueryInput): Promise<AdminServiceObjectResponse<RolePermissionChangeImpactV1_0_0QueryData>> {

@@ -65,9 +65,9 @@ const requiredImplementedCapabilityIDs = [
   "organization-rbac-menu-contract-and-migration-design",
   "organization-role-pool-backend-and-migration",
   "organization-user-admin-experience",
+  "role-tree-and-authorization-entry",
 ];
 const requiredPartialCapabilityIDs = [
-  "role-tree-and-authorization-entry",
   "menu-tree-and-button-permission-configuration",
   "organization-rbac-menu-e2e-qa",
   "multi-datasource-contract-and-runtime",
@@ -83,7 +83,6 @@ const requiredPartialCapabilityIDs = [
   "public-documentation-and-release",
 ];
 const requiredPartialCapabilityDependencies = {
-  "role-tree-and-authorization-entry": ["organization-user-admin-experience"],
   "menu-tree-and-button-permission-configuration": ["role-tree-and-authorization-entry"],
   "organization-rbac-menu-e2e-qa": [
     "organization-user-admin-experience",

@@ -3,7 +3,6 @@ package adminresource
 import (
 	"errors"
 	"slices"
-	"sort"
 	"strings"
 
 	"platform-go/internal/platform/rbac"
@@ -75,26 +74,26 @@ func (s *Store) currentPrincipalLocked(username string) rbac.Principal {
 		return rbac.Principal{User: rbac.User{Username: username}}
 	}
 	roles := s.effectiveRoleCodesLocked(*user)
-	permissions := make([]string, 0)
-	deniedPermissions := make([]string, 0)
+	permissionPolicies := make([]string, 0)
+	deniedPermissionPolicies := make([]string, 0)
 	for _, role := range roles {
 		roleRecord := findRecordByCode(visibleRecords("roles", s.resources["roles"]), role)
 		if roleRecord == nil || roleRecord.Status == "disabled" {
 			continue
 		}
 		for _, permission := range rbac.ParsePermissionList(roleRecord.Values["permissions"]) {
-			if !slices.Contains(permissions, permission) {
-				permissions = append(permissions, permission)
+			if !slices.Contains(permissionPolicies, permission) {
+				permissionPolicies = append(permissionPolicies, permission)
 			}
 		}
 		for _, permission := range rbac.ParsePermissionList(roleRecord.Values["denyPermissions"]) {
-			if !slices.Contains(deniedPermissions, permission) {
-				deniedPermissions = append(deniedPermissions, permission)
+			if !slices.Contains(deniedPermissionPolicies, permission) {
+				deniedPermissionPolicies = append(deniedPermissionPolicies, permission)
 			}
 		}
 	}
-	sort.Strings(permissions)
-	sort.Strings(deniedPermissions)
+	permissions := s.expandPermissionPoliciesLocked(permissionPolicies)
+	deniedPermissions := s.expandPermissionPoliciesLocked(deniedPermissionPolicies)
 	return rbac.Principal{
 		User: rbac.User{
 			ID:          user.ID,

@@ -59,3 +59,20 @@ func TestCasbinAuthorizerDenyOverridesWildcardAllow(t *testing.T) {
 		t.Fatalf("Can(other tenant action) = false, want true")
 	}
 }
+
+func TestCasbinAuthorizerInactivePermissionOverridesWildcardAllow(t *testing.T) {
+	authorizer, err := NewCasbinAuthorizerWithInactivePermissions([]RolePolicy{
+		{RoleCode: "platform-admin", Tenant: "platform", Permission: "*", Action: "*"},
+	}, []UserRole{
+		{User: "user:1", RoleCode: "platform-admin", Tenant: "platform"},
+	}, []string{"admin:user:read"})
+	if err != nil {
+		t.Fatalf("NewCasbinAuthorizerWithInactivePermissions() error = %v", err)
+	}
+	if authorizer.Can("user:1", "platform", "admin:user:read", "read") {
+		t.Fatal("inactive admin:user:read allowed through global wildcard")
+	}
+	if !authorizer.Can("user:1", "platform", "admin:tenant:read", "read") {
+		t.Fatal("unrelated permission rejected through global wildcard")
+	}
+}

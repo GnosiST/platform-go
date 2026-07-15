@@ -10,11 +10,11 @@ import (
 const platformTenant = "platform"
 
 func (s *Store) CasbinAuthorizer() (*authz.CasbinAuthorizer, error) {
-	policies, roles := s.casbinPolicySnapshot()
-	return authz.NewCasbinAuthorizer(policies, roles)
+	policies, roles, inactivePermissions := s.casbinPolicySnapshot()
+	return authz.NewCasbinAuthorizerWithInactivePermissions(policies, roles, inactivePermissions)
 }
 
-func (s *Store) casbinPolicySnapshot() ([]authz.RolePolicy, []authz.UserRole) {
+func (s *Store) casbinPolicySnapshot() ([]authz.RolePolicy, []authz.UserRole, []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -27,7 +27,7 @@ func (s *Store) casbinPolicySnapshot() ([]authz.RolePolicy, []authz.UserRole) {
 		if !ok {
 			continue
 		}
-		for _, permission := range rbac.ParsePermissionList(role.Values["permissions"]) {
+		for _, permission := range s.activePermissionPoliciesLocked(rbac.ParsePermissionList(role.Values["permissions"])) {
 			policies = append(policies, authz.RolePolicy{
 				RoleCode:   role.Code,
 				Tenant:     roleTenant,
@@ -36,7 +36,7 @@ func (s *Store) casbinPolicySnapshot() ([]authz.RolePolicy, []authz.UserRole) {
 				Effect:     authz.PolicyEffectAllow,
 			})
 		}
-		for _, permission := range rbac.ParsePermissionList(role.Values["denyPermissions"]) {
+		for _, permission := range s.activePermissionPoliciesLocked(rbac.ParsePermissionList(role.Values["denyPermissions"])) {
 			policies = append(policies, authz.RolePolicy{
 				RoleCode:   role.Code,
 				Tenant:     roleTenant,
@@ -64,7 +64,7 @@ func (s *Store) casbinPolicySnapshot() ([]authz.RolePolicy, []authz.UserRole) {
 			})
 		}
 	}
-	return policies, roles
+	return policies, roles, s.inactivePermissionCodesLocked()
 }
 
 func (s *Store) roleTenantLocked(role Record) (string, bool) {

@@ -3,6 +3,7 @@ package organizationrbac
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -188,6 +189,14 @@ func TestRoleMovePrepareApplyRequiresReviewedAssignmentRemediation(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
+	conflicts, err := executor.ExecuteQuery(context.Background(), serviceobject.QueryPlan{
+		Definition: queryDefinitionByID(t, RoleStateOrGroupConflictsQueryID), Execution: execution,
+		AST:  serviceobject.QueryAST{Predicates: []serviceobject.Predicate{{Field: "previewId", Operator: serviceobject.PredicateEqual, Value: prepare.Values["previewId"]}}},
+		Page: 1, PageSize: 100,
+	})
+	if err != nil || len(conflicts.Items) != 1 || conflicts.Items[0]["userCode"] != "alice" || conflicts.Items[0]["roleCode"] != "operator" {
+		t.Fatalf("role conflicts = %+v error=%v", conflicts, err)
+	}
 	apply, err := executor.ExecuteDomainCommand(context.Background(), serviceobject.DomainCommandPlan{
 		Definition: domainDefinitionByID(t, RoleMoveCommandID), Execution: execution,
 		Arguments: serviceobject.ValidatedArguments{
@@ -204,6 +213,60 @@ func TestRoleMovePrepareApplyRequiresReviewedAssignmentRemediation(t *testing.T)
 	_, roles, err := loadUserWithRoles(db, "alice")
 	if err != nil || len(roles) != 1 || roles[0] != "viewer" {
 		t.Fatalf("roles = %v error=%v", roles, err)
+	}
+}
+
+func TestRoleStateOrGroupConflictsQueryPaginatesAcrossThe1000RowBoundary(t *testing.T) {
+	_, repository := prepareOrganizationRBACTestRepository(t)
+	executor, err := NewServiceObjectExecutor(repository, func() time.Time {
+		return time.Date(2026, 7, 15, 16, 0, 0, 0, time.UTC)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	execution := kernel.ExecutionContext{
+		Context: context.Background(), Actor: kernel.Actor{Username: "admin", Kind: kernel.ActorKindUser},
+		TenantScope: kernel.TenantScope{PlatformWide: true}, PermissionIntent: kernel.PermissionIntent{Code: "admin:role:update", Action: "update"},
+	}
+	conflicts := make([]RoleAssignmentConflict, 2000)
+	for index := range conflicts {
+		conflicts[index] = RoleAssignmentConflict{UserCode: fmt.Sprintf("user-%04d", index+1), RoleCode: "operator"}
+	}
+	prepared, err := executor.storeDomainPreview(context.Background(), serviceobject.DomainCommandPlan{Execution: execution}, roleDisablePreviewOperation, 0,
+		roleStateOrGroupChangeSet{RoleCode: "operator", Operation: roleOperationDisable},
+		organizationRoleGroupImpactSummary{Severity: "high", AffectedUsers: len(conflicts), ConflictCount: len(conflicts), Conflicts: conflicts})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, err := serviceobject.NewRegistry(OrganizationQueryDefinitions(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := serviceobject.NewRuntime(registry, serviceobject.AuthorizerFunc(func(context.Context, kernel.ExecutionContext, string, string) bool { return true }), executor, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := serviceobject.QueryRequest{
+		QueryID: RoleStateOrGroupConflictsQueryID, Version: ServiceObjectVersion,
+		Arguments:  map[string]any{"previewId": prepared.Values["previewId"]},
+		Pagination: serviceobject.Pagination{Page: 1, PageSize: 1000},
+	}
+	firstPage, err := runtime.ExecuteQuery(serviceobject.Invocation{Execution: execution}, request)
+	if err != nil {
+		t.Fatalf("first conflict page error = %v", err)
+	}
+	if len(firstPage.Items) != 1000 || firstPage.Items[999]["userCode"] != "user-1000" {
+		t.Fatalf("first conflict page len=%d last=%v", len(firstPage.Items), firstPage.Items[999])
+	}
+	request.Pagination.Page = 2
+	secondPage, err := runtime.ExecuteQuery(serviceobject.Invocation{Execution: execution}, request)
+	if err != nil || len(secondPage.Items) != 1000 || secondPage.Items[0]["userCode"] != "user-1001" {
+		t.Fatalf("second conflict page = %+v, error=%v", secondPage, err)
+	}
+	request.Pagination.Page = 3
+	terminalPage, err := runtime.ExecuteQuery(serviceobject.Invocation{Execution: execution}, request)
+	if err != nil || len(terminalPage.Items) != 0 {
+		t.Fatalf("terminal conflict page = %+v, error=%v", terminalPage, err)
 	}
 }
 

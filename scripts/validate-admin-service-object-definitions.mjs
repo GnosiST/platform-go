@@ -328,7 +328,7 @@ for (const [sourcePath, source] of sources) {
   const runtimeSymbols = new Set(
     [
       ...source.matchAll(/\bID:\s*([A-Za-z][A-Za-z0-9_]*(?:QueryID|CommandID))\b/g),
-      ...source.matchAll(/\b(?:impactQueryDefinition|applyDomainDefinition)\(\s*([A-Za-z][A-Za-z0-9_]*(?:QueryID|CommandID))\b/g),
+      ...source.matchAll(/\b(?:impactQueryDefinition|conflictQueryDefinition|applyDomainDefinition)\(\s*([A-Za-z][A-Za-z0-9_]*(?:QueryID|CommandID))\b/g),
     ].map((match) => match[1]),
   );
   if (JSON.stringify([...runtimeSymbols].sort()) !== JSON.stringify([...registeredSymbols].sort())) {

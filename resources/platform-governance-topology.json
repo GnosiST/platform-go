@@ -44,7 +44,7 @@
     }
   },
   "organizationRbacMenuMigration": {
-    "status": "backend-and-organization-admin-implemented-role-menu-e2e-pending",
+    "status": "backend-organization-and-role-admin-implemented-menu-e2e-pending",
     "designStatus": "frozen",
     "designContract": "resources/platform-organization-rbac-menu-contract.json",
     "taskIds": [

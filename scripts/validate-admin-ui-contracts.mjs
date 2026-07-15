@@ -25,6 +25,7 @@ const files = {
   resourceConsole: readSource("admin/src/platform/resources/GenericResourceConsole.tsx"),
   resourceExperience: readSource("admin/src/platform/resources/resourceExperience.ts"),
   organizationUserExperience: readSource("admin/src/platform/resources/organizationUserExperience.tsx"),
+  roleGovernance: readSource("admin/src/platform/resources/RoleGovernanceConsole.tsx"),
   resourceRoute: readSource("admin/src/platform/refine/ResourceRoutePage.tsx"),
   sensitiveRevealModal: readSource("admin/src/platform/resources/SensitiveFieldRevealModal.tsx"),
   sensitiveRevealOIDC: readSource("admin/src/platform/security/sensitiveRevealOIDC.ts"),
@@ -36,6 +37,8 @@ const files = {
   resourceForm: readSource("admin/src/platform/ui/PlatformResourceForm.tsx"),
   formSlotRegistry: readSource("admin/src/platform/ui/formSlotRegistry.tsx"),
   treeSelect: readSource("admin/src/platform/ui/PlatformTreeSelect.tsx"),
+  treeTransfer: readSource("admin/src/platform/ui/PlatformTreeTransfer.tsx"),
+  treeWorkbench: readSource("admin/src/platform/ui/AdminTreeWorkbench.tsx"),
   uiIndex: readSource("admin/src/platform/ui/index.ts"),
   styles: readSource("admin/src/styles.css"),
 };
@@ -230,6 +233,72 @@ requireIncludes(files.organizationUserExperience, "conflicts.length !== initialI
 requireIncludes(files.organizationUserExperience, "aria-invalid={invalidSelectedRoles.length > 0}", "Out-of-pool user roles must expose their invalid state semantically.");
 requireIncludes(files.organizationUserExperience, '<ul className="organization-role-pool-list"', "Organization role-pool provenance must use list semantics.");
 requireIncludes(files.organizationUserExperience, 'role="textbox" aria-readonly="true"', "Read-only role values must expose a valid read-only widget semantic.");
+requireIncludes(files.resourceRoute, 'resource.route === "/roles" || resource.route === "/role-groups"', "Role and role-group routes must share the role governance console.");
+requireIncludes(files.roleGovernance, "AdminTreeWorkbench", "Role governance must use the platform tree workbench wrapper.");
+requireIncludes(files.roleGovernance, "PlatformTreeTransfer", "Role permission and menu entry points must use the platform Tree Transfer wrapper.");
+requireIncludes(files.roleGovernance, 'const canReadGroups = hasPermission(permissions, "admin:role-group:read", deniedPermissions);', "Role governance must derive role-group read access from the active permission set.");
+requireIncludes(files.roleGovernance, 'const canReadRoles = hasPermission(permissions, "admin:role:read", deniedPermissions);', "Role governance must derive role read access from the active permission set.");
+requireIncludes(files.roleGovernance, 'const canReadTenants = hasPermission(permissions, "admin:tenant:read", deniedPermissions);', "Role-group creation must derive tenant read access from the active permission set.");
+requireIncludes(files.roleGovernance, 'const canCreateGroup = hasPermission(permissions, "admin:role-group:create", deniedPermissions) && canReadTenants;', "Tenant-scoped role-group creation must require tenant read access.");
+requireIncludes(files.roleGovernance, 'const canReadAuthorizationInputs = hasPermission(permissions, "admin:permission:read", deniedPermissions) && hasPermission(permissions, "admin:org-unit:read", deniedPermissions) && hasPermission(permissions, "admin:area-code:read", deniedPermissions);', "Role permission assignment must require every resource read permission used by its editor.");
+requireIncludes(files.roleGovernance, 'const canReadMenus = hasPermission(permissions, "admin:menu:read", deniedPermissions);', "Read-only role menu assignment must require menu read access.");
+requireIncludes(files.roleGovernance, '{canReadMenus ? <Button ref={menuTriggerRef}', "Role menu assignment must be hidden when menu records cannot be read.");
+requireIncludes(files.roleGovernance, '{canReadAuthorizationInputs ? <Button ref={authorizationTriggerRef}', "Role permission assignment must be hidden when its supporting records cannot be read.");
+requireRegex(
+  files.roleGovernance,
+  /canReadGroups\s*\?\s*loadAllRecords\("role-groups"\)\s*:\s*Promise\.resolve\(\[\]\)[\s\S]*?canReadRoles\s*\?\s*loadAllRecords\("roles", query \? \[query\] : undefined\)\s*:\s*Promise\.resolve\(\[\]\)/,
+  "Role governance must not request role or role-group resources the current principal cannot read.",
+);
+requireIncludes(files.roleGovernance, "const governanceRequest = useRef(0);", "Role governance must track the latest tree request.");
+requireIncludes(files.roleGovernance, "if (governanceRequest.current !== requestID) return;", "Role governance must discard stale role and role-group search responses.");
+requireRegex(files.roleGovernance, /loadGovernance[\s\S]*?if \(governanceRequest\.current !== requestID\) return;\s*setLoading\(true\);/, "A stale debounced role-governance request must not re-enter the loading state.");
+requireIncludes(files.roleGovernance, "allowPermissionCodes: authorization.allow", "Role policy prepare must include allowed permissions.");
+requireIncludes(files.roleGovernance, "denyPermissionCodes: authorization.deny", "Role policy prepare must include denied permissions.");
+requireIncludes(files.roleGovernance, "dataScope: authorization.dataScope", "Role policy prepare must include data scope.");
+requireIncludes(files.roleGovernance, "await replaceRolePermissions(preview)", "Role policy changes must apply through the reviewed domain command.");
+requireNotIncludes(files.roleGovernance, 'await updateAdminResource("roles", authorization.role.id', "Role policy apply must not be followed by a second generic role mutation.");
+requireIncludes(files.roleGovernance, "sameRoleGroupBoundary(group, moveSourceGroup)", "Role move options must stay inside the current scope and tenant boundary.");
+requireCountAtLeast(files.roleGovernance, 'disabled={!canUpdateRole || record.status !== "enabled"}', 2, "Disabled roles must not expose move or permission mutation actions.");
+requireIncludes(files.roleGovernance, "readOnlyMessage={dictionary.roleMenuLegacyReadonlyDescription}", "The pre-migration menu assignment entry must state that it is read-only.");
+requireIncludes(
+  files.roleGovernance,
+  "permissionTreeNodes(permissionCatalog, dictionary, uniqueSorted([...authorization.allow, ...authorization.deny]))",
+  "Role authorization must project disabled and missing historical permissions into the Tree Transfer catalog.",
+);
+requireIncludes(files.roleGovernance, "dictionary.rolePermissionHistoricalDisabled", "Disabled historical permissions must remain removable but unavailable for assignment.");
+requireIncludes(files.roleGovernance, "availableDisabledReason: dictionary.rolePermissionHistoricalMissing", "Missing historical permissions must remain removable but unavailable for assignment.");
+requireIncludes(files.treeTransfer, "const preserved = value.filter((key) => !mutableVisibleSet.has(key));", "Filtered Tree Transfer changes must preserve selections outside the current result.");
+requireIncludes(files.treeTransfer, "const visibleCheckedKeys = useMemo(() => value.filter((key) => filteredKeys.has(key))", "Filtered Tree Transfer rendering must not pass hidden selections to Ant Tree.");
+requireIncludes(files.treeTransfer, "const preservedDisabled = value.filter((key) => !mutableLeafKeySet.has(key));", "Tree Transfer bulk operations must preserve disabled selections.");
+requireIncludes(files.treeTransfer, "returnFocusRef?.current?.focus({ preventScroll: true });", "Closing Tree Transfer workflows must restore focus without scrolling.");
+requireIncludes(files.treeTransfer, "virtual={virtual}", "Tree Transfer must virtualize large trees through the platform component.");
+requireIncludes(files.treeTransfer, "platform-tree-transfer-mobile-tabs", "Tree Transfer must switch to a mobile single-pane tab layout.");
+requireIncludes(files.treeTransfer, "node.kind === \"leaf\" && !node.disabledReason && !node.availableDisabledReason", "Tree Transfer bulk assignment must exclude unavailable historical selections.");
+requireIncludes(files.treeTransfer, "const unavailable = Boolean(node.disabledReason || !selectedOnly && node.availableDisabledReason);", "Tree Transfer historical selections must be disabled only in the available pane.");
+requireIncludes(files.treeTransfer, "disabled: unavailable", "Tree Transfer must expose pane-specific unavailable semantics to Ant Tree.");
+requireIncludes(files.treeWorkbench, 'aria-label={ariaLabel}', "The role tree workbench must expose an accessible tree label.");
+requireIncludes(files.styles, ".admin-tree-workbench {", "Role governance must define a stable tree/detail layout.");
+requireIncludes(files.styles, ".platform-tree-transfer-pane {", "Tree Transfer must define stable pane dimensions.");
+requireRegex(files.styles, /\.platform-tree-transfer-mobile-tabs \.ant-tabs-tab \{[\s\S]*?min-height:\s*44px;/, "Tree Transfer mobile tabs must expose 44px targets.");
+requireRegex(files.styles, /\.admin-tree-workbench-navigation \.admin-list-actions \.ant-btn,[\s\S]*?min-height:\s*44px;/, "Role tree creation actions must expose 44px targets.");
+requireRegex(files.styles, /\.role-governance-detail \.admin-list-actions \.ant-btn,[\s\S]*?min-height:\s*44px;/, "Role detail actions must expose 44px targets.");
+requireRegex(
+  files.styles,
+  /\.platform-tree-transfer-pane \.ant-tree-checkbox\s*\{[\s\S]*?width:\s*44px;[\s\S]*?min-width:\s*44px;[\s\S]*?height:\s*44px;/,
+  "Tree Transfer checkboxes must expose a real 44px by 44px pointer target.",
+);
+for (const key of [
+  "roleGovernanceTitle",
+  "roleTreeAriaLabel",
+  "assignPermissions",
+  "assignMenus",
+  "roleMenuLegacyReadonlyDescription",
+  "rolePermissionHistoricalDisabled",
+  "rolePermissionHistoricalMissing",
+  "transferSelectedCount",
+]) {
+  requireCountExactly(files.i18n, `${key}:`, 2, `Role governance i18n key ${key} must exist in matching Chinese and English dictionaries.`);
+}
 requireRegex(
   files.resourceConsole,
   /const canRevealField = useCallback\([\s\S]*?field\.inDetail && field\.reveal && permissionAllows\(permissions, field\.reveal\.permission, deniedPermissions\)/,

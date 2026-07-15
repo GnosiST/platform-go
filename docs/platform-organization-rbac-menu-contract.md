@@ -1,6 +1,6 @@
 # Organization, RBAC And Menu Contract
 
-> Status: backend constraints, migration runtime and organization/user Admin UI implemented; role tree, menu tree and full browser E2E remain pending in three downstream nodes.
+> Status: backend constraints, migration runtime, organization/user Admin UI and the role tree/authorization entry are implemented; menu tree and full browser E2E remain pending in two downstream nodes.
 
 This document is the implementation contract for organization role pools, tenant derivation, role ownership, menu visibility, permission boundaries and migration. The machine-readable source is `resources/platform-organization-rbac-menu-contract.json`.
 
@@ -150,11 +150,11 @@ Cutover requires zero unapproved principal differences, a verified checkpoint, a
 
 ## Tree Workbench And Transfer
 
-Role and menu management use a shared `AdminTreeWorkbench`; authorization selection uses a new `PlatformTreeTransfer`. `PlatformTreeSelect` remains appropriate for ordinary bounded relation fields and is not expanded into this large-data control.
+Role management now uses the shared `AdminTreeWorkbench`; authorization selection uses `PlatformTreeTransfer`. `PlatformTreeSelect` remains appropriate for ordinary bounded relation fields and is not expanded into this control. Menu management will adopt the same primitives in its own node.
 
-The Transfer value contains assignable leaf keys plus a revision. Parent nodes are navigation and bulk-selection controls. Search is server-backed, preserves ancestor paths and defines "select all" as the current filtered result only. Lazy loading, selected-value hydration and virtual rendering activate for large sets; 50 visible nodes is the virtualization threshold.
+The implemented role baseline keeps leaf keys plus revision metadata, parent navigation/bulk selection, local filtering over loaded nodes, selected replay, disabled reasons, half selection, counts and virtual tree rendering at 50 visible nodes. It exposes an optional child-loading seam, but does not claim the future server-backed search, selected-value hydration runtime or 10,000-node certification.
 
-The control supports search, full/half selection, disabled reasons, selected replay, counts, optimistic concurrency and 10,000 nodes with 2,000 selected items. Permission assignment groups API and page-button permissions and keeps grant and explicit-deny sets mutually exclusive.
+Permission assignment groups API and page-button permissions, keeps grant and explicit-deny sets mutually exclusive, and saves through the role-policy revision/impact workflow. Server-backed search, deterministic hydration of unloaded selections, 10,000 nodes with 2,000 selected items, and the complete menu dataset contract remain completion gates for `organization-rbac-menu-e2e-qa` after the menu node provides its runtime.
 
 Keyboard behavior follows the treeview pattern: arrows navigate and expand/collapse, Home/End move within the current tree, Space toggles selection and Enter activates the focused command. Mixed nodes expose `aria-checked="mixed"`; count changes use `aria-live="polite"`; focus returns to the trigger when the dialog closes. Drag is optional on desktop and always has a button/command alternative. Interactive targets are at least 44px.
 
@@ -162,7 +162,7 @@ At 1024px and above the Transfer is two-pane. At 768-1023px it uses a compact tw
 
 ## Browser Acceptance Contract
 
-Later UI and E2E nodes must exercise the following at `375x812`, `390x844`, `768x1024`, `1024x768`, `1280x720` and `1440x1024`:
+The organization/user and focused role nodes already cover their bounded form, role tree, permission save/reload, focus, reduced-motion and responsive scenarios at `375x812`, `390x844`, `768x1024`, `1024x768`, `1280x720` and `1440x1024`. The later menu and full E2E nodes must complete the remaining cross-surface contract:
 
 - bind organization groups and inspect role-pool provenance;
 - derive tenant and load roles after selecting an organization;
@@ -178,12 +178,11 @@ Later UI and E2E nodes must exercise the following at `375x812`, `390x844`, `768
 
 ## Implemented And Deferred Boundaries
 
-`organization-role-pool-backend-and-migration` owns the target GORM relations, server-derived tenant and role-pool validation, conflict-aware prepare/impact/apply service objects, authorization lifecycle checks, migration inventory/apply/verify/rollback workflow, target-mode bootstrap and generated Admin service-object contracts. `organization-user-admin-experience` separately closes organization role-group management, derived tenant display, organization-scoped role selection, explicit invalid-role handling and responsive browser acceptance. Neither node claims the remaining role tree, menu tree or full E2E experience.
+`organization-role-pool-backend-and-migration` owns the target GORM relations, server-derived tenant and role-pool validation, conflict-aware prepare/impact/apply service objects, authorization lifecycle checks, migration inventory/apply/verify/rollback workflow, target-mode bootstrap and generated Admin service-object contracts. `organization-user-admin-experience` closes organization role-group management, derived tenant display, organization-scoped role selection, explicit invalid-role handling and responsive browser acceptance. `role-tree-and-authorization-entry` closes the strict two-level role workbench, role/group metadata maintenance, reviewed role move/disable remediation, atomic allow/deny/data-scope authorization, and the read-only menu assignment boundary. It does not claim directory/page menu authoring or `role_menu` persistence.
 
 The remaining work is owned by:
 
-1. `role-tree-and-authorization-entry`
-2. `menu-tree-and-button-permission-configuration`
-3. `organization-rbac-menu-e2e-qa`
+1. `menu-tree-and-button-permission-configuration`
+2. `organization-rbac-menu-e2e-qa`
 
 Datasource routing, federation, XA, Outbox/MQ, search projection and workload identity remain outside this lane.

@@ -9,7 +9,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "role-tree-and-authorization-entry",
   "menu-tree-and-button-permission-configuration",
   "organization-rbac-menu-e2e-qa",
   "multi-datasource-contract-and-runtime",
@@ -95,7 +94,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("preserves 37 baseline closeouts, closes thirteen completion nodes, and tracks 16 pending nodes", () => {
+  it("preserves 37 baseline closeouts, closes fourteen completion nodes, and tracks 15 pending nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -103,7 +102,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(task, "task graph must include production-admin-oidc-auth");
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
-    assert.equal(audit.nodeCloseouts.length, 50);
+    assert.equal(audit.nodeCloseouts.length, 51);
     assert.deepEqual(audit.nodeCloseouts.slice(0, 37).map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
     assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts.slice(0, 37))).digest("hex"), foundationBaselineCloseoutDigest);
     const runtimeSecurityCloseout = audit.nodeCloseouts[37];
@@ -198,7 +197,40 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(organizationAdminCloseout.visualEvidence.includes("ui-ux-pro-max"));
     assert.ok(organizationAdminCloseout.visualEvidence.includes("playwright-1.55-local-fallback"));
     assert.equal(organizationAdminCloseout.visualEvidence.includes("browser:control-in-app-browser"), false);
+    const roleAdminCloseout = audit.nodeCloseouts.find(
+      (item) => item.taskId === "role-tree-and-authorization-entry",
+    );
+    assert.equal(roleAdminCloseout.status, "closed");
+    assert.equal(roleAdminCloseout.neatFreak, true);
+    assert.equal(roleAdminCloseout.cleanupMode, "focused");
+    assert.ok(roleAdminCloseout.cleanupEvidence.includes("resources/evidence/role-tree-and-authorization-entry-20260715.json"));
+    assert.ok(roleAdminCloseout.cleanupEvidence.includes("scripts/admin-ui-contracts.test.mjs"));
+    assert.ok(roleAdminCloseout.visualEvidence.includes("product-design"));
+    assert.ok(roleAdminCloseout.visualEvidence.includes("ui-ux-pro-max"));
+    assert.ok(roleAdminCloseout.visualEvidence.includes("playwright-1.55-local-fallback"));
+    assert.equal(roleAdminCloseout.visualEvidence.includes("browser:control-in-app-browser"), true);
     assert.deepEqual(audit.pendingNodeEvidence, completionProgramTaskIDs);
+  });
+
+  it("rejects role Admin closeout without UI, browser manifest and design evidence", () => {
+    const audit = readJSON("resources/platform-node-closeout-audit.json");
+    const closeout = audit.nodeCloseouts.find((item) => item.taskId === "role-tree-and-authorization-entry");
+    closeout.cleanupEvidence = closeout.cleanupEvidence.filter(
+      (item) =>
+        item !== "resources/evidence/role-tree-and-authorization-entry-20260715.json" &&
+        item !== "scripts/admin-ui-contracts.test.mjs" &&
+        item !== "scripts/validate-admin-ui-contracts.mjs",
+    );
+    closeout.visualEvidence = ["superpowers:brainstorming"];
+
+    const result = runValidator(["--audit", tempJSON("missing-role-admin-closeout-evidence.json", audit)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /nodeCloseouts\.role-tree-and-authorization-entry\.cleanupEvidence must include resources\/evidence\/role-tree-and-authorization-entry-20260715\.json/);
+    assert.match(result.stderr, /nodeCloseouts\.role-tree-and-authorization-entry\.cleanupEvidence must include scripts\/admin-ui-contracts\.test\.mjs/);
+    assert.match(result.stderr, /nodeCloseouts\.role-tree-and-authorization-entry\.visualEvidence must include product-design/);
+    assert.match(result.stderr, /nodeCloseouts\.role-tree-and-authorization-entry\.visualEvidence must include ui-ux-pro-max/);
+    assert.match(result.stderr, /nodeCloseouts\.role-tree-and-authorization-entry\.visualEvidence must include playwright-1\.55-local-fallback/);
   });
 
   it("rejects organization Admin closeout without UI, browser manifest and design evidence", () => {

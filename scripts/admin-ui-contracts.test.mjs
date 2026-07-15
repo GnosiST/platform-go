@@ -90,6 +90,276 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /Organization and user routes must inject the shared organization-user experience/);
   });
 
+  it("rejects role routes that bypass the shared governance console", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/refine/ResourceRoutePage.tsx",
+      'resource.route === "/roles" || resource.route === "/role-groups"',
+      'resource.route === "/roles"',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Role and role-group routes must share the role governance console/);
+  });
+
+  it("rejects role governance that queries a resource the principal cannot read", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      'canReadGroups ? loadAllRecords("role-groups") : Promise.resolve([])',
+      'loadAllRecords("role-groups")',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must not request role or role-group resources the current principal cannot read/);
+  });
+
+  it("rejects role permission assignment that omits a supporting read permission", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      'const canReadAuthorizationInputs = hasPermission(permissions, "admin:permission:read", deniedPermissions) && hasPermission(permissions, "admin:org-unit:read", deniedPermissions) && hasPermission(permissions, "admin:area-code:read", deniedPermissions);',
+      'const canReadAuthorizationInputs = hasPermission(permissions, "admin:permission:read", deniedPermissions) && hasPermission(permissions, "admin:org-unit:read", deniedPermissions);',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must require every resource read permission used by its editor/);
+  });
+
+  it("rejects read-only role menu assignment without menu read access", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      '{canReadMenus ? <Button ref={menuTriggerRef}',
+      '{true ? <Button ref={menuTriggerRef}',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must be hidden when menu records cannot be read/);
+  });
+
+  it("rejects tenant-scoped role-group creation without tenant read access", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      'const canCreateGroup = hasPermission(permissions, "admin:role-group:create", deniedPermissions) && canReadTenants;',
+      'const canCreateGroup = hasPermission(permissions, "admin:role-group:create", deniedPermissions);',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must require tenant read access/);
+  });
+
+  it("rejects role governance search that can apply a stale response", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      "if (governanceRequest.current !== requestID) return;",
+      "if (false) return;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must discard stale role and role-group search responses/);
+  });
+
+  it("rejects a stale debounced role-governance request that can restart loading", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      'const loadGovernance = useCallback(async (query = "", requestID = ++governanceRequest.current) => {\n    if (governanceRequest.current !== requestID) return;\n    setLoading(true);',
+      'const loadGovernance = useCallback(async (query = "", requestID = ++governanceRequest.current) => {\n    setLoading(true);',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must not re-enter the loading state/);
+  });
+
+  it("rejects filtered Tree Transfer behavior that drops hidden selections", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/ui/PlatformTreeTransfer.tsx",
+      "const preserved = value.filter((key) => !mutableVisibleSet.has(key));",
+      "const preserved: string[] = [];",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must preserve selections outside the current result/);
+  });
+
+  it("rejects filtered Tree Transfer rendering that passes hidden selections to Ant Tree", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/ui/PlatformTreeTransfer.tsx",
+      "const visibleCheckedKeys = useMemo(() => value.filter((key) => filteredKeys.has(key)), [filteredKeys, value]);",
+      "const visibleCheckedKeys = value;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must not pass hidden selections to Ant Tree/);
+  });
+
+  it("rejects role move options that cross scope or tenant boundaries", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      "sameRoleGroupBoundary(group, moveSourceGroup)",
+      "true",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must stay inside the current scope and tenant boundary/);
+  });
+
+  it("rejects role mutation actions that remain enabled for disabled roles", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      'disabled={!canUpdateRole || record.status !== "enabled"}',
+      "disabled={!canUpdateRole}",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Disabled roles must not expose move or permission mutation actions/);
+  });
+
+  it("rejects role detail actions without 44px touch targets", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/styles.css",
+      ".role-governance-detail .admin-list-actions .ant-btn,",
+      ".role-governance-detail .admin-list-actions-missing .ant-btn,",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Role detail actions must expose 44px targets/);
+  });
+
+  it("rejects Tree Transfer checkboxes without a real 44px pointer target", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/styles.css",
+      ".platform-tree-transfer-pane .ant-tree-checkbox {",
+      ".platform-tree-transfer-pane .ant-tree-checkbox-missing {",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Tree Transfer checkboxes must expose a real 44px by 44px pointer target/);
+  });
+
+  it("rejects Tree Transfer bulk operations that clear disabled selections", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/ui/PlatformTreeTransfer.tsx",
+      "const preservedDisabled = value.filter((key) => !mutableLeafKeySet.has(key));",
+      "const preservedDisabled: string[] = [];",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /bulk operations must preserve disabled selections/);
+  });
+
+  it("rejects Tree Transfer bulk assignment that can add unavailable historical permissions", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/ui/PlatformTreeTransfer.tsx",
+      'node.kind === "leaf" && !node.disabledReason && !node.availableDisabledReason',
+      'node.kind === "leaf" && !node.disabledReason',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /bulk assignment must exclude unavailable historical selections/);
+  });
+
+  it("rejects Tree Transfer that prevents removing historical permissions from the selected pane", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/ui/PlatformTreeTransfer.tsx",
+      "const unavailable = Boolean(node.disabledReason || !selectedOnly && node.availableDisabledReason);",
+      "const unavailable = Boolean(node.disabledReason || node.availableDisabledReason);",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /historical selections must be disabled only in the available pane/);
+  });
+
+  it("rejects role authorization that drops disabled or missing historical permissions", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      "permissionTreeNodes(permissionCatalog, dictionary, uniqueSorted([...authorization.allow, ...authorization.deny]))",
+      "permissionTreeNodes(permissionCatalog, dictionary)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must project disabled and missing historical permissions/);
+  });
+
+  it("rejects a second generic role mutation after atomic policy apply", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      "await replaceRolePermissions(preview);",
+      'await replaceRolePermissions(preview);\n      await updateAdminResource("roles", authorization.role.id, {} as never);',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must not be followed by a second generic role mutation/);
+  });
+
   it("rejects a new user form that implicitly selects organization context", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(

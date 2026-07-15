@@ -185,10 +185,14 @@ func TestAdminResourcesFromConfigRequiresPreparedOrganizationRBACTarget(t *testi
 		t.Fatalf("AdminResourcesFromConfig(prepared target) error = %v", err)
 	}
 	if _, err := store.Update("roles", "role-operator", adminresource.WriteInput{
-		Name: "Changed Outside Domain", Status: "enabled",
-		Values: map[string]string{"groupCode": "operations", "dataScope": "all", "permissions": "admin:*"},
+		Name: "Tenant Operator Updated", Status: "enabled", Values: map[string]string{"groupCode": "tenant-ops"},
+	}); err != nil {
+		t.Fatalf("Update(target role metadata) error = %v", err)
+	}
+	if _, err := store.Update("roles", "role-operator", adminresource.WriteInput{
+		Name: "Changed Outside Domain", Status: "enabled", Values: map[string]string{"groupCode": "operations"},
 	}); !errors.Is(err, adminresource.ErrDomainOwnedMutation) {
-		t.Fatalf("Update(domain-owned role) error = %v, want ErrDomainOwnedMutation", err)
+		t.Fatalf("Update(target role group ownership) error = %v, want ErrDomainOwnedMutation", err)
 	}
 	organizationRepository, err := organizationrbac.OpenGORMRepository(context.Background(), db)
 	if err != nil {
