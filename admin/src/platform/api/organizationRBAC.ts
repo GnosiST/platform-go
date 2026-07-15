@@ -9,6 +9,7 @@ import {
   type OrganizationRoleGroupChangeImpactV1_0_0Item,
   type OrganizationRolePoolGetV1_0_0Item,
   type OrganizationRoleGroupChangePrepareV1_0_0Values,
+  type NavigationRoleMenuChangePrepareV1_0_0Values,
   type RolePermissionChangeImpactV1_0_0Item,
   type RolePermissionChangePrepareV1_0_0Values,
   type RoleStateOrGroupChangeConflictsV1_0_0Item,
@@ -30,6 +31,8 @@ const transport = {
 };
 
 const client = new AdminServiceObjectClient(transport);
+
+export const roleMenuMigrationWriteEnabled = false;
 
 export type OrganizationRolePoolItem = OrganizationRolePoolGetV1_0_0Item;
 export type OrganizationChangeImpact = OrganizationRoleGroupChangeImpactV1_0_0Item;
@@ -64,6 +67,42 @@ export async function replaceMenuDefinition(definition: MenuDefinition, expected
   return requireData(await client.replaceMenuDefinition({
     arguments: { definition, expectedRevision },
     idempotencyKey: idempotencyKey("menu-definition-replace"),
+  })).values;
+}
+
+export async function getRoleMenus(roleCode: string) {
+  const result = requireData(await client.getRoleMenus({
+    arguments: { roleCode },
+    pagination: { page: 1, pageSize: 1 },
+  })).items[0];
+  if (!result) {
+    throw new Error("Role menu assignment is unavailable");
+  }
+  return result;
+}
+
+export async function prepareRoleMenuChange(roleCode: string, menuCodes: string[]) {
+  return requireData(await client.prepareRoleMenuChange({
+    arguments: { roleCode, menuCodes },
+    idempotencyKey: idempotencyKey("role-menus-prepare"),
+  })).values as NavigationRoleMenuChangePrepareV1_0_0Values;
+}
+
+export async function getRoleMenuChangeImpact(previewId: string) {
+  return requireData(await client.getRoleMenuChangeImpact({
+    arguments: { previewId },
+    pagination: { page: 1, pageSize: 1 },
+  })).items[0];
+}
+
+export async function replaceRoleMenus(preview: NavigationRoleMenuChangePrepareV1_0_0Values) {
+  return requireData(await client.replaceRoleMenus({
+    arguments: {
+      previewId: preview.previewId,
+      expectedRevision: preview.expectedRevision,
+      impactHash: preview.impactHash,
+    },
+    idempotencyKey: idempotencyKey("role-menus-apply"),
   })).values;
 }
 

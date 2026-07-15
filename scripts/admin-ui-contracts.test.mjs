@@ -54,6 +54,10 @@ function runTypeScriptProbe(relativePath, body) {
   );
 }
 
+function adminSource(relativePath) {
+  return fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
+}
+
 describe("validate-admin-ui-contracts", () => {
   it("accepts the current componentized admin UI contract", () => {
     const result = runValidator();
@@ -435,6 +439,50 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /must be hidden when menu records cannot be read/);
+  });
+
+  it("requires cutover-gated role menu assignment to persist page leaves only", () => {
+    const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+
+    assert.match(roleGovernance, /const menuCodes = pageMenuCodes\(menuTreeNodes\(menus, menuAssignment\.menuCodes, dictionary\), menuAssignment\.menuCodes\);/);
+    assert.match(roleGovernance, /valueOf\(record, "nodeType"\) === "page" \? "leaf"(?: as const)? : "branch"(?: as const)?/);
+    assert.doesNotMatch(roleGovernance, /menuCodes:\s*legacyVisibleMenus/);
+  });
+
+  it("requires Tree Transfer directory state to be derived without persisting branch keys", () => {
+    const treeTransfer = adminSource("admin/src/platform/ui/PlatformTreeTransfer.tsx");
+
+    assert.match(treeTransfer, /const normalizedValue = useMemo\(\(\) => leafValues\(nodes, value\), \[nodes, value\]\);/);
+    assert.match(treeTransfer, /halfCheckedKeys/);
+    assert.match(treeTransfer, /checkStrictly/);
+  });
+
+  it("requires disabled and missing historical role menu selections to stay removable", () => {
+    const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+
+    assert.match(roleGovernance, /menuTreeNodes\(menus, menuAssignment\.menuCodes, dictionary\)/);
+    assert.match(roleGovernance, /availableDisabledReason: enabled\(record\) \? undefined : dictionary\.rolePermissionHistoricalDisabled/);
+    assert.match(roleGovernance, /availableDisabledReason: dictionary\.rolePermissionHistoricalMissing/);
+  });
+
+  it("requires role update plus menu read permission while the migration write gate stays closed", () => {
+    const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+    const organizationRBAC = adminSource("admin/src/platform/api/organizationRBAC.ts");
+
+    assert.match(roleGovernance, /const canAssignMenus = canReadMenus && canUpdateRole;/);
+    assert.match(roleGovernance, /readOnly=\{!roleMenuMigrationWriteEnabled \|\| !canAssignMenus\}/);
+    assert.match(roleGovernance, /if \(!menuAssignment \|\| !roleMenuMigrationWriteEnabled \|\| !canAssignMenus\) return;/);
+    assert.match(organizationRBAC, /export const roleMenuMigrationWriteEnabled = false;/);
+  });
+
+  it("requires one generated-client role menu prepare, impact and apply flow without client chunks", () => {
+    const organizationRBAC = adminSource("admin/src/platform/api/organizationRBAC.ts");
+
+    assert.match(organizationRBAC, /client\.getRoleMenus/);
+    assert.match(organizationRBAC, /client\.prepareRoleMenuChange/);
+    assert.match(organizationRBAC, /client\.getRoleMenuChangeImpact/);
+    assert.match(organizationRBAC, /client\.replaceRoleMenus/);
+    assert.doesNotMatch(organizationRBAC, /menuCodes\.(?:slice|splice)\(/);
   });
 
   it("rejects tenant-scoped role-group creation without tenant read access", () => {

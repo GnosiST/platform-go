@@ -18,12 +18,17 @@ import {
 } from "../api/client";
 import {
   applyRoleStateOrGroupChange,
+  getRoleMenuChangeImpact,
+  getRoleMenus,
   getRolePermissionChangeImpact,
   getRoleStateOrGroupChangeConflicts,
   getRoleStateOrGroupChangeImpact,
+  prepareRoleMenuChange,
   prepareRolePermissionChange,
   prepareRoleStateOrGroupChange,
+  replaceRoleMenus,
   replaceRolePermissions,
+  roleMenuMigrationWriteEnabled,
   type OrganizationRoleRemediation,
   type RoleChangeConflict,
 } from "../api/organizationRBAC";
@@ -67,6 +72,12 @@ type AuthorizationState = {
   dataScopeAreaCodes: string[];
 };
 
+type MenuAssignmentState = {
+  role: AdminResourceRecord;
+  menuCodes: string[];
+  revision: number;
+};
+
 type MetadataValues = {
   code: string;
   name: string;
@@ -97,7 +108,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const [moveTargetGroup, setMoveTargetGroup] = useState("");
   const [authorization, setAuthorization] = useState<AuthorizationState | null>(null);
   const [permissionMode, setPermissionMode] = useState<"allow" | "deny">("allow");
-  const [menuRole, setMenuRole] = useState<AdminResourceRecord | null>(null);
+  const [menuAssignment, setMenuAssignment] = useState<MenuAssignmentState | null>(null);
   const [metadataForm] = Form.useForm<MetadataValues>();
   const authorizationTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -111,6 +122,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const canUpdateRole = hasPermission(permissions, "admin:role:update", deniedPermissions);
   const canReadAuthorizationInputs = hasPermission(permissions, "admin:permission:read", deniedPermissions) && hasPermission(permissions, "admin:org-unit:read", deniedPermissions) && hasPermission(permissions, "admin:area-code:read", deniedPermissions);
   const canReadMenus = hasPermission(permissions, "admin:menu:read", deniedPermissions);
+  const canAssignMenus = canReadMenus && canUpdateRole;
 
   const loadGovernance = useCallback(async (query = "", requestID = ++governanceRequest.current) => {
     if (governanceRequest.current !== requestID) return;
@@ -253,10 +265,31 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const openMenus = async (role: AdminResourceRecord) => {
     if (!canReadMenus) return;
     try {
-      if (menus.length === 0) setMenus(await loadAllRecords("menus"));
-      setMenuRole(role);
+      const [nextMenus, assignment] = await Promise.all([
+        menus.length > 0 ? Promise.resolve(menus) : loadAllRecords("menus"),
+        getRoleMenus(role.code),
+      ]);
+      setMenus(nextMenus);
+      setMenuAssignment({ role, menuCodes: [...assignment.menuCodes], revision: assignment.revision });
     } catch (nextError) {
       setError(errorMessage(nextError, dictionary.loadResourceFailed));
+    }
+  };
+
+  const saveMenus = async () => {
+    if (!menuAssignment || !roleMenuMigrationWriteEnabled || !canAssignMenus) return;
+    const menuCodes = pageMenuCodes(menuTreeNodes(menus, menuAssignment.menuCodes, dictionary), menuAssignment.menuCodes);
+    setActing("menus");
+    try {
+      const preview = await prepareRoleMenuChange(menuAssignment.role.code, menuCodes);
+      const impact = await getRoleMenuChangeImpact(preview.previewId);
+      if (!impact) throw new Error(dictionary.changePreviewUnavailable);
+      await replaceRoleMenus(preview);
+      setMenuAssignment(null);
+    } catch (nextError) {
+      setError(errorMessage(nextError, dictionary.roleGovernanceSaveFailed));
+    } finally {
+      setActing("");
     }
   };
 
@@ -416,11 +449,15 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
       />
 
       <MenuVisibilityModal
+        acting={acting === "menus"}
+        canAssignMenus={canAssignMenus}
         dictionary={dictionary}
+        menuAssignment={menuAssignment}
         menus={menus}
-        role={menuRole}
         returnFocusRef={menuTriggerRef}
-        onClose={() => setMenuRole(null)}
+        onAssignmentChange={setMenuAssignment}
+        onClose={() => setMenuAssignment(null)}
+        onSave={() => void saveMenus()}
       />
     </AdminPage>
   );
@@ -609,30 +646,58 @@ function AuthorizationModal({
   );
 }
 
-function MenuVisibilityModal({ role, menus, dictionary, returnFocusRef, onClose }: { role: AdminResourceRecord | null; menus: AdminResourceRecord[]; dictionary: Dictionary; returnFocusRef: React.RefObject<HTMLElement>; onClose: () => void }) {
-  if (!role) return null;
-  const visible = legacyVisibleMenus(role, menus);
+function MenuVisibilityModal({
+  menuAssignment,
+  menus,
+  acting,
+  canAssignMenus,
+  dictionary,
+  returnFocusRef,
+  onAssignmentChange,
+  onClose,
+  onSave,
+}: {
+  menuAssignment: MenuAssignmentState | null;
+  menus: AdminResourceRecord[];
+  acting: boolean;
+  canAssignMenus: boolean;
+  dictionary: Dictionary;
+  returnFocusRef: React.RefObject<HTMLElement>;
+  onAssignmentChange: (assignment: MenuAssignmentState | null) => void;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  if (!menuAssignment) return null;
+  const legacyVisible = legacyVisibleMenus(menuAssignment.role, menus);
+  const historicalCodes = uniqueSorted([...menuAssignment.menuCodes, ...legacyVisible]);
+  const nodes = menuTreeNodes(menus, historicalCodes, dictionary);
+  const value = roleMenuMigrationWriteEnabled ? menuAssignment.menuCodes : legacyVisible;
+  const readOnly = !roleMenuMigrationWriteEnabled || !canAssignMenus;
   return (
     <Modal
       className="role-menu-visibility-modal"
       cancelText={dictionary.close}
+      confirmLoading={acting}
       destroyOnHidden
-      footer={<Button onClick={onClose}>{dictionary.close}</Button>}
+      footer={readOnly ? <Button onClick={onClose}>{dictionary.close}</Button> : undefined}
+      okText={dictionary.reviewAndApply}
       open
-      title={`${dictionary.assignMenus}: ${role.name}`}
+      title={`${dictionary.assignMenus}: ${menuAssignment.role.name}`}
       width={980}
       onCancel={onClose}
+      onOk={onSave}
     >
       <AdminFeedback type="warning" message={dictionary.roleMenuLegacyReadonlyTitle} description={dictionary.roleMenuLegacyReadonlyDescription} />
       <PlatformTreeTransfer
         ariaLabel={dictionary.assignMenus}
         labels={transferLabels(dictionary)}
-        nodes={menuTreeNodes(menus)}
-        readOnly
+        nodes={nodes}
+        readOnly={!roleMenuMigrationWriteEnabled || !canAssignMenus}
         readOnlyMessage={dictionary.roleMenuLegacyReadonlyDescription}
         returnFocusRef={returnFocusRef}
-        value={visible}
-        onChange={() => undefined}
+        revision={menuAssignment.revision}
+        value={value}
+        onChange={(menuCodes) => onAssignmentChange({ ...menuAssignment, menuCodes: pageMenuCodes(nodes, menuCodes) })}
       />
     </Modal>
   );
@@ -707,16 +772,30 @@ function permissionTreeNodes(records: AdminResourceRecord[], dictionary: Diction
   return nodes;
 }
 
-function menuTreeNodes(records: AdminResourceRecord[]): PlatformTreeTransferNode[] {
-  const parentCodes = new Set(records.map((record) => valueOf(record, "parentCode")).filter(Boolean));
-  return records.map((record) => ({
+function menuTreeNodes(records: AdminResourceRecord[], historicalCodes: string[], dictionary: Dictionary): PlatformTreeTransferNode[] {
+  const catalogCodes = new Set(records.map((record) => record.code));
+  const nodes: PlatformTreeTransferNode[] = records.map((record) => ({
     key: record.code,
     parentKey: valueOf(record, "parentCode") || undefined,
-    kind: parentCodes.has(record.code) ? "branch" : "leaf",
+    kind: valueOf(record, "nodeType") === "page" ? "leaf" as const : "branch" as const,
     label: record.name || record.code,
     code: record.code,
     status: record.status,
+    availableDisabledReason: enabled(record) ? undefined : dictionary.rolePermissionHistoricalDisabled,
   }));
+  nodes.push(...historicalCodes.filter((code) => !catalogCodes.has(code)).map((code) => ({
+    key: code,
+    kind: "leaf" as const,
+    label: code,
+    code,
+    availableDisabledReason: dictionary.rolePermissionHistoricalMissing,
+  })));
+  return nodes;
+}
+
+function pageMenuCodes(nodes: PlatformTreeTransferNode[], values: string[]) {
+  const pageCodes = new Set(nodes.filter((node) => node.kind === "leaf").map((node) => node.key));
+  return uniqueSorted(values.filter((code) => pageCodes.has(code)));
 }
 
 function legacyVisibleMenus(role: AdminResourceRecord, menus: AdminResourceRecord[]) {
