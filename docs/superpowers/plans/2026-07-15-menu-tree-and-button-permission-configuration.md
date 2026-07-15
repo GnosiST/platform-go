@@ -66,7 +66,7 @@
 - Modify: `scripts/admin-service-object-definitions.mjs`
 
 - [ ] Add failing tests for atomic menu-definition get/replace, prepare/impact/apply, idempotent replay, stale preview, disabled role/page rejection, complete-set atomicity and target ancestor derivation.
-- [ ] Register `platform.navigation.menu-definition.get`, `platform.navigation.menu-definition.replace`, `platform.navigation.role-menus.get`, `platform.navigation.role-menu-change.impact`, `platform.navigation.role-menu-change.prepare` and `platform.navigation.role-menus.replace`.
+- [ ] Register `platform.navigation.menu-definition.get`, `platform.navigation.menu-definition.create`, `platform.navigation.menu-definition.replace`, `platform.navigation.role-menus.get`, `platform.navigation.role-menu-change.impact`, `platform.navigation.role-menu-change.prepare` and `platform.navigation.role-menus.replace` with distinct create/update permission gates.
 - [ ] Add deterministic legacy-policy candidate backfill and `platform.navigation.role-menu-migration.compare` without claiming all-principal equivalence.
 - [ ] Add explicit legacy/compare/dual-read/target resolution seams while rejecting target serving and role-menu writes when their independent cutover gates are closed.
 - [ ] Regenerate OpenAPI and TypeScript service-object clients and validate Go/JS definition consistency.
