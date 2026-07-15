@@ -211,6 +211,20 @@ func TestRuntimeMakesUnknownAndUnauthorizedQueriesIndistinguishable(t *testing.T
 	}
 }
 
+func TestRuntimePreservesPublicQueryConflictAndValidationErrors(t *testing.T) {
+	for _, publicErr := range []error{ErrConflict, ErrValidation} {
+		runtime := newRuntimeWithExecutors(t, []QueryDefinition{ReferenceQueryDefinition()}, nil, queryExecutorFunc(func(context.Context, QueryPlan) (QueryResult, error) {
+			return QueryResult{}, publicErr
+		}), nil, nil)
+		_, err := runtime.ExecuteQuery(referenceExecution("admin:reference-records:read", "read", "tenant-1"), QueryRequest{
+			QueryID: ReferenceQueryID, Version: ReferenceVersion,
+		})
+		if !errors.Is(err, publicErr) {
+			t.Fatalf("ExecuteQuery(%v) error = %v, want preserved public error", publicErr, err)
+		}
+	}
+}
+
 func TestRuntimeEnforcesCostAndTimeoutWithoutLeakingExecutorDetails(t *testing.T) {
 	definition := ReferenceQueryDefinition()
 	definition.Cost.BaseCost = 1

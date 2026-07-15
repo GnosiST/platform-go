@@ -25,14 +25,15 @@ func (r *GORMRepository) PreviewRoleMenus(ctx context.Context, roleCode string, 
 		return RoleMenuImpact{}, err
 	}
 	db := r.db.WithContext(ctx)
-	if err := validateRoleMenuTarget(db, roleCode, codes); err != nil {
+	tenantCode, err := validateRoleMenuTarget(db, roleCode, codes)
+	if err != nil {
 		return RoleMenuImpact{}, err
 	}
 	current, err := loadRoleMenus(db, roleCode)
 	if err != nil {
 		return RoleMenuImpact{}, err
 	}
-	return RoleMenuImpact{RoleCode: roleCode, CurrentMenuCodes: current.MenuCodes, ProposedMenuCodes: codes, ExpectedRevision: current.Revision, Changed: !reflect.DeepEqual(current.MenuCodes, codes)}, nil
+	return RoleMenuImpact{RoleCode: roleCode, TenantCode: tenantCode, CurrentMenuCodes: current.MenuCodes, ProposedMenuCodes: codes, ExpectedRevision: current.Revision, Changed: !reflect.DeepEqual(current.MenuCodes, codes)}, nil
 }
 
 func (r *GORMRepository) ReplaceRoleMenus(ctx context.Context, request ReplaceRoleMenusRequest) (RoleMenuSet, error) {
@@ -46,7 +47,7 @@ func (r *GORMRepository) ReplaceRoleMenus(ctx context.Context, request ReplaceRo
 	request.ChangedAt = request.ChangedAt.UTC()
 	var committed RoleMenuSet
 	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := validateRoleMenuTarget(tx, request.RoleCode, codes); err != nil {
+		if _, err := validateRoleMenuTarget(tx, request.RoleCode, codes); err != nil {
 			return err
 		}
 		current, err := loadRoleMenus(tx, request.RoleCode)
@@ -138,26 +139,33 @@ func loadRoleMenuRevision(db *gorm.DB, roleCode string) (uint64, error) {
 	return row.Revision, nil
 }
 
-func validateRoleMenuTarget(db *gorm.DB, roleCode string, menuCodes []string) error {
+func validateRoleMenuTarget(db *gorm.DB, roleCode string, menuCodes []string) (string, error) {
 	var role gormRole
 	if err := db.Where("code = ?", roleCode).Take(&role).Error; err != nil {
-		return repositoryError(err)
+		return "", repositoryError(err)
 	}
 	deleted, err := isLifecycleDeleted(db, "roles", role.ID)
 	if err != nil || deleted || role.Status != StatusEnabled {
-		return ErrInvalid
+		return "", ErrInvalid
+	}
+	var group gormRoleGroup
+	if err := db.Where("code = ?", role.GroupCode).Take(&group).Error; err != nil {
+		return "", repositoryError(err)
+	}
+	if err := ValidateRoleGroup(roleGroupFromGORM(group, false)); err != nil {
+		return "", err
 	}
 	for _, code := range menuCodes {
 		var menu gormMenu
 		if err := db.Where("code = ?", code).Take(&menu).Error; err != nil {
-			return repositoryError(err)
+			return "", repositoryError(err)
 		}
 		deleted, err := isLifecycleDeleted(db, "menus", menu.ID)
 		if err != nil || deleted || menu.Status != StatusEnabled || MenuNodeType(menu.NodeType) != MenuNodeTypePage {
-			return ErrInvalid
+			return "", ErrInvalid
 		}
 	}
-	return nil
+	return group.TenantCode, nil
 }
 
 func canonicalRoleMenuCodes(menuCodes []string) ([]string, error) {

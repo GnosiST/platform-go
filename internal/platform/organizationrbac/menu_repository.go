@@ -129,6 +129,7 @@ type ReplaceMenuDefinitionRequest struct {
 
 type RoleMenuImpact struct {
 	RoleCode          string
+	TenantCode        string
 	CurrentMenuCodes  []string
 	ProposedMenuCodes []string
 	ExpectedRevision  uint64

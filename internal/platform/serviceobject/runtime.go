@@ -81,7 +81,7 @@ func (r *Runtime) ExecuteQuery(invocation Invocation, request QueryRequest) (Que
 		Scope: cloneScopeConstraint(invocation.Scope), Page: page, PageSize: pageSize, Sort: sort,
 	})
 	if err != nil {
-		if errors.Is(err, ErrObjectUnavailable) || errors.Is(err, ErrCostLimitExceeded) {
+		if errors.Is(err, ErrObjectUnavailable) || errors.Is(err, ErrCostLimitExceeded) || errors.Is(err, ErrConflict) || errors.Is(err, ErrValidation) {
 			return QueryResult{}, err
 		}
 		return QueryResult{}, ErrExecutionFailed

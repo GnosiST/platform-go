@@ -47,9 +47,10 @@ const (
 )
 
 type ServiceObjectExecutor struct {
-	repository *GORMRepository
-	now        func() time.Time
-	ttl        time.Duration
+	repository           *GORMRepository
+	now                  func() time.Time
+	ttl                  time.Duration
+	roleMenuWriteEnabled bool
 }
 
 type organizationRoleGroupChangeSet struct {
@@ -118,17 +119,24 @@ func (gormOrganizationRBACAuditEvent) TableName() string {
 }
 
 func NewServiceObjectExecutor(repository *GORMRepository, now func() time.Time) (*ServiceObjectExecutor, error) {
+	return NewServiceObjectExecutorWithOptions(repository, now, ServiceObjectExecutorOptions{})
+}
+
+func NewServiceObjectExecutorWithOptions(repository *GORMRepository, now func() time.Time, options ServiceObjectExecutorOptions) (*ServiceObjectExecutor, error) {
 	if repository == nil || !repository.Persistent() {
 		return nil, ErrRepositoryFailed
 	}
 	if now == nil {
 		now = time.Now
 	}
-	return &ServiceObjectExecutor{repository: repository, now: now, ttl: defaultOrganizationRoleGroupPreviewDuration}, nil
+	return &ServiceObjectExecutor{
+		repository: repository, now: now, ttl: defaultOrganizationRoleGroupPreviewDuration,
+		roleMenuWriteEnabled: options.RoleMenuWriteEnabled,
+	}, nil
 }
 
 func OrganizationQueryDefinitions() []serviceobject.QueryDefinition {
-	return []serviceobject.QueryDefinition{
+	definitions := []serviceobject.QueryDefinition{
 		{
 			ID: OrganizationRolePoolQueryID, Version: ServiceObjectVersion, Resource: "org-units",
 			Permission: "admin:org-unit:read", Action: "read", TenantMode: serviceobject.TenantPlatform, DataScope: "platform",
@@ -179,11 +187,12 @@ func OrganizationQueryDefinitions() []serviceobject.QueryDefinition {
 		impactQueryDefinition(RolePermissionImpactQueryID, "roles", "admin:role:update"),
 		resourceLifecycleImpactQueryDefinition(),
 	}
+	return append(definitions, navigationQueryDefinitions()...)
 }
 
 func OrganizationDomainCommandDefinitions() []serviceobject.DomainCommandDefinition {
 	baseCost := serviceobject.CostPolicy{BaseCost: 5, PerRowCost: 1, Limit: 2005}
-	return []serviceobject.DomainCommandDefinition{
+	definitions := []serviceobject.DomainCommandDefinition{
 		{
 			ID: OrganizationRoleGroupPrepareCommandID, Version: ServiceObjectVersion, Resource: "org-units",
 			Permission: "admin:org-unit:update", Action: "update", TenantMode: serviceobject.TenantPlatform, DataScope: "platform",
@@ -254,6 +263,7 @@ func OrganizationDomainCommandDefinitions() []serviceobject.DomainCommandDefinit
 		resourceLifecyclePrepareDefinition(baseCost),
 		resourceLifecycleApplyDefinition(baseCost),
 	}
+	return append(definitions, navigationDomainCommandDefinitions()...)
 }
 
 func impactQueryDefinition(id, resource, permission string) serviceobject.QueryDefinition {
@@ -319,6 +329,14 @@ func previewResultSchema() []serviceobject.ResultField {
 
 func (e *ServiceObjectExecutor) ExecuteQuery(ctx context.Context, plan serviceobject.QueryPlan) (serviceobject.QueryResult, error) {
 	switch plan.Definition.ID {
+	case MenuDefinitionGetQueryID:
+		return e.getMenuDefinition(ctx, plan)
+	case RoleMenusGetQueryID:
+		return e.getRoleMenus(ctx, plan)
+	case RoleMenuImpactQueryID:
+		return e.getRoleMenuImpact(ctx, plan)
+	case RoleMenuMigrationCompareQueryID:
+		return e.compareRoleMenuMigration(ctx, plan)
 	case OrganizationRolePoolQueryID:
 		orgUnitCode, ok := predicateString(plan.AST, "orgUnitCode")
 		if !ok {
@@ -397,6 +415,14 @@ func (e *ServiceObjectExecutor) ExecuteQuery(ctx context.Context, plan serviceob
 
 func (e *ServiceObjectExecutor) ExecuteDomainCommand(ctx context.Context, plan serviceobject.DomainCommandPlan) (serviceobject.CommandResult, error) {
 	switch plan.Definition.ID {
+	case MenuDefinitionCreateCommandID:
+		return e.createMenuDefinition(ctx, plan)
+	case MenuDefinitionReplaceCommandID:
+		return e.replaceMenuDefinition(ctx, plan)
+	case RoleMenuPrepareCommandID:
+		return e.prepareRoleMenus(ctx, plan)
+	case RoleMenusReplaceCommandID:
+		return e.applyRoleMenus(ctx, plan)
 	case OrganizationRoleGroupPrepareCommandID:
 		return e.prepareOrganizationRoleGroups(ctx, plan)
 	case OrganizationRoleGroupsReplaceCommandID:
