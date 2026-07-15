@@ -51,6 +51,25 @@ describe("platform foundation documentation drift", () => {
     assert.doesNotMatch(source, /ordered seven-node remainder/);
   });
 
+  it("records organization and user Admin experience as implemented", () => {
+    for (const relativePath of [
+      "README.md",
+      "docs/platform-foundation-task-map.md",
+      "docs/platform-roadmap.md",
+      "docs/platform-ui-optimization-assessment.md",
+      "docs/platform-data-governance-and-integrations-assessment.md",
+      "docs/platform-organization-rbac-menu-contract.md",
+      "docs/admin-rbac-menu.md",
+      "docs/admin-resource-schema.md",
+      "design-qa.md",
+    ]) {
+      const source = read(relativePath);
+      assert.match(source, /organization-user-admin-experience|organization\/user Admin/i);
+    }
+    assert.match(read("design-qa.md"), /playwright 1\.55 fallback/i);
+    assert.doesNotMatch(read("docs/platform-foundation-task-map.md"), /organization\/user Admin experience is the next organization-lane node/);
+  });
+
   it("keeps completed plan and sensitive-data dependency wording honest", () => {
     const plan = read("docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md");
     const assessment = read("docs/platform-data-governance-and-integrations-assessment.md");

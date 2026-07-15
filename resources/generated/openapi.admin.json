@@ -9482,6 +9482,9 @@
           "roleCode": {
             "type": "string"
           },
+          "roleName": {
+            "type": "string"
+          },
           "roleGroupCode": {
             "type": "string"
           },
@@ -9497,6 +9500,7 @@
         },
         "required": [
           "roleCode",
+          "roleName",
           "roleGroupCode",
           "roleGroupName",
           "tenantCode",
@@ -9712,6 +9716,116 @@
             "limit": 8
           },
           "timeoutMs": 2000
+        }
+      },
+      "OrganizationRoleGroupChangeConflictsV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "previewId"
+        ]
+      },
+      "OrganizationRoleGroupChangeConflictsV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userCode": {
+            "type": "string"
+          },
+          "roleCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userCode",
+          "roleCode"
+        ]
+      },
+      "OrganizationRoleGroupChangeConflictsV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationRoleGroupChangeConflictsV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        }
+      },
+      "OrganizationRoleGroupChangeConflictsV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version",
+          "arguments"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.identity.organization-role-group-change.conflicts.list"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/OrganizationRoleGroupChangeConflictsV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              }
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "org-units",
+          "permission": "admin:org-unit:update",
+          "action": "update",
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 2,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 3000
         }
       },
       "UserOrganizationChangeImpactV1_0_0Arguments": {
@@ -11768,6 +11882,9 @@
             "$ref": "#/components/schemas/OrganizationRoleGroupChangeImpactV1_0_0QueryRequest"
           },
           {
+            "$ref": "#/components/schemas/OrganizationRoleGroupChangeConflictsV1_0_0QueryRequest"
+          },
+          {
             "$ref": "#/components/schemas/UserOrganizationChangeImpactV1_0_0QueryRequest"
           },
           {
@@ -11799,6 +11916,10 @@
               "version": "1.0.0"
             },
             {
+              "queryId": "platform.identity.organization-role-group-change.conflicts.list",
+              "version": "1.0.0"
+            },
+            {
               "queryId": "platform.identity.user-organization-change.impact",
               "version": "1.0.0"
             },
@@ -11822,6 +11943,7 @@
             "platform.reference-records.list": "#/components/schemas/ReferenceRecordsListV1_0_0QueryRequest",
             "platform.identity.organization-role-pool.get": "#/components/schemas/OrganizationRolePoolGetV1_0_0QueryRequest",
             "platform.identity.organization-role-group-change.impact": "#/components/schemas/OrganizationRoleGroupChangeImpactV1_0_0QueryRequest",
+            "platform.identity.organization-role-group-change.conflicts.list": "#/components/schemas/OrganizationRoleGroupChangeConflictsV1_0_0QueryRequest",
             "platform.identity.user-organization-change.impact": "#/components/schemas/UserOrganizationChangeImpactV1_0_0QueryRequest",
             "platform.identity.role-state-or-group-change.impact": "#/components/schemas/RoleStateOrGroupChangeImpactV1_0_0QueryRequest",
             "platform.authorization.role-permission-change.impact": "#/components/schemas/RolePermissionChangeImpactV1_0_0QueryRequest",
@@ -11952,6 +12074,9 @@
           },
           {
             "$ref": "#/components/schemas/OrganizationRoleGroupChangeImpactV1_0_0QueryData"
+          },
+          {
+            "$ref": "#/components/schemas/OrganizationRoleGroupChangeConflictsV1_0_0QueryData"
           },
           {
             "$ref": "#/components/schemas/UserOrganizationChangeImpactV1_0_0QueryData"

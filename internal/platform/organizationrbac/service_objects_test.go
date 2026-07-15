@@ -49,6 +49,13 @@ func TestOrganizationRoleGroupPrepareImpactApplyIsOwnerScopedAndAtomic(t *testin
 	if err != nil || len(impact.Items) != 1 || impact.Items[0]["conflictCount"] != int64(1) {
 		t.Fatalf("impact = %+v, error = %v", impact, err)
 	}
+	conflicts, err := executor.ExecuteQuery(context.Background(), serviceobject.QueryPlan{
+		Definition: queryDefinitionByID(t, OrganizationRoleGroupConflictsQueryID), Execution: execution, Page: 1, PageSize: 100,
+		AST: serviceobject.QueryAST{Predicates: []serviceobject.Predicate{{Field: "previewId", Operator: serviceobject.PredicateEqual, Value: previewID}}},
+	})
+	if err != nil || len(conflicts.Items) != 1 || conflicts.Items[0]["userCode"] != "alice" || conflicts.Items[0]["roleCode"] != "operator" {
+		t.Fatalf("conflicts = %+v, error = %v", conflicts, err)
+	}
 	impactPlan.Definition = queryDefinitionByID(t, UserOrganizationImpactQueryID)
 	if _, err := executor.ExecuteQuery(context.Background(), impactPlan); !errors.Is(err, serviceobject.ErrObjectUnavailable) {
 		t.Fatalf("cross-operation impact error = %v", err)

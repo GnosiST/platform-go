@@ -58,6 +58,7 @@ func (e *ServiceObjectExecutor) prepareUserOrganizationChange(ctx context.Contex
 	summary := organizationRoleGroupImpactSummary{
 		Severity: severity, AffectedUsers: 1, ConflictCount: len(impact.Conflicts),
 		CurrentGroupCount: len(impact.CurrentRoleCodes), TargetGroupCount: len(impact.TargetRoleCodes),
+		Conflicts: impact.Conflicts,
 	}
 	return e.storeDomainPreview(ctx, plan, userOrganizationPreviewOperation, impact.ExpectedRevision, changeSet, summary)
 }

@@ -710,6 +710,8 @@ func orgUnitResourceSchema() Schema {
 		withRelation(valueField("parentCode", text("上级机构", "Parent"), "select", false, true, true, true, true, 160, nil), treeFieldRelation("org-units", "code", "name", "parentCode", enabledRelationFilter())),
 		withRelation(valueField("areaCode", text("地址码", "Area Code"), "select", false, true, true, true, true, 140, nil), areaCodeFieldRelation(enabledRelationFilter())),
 		withRelation(readOnlyValueField("roleGroupCodes", text("角色组", "Role Groups"), "multiselect", false, false, true, 220, nil), fieldRelation("role-groups", "code", "name", true, enabledRelationFilter())),
+		readOnlyValueField("roleGroupCount", text("绑定角色组数", "Bound Role Groups"), "number", false, true, true, 130, nil),
+		readOnlyValueField("effectiveRoleCount", text("有效角色数", "Effective Roles"), "number", false, true, true, 130, nil),
 		valueField("sortOrder", text("排序", "Sort Order"), "number", false, false, false, true, true, 110, nil),
 	)
 	schema.SearchFields = []string{"name", "code", "status", "description", "type", "tenantCode", "parentCode", "areaCode"}

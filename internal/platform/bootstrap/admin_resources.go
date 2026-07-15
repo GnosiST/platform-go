@@ -27,7 +27,9 @@ func AdminResourcesFromConfig(cfg config.Config, manifests []capability.Manifest
 			if cfg.OrganizationRBACMode == config.OrganizationRBACModeTarget {
 				repository, err = adminresource.OpenGORMAdminResourceRepository(context.Background(), db)
 				if err == nil {
-					repository = repository.WithOrganizationRBACOwnership(organizationrbac.NewAdminUserSnapshotWriter())
+					repository = repository.
+						WithOrganizationRBACOwnership(organizationrbac.NewAdminUserSnapshotWriter()).
+						WithOrganizationRBACOrgUnitWriter(organizationrbac.NewAdminOrgUnitSnapshotWriter())
 				}
 			} else {
 				repository, err = adminresource.NewGORMAdminResourceRepository(context.Background(), db)

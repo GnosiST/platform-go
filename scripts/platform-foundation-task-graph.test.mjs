@@ -79,7 +79,7 @@ const completionProgramTaskIDs = [
   "github-release-publication",
 ];
 
-const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(12);
+const pendingCompletionProgramTaskIDs = completionProgramTaskIDs.slice(13);
 
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-foundation-task-graph.mjs", ...args], {
@@ -322,7 +322,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /task production-auth-provider-hardening must declare at least one evidence\.docs path/);
   });
 
-  it("preserves the closed 37-node baseline, implements twelve completion nodes, and tracks 17 pending program nodes", () => {
+  it("preserves the closed 37-node baseline, implements thirteen completion nodes, and tracks 16 pending program nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
@@ -355,7 +355,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
     assert.equal(graph.tasks.length, 66);
-    assert.equal(implemented.length, 49);
+    assert.equal(implemented.length, 50);
     assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "admin-watermark-export-governance")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-protection-runtime")?.status, "implemented");
@@ -387,6 +387,11 @@ describe("validate-platform-foundation-task-graph", () => {
         .find((item) => item.id === "organization-role-pool-backend-and-migration")
         ?.resourceLocks?.includes("query-command-contract"),
     );
+    const organizationAdmin = graph.tasks.find((item) => item.id === "organization-user-admin-experience");
+    assert.equal(organizationAdmin?.status, "implemented");
+    assert.ok(organizationAdmin?.evidence?.validators?.includes("scripts/validate-admin-ui-contracts.mjs"));
+    assert.deepEqual(organizationAdmin?.evidence?.screenshots, ["resources/evidence/organization-user-admin-experience-20260715.json"]);
+    assert.ok(organizationAdmin?.evidence?.skills?.includes("ui-ux-pro-max"));
     assert.deepEqual(graph.tasks.find((item) => item.id === "integration-ports-disabled-default")?.dependsOn, [
       "platform-service-contract-standard",
       "notification-extension-boundary",
@@ -491,21 +496,38 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /visual task admin-watermark-export-governance with status implemented must declare screenshot evidence/);
   });
 
-  it("requires tracked evidence manifests for current watermark and sensitive reveal visual nodes", () => {
+  it("requires tracked evidence manifests for current watermark, sensitive reveal and organization Admin visual nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const watermarkTask = graph.tasks.find((item) => item.id === "admin-watermark-export-governance");
     const revealTask = graph.tasks.find((item) => item.id === "sensitive-data-reveal-step-up");
+    const organizationTask = graph.tasks.find((item) => item.id === "organization-user-admin-experience");
 
     assert.deepEqual(watermarkTask.evidence.screenshots, ["resources/evidence/admin-watermark-export-governance-20260713.json"]);
     assert.deepEqual(revealTask.evidence.screenshots, ["resources/evidence/sensitive-data-reveal-step-up-20260713.json"]);
+    assert.deepEqual(organizationTask.evidence.screenshots, ["resources/evidence/organization-user-admin-experience-20260715.json"]);
 
     watermarkTask.evidence.screenshots = [".superpowers/product-design-audit/watermark/09-full-viewport-dashboard.png"];
     revealTask.evidence.screenshots = [".superpowers/product-design-audit/sensitive-reveal/01-factor-selection.png"];
+    organizationTask.evidence.screenshots = [".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/users-create-375.png"];
     const result = runValidator(["--graph", tempJSON("ignored-current-visual-evidence.json", graph)]);
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /admin-watermark-export-governance evidence\.screenshots must include resources\/evidence\/admin-watermark-export-governance-20260713\.json/);
     assert.match(result.stderr, /sensitive-data-reveal-step-up evidence\.screenshots must include resources\/evidence\/sensitive-data-reveal-step-up-20260713\.json/);
+    assert.match(result.stderr, /organization-user-admin-experience evidence\.screenshots must include resources\/evidence\/organization-user-admin-experience-20260715\.json/);
+  });
+
+  it("rejects organization Admin closeout without UI UX and browser evidence", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const task = graph.tasks.find((item) => item.id === "organization-user-admin-experience");
+    task.evidence.skills = [];
+    task.evidence.screenshots = [];
+
+    const result = runValidator(["--graph", tempJSON("missing-organization-admin-evidence.json", graph)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /organization-user-admin-experience evidence\.skills must include ui-ux-pro-max/);
+    assert.match(result.stderr, /organization-user-admin-experience evidence\.screenshots must include resources\/evidence\/organization-user-admin-experience-20260715\.json/);
   });
 
   it("rejects missing or reordered completion program task IDs", () => {

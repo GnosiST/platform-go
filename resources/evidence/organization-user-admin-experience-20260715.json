@@ -1,0 +1,79 @@
+{
+  "$schema": "https://platform-go.local/schemas/organization-user-admin-experience-evidence.json",
+  "capturedAt": "2026-07-15",
+  "purpose": "Tracked, redacted manifest for organization and user Admin browser acceptance. Source screenshots remain local Product Design audit artifacts and are intentionally not tracked.",
+  "sourceEvidenceRoot": ".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15",
+  "sourceArtifactsTracked": false,
+  "browser": {
+    "tool": "playwright-1.55-local-fallback",
+    "inAppBrowserStatus": "blocked-module-initialization",
+    "inAppBrowserError": "Cannot redefine property: process",
+    "projectDependencyAdded": false,
+    "baseURL": "http://127.0.0.1:19212",
+    "viewports": [
+      "375x812",
+      "390x844",
+      "768x1024",
+      "1024x768",
+      "1280x800",
+      "1440x900"
+    ],
+    "reducedMotion": true,
+    "horizontalOverflow": false,
+    "consoleErrors": 0,
+    "failedFirstPartyRequests": 0,
+    "refineTelemetryDisabled": true
+  },
+  "scenarios": [
+    "organization-list-responsive",
+    "organization-create-role-groups-disabled-until-created",
+    "user-create-empty-organization-and-read-only-derived-tenant",
+    "user-create-role-selection-disabled-before-role-pool"
+  ],
+  "redaction": {
+    "scanPassed": true,
+    "screenshotsInspected": true,
+    "customerDataPresent": false,
+    "credentialsPresent": false,
+    "sensitivePlaintextPresent": false
+  },
+  "screenshots": [
+    {"scenario":"organization-list-responsive","viewport":"375x812","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/org-units-375.png","sha256":"sha256:d016b47a0d6af908e02a7b53c01701a7e29e041f7a756dae0eac690ba684a417","sizeBytes":40785,"redacted":true},
+    {"scenario":"organization-create-role-groups-disabled-until-created","viewport":"375x812","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/org-units-create-context-375.png","sha256":"sha256:e95e00ee8ddbd139c3b7943964629b208775bbbd286875d85c7d925fff500cdf","sizeBytes":39463,"redacted":true},
+    {"scenario":"user-create-empty-organization-and-read-only-derived-tenant","viewport":"375x812","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/users-create-375.png","sha256":"sha256:e9c52fd5ce1a02f55c3074e08a6efae6d694ca4de7354c591aa34b5fb08c9576","sizeBytes":34739,"redacted":true},
+    {"scenario":"user-create-role-selection-disabled-before-role-pool","viewport":"375x812","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/users-create-context-375.png","sha256":"sha256:d8e810be44cf5e2089493120a387aefd136284f1b626e6141624c9d4996b2546","sizeBytes":36673,"redacted":true},
+    {"scenario":"organization-list-responsive","viewport":"390x844","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/org-units-390.png","sha256":"sha256:345e238e29fd4d7887d7611ad256f5598ac39e211269a8cc105fdfbba3ccaf4d","sizeBytes":41307,"redacted":true},
+    {"scenario":"organization-create-role-groups-disabled-until-created","viewport":"390x844","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/org-units-create-context-390.png","sha256":"sha256:c19d29176fa8f141652a5be1808ac1c3552029270b648cdf85912feabbac9729","sizeBytes":41447,"redacted":true},
+    {"scenario":"user-create-empty-organization-and-read-only-derived-tenant","viewport":"390x844","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/users-create-390.png","sha256":"sha256:3165e92f93b02d0ba76cc446a1ab4a92f64a19892762136e0b019c3806537987","sizeBytes":35570,"redacted":true},
+    {"scenario":"user-create-role-selection-disabled-before-role-pool","viewport":"390x844","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/users-create-context-390.png","sha256":"sha256:627be689fe713256bee54903e130096c521cee58616cb15c3d3418b54c883d34","sizeBytes":38254,"redacted":true},
+    {"scenario":"organization-list-responsive","viewport":"768x1024","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/org-units-768.png","sha256":"sha256:a2b4b94bf0fa5feaef6377192e57b9ac7f6f8af6a45dc9fb463d2891064997cd","sizeBytes":55088,"redacted":true},
+    {"scenario":"organization-create-role-groups-disabled-until-created","viewport":"768x1024","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/org-units-create-context-768.png","sha256":"sha256:5707a7eea5ede9d2cca57409d8199334f7ee50bfed22018fed6a89870cad162c","sizeBytes":64793,"redacted":true},
+    {"scenario":"user-create-empty-organization-and-read-only-derived-tenant","viewport":"768x1024","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/users-create-768.png","sha256":"sha256:1e477658ea24ad83ee7fab564ef073c02a7ffecfe1b8da9283203fa6c534a0f1","sizeBytes":60862,"redacted":true},
+    {"scenario":"user-create-role-selection-disabled-before-role-pool","viewport":"768x1024","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/users-create-context-768.png","sha256":"sha256:8fe6a657829fc5e52c0e715c9e0e3ffd6538fa47177406282d2faace4dd383da","sizeBytes":61083,"redacted":true},
+    {"scenario":"organization-list-responsive","viewport":"1024x768","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/org-units-1024.png","sha256":"sha256:5628c584c6784a39aedbd1778909e52a6979e961a87a984d02a299a0d8f14397","sizeBytes":99608,"redacted":true},
+    {"scenario":"organization-create-role-groups-disabled-until-created","viewport":"1024x768","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/org-units-create-context-1024.png","sha256":"sha256:7c2de087362ea4eec4a7c771d1e14978a54b279aaf5b005dae43d7cc09d01184","sizeBytes":86621,"redacted":true},
+    {"scenario":"user-create-empty-organization-and-read-only-derived-tenant","viewport":"1024x768","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/users-create-1024.png","sha256":"sha256:4107cb7cc45bd5f9c0bfe5fbe915e5edbb9a1b317d5a1adf14d0d41b38d17de6","sizeBytes":77214,"redacted":true},
+    {"scenario":"user-create-role-selection-disabled-before-role-pool","viewport":"1024x768","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/users-create-context-1024.png","sha256":"sha256:ae936eb6e79888a8839b7b8d35aa7783600d9553834bfc5ccf5af0ab377b959f","sizeBytes":83852,"redacted":true},
+    {"scenario":"organization-list-responsive","viewport":"1280x800","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/org-units-1280.png","sha256":"sha256:36527d771093844a91b4ffd21eb2d36ee95332465c822637768f5676e5a87ce1","sizeBytes":107445,"redacted":true},
+    {"scenario":"organization-create-role-groups-disabled-until-created","viewport":"1280x800","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/org-units-create-context-1280.png","sha256":"sha256:1f3ed359e3dd97bcbbaf107791f969f2ef6338607e09e04484d335a6539c5c3c","sizeBytes":98648,"redacted":true},
+    {"scenario":"user-create-empty-organization-and-read-only-derived-tenant","viewport":"1280x800","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/users-create-1280.png","sha256":"sha256:be4e325568f5bbfd59f4b62f7f2055ab5a69b0da5cbd4453482544f13bcb5c5c","sizeBytes":91073,"redacted":true},
+    {"scenario":"user-create-role-selection-disabled-before-role-pool","viewport":"1280x800","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/users-create-context-1280.png","sha256":"sha256:81ae5058a04453b5b985075c32763adddb7dd35d3d39fc21c9a64caceb21cb56","sizeBytes":95775,"redacted":true},
+    {"scenario":"organization-list-responsive","viewport":"1440x900","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/org-units-1440.png","sha256":"sha256:4abcc50b12ed5e1fca8ed316aadf13e79b9268bde35bd4936b1d31bc50bc566c","sizeBytes":112361,"redacted":true},
+    {"scenario":"organization-create-role-groups-disabled-until-created","viewport":"1440x900","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/org-units-create-context-1440.png","sha256":"sha256:b96f16bc24d7e0590181452c89f253f6461596f83b1e1070021e92ae5d63de87","sizeBytes":121022,"redacted":true},
+    {"scenario":"user-create-empty-organization-and-read-only-derived-tenant","viewport":"1440x900","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/users-create-1440.png","sha256":"sha256:7bcb48a33bb4fcacb63a2bf1e77f41c4c503e89aeede92afa5da59ed11dac724","sizeBytes":122810,"redacted":true},
+    {"scenario":"user-create-role-selection-disabled-before-role-pool","viewport":"1440x900","localPath":".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/users-create-context-1440.png","sha256":"sha256:77c426be47ca6f50548b11f91196cee9b38e39a02855d2fa7132efe23a7c63ee","sizeBytes":119810,"redacted":true}
+  ],
+  "audit": {
+    "steps": [
+      {"step":1,"name":"Organization list","health":"healthy"},
+      {"step":2,"name":"Organization create role-group boundary","health":"healthy"},
+      {"step":3,"name":"User create entry","health":"healthy"},
+      {"step":4,"name":"User organization and role context","health":"healthy"}
+    ],
+    "evidenceLimits": [
+      "Screenshots do not certify full WCAG conformance.",
+      "The in-app Browser was unavailable; current-run local Playwright fallback evidence is recorded instead.",
+      "Role-group conflict remediation is covered by contract and mutation tests but the seeded browser dataset contains no conflicting user assignment."
+    ]
+  }
+}

@@ -491,6 +491,7 @@ function PlatformRefineRuntime({
           resources={resources}
           routerProvider={routerProvider}
           options={{
+            disableTelemetry: true,
             syncWithLocation: true,
             warnWhenUnsavedChanges: true,
             projectId: "platform-go",

@@ -22,6 +22,7 @@ const (
 	ServiceObjectVersion                        = "1.0.0"
 	OrganizationRolePoolQueryID                 = "platform.identity.organization-role-pool.get"
 	OrganizationRoleGroupImpactQueryID          = "platform.identity.organization-role-group-change.impact"
+	OrganizationRoleGroupConflictsQueryID       = "platform.identity.organization-role-group-change.conflicts.list"
 	UserOrganizationImpactQueryID               = "platform.identity.user-organization-change.impact"
 	RoleStateOrGroupImpactQueryID               = "platform.identity.role-state-or-group-change.impact"
 	RolePermissionImpactQueryID                 = "platform.authorization.role-permission-change.impact"
@@ -58,16 +59,17 @@ type organizationRoleGroupChangeSet struct {
 }
 
 type organizationRoleGroupImpactSummary struct {
-	Severity          string `json:"severity"`
-	AffectedUsers     int    `json:"affectedUsers"`
-	ConflictCount     int    `json:"conflictCount"`
-	CurrentGroupCount int    `json:"currentGroupCount"`
-	TargetGroupCount  int    `json:"targetGroupCount"`
-	Resource          string `json:"resource,omitempty"`
-	ResourceCode      string `json:"resourceCode,omitempty"`
-	Operation         string `json:"operation,omitempty"`
-	ReferenceCount    int    `json:"referenceCount,omitempty"`
-	RetentionElapsed  bool   `json:"retentionElapsed,omitempty"`
+	Severity          string                   `json:"severity"`
+	AffectedUsers     int                      `json:"affectedUsers"`
+	ConflictCount     int                      `json:"conflictCount"`
+	CurrentGroupCount int                      `json:"currentGroupCount"`
+	TargetGroupCount  int                      `json:"targetGroupCount"`
+	Resource          string                   `json:"resource,omitempty"`
+	ResourceCode      string                   `json:"resourceCode,omitempty"`
+	Operation         string                   `json:"operation,omitempty"`
+	ReferenceCount    int                      `json:"referenceCount,omitempty"`
+	RetentionElapsed  bool                     `json:"retentionElapsed,omitempty"`
+	Conflicts         []RoleAssignmentConflict `json:"conflicts,omitempty"`
 }
 
 type organizationRoleGroupAppliedResult struct {
@@ -133,7 +135,7 @@ func OrganizationQueryDefinitions() []serviceobject.QueryDefinition {
 			Cost:      serviceobject.CostPolicy{BaseCost: 2, PerRowCost: 1, PredicateCost: 1, Limit: 2050}, Timeout: 3 * time.Second,
 			MaxPageSize: 1000,
 			ResultSchema: []serviceobject.ResultField{
-				{Name: "roleCode", Type: serviceobject.ValueString}, {Name: "roleGroupCode", Type: serviceobject.ValueString},
+				{Name: "roleCode", Type: serviceobject.ValueString}, {Name: "roleName", Type: serviceobject.ValueString}, {Name: "roleGroupCode", Type: serviceobject.ValueString},
 				{Name: "roleGroupName", Type: serviceobject.ValueString}, {Name: "tenantCode", Type: serviceobject.ValueString},
 				{Name: "status", Type: serviceobject.ValueString},
 			},
@@ -152,6 +154,19 @@ func OrganizationQueryDefinitions() []serviceobject.QueryDefinition {
 				{Name: "affectedUsers", Type: serviceobject.ValueInteger}, {Name: "conflictCount", Type: serviceobject.ValueInteger},
 				{Name: "expectedRevision", Type: serviceobject.ValueInteger}, {Name: "impactHash", Type: serviceobject.ValueString},
 				{Name: "expiresAt", Type: serviceobject.ValueString},
+			},
+			Build: func(arguments serviceobject.ValidatedArguments) (serviceobject.QueryAST, error) {
+				return serviceobject.QueryAST{Resource: "org-units", Predicates: []serviceobject.Predicate{{Field: "previewId", Operator: serviceobject.PredicateEqual, Value: arguments["previewId"]}}}, nil
+			},
+		},
+		{
+			ID: OrganizationRoleGroupConflictsQueryID, Version: ServiceObjectVersion, Resource: "org-units",
+			Permission: "admin:org-unit:update", Action: "update", TenantMode: serviceobject.TenantPlatform, DataScope: "platform",
+			Arguments: []serviceobject.ArgumentDefinition{{Name: "previewId", Type: serviceobject.ValueString, Required: true, MaxLength: 64}},
+			Cost:      serviceobject.CostPolicy{BaseCost: 2, PerRowCost: 1, PredicateCost: 1, Limit: 2005}, Timeout: 3 * time.Second,
+			MaxPageSize: 1000,
+			ResultSchema: []serviceobject.ResultField{
+				{Name: "userCode", Type: serviceobject.ValueString}, {Name: "roleCode", Type: serviceobject.ValueString},
 			},
 			Build: func(arguments serviceobject.ValidatedArguments) (serviceobject.QueryAST, error) {
 				return serviceobject.QueryAST{Resource: "org-units", Predicates: []serviceobject.Predicate{{Field: "previewId", Operator: serviceobject.PredicateEqual, Value: arguments["previewId"]}}}, nil
@@ -292,7 +307,7 @@ func (e *ServiceObjectExecutor) ExecuteQuery(ctx context.Context, plan serviceob
 		items := make([]map[string]any, 0, len(pool))
 		for _, entry := range pool {
 			items = append(items, map[string]any{
-				"roleCode": entry.RoleCode, "roleGroupCode": entry.RoleGroupCode, "roleGroupName": entry.RoleGroupName,
+				"roleCode": entry.RoleCode, "roleName": entry.RoleName, "roleGroupCode": entry.RoleGroupCode, "roleGroupName": entry.RoleGroupName,
 				"tenantCode": entry.TenantCode, "status": entry.Status,
 			})
 		}
@@ -322,6 +337,34 @@ func (e *ServiceObjectExecutor) ExecuteQuery(ctx context.Context, plan serviceob
 			item["retentionElapsed"] = summary.RetentionElapsed
 		}
 		return serviceobject.QueryResult{Items: []map[string]any{item}}, nil
+	case OrganizationRoleGroupConflictsQueryID:
+		previewID, ok := predicateString(plan.AST, "previewId")
+		if !ok {
+			return serviceobject.QueryResult{}, serviceobject.ErrValidation
+		}
+		preview, summary, err := e.loadPreviewForPlan(ctx, plan.Execution.Actor.Username, plan.TenantID, plan.Scope, previewID)
+		if err != nil {
+			return serviceobject.QueryResult{}, err
+		}
+		if preview.Operation != organizationRoleGroupPreviewOperation {
+			return serviceobject.QueryResult{}, serviceobject.ErrObjectUnavailable
+		}
+		start := (plan.Page - 1) * plan.PageSize
+		if start < 0 {
+			start = 0
+		}
+		if start > len(summary.Conflicts) {
+			start = len(summary.Conflicts)
+		}
+		end := start + plan.PageSize
+		if end > len(summary.Conflicts) {
+			end = len(summary.Conflicts)
+		}
+		items := make([]map[string]any, 0, end-start)
+		for _, conflict := range summary.Conflicts[start:end] {
+			items = append(items, map[string]any{"userCode": conflict.UserCode, "roleCode": conflict.RoleCode})
+		}
+		return serviceobject.QueryResult{Items: items}, nil
 	default:
 		return serviceobject.QueryResult{}, serviceobject.ErrObjectUnavailable
 	}
@@ -410,6 +453,7 @@ func (e *ServiceObjectExecutor) prepareOrganizationRoleGroups(ctx context.Contex
 	summary := organizationRoleGroupImpactSummary{
 		Severity: severity, AffectedUsers: impact.AffectedUsers, ConflictCount: len(impact.Conflicts),
 		CurrentGroupCount: len(impact.CurrentRoleGroupCodes), TargetGroupCount: len(impact.ProposedRoleGroupCodes),
+		Conflicts: impact.Conflicts,
 	}
 	summaryJSON, err := json.Marshal(summary)
 	if err != nil {

@@ -7,7 +7,7 @@ Last updated: 2026-07-15
 
 The admin foundation now has a runtime RBAC slice for platform menus and generic admin resources. Menu records are generated from enabled capability manifests, then filtered by the current principal.
 
-The current Admin behavior below remains the migration-source experience. The target backend contract in `docs/platform-organization-rbac-menu-contract.md` is implemented behind `PLATFORM_ORGANIZATION_RBAC_MODE=target`: role groups are non-nested and scoped, organizations bind tenant role groups, tenant users derive tenant from one primary organization, and API/page-button permission resources are separated. The organization/user Admin UI, role tree, independent role-menu runtime and browser E2E remain pending; do not describe those screens or navigation semantics as delivered.
+The current Admin behavior below remains the migration-source experience. The target backend contract in `docs/platform-organization-rbac-menu-contract.md` is implemented behind `PLATFORM_ORGANIZATION_RBAC_MODE=target`: role groups are non-nested and scoped, organizations bind tenant role groups, tenant users derive tenant from one primary organization, and API/page-button permission resources are separated. The organization/user Admin UI is implemented with derived read-only tenant display, organization-scoped role pools, role-group provenance and explicit invalid-role handling. The role tree, independent role-menu runtime and full browser E2E remain pending; do not describe those navigation and authorization surfaces as delivered.
 
 This slice turns resource permission codes into executable behavior:
 

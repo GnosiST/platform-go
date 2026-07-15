@@ -329,6 +329,34 @@
       },
       {
         "kind": "query",
+        "id": "platform.identity.organization-role-group-change.conflicts.list",
+        "version": "1.0.0",
+        "clientMethod": "getOrganizationRoleGroupChangeConflicts",
+        "requestType": "OrganizationRoleGroupChangeConflictsV1_0_0QueryRequest",
+        "inputType": "OrganizationRoleGroupChangeConflictsV1_0_0QueryInput",
+        "responseType": "OrganizationRoleGroupChangeConflictsV1_0_0QueryData",
+        "argumentNames": [
+          "previewId"
+        ],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 3000,
+          "cost": {
+            "baseCost": 2,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "maxPageSize": 1000,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "query",
         "id": "platform.identity.user-organization-change.impact",
         "version": "1.0.0",
         "clientMethod": "getUserOrganizationChangeImpact",

@@ -8,7 +8,6 @@
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "businessReferenceMode": "reference-only",
     "requiredControlledUnfinishedNodes": [
-      "organization-user-admin-experience",
       "role-tree-and-authorization-entry",
       "menu-tree-and-button-permission-configuration",
       "organization-rbac-menu-e2e-qa",
@@ -33,8 +32,8 @@
   },
   "taskSummary": {
     "expectedTotal": 66,
-    "expectedImplemented": 49,
-    "expectedControlledUnfinished": 17
+    "expectedImplemented": 50,
+    "expectedControlledUnfinished": 16
   },
   "requirements": [
     {

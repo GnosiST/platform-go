@@ -60,6 +60,251 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stdout, /Admin UI contract validation passed/);
   });
 
+  it("rejects an Admin runtime that enables Refine third-party telemetry", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/App.tsx",
+      "disableTelemetry: true",
+      "disableTelemetry: false",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must disable Refine third-party telemetry by default/);
+  });
+
+  it("rejects organization and user routes without the domain experience", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/refine/ResourceRoutePage.tsx",
+      'experienceKey={resource.route === "/org-units" || resource.route === "/users" ? "organization-user" : undefined}',
+      "experienceKey={undefined}",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Organization and user routes must inject the shared organization-user experience/);
+  });
+
+  it("rejects a new user form that implicitly selects organization context", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/organizationUserExperience.tsx",
+      'record ? values : { ...values, tenantCode: "", orgUnitCode: undefined, roles: [] }',
+      'record ? values : { ...values, tenantCode: "tenant-default", orgUnitCode: "org-default", roles: ["role-default"] }',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /New organization-scoped users must start without an implicitly selected organization/);
+  });
+
+  it("rejects form initialization that reruns when async options change", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "if (initializedFormKeyRef.current === initializationKey)",
+      "if (false && initializedFormKeyRef.current === initializationKey)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Async relation and organization context updates must not reset an already initialized form/);
+  });
+
+  it("rejects form initialization that bypasses resource experience defaults", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "form.setFieldsValue(activeFormInitialValues)",
+      "form.setFieldsValue(defaultFormValues(formFields))",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Form initialization must apply the active resource experience initial values/);
+  });
+
+  it("rejects initial value calculation that bypasses the resource experience", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "return experience.initialValues?.(values, editingRecord) ?? values;",
+      "return values;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Generic resource forms must apply experience-owned initial values/);
+  });
+
+  it("rejects a form initialization guard that never records its lifecycle key", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "initializedFormKeyRef.current = initializationKey;",
+      "void initializationKey;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Form initialization must record the active modal lifecycle/);
+  });
+
+  it("rejects a closed modal that retains its initialization key", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      'initializedFormKeyRef.current = "";',
+      "void initializedFormKeyRef.current;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Closing a form must clear its initialization key/);
+  });
+
+  it("rejects an editable tenant field for organization-scoped users", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/organizationUserExperience.tsx",
+      '<Input readOnly aria-readonly="true" placeholder={dictionary.userDerivedTenantPending} />',
+      '<Input placeholder={dictionary.userDerivedTenantPending} />',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Derived user tenant must remain visibly and semantically read-only/);
+  });
+
+  it("rejects a role selector enabled before organization selection", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/organizationUserExperience.tsx",
+      "disabled={!selectedOrgUnitCode || rolePoolLoading}",
+      "disabled={rolePoolLoading}",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /User roles must remain disabled until an organization is selected/);
+  });
+
+  it("rejects organization role-pool feedback without a polite live region", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/organizationUserExperience.tsx",
+      '<div aria-live="polite" id="organization-role-pool-status"',
+      '<div aria-live="off" id="organization-role-pool-status"',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Role-pool status changes must use a polite live region/);
+  });
+
+  it("rejects organization role-group bindings in generic CRUD input", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/organizationUserExperience.tsx",
+      'values: omitValue(context.input.values, "roleGroupCodes")',
+      "values: context.input.values",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Generic organization CRUD must not carry role-group bindings/);
+  });
+
+  it("rejects organization context loading that stops after the first generic-resource page", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "records.length >= result.total",
+      "currentPage >= 1",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /context pagination must stop only after the full result set is loaded/);
+  });
+
+  it("rejects a generic metadata write after organization role-group apply", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/organizationUserExperience.tsx",
+      "await replaceOrganizationRoleGroups(preview);\n  return recordWithValues(context.editingRecord, { roleGroupCodes: selectedGroups.join(\",\") });",
+      "await replaceOrganizationRoleGroups(preview);\n  return context.persist(input);",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Organization role-group apply must not be followed by a second generic metadata write/);
+  });
+
+  it("rejects static organization authorization confirmations outside the AntD application context", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/organizationUserExperience.tsx",
+      "const { modal } = App.useApp();",
+      "const modal = { confirm: () => undefined };",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /confirmations must use the active AntD application context/);
+  });
+
+  for (const [name, source, replacement, expected] of [
+    ["delete actions", "allowDelete: !active", "allowDelete: true", /generic delete actions must stay disabled/],
+    ["status toggles", "allowStatusToggle: !active", "allowStatusToggle: true", /generic status toggles must stay disabled/],
+  ]) {
+    it(`rejects organization and user ${name}`, () => {
+      const tempRoot = tempAdminRoot();
+      replaceInTemp(
+        tempRoot,
+        "admin/src/platform/resources/organizationUserExperience.tsx",
+        source,
+        replacement,
+      );
+
+      const result = runValidator(["--root", tempRoot]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, expected);
+    });
+  }
+
   it("rejects optional personnel copy that is labeled as the organization capability", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(

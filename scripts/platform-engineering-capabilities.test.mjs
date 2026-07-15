@@ -37,7 +37,6 @@ const completionProgramCapabilityIDs = [
 ];
 
 const partialCapabilityDependencies = {
-  "organization-user-admin-experience": ["organization-role-pool-backend-and-migration"],
   "role-tree-and-authorization-entry": ["organization-user-admin-experience"],
   "menu-tree-and-button-permission-configuration": ["role-tree-and-authorization-entry"],
   "organization-rbac-menu-e2e-qa": [
@@ -149,6 +148,7 @@ describe("validate-platform-engineering-capabilities", () => {
       "integration-ports-disabled-default",
       "organization-rbac-menu-contract-and-migration-design",
       "organization-role-pool-backend-and-migration",
+      "organization-user-admin-experience",
     ]);
     for (const capability of capabilities.filter((item) => implementedCapabilityIDs.has(item.id))) {
       assert.equal(capability.status, "implemented");
@@ -204,6 +204,22 @@ describe("validate-platform-engineering-capabilities", () => {
     assert.equal(integrationPorts.status, "implemented");
     assert.ok(integrationPorts.evidence.sourcePaths.includes("resources/platform-integration-ports.json"));
     assert.ok(integrationPorts.evidence.tests.includes("scripts/platform-integration-ports.test.mjs"));
+    const organizationAdmin = capabilities.find((item) => item.id === "organization-user-admin-experience");
+    assert.equal(organizationAdmin.status, "implemented");
+    assert.ok(organizationAdmin.evidence.sourcePaths.includes("admin/src/platform/resources/organizationUserExperience.tsx"));
+    assert.ok(organizationAdmin.evidence.sourcePaths.includes("resources/evidence/organization-user-admin-experience-20260715.json"));
+    assert.ok(organizationAdmin.evidence.tests.includes("scripts/admin-ui-contracts.test.mjs"));
+    assert.ok(organizationAdmin.evidence.validators.includes("scripts/validate-admin-ui-contracts.mjs"));
+  });
+
+  it("rejects regressing organization and user Admin experience after closeout", () => {
+    const matrix = readJSON("resources/platform-engineering-capabilities.json");
+    matrix.capabilities.find((item) => item.id === "organization-user-admin-experience").status = "partial";
+
+    const result = runValidator(["--matrix", tempJSON("partial-organization-user-admin.json", matrix)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /required implemented capability organization-user-admin-experience must stay implemented/);
   });
 
   it("rejects regressing integration ports after closeout", () => {

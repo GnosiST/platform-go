@@ -2704,15 +2704,7 @@
       },
       "phase": "production-governance",
       "scope": "admin-ui",
-      "status": "pending",
-      "statusReason": {
-        "zh": "组织页面缺少角色组绑定与来源明细，用户页面仍可直接选择租户且角色不依赖机构。",
-        "en": "Organization pages lack role-group bindings and source detail, while users can still choose tenants directly and roles do not depend on organization."
-      },
-      "completionGate": {
-        "zh": "完成组织角色组绑定、角色池来源、派生只读租户、机构依赖多角色选择和机构变更冲突确认。",
-        "en": "Complete organization role-group binding, role-pool provenance, derived read-only tenant, organization-dependent multi-role selection and explicit organization-change conflict handling."
-      },
+      "status": "implemented",
       "visual": true,
       "designGate": [
         "superpowers:brainstorming",
@@ -2731,7 +2723,41 @@
       "evidence": {
         "docs": [
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
-          "docs/platform-ui-optimization-assessment.md"
+          "docs/superpowers/specs/2026-07-15-organization-user-admin-experience-design.md",
+          "docs/superpowers/plans/2026-07-15-organization-user-admin-experience.md",
+          "docs/platform-organization-rbac-menu-contract.md",
+          "docs/platform-ui-optimization-assessment.md",
+          "docs/admin-resource-schema.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+          "scripts/validate-platform-admin-api-boundary.mjs",
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs",
+          "scripts/validate-platform-foundation-task-graph.mjs",
+          "scripts/validate-platform-node-closeout-audit.mjs"
+        ],
+        "tests": [
+          "internal/platform/organizationrbac/admin_org_unit_snapshot_test.go",
+          "internal/platform/organizationrbac/gorm_repository_test.go",
+          "internal/platform/organizationrbac/service_objects_test.go",
+          "internal/platform/bootstrap/admin_resources_test.go",
+          "scripts/admin-ui-contracts.test.mjs",
+          "scripts/platform-organization-rbac-menu-contract.test.mjs",
+          "scripts/platform-foundation-task-graph.test.mjs",
+          "scripts/platform-node-closeout-audit.test.mjs"
+        ],
+        "screenshots": [
+          "resources/evidence/organization-user-admin-experience-20260715.json"
+        ],
+        "skills": [
+          "ui-ux-pro-max"
+        ],
+        "checks": [
+          "rtk go test ./...",
+          "rtk npm --prefix admin run build",
+          "375/390/768/1024/1280/1440 reduced-motion browser acceptance",
+          "no horizontal overflow, console errors or failed first-party requests"
         ]
       }
     },

@@ -191,11 +191,19 @@ describe("platform organization RBAC menu contract", () => {
     assert.match(result.stderr, /organization-role-pool-backend-and-migration status must be implemented/);
   });
 
-  it("rejects claiming a downstream UI node is already implemented", () => {
+  it("rejects regressing the implemented organization and user Admin node", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
-    graph.tasks.find((task) => task.id === "organization-user-admin-experience").status = "implemented";
+    graph.tasks.find((task) => task.id === "organization-user-admin-experience").status = "pending";
     const result = runValidator(["--task-graph", tempJSON("task-graph.json", graph)]);
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /downstream runtime\/UI task organization-user-admin-experience must remain unfinished/);
+    assert.match(result.stderr, /implemented downstream Admin task organization-user-admin-experience must stay implemented/);
+  });
+
+  it("rejects closing role, menu or full E2E nodes before their implementation", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    graph.tasks.find((task) => task.id === "role-tree-and-authorization-entry").status = "implemented";
+    const result = runValidator(["--task-graph", tempJSON("premature-role-tree.json", graph)]);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /downstream runtime\/UI task role-tree-and-authorization-entry must remain unfinished/);
   });
 });

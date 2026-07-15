@@ -35,7 +35,6 @@
     "unfinishedTasksMustNotHaveCloseout": true
   },
   "pendingNodeEvidence": [
-    "organization-user-admin-experience",
     "role-tree-and-authorization-entry",
     "menu-tree-and-button-permission-configuration",
     "organization-rbac-menu-e2e-qa",
@@ -1379,6 +1378,59 @@
         "scripts/platform-foundation-task-graph.test.mjs",
         "scripts/validate-platform-engineering-capabilities.mjs",
         "scripts/platform-engineering-capabilities.test.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
+      ]
+    },
+    {
+      "taskId": "organization-user-admin-experience",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupMode": "phase-level",
+      "cleanupEvidence": [
+        "README.md",
+        "design-qa.md",
+        "docs/admin-rbac-menu.md",
+        "docs/admin-resource-schema.md",
+        "docs/platform-data-governance-and-integrations-assessment.md",
+        "docs/platform-foundation-task-map.md",
+        "docs/platform-organization-rbac-menu-contract.md",
+        "docs/platform-roadmap.md",
+        "docs/platform-ui-optimization-assessment.md",
+        "docs/superpowers/specs/2026-07-15-organization-user-admin-experience-design.md",
+        "docs/superpowers/plans/2026-07-15-organization-user-admin-experience.md",
+        "admin/src/App.tsx",
+        "admin/src/platform/api/organizationRBAC.ts",
+        "admin/src/platform/resources/resourceExperience.ts",
+        "admin/src/platform/resources/organizationUserExperience.tsx",
+        "admin/src/platform/resources/GenericResourceConsole.tsx",
+        "internal/platform/organizationrbac/admin_org_unit_snapshot.go",
+        "internal/platform/organizationrbac/gorm_repository.go",
+        "internal/platform/organizationrbac/service_objects.go",
+        "resources/evidence/organization-user-admin-experience-20260715.json",
+        "resources/generated/admin-service-object-client.ts",
+        "resources/generated/openapi.admin.json",
+        "resources/platform-foundation-task-graph.json",
+        "resources/platform-engineering-capabilities.json",
+        "resources/platform-task-execution-audit.json",
+        "resources/platform-foundation-alignment-audit.json",
+        "resources/platform-goal-completion-audit.json",
+        "resources/platform-node-closeout-audit.json",
+        "resources/platform-objective-conformance.json",
+        "scripts/validate-admin-ui-contracts.mjs",
+        "scripts/admin-ui-contracts.test.mjs",
+        "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+        "scripts/platform-organization-rbac-menu-contract.test.mjs"
+      ],
+      "visualEvidence": [
+        "superpowers:brainstorming",
+        "product-design",
+        "ui-ux-pro-max",
+        "playwright-1.55-local-fallback"
       ],
       "dimensions": [
         "docs",

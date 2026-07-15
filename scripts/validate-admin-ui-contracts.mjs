@@ -18,10 +18,13 @@ const files = {
   oidcPolicy: readSource("admin/src/platform/auth/oidcPolicy.ts"),
   capabilityMetadata: readSource("admin/src/platform/capabilities/metadata.ts"),
   client: readSource("admin/src/platform/api/client.ts"),
+  organizationRBAC: readSource("admin/src/platform/api/organizationRBAC.ts"),
   sessionExpiry: readSource("admin/src/platform/api/sessionExpiry.ts"),
   i18n: readSource("admin/src/platform/i18n.ts"),
   primitives: readSource("admin/src/platform/ui/AdminPrimitives.tsx"),
   resourceConsole: readSource("admin/src/platform/resources/GenericResourceConsole.tsx"),
+  resourceExperience: readSource("admin/src/platform/resources/resourceExperience.ts"),
+  organizationUserExperience: readSource("admin/src/platform/resources/organizationUserExperience.tsx"),
   resourceRoute: readSource("admin/src/platform/refine/ResourceRoutePage.tsx"),
   sensitiveRevealModal: readSource("admin/src/platform/resources/SensitiveFieldRevealModal.tsx"),
   sensitiveRevealOIDC: readSource("admin/src/platform/security/sensitiveRevealOIDC.ts"),
@@ -44,6 +47,7 @@ const tabletLoginStyles = extractCssBlock(files.styles, "@media (max-width: 1024
 requireIncludes(files.app, "readStoredUIConfig", "App must keep persisted admin UI configuration.");
 requireIncludes(files.app, "writeStorageValue(adminPreferenceStorageKeys.ui", "App must persist admin UI configuration changes.");
 requireIncludes(files.app, "defaultAdminUIConfig", "App must fall back to the shared default admin UI config.");
+requireIncludes(files.app, "disableTelemetry: true", "The reusable Admin foundation must disable Refine third-party telemetry by default.");
 requireIncludes(files.app, "PolicyReviewConsole", "App must mount the policy-review custom governance console when the resource is enabled.");
 requireIncludes(files.app, 'resource.route !== "/policy-reviews"', "Generic resource routing must not also mount policy-reviews when the custom console is active.");
 requireIncludes(files.client, "export class AdminAPIError", "Admin API failures must expose typed status codes.");
@@ -176,6 +180,56 @@ requireRegex(
   "Reveal callbacks must clear callback parameters through React Router after exchange.",
 );
 requireIncludes(files.resourceRoute, "oidcResume={sensitiveRevealOIDCResume}", "Resource routes must pass reveal resume state only to the mounted resource console.");
+requireIncludes(
+  files.resourceRoute,
+  'experienceKey={resource.route === "/org-units" || resource.route === "/users" ? "organization-user" : undefined}',
+  "Organization and user routes must inject the shared organization-user experience.",
+);
+requireIncludes(files.resourceConsole, "useOrganizationUserExperience({", "GenericResourceConsole must consume the organization-user experience through one stable hook.");
+requireIncludes(files.resourceConsole, "experience.submit({ editingRecord, input, values, persist })", "Organization and user writes must pass through the experience submit boundary.");
+requireIncludes(files.resourceConsole, "const effectiveCanDelete = canDelete && experience.allowDelete;", "GenericResourceConsole must enforce experience delete policy.");
+requireIncludes(files.resourceConsole, "canUpdate && experience.allowStatusToggle", "GenericResourceConsole must enforce experience status policy.");
+requireIncludes(files.resourceExperience, "initialValues?: (values: ResourceFormValues, editingRecord: AdminResourceRecord | null) => ResourceFormValues;", "Resource experiences must be able to provide deterministic create and edit initial values.");
+requireIncludes(files.organizationUserExperience, 'record ? values : { ...values, tenantCode: "", orgUnitCode: undefined, roles: [] }', "New organization-scoped users must start without an implicitly selected organization, tenant, or role.");
+requireIncludes(files.resourceConsole, "for (let currentPage = 1; ; currentPage += 1)", "Organization and user context options must load every generic-resource page.");
+requireIncludes(files.resourceConsole, "records.length >= result.total", "Organization and user context pagination must stop only after the full result set is loaded.");
+requireIncludes(files.organizationRBAC, "new AdminServiceObjectClient(transport)", "Organization RBAC UI calls must use the generated service-object client.");
+requireIncludes(files.organizationRBAC, 'path.startsWith("/api/") ? path.slice(4) : path', "Organization RBAC transport must avoid duplicating the shared /api prefix.");
+requireIncludes(files.organizationRBAC, "collectPages(async (page, pageSize)", "Organization role pools and conflict details must collect every service-object page.");
+requireIncludes(files.organizationUserExperience, 'form.setFieldValue("tenantCode", derivedTenantCode)', "User tenant must be derived from the selected organization.");
+requireIncludes(
+  files.organizationUserExperience,
+  '<Input readOnly aria-readonly="true" placeholder={dictionary.userDerivedTenantPending} />',
+  "Derived user tenant must remain visibly and semantically read-only.",
+);
+requireIncludes(files.organizationUserExperience, "disabled={!selectedOrgUnitCode || rolePoolLoading}", "User roles must remain disabled until an organization is selected and its role pool is ready.");
+requireIncludes(files.organizationUserExperience, 'setFieldError(form, "roles", message)', "Out-of-pool roles must block submission with a field-level error.");
+requireIncludes(files.organizationUserExperience, 'aria-describedby="organization-role-pool-status"', "The user role selector must reference its async role-pool status.");
+requireIncludes(files.organizationUserExperience, '<div aria-live="polite" id="organization-role-pool-status"', "Role-pool status changes must use a polite live region.");
+requireIncludes(files.organizationUserExperience, 'values: omitValue(context.input.values, "roleGroupCodes")', "Generic organization CRUD must not carry role-group bindings.");
+requireIncludes(files.organizationUserExperience, "prepareOrganizationRoleGroupChange", "Organization role-group changes must use the domain prepare contract.");
+requireIncludes(files.organizationUserExperience, "replaceOrganizationRoleGroups(preview)", "Organization role-group changes must use the domain apply contract.");
+requireIncludes(files.organizationUserExperience, "allowDelete: !active", "Organization and user generic delete actions must stay disabled.");
+requireIncludes(files.organizationUserExperience, "allowStatusToggle: !active", "Organization and user generic status toggles must stay disabled.");
+requireIncludes(files.organizationUserExperience, "rolePoolRequest.current === requestID", "Role-pool loading must discard stale organization responses.");
+requireIncludes(files.organizationUserExperience, "rolePoolRequest.current += 1", "Closing or clearing an organization must invalidate in-flight role-pool requests.");
+requireIncludes(files.organizationUserExperience, "App.useApp()", "Organization authorization confirmations must use the active AntD application context.");
+requireIncludes(files.organizationUserExperience, "cancelText", "Organization authorization confirmations must expose localized cancellation copy.");
+requireIncludes(files.organizationUserExperience, "hasMetadataChanges(context.editingRecord", "Authorization and metadata changes must be submitted separately.");
+requireRegex(
+  files.organizationUserExperience,
+  /await replaceOrganizationRoleGroups\(preview\);\s*return recordWithValues/,
+  "Organization role-group apply must not be followed by a second generic metadata write.",
+);
+requireRegex(
+  files.organizationUserExperience,
+  /await changeUserOrganization\(preview\);\s*return recordWithValues/,
+  "User authorization apply must not be followed by a second generic metadata write.",
+);
+requireIncludes(files.organizationUserExperience, "conflicts.length !== initialImpact.conflictCount", "Organization conflict remediation must reject incomplete conflict pages.");
+requireIncludes(files.organizationUserExperience, "aria-invalid={invalidSelectedRoles.length > 0}", "Out-of-pool user roles must expose their invalid state semantically.");
+requireIncludes(files.organizationUserExperience, '<ul className="organization-role-pool-list"', "Organization role-pool provenance must use list semantics.");
+requireIncludes(files.organizationUserExperience, 'role="textbox" aria-readonly="true"', "Read-only role values must expose a valid read-only widget semantic.");
 requireRegex(
   files.resourceConsole,
   /const canRevealField = useCallback\([\s\S]*?field\.inDetail && field\.reveal && permissionAllows\(permissions, field\.reveal\.permission, deniedPermissions\)/,
@@ -425,7 +479,14 @@ for (const [component, label] of [
 requireIncludes(files.resourceConsole, "<PlatformResourceForm", "GenericResourceConsole must render schema forms through PlatformResourceForm.");
 requireIncludes(files.resourceConsole, 'getValuePropName={(field) => (field.type === "switch" ? "checked" : undefined)}', "Switch form fields must bind AntD Form values through checked.");
 requireIncludes(files.resourceConsole, "if (!modalOpen)", "GenericResourceConsole must only reset or set form values when the form modal is open.");
-requireIncludes(files.resourceConsole, "form.setFieldsValue(formValuesFromRecord(editingRecord, formFields))", "Editing a resource must hydrate form values from the selected record.");
+requireIncludes(files.resourceConsole, 'const initializationKey = editingRecord ? `edit:${editingRecord.id}` : `create:${resourceKey}`;', "Form initialization must be scoped to the current create or edit modal lifecycle.");
+requireIncludes(files.resourceConsole, "if (initializedFormKeyRef.current === initializationKey)", "Async relation and organization context updates must not reset an already initialized form.");
+requireIncludes(files.resourceConsole, 'const values = editingRecord ? formValuesFromRecord(editingRecord, formFields) : defaultFormValues(formFields);', "Editing a resource must hydrate form values from the selected record while create forms use schema defaults.");
+requireIncludes(files.resourceConsole, "return experience.initialValues?.(values, editingRecord) ?? values;", "Generic resource forms must apply experience-owned initial values before opening.");
+requireIncludes(files.resourceConsole, "initializedFormKeyRef.current = initializationKey;", "Form initialization must record the active modal lifecycle before resetting fields.");
+requireOrder(files.resourceConsole, "initializedFormKeyRef.current = initializationKey;", "form.resetFields();", "Form initialization must record its lifecycle key before resetting fields.");
+requireIncludes(files.resourceConsole, "form.setFieldsValue(activeFormInitialValues)", "Form initialization must apply the active resource experience initial values.");
+requireOrder(files.resourceConsole, 'initializedFormKeyRef.current = "";', "form.setFieldsValue(activeFormInitialValues)", "Closing a form must clear its initialization key before a later modal lifecycle can initialize.");
 requireIncludes(files.resourceConsole, "field.type === \"multiselect\"", "Form hydration must preserve multiselect arrays for relation fields.");
 requireRegex(
   files.resourceConsole,

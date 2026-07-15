@@ -54,6 +54,7 @@ type gormRoleGroup struct {
 type gormRole struct {
 	ID         string `gorm:"column:id;size:191;primaryKey"`
 	Code       string `gorm:"column:code;size:191;uniqueIndex"`
+	Name       string `gorm:"column:name;size:191"`
 	GroupCode  string `gorm:"column:group_code;size:191;index"`
 	Status     string `gorm:"column:status;size:32;index"`
 	UpdatedAt  string `gorm:"column:updated_at;size:35"`
@@ -170,7 +171,7 @@ func OpenGORMRepository(ctx context.Context, db *gorm.DB) (*GORMRepository, erro
 	}{
 		{model: gormOrganization{}, fields: []string{"Code", "TenantCode", "Status"}},
 		{model: gormRoleGroup{}, fields: []string{"Code", "ScopeType", "TenantCode", "Status", "Revision"}},
-		{model: gormRole{}, fields: []string{"Code", "GroupCode", "Status"}},
+		{model: gormRole{}, fields: []string{"Code", "Name", "GroupCode", "Status"}},
 		{model: gormUser{}, fields: []string{"ID", "ScopeType", "TenantCode", "OrgUnitCode"}},
 		{model: gormUserRole{}, fields: []string{"UserID", "RoleCode"}},
 		{model: gormPermission{}, fields: []string{"ID", "Code", "Status", "ResourceType"}},
@@ -428,7 +429,7 @@ func (r *GORMRepository) ValidateCutover(ctx context.Context) (CutoverReport, er
 		if err != nil {
 			return CutoverReport{}, err
 		}
-		role := Role{Code: row.Code, GroupCode: row.GroupCode, Status: row.Status, Deleted: deleted}
+		role := Role{Code: row.Code, Name: row.Name, GroupCode: row.GroupCode, Status: row.Status, Deleted: deleted}
 		if err := ValidateRole(role, groupMap); err != nil {
 			return CutoverReport{}, err
 		}
@@ -627,7 +628,7 @@ func loadRolesForGroups(db *gorm.DB, groupCodes []string) (map[string]Role, erro
 		if err != nil {
 			return nil, err
 		}
-		roles[row.Code] = Role{Code: row.Code, GroupCode: row.GroupCode, Status: row.Status, Deleted: deleted}
+		roles[row.Code] = Role{Code: row.Code, Name: row.Name, GroupCode: row.GroupCode, Status: row.Status, Deleted: deleted}
 	}
 	return roles, nil
 }

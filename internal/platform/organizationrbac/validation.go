@@ -80,7 +80,7 @@ func EffectiveRolePool(
 			return nil, err
 		}
 		pool = append(pool, RolePoolEntry{
-			RoleCode: role.Code, RoleGroupCode: group.Code, RoleGroupName: group.Name, TenantCode: organization.TenantCode, Status: role.Status,
+			RoleCode: role.Code, RoleName: role.Name, RoleGroupCode: group.Code, RoleGroupName: group.Name, TenantCode: organization.TenantCode, Status: role.Status,
 		})
 	}
 	return pool, nil

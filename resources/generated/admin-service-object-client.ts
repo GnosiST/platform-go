@@ -77,6 +77,7 @@ export type OrganizationRolePoolGetV1_0_0Sort = {
 
 export type OrganizationRolePoolGetV1_0_0Item = {
   readonly "roleCode": string;
+  readonly "roleName": string;
   readonly "roleGroupCode": string;
   readonly "roleGroupName": string;
   readonly "tenantCode": string;
@@ -138,6 +139,40 @@ export type OrganizationRoleGroupChangeImpactV1_0_0QueryRequest = OrganizationRo
 
 export type OrganizationRoleGroupChangeImpactV1_0_0QueryData = {
   readonly items: ReadonlyArray<OrganizationRoleGroupChangeImpactV1_0_0Item>;
+  readonly page: number;
+  readonly pageSize: number;
+};
+
+export type OrganizationRoleGroupChangeConflictsV1_0_0Arguments = {
+  "previewId": string;
+};
+
+export type OrganizationRoleGroupChangeConflictsV1_0_0Sort = {
+  readonly name: never;
+  readonly order: "asc" | "desc";
+};
+
+export type OrganizationRoleGroupChangeConflictsV1_0_0Item = {
+  readonly "userCode": string;
+  readonly "roleCode": string;
+};
+
+export type OrganizationRoleGroupChangeConflictsV1_0_0QueryInput = {
+  readonly arguments: OrganizationRoleGroupChangeConflictsV1_0_0Arguments;
+  readonly pagination?: {
+    readonly page?: number;
+    readonly pageSize?: number;
+  };
+  readonly sort?: ReadonlyArray<OrganizationRoleGroupChangeConflictsV1_0_0Sort>;
+};
+
+export type OrganizationRoleGroupChangeConflictsV1_0_0QueryRequest = OrganizationRoleGroupChangeConflictsV1_0_0QueryInput & {
+  readonly queryId: "platform.identity.organization-role-group-change.conflicts.list";
+  readonly version: "1.0.0";
+};
+
+export type OrganizationRoleGroupChangeConflictsV1_0_0QueryData = {
+  readonly items: ReadonlyArray<OrganizationRoleGroupChangeConflictsV1_0_0Item>;
   readonly page: number;
   readonly pageSize: number;
 };
@@ -649,6 +684,15 @@ export class AdminServiceObjectClient {
       version: "1.0.0",
     };
     return this.transport.post<OrganizationRoleGroupChangeImpactV1_0_0QueryData, OrganizationRoleGroupChangeImpactV1_0_0QueryRequest>("/api/admin/service-objects/query", request);
+  }
+
+  getOrganizationRoleGroupChangeConflicts(input: OrganizationRoleGroupChangeConflictsV1_0_0QueryInput): Promise<AdminServiceObjectResponse<OrganizationRoleGroupChangeConflictsV1_0_0QueryData>> {
+    const request: OrganizationRoleGroupChangeConflictsV1_0_0QueryRequest = {
+      ...input,
+      queryId: "platform.identity.organization-role-group-change.conflicts.list",
+      version: "1.0.0",
+    };
+    return this.transport.post<OrganizationRoleGroupChangeConflictsV1_0_0QueryData, OrganizationRoleGroupChangeConflictsV1_0_0QueryRequest>("/api/admin/service-objects/query", request);
   }
 
   getUserOrganizationChangeImpact(input: UserOrganizationChangeImpactV1_0_0QueryInput): Promise<AdminServiceObjectResponse<UserOrganizationChangeImpactV1_0_0QueryData>> {

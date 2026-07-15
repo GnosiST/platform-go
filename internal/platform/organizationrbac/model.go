@@ -78,6 +78,7 @@ func (group RoleGroup) Enabled() bool {
 
 type Role struct {
 	Code      string
+	Name      string
 	GroupCode string
 	Status    string
 	Deleted   bool
@@ -104,6 +105,7 @@ type OrgUnitRoleGroupBinding struct {
 
 type RolePoolEntry struct {
 	RoleCode      string
+	RoleName      string
 	RoleGroupCode string
 	RoleGroupName string
 	TenantCode    string
@@ -132,8 +134,8 @@ type RoleAssignmentRemediation struct {
 }
 
 type RoleAssignmentConflict struct {
-	UserCode string
-	RoleCode string
+	UserCode string `json:"userCode"`
+	RoleCode string `json:"roleCode"`
 }
 
 type OrgUnitRoleGroupImpact struct {

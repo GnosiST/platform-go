@@ -16,13 +16,18 @@ import (
 )
 
 type GORMAdminResourceRepository struct {
-	db                    *gorm.DB
-	organizationRBACOwned bool
-	organizationRBACUsers OrganizationRBACUserSnapshotWriter
+	db                       *gorm.DB
+	organizationRBACOwned    bool
+	organizationRBACUsers    OrganizationRBACUserSnapshotWriter
+	organizationRBACOrgUnits OrganizationRBACOrgUnitSnapshotWriter
 }
 
 type OrganizationRBACUserSnapshotWriter interface {
 	ApplyUserSnapshot(context.Context, *gorm.DB, []Record, []Record) error
+}
+
+type OrganizationRBACOrgUnitSnapshotWriter interface {
+	ApplyOrgUnitSnapshot(context.Context, *gorm.DB, []Record, []Record) error
 }
 
 var organizationRBACOwnedResources = []string{"users", "org-units", "roles", "role-groups"}
@@ -398,6 +403,15 @@ func (r *GORMAdminResourceRepository) WithOrganizationRBACOwnership(userWriter .
 	return &clone
 }
 
+func (r *GORMAdminResourceRepository) WithOrganizationRBACOrgUnitWriter(writer OrganizationRBACOrgUnitSnapshotWriter) *GORMAdminResourceRepository {
+	if r == nil {
+		return nil
+	}
+	clone := *r
+	clone.organizationRBACOrgUnits = writer
+	return &clone
+}
+
 func (r *GORMAdminResourceRepository) ExcludeCapabilitySeed(resource string) bool {
 	return r != nil && r.organizationRBACOwned && slices.Contains(organizationRBACOwnedResources, resource)
 }
@@ -552,6 +566,7 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 	var committed uint64
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var organizationRBACUsersChanged bool
+		var organizationRBACOrgUnitsChanged bool
 		if r.organizationRBACOwned {
 			current := ResourceSnapshot{Resources: map[string][]Record{}}
 			txRepository := &GORMAdminResourceRepository{db: tx}
@@ -563,14 +578,29 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 			}
 			for _, resource := range organizationRBACOwnedResources {
 				if !equalOrganizationRBACProjection(resource, current.Resources[resource], snapshot.Resources[resource]) {
-					if resource != "users" || r.organizationRBACUsers == nil {
+					switch resource {
+					case "users":
+						if r.organizationRBACUsers == nil {
+							return fmt.Errorf("%w: %s", ErrDomainOwnedMutation, resource)
+						}
+						organizationRBACUsersChanged = true
+					case "org-units":
+						if r.organizationRBACOrgUnits == nil {
+							return fmt.Errorf("%w: %s", ErrDomainOwnedMutation, resource)
+						}
+						organizationRBACOrgUnitsChanged = true
+					default:
 						return fmt.Errorf("%w: %s", ErrDomainOwnedMutation, resource)
 					}
-					organizationRBACUsersChanged = true
 				}
 			}
 			if organizationRBACUsersChanged {
 				if err := r.organizationRBACUsers.ApplyUserSnapshot(ctx, tx, current.Resources["users"], snapshot.Resources["users"]); err != nil {
+					return err
+				}
+			}
+			if organizationRBACOrgUnitsChanged {
+				if err := r.organizationRBACOrgUnits.ApplyOrgUnitSnapshot(ctx, tx, current.Resources["org-units"], snapshot.Resources["org-units"]); err != nil {
 					return err
 				}
 			}
@@ -949,6 +979,35 @@ func (r *GORMAdminResourceRepository) loadOrgUnits(ctx context.Context) ([]Recor
 			groupsByOrganization[binding.OrgUnitCode] = append(groupsByOrganization[binding.OrgUnitCode], binding.RoleGroupCode)
 		}
 	}
+	var groupRows []gormAdminRoleGroup
+	if err := r.db.WithContext(ctx).Find(&groupRows).Error; err != nil {
+		return nil, err
+	}
+	var roleRows []gormAdminRole
+	if err := r.db.WithContext(ctx).Find(&roleRows).Error; err != nil {
+		return nil, err
+	}
+	var lifecycleRows []gormAdminResourceLifecycle
+	if err := r.db.WithContext(ctx).
+		Where("resource IN ?", []string{"org-units", "role-groups", "roles"}).
+		Find(&lifecycleRows).Error; err != nil {
+		return nil, err
+	}
+	deleted := make(map[string]map[string]struct{})
+	for _, lifecycle := range lifecycleRows {
+		if deleted[lifecycle.Resource] == nil {
+			deleted[lifecycle.Resource] = map[string]struct{}{}
+		}
+		deleted[lifecycle.Resource][lifecycle.RecordID] = struct{}{}
+	}
+	groupsByCode := make(map[string]gormAdminRoleGroup, len(groupRows))
+	for _, group := range groupRows {
+		groupsByCode[group.Code] = group
+	}
+	rolesByGroup := make(map[string][]gormAdminRole)
+	for _, role := range roleRows {
+		rolesByGroup[role.GroupCode] = append(rolesByGroup[role.GroupCode], role)
+	}
 	records := make([]Record, 0, len(rows))
 	for _, row := range rows {
 		values, err := valuesFromJSON(row.ValuesJSON)
@@ -963,6 +1022,31 @@ func (r *GORMAdminResourceRepository) loadOrgUnits(ctx context.Context) ([]Recor
 		if roleGroups := groupsByOrganization[row.Code]; len(roleGroups) > 0 {
 			values["roleGroupCodes"] = strings.Join(roleGroups, ",")
 		}
+		roleGroupCodes := groupsByOrganization[row.Code]
+		values["roleGroupCount"] = strconv.Itoa(len(roleGroupCodes))
+		effectiveRoles := map[string]struct{}{}
+		if row.Status == "enabled" {
+			if _, orgDeleted := deleted["org-units"][row.ID]; !orgDeleted {
+				for _, groupCode := range roleGroupCodes {
+					group, exists := groupsByCode[groupCode]
+					if !exists || group.Status != "enabled" || group.ScopeType != "tenant" || group.TenantCode != row.TenantCode {
+						continue
+					}
+					if _, groupDeleted := deleted["role-groups"][group.ID]; groupDeleted {
+						continue
+					}
+					for _, role := range rolesByGroup[groupCode] {
+						if role.Status != "enabled" {
+							continue
+						}
+						if _, roleDeleted := deleted["roles"][role.ID]; !roleDeleted {
+							effectiveRoles[role.Code] = struct{}{}
+						}
+					}
+				}
+			}
+		}
+		values["effectiveRoleCount"] = strconv.Itoa(len(effectiveRoles))
 		records = append(records, recordFromNormalized(row.ID, row.Code, row.Name, row.Status, row.Description, row.UpdatedAt, values))
 	}
 	return records, nil

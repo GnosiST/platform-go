@@ -44,6 +44,7 @@ export function ResourceRoutePage({ resource, availableResourceRoutes, language,
       availableResourceRoutes={availableResourceRoutes}
       language={language}
       dictionary={dictionary}
+      experienceKey={resource.route === "/org-units" || resource.route === "/users" ? "organization-user" : undefined}
       permissions={permissions}
       deniedPermissions={deniedPermissions}
       oidcResume={sensitiveRevealOIDCResume}

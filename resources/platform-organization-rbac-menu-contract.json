@@ -1,7 +1,7 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-organization-rbac-menu-contract.json",
   "capturedAt": "2026-07-15",
-  "status": "backend-and-migration-implemented-ui-menu-e2e-pending",
+  "status": "backend-and-organization-admin-implemented-role-menu-e2e-pending",
   "taskId": "organization-rbac-menu-contract-and-migration-design",
   "purpose": "Freeze the organization role-pool, derived-tenant, strict role tree, independent menu assignment, permission boundary, conflict and migration contracts before runtime implementation.",
   "designEvidence": [
@@ -173,6 +173,7 @@
     "queries": [
       {"id": "platform.identity.organization-role-pool.get", "version": "1.0.0"},
       {"id": "platform.identity.organization-role-group-change.impact", "version": "1.0.0"},
+      {"id": "platform.identity.organization-role-group-change.conflicts.list", "version": "1.0.0"},
       {"id": "platform.identity.user-organization-change.impact", "version": "1.0.0"},
       {"id": "platform.identity.role-state-or-group-change.impact", "version": "1.0.0"},
       {"id": "platform.authorization.resource-lifecycle.impact", "version": "1.0.0"},
@@ -417,14 +418,13 @@
     ]
   },
   "runtimeBoundary": {
-    "implementationStatus": "backend-and-migration-implemented-ui-menu-e2e-pending",
+    "implementationStatus": "backend-and-organization-admin-implemented-role-menu-e2e-pending",
     "backendAndMigrationStatus": "implemented",
-    "adminUIStatus": "pending",
+    "adminUIStatus": "organization-user-implemented-role-menu-pending",
     "menuRuntimeStatus": "pending",
-    "browserQAStatus": "pending",
+    "browserQAStatus": "organization-user-browser-accepted-full-e2e-pending",
     "implementedByThisNode": ["design-docs", "machine-contract", "validator", "mutation-tests", "task-governance-closeout"],
     "deferredTaskIds": [
-      "organization-user-admin-experience",
       "role-tree-and-authorization-entry",
       "menu-tree-and-button-permission-configuration",
       "organization-rbac-menu-e2e-qa"

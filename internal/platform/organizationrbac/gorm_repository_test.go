@@ -97,7 +97,7 @@ func TestGORMRepositoryReplaceUsesRolePoolAndRevisionCAS(t *testing.T) {
 		t.Fatalf("ReplaceOrgUnitRoleGroups(first) = %+v", first)
 	}
 	pool, err := repository.EffectiveRolePool(context.Background(), "acme-hq")
-	if err != nil || len(pool) != 1 || pool[0].RoleCode != "operator" {
+	if err != nil || len(pool) != 1 || pool[0].RoleCode != "operator" || pool[0].RoleName != "Operator" {
 		t.Fatalf("EffectiveRolePool() = %+v, %v", pool, err)
 	}
 
@@ -206,10 +206,10 @@ func seedOrganizationRBAC(t *testing.T, db *gorm.DB) {
 		&gormRoleGroup{ID: "group-acme-ops", Code: "acme-ops", Name: "Operations", ScopeType: string(ScopeTenant), TenantCode: "acme", Status: StatusEnabled},
 		&gormRoleGroup{ID: "group-acme-audit", Code: "acme-audit", Name: "Audit", ScopeType: string(ScopeTenant), TenantCode: "acme", Status: StatusEnabled},
 		&gormRoleGroup{ID: "group-platform", Code: "platform-admin", Name: "Platform", ScopeType: string(ScopePlatform), Status: StatusEnabled},
-		&gormRole{ID: "role-operator", Code: "operator", GroupCode: "acme-ops", Status: StatusEnabled},
-		&gormRole{ID: "role-auditor", Code: "auditor", GroupCode: "acme-audit", Status: StatusEnabled},
-		&gormRole{ID: "role-disabled", Code: "disabled-role", GroupCode: "acme-ops", Status: "disabled"},
-		&gormRole{ID: "role-super-admin", Code: "super-admin", GroupCode: "platform-admin", Status: StatusEnabled},
+		&gormRole{ID: "role-operator", Code: "operator", Name: "Operator", GroupCode: "acme-ops", Status: StatusEnabled},
+		&gormRole{ID: "role-auditor", Code: "auditor", Name: "Auditor", GroupCode: "acme-audit", Status: StatusEnabled},
+		&gormRole{ID: "role-disabled", Code: "disabled-role", Name: "Disabled Role", GroupCode: "acme-ops", Status: "disabled"},
+		&gormRole{ID: "role-super-admin", Code: "super-admin", Name: "Super Admin", GroupCode: "platform-admin", Status: StatusEnabled},
 	}
 	for _, row := range rows {
 		if err := db.Create(row).Error; err != nil {

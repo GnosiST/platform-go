@@ -3199,7 +3199,7 @@
         "zh": "组织与用户管理体验",
         "en": "Organization And User Admin Experience"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Provide organization, role-group and user administration with derived tenant display, role-pool filtering and explicit conflict handling.",
       "dependsOn": [
         "organization-role-pool-backend-and-migration"
@@ -3207,8 +3207,33 @@
       "evidence": {
         "sourcePaths": [
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/superpowers/specs/2026-07-15-organization-user-admin-experience-design.md",
+          "docs/superpowers/plans/2026-07-15-organization-user-admin-experience.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/platform-roadmap.md",
+          "admin/src/platform/api/organizationRBAC.ts",
+          "admin/src/platform/resources/resourceExperience.ts",
+          "admin/src/platform/resources/organizationUserExperience.tsx",
+          "admin/src/platform/resources/GenericResourceConsole.tsx",
+          "internal/platform/organizationrbac/admin_org_unit_snapshot.go",
+          "internal/platform/organizationrbac/gorm_repository.go",
+          "internal/platform/organizationrbac/service_objects.go",
+          "resources/generated/admin-service-object-client.ts",
+          "resources/generated/openapi.admin.json",
+          "resources/evidence/organization-user-admin-experience-20260715.json"
+        ],
+        "validators": [
+          "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+          "scripts/validate-platform-admin-api-boundary.mjs",
+          "scripts/validate-admin-i18n.mjs",
+          "scripts/validate-admin-ui-contracts.mjs"
+        ],
+        "tests": [
+          "internal/platform/organizationrbac/admin_org_unit_snapshot_test.go",
+          "internal/platform/organizationrbac/gorm_repository_test.go",
+          "internal/platform/organizationrbac/service_objects_test.go",
+          "scripts/admin-ui-contracts.test.mjs",
+          "scripts/platform-organization-rbac-menu-contract.test.mjs"
         ],
         "taskIds": [
           "organization-user-admin-experience"

@@ -1,6 +1,6 @@
 # Organization, RBAC And Menu Contract
 
-> Status: backend constraints and migration runtime implemented; organization/user Admin UI, role tree, menu tree and browser E2E remain pending in four downstream nodes.
+> Status: backend constraints, migration runtime and organization/user Admin UI implemented; role tree, menu tree and full browser E2E remain pending in three downstream nodes.
 
 This document is the implementation contract for organization role pools, tenant derivation, role ownership, menu visibility, permission boundaries and migration. The machine-readable source is `resources/platform-organization-rbac-menu-contract.json`.
 
@@ -79,6 +79,7 @@ Read and impact queries:
 
 - `platform.identity.organization-role-pool.get@1.0.0`
 - `platform.identity.organization-role-group-change.impact@1.0.0`
+- `platform.identity.organization-role-group-change.conflicts.list@1.0.0`
 - `platform.identity.user-organization-change.impact@1.0.0`
 - `platform.identity.role-state-or-group-change.impact@1.0.0`
 - `platform.authorization.resource-lifecycle.impact@1.0.0`
@@ -177,13 +178,12 @@ Later UI and E2E nodes must exercise the following at `375x812`, `390x844`, `768
 
 ## Implemented And Deferred Boundaries
 
-`organization-role-pool-backend-and-migration` now owns the target GORM relations, server-derived tenant and role-pool validation, conflict-aware prepare/impact/apply service objects, authorization lifecycle checks, migration inventory/apply/verify/rollback workflow, target-mode bootstrap and generated Admin service-object contracts. It does not claim the remaining Admin or menu experience.
+`organization-role-pool-backend-and-migration` owns the target GORM relations, server-derived tenant and role-pool validation, conflict-aware prepare/impact/apply service objects, authorization lifecycle checks, migration inventory/apply/verify/rollback workflow, target-mode bootstrap and generated Admin service-object contracts. `organization-user-admin-experience` separately closes organization role-group management, derived tenant display, organization-scoped role selection, explicit invalid-role handling and responsive browser acceptance. Neither node claims the remaining role tree, menu tree or full E2E experience.
 
 The remaining work is owned by:
 
-1. `organization-user-admin-experience`
-2. `role-tree-and-authorization-entry`
-3. `menu-tree-and-button-permission-configuration`
-4. `organization-rbac-menu-e2e-qa`
+1. `role-tree-and-authorization-entry`
+2. `menu-tree-and-button-permission-configuration`
+3. `organization-rbac-menu-e2e-qa`
 
 Datasource routing, federation, XA, Outbox/MQ, search projection and workload identity remain outside this lane.

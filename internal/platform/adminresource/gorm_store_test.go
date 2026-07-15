@@ -235,7 +235,7 @@ func TestGORMAdminResourceRepositoryNormalizesGovernanceResources(t *testing.T) 
 		NextID: 1090,
 		Resources: map[string][]Record{
 			"org-units": {
-				{ID: "org-platform-hq", Code: "platform-hq", Name: "Platform HQ", Status: "enabled", Description: "Top org", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"type": "organization", "tenantCode": "platform", "areaCode": "110000", "sortOrder": "10"}},
+					{ID: "org-platform-hq", Code: "platform-hq", Name: "Platform HQ", Status: "enabled", Description: "Top org", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"type": "organization", "tenantCode": "platform", "areaCode": "110000", "sortOrder": "10", "roleGroupCount": "0", "effectiveRoleCount": "0"}},
 			},
 			"role-groups": {
 				{ID: "role-group-system-admin", Code: "system-admin", Name: "System Admin", Status: "enabled", Description: "System role group", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"sortOrder": "10"}},
@@ -266,6 +266,68 @@ func TestGORMAdminResourceRepositoryNormalizesGovernanceResources(t *testing.T) 
 	}
 	if !reflect.DeepEqual(loaded.Resources, snapshot.Resources) {
 		t.Fatalf("Resources = %#v, want %#v", loaded.Resources, snapshot.Resources)
+	}
+}
+
+func TestGORMAdminResourceRepositoryProjectsOrganizationRoleCounts(t *testing.T) {
+	ctx := context.Background()
+	db := openAdminResourceGORMDB(t)
+	repository, err := NewGORMAdminResourceRepository(ctx, db)
+	if err != nil {
+		t.Fatalf("NewGORMAdminResourceRepository() error = %v", err)
+	}
+	deletedAt := "2026-07-15T00:00:00Z"
+	snapshot := ResourceSnapshot{
+		NextID: 20,
+		Resources: map[string][]Record{
+			"org-units": {
+				{ID: "org-acme-hq", Code: "acme-hq", Name: "Acme HQ", Status: "enabled", Values: map[string]string{"type": "organization", "tenantCode": "acme"}},
+			},
+			"role-groups": {
+				{ID: "group-valid", Code: "valid", Name: "Valid", Status: "enabled", Values: map[string]string{"scopeType": "tenant", "tenantCode": "acme"}},
+				{ID: "group-disabled", Code: "disabled", Name: "Disabled", Status: "disabled", Values: map[string]string{"scopeType": "tenant", "tenantCode": "acme"}},
+				{ID: "group-deleted", Code: "deleted", Name: "Deleted", Status: "enabled", DeletedAt: deletedAt, Values: map[string]string{"scopeType": "tenant", "tenantCode": "acme"}},
+				{ID: "group-cross-tenant", Code: "cross-tenant", Name: "Cross Tenant", Status: "enabled", Values: map[string]string{"scopeType": "tenant", "tenantCode": "other"}},
+			},
+			"roles": {
+				{ID: "role-valid", Code: "valid-role", Name: "Valid Role", Status: "enabled", Values: map[string]string{"groupCode": "valid"}},
+				{ID: "role-disabled", Code: "disabled-role", Name: "Disabled Role", Status: "disabled", Values: map[string]string{"groupCode": "valid"}},
+				{ID: "role-deleted", Code: "deleted-role", Name: "Deleted Role", Status: "enabled", DeletedAt: deletedAt, Values: map[string]string{"groupCode": "valid"}},
+				{ID: "role-disabled-group", Code: "disabled-group-role", Name: "Disabled Group Role", Status: "enabled", Values: map[string]string{"groupCode": "disabled"}},
+				{ID: "role-deleted-group", Code: "deleted-group-role", Name: "Deleted Group Role", Status: "enabled", Values: map[string]string{"groupCode": "deleted"}},
+				{ID: "role-cross-tenant", Code: "cross-tenant-role", Name: "Cross Tenant Role", Status: "enabled", Values: map[string]string{"groupCode": "cross-tenant"}},
+			},
+		},
+	}
+	if _, err := repository.Save(ctx, snapshot); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	if err := db.AutoMigrate(&gormAdminOrgUnitRoleGroup{}); err != nil {
+		t.Fatalf("AutoMigrate(org unit role groups) error = %v", err)
+	}
+	bindings := []gormAdminOrgUnitRoleGroup{
+		{OrgUnitCode: "acme-hq", RoleGroupCode: "valid"},
+		{OrgUnitCode: "acme-hq", RoleGroupCode: "disabled"},
+		{OrgUnitCode: "acme-hq", RoleGroupCode: "deleted"},
+		{OrgUnitCode: "acme-hq", RoleGroupCode: "cross-tenant"},
+	}
+	if err := db.Create(&bindings).Error; err != nil {
+		t.Fatalf("Create(bindings) error = %v", err)
+	}
+
+	loaded, err := repository.Load(ctx)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	organizations := loaded.Resources["org-units"]
+	if len(organizations) != 1 {
+		t.Fatalf("org-units = %+v, want one organization", organizations)
+	}
+	if got := organizations[0].Values["roleGroupCount"]; got != "4" {
+		t.Fatalf("roleGroupCount = %q, want 4 bound groups", got)
+	}
+	if got := organizations[0].Values["effectiveRoleCount"]; got != "1" {
+		t.Fatalf("effectiveRoleCount = %q, want only the enabled same-tenant live role", got)
 	}
 }
 

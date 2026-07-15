@@ -28,7 +28,6 @@
     "requiresDependencyConflictChecks": true,
     "requiresTaskGraphBeforeNewNode": true,
     "requiredUnfinishedNodes": [
-      "organization-user-admin-experience",
       "role-tree-and-authorization-entry",
       "menu-tree-and-button-permission-configuration",
       "organization-rbac-menu-e2e-qa",
@@ -83,7 +82,6 @@
     "mustNotMarkCompleteWhileBlockersActive": true,
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "controlledBlockers": [
-      "organization-user-admin-experience",
       "role-tree-and-authorization-entry",
       "menu-tree-and-button-permission-configuration",
       "organization-rbac-menu-e2e-qa",

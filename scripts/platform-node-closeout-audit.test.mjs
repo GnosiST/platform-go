@@ -9,7 +9,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "organization-user-admin-experience",
   "role-tree-and-authorization-entry",
   "menu-tree-and-button-permission-configuration",
   "organization-rbac-menu-e2e-qa",
@@ -96,7 +95,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("preserves 37 baseline closeouts, closes twelve completion nodes, and tracks 17 pending nodes", () => {
+  it("preserves 37 baseline closeouts, closes thirteen completion nodes, and tracks 16 pending nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -104,7 +103,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(task, "task graph must include production-admin-oidc-auth");
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
-    assert.equal(audit.nodeCloseouts.length, 49);
+    assert.equal(audit.nodeCloseouts.length, 50);
     assert.deepEqual(audit.nodeCloseouts.slice(0, 37).map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
     assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts.slice(0, 37))).digest("hex"), foundationBaselineCloseoutDigest);
     const runtimeSecurityCloseout = audit.nodeCloseouts[37];
@@ -187,7 +186,40 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(organizationBackendCloseout.cleanupEvidence.includes("internal/platform/organizationrbac/migration_test.go"));
     assert.ok(organizationBackendCloseout.cleanupEvidence.includes("scripts/validate-admin-service-object-definitions.mjs"));
     assert.equal("visualEvidence" in organizationBackendCloseout, false);
+    const organizationAdminCloseout = audit.nodeCloseouts.find(
+      (item) => item.taskId === "organization-user-admin-experience",
+    );
+    assert.equal(organizationAdminCloseout.status, "closed");
+    assert.equal(organizationAdminCloseout.neatFreak, true);
+    assert.equal(organizationAdminCloseout.cleanupMode, "phase-level");
+    assert.ok(organizationAdminCloseout.cleanupEvidence.includes("resources/evidence/organization-user-admin-experience-20260715.json"));
+    assert.ok(organizationAdminCloseout.cleanupEvidence.includes("scripts/admin-ui-contracts.test.mjs"));
+    assert.ok(organizationAdminCloseout.visualEvidence.includes("product-design"));
+    assert.ok(organizationAdminCloseout.visualEvidence.includes("ui-ux-pro-max"));
+    assert.ok(organizationAdminCloseout.visualEvidence.includes("playwright-1.55-local-fallback"));
+    assert.equal(organizationAdminCloseout.visualEvidence.includes("browser:control-in-app-browser"), false);
     assert.deepEqual(audit.pendingNodeEvidence, completionProgramTaskIDs);
+  });
+
+  it("rejects organization Admin closeout without UI, browser manifest and design evidence", () => {
+    const audit = readJSON("resources/platform-node-closeout-audit.json");
+    const closeout = audit.nodeCloseouts.find((item) => item.taskId === "organization-user-admin-experience");
+    closeout.cleanupEvidence = closeout.cleanupEvidence.filter(
+      (item) =>
+        item !== "resources/evidence/organization-user-admin-experience-20260715.json" &&
+        item !== "scripts/admin-ui-contracts.test.mjs" &&
+        item !== "scripts/validate-admin-ui-contracts.mjs",
+    );
+    closeout.visualEvidence = ["superpowers:brainstorming"];
+
+    const result = runValidator(["--audit", tempJSON("missing-organization-admin-closeout-evidence.json", audit)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /nodeCloseouts\.organization-user-admin-experience\.cleanupEvidence must include resources\/evidence\/organization-user-admin-experience-20260715\.json/);
+    assert.match(result.stderr, /nodeCloseouts\.organization-user-admin-experience\.cleanupEvidence must include scripts\/admin-ui-contracts\.test\.mjs/);
+    assert.match(result.stderr, /nodeCloseouts\.organization-user-admin-experience\.visualEvidence must include product-design/);
+    assert.match(result.stderr, /nodeCloseouts\.organization-user-admin-experience\.visualEvidence must include ui-ux-pro-max/);
+    assert.match(result.stderr, /nodeCloseouts\.organization-user-admin-experience\.visualEvidence must include playwright-1\.55-local-fallback/);
   });
 
   it("rejects organization contract closeout without its contract, validator, tests and design evidence", () => {

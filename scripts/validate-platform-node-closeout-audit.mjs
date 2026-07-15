@@ -144,6 +144,18 @@ const requiredCleanupEvidenceByTask = new Map([
       "scripts/platform-organization-rbac-menu-contract.test.mjs",
     ],
   ],
+  [
+    "organization-user-admin-experience",
+    [
+      "docs/superpowers/specs/2026-07-15-organization-user-admin-experience-design.md",
+      "docs/superpowers/plans/2026-07-15-organization-user-admin-experience.md",
+      "resources/evidence/organization-user-admin-experience-20260715.json",
+      "scripts/validate-admin-ui-contracts.mjs",
+      "scripts/admin-ui-contracts.test.mjs",
+      "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+      "scripts/platform-organization-rbac-menu-contract.test.mjs",
+    ],
+  ],
 ]);
 
 const requiredVisualEvidenceByTask = new Map([
@@ -158,6 +170,10 @@ const requiredVisualEvidenceByTask = new Map([
   [
     "organization-rbac-menu-contract-and-migration-design",
     ["superpowers:brainstorming", "product-design", "ui-ux-pro-max"],
+  ],
+  [
+    "organization-user-admin-experience",
+    ["superpowers:brainstorming", "product-design", "ui-ux-pro-max", "playwright-1.55-local-fallback"],
   ],
 ]);
 

@@ -56,6 +56,8 @@ import {
 } from "../ui";
 import type { AdminResourceDefinition } from "./registry";
 import { SensitiveFieldRevealModal } from "./SensitiveFieldRevealModal";
+import { useOrganizationUserExperience } from "./organizationUserExperience";
+import { ResourceExperienceCancelledError, type ResourceExperienceDetailTab, type ResourceExperienceKey, type ResourceFormValues } from "./resourceExperience";
 
 type GenericResourceConsoleProps = {
   resource: AdminResourceDefinition;
@@ -64,11 +66,10 @@ type GenericResourceConsoleProps = {
   dictionary: Dictionary;
   permissions?: string[];
   deniedPermissions?: string[];
+  experienceKey?: ResourceExperienceKey;
   oidcResume: SensitiveRevealOIDCResume<AdminSensitiveRevealFactorComplete> | null;
   onOIDCResumeConsumed: () => void;
 };
-
-type ResourceFormValues = Record<string, string | string[] | boolean | number | undefined>;
 
 type ResourceFormSection = PlatformResourceFormSection<AdminResourceField>;
 
@@ -100,7 +101,7 @@ const FOCUSABLE_RESOURCE_FORM_CONTROL_SELECTOR = [
   '.resource-form-fields [tabindex]:not([tabindex="-1"]):not([disabled]):not([readonly]):not([aria-disabled="true"])',
 ].join(", ");
 
-export function GenericResourceConsole({ resource, availableResourceRoutes = [], language, dictionary, permissions = ["*"], deniedPermissions = [], oidcResume, onOIDCResumeConsumed }: GenericResourceConsoleProps) {
+export function GenericResourceConsole({ resource, availableResourceRoutes = [], language, dictionary, permissions = ["*"], deniedPermissions = [], experienceKey, oidcResume, onOIDCResumeConsumed }: GenericResourceConsoleProps) {
   const resourceKey = resourceKeyFromRoute(resource.route);
   const isFileResource = resourceKey === "files";
   const hasAuditResource = availableResourceRoutes.includes("/audit-logs");
@@ -134,19 +135,55 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
   const watchedFormValues = Form.useWatch([], form) as ResourceFormValues | undefined;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const oidcResumeOpeningRef = useRef("");
+  const initializedFormKeyRef = useRef("");
   const dataProvider = useDataProvider();
 
   const relationOptionSignature = useMemo(() => relationSignature(schema.fields), [schema.fields]);
   const tableFields = useMemo(() => schema.fields.filter((field) => field.inTable && field.responseMode !== "omitted"), [schema.fields]);
-  const formFields = useMemo(() => schema.fields.filter((field) => field.inForm && !field.readOnly), [schema.fields]);
+  const experienceFormValues = useMemo(
+    () => ({ ...(editingRecord ? formValuesFromRecord(editingRecord, schema.fields) : {}), ...(watchedFormValues ?? {}) }),
+    [editingRecord, schema.fields, watchedFormValues],
+  );
+  const loadExperienceRecords = useCallback(async (targetResource: string) => {
+    const provider = dataProvider();
+    const pageSize = 100;
+    const records: AdminResourceRecord[] = [];
+    for (let currentPage = 1; ; currentPage += 1) {
+      const result = await provider.getList<AdminResourceRecord>({
+        resource: targetResource,
+        pagination: { currentPage, pageSize, mode: "server" },
+      });
+      records.push(...result.data);
+      if (result.data.length === 0 || records.length >= result.total) {
+        return records;
+      }
+    }
+  }, [dataProvider]);
+  const experience = useOrganizationUserExperience({
+    experienceKey,
+    resourceKey,
+    schema,
+    form,
+    formValues: experienceFormValues,
+    editingRecord,
+    modalOpen,
+    language,
+    dictionary,
+    loadRecords: loadExperienceRecords,
+  });
+  const formFields = experience.formFields;
   const formSections = useMemo(() => resourceFormSections(formFields, schema.formGroups ?? [], language, dictionary), [dictionary, formFields, language, schema.formGroups]);
   const formLayoutPreset = useMemo(() => normalizeFormLayoutPreset(schema.formLayout, formFields), [formFields, schema.formLayout]);
-  const activeFormInitialValues = useMemo(() => (editingRecord ? formValuesFromRecord(editingRecord, formFields) : defaultFormValues(formFields)), [editingRecord, formFields]);
+  const activeFormInitialValues = useMemo(() => {
+    const values = editingRecord ? formValuesFromRecord(editingRecord, formFields) : defaultFormValues(formFields);
+    return experience.initialValues?.(values, editingRecord) ?? values;
+  }, [editingRecord, experience.initialValues, formFields]);
   const runtimeFormValues = useMemo(() => ({ ...activeFormInitialValues, ...(watchedFormValues ?? {}) }), [activeFormInitialValues, watchedFormValues]);
   const detailFields = useMemo(() => schema.fields.filter((field) => field.inDetail && field.responseMode !== "omitted"), [schema.fields]);
   const canCreate = useMemo(() => permissionAllows(permissions, schema.permissions.create, deniedPermissions), [deniedPermissions, permissions, schema.permissions.create]);
   const canUpdate = useMemo(() => permissionAllows(permissions, schema.permissions.update, deniedPermissions), [deniedPermissions, permissions, schema.permissions.update]);
   const canDelete = useMemo(() => permissionAllows(permissions, schema.permissions.delete, deniedPermissions), [deniedPermissions, permissions, schema.permissions.delete]);
+  const effectiveCanDelete = canDelete && experience.allowDelete;
   const filterFields = useMemo(() => resourceFilterFields(schema.fields, language, dictionary), [dictionary, language, schema.fields]);
   const customRowActions = useMemo(
     () => (schema.actions ?? []).filter((action) => action.kind === "row" && permissionAllows(permissions, action.permission, deniedPermissions)),
@@ -176,6 +213,10 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
         deniedPermissions,
       }),
     [deniedPermissions, dictionary, editingRecord, formFields, formSections, language, permissions, runtimeFormValues, schema.permissions, schema.runtimeSlots],
+  );
+  const combinedFormSlots = useMemo(
+    () => mergeResourceFormSlots(runtimeFormSlots, experience.formSlots),
+    [experience.formSlots, runtimeFormSlots],
   );
   const resourceQuery = useMemo(
     () => buildResourceQuery(schema, query, filters, page, pageSize, sortState),
@@ -269,7 +310,10 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
     if (!schemaReady) {
       return;
     }
-    await listQuery.query.refetch();
+    const result = await listQuery.query.refetch();
+    if (result.error) {
+      throw result.error;
+    }
   }, [listQuery.query, schemaReady]);
 
   useEffect(() => {
@@ -375,33 +419,50 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
 
   useEffect(() => {
     if (!modalOpen) {
+      initializedFormKeyRef.current = "";
       return;
     }
-    if (editingRecord) {
-      form.setFieldsValue(formValuesFromRecord(editingRecord, formFields));
+    const initializationKey = editingRecord ? `edit:${editingRecord.id}` : `create:${resourceKey}`;
+    if (initializedFormKeyRef.current === initializationKey) {
       return;
     }
+    initializedFormKeyRef.current = initializationKey;
     form.resetFields();
-    form.setFieldsValue(defaultFormValues(formFields));
-  }, [editingRecord, form, formFields, modalOpen]);
+    form.setFieldsValue(activeFormInitialValues);
+  }, [activeFormInitialValues, editingRecord, form, modalOpen, resourceKey]);
 
   const submitForm = async (values: ResourceFormValues) => {
     const input = inputFromFormValues(values, formFields);
     setSaving(true);
     try {
-      const result = editingRecord
-        ? await updateResource.mutateAsync({ resource: resourceKey, id: editingRecord.id, values: input })
-        : await createResource.mutateAsync({ resource: resourceKey, values: input });
-      await refreshResource();
-      setSelectedID(String(result.data.id));
+      const persist = async (nextInput: AdminResourceInput) => {
+        const result = editingRecord
+          ? await updateResource.mutateAsync({ resource: resourceKey, id: editingRecord.id, values: nextInput })
+          : await createResource.mutateAsync({ resource: resourceKey, values: nextInput });
+        return result.data;
+      };
+      const result = experience.submit
+        ? await experience.submit({ editingRecord, input, values, persist })
+        : await persist(input);
+      let refreshFailed = false;
+      try {
+        await refreshResource();
+      } catch {
+        refreshFailed = true;
+      }
+      setSelectedID(String(result.id));
       setModalOpen(false);
-      const issuedToken = issuedTokenFromRefineRecord(result.data);
+      const issuedToken = issuedTokenFromRefineRecord(result);
       if (issuedToken) {
         setIssuedToken(issuedToken);
       }
-      setError("");
+      setError(refreshFailed ? dictionary.saveSucceededRefreshFailed : "");
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : dictionary.loadResourceFailed);
+      if (nextError instanceof ResourceExperienceCancelledError) {
+        setError("");
+      } else {
+        setError(nextError instanceof Error ? nextError.message : dictionary.loadResourceFailed);
+      }
     } finally {
       setSaving(false);
     }
@@ -662,7 +723,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
           }}
         />
       ) : null}
-      {canDelete ? (
+      {effectiveCanDelete ? (
         <Popconfirm title={dictionary.deleteConfirm} okText={dictionary.deleteRecord} cancelText={dictionary.cancel} onConfirm={() => removeRecord(record)}>
           <AdminActionButton
             danger
@@ -698,7 +759,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
       sortOrder: tableSortOrder(sortState, field.key),
       render: (_: unknown, record: AdminResourceRecord) =>
         renderFieldValue(record, field, language, dictionary, {
-          canToggleStatus: canUpdate && canToggleStatusField(field, record),
+          canToggleStatus: canUpdate && experience.allowStatusToggle && canToggleStatusField(field, record),
           toggling: togglingRecordID === record.id,
           onToggleStatus: toggleRecordStatus,
         }),
@@ -805,7 +866,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
                   clearSelection={clearSelection}
                   onUnavailable={(message) => setError(message)}
                 />
-                {canDelete ? (
+                {effectiveCanDelete ? (
                   <Popconfirm
                     title={dictionary.deleteConfirm}
                     okText={dictionary.deleteRecord}
@@ -890,6 +951,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
           language={language}
           permissions={schema.permissions}
           panels={customPanels}
+          detailTab={detailRecord ? experience.detailTab?.(detailRecord) : undefined}
           record={detailRecord}
           canUpdate={canUpdate}
           canRevealField={canRevealField}
@@ -927,11 +989,11 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
           key={editingRecord?.id ?? "create"}
           layoutPreset={formLayoutPreset}
           sections={formSections}
-          renderField={(field) => <FieldInput field={field} language={language} />}
-          renderFieldExtra={(field) => fieldExtra(field, Boolean(editingRecord), language, dictionary)}
+          renderField={(field) => experience.renderField(field, <FieldInput field={field} language={language} />)}
+          renderFieldExtra={(field) => experience.fieldExtra?.(field, fieldExtra(field, Boolean(editingRecord), language, dictionary)) ?? fieldExtra(field, Boolean(editingRecord), language, dictionary)}
           renderFieldLabel={(field) => localizedText(field.label, language)}
           rules={(field) => fieldRules(field, language, dictionary, Boolean(editingRecord))}
-          slots={runtimeFormSlots}
+          slots={combinedFormSlots}
           getValuePropName={(field) => (field.type === "switch" ? "checked" : undefined)}
           onFinish={submitForm}
         />
@@ -979,6 +1041,7 @@ function ResourceInspector({
   language,
   permissions,
   panels,
+  detailTab,
   canUpdate,
   canRevealField,
   onDownload,
@@ -997,6 +1060,7 @@ function ResourceInspector({
   language: Language;
   permissions: AdminResourceSchema["permissions"];
   panels: AdminResourcePanel[];
+  detailTab?: ResourceExperienceDetailTab;
   canUpdate: boolean;
   canRevealField: (field: AdminResourceField) => boolean;
   onDownload: (record: AdminResourceRecord) => void;
@@ -1048,6 +1112,7 @@ function ResourceInspector({
             label: dictionary.permissionPanel,
             children: <PermissionPanel permissions={permissions} />,
           },
+          ...(detailTab ? [detailTab] : []),
           ...panels
             .slice()
             .sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
@@ -1669,6 +1734,22 @@ function relationSignature(fields: AdminResourceField[]) {
     .map((field) => `${field.key}:${field.relation?.resource}:${field.relation?.valueField}:${field.relation?.labelField}:${field.relation?.multiple ? "multi" : "single"}:${JSON.stringify(field.relation?.filters ?? [])}:${field.relation?.sortField ?? ""}:${field.relation?.sortOrder ?? ""}:${field.relation?.display ?? ""}:${field.relation?.parentField ?? ""}:${field.relation?.pathField ?? ""}:${field.relation?.rootValue ?? ""}`)
     .sort()
     .join("|");
+}
+
+function mergeResourceFormSlots(
+  base?: PlatformResourceFormSlots<AdminResourceField>,
+  experience?: PlatformResourceFormSlots<AdminResourceField>,
+): PlatformResourceFormSlots<AdminResourceField> | undefined {
+  if (!base) return experience;
+  if (!experience) return base;
+  return {
+    header: <>{base.header}{experience.header}</>,
+    footer: <>{base.footer}{experience.footer}</>,
+    sectionBefore: experience.sectionBefore ?? base.sectionBefore,
+    sectionAfter: experience.sectionAfter ?? base.sectionAfter,
+    fieldControl: experience.fieldControl ?? base.fieldControl,
+    sidePreview: experience.sidePreview ?? base.sidePreview,
+  };
 }
 
 type FieldInputProps = {

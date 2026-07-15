@@ -376,3 +376,23 @@ Sensitive reveal evidence under `.superpowers/product-design-audit/sensitive-rev
 Automated evidence includes the Admin UI validator and 92 drift tests, Admin TypeScript checking, generated OpenAPI tests, focused Go runtime/config/HTTP/OIDC/bootstrap tests and the final Admin build. Screenshot and DOM evidence support the implemented interaction but do not certify full WCAG conformance.
 
 final result: passed
+
+## 2026-07-15 Organization And User Admin Experience QA
+
+Status: implemented and accepted for `organization-user-admin-experience`.
+
+The tracked browser manifest is `resources/evidence/organization-user-admin-experience-20260715.json`; source screenshots remain local under `.superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/`. Acceptance covered `375x812`, `390x844`, `768x1024`, `1024x768`, `1280x800` and `1440x900`.
+
+Accepted behavior:
+
+- organization list and create flows remain responsive without page-level horizontal overflow;
+- organization role-group selection stays disabled until the organization exists;
+- a new user starts with no automatically selected organization;
+- tenant is derived from the selected organization and rendered read-only;
+- role selection remains disabled until the organization role pool loads, and role options preserve role-group provenance;
+- asynchronous option loading does not reset values already entered into an open modal;
+- Refine third-party telemetry is disabled by default.
+
+The accepted run recorded zero application console errors and zero failed first-party requests. The in-app Browser could not initialize because its module threw `Cannot redefine property: process`, so this evidence uses a current-run local Playwright 1.55 fallback and must not be represented as in-app Browser evidence. The package supports the implemented responsive interaction but is not a WCAG certification; the seeded dataset also did not contain a conflicting existing user assignment for visual conflict-remediation proof.
+
+final result: passed
