@@ -6703,6 +6703,7 @@ func authProviderTestManifest() capability.Manifest {
 
 type controllableSessionRepository struct {
 	sessions    map[string]session.StoredSession
+	createErr   error
 	resolveErr  error
 	renewErr    error
 	revokeErr   error
@@ -6767,6 +6768,9 @@ func (r *controllableSessionRepository) Load(context.Context) (session.Snapshot,
 }
 
 func (r *controllableSessionRepository) Create(_ context.Context, created session.StoredSession) error {
+	if r.createErr != nil {
+		return r.createErr
+	}
 	r.sessions[created.TokenDigest] = created
 	return nil
 }

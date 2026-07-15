@@ -76,6 +76,12 @@ type ServerOptions struct {
 	AdminMenuServingMode     AdminMenuServingMode
 	AdminMenuResolver        AdminMenuResolver
 	AdminMenuComparisonSink  AdminMenuComparisonSink
+	tokenService             authTokenService
+}
+
+type authTokenService interface {
+	Sign(authjwt.Subject, time.Duration) (string, time.Time, error)
+	Parse(string) (authjwt.Claims, error)
 }
 
 type Authorizer interface {
@@ -134,7 +140,7 @@ type Server struct {
 	sensitiveReveal          *sensitivereveal.Runtime
 	serviceObjects           *serviceobject.Runtime
 	debugCodeEnabled         bool
-	tokens                   *authjwt.Service
+	tokens                   authTokenService
 	now                      func() time.Time
 	openAPIDocument          []byte
 	authorizer               Authorizer
@@ -206,8 +212,12 @@ func New(options ServerOptions) *Server {
 	if fileStorage == nil {
 		fileStorage = storage.NewLocalObjectStore(storage.LocalObjectStoreOptions{})
 	}
-	tokens := options.TokenService
-	if tokens == nil {
+	var tokens authTokenService
+	if options.tokenService != nil {
+		tokens = options.tokenService
+	} else if options.TokenService != nil {
+		tokens = options.TokenService
+	} else {
 		jwtSecret := strings.TrimSpace(options.JWTSecret)
 		if jwtSecret == "" {
 			jwtSecret = defaultJWTSecret
@@ -337,6 +347,14 @@ func (s *Server) health(ctx *gin.Context) {
 }
 
 func (s *Server) enforceRateLimit(ctx *gin.Context, operation ratelimit.Operation, dimensions ...string) bool {
+	return s.enforceRateLimitWithSink(ctx, nil, operation, dimensions...)
+}
+
+func (s *Server) enforceAdminRateLimit(ctx *gin.Context, operation ratelimit.Operation, dimensions ...string) bool {
+	return s.enforceRateLimitWithSink(ctx, s.internalErrorSink, operation, dimensions...)
+}
+
+func (s *Server) enforceRateLimitWithSink(ctx *gin.Context, sink InternalErrorSink, operation ratelimit.Operation, dimensions ...string) bool {
 	policy, ok := ratelimit.PolicyFor(operation)
 	if !ok || s.rateLimiter == nil || s.rateLimitKeyBuilder == nil {
 		writePlatformError(ctx, errorcode.CodeRateLimitUnavailable)
@@ -344,12 +362,12 @@ func (s *Server) enforceRateLimit(ctx *gin.Context, operation ratelimit.Operatio
 	}
 	key, err := s.rateLimitKeyBuilder.Build(operation, dimensions...)
 	if err != nil {
-		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeRateLimitUnavailable, err)
+		writeRateLimitDependencyError(ctx, sink, err)
 		return false
 	}
 	decision, err := s.rateLimiter.Allow(ctx.Request.Context(), key, policy.Limit, policy.Window)
 	if err != nil {
-		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeRateLimitUnavailable, err)
+		writeRateLimitDependencyError(ctx, sink, err)
 		return false
 	}
 	if decision.Allowed {
@@ -362,6 +380,14 @@ func (s *Server) enforceRateLimit(ctx *gin.Context, operation ratelimit.Operatio
 	ctx.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
 	writePlatformError(ctx, errorcode.CodeRateLimited)
 	return false
+}
+
+func writeRateLimitDependencyError(ctx *gin.Context, sink InternalErrorSink, cause error) {
+	if sink == nil {
+		writePlatformError(ctx, errorcode.CodeRateLimitUnavailable)
+		return
+	}
+	writePlatformErrorWithCause(ctx, sink, errorcode.CodeRateLimitUnavailable, cause)
 }
 
 func rateLimitClientIP(ctx *gin.Context) string {
@@ -461,7 +487,7 @@ func (s *Server) adminServiceObjectQuery(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminServiceObjectQuery, rateLimitClientIP(ctx), invocation.Execution.Actor.Username) {
+	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationAdminServiceObjectQuery, rateLimitClientIP(ctx), invocation.Execution.Actor.Username) {
 		return
 	}
 	if s.serviceObjects == nil {
@@ -486,7 +512,7 @@ func (s *Server) adminServiceObjectCommand(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminServiceObjectCommand, rateLimitClientIP(ctx), invocation.Execution.Actor.Username) {
+	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationAdminServiceObjectCommand, rateLimitClientIP(ctx), invocation.Execution.Actor.Username) {
 		return
 	}
 	if s.serviceObjects == nil {
@@ -676,7 +702,7 @@ func (s *Server) authProviderStart(ctx *gin.Context) {
 		writePlatformError(ctx, errorcode.CodeAuthProviderStartInvalid)
 		return
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminOIDCStart, rateLimitClientIP(ctx), strings.ToLower(strings.TrimSpace(ctx.Param("provider")))) {
+	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationAdminOIDCStart, rateLimitClientIP(ctx), strings.ToLower(strings.TrimSpace(ctx.Param("provider")))) {
 		return
 	}
 	provider, ok := s.findAuthProvider(ctx.Param("provider"), capability.AuthProviderAudienceAdmin)
@@ -729,7 +755,7 @@ func (s *Server) authLogin(ctx *gin.Context) {
 	if providerDimension == "" {
 		providerDimension = "unknown"
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminLogin, rateLimitClientIP(ctx), providerDimension, usernameDimension) {
+	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationAdminLogin, rateLimitClientIP(ctx), providerDimension, usernameDimension) {
 		return
 	}
 	if !s.refreshAdminResourceState(ctx, errorcode.CodeAuthStateRefreshFailed) {
@@ -1536,7 +1562,7 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 	if !s.authorizeAdminResource(ctx, "files", "create") {
 		return
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminUpload, rateLimitClientIP(ctx), s.auditActorID(ctx)) {
+	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationAdminUpload, rateLimitClientIP(ctx), s.auditActorID(ctx)) {
 		return
 	}
 	upload, err := readValidatedUpload(ctx, s.uploadPolicy, "ADMIN_FILE")

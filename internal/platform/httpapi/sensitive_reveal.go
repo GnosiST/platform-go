@@ -186,7 +186,7 @@ func (s *Server) adminSensitiveRevealChallenge(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationSensitiveRevealChallenge, rateLimitClientIP(ctx), target.scope.Actor, target.resource, target.recordID, target.field.Key) {
+	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationSensitiveRevealChallenge, rateLimitClientIP(ctx), target.scope.Actor, target.resource, target.recordID, target.field.Key) {
 		return
 	}
 	result, err := s.sensitiveReveal.BeginChallenge(ctx.Request.Context(), sensitivereveal.BeginChallengeRequest{
@@ -224,7 +224,7 @@ func (s *Server) adminSensitiveRevealOIDCStart(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationSensitiveRevealFactor, rateLimitClientIP(ctx), target.scope.Actor, "oidc-start") {
+	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationSensitiveRevealFactor, rateLimitClientIP(ctx), target.scope.Actor, "oidc-start") {
 		return
 	}
 	provider, ok := s.findAuthProvider(input.Provider, capability.AuthProviderAudienceAdmin)
@@ -265,7 +265,7 @@ func (s *Server) adminSensitiveRevealOIDCComplete(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationSensitiveRevealFactor, rateLimitClientIP(ctx), target.scope.Actor, "oidc-complete") {
+	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationSensitiveRevealFactor, rateLimitClientIP(ctx), target.scope.Actor, "oidc-complete") {
 		return
 	}
 	provider, ok := s.findAuthProvider(input.Provider, capability.AuthProviderAudienceAdmin)
@@ -313,7 +313,7 @@ func (s *Server) adminSensitiveRevealSMSStart(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationSensitiveRevealFactor, rateLimitClientIP(ctx), target.scope.Actor, "sms-start") {
+	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationSensitiveRevealFactor, rateLimitClientIP(ctx), target.scope.Actor, "sms-start") {
 		return
 	}
 	if s.adminStepUpPhoneResolver == nil || s.phoneProtector == nil || s.phoneVerificationSender == nil {
@@ -382,7 +382,7 @@ func (s *Server) adminSensitiveRevealSMSComplete(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationSensitiveRevealFactor, rateLimitClientIP(ctx), target.scope.Actor, "sms-complete") {
+	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationSensitiveRevealFactor, rateLimitClientIP(ctx), target.scope.Actor, "sms-complete") {
 		return
 	}
 	if s.adminStepUpPhoneResolver == nil || s.phoneProtector == nil {
@@ -425,7 +425,7 @@ func (s *Server) adminSensitiveReveal(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationSensitiveRevealConsume, rateLimitClientIP(ctx), target.scope.Actor, target.resource, target.recordID, target.field.Key) {
+	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationSensitiveRevealConsume, rateLimitClientIP(ctx), target.scope.Actor, target.resource, target.recordID, target.field.Key) {
 		return
 	}
 	grant, err := s.sensitiveReveal.ConsumeGrant(ctx.Request.Context(), sensitivereveal.ConsumeGrantRequest{
