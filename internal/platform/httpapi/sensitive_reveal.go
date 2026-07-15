@@ -492,12 +492,12 @@ func (s *Server) resolveAdminSensitiveRevealTarget(ctx *gin.Context, purpose str
 		return adminSensitiveRevealTarget{}, false
 	}
 	if !ok {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return adminSensitiveRevealTarget{}, false
 	}
 	principal := s.currentPrincipalForUsername(ctx.Request.Context(), authSession.Username)
 	if strings.TrimSpace(principal.User.ID) == "" {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return adminSensitiveRevealTarget{}, false
 	}
 	resource := strings.TrimSpace(ctx.Param("resource"))
@@ -514,7 +514,7 @@ func (s *Server) resolveAdminSensitiveRevealTarget(ctx *gin.Context, purpose str
 		return adminSensitiveRevealTarget{}, false
 	}
 	if !s.can(principal, schema.Permissions.Read) || !s.can(principal, field.Reveal.Permission) {
-		writeForbidden(ctx)
+		writePlatformError(ctx, errorcode.CodeAdminForbidden)
 		return adminSensitiveRevealTarget{}, false
 	}
 	items, err := s.resources.ListForPrincipal(resource, principal)

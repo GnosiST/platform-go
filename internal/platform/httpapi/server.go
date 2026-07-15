@@ -339,17 +339,17 @@ func (s *Server) health(ctx *gin.Context) {
 func (s *Server) enforceRateLimit(ctx *gin.Context, operation ratelimit.Operation, dimensions ...string) bool {
 	policy, ok := ratelimit.PolicyFor(operation)
 	if !ok || s.rateLimiter == nil || s.rateLimitKeyBuilder == nil {
-		writeAuthError(ctx, http.StatusServiceUnavailable, "RATE_LIMIT_UNAVAILABLE", "rate limit service is unavailable")
+		writePlatformError(ctx, errorcode.CodeRateLimitUnavailable)
 		return false
 	}
 	key, err := s.rateLimitKeyBuilder.Build(operation, dimensions...)
 	if err != nil {
-		writeAuthError(ctx, http.StatusServiceUnavailable, "RATE_LIMIT_UNAVAILABLE", "rate limit service is unavailable")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeRateLimitUnavailable, err)
 		return false
 	}
 	decision, err := s.rateLimiter.Allow(ctx.Request.Context(), key, policy.Limit, policy.Window)
 	if err != nil {
-		writeAuthError(ctx, http.StatusServiceUnavailable, "RATE_LIMIT_UNAVAILABLE", "rate limit service is unavailable")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeRateLimitUnavailable, err)
 		return false
 	}
 	if decision.Allowed {
@@ -360,7 +360,7 @@ func (s *Server) enforceRateLimit(ctx *gin.Context, operation ratelimit.Operatio
 		retryAfter = 1
 	}
 	ctx.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
-	writeAuthError(ctx, http.StatusTooManyRequests, "RATE_LIMITED", "request rate limit exceeded")
+	writePlatformError(ctx, errorcode.CodeRateLimited)
 	return false
 }
 
@@ -519,12 +519,12 @@ func isAuthorizationServiceObjectCommand(commandID string) bool {
 }
 
 func (s *Server) adminServiceObjectInvocation(ctx *gin.Context) (serviceobject.Invocation, bool) {
-	if !s.refreshAdminResourceState(ctx, "ADMIN_AUTH_STATE_REFRESH_FAILED", "authorization state is unavailable") {
+	if !s.refreshAdminResourceState(ctx, errorcode.CodeAdminAuthStateRefreshFailed) {
 		return serviceobject.Invocation{}, false
 	}
 	principal, ok := s.currentPrincipal(ctx)
 	if !ok {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return serviceobject.Invocation{}, false
 	}
 	tenantID := strings.TrimSpace(principal.User.TenantCode)
@@ -532,19 +532,19 @@ func (s *Server) adminServiceObjectInvocation(ctx *gin.Context) (serviceobject.I
 	switch strings.TrimSpace(principal.User.ScopeType) {
 	case "platform":
 		if tenantID != "" && tenantID != platformTenant {
-			writeUnauthorized(ctx)
+			writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 			return serviceobject.Invocation{}, false
 		}
 		tenantID = ""
 		tenantScope = kernel.TenantScope{TenantCode: platformTenant, PlatformWide: true}
 	case "tenant":
 		if tenantID == "" || tenantID == platformTenant || strings.TrimSpace(principal.User.OrgUnitCode) == "" {
-			writeUnauthorized(ctx)
+			writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 			return serviceobject.Invocation{}, false
 		}
 		tenantScope = kernel.TenantScope{TenantID: 1, TenantCode: tenantID}
 	default:
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return serviceobject.Invocation{}, false
 	}
 	principalScope := s.resources.DataScopeForPrincipal(principal)
@@ -673,7 +673,7 @@ func (s *Server) authProviders(ctx *gin.Context) {
 func (s *Server) authProviderStart(ctx *gin.Context) {
 	var input authProviderStartRequest
 	if err := ctx.ShouldBindJSON(&input); err != nil {
-		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_START_INVALID", "invalid auth provider start request")
+		writePlatformError(ctx, errorcode.CodeAuthProviderStartInvalid)
 		return
 	}
 	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminOIDCStart, rateLimitClientIP(ctx), strings.ToLower(strings.TrimSpace(ctx.Param("provider")))) {
@@ -681,19 +681,19 @@ func (s *Server) authProviderStart(ctx *gin.Context) {
 	}
 	provider, ok := s.findAuthProvider(ctx.Param("provider"), capability.AuthProviderAudienceAdmin)
 	if !ok {
-		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_NOT_FOUND", "auth provider not found")
+		writePlatformError(ctx, errorcode.CodeAuthProviderNotFound)
 		return
 	}
 	if !provider.Configured {
-		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_NOT_CONFIGURED", "auth provider is not configured")
+		writePlatformError(ctx, errorcode.CodeAuthProviderNotConfigured)
 		return
 	}
 	if provider.Kind != "oidc" {
-		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_UNSUPPORTED", "auth provider is not supported")
+		writePlatformError(ctx, errorcode.CodeAuthProviderUnsupported)
 		return
 	}
 	if s.adminIdentityResolver == nil {
-		writeAuthError(ctx, http.StatusNotImplemented, "AUTH_PROVIDER_RESOLVER_NOT_CONFIGURED", "auth provider resolver is not configured")
+		writePlatformError(ctx, errorcode.CodeAuthProviderResolverNotConfigured)
 		return
 	}
 	started, err := s.adminIdentityResolver.StartAdminIdentity(ctx.Request.Context(), AdminIdentityStartInput{
@@ -701,11 +701,11 @@ func (s *Server) authProviderStart(ctx *gin.Context) {
 		CodeChallenge: strings.TrimSpace(input.CodeChallenge),
 	})
 	if errors.Is(err, ErrAdminIdentityInvalid) || errors.Is(err, ErrAdminIdentityTransaction) {
-		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_START_INVALID", "invalid auth provider start request")
+		writePlatformError(ctx, errorcode.CodeAuthProviderStartInvalid)
 		return
 	}
 	if err != nil {
-		writeAuthError(ctx, http.StatusBadGateway, "AUTH_PROVIDER_START_FAILED", "auth provider start failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthProviderStartFailed, err)
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[authProviderStartResponse]{Data: authProviderStartResponse{
@@ -718,7 +718,7 @@ func (s *Server) authProviderStart(ctx *gin.Context) {
 func (s *Server) authLogin(ctx *gin.Context) {
 	var input authLoginRequest
 	if err := ctx.ShouldBindJSON(&input); err != nil {
-		writeAuthError(ctx, http.StatusBadRequest, "AUTH_INVALID_REQUEST", "invalid auth login request")
+		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
 		return
 	}
 	usernameDimension := strings.TrimSpace(input.Username)
@@ -732,16 +732,16 @@ func (s *Server) authLogin(ctx *gin.Context) {
 	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminLogin, rateLimitClientIP(ctx), providerDimension, usernameDimension) {
 		return
 	}
-	if !s.refreshAdminResourceState(ctx, "AUTH_STATE_REFRESH_FAILED", "auth state is unavailable") {
+	if !s.refreshAdminResourceState(ctx, errorcode.CodeAuthStateRefreshFailed) {
 		return
 	}
 	provider, ok := s.findAuthProvider(input.Provider, capability.AuthProviderAudienceAdmin)
 	if !ok {
-		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_NOT_FOUND", "auth provider not found")
+		writePlatformError(ctx, errorcode.CodeAuthProviderNotFound)
 		return
 	}
 	if !provider.Configured {
-		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_NOT_CONFIGURED", "auth provider is not configured")
+		writePlatformError(ctx, errorcode.CodeAuthProviderNotConfigured)
 		return
 	}
 	switch provider.Kind {
@@ -752,17 +752,17 @@ func (s *Server) authLogin(ctx *gin.Context) {
 		}
 		principal, err := adminresource.ValidateAdminPrincipal(s.resources, username)
 		if err != nil {
-			writeAuthError(ctx, http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "invalid demo account")
+			writePlatformError(ctx, errorcode.CodeAuthInvalidCredentials)
 			return
 		}
 		s.issueAdminLogin(ctx, principal, provider)
 	case "oidc":
 		if strings.TrimSpace(input.Code) == "" || strings.TrimSpace(input.State) == "" || strings.TrimSpace(input.CodeVerifier) == "" {
-			writeAuthError(ctx, http.StatusBadRequest, "AUTH_IDENTITY_TRANSACTION_REQUIRED", "auth identity transaction is required")
+			writePlatformError(ctx, errorcode.CodeAuthIdentityTransactionRequired)
 			return
 		}
 		if s.adminIdentityResolver == nil {
-			writeAuthError(ctx, http.StatusNotImplemented, "AUTH_PROVIDER_RESOLVER_NOT_CONFIGURED", "auth provider resolver is not configured")
+			writePlatformError(ctx, errorcode.CodeAuthProviderResolverNotConfigured)
 			return
 		}
 		identity, err := s.adminIdentityResolver.ResolveAdminIdentity(ctx.Request.Context(), AdminIdentityResolveInput{
@@ -772,15 +772,15 @@ func (s *Server) authLogin(ctx *gin.Context) {
 			CodeVerifier: strings.TrimSpace(input.CodeVerifier),
 		})
 		if errors.Is(err, ErrAdminIdentityInvalid) {
-			writeAuthError(ctx, http.StatusBadRequest, "AUTH_IDENTITY_INVALID", "invalid admin identity")
+			writePlatformError(ctx, errorcode.CodeAuthIdentityInvalid)
 			return
 		}
 		if errors.Is(err, ErrAdminIdentityTransaction) {
-			writeAuthError(ctx, http.StatusUnauthorized, "AUTH_IDENTITY_TRANSACTION_INVALID", "invalid admin identity transaction")
+			writePlatformError(ctx, errorcode.CodeAuthIdentityTransactionInvalid)
 			return
 		}
 		if err != nil {
-			writeAuthError(ctx, http.StatusBadGateway, "AUTH_PROVIDER_RESOLVE_FAILED", "auth provider resolve failed")
+			writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthProviderResolveFailed, err)
 			return
 		}
 		binding, err := s.adminIdentityBindings.ResolveAdminIdentityBinding(ctx.Request.Context(), AdminIdentityBindingInput{
@@ -790,28 +790,28 @@ func (s *Server) authLogin(ctx *gin.Context) {
 			Now:             s.now().UTC(),
 		})
 		if errors.Is(err, ErrAdminIdentityBindingInvalid) {
-			writeAuthError(ctx, http.StatusUnauthorized, "AUTH_IDENTITY_NOT_BOUND", "admin identity is not bound")
+			writePlatformError(ctx, errorcode.CodeAuthIdentityNotBound)
 			return
 		}
 		if err != nil {
-			writeAuthError(ctx, http.StatusInternalServerError, "AUTH_IDENTITY_BINDING_FAILED", "admin identity binding failed")
+			writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthIdentityBindingFailed, err)
 			return
 		}
 		principal, err := adminresource.ValidateAdminPrincipal(s.resources, binding.Username)
 		if err != nil {
-			writeAuthError(ctx, http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "invalid admin account")
+			writePlatformError(ctx, errorcode.CodeAuthInvalidCredentials)
 			return
 		}
 		s.issueAdminLogin(ctx, principal, provider)
 	default:
-		writeAuthError(ctx, http.StatusBadRequest, "AUTH_PROVIDER_UNSUPPORTED", "auth provider is not supported")
+		writePlatformError(ctx, errorcode.CodeAuthProviderUnsupported)
 	}
 }
 
 func (s *Server) issueAdminLogin(ctx *gin.Context, principal rbac.Principal, provider capability.AuthProvider) {
 	issued, err := s.sessions.Issue(principal.User.Username)
 	if err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_ISSUE_FAILED", "session issue failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthSessionIssueFailed, err)
 		return
 	}
 	s.publishSessionInvalidation(ctx.Request.Context())
@@ -823,21 +823,19 @@ func (s *Server) issueAdminLogin(ctx *gin.Context, principal rbac.Principal, pro
 		TokenType: authjwt.TokenTypeAdmin,
 	}, issued.ExpiresAt.Sub(issued.IssuedAt))
 	if err != nil {
-		if !s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token) {
-			s.recordInternalError(ctx, "AUTH_SESSION_CLEANUP_FAILED", err)
-			writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_CLEANUP_FAILED", "session cleanup failed")
+		if cleanupErr := s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token); cleanupErr != nil {
+			writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthSessionCleanupFailed, cleanupErr)
 			return
 		}
-		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_TOKEN_SIGN_FAILED", "auth token sign failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthTokenSignFailed, err)
 		return
 	}
 	if err := s.recordAudit("auth.login", principal.User.ID, principal.User.ID, "success", "authenticated"); err != nil {
-		if !s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token) {
-			s.recordInternalError(ctx, "AUTH_SESSION_CLEANUP_FAILED", err)
-			writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_CLEANUP_FAILED", "session cleanup failed")
+		if cleanupErr := s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token); cleanupErr != nil {
+			writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthSessionCleanupFailed, cleanupErr)
 			return
 		}
-		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_AUDIT_FAILED", "auth audit failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthAuditFailed, err)
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[authLoginResponse]{
@@ -845,44 +843,47 @@ func (s *Server) issueAdminLogin(ctx *gin.Context, principal rbac.Principal, pro
 	})
 }
 
-func (s *Server) cleanupIssuedAdminSession(ctx context.Context, token string) bool {
+func (s *Server) cleanupIssuedAdminSession(ctx context.Context, token string) error {
 	revoked, err := s.sessions.RevokeContext(context.WithoutCancel(ctx), token)
-	if err != nil || !revoked {
-		return false
+	if err != nil {
+		return err
+	}
+	if !revoked {
+		return errors.New("issued session cleanup was not acknowledged")
 	}
 	s.publishSessionInvalidation(context.WithoutCancel(ctx))
-	return true
+	return nil
 }
 
 func (s *Server) authRefresh(ctx *gin.Context) {
 	authSession, ok, err := s.authSessionFromBearerContext(ctx)
 	if err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_RENEW_FAILED", "session renewal failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthSessionRenewFailed, err)
 		return
 	}
 	if !ok {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
-	if !s.refreshAdminResourceState(ctx, "AUTH_STATE_REFRESH_FAILED", "auth state is unavailable") {
+	if !s.refreshAdminResourceState(ctx, errorcode.CodeAuthStateRefreshFailed) {
 		return
 	}
 	principal := s.currentPrincipalForUsername(ctx.Request.Context(), authSession.Username)
 	if principal.User.ID == "" || len(principal.Permissions) == 0 {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
 	if err := s.recordAudit("auth.refresh", principal.User.ID, principal.User.ID, "allowed", "renewal-approved"); err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_AUDIT_FAILED", "auth audit failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthAuditFailed, err)
 		return
 	}
 	renewed, ok, err := s.sessions.RenewContext(ctx.Request.Context(), authSession.Token)
 	if err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_RENEW_FAILED", "session renewal failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthSessionRenewFailed, err)
 		return
 	}
 	if !ok {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
 	s.publishSessionInvalidation(ctx.Request.Context())
@@ -895,7 +896,7 @@ func (s *Server) authRefresh(ctx *gin.Context) {
 		TokenType: authjwt.TokenTypeAdmin,
 	}, tokenTTL)
 	if err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_TOKEN_SIGN_FAILED", "auth token sign failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthTokenSignFailed, err)
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[authLoginResponse]{
@@ -906,32 +907,32 @@ func (s *Server) authRefresh(ctx *gin.Context) {
 func (s *Server) authLogout(ctx *gin.Context) {
 	authSession, ok, err := s.authSessionFromBearerContext(ctx)
 	if err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_REVOKE_FAILED", "session revoke failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthSessionRevokeFailed, err)
 		return
 	}
 	if !ok {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
-	if !s.refreshAdminResourceState(ctx, "AUTH_STATE_REFRESH_FAILED", "auth state is unavailable") {
+	if !s.refreshAdminResourceState(ctx, errorcode.CodeAuthStateRefreshFailed) {
 		return
 	}
 	principal := s.currentPrincipalForUsername(ctx.Request.Context(), authSession.Username)
 	if principal.User.ID == "" {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
 	if err := s.recordAudit("auth.logout", principal.User.ID, principal.User.ID, "allowed", "revocation-approved"); err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_AUDIT_FAILED", "auth audit failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthAuditFailed, err)
 		return
 	}
 	revoked, err := s.sessions.RevokeContext(ctx.Request.Context(), authSession.Token)
 	if err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "AUTH_SESSION_REVOKE_FAILED", "session revoke failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthSessionRevokeFailed, err)
 		return
 	}
 	if !revoked {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
 	s.publishSessionInvalidation(ctx.Request.Context())
@@ -969,8 +970,8 @@ func (s *Server) appAuthLogin(ctx *gin.Context) {
 		TokenType: authjwt.TokenTypeApp,
 	}, issued.ExpiresAt.Sub(issued.IssuedAt))
 	if err != nil {
-		if !s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token) {
-			s.recordInternalError(ctx, "APP_AUTH_SESSION_CLEANUP_FAILED", err)
+		if cleanupErr := s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token); cleanupErr != nil {
+			s.recordInternalError(ctx, "APP_AUTH_SESSION_CLEANUP_FAILED", cleanupErr)
 			writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_SESSION_CLEANUP_FAILED", "app session cleanup failed")
 			return
 		}
@@ -979,8 +980,8 @@ func (s *Server) appAuthLogin(ctx *gin.Context) {
 	}
 	actorID := appUserID(username)
 	if err := s.recordAudit("app.auth.login", actorID, actorID, "success", "authenticated"); err != nil {
-		if !s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token) {
-			s.recordInternalError(ctx, "APP_AUTH_SESSION_CLEANUP_FAILED", err)
+		if cleanupErr := s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token); cleanupErr != nil {
+			s.recordInternalError(ctx, "APP_AUTH_SESSION_CLEANUP_FAILED", cleanupErr)
 			writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_SESSION_CLEANUP_FAILED", "app session cleanup failed")
 			return
 		}
@@ -1284,7 +1285,7 @@ func (s *Server) adminPolicyReviewApprove(ctx *gin.Context) {
 	}
 	userCode := s.businessUserCode(ctx)
 	if userCode == "" {
-		writeForbidden(ctx)
+		writePlatformError(ctx, errorcode.CodeAdminForbidden)
 		return
 	}
 	result, err := s.resources.ApprovePolicyReview(ctx.Param("id"), userCode, s.auditActorID(ctx))
@@ -1325,7 +1326,7 @@ func (s *Server) adminPolicyReviewRequest(ctx *gin.Context) {
 	}
 	userCode := s.businessUserCode(ctx)
 	if userCode == "" {
-		writeForbidden(ctx)
+		writePlatformError(ctx, errorcode.CodeAdminForbidden)
 		return
 	}
 	result, err := s.resources.RequestPolicyReview(ctx.Param("id"), userCode, s.auditActorID(ctx))
@@ -1365,7 +1366,7 @@ func (s *Server) adminPolicyReviewReject(ctx *gin.Context) {
 	}
 	userCode := s.businessUserCode(ctx)
 	if userCode == "" {
-		writeForbidden(ctx)
+		writePlatformError(ctx, errorcode.CodeAdminForbidden)
 		return
 	}
 	result, err := s.resources.RejectPolicyReview(ctx.Param("id"), userCode, s.auditActorID(ctx), input.Reason)
@@ -1400,7 +1401,7 @@ func (s *Server) adminPolicyReviewExport(ctx *gin.Context) {
 	}
 	userCode := s.businessUserCode(ctx)
 	if userCode == "" {
-		writeForbidden(ctx)
+		writePlatformError(ctx, errorcode.CodeAdminForbidden)
 		return
 	}
 	watermarkApplied := false
@@ -1701,7 +1702,7 @@ func (s *Server) appFileContent(ctx *gin.Context) {
 		writeUnauthorized(ctx)
 		return
 	}
-	if !s.refreshAdminResourceState(ctx, "APP_FILE_STATE_REFRESH_FAILED", "file authorization state is unavailable") {
+	if !s.refreshResourceStateLegacy(ctx, "APP_FILE_STATE_REFRESH_FAILED", "file authorization state is unavailable") {
 		return
 	}
 	record, err := s.adminResourceRecordByID("files", ctx.Param("id"))
@@ -2102,30 +2103,29 @@ func (s *Server) businessUserCode(ctx *gin.Context) string {
 }
 
 func (s *Server) adminCurrentSession(ctx *gin.Context) {
-	if !s.refreshAdminResourceState(ctx, "ADMIN_AUTH_STATE_REFRESH_FAILED", "authorization state is unavailable") {
+	if !s.refreshAdminResourceState(ctx, errorcode.CodeAdminAuthStateRefreshFailed) {
 		return
 	}
 	principal, ok := s.currentPrincipal(ctx)
 	if !ok {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[rbac.Principal]{Data: principal})
 }
 
 func (s *Server) adminMenus(ctx *gin.Context) {
-	if !s.refreshAdminResourceState(ctx, "ADMIN_AUTH_STATE_REFRESH_FAILED", "authorization state is unavailable") {
+	if !s.refreshAdminResourceState(ctx, errorcode.CodeAdminAuthStateRefreshFailed) {
 		return
 	}
 	principal, ok := s.currentPrincipal(ctx)
 	if !ok {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
 	items, err := s.resolveAdminMenus(ctx.Request.Context(), principal)
 	if err != nil {
-		s.recordInternalError(ctx, "ADMIN_MENU_RESOLUTION_FAILED", err)
-		writePlatformError(ctx, errorcode.CodeAdminMenuResolutionFailed)
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAdminMenuResolutionFailed, err)
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[adminMenuListResponse]{
@@ -2354,30 +2354,30 @@ func appSessionResponseFromSession(appSession session.Session) appSessionRespons
 }
 
 func (s *Server) authorize(ctx *gin.Context, permission string) bool {
-	if !s.refreshAdminResourceState(ctx, "ADMIN_AUTH_STATE_REFRESH_FAILED", "authorization state is unavailable") {
+	if !s.refreshAdminResourceState(ctx, errorcode.CodeAdminAuthStateRefreshFailed) {
 		return false
 	}
 	if token, ok := bearerToken(ctx.GetHeader("Authorization")); ok && strings.HasPrefix(token, apiTokenPrefix) {
 		allowed, valid := s.authorizeAPIToken(token, permission)
 		if !valid {
-			writeUnauthorized(ctx)
+			writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 			return false
 		}
 		if allowed {
 			return true
 		}
-		writeForbidden(ctx)
+		writePlatformError(ctx, errorcode.CodeAdminForbidden)
 		return false
 	}
 	principal, ok := s.currentPrincipal(ctx)
 	if !ok {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return false
 	}
 	if s.can(principal, permission) {
 		return true
 	}
-	writeForbidden(ctx)
+	writePlatformError(ctx, errorcode.CodeAdminForbidden)
 	return false
 }
 
@@ -2412,7 +2412,7 @@ func (s *Server) authorizeAdminResource(ctx *gin.Context, resource string, actio
 }
 
 func (s *Server) authorizeAdminResourcePrincipal(ctx *gin.Context, resource string, action string) (rbac.Principal, bool, bool) {
-	if !s.refreshAdminResourceState(ctx, "ADMIN_AUTH_STATE_REFRESH_FAILED", "authorization state is unavailable") {
+	if !s.refreshAdminResourceState(ctx, errorcode.CodeAdminAuthStateRefreshFailed) {
 		return rbac.Principal{}, false, false
 	}
 	schema, err := s.resources.Schema(resource)
@@ -2424,24 +2424,24 @@ func (s *Server) authorizeAdminResourcePrincipal(ctx *gin.Context, resource stri
 	if token, ok := bearerToken(ctx.GetHeader("Authorization")); ok && strings.HasPrefix(token, apiTokenPrefix) {
 		allowed, valid := s.authorizeAPIToken(token, permission)
 		if !valid {
-			writeUnauthorized(ctx)
+			writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 			return rbac.Principal{}, false, false
 		}
 		if allowed {
 			return rbac.Principal{}, false, true
 		}
-		writeForbidden(ctx)
+		writePlatformError(ctx, errorcode.CodeAdminForbidden)
 		return rbac.Principal{}, false, false
 	}
 	principal, ok := s.currentPrincipal(ctx)
 	if !ok {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return rbac.Principal{}, false, false
 	}
 	if s.can(principal, permission) {
 		return principal, true, true
 	}
-	writeForbidden(ctx)
+	writePlatformError(ctx, errorcode.CodeAdminForbidden)
 	return rbac.Principal{}, false, false
 }
 
@@ -2525,21 +2525,36 @@ func (s *Server) currentPrincipalForUsername(ctx context.Context, username strin
 	})
 }
 
-func (s *Server) refreshAdminResourceState(ctx *gin.Context, code string, message string) bool {
-	changed, err := s.resources.RefreshContext(ctx.Request.Context())
-	if err != nil {
+func (s *Server) refreshAdminResourceState(ctx *gin.Context, code errorcode.Code) bool {
+	if err := s.refreshResourceState(ctx); err != nil {
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, code, err)
+		return false
+	}
+	return true
+}
+
+func (s *Server) refreshResourceStateLegacy(ctx *gin.Context, code string, message string) bool {
+	if err := s.refreshResourceState(ctx); err != nil {
 		s.recordInternalError(ctx, code, err)
 		ctx.JSON(http.StatusServiceUnavailable, Response[gin.H]{
 			Error: legacyErrorBody(ctx, code, message),
 		})
 		return false
 	}
+	return true
+}
+
+func (s *Server) refreshResourceState(ctx *gin.Context) error {
+	changed, err := s.resources.RefreshContext(ctx.Request.Context())
+	if err != nil {
+		return err
+	}
 	if changed {
 		s.invalidatePolicyAuthorizer()
 		_ = s.cache.DeletePrefix(ctx.Request.Context(), cacheKeyPrincipalPrefix)
 		_ = s.cache.DeletePrefix(ctx.Request.Context(), cacheKeyMenusPrefix)
 	}
-	return true
+	return nil
 }
 
 func (s *Server) invalidateCachesForResource(ctx context.Context, resource string) {
