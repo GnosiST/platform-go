@@ -60,10 +60,13 @@
 - Create: `internal/platform/organizationrbac/navigation_service_objects_test.go`
 - Modify: `internal/platform/httpapi/server.go`
 - Modify: `internal/platform/httpapi/server_test.go`
+- Modify: `internal/platform/config/config.go`
+- Modify: `internal/platform/config/config_test.go`
+- Modify: `cmd/platform-api/main.go`
 - Modify: `scripts/admin-service-object-definitions.mjs`
 
 - [ ] Add failing tests for prepare/impact/apply, idempotent replay, stale preview, disabled role/page rejection, complete-set atomicity and target ancestor derivation.
-- [ ] Register `platform.navigation.role-menu-change.impact`, `platform.navigation.role-menu-change.prepare` and `platform.navigation.role-menus.replace`.
+- [ ] Register `platform.navigation.role-menus.get`, `platform.navigation.role-menu-change.impact`, `platform.navigation.role-menu-change.prepare` and `platform.navigation.role-menus.replace`.
 - [ ] Add deterministic legacy-policy candidate backfill and `platform.navigation.role-menu-migration.compare` without claiming all-principal equivalence.
 - [ ] Add explicit legacy/compare/dual-read/target resolution seams while rejecting target serving and role-menu writes when their independent cutover gates are closed.
 - [ ] Regenerate OpenAPI and TypeScript service-object clients and validate Go/JS definition consistency.

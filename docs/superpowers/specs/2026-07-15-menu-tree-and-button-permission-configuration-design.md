@@ -27,7 +27,7 @@ Page buttons are edited inside the selected page detail, not as a separate top-l
 
 ## Role Menu Assignment
 
-`role_menu` stores enabled page leaves only. Directory selection in `PlatformTreeTransfer` is a bulk shortcut over currently eligible descendants, and adding a future page never grants it implicitly. The prepare command stores the complete normalized target set, expected role-menu revision and impact hash; apply revalidates role state, page state and the reviewed set before one atomic diff. No client chunking is allowed.
+`role_menu` stores enabled page leaves only. Directory selection in `PlatformTreeTransfer` is a bulk shortcut over currently eligible descendants, and adding a future page never grants it implicitly. A persisted `platform.navigation.role-menus.get` query returns the current page-leaf set and per-role revision needed to initialize the editor. The prepare command stores the complete normalized target set, expected role-menu revision and impact hash; apply revalidates role state, page state and the reviewed set before one atomic diff. No client chunking is allowed.
 
 The existing role workbench menu entry is wired to the target mutation boundary but remains unavailable while the migration cutover gate is closed. It becomes functional only after `organization-rbac-menu-e2e-qa` proves principal-level equivalence, freezes legacy writes, completes the bounded target observation and explicitly enables new role-menu writes; the principal must also have role-update plus menu-read permissions. The default serving mode remains legacy. Explicit compare and dual-read seams may calculate candidate diffs in this node, but target serving and writes reject while their independent cutover gates are closed.
 
