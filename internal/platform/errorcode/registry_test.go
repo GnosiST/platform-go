@@ -137,3 +137,32 @@ func TestCurrentConflictDecisionsAreCanonical(t *testing.T) {
 		}
 	}
 }
+
+func TestBuiltinRetryAndRedactionMetadataIsSemantic(t *testing.T) {
+	tests := []struct {
+		code      Code
+		retry     RetryPolicy
+		redaction RedactionClass
+	}{
+		{code: CodeAdminFileSaveFailed, retry: RetryNever, redaction: RedactionCorrelationOnly},
+		{code: CodeAppFileRollbackFailed, retry: RetryNever, redaction: RedactionCorrelationOnly},
+		{code: CodeAuthSessionIssueFailed, retry: RetryNever, redaction: RedactionCorrelationOnly},
+		{code: CodeAppAuthSessionRevokeFailed, retry: RetryNever, redaction: RedactionCorrelationOnly},
+		{code: CodeAuthIdentityBindingFailed, retry: RetryNever, redaction: RedactionCorrelationOnly},
+		{code: CodeAuthProviderResolveFailed, retry: RetryBackoff, redaction: RedactionGenericOnly},
+		{code: CodeRateLimitUnavailable, retry: RetryBackoff, redaction: RedactionGenericOnly},
+		{code: CodeAuthProviderResolverNotConfigured, retry: RetryNever, redaction: RedactionGenericOnly},
+		{code: CodeAppRouteHandlerNotConfigured, retry: RetryNever, redaction: RedactionGenericOnly},
+		{code: CodeRateLimited, retry: RetryAfterDelay, redaction: RedactionPublicSafe},
+		{code: CodeInternal, retry: RetryNever, redaction: RedactionCorrelationOnly},
+	}
+	for _, test := range tests {
+		definition, ok := Lookup(test.code)
+		if !ok {
+			t.Fatalf("Lookup(%q) = false", test.code)
+		}
+		if definition.RetryPolicy != test.retry || definition.RedactionClass != test.redaction {
+			t.Errorf("Lookup(%q) metadata = %q/%q, want %q/%q", test.code, definition.RetryPolicy, definition.RedactionClass, test.retry, test.redaction)
+		}
+	}
+}

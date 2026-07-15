@@ -16,13 +16,19 @@
     "redactionClasses": ["public-safe", "generic-only", "correlation-only"]
   },
   "compatibility": {
-    "immutableWithinMajor": ["owner", "planes", "audiences", "category", "httpStatus", "retryPolicy", "redactionClass"],
+    "immutableWithinMajor": ["owner", "planes", "audiences", "category", "httpStatus", "retryPolicy", "redactionClass", "introducedIn"],
     "additiveDefinitionsAllowed": true,
     "removalRequiresRetainedDeprecatedDefinition": true,
     "deprecationRequires": ["sunsetAt", "replacedBy"],
     "sunsetFormat": "YYYY-MM-DD",
     "hashAlgorithm": "sha256",
-    "hashExcludes": ["contractHash"]
+    "hashExcludes": ["contractHash"],
+    "baselineAdvancement": {
+      "represents": "latest-published-contract",
+      "promotionTiming": "release-after-validation",
+      "promotionMode": "deliberate-reviewed-update",
+      "unpublishedAdditions": "remain-additive-until-promotion"
+    }
   },
   "preContractCorrections": [
     {

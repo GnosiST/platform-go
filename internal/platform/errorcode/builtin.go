@@ -137,7 +137,7 @@ var builtinDefinitions = []Definition{
 	public(CodeAuthInvalidRequest, "platform.auth", []Plane{PlaneAdmin}, []Audience{AudienceOperator}, CategoryValidation, 400, "invalid auth login request"),
 	public(CodeAuthProviderNotConfigured, "platform.auth", []Plane{PlaneAdmin}, []Audience{AudienceOperator}, CategoryValidation, 400, "auth provider is not configured"),
 	public(CodeAuthProviderNotFound, "platform.auth", []Plane{PlaneAdmin}, []Audience{AudienceOperator}, CategoryValidation, 400, "auth provider not found"),
-	public(CodeAuthProviderResolverNotConfigured, "platform.auth", []Plane{PlaneAdmin}, []Audience{AudienceOperator}, CategoryDependency, 501, "auth provider resolver is not configured"),
+	nonRetryableDependency(CodeAuthProviderResolverNotConfigured, "platform.auth", []Plane{PlaneAdmin}, []Audience{AudienceOperator}, 501, "auth provider resolver is not configured"),
 	public(CodeAuthProviderResolveFailed, "platform.auth", []Plane{PlaneAdmin}, []Audience{AudienceOperator}, CategoryDependency, 502, "auth provider resolve failed"),
 	public(CodeAuthProviderStartFailed, "platform.auth", []Plane{PlaneAdmin}, []Audience{AudienceOperator}, CategoryDependency, 502, "auth provider start failed"),
 	public(CodeAuthProviderStartInvalid, "platform.auth", []Plane{PlaneAdmin}, []Audience{AudienceOperator}, CategoryValidation, 400, "invalid auth provider start request"),
@@ -186,13 +186,13 @@ var builtinDefinitions = []Definition{
 	public(CodeAppAuthInvalidRequest, "platform.appauth", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryValidation, 400, "invalid app auth login request"),
 	public(CodeAppAuthProviderNotConfigured, "platform.appauth", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryValidation, 400, "app auth provider is not configured"),
 	public(CodeAppAuthProviderNotFound, "platform.appauth", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryValidation, 400, "app auth provider not found"),
-	public(CodeAppAuthProviderResolverNotConfigured, "platform.appauth", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryDependency, 501, "app auth provider resolver is not configured"),
+	nonRetryableDependency(CodeAppAuthProviderResolverNotConfigured, "platform.appauth", []Plane{PlaneApp}, []Audience{AudiencePublic}, 501, "app auth provider resolver is not configured"),
 	public(CodeAppAuthProviderResolveFailed, "platform.appauth", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryDependency, 502, "app auth provider resolve failed"),
 	public(CodeAppAuthSessionCleanupFailed, "platform.appauth", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryInternal, 500, "app session cleanup failed"),
 	public(CodeAppAuthSessionIssueFailed, "platform.appauth", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryInternal, 500, "app session issue failed"),
 	public(CodeAppAuthSessionRevokeFailed, "platform.appauth", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryInternal, 500, "app session revoke failed"),
 	public(CodeAppAuthTokenSignFailed, "platform.appauth", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryInternal, 500, "app auth token sign failed"),
-	public(CodeAppRouteHandlerNotConfigured, "platform.http", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryDependency, 501, "app route handler is not configured"),
+	nonRetryableDependency(CodeAppRouteHandlerNotConfigured, "platform.http", []Plane{PlaneApp}, []Audience{AudiencePublic}, 501, "app route handler is not configured"),
 	public(CodeAppPhoneAlreadyBound, "platform.appphone", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryConflict, 409, "app phone is already bound"),
 	public(CodeAppPhoneAuditFailed, "platform.appphone", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryInternal, 500, "app phone audit failed"),
 	public(CodeAppPhoneBindingCreateFailed, "platform.appphone", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryInternal, 500, "app phone binding create failed"),
@@ -223,7 +223,7 @@ var builtinDefinitions = []Definition{
 	public(CodeRequestBodyInvalid, "platform.http", []Plane{PlaneAdmin, PlaneApp}, []Audience{AudienceOperator, AudiencePublic}, CategoryValidation, 400, "request body is invalid"),
 	public(CodeRequestBodyTooLarge, "platform.http", []Plane{PlaneAdmin, PlaneApp}, []Audience{AudienceOperator, AudiencePublic}, CategoryValidation, 413, "request body exceeds configured limit"),
 	public(CodeRateLimitUnavailable, "platform.http", []Plane{PlaneAdmin, PlaneApp}, []Audience{AudienceOperator, AudiencePublic}, CategoryDependency, 503, "rate limit service is unavailable"),
-	public(CodeRateLimited, "platform.http", []Plane{PlaneAdmin, PlaneApp}, []Audience{AudienceOperator, AudiencePublic}, CategoryRateCost, 429, "request rate limit exceeded"),
+	rateLimited(CodeRateLimited, "platform.http", []Plane{PlaneAdmin, PlaneApp}, []Audience{AudienceOperator, AudiencePublic}, 429, "request rate limit exceeded"),
 	public(CodeFileUploadInvalid, "platform.file", []Plane{PlaneAdmin, PlaneApp}, []Audience{AudienceOperator, AudiencePublic}, CategoryValidation, 400, "invalid file upload"),
 	public(CodeServiceObjectUnavailable, "platform.serviceobject", []Plane{PlaneAdmin, PlaneService}, []Audience{AudienceOperator, AudienceInternal}, CategoryNotFound, 404, "service object is unavailable"),
 	public(CodeServiceObjectRequestInvalid, "platform.serviceobject", []Plane{PlaneAdmin, PlaneService}, []Audience{AudienceOperator, AudienceInternal}, CategoryValidation, 400, "service object request is invalid"),
@@ -245,12 +245,12 @@ var registry = mustRegistry(builtinDefinitions)
 func public(code Code, owner string, planes []Plane, audiences []Audience, category Category, status int, message string) Definition {
 	retry := RetryNever
 	redaction := RedactionPublicSafe
-	if status >= 500 {
+	switch category {
+	case CategoryDependency:
 		retry = RetryBackoff
 		redaction = RedactionGenericOnly
-	}
-	if status == 429 || status == 503 {
-		retry = RetryAfterDelay
+	case CategoryInternal:
+		redaction = RedactionCorrelationOnly
 	}
 	return Definition{
 		Code: code, Owner: owner, Planes: planes, Audiences: audiences, Category: category,
@@ -259,10 +259,20 @@ func public(code Code, owner string, planes []Plane, audiences []Audience, categ
 	}
 }
 
-func internalError(code Code, owner string, planes []Plane, audiences []Audience, status int, message string) Definition {
-	definition := public(code, owner, planes, audiences, CategoryInternal, status, message)
-	definition.RedactionClass = RedactionCorrelationOnly
+func rateLimited(code Code, owner string, planes []Plane, audiences []Audience, status int, message string) Definition {
+	definition := public(code, owner, planes, audiences, CategoryRateCost, status, message)
+	definition.RetryPolicy = RetryAfterDelay
 	return definition
+}
+
+func nonRetryableDependency(code Code, owner string, planes []Plane, audiences []Audience, status int, message string) Definition {
+	definition := public(code, owner, planes, audiences, CategoryDependency, status, message)
+	definition.RetryPolicy = RetryNever
+	return definition
+}
+
+func internalError(code Code, owner string, planes []Plane, audiences []Audience, status int, message string) Definition {
+	return public(code, owner, planes, audiences, CategoryInternal, status, message)
 }
 
 func mustRegistry(definitions []Definition) map[Code]Definition {

@@ -22,6 +22,18 @@ function canonical(value) {
   return JSON.stringify(value);
 }
 
+function goJSONString(value) {
+  return JSON.stringify(value).replaceAll("&", "\\u0026").replaceAll("<", "\\u003c").replaceAll(">", "\\u003e");
+}
+
+function goCanonical(value) {
+  if (Array.isArray(value)) return `[${value.map(goCanonical).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${goJSONString(key)}:${goCanonical(value[key])}`).join(",")}}`;
+  }
+  return typeof value === "string" ? goJSONString(value) : JSON.stringify(value);
+}
+
 function refreshHash(contract) {
   const payload = structuredClone(contract);
   delete payload.contractHash;
@@ -55,6 +67,7 @@ for (const [name, mutate, expected] of [
   ["status reassignment", (contract) => { contract.definitions[0].httpStatus = 500; }, /httpStatus changed/],
   ["retry reassignment", (contract) => { contract.definitions[0].retryPolicy = "never"; }, /retryPolicy changed/],
   ["redaction reassignment", (contract) => { contract.definitions[0].redactionClass = "public-safe"; }, /redactionClass changed/],
+  ["introduced version reassignment", (contract) => { contract.definitions[0].introducedIn = "0.1.1"; }, /introducedIn changed/],
   ["removal", (contract) => { contract.definitions.shift(); contract.codeCount -= 1; }, /removed without a retained deprecated definition/],
   ["invalid sunset", (contract) => { Object.assign(contract.definitions[0], { deprecated: true, sunsetAt: "invalid", replacedBy: "INTERNAL_ERROR" }); }, /sunsetAt/],
   ["invalid calendar sunset", (contract) => { Object.assign(contract.definitions[0], { deprecated: true, sunsetAt: "2027-02-30", replacedBy: "INTERNAL_ERROR" }); }, /sunsetAt/],
@@ -90,6 +103,37 @@ test("validator accepts an additive code", () => {
   contract.definitions.sort(compareCodes);
   contract.codeCount += 1;
   refreshHash(contract);
+  const result = validate(contract);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
+test("validator rejects a multi-node replacement cycle", () => {
+  const contract = baseline();
+  const template = structuredClone(contract.definitions.find((definition) => definition.code === "VALIDATION_ERROR"));
+  const first = { ...template, code: "CYCLE_CODE_A", deprecated: true, sunsetAt: "2027-01-01", replacedBy: "CYCLE_CODE_B" };
+  const second = { ...template, code: "CYCLE_CODE_B", deprecated: true, sunsetAt: "2027-01-01", replacedBy: "CYCLE_CODE_A" };
+  contract.definitions.push(first, second);
+  contract.definitions.sort(compareCodes);
+  contract.codeCount += 2;
+  refreshHash(contract);
+  const result = validate(contract);
+  assert.notEqual(result.status, 0, result.stdout);
+  assert.match(`${result.stdout}\n${result.stderr}`, /replacement cycle/);
+});
+
+test("validator accepts the Go canonical hash for special characters", () => {
+  const contract = baseline();
+  const additive = structuredClone(contract.definitions.find((definition) => definition.code === "VALIDATION_ERROR"));
+  additive.code = "SPECIAL_CHARACTER_CODE";
+  additive.owner = "platform.test<&>";
+  additive.publicMessage = "safe <value> & >";
+  additive.introducedIn = "0.1.1";
+  contract.definitions.push(additive);
+  contract.definitions.sort(compareCodes);
+  contract.codeCount += 1;
+  const payload = structuredClone(contract);
+  delete payload.contractHash;
+  contract.contractHash = `sha256:${createHash("sha256").update(goCanonical(payload)).digest("hex")}`;
   const result = validate(contract);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 });

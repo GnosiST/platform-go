@@ -32,9 +32,13 @@ function readJSON(path) {
 function canonical(value) {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value && typeof value === "object") {
-    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
+    return `{${Object.keys(value).sort().map((key) => `${canonicalString(key)}:${canonical(value[key])}`).join(",")}}`;
   }
-  return JSON.stringify(value);
+  return typeof value === "string" ? canonicalString(value) : JSON.stringify(value);
+}
+
+function canonicalString(value) {
+  return JSON.stringify(value).replaceAll("&", "\\u0026").replaceAll("<", "\\u003c").replaceAll(">", "\\u003e");
 }
 
 function expectedHash(contract) {
@@ -93,6 +97,19 @@ function validateDocument(contract, standard, label) {
     const definition = contract.definitions[index];
     if (definition.deprecated === true && definition.replacedBy && !codes.has(definition.replacedBy)) {
       errors.push(`${label}.definitions[${index}] has unknown replacement ${definition.replacedBy}`);
+    }
+  }
+  const definitionsByCode = new Map(contract.definitions.map((definition) => [definition.code, definition]));
+  for (const definition of contract.definitions) {
+    const path = new Set();
+    let cursor = definition;
+    while (cursor?.deprecated === true && cursor.replacedBy) {
+      if (path.has(cursor.code)) {
+        errors.push(`${label} replacement cycle includes ${cursor.code}`);
+        break;
+      }
+      path.add(cursor.code);
+      cursor = definitionsByCode.get(cursor.replacedBy);
     }
   }
   return errors;
