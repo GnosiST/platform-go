@@ -127,5 +127,41 @@ The service-object test now compares status/code/public message instead of byte-
 ## Concerns / Follow-Up Boundaries
 
 - Tasks 3-4 still own migration of remaining legacy string call sites to the typed registry writer. `legacyErrorBody` is deliberately limited to existing auth/file/resource helper compatibility; it must be removed when those tasks complete.
-- Some direct legacy `ErrorBody` constructions outside those helpers are not migrated in Task 2. Their JSON shape includes the new fields, but full registry-backed correlation behavior remains a Task 3-4 completion gate.
+- Direct `ErrorBody` construction is now centralized in `error_response.go` and protected by an AST regression test. Tasks 3-4 still own semantic migration of legacy string helpers to typed registry mappings.
 - Task 6 owns durable logging/audit correlation. Task 2 only establishes a safe in-process event contract and intentionally does not retain raw causes or panic diagnostics.
+
+## Review Fix Evidence
+
+Code/test commit: `13444d6` (`fix: harden error correlation recovery`).
+
+### Review RED
+
+- RNG injection test failed to compile because `newCorrelationIDGenerator` did not exist.
+- `TestRecoveryDoesNotAppendEnvelopeAfterResponseIsCommitted` reproduced Gin attempting to overwrite `202` with `500` and appending the JSON error envelope to an already committed body.
+- `TestHTTPAPIErrorBodyConstructionIsCentralized` found direct `ErrorBody` construction in `app_routes.go` and `server.go`.
+- `TestDeclaredAppRouteWithoutHandlerReportsConfigurationError` found the missing-handler error response still contained success `data`.
+
+### Review Fixes
+
+- Extracted safe registry event construction/recording into `recordPlatformError`.
+- Recovery now records exactly one safe `INTERNAL_ERROR` event and aborts. If the response is not committed, it writes the normal registry envelope. If the response is already committed, it preserves the original status/body and writes no additional JSON.
+- This committed-response strategy is an HTTP limitation: status and bytes already sent cannot be replaced safely. The server therefore preserves the response and relies on opaque request/trace correlation plus the safe sink event for diagnosis.
+- Replaced every direct `ErrorBody` construction under `internal/platform/httpapi` with `writePlatformError` or `legacyErrorBody`, including the test-only custom App handler.
+- Added an AST regression gate that permits `ErrorBody` construction only in `error_response.go`.
+- Changed the App handler-not-configured path to registered `APP_ROUTE_HANDLER_NOT_CONFIGURED` behavior with no `data` payload.
+- Added an injectable correlation ID generator. Its per-process salt is initialized from CSPRNG when available. Initialization failure derives a local-only salt from PID, process start time, hostname and an address marker. Runtime CSPRNG failure derives IDs from the salt plus an atomic counter; raw seed material is never returned or logged.
+
+### Review GREEN
+
+```text
+Review-specific tests: 4 passed
+Expanded correlation/recovery/error/App tests: 23 passed in 2 packages
+Full kernel + httpapi: 349 passed in 2 packages
+Full Go repository: 1831 passed in 35 packages
+Error-code registry tests: 19 passed; 117 definitions valid
+Foundation task-graph tests: 41 passed; 67 nodes valid
+git diff --check: passed
+CodeGraph: synchronized and up to date
+```
+
+The partial-write test verifies the original `202` status and `committed-response` body remain byte-for-byte unchanged, exactly one safe sink event is recorded, and panic/request/header markers reach neither the sink nor the public response.
