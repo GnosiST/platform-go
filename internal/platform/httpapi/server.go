@@ -72,6 +72,9 @@ type ServerOptions struct {
 	Security                 SecurityOptions
 	RateLimiter              ratelimit.Limiter
 	RateLimitKeyBuilder      *ratelimit.KeyBuilder
+	AdminMenuServingMode     AdminMenuServingMode
+	AdminMenuResolver        AdminMenuResolver
+	AdminMenuComparisonSink  AdminMenuComparisonSink
 }
 
 type Authorizer interface {
@@ -134,6 +137,9 @@ type Server struct {
 	disableDemoAuthProvider  bool
 	rateLimiter              ratelimit.Limiter
 	rateLimitKeyBuilder      *ratelimit.KeyBuilder
+	adminMenuServingMode     AdminMenuServingMode
+	adminMenuResolver        AdminMenuResolver
+	adminMenuComparisonSink  AdminMenuComparisonSink
 }
 
 const (
@@ -254,6 +260,9 @@ func New(options ServerOptions) *Server {
 		disableDemoAuthProvider:  options.DisableDemoAuthProvider,
 		rateLimiter:              rateLimiter,
 		rateLimitKeyBuilder:      rateLimitKeyBuilder,
+		adminMenuServingMode:     options.AdminMenuServingMode,
+		adminMenuResolver:        options.AdminMenuResolver,
+		adminMenuComparisonSink:  options.AdminMenuComparisonSink,
 	}
 	if options.ServiceObjects != nil {
 		server.serviceObjects = options.ServiceObjects.WithAuthorizer(adminServiceObjectAuthorizer{server: server})
@@ -2111,9 +2120,14 @@ func (s *Server) adminMenus(ctx *gin.Context) {
 		writeUnauthorized(ctx)
 		return
 	}
-	items := cachedJSONValue(ctx.Request.Context(), s.cache, adminMenusCacheKey(principal), s.cacheTTL, func() []adminresource.MenuItem {
-		return s.resources.MenuItemsForPrincipal(principal)
-	})
+	items, err := s.resolveAdminMenus(ctx.Request.Context(), principal)
+	if err != nil {
+		s.recordInternalError(ctx, "ADMIN_MENU_RESOLUTION_FAILED", err)
+		ctx.JSON(http.StatusServiceUnavailable, Response[gin.H]{
+			Error: &ErrorBody{Code: "ADMIN_MENU_RESOLUTION_FAILED", Message: "admin menu navigation is unavailable"},
+		})
+		return
+	}
 	ctx.JSON(http.StatusOK, Response[adminMenuListResponse]{
 		Data: adminMenuListResponse{Items: items},
 	})
@@ -2528,14 +2542,6 @@ func (s *Server) refreshAdminResourceState(ctx *gin.Context, code string, messag
 		_ = s.cache.DeletePrefix(ctx.Request.Context(), cacheKeyMenusPrefix)
 	}
 	return true
-}
-
-func adminMenusCacheKey(principal rbac.Principal) string {
-	username := strings.TrimSpace(principal.User.Username)
-	if username == "" {
-		username = "anonymous"
-	}
-	return cacheKeyMenusPrefix + username
 }
 
 func (s *Server) invalidateCachesForResource(ctx context.Context, resource string) {

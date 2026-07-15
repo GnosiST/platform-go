@@ -27,6 +27,8 @@ type Config struct {
 	AdminResourceDriver                 string
 	AdminResourceDSN                    string
 	OrganizationRBACMode                string
+	AdminMenuServingMode                string
+	AdminRoleMenuWriteEnabled           bool
 	SessionFile                         string
 	SessionDriver                       string
 	SessionDSN                          string
@@ -91,6 +93,7 @@ type Config struct {
 	transportPolicySource               transportPolicySource
 	retentionRunnerSource               retentionRunnerSource
 	integrationSource                   integrationSource
+	menuGovernanceSource                menuGovernanceSource
 }
 
 type envConfigState uint8
@@ -127,6 +130,10 @@ type integrationSource struct {
 	searchEnabled     envConfigState
 }
 
+type menuGovernanceSource struct {
+	roleMenuWriteEnabled envConfigState
+}
+
 var defaultCapabilities = []string{
 	"tenant",
 	"identity",
@@ -151,6 +158,9 @@ const (
 	RuntimeEnvironmentProduction  = "production"
 	OrganizationRBACModeLegacy    = "legacy"
 	OrganizationRBACModeTarget    = "target"
+	AdminMenuServingModeLegacy    = "legacy"
+	AdminMenuServingModeDualRead  = "dual-read"
+	AdminMenuServingModeTarget    = "target"
 
 	defaultJWTSecret   = "dev-platform-go-secret"
 	maxFileUploadBytes = int64(100 << 20)
@@ -177,6 +187,7 @@ func Load() Config {
 	retentionRunnerMaxRetries, retentionRunnerMaxRetriesState := intEnvWithState("PLATFORM_RETENTION_RUNNER_MAX_RETRIES", defaultRetentionRunnerMaxRetries)
 	messageBusEnabled, messageBusEnabledState := boolEnvWithState("PLATFORM_MESSAGE_BUS_ENABLED", false)
 	searchEnabled, searchEnabledState := boolEnvWithState("PLATFORM_SEARCH_ENABLED", false)
+	adminRoleMenuWriteEnabled, adminRoleMenuWriteEnabledState := boolEnvWithState("PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED", false)
 	return Config{
 		RuntimeEnvironment:                  strings.ToLower(env("PLATFORM_RUNTIME_ENV", RuntimeEnvironmentDevelopment)),
 		HTTPAddr:                            env("PLATFORM_HTTP_ADDR", "127.0.0.1:9200"),
@@ -189,6 +200,8 @@ func Load() Config {
 		AdminResourceDriver:                 env("PLATFORM_ADMIN_RESOURCE_DRIVER", ""),
 		AdminResourceDSN:                    env("PLATFORM_ADMIN_RESOURCE_DSN", ""),
 		OrganizationRBACMode:                strings.ToLower(env("PLATFORM_ORGANIZATION_RBAC_MODE", OrganizationRBACModeLegacy)),
+		AdminMenuServingMode:                strings.ToLower(env("PLATFORM_ADMIN_MENU_SERVING_MODE", AdminMenuServingModeLegacy)),
+		AdminRoleMenuWriteEnabled:           adminRoleMenuWriteEnabled,
 		SessionFile:                         env("PLATFORM_SESSION_FILE", ""),
 		SessionDriver:                       env("PLATFORM_SESSION_DRIVER", ""),
 		SessionDSN:                          env("PLATFORM_SESSION_DSN", ""),
@@ -267,6 +280,7 @@ func Load() Config {
 			messageBusEnabled: messageBusEnabledState,
 			searchEnabled:     searchEnabledState,
 		},
+		menuGovernanceSource: menuGovernanceSource{roleMenuWriteEnabled: adminRoleMenuWriteEnabledState},
 	}
 }
 
@@ -333,6 +347,26 @@ func (c Config) ValidateRuntime() error {
 		}
 	default:
 		errs = append(errs, errors.New("PLATFORM_ORGANIZATION_RBAC_MODE must be legacy or target"))
+	}
+	rawMenuServingMode := c.AdminMenuServingMode
+	menuServingMode := strings.ToLower(strings.TrimSpace(rawMenuServingMode))
+	if menuServingMode == "" {
+		menuServingMode = AdminMenuServingModeLegacy
+	} else if rawMenuServingMode != menuServingMode {
+		errs = append(errs, errors.New("PLATFORM_ADMIN_MENU_SERVING_MODE must be canonical trimmed lowercase"))
+	}
+	switch menuServingMode {
+	case AdminMenuServingModeLegacy:
+	case AdminMenuServingModeDualRead, AdminMenuServingModeTarget:
+		errs = append(errs, errors.New("PLATFORM_ADMIN_MENU_SERVING_MODE menu serving gate is closed"))
+	default:
+		errs = append(errs, errors.New("PLATFORM_ADMIN_MENU_SERVING_MODE must be legacy, dual-read, or target"))
+	}
+	if c.menuGovernanceSource.roleMenuWriteEnabled == envConfigInvalid {
+		errs = append(errs, errors.New("PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED is invalid"))
+	}
+	if c.AdminRoleMenuWriteEnabled {
+		errs = append(errs, errors.New("PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED role menu write gate is closed"))
 	}
 	errs = append(errs, validateDriverPair("session", c.SessionDriver, c.SessionDSN)...)
 	errs = append(errs, validateDriverPair("lifecycle history", c.LifecycleHistoryDriver, c.LifecycleHistoryDSN)...)

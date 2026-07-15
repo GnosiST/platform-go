@@ -4735,7 +4735,7 @@ func TestRoleUpdateInvalidatesPrincipalAndMenuCaches(t *testing.T) {
 	if menuRecorder.Code != http.StatusOK {
 		t.Fatalf("menus status = %d body = %s", menuRecorder.Code, menuRecorder.Body.String())
 	}
-	if _, ok, err := cacheStore.Get(menuRequest.Context(), "admin:menus:ops"); err != nil || !ok {
+	if _, ok, err := cacheStore.Get(menuRequest.Context(), adminMenusCacheKeyForUsername(AdminMenuServingModeLegacy, AdminMenuRevision{}, "ops")); err != nil || !ok {
 		t.Fatalf("menu cache ok = %v err = %v, want cached menus", ok, err)
 	}
 
@@ -4751,7 +4751,7 @@ func TestRoleUpdateInvalidatesPrincipalAndMenuCaches(t *testing.T) {
 	if _, ok, err := cacheStore.Get(updateRequest.Context(), "admin:principal:ops"); err != nil || ok {
 		t.Fatalf("principal cache after role update ok = %v err = %v, want invalidated principal", ok, err)
 	}
-	if _, ok, err := cacheStore.Get(updateRequest.Context(), "admin:menus:ops"); err != nil || ok {
+	if _, ok, err := cacheStore.Get(updateRequest.Context(), adminMenusCacheKeyForUsername(AdminMenuServingModeLegacy, AdminMenuRevision{}, "ops")); err != nil || ok {
 		t.Fatalf("menu cache after role update ok = %v err = %v, want invalidated menus", ok, err)
 	}
 }
@@ -4802,7 +4802,7 @@ func TestDistributedInvalidationClearsPeerPrincipalMenuAndPolicyCaches(t *testin
 	if _, ok, err := readerCache.Get(sessionRequest.Context(), "admin:principal:ops"); err != nil || !ok {
 		t.Fatalf("reader principal cache ok = %v err = %v, want cached principal", ok, err)
 	}
-	if _, ok, err := readerCache.Get(menuRequest.Context(), "admin:menus:ops"); err != nil || !ok {
+	if _, ok, err := readerCache.Get(menuRequest.Context(), adminMenusCacheKeyForUsername(AdminMenuServingModeLegacy, AdminMenuRevision{}, "ops")); err != nil || !ok {
 		t.Fatalf("reader menu cache ok = %v err = %v, want cached menus", ok, err)
 	}
 
@@ -4818,7 +4818,7 @@ func TestDistributedInvalidationClearsPeerPrincipalMenuAndPolicyCaches(t *testin
 	if _, ok, err := readerCache.Get(updateRequest.Context(), "admin:principal:ops"); err != nil || ok {
 		t.Fatalf("reader principal cache after peer update ok = %v err = %v, want invalidated", ok, err)
 	}
-	if _, ok, err := readerCache.Get(updateRequest.Context(), "admin:menus:ops"); err != nil || ok {
+	if _, ok, err := readerCache.Get(updateRequest.Context(), adminMenusCacheKeyForUsername(AdminMenuServingModeLegacy, AdminMenuRevision{}, "ops")); err != nil || ok {
 		t.Fatalf("reader menu cache after peer update ok = %v err = %v, want invalidated", ok, err)
 	}
 

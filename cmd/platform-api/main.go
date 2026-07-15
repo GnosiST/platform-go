@@ -128,8 +128,10 @@ func main() {
 		}
 	}
 	var serviceObjects *serviceobject.Runtime
+	var adminMenuResolver httpapi.AdminMenuResolver
 	if organizationRBAC != nil {
 		serviceObjects = organizationRBAC.ServiceObjects
+		adminMenuResolver = organizationRBAC.AdminMenus
 	}
 	server := httpapi.New(httpapi.ServerOptions{
 		Capabilities:             ordered,
@@ -157,6 +159,9 @@ func main() {
 		Security:                 securityOptionsFromConfig(cfg),
 		RateLimiter:              rateLimitRuntime.Limiter,
 		RateLimitKeyBuilder:      rateLimitRuntime.KeyBuilder,
+		AdminMenuServingMode:     httpapi.AdminMenuServingMode(cfg.AdminMenuServingMode),
+		AdminMenuResolver:        adminMenuResolver,
+		AdminMenuComparisonSink:  adminMenuComparisonLogSink{},
 	})
 	dataLifecycle, scheduler, err := startRetentionRuntime(ctx, cfg, apps.DefaultManifests(), bootstrap.OpenDataLifecycle)
 	if err != nil {
@@ -177,6 +182,15 @@ func main() {
 		}
 		log.Fatalf("run platform api: %v", err)
 	}
+}
+
+type adminMenuComparisonLogSink struct{}
+
+func (adminMenuComparisonLogSink) Record(_ context.Context, comparison httpapi.AdminMenuComparison) {
+	log.Printf(
+		"admin menu dual-read equal=%t addedCount=%d removedCount=%d globalRevision=%d",
+		comparison.Equal, comparison.AddedCount, comparison.RemovedCount, comparison.GlobalRevision,
+	)
 }
 
 type openDataLifecycleFunc func(config.Config, ...capability.Manifest) (*bootstrap.DataLifecycle, error)

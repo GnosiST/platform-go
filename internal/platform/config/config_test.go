@@ -22,6 +22,8 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_ADMIN_RESOURCE_FILE", "")
 	t.Setenv("PLATFORM_ADMIN_RESOURCE_DRIVER", "")
 	t.Setenv("PLATFORM_ADMIN_RESOURCE_DSN", "")
+	t.Setenv("PLATFORM_ADMIN_MENU_SERVING_MODE", "")
+	t.Setenv("PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED", "")
 	t.Setenv("PLATFORM_SESSION_FILE", "")
 	t.Setenv("PLATFORM_SESSION_DRIVER", "")
 	t.Setenv("PLATFORM_SESSION_DSN", "")
@@ -113,6 +115,9 @@ func TestLoadUsesDefaults(t *testing.T) {
 	}
 	if cfg.OrganizationRBACMode != OrganizationRBACModeLegacy {
 		t.Fatalf("OrganizationRBACMode = %q, want legacy by default", cfg.OrganizationRBACMode)
+	}
+	if cfg.AdminMenuServingMode != AdminMenuServingModeLegacy || cfg.AdminRoleMenuWriteEnabled {
+		t.Fatalf("menu governance defaults = %q/%t, want legacy/false", cfg.AdminMenuServingMode, cfg.AdminRoleMenuWriteEnabled)
 	}
 	if cfg.RetentionRunnerEnabled {
 		t.Fatal("RetentionRunnerEnabled = true, want disabled by default")
@@ -511,6 +516,59 @@ func TestLoadParsesAdminResourceSQLConfig(t *testing.T) {
 	}
 	if cfg.OrganizationRBACMode != OrganizationRBACModeTarget {
 		t.Fatalf("OrganizationRBACMode = %q", cfg.OrganizationRBACMode)
+	}
+}
+
+func TestLoadParsesMenuGovernanceConfiguration(t *testing.T) {
+	t.Setenv("PLATFORM_ADMIN_MENU_SERVING_MODE", "DUAL-READ")
+	t.Setenv("PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED", "true")
+
+	cfg := Load()
+	if cfg.AdminMenuServingMode != AdminMenuServingModeDualRead || !cfg.AdminRoleMenuWriteEnabled {
+		t.Fatalf("menu governance config = %q/%t", cfg.AdminMenuServingMode, cfg.AdminRoleMenuWriteEnabled)
+	}
+}
+
+func TestValidateRuntimeKeepsMenuCutoverGatesClosed(t *testing.T) {
+	base := validDataProtectionConfig(RuntimeEnvironmentDevelopment, "env-aes256")
+	base.AdminMenuServingMode = AdminMenuServingModeLegacy
+	tests := []struct {
+		name      string
+		configure func(*Config)
+		contains  string
+	}{
+		{name: "dual read", configure: func(cfg *Config) { cfg.AdminMenuServingMode = AdminMenuServingModeDualRead }, contains: "menu serving gate is closed"},
+		{name: "target", configure: func(cfg *Config) { cfg.AdminMenuServingMode = AdminMenuServingModeTarget }, contains: "menu serving gate is closed"},
+		{name: "unknown mode", configure: func(cfg *Config) { cfg.AdminMenuServingMode = "automatic" }, contains: "must be legacy, dual-read, or target"},
+		{name: "role menu writes", configure: func(cfg *Config) { cfg.AdminRoleMenuWriteEnabled = true }, contains: "role menu write gate is closed"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := base
+			test.configure(&cfg)
+			if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), test.contains) {
+				t.Fatalf("ValidateRuntime() error = %v, want %q", err, test.contains)
+			}
+		})
+	}
+	if err := base.ValidateRuntime(); err != nil {
+		t.Fatalf("ValidateRuntime(legacy closed gates) error = %v", err)
+	}
+}
+
+func TestValidateRuntimeRejectsNonCanonicalMenuServingMode(t *testing.T) {
+	base := validDataProtectionConfig(RuntimeEnvironmentDevelopment, "env-aes256")
+	base.AdminMenuServingMode = " legacy "
+	if err := base.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "canonical trimmed lowercase") {
+		t.Fatalf("ValidateRuntime() error = %v, want canonical menu serving mode rejection", err)
+	}
+}
+
+func TestValidateRuntimeRejectsInvalidRoleMenuWriteBoolean(t *testing.T) {
+	t.Setenv("PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED", "sometimes")
+	cfg := Load()
+	if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED is invalid") {
+		t.Fatalf("ValidateRuntime() error = %v, want invalid role menu write boolean", err)
 	}
 }
 

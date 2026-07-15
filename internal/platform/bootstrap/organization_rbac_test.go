@@ -11,6 +11,7 @@ import (
 	"platform-go/internal/platform/config"
 	"platform-go/internal/platform/core"
 	"platform-go/internal/platform/organizationrbac"
+	"platform-go/internal/platform/rbac"
 	"platform-go/internal/platform/storage"
 )
 
@@ -60,8 +61,17 @@ func TestPrepareAndOpenOrganizationRBAC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenOrganizationRBAC() error = %v", err)
 	}
-	if runtime.Repository == nil || runtime.ServiceObjects == nil {
+	if runtime.Repository == nil || runtime.ServiceObjects == nil || runtime.AdminMenus == nil {
 		t.Fatalf("runtime = %+v", runtime)
+	}
+	principal := rbac.Principal{}
+	revision, err := runtime.AdminMenus.Revision(context.Background(), principal)
+	if err != nil {
+		t.Fatalf("AdminMenus.Revision() error = %v", err)
+	}
+	revision.GlobalRevision++
+	if _, err := runtime.AdminMenus.Resolve(context.Background(), principal, revision); err == nil || !strings.Contains(err.Error(), "revision changed") {
+		t.Fatalf("AdminMenus.Resolve(stale revision) error = %v", err)
 	}
 	if err := runtime.Close(); err != nil {
 		t.Fatal(err)
