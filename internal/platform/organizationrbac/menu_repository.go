@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"platform-go/internal/platform/adminresource"
+	"platform-go/internal/platform/serviceobject"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -236,7 +237,8 @@ func validatePageNode(node MenuNode) error {
 		parameterKeys[parameter.Key] = struct{}{}
 		switch parameter.Type {
 		case MenuParameterTypeString:
-			if _, ok := parameter.Value.(string); !ok {
+			value, ok := parameter.Value.(string)
+			if !ok || serviceobject.IsForbiddenMenuParameterStringValue(value) {
 				return ErrInvalid
 			}
 		case MenuParameterTypeNumber:

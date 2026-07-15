@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
 const MaximumMenuParameters = 32
+
+var forbiddenMenuParameterWordPattern = regexp.MustCompile(`\b(?:select|insert|update|delete|drop|alter|create|truncate|merge|exec|execute|union|datasource|shard|database|schema|sql|script|expression)\b`)
 
 type MenuNodeType string
 
@@ -162,7 +165,8 @@ func validateMenuPageNode(node MenuNode) error {
 		parameterKeys[parameter.Key] = struct{}{}
 		switch parameter.Type {
 		case MenuParameterTypeString:
-			if _, ok := parameter.Value.(string); !ok {
+			value, ok := parameter.Value.(string)
+			if !ok || IsForbiddenMenuParameterStringValue(value) {
 				return ErrRequestInvalid
 			}
 		case MenuParameterTypeNumber:
@@ -205,6 +209,24 @@ func forbiddenMenuParameterKey(key string) bool {
 	default:
 		return false
 	}
+}
+
+// IsForbiddenMenuParameterStringValue reports whether a static menu parameter carries executable or physical-routing input.
+func IsForbiddenMenuParameterStringValue(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if forbiddenMenuParameterWordPattern.MatchString(normalized) {
+		return true
+	}
+	for _, marker := range []string{
+		"<script", "</script", "javascript:", "vbscript:", "data:text/html", "eval(", "function(",
+		"${", "#{", "@{", "{{", "}}", "/:", "/{", "/*",
+	} {
+		if strings.Contains(normalized, marker) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func cloneMenuDefinition(definition MenuDefinition) MenuDefinition {

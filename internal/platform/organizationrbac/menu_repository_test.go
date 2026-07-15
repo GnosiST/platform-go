@@ -118,6 +118,55 @@ func TestValidateMenuSnapshotRejectsExecutableRoutesAndPhysicalParameters(t *tes
 	}
 }
 
+func TestValidateMenuSnapshotRejectsExecutableAndPhysicalStringParameterValues(t *testing.T) {
+	base := MenuNode{Code: "users", NodeType: MenuNodeTypePage, TitleZH: "用户", TitleEN: "Users", Status: StatusEnabled, Route: "/users", ComponentKey: "users"}
+	unsafeValues := map[string]string{
+		"script tag":          `<script>alert("x")</script>`,
+		"script URI":          `javascript:alert("x")`,
+		"script keyword":      `script`,
+		"expression":          `${tenant.id}`,
+		"expression keyword":  `expression`,
+		"template expression": `{{ currentUser.id }}`,
+		"SQL":                 `SELECT * FROM platform_admin_users`,
+		"SQL keyword":         `sql`,
+		"route parameter":     `/users/:id`,
+		"route expression":    `/users/{id}`,
+		"route wildcard":      `/users/*`,
+		"datasource routing":  `datasource=primary`,
+		"datasource keyword":  `datasource`,
+		"shard routing":       `shard:tenant-42`,
+		"shard keyword":       `shard`,
+		"database routing":    `database=platform`,
+		"database keyword":    `database`,
+		"schema routing":      `{"schema":"public"}`,
+		"schema keyword":      `schema`,
+	}
+	for name, value := range unsafeValues {
+		t.Run(name, func(t *testing.T) {
+			node := base
+			node.Parameters = []MenuParameter{{Key: "tab", Type: MenuParameterTypeString, Value: value}}
+			if err := ValidateMenuSnapshot([]MenuNode{node}, nil, nil); !errors.Is(err, ErrInvalid) {
+				t.Fatalf("ValidateMenuSnapshot(%q) error = %v, want ErrInvalid", value, err)
+			}
+		})
+	}
+
+	for name, value := range map[string]string{
+		"ordinary value": "active",
+		"word substring": "selection",
+		"camel-case key": "schemaVersion",
+		"static path":    "/users/profile",
+	} {
+		t.Run("allows "+name, func(t *testing.T) {
+			node := base
+			node.Parameters = []MenuParameter{{Key: "tab", Type: MenuParameterTypeString, Value: value}}
+			if err := ValidateMenuSnapshot([]MenuNode{node}, nil, nil); err != nil {
+				t.Fatalf("ValidateMenuSnapshot(%q) error = %v", value, err)
+			}
+		})
+	}
+}
+
 func TestReplaceMenuDefinitionAtomicallyOwnsPageButtonPermissions(t *testing.T) {
 	db, repository := prepareOrganizationRBACTestRepository(t)
 	seedOrganizationRBAC(t, db)

@@ -207,6 +207,55 @@ func TestMenuDefinitionArgumentRequiresTypedValidDTO(t *testing.T) {
 	}
 }
 
+func TestMenuDefinitionArgumentRejectsExecutableAndPhysicalStringParameterValues(t *testing.T) {
+	definitions := []ArgumentDefinition{{Name: "definition", Type: ValueMenuDefinition, Required: true}}
+	unsafeValues := map[string]string{
+		"script tag":          `<script>alert("x")</script>`,
+		"script URI":          `javascript:alert("x")`,
+		"script keyword":      `script`,
+		"expression":          `${tenant.id}`,
+		"expression keyword":  `expression`,
+		"template expression": `{{ currentUser.id }}`,
+		"SQL":                 `SELECT * FROM platform_admin_users`,
+		"SQL keyword":         `sql`,
+		"route parameter":     `/users/:id`,
+		"route expression":    `/users/{id}`,
+		"route wildcard":      `/users/*`,
+		"datasource routing":  `datasource=primary`,
+		"datasource keyword":  `datasource`,
+		"shard routing":       `shard:tenant-42`,
+		"shard keyword":       `shard`,
+		"database routing":    `database=platform`,
+		"database keyword":    `database`,
+		"schema routing":      `{"schema":"public"}`,
+		"schema keyword":      `schema`,
+	}
+	for name, value := range unsafeValues {
+		t.Run(name, func(t *testing.T) {
+			definition := validServiceMenuDefinition()
+			definition.Node.Parameters[0].Value = value
+			if _, err := validateArguments(definitions, map[string]any{"definition": definition}); !errors.Is(err, ErrRequestInvalid) {
+				t.Fatalf("validateArguments(%q) error = %v, want ErrRequestInvalid", value, err)
+			}
+		})
+	}
+
+	for name, value := range map[string]string{
+		"ordinary value": "active",
+		"word substring": "selection",
+		"camel-case key": "schemaVersion",
+		"static path":    "/users/profile",
+	} {
+		t.Run("allows "+name, func(t *testing.T) {
+			definition := validServiceMenuDefinition()
+			definition.Node.Parameters[0].Value = value
+			if _, err := validateArguments(definitions, map[string]any{"definition": definition}); err != nil {
+				t.Fatalf("validateArguments(%q) error = %v", value, err)
+			}
+		})
+	}
+}
+
 func TestDecodeCommandRequestConvertsStrictMenuDefinitionJSONToTypedDTO(t *testing.T) {
 	payload := `{
 		"commandId":"platform.navigation.menu-definition.replace",
