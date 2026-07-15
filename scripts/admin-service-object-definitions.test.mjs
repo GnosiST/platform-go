@@ -121,6 +121,23 @@ describe("validate-admin-service-object-definitions", () => {
     assert.match(result.stderr, /Go and JS definition fields differ/);
   });
 
+  it("rejects command-scoped shared navigation permission drift", () => {
+    const source = fs.readFileSync(
+      path.join(repoRoot, "internal/platform/organizationrbac/navigation_service_objects.go"),
+      "utf8",
+    );
+    const commandFunctionIndex = source.indexOf("func navigationDomainCommandDefinitions()");
+    const commandSource = source.slice(commandFunctionIndex).replace(
+      'readMenu := []serviceobject.PermissionRequirement{{Permission: "admin:menu:read", Action: "read"}}',
+      'readMenu := []serviceobject.PermissionRequirement{{Permission: "admin:menu:delete", Action: "delete"}}',
+    );
+    const changed = source.slice(0, commandFunctionIndex) + commandSource;
+    const result = runValidator(["--navigation-source", temporarySource("navigation_service_objects.go", changed)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Go and JS definition fields differ/);
+  });
+
   it("rejects shared cost policy drift between Go and JS", () => {
     const source = fs.readFileSync(path.join(repoRoot, "internal/platform/organizationrbac/service_objects.go"), "utf8");
     const changed = source.replace(

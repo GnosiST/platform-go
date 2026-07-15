@@ -94,6 +94,22 @@ function functionBody(source, name) {
   return start < 0 || end < 0 ? "" : source.slice(start, end + 1);
 }
 
+function functionContaining(source, marker) {
+  const markerIndex = source.indexOf(marker);
+  if (markerIndex < 0) return "";
+  let functionIndex = source.lastIndexOf("\nfunc ", markerIndex);
+  if (functionIndex < 0 && source.startsWith("func ")) functionIndex = 0;
+  while (functionIndex >= 0) {
+    const start = source.indexOf("{", functionIndex);
+    const end = matchingBrace(source, start);
+    if (start >= 0 && start < markerIndex && end > markerIndex) {
+      return source.slice(start, end + 1);
+    }
+    functionIndex = source.lastIndexOf("\nfunc ", functionIndex - 1);
+  }
+  return "";
+}
+
 function constants(source) {
   return new Map(
     [...source.matchAll(/^\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*"([^"]*)"/gm)].map((match) => [match[1], match[2]]),
@@ -205,7 +221,8 @@ function costPolicy(source, block) {
 function parseGoDefinition(definition, source, costSource = source, resultSource = source) {
   const definitionSource = definition.goFactory ? functionBody(source, definition.goFactory) : source;
   const idMarker = definition.goIDMarker ?? (definition.goFactory ? "ID: id" : `ID: ${definition.goIDSymbol}`);
-  const block = compositeContaining(definitionSource, idMarker);
+  const definitionScope = functionContaining(definitionSource, idMarker) || definitionSource;
+  const block = compositeContaining(definitionScope, idMarker);
   if (!block) return null;
   const allowedSortBlock = namedComposite(block, "AllowedSort");
   return {
@@ -217,7 +234,7 @@ function parseGoDefinition(definition, source, costSource = source, resultSource
       identifierField(block, "Permission") === "permission" ? definition.permission : "",
     ),
     action: stringField(block, "Action"),
-    additionalPermissions: parseAdditionalPermissions(block, definitionSource),
+    additionalPermissions: parseAdditionalPermissions(block, definitionScope),
     tenantMode: tenantModes.get(identifierField(block, "TenantMode")) ?? identifierField(block, "TenantMode"),
     dataScope: stringField(block, "DataScope"),
     arguments: parseDefinitionFields(block, "Arguments", definitionSource),
