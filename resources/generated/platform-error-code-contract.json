@@ -4,8 +4,8 @@
   "sourceMode": "go-registry",
   "contractVersion": "1.0.0",
   "sourceVersion": "0.1.0",
-  "contractHash": "sha256:e559635bbdc5a0fa9aaafb6e1ce9eb3891bad543613b39798009fd82dcbcb8c0",
-  "codeCount": 117,
+  "contractHash": "sha256:f4dbaa69b70312857a17553662ce5986a90c0ba0ef4c5fbbcc77056db10f36a8",
+  "codeCount": 118,
   "catalogs": {
     "planes": [
       "admin",
@@ -855,6 +855,23 @@
       "retryPolicy": "never",
       "redactionClass": "correlation-only",
       "publicMessage": "app auth token sign failed",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "APP_FILE_METADATA_FAILED",
+      "owner": "platform.file",
+      "planes": [
+        "app"
+      ],
+      "audiences": [
+        "public"
+      ],
+      "category": "internal",
+      "httpStatus": 500,
+      "retryPolicy": "never",
+      "redactionClass": "correlation-only",
+      "publicMessage": "file metadata operation failed",
       "introducedIn": "0.1.0",
       "deprecated": false
     },

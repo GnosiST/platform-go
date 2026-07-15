@@ -1565,7 +1565,7 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationAdminUpload, rateLimitClientIP(ctx), s.auditActorID(ctx)) {
 		return
 	}
-	upload, err := readValidatedUpload(ctx, s.uploadPolicy, "ADMIN_FILE")
+	upload, err := readValidatedUpload(ctx, s.uploadPolicy, adminUploadErrorCodes)
 	if err != nil {
 		writeUploadPolicyError(ctx, err)
 		return
@@ -1667,7 +1667,7 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 	if !s.enforceRateLimit(ctx, ratelimit.OperationAppUpload, rateLimitClientIP(ctx), username) {
 		return
 	}
-	upload, err := readValidatedUpload(ctx, s.uploadPolicy, "APP_FILE")
+	upload, err := readValidatedUpload(ctx, s.uploadPolicy, appUploadErrorCodes)
 	if err != nil {
 		writeUploadPolicyError(ctx, err)
 		return
@@ -2812,8 +2812,10 @@ func (sink resourceFileCleanupSink) Record(_ context.Context, record FileCleanup
 func writeUploadPolicyError(ctx *gin.Context, err error) {
 	var policyErr *uploadPolicyError
 	if errors.As(err, &policyErr) {
-		writeFileError(ctx, policyErr.Status, policyErr.Code, policyErr.Message)
-		return
+		if _, ok := errorcode.Lookup(policyErr.Code); ok {
+			writePlatformError(ctx, policyErr.Code)
+			return
+		}
 	}
-	writeFileError(ctx, http.StatusBadRequest, "FILE_UPLOAD_INVALID", "invalid file upload")
+	writePlatformError(ctx, errorcode.CodeFileUploadInvalid)
 }

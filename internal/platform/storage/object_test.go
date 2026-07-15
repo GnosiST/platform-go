@@ -19,6 +19,9 @@ import (
 type fakeS3ObjectClient struct {
 	objects      map[string]fakeS3Object
 	lastPutInput *s3.PutObjectInput
+	putErr       error
+	getErr       error
+	deleteErr    error
 }
 
 type fakeS3Object struct {
@@ -237,6 +240,111 @@ func TestNewObjectStoreRejectsS3PartialCredentials(t *testing.T) {
 	}
 }
 
+func TestLocalObjectStoreAdapterErrorsUseRedactedOperationSentinels(t *testing.T) {
+	privatePath := "/private/platform/uploads/tenant-secret/object-key"
+	store := LocalObjectStore{initErr: errors.New(privatePath)}
+	tests := []struct {
+		name string
+		want error
+		run  func() error
+	}{
+		{name: "save", want: ErrObjectSaveFailed, run: func() error {
+			_, err := store.Save(context.Background(), ObjectSaveInput{Reader: strings.NewReader("private")})
+			return err
+		}},
+		{name: "open", want: ErrObjectOpenFailed, run: func() error {
+			_, err := store.Open(context.Background(), "objects/private-key")
+			return err
+		}},
+		{name: "delete", want: ErrObjectDeleteFailed, run: func() error {
+			return store.Delete(context.Background(), "objects/private-key")
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.run()
+			if !errors.Is(err, test.want) {
+				t.Fatalf("adapter error = %v, want %v", err, test.want)
+			}
+			if strings.Contains(err.Error(), privatePath) {
+				t.Fatalf("adapter error leaked filesystem path: %v", err)
+			}
+		})
+	}
+}
+
+func TestS3ObjectStoreAdapterErrorsUseRedactedOperationSentinels(t *testing.T) {
+	privateDetail := "AccessDenied bucket=private-bucket key=objects/private-key endpoint=https://secret.example access=AKIASECRET kms=arn:secret"
+	tests := []struct {
+		name string
+		want error
+		run  func(S3ObjectStore) error
+	}{
+		{name: "save", want: ErrObjectSaveFailed, run: func(store S3ObjectStore) error {
+			_, err := store.Save(context.Background(), ObjectSaveInput{Reader: strings.NewReader("private")})
+			return err
+		}},
+		{name: "open", want: ErrObjectOpenFailed, run: func(store S3ObjectStore) error {
+			_, err := store.Open(context.Background(), "objects/private-key")
+			return err
+		}},
+		{name: "delete", want: ErrObjectDeleteFailed, run: func(store S3ObjectStore) error {
+			return store.Delete(context.Background(), "objects/private-key")
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			providerErr := &smithy.GenericAPIError{Code: "AccessDenied", Message: privateDetail}
+			client := &fakeS3ObjectClient{objects: map[string]fakeS3Object{}, putErr: providerErr, getErr: providerErr, deleteErr: providerErr}
+			store, err := newS3ObjectStoreWithClient(client, S3ObjectStoreConfig{Bucket: "private-bucket", ServerSideEncryption: "AES256"}, func() (string, error) { return "objects/private-key", nil })
+			if err != nil {
+				t.Fatalf("newS3ObjectStoreWithClient() error = %v", err)
+			}
+			err = test.run(store)
+			if !errors.Is(err, test.want) {
+				t.Fatalf("adapter error = %v, want %v", err, test.want)
+			}
+			for _, marker := range []string{"AccessDenied", "private-bucket", "private-key", "secret.example", "AKIASECRET", "arn:secret"} {
+				if strings.Contains(err.Error(), marker) {
+					t.Fatalf("adapter error leaked %q: %v", marker, err)
+				}
+			}
+		})
+	}
+}
+
+func TestS3ObjectStorePreservesNotFoundAcrossAdapterOperations(t *testing.T) {
+	tests := []struct {
+		name string
+		run  func(S3ObjectStore) error
+	}{
+		{name: "save", run: func(store S3ObjectStore) error {
+			_, err := store.Save(context.Background(), ObjectSaveInput{Reader: strings.NewReader("private")})
+			return err
+		}},
+		{name: "open", run: func(store S3ObjectStore) error {
+			_, err := store.Open(context.Background(), "objects/private-key")
+			return err
+		}},
+		{name: "delete", run: func(store S3ObjectStore) error {
+			return store.Delete(context.Background(), "objects/private-key")
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			notFound := &smithy.GenericAPIError{Code: "NoSuchBucket", Message: "private provider detail"}
+			client := &fakeS3ObjectClient{objects: map[string]fakeS3Object{}, putErr: notFound, getErr: notFound, deleteErr: notFound}
+			store, err := newS3ObjectStoreWithClient(client, S3ObjectStoreConfig{Bucket: "private-bucket", ServerSideEncryption: "AES256"}, func() (string, error) { return "objects/private-key", nil })
+			if err != nil {
+				t.Fatalf("newS3ObjectStoreWithClient() error = %v", err)
+			}
+			if err := test.run(store); !errors.Is(err, ErrObjectNotFound) || err.Error() != ErrObjectNotFound.Error() {
+				t.Fatalf("adapter error = %v, want redacted ErrObjectNotFound", err)
+			}
+		})
+	}
+}
+
 func TestS3ObjectStoreSavesOpensAndDeletesObject(t *testing.T) {
 	client := &fakeS3ObjectClient{objects: map[string]fakeS3Object{}}
 	store, err := newS3ObjectStoreWithClient(client, S3ObjectStoreConfig{
@@ -362,6 +470,9 @@ func TestNewS3ObjectStoreRejectsInvalidEncryptionPolicy(t *testing.T) {
 
 func (client *fakeS3ObjectClient) PutObject(_ context.Context, input *s3.PutObjectInput, _ ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
 	client.lastPutInput = input
+	if client.putErr != nil {
+		return nil, client.putErr
+	}
 	body, err := io.ReadAll(input.Body)
 	if err != nil {
 		return nil, err
@@ -374,6 +485,9 @@ func (client *fakeS3ObjectClient) PutObject(_ context.Context, input *s3.PutObje
 }
 
 func (client *fakeS3ObjectClient) GetObject(_ context.Context, input *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+	if client.getErr != nil {
+		return nil, client.getErr
+	}
 	object, ok := client.objects[aws.ToString(input.Key)]
 	if !ok {
 		return nil, &smithy.GenericAPIError{Code: "NoSuchKey", Message: "missing"}
@@ -382,6 +496,9 @@ func (client *fakeS3ObjectClient) GetObject(_ context.Context, input *s3.GetObje
 }
 
 func (client *fakeS3ObjectClient) DeleteObject(_ context.Context, input *s3.DeleteObjectInput, _ ...func(*s3.Options)) (*s3.DeleteObjectOutput, error) {
+	if client.deleteErr != nil {
+		return nil, client.deleteErr
+	}
 	delete(client.objects, aws.ToString(input.Key))
 	return &s3.DeleteObjectOutput{}, nil
 }

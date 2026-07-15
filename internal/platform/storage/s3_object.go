@@ -103,15 +103,15 @@ func validateS3ObjectStoreConfig(config S3ObjectStoreConfig) error {
 
 func (store S3ObjectStore) Save(ctx context.Context, input ObjectSaveInput) (ObjectMetadata, error) {
 	if input.Reader == nil {
-		return ObjectMetadata{}, errors.New("object reader is required")
+		return ObjectMetadata{}, ErrObjectSaveFailed
 	}
 	opaqueKey, err := store.keyGenerator()
 	if err != nil {
-		return ObjectMetadata{}, fmt.Errorf("generate object key: %w", err)
+		return ObjectMetadata{}, ErrObjectSaveFailed
 	}
 	opaqueKey, err = safeObjectKey(opaqueKey)
 	if err != nil {
-		return ObjectMetadata{}, err
+		return ObjectMetadata{}, normalizeObjectOperationError(err, ErrObjectSaveFailed)
 	}
 	key := path.Join(store.prefix, opaqueKey)
 	reader := &countingReader{reader: input.Reader}
@@ -128,7 +128,10 @@ func (store S3ObjectStore) Save(ctx context.Context, input ObjectSaveInput) (Obj
 		putInput.ContentType = aws.String(strings.TrimSpace(input.ContentType))
 	}
 	if _, err := store.client.PutObject(ctx, putInput); err != nil {
-		return ObjectMetadata{}, err
+		if isS3ObjectNotFound(err) {
+			return ObjectMetadata{}, ErrObjectNotFound
+		}
+		return ObjectMetadata{}, ErrObjectSaveFailed
 	}
 	return ObjectMetadata{
 		Driver:    "s3",
@@ -146,7 +149,7 @@ func (store S3ObjectStore) Open(ctx context.Context, key string) (io.ReadCloser,
 		return nil, ErrObjectNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, ErrObjectOpenFailed
 	}
 	return output.Body, nil
 }
@@ -160,7 +163,13 @@ func (store S3ObjectStore) Delete(ctx context.Context, key string) error {
 		Bucket: aws.String(store.bucket),
 		Key:    aws.String(cleanKey),
 	})
-	return err
+	if isS3ObjectNotFound(err) {
+		return ErrObjectNotFound
+	}
+	if err != nil {
+		return ErrObjectDeleteFailed
+	}
+	return nil
 }
 
 type countingReader struct {

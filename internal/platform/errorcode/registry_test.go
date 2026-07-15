@@ -9,7 +9,7 @@ import (
 
 func TestBuiltinsAreUniqueCompleteAndStable(t *testing.T) {
 	definitions := All()
-	if got, want := len(definitions), 117; got != want {
+	if got, want := len(definitions), 118; got != want {
 		t.Fatalf("len(All()) = %d, want %d", got, want)
 	}
 	seen := map[Code]struct{}{}
@@ -121,6 +121,7 @@ func TestCurrentConflictDecisionsAreCanonical(t *testing.T) {
 		CodeAdminFileOpenFailed:            {status: 500, message: "file open failed"},
 		CodeAdminFileUploadOpenFailed:      {status: 400, message: "open uploaded file failed"},
 		CodeAppFileOpenFailed:              {status: 500, message: "file open failed"},
+		CodeAppFileMetadataFailed:          {status: 500, message: "file metadata operation failed"},
 		CodeAppFileUploadOpenFailed:        {status: 400, message: "open uploaded file failed"},
 		CodeAuthInvalidCredentials:         {status: 401, message: "invalid credentials"},
 		CodeAppPhoneInvalidRequest:         {status: 400, message: "invalid app phone request"},
@@ -138,6 +139,28 @@ func TestCurrentConflictDecisionsAreCanonical(t *testing.T) {
 	}
 }
 
+func TestAppFileMetadataFailedDefinitionIsCanonical(t *testing.T) {
+	definition, ok := Lookup(CodeAppFileMetadataFailed)
+	if !ok {
+		t.Fatal("APP_FILE_METADATA_FAILED is missing")
+	}
+	want := Definition{
+		Code:           CodeAppFileMetadataFailed,
+		Owner:          "platform.file",
+		Planes:         []Plane{PlaneApp},
+		Audiences:      []Audience{AudiencePublic},
+		Category:       CategoryInternal,
+		HTTPStatus:     500,
+		RetryPolicy:    RetryNever,
+		RedactionClass: RedactionCorrelationOnly,
+		PublicMessage:  "file metadata operation failed",
+		IntroducedIn:   "0.1.0",
+	}
+	if !reflect.DeepEqual(definition, want) {
+		t.Fatalf("Lookup(APP_FILE_METADATA_FAILED) = %+v, want %+v", definition, want)
+	}
+}
+
 func TestBuiltinRetryAndRedactionMetadataIsSemantic(t *testing.T) {
 	tests := []struct {
 		code      Code
@@ -146,6 +169,7 @@ func TestBuiltinRetryAndRedactionMetadataIsSemantic(t *testing.T) {
 	}{
 		{code: CodeAdminFileSaveFailed, retry: RetryNever, redaction: RedactionCorrelationOnly},
 		{code: CodeAppFileRollbackFailed, retry: RetryNever, redaction: RedactionCorrelationOnly},
+		{code: CodeAppFileMetadataFailed, retry: RetryNever, redaction: RedactionCorrelationOnly},
 		{code: CodeAuthSessionIssueFailed, retry: RetryNever, redaction: RedactionCorrelationOnly},
 		{code: CodeAppAuthSessionRevokeFailed, retry: RetryNever, redaction: RedactionCorrelationOnly},
 		{code: CodeAuthIdentityBindingFailed, retry: RetryNever, redaction: RedactionCorrelationOnly},

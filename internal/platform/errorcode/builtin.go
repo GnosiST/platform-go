@@ -88,6 +88,7 @@ const (
 	CodeAppPhoneVerificationUpdateFailed       Code = "APP_PHONE_VERIFICATION_UPDATE_FAILED"
 	CodeAppFileSaveFailed                      Code = "APP_FILE_SAVE_FAILED"
 	CodeAppFileRollbackFailed                  Code = "APP_FILE_ROLLBACK_FAILED"
+	CodeAppFileMetadataFailed                  Code = "APP_FILE_METADATA_FAILED"
 	CodeAppFileStateRefreshFailed              Code = "APP_FILE_STATE_REFRESH_FAILED"
 	CodeAppFileNotFound                        Code = "APP_FILE_NOT_FOUND"
 	CodeAppFileObjectNotFound                  Code = "APP_FILE_OBJECT_NOT_FOUND"
@@ -208,6 +209,7 @@ var builtinDefinitions = []Definition{
 	public(CodeAppPhoneVerificationUpdateFailed, "platform.appphone", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryInternal, 500, "app phone verification update failed"),
 	public(CodeAppFileSaveFailed, "platform.file", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryInternal, 500, "file save failed"),
 	public(CodeAppFileRollbackFailed, "platform.file", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryInternal, 500, "file upload rollback failed"),
+	public(CodeAppFileMetadataFailed, "platform.file", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryInternal, 500, "file metadata operation failed"),
 	public(CodeAppFileStateRefreshFailed, "platform.file", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryDependency, 503, "file authorization state is unavailable"),
 	public(CodeAppFileNotFound, "platform.file", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryNotFound, 404, "file not found"),
 	public(CodeAppFileObjectNotFound, "platform.file", []Plane{PlaneApp}, []Audience{AudiencePublic}, CategoryNotFound, 404, "file object not found"),

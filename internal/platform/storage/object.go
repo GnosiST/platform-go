@@ -15,6 +15,9 @@ import (
 
 var (
 	ErrObjectNotFound               = errors.New("file object not found")
+	ErrObjectSaveFailed             = errors.New("file object save failed")
+	ErrObjectOpenFailed             = errors.New("file object open failed")
+	ErrObjectDeleteFailed           = errors.New("file object delete failed")
 	ErrUnsupportedObjectStoreDriver = errors.New("unsupported object store driver")
 	ErrInvalidObjectStoreConfig     = errors.New("invalid object store config")
 	ErrUnsafeObjectPath             = errors.New("unsafe file object path")
@@ -121,43 +124,43 @@ func NewLocalObjectStore(options LocalObjectStoreOptions) LocalObjectStore {
 
 func (store LocalObjectStore) Save(_ context.Context, input ObjectSaveInput) (ObjectMetadata, error) {
 	if input.Reader == nil {
-		return ObjectMetadata{}, errors.New("object reader is required")
+		return ObjectMetadata{}, ErrObjectSaveFailed
 	}
 	if err := store.validateRoot(); err != nil {
-		return ObjectMetadata{}, err
+		return ObjectMetadata{}, normalizeObjectOperationError(err, ErrObjectSaveFailed)
 	}
 	key, err := store.keyGenerator()
 	if err != nil {
-		return ObjectMetadata{}, fmt.Errorf("generate object key: %w", err)
+		return ObjectMetadata{}, ErrObjectSaveFailed
 	}
 	key, err = safeObjectKey(key)
 	if err != nil {
-		return ObjectMetadata{}, err
+		return ObjectMetadata{}, normalizeObjectOperationError(err, ErrObjectSaveFailed)
 	}
 	if err := store.ensurePrivateObjectDir(path.Dir(key)); err != nil {
-		return ObjectMetadata{}, err
+		return ObjectMetadata{}, normalizeObjectOperationError(err, ErrObjectSaveFailed)
 	}
 	if info, err := store.root.Lstat(key); err == nil {
 		if info.Mode()&os.ModeSymlink != 0 {
 			return ObjectMetadata{}, fmt.Errorf("%w: object target must not be a symlink", ErrUnsafeObjectPath)
 		}
-		return ObjectMetadata{}, os.ErrExist
+		return ObjectMetadata{}, ErrObjectSaveFailed
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return ObjectMetadata{}, err
+		return ObjectMetadata{}, ErrObjectSaveFailed
 	}
 	file, err := store.root.OpenFile(key, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
-		return ObjectMetadata{}, err
+		return ObjectMetadata{}, ErrObjectSaveFailed
 	}
 	size, copyErr := io.Copy(file, input.Reader)
 	closeErr := file.Close()
 	if copyErr != nil {
 		_ = store.root.Remove(key)
-		return ObjectMetadata{}, copyErr
+		return ObjectMetadata{}, ErrObjectSaveFailed
 	}
 	if closeErr != nil {
 		_ = store.root.Remove(key)
-		return ObjectMetadata{}, closeErr
+		return ObjectMetadata{}, ErrObjectSaveFailed
 	}
 	return ObjectMetadata{
 		Driver:    "local",
@@ -168,20 +171,23 @@ func (store LocalObjectStore) Save(_ context.Context, input ObjectSaveInput) (Ob
 
 func (store LocalObjectStore) Open(_ context.Context, key string) (io.ReadCloser, error) {
 	if err := store.validateRoot(); err != nil {
-		return nil, err
+		return nil, normalizeObjectOperationError(err, ErrObjectOpenFailed)
 	}
 	key, err := safeObjectKey(key)
 	if err != nil {
-		return nil, err
+		return nil, normalizeObjectOperationError(err, ErrObjectOpenFailed)
 	}
 	if err := store.validateObjectTarget(key); err != nil {
-		return nil, err
+		return nil, normalizeObjectOperationError(err, ErrObjectOpenFailed)
 	}
 	file, err := store.root.Open(key)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, ErrObjectNotFound
 	}
-	return file, err
+	if err != nil {
+		return nil, ErrObjectOpenFailed
+	}
+	return file, nil
 }
 
 func (store LocalObjectStore) Delete(_ context.Context, key string) error {
@@ -189,20 +195,36 @@ func (store LocalObjectStore) Delete(_ context.Context, key string) error {
 		return nil
 	}
 	if err := store.validateRoot(); err != nil {
-		return err
+		return normalizeObjectOperationError(err, ErrObjectDeleteFailed)
 	}
 	key, err := safeObjectKey(key)
 	if err != nil {
-		return err
+		return normalizeObjectOperationError(err, ErrObjectDeleteFailed)
 	}
 	if err := store.validateObjectTarget(key); err != nil {
-		return err
+		return normalizeObjectOperationError(err, ErrObjectDeleteFailed)
 	}
 	err = store.root.Remove(key)
 	if errors.Is(err, os.ErrNotExist) {
 		return ErrObjectNotFound
 	}
-	return err
+	if err != nil {
+		return ErrObjectDeleteFailed
+	}
+	return nil
+}
+
+func normalizeObjectOperationError(err error, operation error) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, ErrObjectNotFound):
+		return ErrObjectNotFound
+	case errors.Is(err, ErrUnsafeObjectPath):
+		return ErrUnsafeObjectPath
+	default:
+		return operation
+	}
 }
 
 func (store LocalObjectStore) pathForKey(key string) string {

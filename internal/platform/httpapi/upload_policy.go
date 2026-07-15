@@ -13,12 +13,15 @@ import (
 	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
+
+	"platform-go/internal/platform/errorcode"
 )
 
 const (
 	defaultFileMaxUploadBytes int64 = 10 << 20
 	maxFileUploadBytes        int64 = 100 << 20
 	maxMultipartOverheadBytes int64 = 1 << 20
+	defaultMultipartMemory    int64 = 32 << 20
 	maxUploadFileNameBytes          = 255
 )
 
@@ -41,14 +44,45 @@ type validatedUpload struct {
 	Close       func() error
 }
 
+type UploadErrorCodes struct {
+	Required       errorcode.Code
+	TooLarge       errorcode.Code
+	OpenFailed     errorcode.Code
+	ReadFailed     errorcode.Code
+	MIMEInvalid    errorcode.Code
+	MIMEMismatch   errorcode.Code
+	MIMENotAllowed errorcode.Code
+}
+
+var adminUploadErrorCodes = UploadErrorCodes{
+	Required:       errorcode.CodeAdminFileRequired,
+	TooLarge:       errorcode.CodeAdminFileTooLarge,
+	OpenFailed:     errorcode.CodeAdminFileUploadOpenFailed,
+	ReadFailed:     errorcode.CodeAdminFileReadFailed,
+	MIMEInvalid:    errorcode.CodeAdminFileMIMEInvalid,
+	MIMEMismatch:   errorcode.CodeAdminFileMIMEMismatch,
+	MIMENotAllowed: errorcode.CodeAdminFileMIMENotAllowed,
+}
+
+var appUploadErrorCodes = UploadErrorCodes{
+	Required:       errorcode.CodeAppFileRequired,
+	TooLarge:       errorcode.CodeAppFileTooLarge,
+	OpenFailed:     errorcode.CodeAppFileUploadOpenFailed,
+	ReadFailed:     errorcode.CodeAppFileReadFailed,
+	MIMEInvalid:    errorcode.CodeAppFileMIMEInvalid,
+	MIMEMismatch:   errorcode.CodeAppFileMIMEMismatch,
+	MIMENotAllowed: errorcode.CodeAppFileMIMENotAllowed,
+}
+
 type uploadPolicyError struct {
-	Status  int
-	Code    string
-	Message string
+	Code errorcode.Code
 }
 
 func (err *uploadPolicyError) Error() string {
-	return err.Message
+	if err == nil {
+		return ""
+	}
+	return string(err.Code)
 }
 
 func NewUploadPolicy(maxBytes int64, allowedMediaTypes []string) (UploadPolicy, error) {
@@ -82,45 +116,50 @@ func normalizeUploadPolicy(policy UploadPolicy) UploadPolicy {
 	return policy
 }
 
-func readValidatedUpload(ctx *gin.Context, policy UploadPolicy, codePrefix string) (validatedUpload, error) {
+func readValidatedUpload(ctx *gin.Context, policy UploadPolicy, codes UploadErrorCodes) (validatedUpload, error) {
 	policy = normalizeUploadPolicy(policy)
 	ctx.Request.Body = http.MaxBytesReader(ctx.Writer, ctx.Request.Body, policy.MaxBytes+maxMultipartOverheadBytes)
-	fileHeader, err := ctx.FormFile("file")
+	err := ctx.Request.ParseMultipartForm(defaultMultipartMemory)
 	if err != nil {
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
-			return validatedUpload{}, &uploadPolicyError{Status: http.StatusRequestEntityTooLarge, Code: codePrefix + "_TOO_LARGE", Message: "file exceeds the configured upload limit"}
+			return validatedUpload{}, &uploadPolicyError{Code: codes.TooLarge}
 		}
-		return validatedUpload{}, &uploadPolicyError{Status: http.StatusBadRequest, Code: codePrefix + "_REQUIRED", Message: "file is required"}
+		return validatedUpload{}, &uploadPolicyError{Code: codes.Required}
 	}
+	fileHeaders := ctx.Request.MultipartForm.File["file"]
+	if len(fileHeaders) == 0 {
+		return validatedUpload{}, &uploadPolicyError{Code: codes.Required}
+	}
+	fileHeader := fileHeaders[0]
 	if fileHeader.Size > policy.MaxBytes {
 		_ = closeMultipartUpload(ctx, nil)
-		return validatedUpload{}, &uploadPolicyError{Status: http.StatusRequestEntityTooLarge, Code: codePrefix + "_TOO_LARGE", Message: "file exceeds the configured upload limit"}
+		return validatedUpload{}, &uploadPolicyError{Code: codes.TooLarge}
 	}
 	opened, err := fileHeader.Open()
 	if err != nil {
 		_ = closeMultipartUpload(ctx, nil)
-		return validatedUpload{}, &uploadPolicyError{Status: http.StatusBadRequest, Code: codePrefix + "_OPEN_FAILED", Message: "open uploaded file failed"}
+		return validatedUpload{}, &uploadPolicyError{Code: codes.OpenFailed}
 	}
 	head, err := io.ReadAll(io.LimitReader(opened, 512))
 	if err != nil {
 		_ = closeMultipartUpload(ctx, opened)
-		return validatedUpload{}, &uploadPolicyError{Status: http.StatusBadRequest, Code: codePrefix + "_READ_FAILED", Message: "read uploaded file failed"}
+		return validatedUpload{}, &uploadPolicyError{Code: codes.ReadFailed}
 	}
 	detected, _, err := mime.ParseMediaType(http.DetectContentType(head))
 	if err != nil {
 		_ = closeMultipartUpload(ctx, opened)
-		return validatedUpload{}, &uploadPolicyError{Status: http.StatusUnsupportedMediaType, Code: codePrefix + "_MIME_INVALID", Message: "uploaded file MIME type is invalid"}
+		return validatedUpload{}, &uploadPolicyError{Code: codes.MIMEInvalid}
 	}
 	declared, _, err := mime.ParseMediaType(fileHeader.Header.Get("Content-Type"))
 	if err != nil || declared == "" || !strings.EqualFold(declared, detected) {
 		_ = closeMultipartUpload(ctx, opened)
-		return validatedUpload{}, &uploadPolicyError{Status: http.StatusUnsupportedMediaType, Code: codePrefix + "_MIME_MISMATCH", Message: "declared and detected file MIME types do not match"}
+		return validatedUpload{}, &uploadPolicyError{Code: codes.MIMEMismatch}
 	}
 	detected = strings.ToLower(detected)
 	if _, allowed := policy.AllowedMediaTypes[detected]; !allowed {
 		_ = closeMultipartUpload(ctx, opened)
-		return validatedUpload{}, &uploadPolicyError{Status: http.StatusUnsupportedMediaType, Code: codePrefix + "_MIME_NOT_ALLOWED", Message: "uploaded file MIME type is not allowed"}
+		return validatedUpload{}, &uploadPolicyError{Code: codes.MIMENotAllowed}
 	}
 	return validatedUpload{
 		FileName:    sanitizeUploadFileName(fileHeader.Filename),
