@@ -217,6 +217,9 @@ function validateContract(contract, serviceRuntime, errors) {
   }
   requireEqual(contract.menuContract?.page?.parameterValueSource, "static-literal-only", "menuContract.page.parameterValueSource", errors);
   requireEqual(contract.menuContract?.page?.maximumParameters, 32, "menuContract.page.maximumParameters", errors);
+  requireIncludes(contract.menuContract?.page?.forbiddenClientInputs, [
+    "script", "expression", "datasource", "shard", "sql", "route-template", "physical-database", "physical-schema", "physical-routing",
+  ], "menuContract.page.forbiddenClientInputs", errors);
   requireEqual(contract.menuContract?.page?.externalUrl, "https-required-for-external-pages", "menuContract.page.externalUrl", errors);
   if (!sameList(values(contract.menuContract?.page?.openModes), ["same-tab", "new-tab"])) {
     errors.push("menuContract.page.openModes must be same-tab then new-tab");
@@ -230,12 +233,17 @@ function validateContract(contract, serviceRuntime, errors) {
   requireEqual(contract.menuContract?.pageButtons?.transactionBoundary, "button-and-permission-relation-one-native-transaction", "menuContract.pageButtons.transactionBoundary", errors);
   requireEqual(contract.menuContract?.pageButtons?.apiAuthorization, "visibility-only-casbin-api-permission-still-required", "menuContract.pageButtons.apiAuthorization", errors);
   requireEqual(contract.menuContract?.assignment?.storedNodes, "page-only", "menuContract.assignment.storedNodes", errors);
+  requireEqual(contract.menuContract?.assignment?.effectiveDirectories, "ancestor-closure-of-visible-pages", "menuContract.assignment.effectiveDirectories", errors);
+  requireEqual(contract.menuContract?.assignment?.multipleRoleResolution, "union-of-enabled-role-page-bindings", "menuContract.assignment.multipleRoleResolution", errors);
   requireEqual(contract.menuContract?.assignment?.directorySelection, "bulk-current-eligible-descendant-pages-only", "menuContract.assignment.directorySelection", errors);
   requireEqual(contract.menuContract?.assignment?.futureDescendantGrant, "forbidden", "menuContract.assignment.futureDescendantGrant", errors);
   requireEqual(contract.menuContract?.servingModes?.default, "legacy", "menuContract.servingModes.default", errors);
   if (!sameList(values(contract.menuContract?.servingModes?.explicit), ["legacy", "dual-read", "target"])) {
     errors.push("menuContract.servingModes.explicit must be legacy then dual-read then target");
   }
+  requireEqual(contract.menuContract?.servingModes?.legacyOnlyServingEnabled, true, "menuContract.servingModes.legacyOnlyServingEnabled", errors);
+  requireEqual(contract.menuContract?.servingModes?.targetServingGate, "closed", "menuContract.servingModes.targetServingGate", errors);
+  requireEqual(contract.menuContract?.servingModes?.roleMenuWriteGate, "closed", "menuContract.servingModes.roleMenuWriteGate", errors);
   requireEqual(contract.menuContract?.servingModes?.legacy, "permission-derived-pages", "menuContract.servingModes.legacy", errors);
   requireEqual(contract.menuContract?.servingModes?.dualRead, "serve-legacy-and-compare-target-value-free", "menuContract.servingModes.dualRead", errors);
   requireEqual(contract.menuContract?.servingModes?.target, "role-page-bindings-with-derived-directory-ancestors", "menuContract.servingModes.target", errors);
@@ -244,6 +252,7 @@ function validateContract(contract, serviceRuntime, errors) {
 
   const migration = contract.menuPermissionMigration ?? {};
   requireEqual(migration.legacyField, "menus.permission", "menuPermissionMigration.legacyField", errors);
+  requireEqual(migration.writePolicy, "read-only", "menuPermissionMigration.writePolicy", errors);
   requireEqual(migration.cutoverGate, "zero-unapproved-principal-diffs-and-reviewed-rollback-plan", "menuPermissionMigration.cutoverGate", errors);
   requireIncludes(migration.phases, [
     "compare-legacy-and-candidate-effective-menus-for-every-active-principal",

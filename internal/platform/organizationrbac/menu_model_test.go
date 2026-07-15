@@ -30,7 +30,7 @@ func TestMenuModelFreezesExecutableContractVocabulary(t *testing.T) {
 	}
 }
 
-func TestMenuModelCarriesTypedPagesButtonsAndPageOnlyBindings(t *testing.T) {
+func TestMenuModelCarriesContractPayloadFieldsWithoutRuntimeValidation(t *testing.T) {
 	page := MenuNode{
 		Code:         "users",
 		ParentCode:   "access",
@@ -53,7 +53,7 @@ func TestMenuModelCarriesTypedPagesButtonsAndPageOnlyBindings(t *testing.T) {
 		SortOrder:      10,
 		Status:         StatusEnabled,
 	}
-	binding := RoleMenuBinding{RoleCode: "tenant-admin", MenuCode: page.Code}
+	binding := RoleMenuBinding{RoleCode: "tenant-admin", MenuCode: "users"}
 
 	if page.NodeType != MenuNodeTypePage || len(page.Parameters) != 3 {
 		t.Fatalf("page = %+v", page)
@@ -61,7 +61,7 @@ func TestMenuModelCarriesTypedPagesButtonsAndPageOnlyBindings(t *testing.T) {
 	if button.MenuCode != page.Code || button.ButtonKey == "" || button.PermissionCode == "" {
 		t.Fatalf("button = %+v", button)
 	}
-	if binding.MenuCode != page.Code {
+	if binding.RoleCode == "" || binding.MenuCode == "" {
 		t.Fatalf("binding = %+v", binding)
 	}
 }

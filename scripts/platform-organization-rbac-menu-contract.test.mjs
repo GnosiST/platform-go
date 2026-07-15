@@ -219,6 +219,46 @@ describe("platform organization RBAC menu contract", () => {
     assert.match(result.stderr, /servingModes\.explicit must be legacy then dual-read then target/);
   });
 
+  it("rejects opening target menu serving or role-menu writes before their gates", () => {
+    const contract = readJSON("resources/platform-organization-rbac-menu-contract.json");
+    contract.menuContract.servingModes.legacyOnlyServingEnabled = false;
+    contract.menuContract.servingModes.targetServingGate = "open";
+    contract.menuContract.servingModes.roleMenuWriteGate = "open";
+
+    const result = runValidator(["--contract", tempJSON("contract.json", contract)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /servingModes\.legacyOnlyServingEnabled must be true/);
+    assert.match(result.stderr, /servingModes\.targetServingGate must be closed/);
+    assert.match(result.stderr, /servingModes\.roleMenuWriteGate must be closed/);
+  });
+
+  it("rejects role-menu directory derivation or multi-role composition drift", () => {
+    const contract = readJSON("resources/platform-organization-rbac-menu-contract.json");
+    contract.menuContract.assignment.effectiveDirectories = "stored-directory-bindings";
+    contract.menuContract.assignment.multipleRoleResolution = "first-enabled-role-only";
+
+    const result = runValidator(["--contract", tempJSON("contract.json", contract)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /assignment\.effectiveDirectories must be ancestor-closure-of-visible-pages/);
+    assert.match(result.stderr, /assignment\.multipleRoleResolution must be union-of-enabled-role-page-bindings/);
+  });
+
+  it("rejects writable legacy menu permissions and physical routing parameter inputs", () => {
+    const contract = readJSON("resources/platform-organization-rbac-menu-contract.json");
+    contract.menuPermissionMigration.writePolicy = "freeze-read-only-before-backfill";
+    contract.menuContract.page.forbiddenClientInputs = ["script", "expression"];
+
+    const result = runValidator(["--contract", tempJSON("contract.json", contract)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /menuPermissionMigration\.writePolicy must be read-only/);
+    for (const input of ["datasource", "shard", "sql", "route-template", "physical-database", "physical-schema", "physical-routing"]) {
+      assert.match(result.stderr, new RegExp(`page\\.forbiddenClientInputs must include ${input}`));
+    }
+  });
+
   it("rejects migration plans without principal-level comparison", () => {
     const contract = readJSON("resources/platform-organization-rbac-menu-contract.json");
     contract.menuPermissionMigration.phases = contract.menuPermissionMigration.phases.filter(

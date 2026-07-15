@@ -280,6 +280,7 @@
       "parameterTypes": ["string", "number", "boolean"],
       "parameterValueSource": "static-literal-only",
       "maximumParameters": 32,
+      "forbiddenClientInputs": ["script", "expression", "datasource", "shard", "sql", "route-template", "physical-database", "physical-schema", "physical-routing"],
       "externalUrl": "https-required-for-external-pages",
       "openModes": ["same-tab", "new-tab"],
       "advancedMetadata": ["external", "externalUrl", "openMode", "cacheEnabled", "hidden", "activeMenuCode", "breadcrumbVisible"]
@@ -303,6 +304,9 @@
     "servingModes": {
       "default": "legacy",
       "explicit": ["legacy", "dual-read", "target"],
+      "legacyOnlyServingEnabled": true,
+      "targetServingGate": "closed",
+      "roleMenuWriteGate": "closed",
       "legacy": "permission-derived-pages",
       "dualRead": "serve-legacy-and-compare-target-value-free",
       "target": "role-page-bindings-with-derived-directory-ancestors"
@@ -330,7 +334,7 @@
   },
   "menuPermissionMigration": {
     "legacyField": "menus.permission",
-    "writePolicy": "freeze-read-only-before-backfill",
+    "writePolicy": "read-only",
     "phases": [
       "inventory-and-classify-directory-page-and-permission-records",
       "create-target-tables-and-columns-disabled-from-serving",
