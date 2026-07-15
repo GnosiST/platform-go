@@ -22,6 +22,7 @@ type GORMAdminResourceRepository struct {
 	organizationRBACOrgUnits OrganizationRBACOrgUnitSnapshotWriter
 	organizationRBACRoles    OrganizationRBACRoleSnapshotWriter
 	organizationRBACGroups   OrganizationRBACRoleGroupSnapshotWriter
+	organizationRBACMenus    OrganizationRBACMenuPermissionSnapshotWriter
 }
 
 type OrganizationRBACUserSnapshotWriter interface {
@@ -40,7 +41,13 @@ type OrganizationRBACRoleGroupSnapshotWriter interface {
 	ApplyRoleGroupSnapshot(context.Context, *gorm.DB, []Record, []Record) error
 }
 
-var organizationRBACOwnedResources = []string{"users", "org-units", "roles", "role-groups"}
+type OrganizationRBACMenuPermissionSnapshotWriter interface {
+	ApplyMenuPermissionSnapshot(context.Context, *gorm.DB, []Record, []Record, []Record, []Record) error
+}
+
+var organizationRBACCoreOwnedResources = []string{"users", "org-units", "roles", "role-groups"}
+var organizationRBACOwnedResources = organizationRBACCoreOwnedResources
+var organizationRBACSnapshotResources = append(append([]string{}, organizationRBACCoreOwnedResources...), "menus", "permissions")
 
 const (
 	adminUsersTable             = "platform_admin_users"
@@ -109,8 +116,13 @@ var normalizedGORMResourceLayouts = map[string]gormAdminResourceLayout{
 	"menus": {
 		Table: adminMenusTable,
 		ValueProjections: map[string][]string{
+			"nodeType": {adminMenusTable + ".node_type"}, "parentCode": {adminMenusTable + ".parent_code"},
 			"route": {adminMenusTable + ".route"}, "parent": {adminMenusTable + ".parent"},
+			"componentKey": {adminMenusTable + ".component_key"}, "resourceCode": {adminMenusTable + ".resource_code"},
 			"isExternal": {adminMenusTable + ".is_external"}, "cacheEnabled": {adminMenusTable + ".cache_enabled"},
+			"externalUrl": {adminMenusTable + ".external_url"}, "openMode": {adminMenusTable + ".open_mode"},
+			"parameters": {adminMenusTable + ".parameters_json"}, "hidden": {adminMenusTable + ".hidden"},
+			"activeMenuCode": {adminMenusTable + ".active_menu_code"}, "breadcrumbVisible": {adminMenusTable + ".breadcrumb_visible"},
 			"resource": {adminMenusTable + ".resource"}, "permission": {adminMenusTable + ".permission"},
 			"group": {adminMenusTable + ".group_name"}, "icon": {adminMenusTable + ".icon"},
 			"order": {adminMenusTable + ".sort_order"}, "titleZh": {adminMenusTable + ".title_zh"},
@@ -280,26 +292,47 @@ type gormAdminPermission struct {
 }
 
 type gormAdminMenu struct {
-	ID            string `gorm:"column:id;primaryKey"`
-	Code          string `gorm:"column:code;uniqueIndex;not null"`
-	Name          string `gorm:"column:name;not null"`
-	Status        string `gorm:"column:status;not null"`
-	Description   string `gorm:"column:description;not null"`
-	UpdatedAt     string `gorm:"column:updated_at;not null"`
-	Route         string `gorm:"column:route;not null"`
-	Parent        string `gorm:"column:parent;not null"`
-	IsExternal    bool   `gorm:"column:is_external;not null"`
-	CacheEnabled  bool   `gorm:"column:cache_enabled;not null"`
-	Resource      string `gorm:"column:resource;not null"`
-	Permission    string `gorm:"column:permission;not null"`
-	Group         string `gorm:"column:group_name;not null"`
-	Icon          string `gorm:"column:icon;not null"`
-	Order         int    `gorm:"column:sort_order;not null"`
-	TitleZH       string `gorm:"column:title_zh;not null"`
-	TitleEN       string `gorm:"column:title_en;not null"`
-	DescriptionZH string `gorm:"column:description_zh;not null"`
-	DescriptionEN string `gorm:"column:description_en;not null"`
-	ValuesJSON    string `gorm:"column:values_json;not null"`
+	ID                string `gorm:"column:id;primaryKey"`
+	Code              string `gorm:"column:code;uniqueIndex;not null"`
+	Name              string `gorm:"column:name;not null"`
+	Status            string `gorm:"column:status;not null"`
+	Description       string `gorm:"column:description;not null"`
+	UpdatedAt         string `gorm:"column:updated_at;not null"`
+	NodeType          string `gorm:"column:node_type;size:32;index;not null;default:page"`
+	ParentCode        string `gorm:"column:parent_code;index;not null;default:''"`
+	Route             string `gorm:"column:route;not null"`
+	ComponentKey      string `gorm:"column:component_key;not null;default:''"`
+	ResourceCode      string `gorm:"column:resource_code;not null;default:''"`
+	Parent            string `gorm:"column:parent;not null"`
+	IsExternal        bool   `gorm:"column:is_external;not null"`
+	ExternalURL       string `gorm:"column:external_url;not null;default:''"`
+	OpenMode          string `gorm:"column:open_mode;size:32;not null;default:''"`
+	ParametersJSON    string `gorm:"column:parameters_json;type:text;not null;default:'[]'"`
+	CacheEnabled      bool   `gorm:"column:cache_enabled;not null"`
+	Hidden            bool   `gorm:"column:hidden;not null;default:false"`
+	ActiveMenuCode    string `gorm:"column:active_menu_code;not null;default:''"`
+	BreadcrumbVisible bool   `gorm:"column:breadcrumb_visible;not null;default:true"`
+	Resource          string `gorm:"column:resource;not null"`
+	Permission        string `gorm:"column:permission;not null"`
+	Group             string `gorm:"column:group_name;not null"`
+	Icon              string `gorm:"column:icon;not null"`
+	Order             int    `gorm:"column:sort_order;not null"`
+	TitleZH           string `gorm:"column:title_zh;not null"`
+	TitleEN           string `gorm:"column:title_en;not null"`
+	DescriptionZH     string `gorm:"column:description_zh;not null"`
+	DescriptionEN     string `gorm:"column:description_en;not null"`
+	ValuesJSON        string `gorm:"column:values_json;not null"`
+}
+
+type gormAdminPageButton struct {
+	MenuCode       string `gorm:"column:menu_code;primaryKey" json:"menuCode"`
+	ButtonKey      string `gorm:"column:button_key;primaryKey" json:"buttonKey"`
+	LabelZH        string `gorm:"column:label_zh;not null" json:"labelZh"`
+	LabelEN        string `gorm:"column:label_en;not null" json:"labelEn"`
+	Action         string `gorm:"column:action;not null" json:"action"`
+	SortOrder      int    `gorm:"column:sort_order;not null" json:"sortOrder"`
+	Status         string `gorm:"column:status;not null" json:"status"`
+	PermissionCode string `gorm:"column:permission_code;not null" json:"permissionCode"`
 }
 
 type gormAdminAreaCode struct {
@@ -432,8 +465,17 @@ func (r *GORMAdminResourceRepository) WithOrganizationRBACRoleWriters(roleWriter
 	return &clone
 }
 
+func (r *GORMAdminResourceRepository) WithOrganizationRBACMenuPermissionWriter(writer OrganizationRBACMenuPermissionSnapshotWriter) *GORMAdminResourceRepository {
+	if r == nil {
+		return nil
+	}
+	clone := *r
+	clone.organizationRBACMenus = writer
+	return &clone
+}
+
 func (r *GORMAdminResourceRepository) ExcludeCapabilitySeed(resource string) bool {
-	return r != nil && r.organizationRBACOwned && slices.Contains(organizationRBACOwnedResources, resource)
+	return r != nil && r.organizationRBACOwned && slices.Contains(organizationRBACCoreOwnedResources, resource)
 }
 
 func gormAdminResourceModels() []any {
@@ -505,6 +547,8 @@ func (gormAdminPermission) TableName() string {
 func (gormAdminMenu) TableName() string {
 	return adminMenusTable
 }
+
+func (gormAdminPageButton) TableName() string { return "platform_admin_page_buttons" }
 
 func (gormAdminAreaCode) TableName() string {
 	return adminAreaCodesTable
@@ -589,16 +633,18 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 		var organizationRBACOrgUnitsChanged bool
 		var organizationRBACRolesChanged bool
 		var organizationRBACGroupsChanged bool
+		var organizationRBACMenusChanged bool
+		var organizationRBACPermissionsChanged bool
 		if r.organizationRBACOwned {
 			current := ResourceSnapshot{Resources: map[string][]Record{}}
-			txRepository := &GORMAdminResourceRepository{db: tx}
+			txRepository := &GORMAdminResourceRepository{db: tx, organizationRBACOwned: true}
 			if err := txRepository.loadOrganizationRBACOwnedResources(ctx, &current); err != nil {
 				return err
 			}
-			if err := txRepository.loadLifecycleForResources(ctx, &current, organizationRBACOwnedResources); err != nil {
+			if err := txRepository.loadLifecycleForResources(ctx, &current, organizationRBACSnapshotResources); err != nil {
 				return err
 			}
-			for _, resource := range organizationRBACOwnedResources {
+			for _, resource := range organizationRBACSnapshotResources {
 				if !equalOrganizationRBACProjection(resource, current.Resources[resource], snapshot.Resources[resource]) {
 					switch resource {
 					case "users":
@@ -621,6 +667,16 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 							return fmt.Errorf("%w: %s", ErrDomainOwnedMutation, resource)
 						}
 						organizationRBACGroupsChanged = true
+					case "menus":
+						if r.organizationRBACMenus == nil {
+							return fmt.Errorf("%w: %s", ErrDomainOwnedMutation, resource)
+						}
+						organizationRBACMenusChanged = true
+					case "permissions":
+						if r.organizationRBACMenus == nil {
+							return fmt.Errorf("%w: %s", ErrDomainOwnedMutation, resource)
+						}
+						organizationRBACPermissionsChanged = true
 					default:
 						return fmt.Errorf("%w: %s", ErrDomainOwnedMutation, resource)
 					}
@@ -643,6 +699,15 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 			}
 			if organizationRBACRolesChanged {
 				if err := r.organizationRBACRoles.ApplyRoleSnapshot(ctx, tx, current.Resources["roles"], snapshot.Resources["roles"]); err != nil {
+					return err
+				}
+			}
+			if organizationRBACMenusChanged || organizationRBACPermissionsChanged {
+				if err := r.organizationRBACMenus.ApplyMenuPermissionSnapshot(
+					ctx, tx,
+					current.Resources["menus"], snapshot.Resources["menus"],
+					current.Resources["permissions"], snapshot.Resources["permissions"],
+				); err != nil {
 					return err
 				}
 			}
@@ -671,8 +736,6 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 		deleteModels := []interface{}{
 			&gormAdminResourceRecord{},
 			&gormAdminTenant{},
-			&gormAdminPermission{},
-			&gormAdminMenu{},
 			&gormAdminAreaCode{},
 			&gormAdminAuditLog{},
 			&gormAdminLoginLog{},
@@ -682,7 +745,7 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 		if !r.organizationRBACOwned {
 			deleteModels = append(deleteModels,
 				&gormAdminUserRole{}, &gormAdminRolePermission{}, &gormAdminUser{},
-				&gormAdminOrgUnit{}, &gormAdminRole{}, &gormAdminRoleGroup{},
+				&gormAdminOrgUnit{}, &gormAdminRole{}, &gormAdminRoleGroup{}, &gormAdminPermission{}, &gormAdminMenu{},
 			)
 		}
 		for _, model := range deleteModels {
@@ -692,7 +755,7 @@ func (r *GORMAdminResourceRepository) Save(ctx context.Context, snapshot Resourc
 		}
 		lifecycleDelete := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Model(&gormAdminResourceLifecycle{})
 		if r.organizationRBACOwned {
-			lifecycleDelete = lifecycleDelete.Where("resource NOT IN ?", organizationRBACOwnedResources)
+			lifecycleDelete = lifecycleDelete.Where("resource NOT IN ?", organizationRBACSnapshotResources)
 		}
 		if err := lifecycleDelete.Delete(&gormAdminResourceLifecycle{}).Error; err != nil {
 			return err
@@ -772,6 +835,8 @@ func (r *GORMAdminResourceRepository) loadOrganizationRBACOwnedResources(ctx con
 		{resource: "org-units", load: r.loadOrgUnits},
 		{resource: "roles", load: r.loadRoles},
 		{resource: "role-groups", load: r.loadRoleGroups},
+		{resource: "menus", load: r.loadMenus},
+		{resource: "permissions", load: r.loadPermissions},
 	}
 	for _, loader := range loaders {
 		records, err := loader.load(ctx)
@@ -817,7 +882,7 @@ func (r *GORMAdminResourceRepository) loadLifecycleForResources(ctx context.Cont
 func saveLifecycleRows(tx *gorm.DB, snapshot ResourceSnapshot, organizationRBACOwned bool) error {
 	rows := make([]gormAdminResourceLifecycle, 0)
 	for resource, records := range snapshot.Resources {
-		if organizationRBACOwned && slices.Contains(organizationRBACOwnedResources, resource) {
+		if organizationRBACOwned && slices.Contains(organizationRBACSnapshotResources, resource) {
 			continue
 		}
 		for _, record := range records {
@@ -1194,19 +1259,59 @@ func (r *GORMAdminResourceRepository) loadMenus(ctx context.Context) ([]Record, 
 	if len(rows) == 0 {
 		return nil, nil
 	}
+	buttonsByMenu := map[string][]gormAdminPageButton{}
+	if r.db.WithContext(ctx).Migrator().HasTable(&gormAdminPageButton{}) {
+		var buttons []gormAdminPageButton
+		if err := r.db.WithContext(ctx).Order("menu_code, sort_order, button_key").Find(&buttons).Error; err != nil {
+			return nil, err
+		}
+		for _, button := range buttons {
+			buttonsByMenu[button.MenuCode] = append(buttonsByMenu[button.MenuCode], button)
+		}
+	}
 	records := make([]Record, 0, len(rows))
 	for _, row := range rows {
 		values, err := valuesFromJSON(row.ValuesJSON)
 		if err != nil {
 			return nil, err
 		}
+		if _, ok := values["nodeType"]; ok || row.NodeType != "page" || r.organizationRBACOwned {
+			values["nodeType"] = row.NodeType
+		}
+		if _, ok := values["parentCode"]; ok || r.organizationRBACOwned {
+			values["parentCode"] = row.ParentCode
+		}
 		values["route"] = row.Route
 		values["parent"] = row.Parent
-		if _, ok := values["isExternal"]; ok || row.IsExternal {
+		if _, ok := values["componentKey"]; ok || r.organizationRBACOwned {
+			values["componentKey"] = row.ComponentKey
+		}
+		if _, ok := values["resourceCode"]; ok || r.organizationRBACOwned {
+			values["resourceCode"] = row.ResourceCode
+		}
+		if _, ok := values["isExternal"]; ok || row.IsExternal || r.organizationRBACOwned {
 			values["isExternal"] = boolString(row.IsExternal)
 		}
-		if _, ok := values["cacheEnabled"]; ok || !row.CacheEnabled {
+		if _, ok := values["cacheEnabled"]; ok || !row.CacheEnabled || r.organizationRBACOwned {
 			values["cacheEnabled"] = boolString(row.CacheEnabled)
+		}
+		if _, ok := values["externalUrl"]; ok || row.ExternalURL != "" || r.organizationRBACOwned {
+			values["externalUrl"] = row.ExternalURL
+		}
+		if _, ok := values["openMode"]; ok || row.OpenMode != "" || r.organizationRBACOwned {
+			values["openMode"] = row.OpenMode
+		}
+		if _, ok := values["parameters"]; ok || row.ParametersJSON != "[]" || r.organizationRBACOwned {
+			values["parameters"] = row.ParametersJSON
+		}
+		if _, ok := values["hidden"]; ok || row.Hidden || r.organizationRBACOwned {
+			values["hidden"] = boolString(row.Hidden)
+		}
+		if _, ok := values["activeMenuCode"]; ok || row.ActiveMenuCode != "" || r.organizationRBACOwned {
+			values["activeMenuCode"] = row.ActiveMenuCode
+		}
+		if _, ok := values["breadcrumbVisible"]; ok || !row.BreadcrumbVisible || r.organizationRBACOwned {
+			values["breadcrumbVisible"] = boolString(row.BreadcrumbVisible)
 		}
 		values["resource"] = row.Resource
 		values["permission"] = row.Permission
@@ -1217,6 +1322,13 @@ func (r *GORMAdminResourceRepository) loadMenus(ctx context.Context) ([]Record, 
 		values["titleEn"] = row.TitleEN
 		values["descriptionZh"] = row.DescriptionZH
 		values["descriptionEn"] = row.DescriptionEN
+		if buttons := buttonsByMenu[row.Code]; len(buttons) > 0 {
+			encoded, err := json.Marshal(buttons)
+			if err != nil {
+				return nil, err
+			}
+			values["pageButtons"] = string(encoded)
+		}
 		records = append(records, Record{
 			ID:          row.ID,
 			Code:        row.Code,
@@ -1364,11 +1476,13 @@ func saveNormalizedResources(tx *gorm.DB, snapshot ResourceSnapshot, organizatio
 			return err
 		}
 	}
-	if err := savePermissions(tx, snapshot.Resources["permissions"]); err != nil {
-		return err
-	}
-	if err := saveMenus(tx, snapshot.Resources["menus"]); err != nil {
-		return err
+	if !organizationRBACOwned {
+		if err := savePermissions(tx, snapshot.Resources["permissions"]); err != nil {
+			return err
+		}
+		if err := saveMenus(tx, snapshot.Resources["menus"]); err != nil {
+			return err
+		}
 	}
 	if err := saveAreaCodes(tx, snapshot.Resources["area-codes"]); err != nil {
 		return err
@@ -1575,26 +1689,36 @@ func saveMenus(tx *gorm.DB, records []Record) error {
 			return err
 		}
 		rows = append(rows, gormAdminMenu{
-			ID:            record.ID,
-			Code:          record.Code,
-			Name:          record.Name,
-			Status:        record.Status,
-			Description:   record.Description,
-			UpdatedAt:     record.UpdatedAt,
-			Route:         record.Values["route"],
-			Parent:        record.Values["parent"],
-			IsExternal:    parseBool(record.Values["isExternal"]),
-			CacheEnabled:  parseBoolDefault(record.Values["cacheEnabled"], true),
-			Resource:      record.Values["resource"],
-			Permission:    record.Values["permission"],
-			Group:         record.Values["group"],
-			Icon:          record.Values["icon"],
-			Order:         parseOrder(record.Values["order"]),
-			TitleZH:       valueWithFallback(record.Values["titleZh"], record.Values["nameZh"]),
-			TitleEN:       valueWithFallback(record.Values["titleEn"], record.Values["nameEn"]),
-			DescriptionZH: valueWithFallback(record.Values["descriptionZh"], record.Description),
-			DescriptionEN: valueWithFallback(record.Values["descriptionEn"], record.Description),
-			ValuesJSON:    valuesJSON,
+			ID:                record.ID,
+			Code:              record.Code,
+			Name:              record.Name,
+			Status:            record.Status,
+			Description:       record.Description,
+			UpdatedAt:         record.UpdatedAt,
+			NodeType:          valueWithFallback(record.Values["nodeType"], "page"),
+			ParentCode:        valueWithFallback(record.Values["parentCode"], record.Values["parent"]),
+			Route:             record.Values["route"],
+			ComponentKey:      valueWithFallback(record.Values["componentKey"], record.Values["resource"]),
+			ResourceCode:      valueWithFallback(record.Values["resourceCode"], record.Values["resource"]),
+			Parent:            record.Values["parent"],
+			IsExternal:        parseBool(record.Values["isExternal"]),
+			ExternalURL:       record.Values["externalUrl"],
+			OpenMode:          record.Values["openMode"],
+			ParametersJSON:    valueWithFallback(record.Values["parameters"], "[]"),
+			CacheEnabled:      parseBoolDefault(record.Values["cacheEnabled"], true),
+			Hidden:            parseBool(record.Values["hidden"]),
+			ActiveMenuCode:    record.Values["activeMenuCode"],
+			BreadcrumbVisible: parseBoolDefault(record.Values["breadcrumbVisible"], true),
+			Resource:          record.Values["resource"],
+			Permission:        record.Values["permission"],
+			Group:             record.Values["group"],
+			Icon:              record.Values["icon"],
+			Order:             parseOrder(record.Values["order"]),
+			TitleZH:           valueWithFallback(record.Values["titleZh"], record.Values["nameZh"]),
+			TitleEN:           valueWithFallback(record.Values["titleEn"], record.Values["nameEn"]),
+			DescriptionZH:     valueWithFallback(record.Values["descriptionZh"], record.Description),
+			DescriptionEN:     valueWithFallback(record.Values["descriptionEn"], record.Description),
+			ValuesJSON:        valuesJSON,
 		})
 	}
 	if len(rows) == 0 {

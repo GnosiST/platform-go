@@ -184,6 +184,22 @@ func TestAdminResourcesFromConfigRequiresPreparedOrganizationRBACTarget(t *testi
 	if err != nil {
 		t.Fatalf("AdminResourcesFromConfig(prepared target) error = %v", err)
 	}
+	menuSchema, err := store.Schema("menus")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var nodeTypeRequired, legacyPermissionReadOnly bool
+	for _, field := range menuSchema.Fields {
+		switch field.Key {
+		case "nodeType":
+			nodeTypeRequired = field.Required
+		case "permission":
+			legacyPermissionReadOnly = field.ReadOnly && !field.Required && !field.InForm
+		}
+	}
+	if !nodeTypeRequired || !legacyPermissionReadOnly {
+		t.Fatalf("target menu schema nodeTypeRequired=%v legacyPermissionReadOnly=%v", nodeTypeRequired, legacyPermissionReadOnly)
+	}
 	if _, err := store.Update("roles", "role-operator", adminresource.WriteInput{
 		Name: "Tenant Operator Updated", Status: "enabled", Values: map[string]string{"groupCode": "tenant-ops"},
 	}); err != nil {
@@ -200,6 +216,48 @@ func TestAdminResourcesFromConfigRequiresPreparedOrganizationRBACTarget(t *testi
 	}
 	if report, err := organizationRepository.ValidateCutover(context.Background()); err != nil {
 		t.Fatalf("ValidateCutover() error = %v, report = %+v", err, report)
+	}
+	roleMenus, err := organizationRepository.ReplaceRoleMenus(context.Background(), organizationrbac.ReplaceRoleMenusRequest{
+		RoleCode: "tenant-operator", MenuCodes: []string{"users"}, ExpectedRevision: 0, ActorID: "admin", ChangedAt: time.Now(),
+	})
+	if err != nil || roleMenus.Revision != 1 {
+		t.Fatalf("ReplaceRoleMenus(target bootstrap) = %+v, %v", roleMenus, err)
+	}
+	menuRecords, err := store.List("menus")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var usersMenu adminresource.Record
+	for _, record := range menuRecords {
+		if record.Code == "users" {
+			usersMenu = record
+			break
+		}
+	}
+	if usersMenu.ID == "" {
+		t.Fatal("target bootstrap users menu is missing")
+	}
+	updatedMenuValues := make(map[string]string, len(usersMenu.Values))
+	for key, value := range usersMenu.Values {
+		if key == "parent" || key == "permission" || key == "pageButtons" {
+			continue
+		}
+		updatedMenuValues[key] = value
+	}
+	if _, err := store.Update("menus", usersMenu.ID, adminresource.WriteInput{Code: usersMenu.Code, Name: "Users Updated", Status: usersMenu.Status, Description: usersMenu.Description, Values: updatedMenuValues}); err != nil {
+		t.Fatalf("Update(target menu metadata) error = %v", err)
+	}
+	preservedRoleMenus, err := organizationRepository.LoadRoleMenus(context.Background(), "tenant-operator")
+	if err != nil || preservedRoleMenus.Revision != 1 || len(preservedRoleMenus.MenuCodes) != 1 || preservedRoleMenus.MenuCodes[0] != "users" {
+		t.Fatalf("role menus after generic menu save = %+v, %v", preservedRoleMenus, err)
+	}
+	legacyMutationValues := make(map[string]string, len(updatedMenuValues)+1)
+	for key, value := range updatedMenuValues {
+		legacyMutationValues[key] = value
+	}
+	legacyMutationValues["permission"] = "admin:user:update"
+	if _, err := store.Update("menus", usersMenu.ID, adminresource.WriteInput{Code: usersMenu.Code, Name: "Users Updated", Status: usersMenu.Status, Description: usersMenu.Description, Values: legacyMutationValues}); err == nil {
+		t.Fatalf("Update(target legacy menu permission) error = %v, want ErrDomainOwnedMutation", err)
 	}
 	if _, err := organizationRepository.ReplaceOrgUnitRoleGroups(context.Background(), organizationrbac.ReplaceOrgUnitRoleGroupsRequest{
 		OrgUnitCode: "tenant-hq", RoleGroupCodes: []string{"tenant-ops"}, ExpectedRevision: 0, ActorID: "admin", ChangedAt: time.Now(),

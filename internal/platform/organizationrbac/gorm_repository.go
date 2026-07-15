@@ -152,6 +152,14 @@ func PrepareGORMRepository(ctx context.Context, db *gorm.DB) (*GORMRepository, e
 		Where("resource_type = '' OR resource_type IS NULL").Update("resource_type", PermissionResourceTypeAPI).Error; err != nil {
 		return nil, fmt.Errorf("%w: backfill permission resource type", ErrRepositoryFailed)
 	}
+	if err := db.WithContext(ctx).Model(&gormMenu{}).
+		Where("parent_code = '' AND parent <> ''").Update("parent_code", gorm.Expr("parent")).Error; err != nil {
+		return nil, fmt.Errorf("%w: backfill menu parent code", ErrRepositoryFailed)
+	}
+	if err := db.WithContext(ctx).Model(&gormMenu{}).
+		Where("resource_code = '' AND resource <> ''").Update("resource_code", gorm.Expr("resource")).Error; err != nil {
+		return nil, fmt.Errorf("%w: backfill menu resource code", ErrRepositoryFailed)
+	}
 	return OpenGORMRepository(ctx, db)
 }
 
@@ -176,6 +184,10 @@ func OpenGORMRepository(ctx context.Context, db *gorm.DB) (*GORMRepository, erro
 		{model: gormUserRole{}, fields: []string{"UserID", "RoleCode"}},
 		{model: gormPermission{}, fields: []string{"ID", "Code", "Status", "ResourceType"}},
 		{model: gormRolePermission{}, fields: []string{"RoleCode", "Permission"}},
+		{model: gormMenu{}, fields: []string{"ID", "Code", "Status", "NodeType", "ParentCode", "Route", "ComponentKey", "ResourceCode", "ExternalURL", "ParametersJSON", "BreadcrumbVisible", "LegacyPermission"}},
+		{model: gormRoleMenu{}, fields: []string{"RoleCode", "MenuCode", "Revision", "ActorID", "CreatedAt", "UpdatedAt"}},
+		{model: gormRoleMenuRevision{}, fields: []string{"RoleCode", "Revision", "UpdatedAt"}},
+		{model: gormPageButton{}, fields: []string{"MenuCode", "ButtonKey", "Action", "Status", "PermissionCode"}},
 		{model: gormOrgUnitRoleGroup{}, fields: []string{"OrgUnitCode", "RoleGroupCode", "Revision", "ActorID", "CreatedAt", "UpdatedAt"}},
 		{model: gormOrgUnitRoleGroupRevision{}, fields: []string{"OrgUnitCode", "Revision", "UpdatedAt"}},
 	}
@@ -780,6 +792,7 @@ func repositoryModels() []any {
 	return []any{
 		&gormOrganization{}, &gormRoleGroup{}, &gormRole{}, &gormUser{}, &gormUserRole{}, &gormResourceLifecycle{},
 		&gormPermission{}, &gormRolePermission{},
+		&gormMenu{}, &gormRoleMenu{}, &gormRoleMenuRevision{}, &gormPageButton{},
 		&gormOrgUnitRoleGroup{}, &gormOrgUnitRoleGroupRevision{}, &gormAdminResourceState{},
 		&gormOrganizationRBACPreview{}, &gormOrganizationRBACAuditEvent{},
 		&gormOrganizationRBACMigrationRun{}, &gormOrganizationRBACMigrationConflict{},

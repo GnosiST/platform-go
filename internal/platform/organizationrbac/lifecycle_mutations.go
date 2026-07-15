@@ -191,6 +191,18 @@ func loadResourceLifecycleState(db *gorm.DB, resource, code string, now time.Tim
 			return resourceLifecycleState{}, lifecycleLookupError(err)
 		}
 		impact.RecordID, impact.TenantCode, impact.OrgUnitCode, impact.Status = row.ID, row.TenantCode, row.OrgUnitCode, row.Status
+	case "menus":
+		var row gormMenu
+		if err := db.Where("code = ?", code).Take(&row).Error; err != nil {
+			return resourceLifecycleState{}, lifecycleLookupError(err)
+		}
+		impact.RecordID, impact.Status = row.ID, row.Status
+	case "permissions":
+		var row gormPermission
+		if err := db.Where("code = ?", code).Take(&row).Error; err != nil {
+			return resourceLifecycleState{}, lifecycleLookupError(err)
+		}
+		impact.RecordID, impact.Status = row.ID, row.Status
 	}
 	var lifecycle gormResourceLifecycle
 	err := db.Where("resource = ? AND record_id = ?", resource, impact.RecordID).Take(&lifecycle).Error
@@ -256,6 +268,13 @@ func lifecycleReferences(db *gorm.DB, resource, code, recordID string) ([]Resour
 		for _, permission := range permissions {
 			references = append(references, ResourceLifecycleReference{Kind: "role-permission", Code: permission.Permission})
 		}
+		var menus []gormRoleMenu
+		if err := db.Where("role_code = ?", code).Order("menu_code").Find(&menus).Error; err != nil {
+			return nil, nil, 0, repositoryError(err)
+		}
+		for _, menu := range menus {
+			references = append(references, ResourceLifecycleReference{Kind: "role-menu", Code: menu.MenuCode})
+		}
 	case "role-groups":
 		var roles []gormRole
 		if err := db.Where("group_code = ?", code).Order("code").Find(&roles).Error; err != nil {
@@ -305,6 +324,50 @@ func lifecycleReferences(db *gorm.DB, resource, code, recordID string) ([]Resour
 		}
 		for _, binding := range bindings {
 			references = append(references, ResourceLifecycleReference{Kind: "organization-role-group", Code: binding.RoleGroupCode})
+		}
+	case "menus":
+		var children []gormMenu
+		if err := db.Where("parent_code = ?", code).Order("code").Find(&children).Error; err != nil {
+			return nil, nil, 0, repositoryError(err)
+		}
+		for _, child := range children {
+			references = append(references, ResourceLifecycleReference{Kind: "menu-child", Code: child.Code})
+		}
+		var activeMenus []gormMenu
+		if err := db.Where("active_menu_code = ?", code).Order("code").Find(&activeMenus).Error; err != nil {
+			return nil, nil, 0, repositoryError(err)
+		}
+		for _, menu := range activeMenus {
+			references = append(references, ResourceLifecycleReference{Kind: "active-menu", Code: menu.Code})
+		}
+		var roleMenus []gormRoleMenu
+		if err := db.Where("menu_code = ?", code).Order("role_code").Find(&roleMenus).Error; err != nil {
+			return nil, nil, 0, repositoryError(err)
+		}
+		for _, binding := range roleMenus {
+			references = append(references, ResourceLifecycleReference{Kind: "role-menu", Code: binding.RoleCode})
+		}
+		var buttons []gormPageButton
+		if err := db.Where("menu_code = ?", code).Order("button_key").Find(&buttons).Error; err != nil {
+			return nil, nil, 0, repositoryError(err)
+		}
+		for _, button := range buttons {
+			references = append(references, ResourceLifecycleReference{Kind: "page-button", Code: button.ButtonKey})
+		}
+	case "permissions":
+		var rolePermissions []gormRolePermission
+		if err := db.Where("permission = ?", code).Order("role_code").Find(&rolePermissions).Error; err != nil {
+			return nil, nil, 0, repositoryError(err)
+		}
+		for _, binding := range rolePermissions {
+			references = append(references, ResourceLifecycleReference{Kind: "role-permission", Code: binding.RoleCode})
+		}
+		var buttons []gormPageButton
+		if err := db.Where("permission_code = ?", code).Order("menu_code, button_key").Find(&buttons).Error; err != nil {
+			return nil, nil, 0, repositoryError(err)
+		}
+		for _, button := range buttons {
+			references = append(references, ResourceLifecycleReference{Kind: "page-button", Code: button.MenuCode + ":" + button.ButtonKey})
 		}
 	}
 	sort.Slice(references, func(i, j int) bool {
@@ -413,6 +476,62 @@ func validateLifecycleRestore(db *gorm.DB, impact ResourceLifecycleImpact) error
 			OrgUnitCode: user.OrgUnitCode, Status: "disabled",
 		}, nil)
 		return err
+	case "menus":
+		var menu gormMenu
+		if err := db.Where("code = ?", impact.ResourceCode).Take(&menu).Error; err != nil {
+			return lifecycleLookupError(err)
+		}
+		node, err := menuNodeFromGORM(menu)
+		if err != nil {
+			return err
+		}
+		node.Status = "disabled"
+		nodes := []MenuNode{node}
+		seen := map[string]struct{}{node.Code: {}}
+		for parentCode := node.ParentCode; parentCode != ""; {
+			if _, duplicate := seen[parentCode]; duplicate {
+				return ErrInvalid
+			}
+			seen[parentCode] = struct{}{}
+			var parent gormMenu
+			if err := db.Where("code = ?", parentCode).Take(&parent).Error; err != nil {
+				return lifecycleLookupError(err)
+			}
+			deleted, err := isLifecycleDeleted(db, "menus", parent.ID)
+			if err != nil || deleted || parent.Status != StatusEnabled || MenuNodeType(parent.NodeType) != MenuNodeTypeDirectory {
+				return ErrRolePoolViolation
+			}
+			parentNode, err := menuNodeFromGORM(parent)
+			if err != nil {
+				return err
+			}
+			nodes = append(nodes, parentNode)
+			parentCode = parent.ParentCode
+		}
+		return ValidateMenuSnapshot(nodes, nil, nil)
+	case "permissions":
+		var permission gormPermission
+		if err := db.Where("code = ?", impact.ResourceCode).Take(&permission).Error; err != nil {
+			return lifecycleLookupError(err)
+		}
+		if permission.ResourceType == PermissionResourceTypeAPI {
+			return nil
+		}
+		if permission.ResourceType != PermissionResourceTypePageButton {
+			return ErrInvalid
+		}
+		metadata, err := menuPermissionFromGORM(permission)
+		if err != nil {
+			return err
+		}
+		var button gormPageButton
+		if err := db.Where("menu_code = ? AND button_key = ? AND permission_code = ?", metadata.MenuCode, metadata.ButtonKey, permission.Code).Take(&button).Error; err != nil {
+			return ErrRolePoolViolation
+		}
+		if button.Action != metadata.Action {
+			return ErrRolePoolViolation
+		}
+		return nil
 	}
 	return ErrInvalid
 }
@@ -432,6 +551,10 @@ func setLifecycleResourceStatus(db *gorm.DB, resource, code, status string, chan
 		model = &gormRole{}
 	case "users":
 		model = &gormUser{}
+	case "menus":
+		model = &gormMenu{}
+	case "permissions":
+		model = &gormPermission{}
 	default:
 		return ErrInvalid
 	}
@@ -456,9 +579,16 @@ func purgeLifecycleResource(db *gorm.DB, resource, code string) error {
 	case "role-groups":
 		model = &gormRoleGroup{}
 	case "roles":
+		if err := db.Where("role_code = ?", code).Delete(&gormRoleMenuRevision{}).Error; err != nil {
+			return repositoryError(err)
+		}
 		model = &gormRole{}
 	case "users":
 		model = &gormUser{}
+	case "menus":
+		model = &gormMenu{}
+	case "permissions":
+		model = &gormPermission{}
 	default:
 		return ErrInvalid
 	}
@@ -474,7 +604,7 @@ func purgeLifecycleResource(db *gorm.DB, resource, code string) error {
 
 func validLifecycleResource(resource string) bool {
 	switch resource {
-	case "org-units", "role-groups", "roles", "users":
+	case "org-units", "role-groups", "roles", "users", "menus", "permissions":
 		return true
 	default:
 		return false

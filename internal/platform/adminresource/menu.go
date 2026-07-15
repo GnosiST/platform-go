@@ -10,18 +10,29 @@ import (
 )
 
 type MenuItem struct {
-	Name         string        `json:"name"`
-	Route        string        `json:"route"`
-	Parent       string        `json:"parent"`
-	IsExternal   bool          `json:"isExternal"`
-	CacheEnabled bool          `json:"cacheEnabled"`
-	Resource     string        `json:"resource"`
-	Title        LocalizedText `json:"title"`
-	Description  LocalizedText `json:"description"`
-	Permission   string        `json:"permission"`
-	Group        string        `json:"group"`
-	Icon         string        `json:"icon"`
-	Order        int           `json:"order"`
+	Name              string        `json:"name"`
+	NodeType          string        `json:"nodeType"`
+	Route             string        `json:"route"`
+	Parent            string        `json:"parent"`
+	ParentCode        string        `json:"parentCode"`
+	ComponentKey      string        `json:"componentKey"`
+	ResourceCode      string        `json:"resourceCode"`
+	IsExternal        bool          `json:"isExternal"`
+	ExternalURL       string        `json:"externalUrl"`
+	OpenMode          string        `json:"openMode"`
+	Parameters        string        `json:"parameters"`
+	CacheEnabled      bool          `json:"cacheEnabled"`
+	Hidden            bool          `json:"hidden"`
+	ActiveMenuCode    string        `json:"activeMenuCode"`
+	BreadcrumbVisible bool          `json:"breadcrumbVisible"`
+	PageButtons       string        `json:"pageButtons"`
+	Resource          string        `json:"resource"`
+	Title             LocalizedText `json:"title"`
+	Description       LocalizedText `json:"description"`
+	Permission        string        `json:"permission"`
+	Group             string        `json:"group"`
+	Icon              string        `json:"icon"`
+	Order             int           `json:"order"`
 }
 
 func (s *Store) MenuItemsForPrincipal(principal rbac.Principal) []MenuItem {
@@ -50,18 +61,29 @@ func (s *Store) MenuItemsForPrincipal(principal rbac.Principal) []MenuItem {
 
 func menuItemFromRecord(record Record) MenuItem {
 	return MenuItem{
-		Name:         record.Code,
-		Route:        record.Values["route"],
-		Parent:       record.Values["parent"],
-		IsExternal:   parseBool(record.Values["isExternal"]),
-		CacheEnabled: parseBoolDefault(record.Values["cacheEnabled"], true),
-		Resource:     record.Values["resource"],
-		Title:        text(record.Values["titleZh"], record.Values["titleEn"]),
-		Description:  text(record.Values["descriptionZh"], record.Values["descriptionEn"]),
-		Permission:   record.Values["permission"],
-		Group:        record.Values["group"],
-		Icon:         record.Values["icon"],
-		Order:        parseOrder(record.Values["order"]),
+		Name:              record.Code,
+		NodeType:          valueWithFallback(record.Values["nodeType"], "page"),
+		Route:             record.Values["route"],
+		Parent:            record.Values["parent"],
+		ParentCode:        valueWithFallback(record.Values["parentCode"], record.Values["parent"]),
+		ComponentKey:      valueWithFallback(record.Values["componentKey"], record.Values["resource"]),
+		ResourceCode:      valueWithFallback(record.Values["resourceCode"], record.Values["resource"]),
+		IsExternal:        parseBool(record.Values["isExternal"]),
+		ExternalURL:       record.Values["externalUrl"],
+		OpenMode:          record.Values["openMode"],
+		Parameters:        record.Values["parameters"],
+		CacheEnabled:      parseBoolDefault(record.Values["cacheEnabled"], true),
+		Hidden:            parseBool(record.Values["hidden"]),
+		ActiveMenuCode:    record.Values["activeMenuCode"],
+		BreadcrumbVisible: parseBoolDefault(record.Values["breadcrumbVisible"], true),
+		PageButtons:       record.Values["pageButtons"],
+		Resource:          record.Values["resource"],
+		Title:             text(record.Values["titleZh"], record.Values["titleEn"]),
+		Description:       text(record.Values["descriptionZh"], record.Values["descriptionEn"]),
+		Permission:        record.Values["permission"],
+		Group:             record.Values["group"],
+		Icon:              record.Values["icon"],
+		Order:             parseOrder(record.Values["order"]),
 	}
 }
 
