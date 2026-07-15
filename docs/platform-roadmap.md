@@ -75,7 +75,7 @@ Important correction:
 
 ## Menu And Permission Decision
 
-The current menu model is dynamic and role-linked, but it intentionally does not use a direct role-menu binding table.
+The legacy serving model remains dynamic and permission-derived. The target runtime now has independent page-only role-menu bindings and revision-aware resolution, but serving and write cutover gates remain closed until the menu UI and full organization/menu E2E node finish.
 
 ```text
 user -> roles -> permissions / denyPermissions -> menus/resources/actions

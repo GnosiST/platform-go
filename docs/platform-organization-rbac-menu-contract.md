@@ -22,7 +22,7 @@ Stable role, role-group, organization and menu codes remain globally unique duri
 
 ## Relational Target
 
-The backend migration node introduces native, transactionally managed relations instead of placing the new authorization state only in `ValuesJSON` or the current full-snapshot delete-and-rebuild path. `PLATFORM_ORGANIZATION_RBAC_MODE=target` activates this boundary and is required in production; local compatibility defaults remain `legacy` until the Admin UI and menu migration nodes close.
+The backend migration node introduces native, transactionally managed relations instead of placing the new authorization state only in `ValuesJSON` or the current full-snapshot delete-and-rebuild path. `PLATFORM_ORGANIZATION_RBAC_MODE=target` activates this boundary and is required in production. Page-only role-menu persistence, per-role revisions, menu/page-button definition service objects, deterministic migration comparison and revision-aware target navigation resolution are implemented. `PLATFORM_ADMIN_MENU_SERVING_MODE=legacy` and `PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=false` remain the only accepted production settings until the menu Admin UI and full migration/cutover E2E close.
 
 | Logical model | Physical target | Required behavior |
 | --- | --- | --- |

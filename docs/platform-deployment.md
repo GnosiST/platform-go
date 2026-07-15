@@ -124,6 +124,9 @@ PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID=idx-v1
 PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON={"idx-v1":"<different-base64-32-byte-key>"}
 PLATFORM_ADMIN_RESOURCE_DRIVER=mysql
 PLATFORM_ADMIN_RESOURCE_DSN=<dsn>
+PLATFORM_ORGANIZATION_RBAC_MODE=target
+PLATFORM_ADMIN_MENU_SERVING_MODE=legacy
+PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=false
 PLATFORM_SESSION_DRIVER=mysql
 PLATFORM_SESSION_DSN=<dsn>
 PLATFORM_LIFECYCLE_HISTORY_DRIVER=mysql
@@ -152,6 +155,8 @@ The standard env template contains recognizable placeholder material and passes 
 Historical plaintext migration is an offline maintenance workflow, not an API deployment step. MySQL and PostgreSQL remain production targets only after real driver/version integration rehearsal and certification evidence exists; SQLite is accepted only in development/test for local rehearsal and fails closed in staging/production. Oracle, Kingbase, file mutation and legacy SQL mutation are outside the certified boundary. Before migration, operators must create an external backup and retain isolated restore evidence; encrypted escrow is not a replacement. Follow [Sensitive Data Historical Migration Runbook](platform-sensitive-data-migration.md) for inventory, dry-run, prepare, apply, verify, restore rehearsal, rollback, resume and incident-stop procedures.
 
 Retention maintenance is also an explicit production operation. Leave `PLATFORM_RETENTION_RUNNER_ENABLED=false` until `platform-admin data-lifecycle --operation prepare` has created the reviewed state, the active policy has a completed impact and dry-run, and the exact current/proposed fingerprints have persisted promotion evidence. Enabling the scheduler requires the GORM-backed Admin resource store; memory and file-backed Admin stores are rejected. The runner defaults to `24h`, batch `100` and three retries and accepts only the default datasource. It performs no cross-datasource transaction, exposes no HTTP purge endpoint, provides no generic archive tier and does not replace database or object-storage backups. Oracle and KingbaseES remain uncertified.
+
+Organization RBAC production composition uses `PLATFORM_ORGANIZATION_RBAC_MODE=target`, while Admin navigation remains on `PLATFORM_ADMIN_MENU_SERVING_MODE=legacy` and `PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=false`. The latter two cutover gates are intentionally closed in the current binary: `dual-read`, `target` serving or role-menu writes fail startup validation until `organization-rbac-menu-e2e-qa` supplies principal equivalence, bounded observation and rollback evidence.
 
 External message and search integrations are also explicit production choices. Keep `PLATFORM_MESSAGE_BUS_ENABLED=false` and `PLATFORM_SEARCH_ENABLED=false` unless a downstream composition registers the named adapters. The stock API process includes only disabled implementations and fails startup if either switch is enabled without a complete matching adapter; see `docs/platform-integration-ports.md`.
 
