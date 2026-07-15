@@ -443,10 +443,23 @@ describe("validate-admin-ui-contracts", () => {
 
   it("requires cutover-gated role menu assignment to persist page leaves only", () => {
     const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+    const result = runTypeScriptProbe("admin/src/platform/resources/menuTreeProjection.ts", (moduleURL) => `
+      import assert from "node:assert/strict";
+      import { pageMenuCodes, projectMenuTreeNodes } from ${JSON.stringify(moduleURL)};
+      const nodes = projectMenuTreeNodes(
+        [
+          { code: "directory-a", name: "Directory A", status: "enabled", nodeType: "directory" },
+          { code: "page-a", name: "Page A", status: "enabled", nodeType: "page", parentCode: "directory-a" },
+        ],
+        [],
+        { historicalLabel: "Historical", disabledReason: "Disabled", missingReason: "Missing" },
+      );
+      assert.deepEqual(pageMenuCodes(nodes, ["directory-a", "page-a"]), ["page-a"]);
+    `);
 
     assert.match(roleGovernance, /const menuCodes = pageMenuCodes\(menuTreeNodes\(menus, menuAssignment\.menuCodes, dictionary\), menuAssignment\.menuCodes\);/);
-    assert.match(roleGovernance, /valueOf\(record, "nodeType"\) === "page" \? "leaf"(?: as const)? : "branch"(?: as const)?/);
     assert.doesNotMatch(roleGovernance, /menuCodes:\s*legacyVisibleMenus/);
+    assert.equal(result.status, 0, result.stderr);
   });
 
   it("requires Tree Transfer directory state to be derived without persisting branch keys", () => {
@@ -459,10 +472,21 @@ describe("validate-admin-ui-contracts", () => {
 
   it("requires disabled and missing historical role menu selections to stay removable", () => {
     const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+    const result = runTypeScriptProbe("admin/src/platform/resources/menuTreeProjection.ts", (moduleURL) => `
+      import assert from "node:assert/strict";
+      import { pageMenuCodes, projectMenuTreeNodes } from ${JSON.stringify(moduleURL)};
+      const nodes = projectMenuTreeNodes(
+        [{ code: "disabled-page", name: "Disabled Page", status: "disabled", nodeType: "page" }],
+        ["disabled-page", "missing-page"],
+        { historicalLabel: "Historical", disabledReason: "Disabled", missingReason: "Missing" },
+      );
+      assert.equal(nodes.find((node) => node.key === "disabled-page")?.availableDisabledReason, "Disabled");
+      assert.equal(nodes.find((node) => node.key === "missing-page")?.availableDisabledReason, "Missing");
+      assert.deepEqual(pageMenuCodes(nodes, ["disabled-page", "missing-page"]), ["disabled-page", "missing-page"]);
+    `);
 
     assert.match(roleGovernance, /menuTreeNodes\(menus, menuAssignment\.menuCodes, dictionary\)/);
-    assert.match(roleGovernance, /availableDisabledReason: enabled\(record\) \? undefined : dictionary\.rolePermissionHistoricalDisabled/);
-    assert.match(roleGovernance, /availableDisabledReason: dictionary\.rolePermissionHistoricalMissing/);
+    assert.equal(result.status, 0, result.stderr);
   });
 
   it("requires role update plus menu read permission while the migration write gate stays closed", () => {
@@ -533,9 +557,57 @@ describe("validate-admin-ui-contracts", () => {
   it("keeps missing historical menu selections visible under a removable selected branch", () => {
     const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
 
-    assert.match(roleGovernance, /const historicalBranchKey = "menu-history";/);
-    assert.match(roleGovernance, /parentKey: historicalBranchKey/);
-    assert.match(roleGovernance, /availableDisabledReason: dictionary\.rolePermissionHistoricalMissing/);
+    assert.match(roleGovernance, /projectMenuTreeNodes/);
+    assert.match(roleGovernance, /historicalLabel: dictionary\.permissionTypeHistorical/);
+    assert.match(roleGovernance, /missingReason: dictionary\.rolePermissionHistoricalMissing/);
+  });
+
+  it("projects a unique historical branch when a real page uses the base branch key", () => {
+    const result = runTypeScriptProbe("admin/src/platform/resources/menuTreeProjection.ts", (moduleURL) => `
+      import assert from "node:assert/strict";
+      import { pageMenuCodes, projectMenuTreeNodes } from ${JSON.stringify(moduleURL)};
+      const nodes = projectMenuTreeNodes(
+        [
+          { code: "menu-history", name: "History Page", status: "enabled", nodeType: "page" },
+          { code: "page-a", name: "Page A", status: "enabled", nodeType: "page" },
+        ],
+        ["menu-history", "missing-a"],
+        { historicalLabel: "Historical", disabledReason: "Disabled", missingReason: "Missing" },
+      );
+      const keys = nodes.map((node) => node.key);
+      const historyBranch = nodes.find((node) => node.kind === "branch" && node.code === undefined);
+      const missing = nodes.find((node) => node.key === "missing-a");
+      assert.equal(new Set(keys).size, keys.length);
+      assert.ok(historyBranch);
+      assert.notEqual(historyBranch.key, "menu-history");
+      assert.equal(missing?.parentKey, historyBranch.key);
+      assert.deepEqual(pageMenuCodes(nodes, keys), ["menu-history", "missing-a", "page-a"]);
+    `);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  it("projects a unique historical branch when a missing historical page uses the base branch key", () => {
+    const result = runTypeScriptProbe("admin/src/platform/resources/menuTreeProjection.ts", (moduleURL) => `
+      import assert from "node:assert/strict";
+      import { pageMenuCodes, projectMenuTreeNodes } from ${JSON.stringify(moduleURL)};
+      const nodes = projectMenuTreeNodes(
+        [{ code: "page-a", name: "Page A", status: "enabled", nodeType: "page" }],
+        ["menu-history"],
+        { historicalLabel: "Historical", disabledReason: "Disabled", missingReason: "Missing" },
+      );
+      const keys = nodes.map((node) => node.key);
+      const historyBranch = nodes.find((node) => node.kind === "branch" && node.code === undefined);
+      const missing = nodes.find((node) => node.key === "menu-history");
+      assert.equal(new Set(keys).size, keys.length);
+      assert.ok(historyBranch);
+      assert.notEqual(historyBranch.key, "menu-history");
+      assert.equal(missing?.parentKey, historyBranch.key);
+      assert.notEqual(missing?.key, missing?.parentKey);
+      assert.deepEqual(pageMenuCodes(nodes, [historyBranch.key, "menu-history"]), ["menu-history"]);
+    `);
+
+    assert.equal(result.status, 0, result.stderr);
   });
 
   it("derives directory full and half state from each pane eligible descendants", () => {

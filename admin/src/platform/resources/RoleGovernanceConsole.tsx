@@ -48,6 +48,7 @@ import {
   type AdminTreeWorkbenchNode,
   type PlatformTreeTransferNode,
 } from "../ui";
+import { pageMenuCodes, projectMenuTreeNodes } from "./menuTreeProjection";
 import type { AdminResourceDefinition } from "./registry";
 
 type RoleGovernanceConsoleProps = {
@@ -809,35 +810,21 @@ function permissionTreeNodes(records: AdminResourceRecord[], dictionary: Diction
 }
 
 function menuTreeNodes(records: AdminResourceRecord[], historicalCodes: string[], dictionary: Dictionary): PlatformTreeTransferNode[] {
-  const catalogCodes = new Set(records.map((record) => record.code));
-  const nodes: PlatformTreeTransferNode[] = records.map((record) => ({
-    key: record.code,
-    parentKey: valueOf(record, "parentCode") || undefined,
-    kind: valueOf(record, "nodeType") === "page" ? "leaf" as const : "branch" as const,
-    label: record.name || record.code,
-    code: record.code,
-    status: record.status,
-    availableDisabledReason: enabled(record) ? undefined : dictionary.rolePermissionHistoricalDisabled,
-  }));
-  const missingCodes = historicalCodes.filter((code) => !catalogCodes.has(code));
-  if (missingCodes.length > 0) {
-    const historicalBranchKey = "menu-history";
-    nodes.push({ key: historicalBranchKey, kind: "branch", label: dictionary.permissionTypeHistorical });
-    nodes.push(...missingCodes.map((code) => ({
-      key: code,
-      parentKey: historicalBranchKey,
-      kind: "leaf" as const,
-      label: code,
-      code,
-      availableDisabledReason: dictionary.rolePermissionHistoricalMissing,
-    })));
-  }
-  return nodes;
-}
-
-function pageMenuCodes(nodes: PlatformTreeTransferNode[], values: string[]) {
-  const pageCodes = new Set(nodes.filter((node) => node.kind === "leaf").map((node) => node.key));
-  return uniqueSorted(values.filter((code) => pageCodes.has(code)));
+  return projectMenuTreeNodes(
+    records.map((record) => ({
+      code: record.code,
+      name: record.name,
+      status: record.status,
+      nodeType: valueOf(record, "nodeType"),
+      parentCode: valueOf(record, "parentCode"),
+    })),
+    historicalCodes,
+    {
+      historicalLabel: dictionary.permissionTypeHistorical,
+      disabledReason: dictionary.rolePermissionHistoricalDisabled,
+      missingReason: dictionary.rolePermissionHistoricalMissing,
+    },
+  );
 }
 
 function legacyVisibleMenus(role: AdminResourceRecord, menus: AdminResourceRecord[]) {
