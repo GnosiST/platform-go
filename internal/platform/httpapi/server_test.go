@@ -5863,6 +5863,38 @@ func TestAppFileUploadReportsRollbackFailureWithoutLeakingDetails(t *testing.T) 
 	assertSafeCleanupRecord(t, cleanupSink.records, "object:"+opaqueID, now, "metadata-private-detail", "delete-private", objectKey, "report.txt")
 }
 
+func TestAppFileMetadataGenericFailureDoesNotRecordAdminResourceEvent(t *testing.T) {
+	const marker = "physical_table=files email=private@example.test"
+	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"})
+	repository := &controllableAdminResourceRepository{}
+	resources, err := adminresource.NewRepositoryBackedStoreFromCapabilities(repository, capabilities)
+	if err != nil {
+		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+	}
+	fileStore := &recordingObjectStore{}
+	sink := &recordingInternalErrorSink{}
+	server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources, FileStorage: fileStore, InternalErrorSink: sink})
+	login := appLoginForTest(t, server, "buyer")
+	repository.saveErr = errors.New(marker)
+	body, contentType := multipartUploadBodyWithMediaType(t, "report.txt", "text/plain", "private")
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/app/files", body)
+	request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	request.Header.Set("Content-Type", contentType)
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusInternalServerError || !strings.Contains(recorder.Body.String(), `"code":"ADMIN_RESOURCE_ERROR"`) || !strings.Contains(recorder.Body.String(), `"message":"admin resource operation failed"`) {
+		t.Fatalf("POST app file metadata failure status/body = %d/%s, want canonical ADMIN_RESOURCE_ERROR", recorder.Code, recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), "physical_table") || strings.Contains(recorder.Body.String(), "private@example.test") {
+		t.Fatalf("app metadata failure leaked cause: %s", recorder.Body.String())
+	}
+	if len(sink.events) != 0 {
+		t.Fatalf("app metadata failure recorded Task-3 Admin events: %+v", sink.events)
+	}
+}
+
 func TestResourceFileCleanupSinkPersistsOnlySafeRetryMetadata(t *testing.T) {
 	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit"})
 	resources := openGORMAdminResourceStoreForHTTPTest(t, filepath.Join(t.TempDir(), "cleanup-records.db"), capabilities)

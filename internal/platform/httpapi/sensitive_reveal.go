@@ -284,7 +284,11 @@ func (s *Server) adminSensitiveRevealOIDCComplete(ctx *gin.Context) {
 	binding, err := s.adminIdentityBindings.ResolveAdminIdentityBinding(ctx.Request.Context(), AdminIdentityBindingInput{
 		Provider: provider, Issuer: identity.Issuer, ProviderSubject: identity.ProviderSubject, Now: s.now().UTC(),
 	})
-	if err != nil || strings.TrimSpace(binding.Username) != strings.TrimSpace(target.principal.User.Username) {
+	if err != nil {
+		writeSensitiveRevealError(ctx, s.internalErrorSink, err)
+		return
+	}
+	if strings.TrimSpace(binding.Username) != strings.TrimSpace(target.principal.User.Username) {
 		writeSensitiveRevealError(ctx, s.internalErrorSink, sensitivereveal.ErrVerificationFailed)
 		return
 	}

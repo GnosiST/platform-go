@@ -15,6 +15,7 @@ import (
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/core"
 	"platform-go/internal/platform/dataprotection"
+	"platform-go/internal/platform/errorcode"
 	"platform-go/internal/platform/ratelimit"
 	"platform-go/internal/platform/sensitivereveal"
 )
@@ -371,21 +372,28 @@ func TestSensitiveRevealGrantRejectsPurposeRecordAndSessionScopeMismatch(t *test
 }
 
 func TestSensitiveRevealOIDCBindingMustMatchCurrentActor(t *testing.T) {
+	const marker = "physical_table=identity_bindings email=private@example.test"
 	for _, test := range []struct {
 		name            string
 		bindingUsername string
+		bindingErr      error
 		want            int
+		wantCode        errorcode.Code
+		wantEvents      int
 		wantGrant       bool
 	}{
 		{name: "matching actor", bindingUsername: "admin", want: http.StatusOK, wantGrant: true},
-		{name: "different actor", bindingUsername: "ops", want: http.StatusUnprocessableEntity},
+		{name: "different actor", bindingUsername: "ops", want: http.StatusUnprocessableEntity, wantCode: errorcode.CodeAdminSensitiveRevealVerificationFailed},
+		{name: "binding repository failure", bindingErr: errors.New(marker), want: http.StatusInternalServerError, wantCode: errorcode.CodeAdminSensitiveRevealFailed, wantEvents: 1},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			resolver := &sensitiveRevealIdentityResolverStub{}
-			bindings := &sensitiveRevealIdentityBindingStub{username: test.bindingUsername}
+			bindings := &sensitiveRevealIdentityBindingStub{username: test.bindingUsername, err: test.bindingErr}
+			sink := &recordingInternalErrorSink{}
 			harness := newSensitiveRevealHTTPHarness(t, sensitiveRevealHTTPHarnessOptions{
-				identityResolver: resolver,
-				identityBindings: bindings,
+				identityResolver:  resolver,
+				identityBindings:  bindings,
+				internalErrorSink: sink,
 			})
 			recordID := harness.records["ops"]
 			challenge := harness.beginChallenge(t, recordID, sensitiveRevealHTTPPurpose, harness.token)
@@ -410,16 +418,32 @@ func TestSensitiveRevealOIDCBindingMustMatchCurrentActor(t *testing.T) {
 			if completeRecorder.Code != test.want {
 				t.Fatalf("POST OIDC complete status = %d body = %s, want %d", completeRecorder.Code, completeRecorder.Body.String(), test.want)
 			}
+			if completeRecorder.Header().Get("Cache-Control") != "no-store" {
+				t.Fatalf("POST OIDC complete Cache-Control = %q, want no-store", completeRecorder.Header().Get("Cache-Control"))
+			}
 			if resolver.stepUpStarts != 1 || resolver.stepUpResolves != 1 || bindings.issuer != "https://id.example" || bindings.subject != "subject-123" {
 				t.Fatalf("OIDC boundary calls = start:%d resolve:%d binding:%q/%q", resolver.stepUpStarts, resolver.stepUpResolves, bindings.issuer, bindings.subject)
+			}
+			if len(sink.events) != test.wantEvents {
+				t.Fatalf("OIDC binding events = %+v, want %d", sink.events, test.wantEvents)
 			}
 			if test.wantGrant {
 				completed := decodeSensitiveRevealData[adminSensitiveRevealFactorCompleteResponse](t, completeRecorder)
 				if completed.GrantToken == "" || !completed.PolicySatisfied {
 					t.Fatalf("matching OIDC binding did not issue grant: %+v", completed)
 				}
-			} else if strings.Contains(completeRecorder.Body.String(), "grantToken") {
-				t.Fatalf("mismatched OIDC binding exposed a grant: %s", completeRecorder.Body.String())
+			} else {
+				var payload Response[any]
+				if err := json.Unmarshal(completeRecorder.Body.Bytes(), &payload); err != nil || payload.Error == nil {
+					t.Fatalf("decode OIDC error: %v body = %s", err, completeRecorder.Body.String())
+				}
+				definition, _ := errorcode.Lookup(test.wantCode)
+				if payload.Error.Code != test.wantCode || payload.Error.Message != definition.PublicMessage || payload.Error.RequestID == "" || payload.Error.TraceID == "" {
+					t.Fatalf("OIDC error = %+v, want registered %s with correlation", payload.Error, test.wantCode)
+				}
+				if strings.Contains(completeRecorder.Body.String(), "grantToken") || strings.Contains(completeRecorder.Body.String(), "physical_table") || strings.Contains(completeRecorder.Body.String(), "private@example.test") {
+					t.Fatalf("OIDC binding error leaked grant or cause: %s", completeRecorder.Body.String())
+				}
 			}
 		})
 	}

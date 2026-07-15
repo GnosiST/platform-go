@@ -1680,14 +1680,14 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 			writeFileError(ctx, http.StatusInternalServerError, "APP_FILE_ROLLBACK_FAILED", "file upload rollback failed")
 			return
 		}
-		writeAdminResourceError(ctx, s.internalErrorSink, err)
+		writeAdminResourceErrorWithoutSink(ctx, err)
 		return
 	}
 	record := mutation.Record
 	s.invalidateCachesForResource(ctx.Request.Context(), "files")
 	projected, err := s.resources.ProjectRecord("files", record, adminresource.ProjectionResponse)
 	if err != nil {
-		writeAdminResourceError(ctx, s.internalErrorSink, err)
+		writeAdminResourceErrorWithoutSink(ctx, err)
 		return
 	}
 	ctx.JSON(http.StatusCreated, Response[adminResourceRecordResponse]{
@@ -1731,7 +1731,7 @@ func (s *Server) appFileContent(ctx *gin.Context) {
 	}
 	defer body.Close()
 	if err := s.recordFileAuditForActor("file.content", appUserID(username), record); err != nil {
-		writeAdminResourceError(ctx, s.internalErrorSink, err)
+		writeAdminResourceErrorWithoutSink(ctx, err)
 		return
 	}
 

@@ -44,3 +44,8 @@ func writeAdminResourceError(ctx *gin.Context, sink InternalErrorSink, err error
 	}
 	writePlatformError(ctx, code)
 }
+
+// Task 4 replaces the remaining App file paths with App-owned error codes.
+func writeAdminResourceErrorWithoutSink(ctx *gin.Context, err error) {
+	writePlatformError(ctx, adminResourceErrorCode(err))
+}
