@@ -380,9 +380,7 @@ func (s *Server) openapi(ctx *gin.Context) {
 		return
 	}
 	if len(s.openAPIDocument) == 0 {
-		ctx.JSON(http.StatusNotFound, Response[gin.H]{
-			Error: &ErrorBody{Code: "OPENAPI_NOT_CONFIGURED", Message: "openapi document is not configured"},
-		})
+		writePlatformError(ctx, errorcode.CodeOpenAPINotConfigured)
 		return
 	}
 	ctx.Data(http.StatusOK, "application/json; charset=utf-8", s.openAPIDocument)
@@ -1408,16 +1406,12 @@ func (s *Server) adminPolicyReviewExport(ctx *gin.Context) {
 	watermarkApplied := false
 	query, queryErr := url.ParseQuery(ctx.Request.URL.RawQuery)
 	if queryErr != nil {
-		ctx.JSON(http.StatusBadRequest, Response[gin.H]{Error: &ErrorBody{
-			Code: "ADMIN_POLICY_REVIEW_WATERMARK_INVALID", Message: "watermark must be true or false",
-		}})
+		writePlatformError(ctx, errorcode.CodeAdminPolicyReviewWatermarkInvalid)
 		return
 	}
 	if values, exists := query["watermark"]; exists {
 		if len(values) != 1 || (values[0] != "true" && values[0] != "false") {
-			ctx.JSON(http.StatusBadRequest, Response[gin.H]{Error: &ErrorBody{
-				Code: "ADMIN_POLICY_REVIEW_WATERMARK_INVALID", Message: "watermark must be true or false",
-			}})
+			writePlatformError(ctx, errorcode.CodeAdminPolicyReviewWatermarkInvalid)
 			return
 		}
 		watermarkApplied = values[0] == "true"
@@ -2131,9 +2125,7 @@ func (s *Server) adminMenus(ctx *gin.Context) {
 	items, err := s.resolveAdminMenus(ctx.Request.Context(), principal)
 	if err != nil {
 		s.recordInternalError(ctx, "ADMIN_MENU_RESOLUTION_FAILED", err)
-		ctx.JSON(http.StatusServiceUnavailable, Response[gin.H]{
-			Error: &ErrorBody{Code: "ADMIN_MENU_RESOLUTION_FAILED", Message: "admin menu navigation is unavailable"},
-		})
+		writePlatformError(ctx, errorcode.CodeAdminMenuResolutionFailed)
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[adminMenuListResponse]{
@@ -2169,9 +2161,7 @@ func (s *Server) adminDemoDataApply(ctx *gin.Context) {
 	datasetID := ctx.Param("dataset")
 	dataset, ok := s.findDemoDataSet(capabilityID, datasetID)
 	if !ok {
-		ctx.JSON(http.StatusNotFound, Response[gin.H]{
-			Error: &ErrorBody{Code: "ADMIN_DEMO_DATA_NOT_FOUND", Message: "demo data set not found"},
-		})
+		writePlatformError(ctx, errorcode.CodeAdminDemoDataNotFound)
 		return
 	}
 	result, err := s.resources.ApplyDemoDataSet(dataset)
@@ -2609,7 +2599,7 @@ func (s *Server) invalidatePolicyAuthorizer() {
 
 func writeForbidden(ctx *gin.Context) {
 	ctx.JSON(http.StatusForbidden, Response[gin.H]{
-		Error: &ErrorBody{Code: "ADMIN_FORBIDDEN", Message: "permission denied"},
+		Error: legacyErrorBody(ctx, "ADMIN_FORBIDDEN", "permission denied"),
 	})
 }
 
@@ -2621,7 +2611,7 @@ func writeUnauthorized(ctx *gin.Context) {
 		}
 	}
 	ctx.JSON(http.StatusUnauthorized, Response[gin.H]{
-		Error: &ErrorBody{Code: "AUTH_UNAUTHORIZED", Message: "unauthorized"},
+		Error: legacyErrorBody(ctx, "AUTH_UNAUTHORIZED", "unauthorized"),
 	})
 }
 

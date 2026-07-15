@@ -10,6 +10,7 @@ import (
 
 	"platform-go/internal/platform/approute"
 	"platform-go/internal/platform/capability"
+	"platform-go/internal/platform/errorcode"
 	"platform-go/internal/platform/session"
 )
 
@@ -160,19 +161,9 @@ func (s *Server) canApp(appSession session.Session, permission string) bool {
 	return authorizer.Can(appUserID(appUsername(appSession.Username)), appTenant, permission, actionFromPermission(permission))
 }
 
-func appRouteHandlerNotConfigured(route capability.AppRouteContract) gin.HandlerFunc {
+func appRouteHandlerNotConfigured(_ capability.AppRouteContract) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		ctx.JSON(http.StatusNotImplemented, Response[gin.H]{
-			Error: &ErrorBody{
-				Code:    "APP_ROUTE_HANDLER_NOT_CONFIGURED",
-				Message: "app route handler is not configured",
-			},
-			Data: gin.H{
-				"capability": route.CapabilityID,
-				"method":     route.Method,
-				"path":       route.Path,
-			},
-		})
+		writePlatformError(ctx, errorcode.CodeAppRouteHandlerNotConfigured)
 	}
 }
 

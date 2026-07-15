@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -13,6 +14,22 @@ import (
 )
 
 var requestIDPatternForTest = regexp.MustCompile(`^req_[0-9a-f]{32}$`)
+
+type saltThenFailCorrelationReader struct {
+	salt byte
+	read bool
+}
+
+func (reader *saltThenFailCorrelationReader) Read(value []byte) (int, error) {
+	if reader.read {
+		return 0, errors.New("injected random failure")
+	}
+	reader.read = true
+	for index := range value {
+		value[index] = reader.salt
+	}
+	return len(value), nil
+}
 
 func TestRequestCorrelationGeneratesServerOwnedRequestID(t *testing.T) {
 	const clientRequestID = "email@example.test/private/path"
@@ -113,5 +130,24 @@ func TestRequestCorrelationRejectsDuplicateTraceparentHeaders(t *testing.T) {
 
 	if correlation.TraceID == "" || correlation.TraceID == "4bf92f3577b34da6a3ce929d0e0e4736" {
 		t.Fatalf("duplicate traceparent was retained as %+v", correlation)
+	}
+}
+
+func TestCorrelationGeneratorFallbackIsFormattedUniqueAndSalted(t *testing.T) {
+	first := newCorrelationIDGenerator(&saltThenFailCorrelationReader{salt: 0x11})
+	second := newCorrelationIDGenerator(&saltThenFailCorrelationReader{salt: 0x22})
+	seen := make(map[string]struct{})
+	for index := 0; index < 4; index++ {
+		requestID := "req_" + first.randomHex(16)
+		if !requestIDPatternForTest.MatchString(requestID) {
+			t.Fatalf("fallback request ID = %q, want req_ plus 32 lowercase hex", requestID)
+		}
+		if _, exists := seen[requestID]; exists {
+			t.Fatalf("duplicate fallback request ID %q", requestID)
+		}
+		seen[requestID] = struct{}{}
+	}
+	if first.randomHex(16) == second.randomHex(16) {
+		t.Fatal("fallback output did not incorporate process salt")
 	}
 }

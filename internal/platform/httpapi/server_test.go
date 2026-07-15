@@ -2295,6 +2295,20 @@ func TestDeclaredAppRouteWithoutHandlerReportsConfigurationError(t *testing.T) {
 	if !strings.Contains(recorder.Body.String(), "APP_ROUTE_HANDLER_NOT_CONFIGURED") {
 		t.Fatalf("GET declared app route without handler body = %s, want configuration error", recorder.Body.String())
 	}
+	var response map[string]json.RawMessage
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode missing handler response: %v", err)
+	}
+	if _, exists := response["data"]; exists {
+		t.Fatalf("GET declared app route without handler included data: %s", recorder.Body.String())
+	}
+	var body Response[any]
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil || body.Error == nil {
+		t.Fatalf("decode missing handler error: body=%+v err=%v", body, err)
+	}
+	if body.Error.RequestID != recorder.Header().Get("X-Request-ID") || body.Error.TraceID == "" || body.Error.TraceID != strings.Split(recorder.Header().Get("traceparent"), "-")[1] {
+		t.Fatalf("missing handler correlation mismatch: headers=%v body=%+v", recorder.Header(), body.Error)
+	}
 }
 
 func TestAppRouteRegistrationUsesManifestSessionAndPermissionPolicy(t *testing.T) {
@@ -2321,9 +2335,7 @@ func TestAppRouteRegistrationUsesManifestSessionAndPermissionPolicy(t *testing.T
 				Handler: func(ctx *gin.Context) {
 					appSession, ok := AppSessionFromContext(ctx)
 					if !ok {
-						ctx.JSON(http.StatusInternalServerError, Response[gin.H]{
-							Error: &ErrorBody{Code: "TEST_APP_SESSION_MISSING", Message: "app session missing"},
-						})
+						ctx.JSON(http.StatusInternalServerError, Response[gin.H]{Error: legacyErrorBody(ctx, "TEST_APP_SESSION_MISSING", "app session missing")})
 						return
 					}
 					ctx.JSON(http.StatusOK, Response[gin.H]{

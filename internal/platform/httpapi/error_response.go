@@ -16,6 +16,11 @@ func writePlatformError(ctx *gin.Context, code errorcode.Code) {
 
 func writePlatformErrorWithCause(ctx *gin.Context, sink InternalErrorSink, code errorcode.Code, _ error) {
 	definition := registeredErrorDefinition(code)
+	recordPlatformError(ctx, sink, definition)
+	writeRegisteredError(ctx, definition)
+}
+
+func recordPlatformError(ctx *gin.Context, sink InternalErrorSink, definition errorcode.Definition) {
 	correlation := correlationFromGinContext(ctx)
 	publicErr := errorcode.New(definition.Code)
 	event := InternalErrorEvent{
@@ -38,14 +43,18 @@ func writePlatformErrorWithCause(ctx *gin.Context, sink InternalErrorSink, code 
 		}
 		sink.Record(recordContext, event)
 	}
-	writeRegisteredError(ctx, definition)
 }
 
 func recoveryMiddleware(sink InternalErrorSink) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		defer func() {
 			if recover() != nil {
-				writePlatformErrorWithCause(ctx, sink, errorcode.CodeInternal, nil)
+				definition := registeredErrorDefinition(errorcode.CodeInternal)
+				recordPlatformError(ctx, sink, definition)
+				ctx.Abort()
+				if !ctx.Writer.Written() {
+					writeRegisteredError(ctx, definition)
+				}
 			}
 		}()
 		ctx.Next()
