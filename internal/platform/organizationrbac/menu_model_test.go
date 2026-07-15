@@ -22,6 +22,9 @@ func TestMenuModelFreezesExecutableContractVocabulary(t *testing.T) {
 	if MaximumMenuParameters != 32 {
 		t.Fatalf("MaximumMenuParameters = %d, want 32", MaximumMenuParameters)
 	}
+	if MaximumRoleMenuSelections != 2000 {
+		t.Fatalf("MaximumRoleMenuSelections = %d, want 2000", MaximumRoleMenuSelections)
+	}
 	if RoleMenuStoredNodeType != MenuNodeTypePage {
 		t.Fatalf("RoleMenuStoredNodeType = %q, want page", RoleMenuStoredNodeType)
 	}

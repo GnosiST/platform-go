@@ -20,7 +20,7 @@ func (r *GORMRepository) PreviewRoleMenus(ctx context.Context, roleCode string, 
 	if !r.ready(ctx) || !validCode(roleCode) {
 		return RoleMenuImpact{}, ErrInvalid
 	}
-	codes, err := canonicalCodes(menuCodes)
+	codes, err := canonicalRoleMenuCodes(menuCodes)
 	if err != nil {
 		return RoleMenuImpact{}, err
 	}
@@ -39,7 +39,7 @@ func (r *GORMRepository) ReplaceRoleMenus(ctx context.Context, request ReplaceRo
 	if !r.ready(ctx) || !validCode(request.RoleCode) || !validCode(request.ActorID) || request.ChangedAt.IsZero() {
 		return RoleMenuSet{}, ErrInvalid
 	}
-	codes, err := canonicalCodes(request.MenuCodes)
+	codes, err := canonicalRoleMenuCodes(request.MenuCodes)
 	if err != nil {
 		return RoleMenuSet{}, err
 	}
@@ -158,6 +158,14 @@ func validateRoleMenuTarget(db *gorm.DB, roleCode string, menuCodes []string) er
 		}
 	}
 	return nil
+}
+
+func canonicalRoleMenuCodes(menuCodes []string) ([]string, error) {
+	codes, err := canonicalCodes(menuCodes)
+	if err != nil || len(codes) > MaximumRoleMenuSelections {
+		return nil, ErrInvalid
+	}
+	return codes, nil
 }
 
 func stringSet(values []string) map[string]struct{} {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -59,6 +60,7 @@ func TestValidateMenuSnapshotRejectsInvalidTrees(t *testing.T) {
 	valid := []MenuNode{
 		{Code: "access", NodeType: MenuNodeTypeDirectory, TitleZH: "权限", TitleEN: "Access", Status: StatusEnabled},
 		{Code: "users", ParentCode: "access", NodeType: MenuNodeTypePage, TitleZH: "用户", TitleEN: "Users", Status: StatusEnabled, Route: "/users", ComponentKey: "users", BreadcrumbVisible: true},
+		{Code: "user-detail", ParentCode: "access", NodeType: MenuNodeTypePage, TitleZH: "用户详情", TitleEN: "User Detail", Status: StatusEnabled, Route: "/user-detail", ComponentKey: "user-detail", Hidden: true, ActiveMenuCode: "users", BreadcrumbVisible: true},
 	}
 	if err := ValidateMenuSnapshot(valid, nil, nil); err != nil {
 		t.Fatalf("ValidateMenuSnapshot(valid) error = %v", err)
@@ -71,6 +73,10 @@ func TestValidateMenuSnapshotRejectsInvalidTrees(t *testing.T) {
 		{name: "page parent", nodes: []MenuNode{{Code: "parent", NodeType: MenuNodeTypePage, TitleZH: "P", TitleEN: "P", Status: StatusEnabled, Route: "/parent", ComponentKey: "parent"}, {Code: "child", ParentCode: "parent", NodeType: MenuNodeTypePage, TitleZH: "C", TitleEN: "C", Status: StatusEnabled, Route: "/child", ComponentKey: "child"}}},
 		{name: "cycle", nodes: []MenuNode{{Code: "one", ParentCode: "two", NodeType: MenuNodeTypeDirectory, TitleZH: "一", TitleEN: "One", Status: StatusEnabled}, {Code: "two", ParentCode: "one", NodeType: MenuNodeTypeDirectory, TitleZH: "二", TitleEN: "Two", Status: StatusEnabled}}},
 		{name: "external http", nodes: []MenuNode{{Code: "docs", NodeType: MenuNodeTypePage, TitleZH: "文档", TitleEN: "Docs", Status: StatusEnabled, External: true, ExternalURL: "http://example.com", OpenMode: MenuOpenModeNewTab}}},
+		{name: "active menu missing", nodes: []MenuNode{{Code: "detail", NodeType: MenuNodeTypePage, TitleZH: "详情", TitleEN: "Detail", Status: StatusEnabled, Route: "/detail", ComponentKey: "detail", ActiveMenuCode: "missing"}}},
+		{name: "active menu directory", nodes: []MenuNode{{Code: "access", NodeType: MenuNodeTypeDirectory, TitleZH: "权限", TitleEN: "Access", Status: StatusEnabled}, {Code: "detail", ParentCode: "access", NodeType: MenuNodeTypePage, TitleZH: "详情", TitleEN: "Detail", Status: StatusEnabled, Route: "/detail", ComponentKey: "detail", ActiveMenuCode: "access"}}},
+		{name: "active menu disabled", nodes: []MenuNode{{Code: "users", NodeType: MenuNodeTypePage, TitleZH: "用户", TitleEN: "Users", Status: "disabled", Route: "/users", ComponentKey: "users"}, {Code: "detail", NodeType: MenuNodeTypePage, TitleZH: "详情", TitleEN: "Detail", Status: StatusEnabled, Route: "/detail", ComponentKey: "detail", ActiveMenuCode: "users"}}},
+		{name: "active menu self", nodes: []MenuNode{{Code: "detail", NodeType: MenuNodeTypePage, TitleZH: "详情", TitleEN: "Detail", Status: StatusEnabled, Route: "/detail", ComponentKey: "detail", ActiveMenuCode: "detail"}}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -123,6 +129,22 @@ func TestReplaceMenuDefinitionAtomicallyOwnsPageButtonPermissions(t *testing.T) 
 	revision, err := repository.ReplaceMenuDefinition(context.Background(), ReplaceMenuDefinitionRequest{Definition: definition, ExpectedRevision: 0, ActorID: "admin", ChangedAt: now})
 	if err != nil || revision != 1 {
 		t.Fatalf("ReplaceMenuDefinition(create) = %d, %v", revision, err)
+	}
+	invalidActiveMenu := definition
+	invalidActiveMenu.Node.ActiveMenuCode = "missing"
+	if _, err := repository.ReplaceMenuDefinition(context.Background(), ReplaceMenuDefinitionRequest{Definition: invalidActiveMenu, ExpectedRevision: 1, ActorID: "admin", ChangedAt: now.Add(5 * time.Second)}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("ReplaceMenuDefinition(missing active menu) error = %v, want ErrInvalid", err)
+	}
+	deletedTarget := gormMenu{ID: "menu-dashboard", Code: "dashboard", Name: "Dashboard", Status: StatusEnabled, NodeType: string(MenuNodeTypePage), Route: "/dashboard", ComponentKey: "dashboard", TitleZH: "看板", TitleEN: "Dashboard", ParametersJSON: "[]", ValuesJSON: "{}"}
+	if err := db.Create(&deletedTarget).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&gormResourceLifecycle{Resource: "menus", RecordID: deletedTarget.ID, DeletedAt: now.Format(time.RFC3339)}).Error; err != nil {
+		t.Fatal(err)
+	}
+	invalidActiveMenu.Node.ActiveMenuCode = deletedTarget.Code
+	if _, err := repository.ReplaceMenuDefinition(context.Background(), ReplaceMenuDefinitionRequest{Definition: invalidActiveMenu, ExpectedRevision: 1, ActorID: "admin", ChangedAt: now.Add(6 * time.Second)}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("ReplaceMenuDefinition(deleted active menu) error = %v, want ErrInvalid", err)
 	}
 	assertPageButtonPermission(t, db, "page:user:export", "users", "export", "export")
 	conflictingID := definition
@@ -386,6 +408,23 @@ func TestGORMRepositoryReplaceRoleMenusUsesPerRoleRevisionAndNoOp(t *testing.T) 
 	_, err = repository.ReplaceRoleMenus(context.Background(), ReplaceRoleMenusRequest{RoleCode: "operator", MenuCodes: []string{"access"}, ExpectedRevision: 1, ActorID: "admin", ChangedAt: now.Add(4 * time.Minute)})
 	if !errors.Is(err, ErrInvalid) {
 		t.Fatalf("directory replace error = %v, want ErrInvalid", err)
+	}
+}
+
+func TestGORMRepositoryRoleMenusRejectsSelectionsAboveContractLimit(t *testing.T) {
+	_, repository := prepareOrganizationRBACTestRepository(t)
+	menuCodes := make([]string, MaximumRoleMenuSelections+1)
+	for index := range menuCodes {
+		menuCodes[index] = fmt.Sprintf("menu-%04d", index)
+	}
+
+	if _, err := repository.PreviewRoleMenus(context.Background(), "operator", menuCodes); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("PreviewRoleMenus(over limit) error = %v, want ErrInvalid", err)
+	}
+	if _, err := repository.ReplaceRoleMenus(context.Background(), ReplaceRoleMenusRequest{
+		RoleCode: "operator", MenuCodes: menuCodes, ActorID: "admin", ChangedAt: time.Now().UTC(),
+	}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("ReplaceRoleMenus(over limit) error = %v, want ErrInvalid", err)
 	}
 }
 

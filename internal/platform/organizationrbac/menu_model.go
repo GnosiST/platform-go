@@ -15,6 +15,7 @@ const (
 	MenuParameterTypeNumber  MenuParameterType = "number"
 	MenuParameterTypeBoolean MenuParameterType = "boolean"
 	MaximumMenuParameters                      = 32
+	MaximumRoleMenuSelections                  = 2000
 )
 
 type MenuOpenMode string

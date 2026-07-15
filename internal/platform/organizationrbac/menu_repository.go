@@ -163,14 +163,20 @@ func ValidateMenuSnapshot(nodes []MenuNode, buttons []PageButton, permissions []
 	}
 	for _, node := range nodes {
 		if node.ParentCode == "" {
-			continue
+			// Root nodes still need active-menu validation below.
+		} else {
+			parent, exists := byCode[node.ParentCode]
+			legacyMissingParent := !exists && node.LegacyPermission != ""
+			if !legacyMissingParent && (!exists || parent.NodeType != MenuNodeTypeDirectory || node.ParentCode == node.Code) {
+				return ErrInvalid
+			}
 		}
-		parent, exists := byCode[node.ParentCode]
-		if !exists && node.LegacyPermission != "" {
-			continue
-		}
-		if !exists || parent.NodeType != MenuNodeTypeDirectory || node.ParentCode == node.Code {
-			return ErrInvalid
+		activeMenuCode := strings.TrimSpace(node.ActiveMenuCode)
+		if activeMenuCode != "" {
+			target, exists := byCode[activeMenuCode]
+			if !exists || activeMenuCode == node.Code || target.NodeType != MenuNodeTypePage || target.Status != StatusEnabled {
+				return ErrInvalid
+			}
 		}
 	}
 	if menuTreeHasCycle(byCode) {
@@ -443,9 +449,22 @@ func loadMenuValidationSnapshot(db *gorm.DB, definition MenuDefinition) ([]MenuN
 	if err := db.Order("sort_order, code").Find(&menuRows).Error; err != nil {
 		return nil, nil, nil, repositoryError(err)
 	}
+	var deletedMenuIDs []string
+	if err := db.Model(&gormResourceLifecycle{}).
+		Where("resource = ? AND deleted_at <> ''", "menus").
+		Pluck("record_id", &deletedMenuIDs).Error; err != nil {
+		return nil, nil, nil, repositoryError(err)
+	}
+	deletedMenus := stringSet(deletedMenuIDs)
 	nodes := make([]MenuNode, 0, len(menuRows)+1)
 	found := false
 	for _, row := range menuRows {
+		if _, deleted := deletedMenus[row.ID]; deleted {
+			if row.Code == definition.Node.Code {
+				return nil, nil, nil, ErrInvalid
+			}
+			continue
+		}
 		if row.Code == definition.Node.Code {
 			nodes = append(nodes, definition.Node)
 			found = true
