@@ -375,6 +375,95 @@ func TestStoreSchemaExposesStaticMenuActionAndPanelMetadata(t *testing.T) {
 	}
 }
 
+func TestStoreSchemaExposesMenuGovernanceFields(t *testing.T) {
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	legacySchema, err := store.Schema("menus")
+	if err != nil {
+		t.Fatalf("Schema(menus legacy) error = %v", err)
+	}
+	if nodeType := fieldByKey(legacySchema.Fields, "nodeType"); nodeType == nil || nodeType.Required {
+		t.Fatalf("legacy menus nodeType = %+v, want optional compatibility field", nodeType)
+	}
+	for _, key := range []string{"parent", "permission"} {
+		field := fieldByKey(legacySchema.Fields, key)
+		if field == nil || field.ReadOnly || !field.InForm {
+			t.Fatalf("legacy menus field %q = %+v, want writable compatibility field", key, field)
+		}
+	}
+
+	store.EnableOrganizationRBACMenuGovernanceWrites()
+
+	schema, err := store.Schema("menus")
+	if err != nil {
+		t.Fatalf("Schema(menus) error = %v", err)
+	}
+
+	expectations := []struct {
+		key       string
+		fieldType string
+		required  bool
+		inTable   bool
+		inForm    bool
+		readOnly  bool
+	}{
+		{key: "nodeType", fieldType: "select", required: true, inTable: true, inForm: true},
+		{key: "parentCode", fieldType: "select", inTable: true, inForm: true},
+		{key: "componentKey", fieldType: "text", inTable: true, inForm: true},
+		{key: "resourceCode", fieldType: "text", inTable: true, inForm: true},
+		{key: "isExternal", fieldType: "switch", inTable: true, inForm: true},
+		{key: "externalUrl", fieldType: "text", inForm: true},
+		{key: "openMode", fieldType: "select", inTable: true, inForm: true},
+		{key: "parameters", fieldType: "textarea", inForm: true},
+		{key: "cacheEnabled", fieldType: "switch", inTable: true, inForm: true},
+		{key: "hidden", fieldType: "switch", inTable: true, inForm: true},
+		{key: "activeMenuCode", fieldType: "select", inForm: true},
+		{key: "breadcrumbVisible", fieldType: "switch", inTable: true, inForm: true},
+		{key: "pageButtons", fieldType: "textarea", readOnly: true},
+		{key: "parent", fieldType: "text", inTable: true, readOnly: true},
+		{key: "permission", fieldType: "text", inTable: true, readOnly: true},
+	}
+	for _, expectation := range expectations {
+		field := fieldByKey(schema.Fields, expectation.key)
+		if field == nil {
+			t.Errorf("menus field %q is missing", expectation.key)
+			continue
+		}
+		if field.Type != expectation.fieldType || field.Required != expectation.required || field.InTable != expectation.inTable || field.InForm != expectation.inForm || field.ReadOnly != expectation.readOnly || !field.InDetail {
+			t.Errorf("menus field %q = %+v, want type=%q required=%t inTable=%t inForm=%t readOnly=%t inDetail=true", expectation.key, field, expectation.fieldType, expectation.required, expectation.inTable, expectation.inForm, expectation.readOnly)
+		}
+	}
+
+	nodeType := fieldByKey(schema.Fields, "nodeType")
+	if nodeType == nil || !reflect.DeepEqual(nodeType.Options, []FieldOption{
+		option("directory", "目录", "Directory"),
+		option("page", "页面", "Page"),
+	}) {
+		t.Fatalf("menus nodeType options = %+v, want directory/page", nodeType)
+	}
+	openMode := fieldByKey(schema.Fields, "openMode")
+	if openMode == nil || !reflect.DeepEqual(openMode.Options, []FieldOption{
+		option("same-tab", "当前页", "Same Tab"),
+		option("new-tab", "新标签页", "New Tab"),
+	}) {
+		t.Fatalf("menus openMode options = %+v, want same-tab/new-tab", openMode)
+	}
+	for _, key := range []string{"parentCode", "activeMenuCode"} {
+		field := fieldByKey(schema.Fields, key)
+		if field == nil || field.Relation == nil || field.Relation.Resource != "menus" || field.Relation.Display != "tree" || field.Relation.ParentField != "parentCode" {
+			t.Errorf("menus field %q relation = %+v, want menus tree relation", key, field)
+		}
+	}
+	if route := fieldByKey(schema.Fields, "route"); route == nil || route.Required {
+		t.Fatalf("menus route = %+v, want conditionally required field", route)
+	}
+	for _, key := range []string{"parent", "permission"} {
+		field := fieldByKey(schema.Fields, key)
+		if field == nil || field.Required || field.InForm || !field.ReadOnly || !field.InTable || !field.InDetail {
+			t.Fatalf("menus legacy field %q = %+v, want readable read-only migration field", key, field)
+		}
+	}
+}
+
 func TestCoreRuntimeSchemasHaveUniqueFieldKeys(t *testing.T) {
 	store := NewStoreFromCapabilities(core.DefaultManifests())
 

@@ -239,6 +239,28 @@ func (s *Store) EnableOrganizationRBACRoleGovernanceWrites() {
 	s.schemas["roles"] = roleSchema
 }
 
+// EnableOrganizationRBACMenuGovernanceWrites exposes target menu authoring
+// while keeping legacy routing and permission fields readable for migration.
+func (s *Store) EnableOrganizationRBACMenuGovernanceWrites() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	schema, ok := s.schemas["menus"]
+	if !ok {
+		return
+	}
+	for index := range schema.Fields {
+		switch schema.Fields[index].Key {
+		case "nodeType":
+			schema.Fields[index].Required = true
+		case "parent", "permission":
+			schema.Fields[index].Required = false
+			schema.Fields[index].ReadOnly = true
+			schema.Fields[index].InForm = false
+		}
+	}
+	s.schemas["menus"] = schema
+}
+
 func cloneSchema(schema Schema) Schema {
 	schema.FormGroups = append([]FormGroupDefinition(nil), schema.FormGroups...)
 	schema.Fields = append([]FieldDefinition(nil), schema.Fields...)
@@ -1035,12 +1057,29 @@ func menuResourceSchema() Schema {
 		"admin:menu",
 	)
 	schema.Fields = append(schema.Fields,
-		valueField("route", text("路由", "Route"), "text", true, true, true, true, true, 180, nil),
-		valueField("parent", text("上级菜单", "Parent Menu"), "text", false, true, true, true, true, 160, nil),
+		valueField("nodeType", text("节点类型", "Node Type"), "select", false, true, true, true, true, 120, []FieldOption{
+			option("directory", "目录", "Directory"),
+			option("page", "页面", "Page"),
+		}),
+		withRelation(valueField("parentCode", text("上级菜单", "Parent Menu"), "select", false, true, true, true, true, 160, nil), treeFieldRelation("menus", "code", "name", "parentCode", enabledRelationFilter())),
+		valueField("route", text("路由", "Route"), "text", false, true, true, true, true, 180, nil),
+		valueField("componentKey", text("组件键", "Component Key"), "text", false, true, true, true, true, 180, nil),
+		valueField("resourceCode", text("资源编码", "Resource Code"), "text", false, true, true, true, true, 160, nil),
 		valueField("isExternal", text("是否外链", "External Link"), "switch", false, true, true, true, true, 110, nil),
+		valueField("externalUrl", text("外链地址", "External URL"), "text", false, true, false, true, true, 240, nil),
+		valueField("openMode", text("打开方式", "Open Mode"), "select", false, true, true, true, true, 130, []FieldOption{
+			option("same-tab", "当前页", "Same Tab"),
+			option("new-tab", "新标签页", "New Tab"),
+		}),
+		valueField("parameters", text("页面参数", "Page Parameters"), "textarea", false, false, false, true, true, 280, nil),
 		valueField("cacheEnabled", text("启用缓存", "Cache Enabled"), "switch", false, true, true, true, true, 110, nil),
+		valueField("hidden", text("隐藏菜单", "Hidden"), "switch", false, true, true, true, true, 110, nil),
+		withRelation(valueField("activeMenuCode", text("激活菜单", "Active Menu"), "select", false, true, false, true, true, 160, nil), treeFieldRelation("menus", "code", "name", "parentCode", enabledRelationFilter())),
+		valueField("breadcrumbVisible", text("显示面包屑", "Breadcrumb Visible"), "switch", false, true, true, true, true, 130, nil),
+		readOnlyValueField("pageButtons", text("页面按钮", "Page Buttons"), "textarea", false, false, true, 280, nil),
+		valueField("parent", text("上级菜单", "Parent Menu"), "text", false, true, true, true, true, 160, nil),
 		valueField("resource", text("资源", "Resource"), "text", false, true, true, true, true, 160, nil),
-		valueField("permission", text("权限码", "Permission"), "text", true, true, true, true, true, 220, nil),
+		valueField("permission", text("旧权限码", "Legacy Permission"), "text", true, true, true, true, true, 220, nil),
 		valueField("group", text("分组", "Group"), "select", true, true, true, true, true, 140, []FieldOption{
 			option("foundation", "基础", "Foundation"),
 			option("governance", "治理", "Governance"),
@@ -1106,7 +1145,11 @@ func menuResourceSchema() Schema {
 			Order:       30,
 		},
 	}
-	schema.SearchFields = []string{"name", "code", "status", "description", "route", "parent", "isExternal", "cacheEnabled", "permission", "group", "titleZh", "titleEn"}
+	schema.SearchFields = []string{
+		"name", "code", "status", "description", "nodeType", "parentCode", "route", "componentKey", "resourceCode",
+		"isExternal", "externalUrl", "openMode", "cacheEnabled", "hidden", "activeMenuCode", "breadcrumbVisible",
+		"parent", "resource", "permission", "group", "titleZh", "titleEn",
+	}
 	return schema
 }
 
