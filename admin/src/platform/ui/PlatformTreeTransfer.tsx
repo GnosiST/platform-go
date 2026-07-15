@@ -33,6 +33,7 @@ type PlatformTreeTransferProps = {
   revision?: number;
   readOnly?: boolean;
   readOnlyMessage?: string;
+  showReadOnlyMessage?: boolean;
   returnFocusRef?: RefObject<HTMLElement>;
   onChange: (keys: string[]) => void;
   onLoadChildren?: (node: PlatformTreeTransferNode) => Promise<void>;
@@ -46,6 +47,7 @@ export function PlatformTreeTransfer({
   revision,
   readOnly = false,
   readOnlyMessage,
+  showReadOnlyMessage = true,
   returnFocusRef,
   onChange,
   onLoadChildren,
@@ -59,9 +61,11 @@ export function PlatformTreeTransfer({
   const mutableLeafKeySet = useMemo(() => new Set(mutableLeafKeys), [mutableLeafKeys]);
   const selectableLeafKeys = useMemo(() => nodes.filter((node) => node.kind === "leaf" && !node.disabledReason && !node.availableDisabledReason).map((node) => node.key), [nodes]);
   const selectableLeafKeySet = useMemo(() => new Set(selectableLeafKeys), [selectableLeafKeys]);
+  const selectedEligibleLeafKeySet = useMemo(() => new Set(normalizedValue.filter((key) => mutableLeafKeySet.has(key))), [mutableLeafKeySet, normalizedValue]);
   const filteredKeys = useMemo(() => filteredNodeKeys(nodes, search), [nodes, search]);
   const visibleCheckedKeys = useMemo(() => value.filter((key) => filteredKeys.has(key)), [filteredKeys, value]);
-  const treeSelection = useMemo(() => derivedTreeSelection(nodes, normalizedValue, leafValues(nodes, visibleCheckedKeys), filteredKeys), [filteredKeys, nodes, normalizedValue, visibleCheckedKeys]);
+  const availableTreeSelection = useMemo(() => derivedTreeSelection(nodes, normalizedValue, leafValues(nodes, visibleCheckedKeys), filteredKeys, selectableLeafKeySet), [filteredKeys, nodes, normalizedValue, selectableLeafKeySet, visibleCheckedKeys]);
+  const selectedTreeSelection = useMemo(() => derivedTreeSelection(nodes, normalizedValue, leafValues(nodes, visibleCheckedKeys), filteredKeys, selectedEligibleLeafKeySet), [filteredKeys, nodes, normalizedValue, selectedEligibleLeafKeySet, visibleCheckedKeys]);
   const availableTree = useMemo(() => transferTreeData(nodes, filteredKeys, valueSet, labels, false), [filteredKeys, labels, nodes, valueSet]);
   const selectedTree = useMemo(() => transferTreeData(nodes, filteredKeys, valueSet, labels, true), [filteredKeys, labels, nodes, valueSet]);
   useEffect(() => () => {
@@ -104,8 +108,8 @@ export function PlatformTreeTransfer({
     <TransferPane
       className="available"
       ariaLabel={`${ariaLabel}: ${labels.available}`}
-      checkedKeys={treeSelection.checkedKeys}
-      halfCheckedKeys={treeSelection.halfCheckedKeys}
+      checkedKeys={availableTreeSelection.checkedKeys}
+      halfCheckedKeys={availableTreeSelection.halfCheckedKeys}
       empty={labels.empty}
       loadData={loadData}
       readOnly={readOnly}
@@ -118,8 +122,8 @@ export function PlatformTreeTransfer({
     <TransferPane
       className="selected"
       ariaLabel={`${ariaLabel}: ${labels.selected}`}
-      checkedKeys={treeSelection.checkedKeys}
-      halfCheckedKeys={treeSelection.halfCheckedKeys}
+      checkedKeys={selectedTreeSelection.checkedKeys}
+      halfCheckedKeys={selectedTreeSelection.halfCheckedKeys}
       empty={labels.empty}
       loadData={loadData}
       readOnly={readOnly}
@@ -152,7 +156,7 @@ export function PlatformTreeTransfer({
           </Button>
         </Space>
       </div>
-      {readOnlyMessage ? <Typography.Text className="platform-tree-transfer-readonly" type="secondary">{readOnlyMessage}</Typography.Text> : null}
+      {showReadOnlyMessage && readOnlyMessage ? <Typography.Text className="platform-tree-transfer-readonly" type="secondary">{readOnlyMessage}</Typography.Text> : null}
       <div className="platform-tree-transfer-count" aria-live="polite">{labels.selectedCount(normalizedValue.length)}</div>
       {mobile ? (
         <Tabs
@@ -276,13 +280,13 @@ function leafValues(nodes: PlatformTreeTransferNode[], value: string[]) {
   return uniqueSorted(value.filter((key) => leafKeys.has(key)));
 }
 
-function derivedTreeSelection(nodes: PlatformTreeTransferNode[], value: string[], visibleValue: string[], filteredKeys: Set<string>) {
+function derivedTreeSelection(nodes: PlatformTreeTransferNode[], value: string[], visibleValue: string[], filteredKeys: Set<string>, eligibleLeafKeys: Set<string>) {
   const selected = new Set(value);
   const checkedBranches: string[] = [];
   const halfCheckedKeys: string[] = [];
   for (const node of nodes) {
     if (node.kind !== "branch") continue;
-    const descendants = leafDescendants(nodes, node.key);
+    const descendants = leafDescendants(nodes, node.key).filter((key) => eligibleLeafKeys.has(key));
     const selectedCount = descendants.filter((key) => selected.has(key)).length;
     if (!filteredKeys.has(node.key)) continue;
     if (descendants.length > 0 && selectedCount === descendants.length) checkedBranches.push(node.key);

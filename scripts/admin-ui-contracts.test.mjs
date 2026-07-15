@@ -485,6 +485,78 @@ describe("validate-admin-ui-contracts", () => {
     assert.doesNotMatch(organizationRBAC, /menuCodes\.(?:slice|splice)\(/);
   });
 
+  it("keeps closed-gate legacy menu visibility independent from target assignment reads", () => {
+    const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+
+    assert.match(roleGovernance, /const targetRequest = roleMenuMigrationWriteEnabled \? getRoleMenus\(role\.code\) : Promise\.resolve\(null\);/);
+    assert.match(roleGovernance, /menuCodes: targetAssignment \? \[\.\.\.targetAssignment\.menuCodes\] : \[\]/);
+    assert.match(roleGovernance, /const value = migrationReadOnly \? legacyVisible : menuAssignment\.menuCodes;/);
+  });
+
+  it("requires stale role-menu opens and closes to invalidate older async results", () => {
+    const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+    const openMenus = roleGovernance.slice(roleGovernance.indexOf("const openMenus"), roleGovernance.indexOf("const closeMenus"));
+
+    assert.match(roleGovernance, /const menuRequest = useRef\(0\);/);
+    assert.match(openMenus, /const requestID = \+\+menuRequest\.current;/);
+    assert.ok((openMenus.match(/if \(menuRequest\.current !== requestID\) return;/g) ?? []).length >= 2);
+    assert.match(roleGovernance, /const closeMenus = \(\) => \{\s*menuRequest\.current \+= 1;\s*setMenuAssignment\(null\);\s*\};/);
+  });
+
+  it("requires role-menu impact to match the opened snapshot before apply", () => {
+    const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+    const guard = roleGovernance.indexOf("!roleMenuImpactMatches(impact, menuAssignment, menuCodes)");
+    const apply = roleGovernance.indexOf("await replaceRoleMenus(preview);");
+
+    assert.match(roleGovernance, /initialMenuCodes: string\[\];/);
+    assert.match(roleGovernance, /impact\.expectedRevision === assignment\.revision/);
+    assert.match(roleGovernance, /impact\.previewId !== preview\.previewId \|\| impact\.impactHash !== preview\.impactHash/);
+    assert.match(roleGovernance, /sameStringSet\(impact\.currentMenuCodes, assignment\.initialMenuCodes\)/);
+    assert.match(roleGovernance, /sameStringSet\(impact\.proposedMenuCodes, proposedMenuCodes\)/);
+    assert.match(roleGovernance, /impact\.changed === !sameStringSet\(assignment\.initialMenuCodes, proposedMenuCodes\)/);
+    assert.match(roleGovernance, /setError\(dictionary\.changePreviewUnavailable\);\s*await openMenus\(menuAssignment\.role\);\s*return;/);
+    assert.ok(guard >= 0 && apply > guard, "snapshot guard must run before apply");
+  });
+
+  it("requires explicit role-menu impact confirmation before apply", () => {
+    const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+    const confirm = roleGovernance.indexOf("if (!await confirmRoleMenuImpact(modal.confirm, dictionary, impact)) return;");
+    const apply = roleGovernance.indexOf("await replaceRoleMenus(preview);");
+
+    assert.match(roleGovernance, /impact\.currentMenuCodes\.join\(", "\)/);
+    assert.match(roleGovernance, /impact\.proposedMenuCodes\.join\(", "\)/);
+    assert.match(roleGovernance, /dictionary\.currentContext/);
+    assert.match(roleGovernance, /dictionary\.reviewAndApply/);
+    assert.ok(confirm >= 0 && apply > confirm, "impact cancellation must stop apply");
+  });
+
+  it("keeps missing historical menu selections visible under a removable selected branch", () => {
+    const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+
+    assert.match(roleGovernance, /const historicalBranchKey = "menu-history";/);
+    assert.match(roleGovernance, /parentKey: historicalBranchKey/);
+    assert.match(roleGovernance, /availableDisabledReason: dictionary\.rolePermissionHistoricalMissing/);
+  });
+
+  it("derives directory full and half state from each pane eligible descendants", () => {
+    const treeTransfer = adminSource("admin/src/platform/ui/PlatformTreeTransfer.tsx");
+
+    assert.match(treeTransfer, /const selectedEligibleLeafKeySet = useMemo/);
+    assert.match(treeTransfer, /derivedTreeSelection\(nodes, normalizedValue, leafValues\(nodes, visibleCheckedKeys\), filteredKeys, selectableLeafKeySet\)/);
+    assert.match(treeTransfer, /derivedTreeSelection\(nodes, normalizedValue, leafValues\(nodes, visibleCheckedKeys\), filteredKeys, selectedEligibleLeafKeySet\)/);
+    assert.match(treeTransfer, /leafDescendants\(nodes, node\.key\)\.filter\(\(key\) => eligibleLeafKeys\.has\(key\)\)/);
+  });
+
+  it("only renders legacy read-only messaging while role-menu assignment is read-only", () => {
+    const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+    const treeTransfer = adminSource("admin/src/platform/ui/PlatformTreeTransfer.tsx");
+
+    assert.match(roleGovernance, /\{migrationReadOnly \? <AdminFeedback type="warning"/);
+    assert.match(roleGovernance, /showReadOnlyMessage=\{migrationReadOnly\}/);
+    assert.match(treeTransfer, /showReadOnlyMessage && readOnlyMessage/);
+    assert.doesNotMatch(roleGovernance, /^\s*<AdminFeedback type="warning" message=\{dictionary\.roleMenuLegacyReadonlyTitle\}/m);
+  });
+
   it("rejects tenant-scoped role-group creation without tenant read access", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(

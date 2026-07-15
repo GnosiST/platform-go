@@ -31,6 +31,7 @@ import {
   roleMenuMigrationWriteEnabled,
   type OrganizationRoleRemediation,
   type RoleChangeConflict,
+  type RoleMenuImpact,
 } from "../api/organizationRBAC";
 import type { Dictionary, Language } from "../i18n";
 import { hasPermission } from "../refine";
@@ -75,6 +76,7 @@ type AuthorizationState = {
 type MenuAssignmentState = {
   role: AdminResourceRecord;
   menuCodes: string[];
+  initialMenuCodes: string[];
   revision: number;
 };
 
@@ -113,6 +115,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const authorizationTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const governanceRequest = useRef(0);
+  const menuRequest = useRef(0);
   const canReadGroups = hasPermission(permissions, "admin:role-group:read", deniedPermissions);
   const canReadRoles = hasPermission(permissions, "admin:role:read", deniedPermissions);
   const canReadTenants = hasPermission(permissions, "admin:tenant:read", deniedPermissions);
@@ -264,29 +267,60 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
 
   const openMenus = async (role: AdminResourceRecord) => {
     if (!canReadMenus) return;
+    const requestID = ++menuRequest.current;
     try {
-      const [nextMenus, assignment] = await Promise.all([
+      const targetRequest = roleMenuMigrationWriteEnabled ? getRoleMenus(role.code) : Promise.resolve(null);
+      const [nextMenus, targetAssignment] = await Promise.all([
         menus.length > 0 ? Promise.resolve(menus) : loadAllRecords("menus"),
-        getRoleMenus(role.code),
+        targetRequest,
       ]);
+      if (menuRequest.current !== requestID) return;
+      const initialMenuCodes = targetAssignment ? [...targetAssignment.menuCodes] : [];
       setMenus(nextMenus);
-      setMenuAssignment({ role, menuCodes: [...assignment.menuCodes], revision: assignment.revision });
+      setMenuAssignment({
+        role,
+        menuCodes: targetAssignment ? [...targetAssignment.menuCodes] : [],
+        initialMenuCodes,
+        revision: targetAssignment?.revision ?? 0,
+      });
     } catch (nextError) {
+      if (menuRequest.current !== requestID) return;
       setError(errorMessage(nextError, dictionary.loadResourceFailed));
     }
   };
 
+  const closeMenus = () => {
+    menuRequest.current += 1;
+    setMenuAssignment(null);
+  };
+
   const saveMenus = async () => {
     if (!menuAssignment || !roleMenuMigrationWriteEnabled || !canAssignMenus) return;
+    const requestID = menuRequest.current;
     const menuCodes = pageMenuCodes(menuTreeNodes(menus, menuAssignment.menuCodes, dictionary), menuAssignment.menuCodes);
     setActing("menus");
     try {
       const preview = await prepareRoleMenuChange(menuAssignment.role.code, menuCodes);
+      if (menuRequest.current !== requestID) return;
       const impact = await getRoleMenuChangeImpact(preview.previewId);
       if (!impact) throw new Error(dictionary.changePreviewUnavailable);
+      if (menuRequest.current !== requestID) return;
+      if (impact.previewId !== preview.previewId || impact.impactHash !== preview.impactHash || !roleMenuImpactMatches(impact, menuAssignment, menuCodes)) {
+        setError(dictionary.changePreviewUnavailable);
+        await openMenus(menuAssignment.role);
+        return;
+      }
+      if (!impact.changed) {
+        closeMenus();
+        return;
+      }
+      if (!await confirmRoleMenuImpact(modal.confirm, dictionary, impact)) return;
+      if (menuRequest.current !== requestID) return;
       await replaceRoleMenus(preview);
-      setMenuAssignment(null);
+      if (menuRequest.current !== requestID) return;
+      closeMenus();
     } catch (nextError) {
+      if (menuRequest.current !== requestID) return;
       setError(errorMessage(nextError, dictionary.roleGovernanceSaveFailed));
     } finally {
       setActing("");
@@ -456,7 +490,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
         menus={menus}
         returnFocusRef={menuTriggerRef}
         onAssignmentChange={setMenuAssignment}
-        onClose={() => setMenuAssignment(null)}
+        onClose={closeMenus}
         onSave={() => void saveMenus()}
       />
     </AdminPage>
@@ -671,8 +705,9 @@ function MenuVisibilityModal({
   const legacyVisible = legacyVisibleMenus(menuAssignment.role, menus);
   const historicalCodes = uniqueSorted([...menuAssignment.menuCodes, ...legacyVisible]);
   const nodes = menuTreeNodes(menus, historicalCodes, dictionary);
-  const value = roleMenuMigrationWriteEnabled ? menuAssignment.menuCodes : legacyVisible;
-  const readOnly = !roleMenuMigrationWriteEnabled || !canAssignMenus;
+  const migrationReadOnly = !roleMenuMigrationWriteEnabled;
+  const readOnly = migrationReadOnly || !canAssignMenus;
+  const value = migrationReadOnly ? legacyVisible : menuAssignment.menuCodes;
   return (
     <Modal
       className="role-menu-visibility-modal"
@@ -687,7 +722,7 @@ function MenuVisibilityModal({
       onCancel={onClose}
       onOk={onSave}
     >
-      <AdminFeedback type="warning" message={dictionary.roleMenuLegacyReadonlyTitle} description={dictionary.roleMenuLegacyReadonlyDescription} />
+      {migrationReadOnly ? <AdminFeedback type="warning" message={dictionary.roleMenuLegacyReadonlyTitle} description={dictionary.roleMenuLegacyReadonlyDescription} /> : <Typography.Text type="secondary">{dictionary.changeImpactTitle}</Typography.Text>}
       <PlatformTreeTransfer
         ariaLabel={dictionary.assignMenus}
         labels={transferLabels(dictionary)}
@@ -696,6 +731,7 @@ function MenuVisibilityModal({
         readOnlyMessage={dictionary.roleMenuLegacyReadonlyDescription}
         returnFocusRef={returnFocusRef}
         revision={menuAssignment.revision}
+        showReadOnlyMessage={migrationReadOnly}
         value={value}
         onChange={(menuCodes) => onAssignmentChange({ ...menuAssignment, menuCodes: pageMenuCodes(nodes, menuCodes) })}
       />
@@ -783,13 +819,19 @@ function menuTreeNodes(records: AdminResourceRecord[], historicalCodes: string[]
     status: record.status,
     availableDisabledReason: enabled(record) ? undefined : dictionary.rolePermissionHistoricalDisabled,
   }));
-  nodes.push(...historicalCodes.filter((code) => !catalogCodes.has(code)).map((code) => ({
-    key: code,
-    kind: "leaf" as const,
-    label: code,
-    code,
-    availableDisabledReason: dictionary.rolePermissionHistoricalMissing,
-  })));
+  const missingCodes = historicalCodes.filter((code) => !catalogCodes.has(code));
+  if (missingCodes.length > 0) {
+    const historicalBranchKey = "menu-history";
+    nodes.push({ key: historicalBranchKey, kind: "branch", label: dictionary.permissionTypeHistorical });
+    nodes.push(...missingCodes.map((code) => ({
+      key: code,
+      parentKey: historicalBranchKey,
+      kind: "leaf" as const,
+      label: code,
+      code,
+      availableDisabledReason: dictionary.rolePermissionHistoricalMissing,
+    })));
+  }
   return nodes;
 }
 
@@ -821,6 +863,19 @@ function permissionAllows(allows: string[], denies: string[], permission: string
 
 function permissionMatch(granted: string, permission: string) {
   return granted === "*" || granted === permission || granted.endsWith(":*") && permission.startsWith(granted.slice(0, -1));
+}
+
+function roleMenuImpactMatches(impact: RoleMenuImpact, assignment: MenuAssignmentState, proposedMenuCodes: string[]) {
+  return impact.expectedRevision === assignment.revision
+    && sameStringSet(impact.currentMenuCodes, assignment.initialMenuCodes)
+    && sameStringSet(impact.proposedMenuCodes, proposedMenuCodes)
+    && impact.changed === !sameStringSet(assignment.initialMenuCodes, proposedMenuCodes);
+}
+
+function sameStringSet(left: ReadonlyArray<string>, right: ReadonlyArray<string>) {
+  const leftValues = uniqueSorted([...left]);
+  const rightValues = uniqueSorted([...right]);
+  return leftValues.length === rightValues.length && leftValues.every((value, index) => value === rightValues[index]);
 }
 
 async function loadAllRecords(resource: string, keywords?: string[]) {
@@ -910,6 +965,23 @@ function confirmImpact(confirm: ConfirmModal, dictionary: Dictionary, affectedUs
 
 function confirmRoleConflicts(confirm: ConfirmModal, dictionary: Dictionary, conflicts: ReadonlyArray<RoleChangeConflict>) {
   return confirmPromise(confirm, dictionary.roleConflictTitle, <div><Typography.Paragraph>{dictionary.roleConflictDescription.replace("{count}", String(conflicts.length))}</Typography.Paragraph><ul className="role-conflict-list">{conflicts.map((conflict) => <li key={`${conflict.userCode}:${conflict.roleCode}`}>{conflict.userCode} · {conflict.roleCode}</li>)}</ul></div>, dictionary.userInvalidRoleRemove, dictionary.cancel);
+}
+
+function confirmRoleMenuImpact(confirm: ConfirmModal, dictionary: Dictionary, impact: RoleMenuImpact) {
+  const current = impact.currentMenuCodes.join(", ") || "-";
+  const proposed = impact.proposedMenuCodes.join(", ") || "-";
+  return confirmPromise(
+    confirm,
+    dictionary.changeImpactTitle,
+    <div>
+      <Typography.Paragraph strong>{dictionary.currentContext} · {dictionary.transferSelectedCount.replace("{count}", String(impact.currentMenuCodes.length))}</Typography.Paragraph>
+      <Typography.Text code>{current}</Typography.Text>
+      <Typography.Paragraph strong>{dictionary.reviewAndApply} · {dictionary.transferSelectedCount.replace("{count}", String(impact.proposedMenuCodes.length))}</Typography.Paragraph>
+      <Typography.Text code>{proposed}</Typography.Text>
+    </div>,
+    dictionary.reviewAndApply,
+    dictionary.cancel,
+  );
 }
 
 function confirmPromise(confirm: ConfirmModal, title: string, content: ReactNode, okText: string, cancelText: string): Promise<boolean> {

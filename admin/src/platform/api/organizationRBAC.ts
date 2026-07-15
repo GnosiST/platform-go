@@ -10,6 +10,7 @@ import {
   type OrganizationRolePoolGetV1_0_0Item,
   type OrganizationRoleGroupChangePrepareV1_0_0Values,
   type NavigationRoleMenuChangePrepareV1_0_0Values,
+  type NavigationRoleMenuChangeImpactV1_0_0Item,
   type RolePermissionChangeImpactV1_0_0Item,
   type RolePermissionChangePrepareV1_0_0Values,
   type RoleStateOrGroupChangeConflictsV1_0_0Item,
@@ -40,6 +41,7 @@ export type OrganizationChangeConflict = OrganizationRoleGroupChangeConflictsV1_
 export type OrganizationRoleRemediation = AdminServiceObjectRoleRemediation;
 export type RoleChangeImpact = RoleStateOrGroupChangeImpactV1_0_0Item;
 export type RolePermissionImpact = RolePermissionChangeImpactV1_0_0Item;
+export type RoleMenuImpact = NavigationRoleMenuChangeImpactV1_0_0Item;
 export type RoleChangeConflict = RoleStateOrGroupChangeConflictsV1_0_0Item;
 export type MenuDefinition = AdminServiceObjectMenuDefinition;
 export type MenuParameter = AdminServiceObjectMenuParameter;
