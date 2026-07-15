@@ -1,5 +1,8 @@
 import {
   AdminServiceObjectClient,
+  type AdminServiceObjectMenuDefinition,
+  type AdminServiceObjectMenuParameter,
+  type AdminServiceObjectPageButton,
   type AdminServiceObjectResponse,
   type AdminServiceObjectRoleRemediation,
   type OrganizationRoleGroupChangeConflictsV1_0_0Item,
@@ -35,6 +38,34 @@ export type OrganizationRoleRemediation = AdminServiceObjectRoleRemediation;
 export type RoleChangeImpact = RoleStateOrGroupChangeImpactV1_0_0Item;
 export type RolePermissionImpact = RolePermissionChangeImpactV1_0_0Item;
 export type RoleChangeConflict = RoleStateOrGroupChangeConflictsV1_0_0Item;
+export type MenuDefinition = AdminServiceObjectMenuDefinition;
+export type MenuParameter = AdminServiceObjectMenuParameter;
+export type PageButton = AdminServiceObjectPageButton;
+
+export async function getMenuDefinition(menuCode: string) {
+  const result = requireData(await client.getMenuDefinition({
+    arguments: { menuCode },
+    pagination: { page: 1, pageSize: 1 },
+  })).items[0];
+  if (!result) {
+    throw new Error("Menu definition is unavailable");
+  }
+  return result;
+}
+
+export async function createMenuDefinition(definition: MenuDefinition, expectedRevision: number) {
+  return requireData(await client.createMenuDefinition({
+    arguments: { definition, expectedRevision },
+    idempotencyKey: idempotencyKey("menu-definition-create"),
+  })).values;
+}
+
+export async function replaceMenuDefinition(definition: MenuDefinition, expectedRevision: number) {
+  return requireData(await client.replaceMenuDefinition({
+    arguments: { definition, expectedRevision },
+    idempotencyKey: idempotencyKey("menu-definition-replace"),
+  })).values;
+}
 
 export async function getOrganizationRolePool(orgUnitCode: string) {
   return collectPages(async (page, pageSize) => requireData(await client.getOrganizationRolePool({

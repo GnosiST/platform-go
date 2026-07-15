@@ -105,6 +105,121 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /Role and role-group routes must share the role governance console/);
   });
 
+  it("rejects a menus route that falls through to the generic resource console", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/refine/ResourceRoutePage.tsx",
+      'resource.route === "/menus"',
+      'resource.route === "/menus-disabled"',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /menus route must use the dedicated menu governance console/);
+  });
+
+  it("rejects menu governance that exposes page metadata while authoring a directory", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "{!directoryMode ? (",
+      "{true ? (",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Page-only route, parameter, and button controls must stay hidden during directory authoring/);
+  });
+
+  it("rejects menu parameter rows without the forbidden-input guard", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/platform/resources/MenuGovernanceConsole.tsx", "FORBIDDEN_PARAMETER_INPUT", "ALLOW_ANY_PARAMETER_INPUT");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must reject scripts, expressions, SQL, and physical routing inputs/);
+  });
+
+  it("rejects menu page buttons without current-menu metadata binding", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "button.menuCode === values.code.trim()",
+      "button.menuCode.length > 0",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Page-button metadata must point to the current menu code/);
+  });
+
+  it("rejects menu governance search that can apply a stale response", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "if (menuListRequest.current !== requestID) return;",
+      "if (false) return;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Menu search must discard stale responses/);
+  });
+
+  it("rejects menu governance that bypasses generated menu-definition service objects", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/api/organizationRBAC.ts",
+      "client.replaceMenuDefinition",
+      "transport.post",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /menu-definition replace wrapper must use the generated service-object client/);
+  });
+
+  it("rejects menu creation that hard-codes the initial global revision", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "createMenuDefinition(definition, selectedRevision)",
+      "createMenuDefinition(definition, 0)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Menu creation must use the most recent trusted global menu revision/);
+  });
+
+  it("rejects menu saves that retain a stale selected-definition revision", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "setDefinitionRefresh((current) => current + 1);",
+      "void selectedRevision;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must reload the normalized definition and its new global revision/);
+  });
+
   it("rejects role governance that queries a resource the principal cannot read", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(

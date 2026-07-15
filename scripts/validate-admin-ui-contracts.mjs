@@ -26,6 +26,7 @@ const files = {
   resourceExperience: readSource("admin/src/platform/resources/resourceExperience.ts"),
   organizationUserExperience: readSource("admin/src/platform/resources/organizationUserExperience.tsx"),
   roleGovernance: readSource("admin/src/platform/resources/RoleGovernanceConsole.tsx"),
+  menuGovernance: readSourceOptional("admin/src/platform/resources/MenuGovernanceConsole.tsx"),
   resourceRoute: readSource("admin/src/platform/refine/ResourceRoutePage.tsx"),
   sensitiveRevealModal: readSource("admin/src/platform/resources/SensitiveFieldRevealModal.tsx"),
   sensitiveRevealOIDC: readSource("admin/src/platform/security/sensitiveRevealOIDC.ts"),
@@ -234,6 +235,66 @@ requireIncludes(files.organizationUserExperience, "aria-invalid={invalidSelected
 requireIncludes(files.organizationUserExperience, '<ul className="organization-role-pool-list"', "Organization role-pool provenance must use list semantics.");
 requireIncludes(files.organizationUserExperience, 'role="textbox" aria-readonly="true"', "Read-only role values must expose a valid read-only widget semantic.");
 requireIncludes(files.resourceRoute, 'resource.route === "/roles" || resource.route === "/role-groups"', "Role and role-group routes must share the role governance console.");
+requireIncludes(files.resourceRoute, 'resource.route === "/menus"', "The menus route must use the dedicated menu governance console.");
+requireIncludes(files.resourceRoute, "<MenuGovernanceConsole", "The menus route must render MenuGovernanceConsole instead of GenericResourceConsole.");
+requireIncludes(files.menuGovernance, "export function MenuGovernanceConsole", "MenuGovernanceConsole must expose the dedicated menus workbench entry point.");
+requireIncludes(files.menuGovernance, 'type MenuEditorMode = "create-directory" | "create-page" | "edit-directory" | "edit-page";', "Menu governance must expose explicit directory and page create/edit modes.");
+requireIncludes(files.menuGovernance, 'const directoryMode = editor?.mode === "create-directory" || editor?.mode === "edit-directory";', "Directory authoring must use an explicit mode boundary.");
+requireIncludes(files.menuGovernance, "{!directoryMode ? (", "Page-only route, parameter, and button controls must stay hidden during directory authoring.");
+requireIncludes(files.menuGovernance, 'route: "",', "Directory definitions must clear route metadata before submission.");
+requireIncludes(files.menuGovernance, 'componentKey: "",', "Directory definitions must clear component metadata before submission.");
+requireIncludes(files.menuGovernance, 'externalUrl: "",', "Directory definitions must clear external URL metadata before submission.");
+requireIncludes(files.menuGovernance, 'parameters: [],', "Directory definitions must clear page parameters before submission.");
+requireIncludes(files.menuGovernance, 'buttons: directoryMode ? [] :', "Directory definitions must clear page buttons before submission.");
+requireIncludes(files.menuGovernance, 'nodeType(record) === "directory"', "Page parent choices must be restricted to directory nodes.");
+requireIncludes(files.menuGovernance, 'isLeaf: nodeType(record) === "page"', "Page menu nodes must remain tree leaves.");
+requireNotIncludes(files.menuGovernance, 'name="permission"', "Legacy menu permission must remain read-only and absent from authoring.");
+requireIncludes(files.menuGovernance, "AdminTreeWorkbench", "Menu governance must reuse the platform tree workbench wrapper.");
+requireIncludes(files.menuGovernance, 'const canRead = hasPermission(permissions, "admin:menu:read", deniedPermissions);', "Menu governance read access must respect allowed and denied menu permissions.");
+requireIncludes(files.menuGovernance, 'const canCreate = hasPermission(permissions, "admin:menu:create", deniedPermissions);', "Menu creation must require admin:menu:create and respect denied permissions.");
+requireIncludes(files.menuGovernance, 'const canUpdate = hasPermission(permissions, "admin:menu:update", deniedPermissions);', "Menu updates must require admin:menu:update and respect denied permissions.");
+requireIncludes(files.menuGovernance, "getMenuDefinition", "Menu governance must load selected button metadata through the atomic menu-definition service object.");
+requireIncludes(files.menuGovernance, "createMenuDefinition", "Menu governance must create menus through the atomic menu-definition service object.");
+requireIncludes(files.menuGovernance, "replaceMenuDefinition", "Menu governance must replace menus through the atomic menu-definition service object.");
+requireNotIncludes(files.menuGovernance, "createAdminResource", "Menu governance must not compose atomic menu definitions from generic menu CRUD.");
+requireNotIncludes(files.menuGovernance, "updateAdminResource", "Menu governance must not compose atomic menu definitions from generic menu CRUD.");
+requireIncludes(files.organizationRBAC, "client.getMenuDefinition", "The menu-definition query wrapper must use the generated service-object client.");
+requireIncludes(files.organizationRBAC, "client.createMenuDefinition", "The menu-definition create wrapper must use the generated service-object client.");
+requireIncludes(files.organizationRBAC, "client.replaceMenuDefinition", "The menu-definition replace wrapper must use the generated service-object client.");
+requireIncludes(files.organizationRBAC, "arguments: { definition, expectedRevision }", "Menu-definition creation and replacement must carry the caller's current global revision.");
+requireIncludes(files.menuGovernance, "createMenuDefinition(definition, selectedRevision)", "Menu creation must use the most recent trusted global menu revision.");
+requireIncludes(files.menuGovernance, 'type MenuParameterType = "string" | "number" | "boolean";', "Page parameters must use the bounded string, number, or boolean type set.");
+requireIncludes(files.menuGovernance, "SAFE_PARAMETER_KEY", "Page parameter keys must use an explicit safe-key contract.");
+requireIncludes(files.menuGovernance, "FORBIDDEN_PARAMETER_INPUT", "Page parameters must reject scripts, expressions, SQL, and physical routing inputs.");
+requireIncludes(files.menuGovernance, "duplicateParameterKey", "Page parameters must reject duplicate keys.");
+requireIncludes(files.menuGovernance, '<Form.List name="parameters"', "Page parameters must be controlled typed form rows.");
+requireIncludes(files.menuGovernance, "parameterValueControl(parameterType", "Page parameter values must render controls that preserve their selected type.");
+requireIncludes(files.menuGovernance, "button.menuCode === values.code.trim()", "Page-button metadata must point to the current menu code.");
+requireIncludes(files.menuGovernance, "button.permissionCode.trim()", "Each page button must carry exactly one explicit permission code.");
+requireIncludes(files.menuGovernance, "duplicateButtonKey", "Page buttons must reject duplicate stable button keys.");
+requireIncludes(files.menuGovernance, '<Form.List name="buttons">', "Page buttons must be controlled rows inside the selected page editor.");
+requireIncludes(files.menuGovernance, "dictionary.menuButtonAuthorizationBoundary", "Page-button editing must state that visibility metadata does not authorize APIs.");
+requireIncludes(files.menuGovernance, "const menuListRequest = useRef(0);", "Menu governance must track the latest tree search request.");
+requireIncludes(files.menuGovernance, "const definitionRequest = useRef(0);", "Menu governance must track the latest selected-definition request.");
+requireIncludes(files.menuGovernance, "setDefinitionRefresh((current) => current + 1);", "Menu saves must reload the normalized definition and its new global revision even when selection stays unchanged.");
+requireCountAtLeast(files.menuGovernance, "if (menuListRequest.current !== requestID) return;", 2, "Menu search must discard stale responses before changing loading, error, data, or selection.");
+requireCountAtLeast(files.menuGovernance, "if (definitionRequest.current !== requestID) return;", 2, "Selected menu loading must discard stale responses before changing detail state.");
+requireIncludes(files.menuGovernance, "returnFocusRef.current?.focus({ preventScroll: true });", "Closing the menu editor must restore focus without scrolling.");
+requireRegex(files.styles, /\.menu-governance-detail \.admin-list-actions \.ant-btn,[\s\S]*?min-height:\s*44px;/, "Menu governance actions must expose 44px targets.");
+requireRegex(files.styles, /\.menu-governance-form-list-row\s*\{[\s\S]*?grid-template-columns:/, "Menu parameter and button rows must use a stable responsive grid.");
+requireRegex(files.styles, /@media screen and \(max-width:\s*767px\)[\s\S]*?\.menu-governance-form-list-row\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);/, "Menu parameter and button rows must stack without horizontal overflow on mobile.");
+for (const key of [
+  "menuGovernanceTitle",
+  "menuTreeAriaLabel",
+  "menuAddDirectory",
+  "menuAddPage",
+  "menuParameters",
+  "menuPageButtons",
+  "menuButtonAuthorizationBoundary",
+  "menuSaveSucceeded",
+]) {
+  requireCountExactly(files.i18n, `${key}:`, 2, `Menu governance i18n key ${key} must exist in matching Chinese and English dictionaries.`);
+}
 requireIncludes(files.roleGovernance, "AdminTreeWorkbench", "Role governance must use the platform tree workbench wrapper.");
 requireIncludes(files.roleGovernance, "PlatformTreeTransfer", "Role permission and menu entry points must use the platform Tree Transfer wrapper.");
 requireIncludes(files.roleGovernance, 'const canReadGroups = hasPermission(permissions, "admin:role-group:read", deniedPermissions);', "Role governance must derive role-group read access from the active permission set.");
@@ -766,6 +827,15 @@ console.log("Admin UI contract validation passed.");
 
 function readSource(relativePath) {
   return readFileSync(join(root, relativePath), "utf8");
+}
+
+function readSourceOptional(relativePath) {
+  try {
+    return readSource(relativePath);
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return "";
+    throw error;
+  }
 }
 
 function requireIncludes(source, needle, message) {

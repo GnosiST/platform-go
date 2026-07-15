@@ -2,6 +2,7 @@ import { Spin } from "antd";
 import { useCan, useResourceParams } from "@refinedev/core";
 import type { Dictionary, Language } from "../i18n";
 import { GenericResourceConsole } from "../resources/GenericResourceConsole";
+import { MenuGovernanceConsole } from "../resources/MenuGovernanceConsole";
 import { RoleGovernanceConsole } from "../resources/RoleGovernanceConsole";
 import type { AdminResourceDefinition } from "../resources/registry";
 import type { AdminSensitiveRevealFactorComplete } from "../api/client";
@@ -43,6 +44,19 @@ export function ResourceRoutePage({ resource, availableResourceRoutes, language,
     return (
       <RoleGovernanceConsole
         resource={resource}
+        language={language}
+        dictionary={dictionary}
+        permissions={permissions}
+        deniedPermissions={deniedPermissions}
+      />
+    );
+  }
+
+  if (resource.route === "/menus") {
+    return (
+      <MenuGovernanceConsole
+        resource={resource}
+        availableResourceRoutes={availableResourceRoutes}
         language={language}
         dictionary={dictionary}
         permissions={permissions}
