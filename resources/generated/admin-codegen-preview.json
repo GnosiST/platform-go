@@ -232,7 +232,8 @@
     "runtimeDefinitionSources": [
       "internal/platform/serviceobject/reference.go",
       "internal/platform/organizationrbac/service_objects.go",
-      "internal/platform/organizationrbac/lifecycle_service_objects.go"
+      "internal/platform/organizationrbac/lifecycle_service_objects.go",
+      "internal/platform/organizationrbac/navigation_service_objects.go"
     ],
     "typescriptClient": "resources/generated/admin-service-object-client.ts",
     "transportContract": "AdminServiceObjectTransport",
@@ -461,6 +462,137 @@
         "logicalSortNames": [],
         "limits": {
           "timeoutMs": 2000,
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "maxPageSize": 1,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "query",
+        "id": "platform.navigation.menu-definition.get",
+        "version": "1.0.0",
+        "clientMethod": "getMenuDefinition",
+        "requestType": "NavigationMenuDefinitionGetV1_0_0QueryRequest",
+        "inputType": "NavigationMenuDefinitionGetV1_0_0QueryInput",
+        "responseType": "NavigationMenuDefinitionGetV1_0_0QueryData",
+        "argumentNames": [
+          "menuCode"
+        ],
+        "additionalPermissions": [],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 2000,
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "maxPageSize": 1,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "query",
+        "id": "platform.navigation.role-menus.get",
+        "version": "1.0.0",
+        "clientMethod": "getRoleMenus",
+        "requestType": "NavigationRoleMenusGetV1_0_0QueryRequest",
+        "inputType": "NavigationRoleMenusGetV1_0_0QueryInput",
+        "responseType": "NavigationRoleMenusGetV1_0_0QueryData",
+        "argumentNames": [
+          "roleCode"
+        ],
+        "additionalPermissions": [
+          {
+            "permission": "admin:menu:read",
+            "action": "read"
+          }
+        ],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 2000,
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "maxPageSize": 1,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "query",
+        "id": "platform.navigation.role-menu-change.impact",
+        "version": "1.0.0",
+        "clientMethod": "getRoleMenuChangeImpact",
+        "requestType": "NavigationRoleMenuChangeImpactV1_0_0QueryRequest",
+        "inputType": "NavigationRoleMenuChangeImpactV1_0_0QueryInput",
+        "responseType": "NavigationRoleMenuChangeImpactV1_0_0QueryData",
+        "argumentNames": [
+          "previewId"
+        ],
+        "additionalPermissions": [
+          {
+            "permission": "admin:menu:read",
+            "action": "read"
+          }
+        ],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 2000,
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "maxPageSize": 1,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "query",
+        "id": "platform.navigation.role-menu-migration.compare",
+        "version": "1.0.0",
+        "clientMethod": "compareRoleMenuMigration",
+        "requestType": "NavigationRoleMenuMigrationCompareV1_0_0QueryRequest",
+        "inputType": "NavigationRoleMenuMigrationCompareV1_0_0QueryInput",
+        "responseType": "NavigationRoleMenuMigrationCompareV1_0_0QueryData",
+        "argumentNames": [
+          "roleCode"
+        ],
+        "additionalPermissions": [
+          {
+            "permission": "admin:menu:read",
+            "action": "read"
+          }
+        ],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 3000,
           "cost": {
             "baseCost": 1,
             "perRowCost": 1,
@@ -800,6 +932,135 @@
           "impactHash"
         ],
         "additionalPermissions": [],
+        "operationPhase": "apply",
+        "limits": {
+          "timeoutMs": 10000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.navigation.menu-definition.create",
+        "version": "1.0.0",
+        "clientMethod": "createMenuDefinition",
+        "requestType": "NavigationMenuDefinitionCreateV1_0_0CommandRequest",
+        "inputType": "NavigationMenuDefinitionCreateV1_0_0CommandInput",
+        "responseType": "NavigationMenuDefinitionCreateV1_0_0CommandData",
+        "argumentNames": [
+          "definition",
+          "expectedRevision"
+        ],
+        "additionalPermissions": [],
+        "limits": {
+          "timeoutMs": 10000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.navigation.menu-definition.replace",
+        "version": "1.0.0",
+        "clientMethod": "replaceMenuDefinition",
+        "requestType": "NavigationMenuDefinitionReplaceV1_0_0CommandRequest",
+        "inputType": "NavigationMenuDefinitionReplaceV1_0_0CommandInput",
+        "responseType": "NavigationMenuDefinitionReplaceV1_0_0CommandData",
+        "argumentNames": [
+          "definition",
+          "expectedRevision"
+        ],
+        "additionalPermissions": [],
+        "limits": {
+          "timeoutMs": 10000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.navigation.role-menu-change.prepare",
+        "version": "1.0.0",
+        "clientMethod": "prepareRoleMenuChange",
+        "requestType": "NavigationRoleMenuChangePrepareV1_0_0CommandRequest",
+        "inputType": "NavigationRoleMenuChangePrepareV1_0_0CommandInput",
+        "responseType": "NavigationRoleMenuChangePrepareV1_0_0CommandData",
+        "argumentNames": [
+          "roleCode",
+          "menuCodes"
+        ],
+        "additionalPermissions": [
+          {
+            "permission": "admin:menu:read",
+            "action": "read"
+          }
+        ],
+        "operationPhase": "prepare",
+        "limits": {
+          "timeoutMs": 5000,
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      {
+        "kind": "command",
+        "id": "platform.navigation.role-menus.replace",
+        "version": "1.0.0",
+        "clientMethod": "replaceRoleMenus",
+        "requestType": "NavigationRoleMenusReplaceV1_0_0CommandRequest",
+        "inputType": "NavigationRoleMenusReplaceV1_0_0CommandInput",
+        "responseType": "NavigationRoleMenusReplaceV1_0_0CommandData",
+        "argumentNames": [
+          "previewId",
+          "expectedRevision",
+          "impactHash"
+        ],
+        "additionalPermissions": [
+          {
+            "permission": "admin:menu:read",
+            "action": "read"
+          }
+        ],
         "operationPhase": "apply",
         "limits": {
           "timeoutMs": 10000,

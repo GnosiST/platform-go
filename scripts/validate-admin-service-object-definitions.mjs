@@ -11,6 +11,7 @@ const sourceArguments = new Map([
   ["internal/platform/serviceobject/reference.go", "--reference-source"],
   ["internal/platform/organizationrbac/service_objects.go", "--organization-source"],
   ["internal/platform/organizationrbac/lifecycle_service_objects.go", "--lifecycle-source"],
+  ["internal/platform/organizationrbac/navigation_service_objects.go", "--navigation-source"],
 ]);
 const valueTypes = new Map([
   ["ValueString", "string"],
@@ -77,6 +78,14 @@ function namedComposite(source, name) {
   return end < 0 ? "" : source.slice(start, end + 1);
 }
 
+function variableComposite(source, name) {
+  const declaration = new RegExp(`\\b${name}\\s*:=\\s*[^\\n{]*\\{`).exec(source);
+  if (!declaration) return "";
+  const start = source.indexOf("{", declaration.index);
+  const end = matchingBrace(source, start);
+  return end < 0 ? "" : source.slice(start, end + 1);
+}
+
 function functionBody(source, name) {
   const functionIndex = source.indexOf(`func ${name}(`);
   if (functionIndex < 0) return "";
@@ -122,18 +131,19 @@ function parseFields(source, contextSource = source) {
   }));
 }
 
-function parseResultFields(block, source) {
-  if (/ResultSchema:\s*previewResultSchema\(\)/.test(block)) {
-    const helper = functionBody(source, "previewResultSchema");
-    const start = helper.indexOf("{", helper.indexOf("return []serviceobject.ResultField"));
-    const end = matchingBrace(helper, start);
-    return parseFields(start < 0 || end < 0 ? "" : helper.slice(start, end + 1)).map(({ name, type }) => ({ name, type }));
-  }
-  return parseFields(namedComposite(block, "ResultSchema")).map(({ name, type }) => ({ name, type }));
+function parseDefinitionFields(block, fieldName, source) {
+  const helper = new RegExp(`${fieldName}:\\s*([A-Za-z][A-Za-z0-9_]*)\\(\\)`).exec(block)?.[1];
+  return parseFields(helper ? functionBody(source, helper) : namedComposite(block, fieldName), source);
 }
 
-function parseAdditionalPermissions(block) {
-  return [...namedComposite(block, "AdditionalPermissions").matchAll(/\{Permission:\s*"([^"]+)",\s*Action:\s*"([^"]+)"\}/g)].map(
+function parseResultFields(block, source) {
+  return parseDefinitionFields(block, "ResultSchema", source).map(({ name, type }) => ({ name, type }));
+}
+
+function parseAdditionalPermissions(block, source) {
+  const identifier = identifierField(block, "AdditionalPermissions");
+  const permissions = identifier ? variableComposite(source, identifier) : namedComposite(block, "AdditionalPermissions");
+  return [...permissions.matchAll(/\{Permission:\s*"([^"]+)",\s*Action:\s*"([^"]+)"\}/g)].map(
     (match) => ({ permission: match[1], action: match[2] }),
   );
 }
@@ -197,7 +207,6 @@ function parseGoDefinition(definition, source, costSource = source, resultSource
   const idMarker = definition.goIDMarker ?? (definition.goFactory ? "ID: id" : `ID: ${definition.goIDSymbol}`);
   const block = compositeContaining(definitionSource, idMarker);
   if (!block) return null;
-  const argumentsBlock = namedComposite(block, "Arguments");
   const allowedSortBlock = namedComposite(block, "AllowedSort");
   return {
     resource: resolvedStringField(block, "Resource", source, identifierField(block, "Resource") === "resource" ? definition.resource : ""),
@@ -208,10 +217,10 @@ function parseGoDefinition(definition, source, costSource = source, resultSource
       identifierField(block, "Permission") === "permission" ? definition.permission : "",
     ),
     action: stringField(block, "Action"),
-    additionalPermissions: parseAdditionalPermissions(block),
+    additionalPermissions: parseAdditionalPermissions(block, definitionSource),
     tenantMode: tenantModes.get(identifierField(block, "TenantMode")) ?? identifierField(block, "TenantMode"),
     dataScope: stringField(block, "DataScope"),
-    arguments: parseFields(argumentsBlock, definitionSource),
+    arguments: parseDefinitionFields(block, "Arguments", definitionSource),
     allowedSort: [...allowedSortBlock.matchAll(/\{Name:\s*"([^"]+)"/g)].map((match) => match[1]),
     cost: costPolicy(costSource, block),
     timeoutMs: timeoutMilliseconds(block),

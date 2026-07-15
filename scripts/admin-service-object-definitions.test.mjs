@@ -73,6 +73,18 @@ describe("validate-admin-service-object-definitions", () => {
     assert.match(result.stdout, /Validated Admin service-object Go\/JS definition consistency/);
   });
 
+  it("rejects a navigation runtime object missing from the JS definition registry", () => {
+    const source = fs.readFileSync(
+      path.join(repoRoot, "internal/platform/organizationrbac/navigation_service_objects.go"),
+      "utf8",
+    );
+    const changed = `${source}\nvar _ = serviceobject.QueryDefinition{ID: UnmirroredNavigationQueryID}\n`;
+    const result = runValidator(["--navigation-source", temporarySource("navigation_service_objects.go", changed)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /navigation_service_objects\.go service-object IDs are not fully mirrored/);
+  });
+
   it("rejects a Go ID that differs from the generated contract", () => {
     const source = fs.readFileSync(path.join(repoRoot, "internal/platform/organizationrbac/service_objects.go"), "utf8");
     const changed = source.replace(

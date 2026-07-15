@@ -10616,6 +10616,509 @@
           "timeoutMs": 2000
         }
       },
+      "NavigationMenuDefinitionGetV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "menuCode": {
+            "type": "string",
+            "maxLength": 191
+          }
+        },
+        "required": [
+          "menuCode"
+        ]
+      },
+      "NavigationMenuDefinitionGetV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/AdminServiceObjectMenuDefinition"
+          },
+          "revision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "definition",
+          "revision"
+        ]
+      },
+      "NavigationMenuDefinitionGetV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NavigationMenuDefinitionGetV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1
+          }
+        }
+      },
+      "NavigationMenuDefinitionGetV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version",
+          "arguments"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.navigation.menu-definition.get"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/NavigationMenuDefinitionGetV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "menus",
+          "permission": "admin:menu:read",
+          "action": "read",
+          "additionalPermissions": [],
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "timeoutMs": 2000
+        }
+      },
+      "NavigationRoleMenusGetV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleCode": {
+            "type": "string",
+            "maxLength": 191
+          }
+        },
+        "required": [
+          "roleCode"
+        ]
+      },
+      "NavigationRoleMenusGetV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleCode": {
+            "type": "string"
+          },
+          "menuCodes": {
+            "$ref": "#/components/schemas/AdminServiceObjectStringSet"
+          },
+          "revision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "roleCode",
+          "menuCodes",
+          "revision"
+        ]
+      },
+      "NavigationRoleMenusGetV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NavigationRoleMenusGetV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1
+          }
+        }
+      },
+      "NavigationRoleMenusGetV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version",
+          "arguments"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.navigation.role-menus.get"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/NavigationRoleMenusGetV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "menus",
+          "permission": "admin:role:read",
+          "action": "read",
+          "additionalPermissions": [
+            {
+              "permission": "admin:menu:read",
+              "action": "read"
+            }
+          ],
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "timeoutMs": 2000
+        }
+      },
+      "NavigationRoleMenuChangeImpactV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "previewId"
+        ]
+      },
+      "NavigationRoleMenuChangeImpactV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "currentMenuCodes": {
+            "$ref": "#/components/schemas/AdminServiceObjectStringSet"
+          },
+          "proposedMenuCodes": {
+            "$ref": "#/components/schemas/AdminServiceObjectStringSet"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "previewId",
+          "changed",
+          "currentMenuCodes",
+          "proposedMenuCodes",
+          "expectedRevision",
+          "impactHash",
+          "expiresAt"
+        ]
+      },
+      "NavigationRoleMenuChangeImpactV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NavigationRoleMenuChangeImpactV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1
+          }
+        }
+      },
+      "NavigationRoleMenuChangeImpactV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version",
+          "arguments"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.navigation.role-menu-change.impact"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/NavigationRoleMenuChangeImpactV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "menus",
+          "permission": "admin:role:update",
+          "action": "update",
+          "additionalPermissions": [
+            {
+              "permission": "admin:menu:read",
+              "action": "read"
+            }
+          ],
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "timeoutMs": 2000
+        }
+      },
+      "NavigationRoleMenuMigrationCompareV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleCode": {
+            "type": "string",
+            "maxLength": 191
+          }
+        },
+        "required": [
+          "roleCode"
+        ]
+      },
+      "NavigationRoleMenuMigrationCompareV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleCode": {
+            "type": "string"
+          },
+          "legacyMenuCodes": {
+            "$ref": "#/components/schemas/AdminServiceObjectStringSet"
+          },
+          "targetMenuCodes": {
+            "$ref": "#/components/schemas/AdminServiceObjectStringSet"
+          },
+          "addedMenuCodes": {
+            "$ref": "#/components/schemas/AdminServiceObjectStringSet"
+          },
+          "removedMenuCodes": {
+            "$ref": "#/components/schemas/AdminServiceObjectStringSet"
+          },
+          "targetRevision": {
+            "type": "integer"
+          },
+          "principalEquivalenceClaimed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "roleCode",
+          "legacyMenuCodes",
+          "targetMenuCodes",
+          "addedMenuCodes",
+          "removedMenuCodes",
+          "targetRevision",
+          "principalEquivalenceClaimed"
+        ]
+      },
+      "NavigationRoleMenuMigrationCompareV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NavigationRoleMenuMigrationCompareV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1
+          }
+        }
+      },
+      "NavigationRoleMenuMigrationCompareV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version",
+          "arguments"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.navigation.role-menu-migration.compare"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/NavigationRoleMenuMigrationCompareV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "menus",
+          "permission": "admin:role:read",
+          "action": "read",
+          "additionalPermissions": [
+            {
+              "permission": "admin:menu:read",
+              "action": "read"
+            }
+          ],
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 1,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 8
+          },
+          "timeoutMs": 3000
+        }
+      },
       "AuthorizationResourceLifecycleImpactV1_0_0Arguments": {
         "type": "object",
         "additionalProperties": false,
@@ -12031,6 +12534,415 @@
           "operationPhase": "apply"
         }
       },
+      "NavigationMenuDefinitionCreateV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/AdminServiceObjectMenuDefinition"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "definition",
+          "expectedRevision"
+        ]
+      },
+      "NavigationMenuDefinitionCreateV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "applied",
+          "revision"
+        ]
+      },
+      "NavigationMenuDefinitionCreateV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/NavigationMenuDefinitionCreateV1_0_0Values"
+          }
+        }
+      },
+      "NavigationMenuDefinitionCreateV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.navigation.menu-definition.create"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/NavigationMenuDefinitionCreateV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "menus",
+          "permission": "admin:menu:create",
+          "action": "create",
+          "additionalPermissions": [],
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 10000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      "NavigationMenuDefinitionReplaceV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/AdminServiceObjectMenuDefinition"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "definition",
+          "expectedRevision"
+        ]
+      },
+      "NavigationMenuDefinitionReplaceV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "applied",
+          "revision"
+        ]
+      },
+      "NavigationMenuDefinitionReplaceV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/NavigationMenuDefinitionReplaceV1_0_0Values"
+          }
+        }
+      },
+      "NavigationMenuDefinitionReplaceV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.navigation.menu-definition.replace"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/NavigationMenuDefinitionReplaceV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "menus",
+          "permission": "admin:menu:update",
+          "action": "update",
+          "additionalPermissions": [],
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 10000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000
+        }
+      },
+      "NavigationRoleMenuChangePrepareV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleCode": {
+            "type": "string",
+            "maxLength": 191
+          },
+          "menuCodes": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 2000,
+            "items": {
+              "type": "string",
+              "maxLength": 191
+            }
+          }
+        },
+        "required": [
+          "roleCode",
+          "menuCodes"
+        ]
+      },
+      "NavigationRoleMenuChangePrepareV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "previewId",
+          "expectedRevision",
+          "impactHash",
+          "expiresAt"
+        ]
+      },
+      "NavigationRoleMenuChangePrepareV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/NavigationRoleMenuChangePrepareV1_0_0Values"
+          }
+        }
+      },
+      "NavigationRoleMenuChangePrepareV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.navigation.role-menu-change.prepare"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/NavigationRoleMenuChangePrepareV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "menus",
+          "permission": "admin:role:update",
+          "action": "update",
+          "additionalPermissions": [
+            {
+              "permission": "admin:menu:read",
+              "action": "read"
+            }
+          ],
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 5000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000,
+          "operationPhase": "prepare"
+        }
+      },
+      "NavigationRoleMenusReplaceV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "impactHash": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "previewId",
+          "expectedRevision",
+          "impactHash"
+        ]
+      },
+      "NavigationRoleMenusReplaceV1_0_0Values": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "previewId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "applied",
+          "revision",
+          "previewId"
+        ]
+      },
+      "NavigationRoleMenusReplaceV1_0_0CommandData": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/NavigationRoleMenusReplaceV1_0_0Values"
+          }
+        }
+      },
+      "NavigationRoleMenusReplaceV1_0_0CommandRequest": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "version",
+          "arguments",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "const": "platform.navigation.role-menus.replace"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/NavigationRoleMenusReplaceV1_0_0Arguments"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "x-platform-definition": {
+          "resource": "menus",
+          "permission": "admin:role:update",
+          "action": "update",
+          "additionalPermissions": [
+            {
+              "permission": "admin:menu:read",
+              "action": "read"
+            }
+          ],
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 5,
+            "perRowCost": 1,
+            "perOffsetCost": 0,
+            "predicateCost": 0,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 0,
+            "limit": 2005
+          },
+          "timeoutMs": 10000,
+          "idempotency": "required-key",
+          "maxAffectedRows": 2000,
+          "operationPhase": "apply"
+        }
+      },
       "AuthorizationResourceLifecyclePrepareV1_0_0Arguments": {
         "type": "object",
         "additionalProperties": false,
@@ -12341,6 +13253,18 @@
             "$ref": "#/components/schemas/RolePermissionChangeImpactV1_0_0QueryRequest"
           },
           {
+            "$ref": "#/components/schemas/NavigationMenuDefinitionGetV1_0_0QueryRequest"
+          },
+          {
+            "$ref": "#/components/schemas/NavigationRoleMenusGetV1_0_0QueryRequest"
+          },
+          {
+            "$ref": "#/components/schemas/NavigationRoleMenuChangeImpactV1_0_0QueryRequest"
+          },
+          {
+            "$ref": "#/components/schemas/NavigationRoleMenuMigrationCompareV1_0_0QueryRequest"
+          },
+          {
             "$ref": "#/components/schemas/AuthorizationResourceLifecycleImpactV1_0_0QueryRequest"
           }
         ],
@@ -12383,6 +13307,22 @@
               "version": "1.0.0"
             },
             {
+              "queryId": "platform.navigation.menu-definition.get",
+              "version": "1.0.0"
+            },
+            {
+              "queryId": "platform.navigation.role-menus.get",
+              "version": "1.0.0"
+            },
+            {
+              "queryId": "platform.navigation.role-menu-change.impact",
+              "version": "1.0.0"
+            },
+            {
+              "queryId": "platform.navigation.role-menu-migration.compare",
+              "version": "1.0.0"
+            },
+            {
               "queryId": "platform.authorization.resource-lifecycle.impact",
               "version": "1.0.0"
             }
@@ -12399,6 +13339,10 @@
             "platform.identity.role-state-or-group-change.impact": "#/components/schemas/RoleStateOrGroupChangeImpactV1_0_0QueryRequest",
             "platform.identity.role-state-or-group-change.conflicts.list": "#/components/schemas/RoleStateOrGroupChangeConflictsV1_0_0QueryRequest",
             "platform.authorization.role-permission-change.impact": "#/components/schemas/RolePermissionChangeImpactV1_0_0QueryRequest",
+            "platform.navigation.menu-definition.get": "#/components/schemas/NavigationMenuDefinitionGetV1_0_0QueryRequest",
+            "platform.navigation.role-menus.get": "#/components/schemas/NavigationRoleMenusGetV1_0_0QueryRequest",
+            "platform.navigation.role-menu-change.impact": "#/components/schemas/NavigationRoleMenuChangeImpactV1_0_0QueryRequest",
+            "platform.navigation.role-menu-migration.compare": "#/components/schemas/NavigationRoleMenuMigrationCompareV1_0_0QueryRequest",
             "platform.authorization.resource-lifecycle.impact": "#/components/schemas/AuthorizationResourceLifecycleImpactV1_0_0QueryRequest"
           }
         }
@@ -12434,6 +13378,18 @@
           },
           {
             "$ref": "#/components/schemas/RolePermissionsReplaceV1_0_0CommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/NavigationMenuDefinitionCreateV1_0_0CommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/NavigationMenuDefinitionReplaceV1_0_0CommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/NavigationRoleMenuChangePrepareV1_0_0CommandRequest"
+          },
+          {
+            "$ref": "#/components/schemas/NavigationRoleMenusReplaceV1_0_0CommandRequest"
           },
           {
             "$ref": "#/components/schemas/AuthorizationResourceLifecyclePrepareV1_0_0CommandRequest"
@@ -12489,6 +13445,22 @@
               "version": "1.0.0"
             },
             {
+              "commandId": "platform.navigation.menu-definition.create",
+              "version": "1.0.0"
+            },
+            {
+              "commandId": "platform.navigation.menu-definition.replace",
+              "version": "1.0.0"
+            },
+            {
+              "commandId": "platform.navigation.role-menu-change.prepare",
+              "version": "1.0.0"
+            },
+            {
+              "commandId": "platform.navigation.role-menus.replace",
+              "version": "1.0.0"
+            },
+            {
               "commandId": "platform.authorization.resource-lifecycle.prepare",
               "version": "1.0.0"
             },
@@ -12511,6 +13483,10 @@
             "platform.identity.role.disable": "#/components/schemas/RoleDisableV1_0_0CommandRequest",
             "platform.authorization.role-permission-change.prepare": "#/components/schemas/RolePermissionChangePrepareV1_0_0CommandRequest",
             "platform.authorization.role-permissions.replace": "#/components/schemas/RolePermissionsReplaceV1_0_0CommandRequest",
+            "platform.navigation.menu-definition.create": "#/components/schemas/NavigationMenuDefinitionCreateV1_0_0CommandRequest",
+            "platform.navigation.menu-definition.replace": "#/components/schemas/NavigationMenuDefinitionReplaceV1_0_0CommandRequest",
+            "platform.navigation.role-menu-change.prepare": "#/components/schemas/NavigationRoleMenuChangePrepareV1_0_0CommandRequest",
+            "platform.navigation.role-menus.replace": "#/components/schemas/NavigationRoleMenusReplaceV1_0_0CommandRequest",
             "platform.authorization.resource-lifecycle.prepare": "#/components/schemas/AuthorizationResourceLifecyclePrepareV1_0_0CommandRequest",
             "platform.authorization.resource-lifecycle.apply": "#/components/schemas/AuthorizationResourceLifecycleApplyV1_0_0CommandRequest"
           }
@@ -12541,6 +13517,18 @@
           },
           {
             "$ref": "#/components/schemas/RolePermissionChangeImpactV1_0_0QueryData"
+          },
+          {
+            "$ref": "#/components/schemas/NavigationMenuDefinitionGetV1_0_0QueryData"
+          },
+          {
+            "$ref": "#/components/schemas/NavigationRoleMenusGetV1_0_0QueryData"
+          },
+          {
+            "$ref": "#/components/schemas/NavigationRoleMenuChangeImpactV1_0_0QueryData"
+          },
+          {
+            "$ref": "#/components/schemas/NavigationRoleMenuMigrationCompareV1_0_0QueryData"
           },
           {
             "$ref": "#/components/schemas/AuthorizationResourceLifecycleImpactV1_0_0QueryData"
@@ -12578,6 +13566,18 @@
           },
           {
             "$ref": "#/components/schemas/RolePermissionsReplaceV1_0_0CommandData"
+          },
+          {
+            "$ref": "#/components/schemas/NavigationMenuDefinitionCreateV1_0_0CommandData"
+          },
+          {
+            "$ref": "#/components/schemas/NavigationMenuDefinitionReplaceV1_0_0CommandData"
+          },
+          {
+            "$ref": "#/components/schemas/NavigationRoleMenuChangePrepareV1_0_0CommandData"
+          },
+          {
+            "$ref": "#/components/schemas/NavigationRoleMenusReplaceV1_0_0CommandData"
           },
           {
             "$ref": "#/components/schemas/AuthorizationResourceLifecyclePrepareV1_0_0CommandData"
@@ -19793,7 +20793,8 @@
   "x-service-object-runtime-sources": [
     "internal/platform/serviceobject/reference.go",
     "internal/platform/organizationrbac/service_objects.go",
-    "internal/platform/organizationrbac/lifecycle_service_objects.go"
+    "internal/platform/organizationrbac/lifecycle_service_objects.go",
+    "internal/platform/organizationrbac/navigation_service_objects.go"
   ],
   "x-source-version": "0.1.0",
   "x-source-updated-at": "2026-07-06",

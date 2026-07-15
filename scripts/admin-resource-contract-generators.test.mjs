@@ -10,6 +10,17 @@ import {
   isForbiddenServiceObjectClientInput,
 } from "./admin-service-object-definitions.mjs";
 
+const requiredNavigationServiceObjects = Object.freeze([
+  { kind: "query", id: "platform.navigation.menu-definition.get", clientMethod: "getMenuDefinition" },
+  { kind: "query", id: "platform.navigation.role-menus.get", clientMethod: "getRoleMenus" },
+  { kind: "query", id: "platform.navigation.role-menu-change.impact", clientMethod: "getRoleMenuChangeImpact" },
+  { kind: "query", id: "platform.navigation.role-menu-migration.compare", clientMethod: "compareRoleMenuMigration" },
+  { kind: "command", id: "platform.navigation.menu-definition.create", clientMethod: "createMenuDefinition" },
+  { kind: "command", id: "platform.navigation.menu-definition.replace", clientMethod: "replaceMenuDefinition" },
+  { kind: "command", id: "platform.navigation.role-menu-change.prepare", clientMethod: "prepareRoleMenuChange" },
+  { kind: "command", id: "platform.navigation.role-menus.replace", clientMethod: "replaceRoleMenus" },
+]);
+
 function runAdminResourceContract(env = {}, args = []) {
   const result = spawnSync(process.execPath, ["scripts/generate-admin-resource-contract.mjs", "--stdout", ...args], {
     cwd: new URL("..", import.meta.url),
@@ -56,9 +67,10 @@ function compileAdminServiceObjectClient(source) {
   fs.writeFileSync(path.join(tempDir, "client.ts"), source);
   fs.writeFileSync(
     path.join(tempDir, "consumer.ts"),
-    `import type { AdminServiceObjectClient } from "./client";
+    `import type { AdminServiceObjectClient, AdminServiceObjectMenuDefinition } from "./client";
 
 declare const client: AdminServiceObjectClient;
+declare const menuDefinition: AdminServiceObjectMenuDefinition;
 
 client.listReferenceRecords({
   arguments: { status: "active", codePrefix: "REF-" },
@@ -114,6 +126,27 @@ client.applyAuthorizationResourceLifecycle({
   arguments: { previewId: "preview-lifecycle-1", expectedRevision: 9, impactHash: "impact-lifecycle-1" },
   idempotencyKey: "apply-resource-lifecycle-1",
 }).then((response) => response.data?.values.applied);
+
+client.getMenuDefinition({ arguments: { menuCode: "users" } }).then((response) => response.data?.items[0]?.definition);
+client.getRoleMenus({ arguments: { roleCode: "operator" } }).then((response) => response.data?.items[0]?.menuCodes);
+client.getRoleMenuChangeImpact({ arguments: { previewId: "preview-role-menu-1" } }).then((response) => response.data?.items[0]?.changed);
+client.compareRoleMenuMigration({ arguments: { roleCode: "operator" } }).then((response) => response.data?.items[0]?.targetMenuCodes);
+client.createMenuDefinition({
+  arguments: { definition: menuDefinition, expectedRevision: 0 },
+  idempotencyKey: "create-menu-1",
+}).then((response) => response.data?.values.revision);
+client.replaceMenuDefinition({
+  arguments: { definition: menuDefinition, expectedRevision: 1 },
+  idempotencyKey: "replace-menu-1",
+}).then((response) => response.data?.values.revision);
+client.prepareRoleMenuChange({
+  arguments: { roleCode: "operator", menuCodes: ["users"] },
+  idempotencyKey: "prepare-role-menu-1",
+}).then((response) => response.data?.values.previewId);
+client.replaceRoleMenus({
+  arguments: { previewId: "preview-role-menu-1", expectedRevision: 1, impactHash: "impact-role-menu-1" },
+  idempotencyKey: "replace-role-menu-1",
+}).then((response) => response.data?.values.revision);
 
 // @ts-expect-error physical fields are not part of persisted query input
 client.listReferenceRecords({ field: "status" });
@@ -452,6 +485,27 @@ describe("admin resource contract generators", () => {
     assert.match(source, /applyAuthorizationResourceLifecycle/);
     assert.doesNotMatch(source, /\[key: string\]/);
     compileAdminServiceObjectClient(source);
+  });
+
+  it("generates the complete navigation query and command client surface", () => {
+    const contract = runAdminResourceContract();
+    const preview = runAdminCodegenPreviewForContract(contract);
+    const source = runAdminServiceObjectClientForContract(contract);
+    const operations = preview.serviceObjects.operations.map(({ kind, id, clientMethod }) => ({ kind, id, clientMethod }));
+
+    for (const expected of requiredNavigationServiceObjects) {
+      assert.ok(
+        operations.some(
+          (operation) =>
+            operation.kind === expected.kind &&
+            operation.id === expected.id &&
+            operation.clientMethod === expected.clientMethod,
+        ),
+        `generated preview is missing ${expected.kind} ${expected.id}`,
+      );
+      assert.match(source, new RegExp(`\\b${expected.clientMethod}\\(`));
+      assert.ok(source.includes(`${expected.kind}Id: "${expected.id}"`));
+    }
   });
 
   it("projects lifecycle routes without exposing maintenance purge over HTTP", () => {
