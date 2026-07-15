@@ -171,7 +171,6 @@ const (
 	apiTokenPrefix                    = "pgo_"
 	sessionInvalidationResource       = "sessions"
 	authorizationInvalidationResource = "authorization"
-	appLogoutResolveErrorKey          = "platform.app.logout.session.resolve-error"
 	systemActorID                     = "system:platform"
 )
 
@@ -968,7 +967,7 @@ func (s *Server) authLogout(ctx *gin.Context) {
 func (s *Server) appAuthLogin(ctx *gin.Context) {
 	var input appLoginRequest
 	if err := ctx.ShouldBindJSON(&input); err != nil {
-		writeAuthError(ctx, http.StatusBadRequest, "APP_AUTH_INVALID_REQUEST", "invalid app auth login request")
+		writePlatformError(ctx, errorcode.CodeAppAuthInvalidRequest)
 		return
 	}
 	providerDimension := strings.ToLower(strings.TrimSpace(input.Provider))
@@ -984,7 +983,7 @@ func (s *Server) appAuthLogin(ctx *gin.Context) {
 	}
 	issued, err := s.sessions.Issue(username)
 	if err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_SESSION_ISSUE_FAILED", "app session issue failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppAuthSessionIssueFailed, err)
 		return
 	}
 	s.publishSessionInvalidation(ctx.Request.Context())
@@ -997,21 +996,19 @@ func (s *Server) appAuthLogin(ctx *gin.Context) {
 	}, issued.ExpiresAt.Sub(issued.IssuedAt))
 	if err != nil {
 		if cleanupErr := s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token); cleanupErr != nil {
-			s.recordInternalError(ctx, "APP_AUTH_SESSION_CLEANUP_FAILED", cleanupErr)
-			writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_SESSION_CLEANUP_FAILED", "app session cleanup failed")
+			writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppAuthSessionCleanupFailed, cleanupErr)
 			return
 		}
-		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_TOKEN_SIGN_FAILED", "app auth token sign failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppAuthTokenSignFailed, err)
 		return
 	}
 	actorID := appUserID(username)
 	if err := s.recordAudit("app.auth.login", actorID, actorID, "success", "authenticated"); err != nil {
 		if cleanupErr := s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token); cleanupErr != nil {
-			s.recordInternalError(ctx, "APP_AUTH_SESSION_CLEANUP_FAILED", cleanupErr)
-			writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_SESSION_CLEANUP_FAILED", "app session cleanup failed")
+			writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppAuthSessionCleanupFailed, cleanupErr)
 			return
 		}
-		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_AUDIT_FAILED", "app auth audit failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppAuthAuditFailed, err)
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[appLoginResponse]{
@@ -1028,30 +1025,30 @@ func (s *Server) resolveAppLoginIdentity(ctx *gin.Context, input appLoginRequest
 	if providerID == "" {
 		provider, ok := s.findAuthProvider("demo", capability.AuthProviderAudienceApp)
 		if !ok || provider.Kind != "demo" {
-			writeAuthError(ctx, http.StatusBadRequest, "APP_AUTH_PROVIDER_NOT_FOUND", "app auth provider not found")
+			writePlatformError(ctx, errorcode.CodeAppAuthProviderNotFound)
 			return "", "", false
 		}
 		if !provider.Configured {
-			writeAuthError(ctx, http.StatusBadRequest, "APP_AUTH_PROVIDER_NOT_CONFIGURED", "app auth provider is not configured")
+			writePlatformError(ctx, errorcode.CodeAppAuthProviderNotConfigured)
 			return "", "", false
 		}
 		return appUsername(input.Username), "", true
 	}
 	provider, ok := s.findAuthProvider(providerID, capability.AuthProviderAudienceApp)
 	if !ok || !provider.Enabled {
-		writeAuthError(ctx, http.StatusBadRequest, "APP_AUTH_PROVIDER_NOT_FOUND", "app auth provider not found")
+		writePlatformError(ctx, errorcode.CodeAppAuthProviderNotFound)
 		return "", "", false
 	}
 	if !provider.Configured {
-		writeAuthError(ctx, http.StatusBadRequest, "APP_AUTH_PROVIDER_NOT_CONFIGURED", "app auth provider is not configured")
+		writePlatformError(ctx, errorcode.CodeAppAuthProviderNotConfigured)
 		return "", "", false
 	}
 	if provider.Kind == "wechat" && strings.TrimSpace(input.Code) == "" {
-		writeAuthError(ctx, http.StatusBadRequest, "APP_AUTH_CODE_REQUIRED", "app auth code is required")
+		writePlatformError(ctx, errorcode.CodeAppAuthCodeRequired)
 		return "", "", false
 	}
 	if s.appIdentityResolver == nil {
-		writeAuthError(ctx, http.StatusNotImplemented, "APP_AUTH_PROVIDER_RESOLVER_NOT_CONFIGURED", "app auth provider resolver is not configured")
+		writePlatformError(ctx, errorcode.CodeAppAuthProviderResolverNotConfigured)
 		return "", "", false
 	}
 	identity, err := s.appIdentityResolver.ResolveAppIdentity(ctx.Request.Context(), AppIdentityResolveInput{
@@ -1060,15 +1057,15 @@ func (s *Server) resolveAppLoginIdentity(ctx *gin.Context, input appLoginRequest
 		UsernameHint: strings.TrimSpace(input.Username),
 	})
 	if errors.Is(err, ErrAppIdentityInvalid) {
-		writeAuthError(ctx, http.StatusUnauthorized, "APP_AUTH_IDENTITY_INVALID", "invalid app identity")
+		writePlatformError(ctx, errorcode.CodeAppAuthIdentityInvalid)
 		return "", "", false
 	}
 	if err != nil {
-		writeAuthError(ctx, http.StatusBadGateway, "APP_AUTH_PROVIDER_RESOLVE_FAILED", "app auth provider resolve failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppAuthProviderResolveFailed, err)
 		return "", "", false
 	}
 	if strings.TrimSpace(identity.ProviderSubject) == "" {
-		writeAuthError(ctx, http.StatusUnauthorized, "APP_AUTH_IDENTITY_INVALID", "invalid app identity")
+		writePlatformError(ctx, errorcode.CodeAppAuthIdentityInvalid)
 		return "", "", false
 	}
 	binding, err := s.appIdentityBindings.ResolveAppIdentityBinding(ctx.Request.Context(), AppIdentityBindingInput{
@@ -1078,15 +1075,15 @@ func (s *Server) resolveAppLoginIdentity(ctx *gin.Context, input appLoginRequest
 		Now:             s.now(),
 	})
 	if errors.Is(err, ErrAppIdentityInvalid) {
-		writeAuthError(ctx, http.StatusUnauthorized, "APP_AUTH_IDENTITY_INVALID", "invalid app identity")
+		writePlatformError(ctx, errorcode.CodeAppAuthIdentityInvalid)
 		return "", "", false
 	}
 	if err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_IDENTITY_BINDING_FAILED", "app identity binding failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppAuthIdentityBindingFailed, err)
 		return "", "", false
 	}
 	if strings.TrimSpace(binding.Username) == "" {
-		writeAuthError(ctx, http.StatusUnauthorized, "APP_AUTH_IDENTITY_INVALID", "invalid app identity")
+		writePlatformError(ctx, errorcode.CodeAppAuthIdentityInvalid)
 		return "", "", false
 	}
 	return appUsername(binding.Username), provider.ID, true
@@ -1095,25 +1092,25 @@ func (s *Server) resolveAppLoginIdentity(ctx *gin.Context, input appLoginRequest
 func (s *Server) appAuthLogout(ctx *gin.Context) {
 	appSession, ok, err := s.appSessionFromBearerContext(ctx)
 	if err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_SESSION_REVOKE_FAILED", "app session revoke failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppAuthSessionRevokeFailed, err)
 		return
 	}
 	if !ok {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
 	actorID := appUserID(appSession.Username)
 	if err := s.recordAudit("app.auth.logout", actorID, actorID, "allowed", "revocation-approved"); err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_AUDIT_FAILED", "app auth audit failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppAuthAuditFailed, err)
 		return
 	}
 	revoked, err := s.sessions.RevokeContext(ctx.Request.Context(), appSession.Token)
 	if err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_SESSION_REVOKE_FAILED", "app session revoke failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppAuthSessionRevokeFailed, err)
 		return
 	}
 	if !revoked {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
 	s.publishSessionInvalidation(ctx.Request.Context())
@@ -1123,7 +1120,7 @@ func (s *Server) appAuthLogout(ctx *gin.Context) {
 func (s *Server) appCurrentSession(ctx *gin.Context) {
 	appSession, ok := s.appSessionFromBearer(ctx)
 	if !ok {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
 	ctx.JSON(http.StatusOK, Response[appSessionResponse]{Data: appSessionResponseFromSession(appSession)})
@@ -1531,17 +1528,16 @@ func (s *Server) restoreAdminFile(ctx *gin.Context, id string) {
 	}
 	key := fileStorageKey(record)
 	if key == "" {
-		writeFileError(ctx, http.StatusConflict, "ADMIN_FILE_RESTORE_UNAVAILABLE", "file restore is unavailable")
+		writePlatformError(ctx, errorcode.CodeAdminFileRestoreUnavailable)
 		return
 	}
 	body, err := s.fileStorage.Open(ctx.Request.Context(), key)
 	if errors.Is(err, storage.ErrObjectNotFound) {
-		writeFileError(ctx, http.StatusConflict, "ADMIN_FILE_RESTORE_UNAVAILABLE", "file restore is unavailable")
+		writePlatformError(ctx, errorcode.CodeAdminFileRestoreUnavailable)
 		return
 	}
 	if err != nil {
-		s.recordInternalError(ctx, "ADMIN_FILE_RESTORE_FAILED", err)
-		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_RESTORE_FAILED", "file restore failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAdminFileRestoreFailed, err)
 		return
 	}
 	_ = body.Close()
@@ -1567,7 +1563,7 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 	}
 	upload, err := readValidatedUpload(ctx, s.uploadPolicy, adminUploadErrorCodes)
 	if err != nil {
-		writeUploadPolicyError(ctx, err)
+		writePlatformError(ctx, uploadPolicyErrorCode(err))
 		return
 	}
 	defer upload.Close()
@@ -1578,8 +1574,7 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 		Reader:      upload.Reader,
 	})
 	if err != nil {
-		s.recordInternalError(ctx, "ADMIN_FILE_SAVE_FAILED", err)
-		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_SAVE_FAILED", "file save failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAdminFileSaveFailed, err)
 		return
 	}
 	mutation, err := s.resources.CreateInternalWithAudit("files", adminresource.WriteInput{
@@ -1597,10 +1592,8 @@ func (s *Server) adminFileUpload(ctx *gin.Context) {
 	}, s.mutationAuditEvent(ctx, "file.upload", "files", "uploaded"))
 	if err != nil {
 		if rollbackErr := s.fileStorage.Delete(ctx.Request.Context(), metadata.Key); rollbackErr != nil {
-			s.recordInternalError(ctx, "ADMIN_FILE_METADATA_CREATE_FAILED", err)
-			s.recordInternalError(ctx, "ADMIN_FILE_ROLLBACK_DELETE_FAILED", rollbackErr)
 			s.recordFileCleanup(ctx, metadata.Key)
-			writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_ROLLBACK_FAILED", "file upload rollback failed")
+			writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAdminFileRollbackFailed, rollbackErr)
 			return
 		}
 		writeAdminResourceError(ctx, s.internalErrorSink, err)
@@ -1629,17 +1622,16 @@ func (s *Server) adminFileContent(ctx *gin.Context) {
 	}
 	key := fileStorageKey(record)
 	if key == "" {
-		writeFileError(ctx, http.StatusNotFound, "ADMIN_FILE_OBJECT_NOT_FOUND", "file object not found")
+		writePlatformError(ctx, errorcode.CodeAdminFileObjectNotFound)
 		return
 	}
 	body, err := s.fileStorage.Open(ctx.Request.Context(), key)
 	if errors.Is(err, storage.ErrObjectNotFound) {
-		writeFileError(ctx, http.StatusNotFound, "ADMIN_FILE_OBJECT_NOT_FOUND", "file object not found")
+		writePlatformError(ctx, errorcode.CodeAdminFileObjectNotFound)
 		return
 	}
 	if err != nil {
-		s.recordInternalError(ctx, "ADMIN_FILE_OPEN_FAILED", err)
-		writeFileError(ctx, http.StatusInternalServerError, "ADMIN_FILE_OPEN_FAILED", "file open failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAdminFileOpenFailed, err)
 		return
 	}
 	defer body.Close()
@@ -1660,7 +1652,7 @@ func (s *Server) adminFileContent(ctx *gin.Context) {
 func (s *Server) appFileUpload(ctx *gin.Context) {
 	appSession, ok := AppSessionFromContext(ctx)
 	if !ok {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
 	username := appUsername(appSession.Username)
@@ -1669,7 +1661,7 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 	}
 	upload, err := readValidatedUpload(ctx, s.uploadPolicy, appUploadErrorCodes)
 	if err != nil {
-		writeUploadPolicyError(ctx, err)
+		writePlatformError(ctx, uploadPolicyErrorCode(err))
 		return
 	}
 	defer upload.Close()
@@ -1680,8 +1672,7 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 		Reader:      upload.Reader,
 	})
 	if err != nil {
-		s.recordInternalError(ctx, "APP_FILE_SAVE_FAILED", err)
-		writeFileError(ctx, http.StatusInternalServerError, "APP_FILE_SAVE_FAILED", "file save failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppFileSaveFailed, err)
 		return
 	}
 	mutation, err := s.resources.CreateInternalWithAudit("files", adminresource.WriteInput{
@@ -1701,20 +1692,18 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 	}, adminresource.AuditEvent{Actor: appUserID(username), Action: "file.upload", Resource: "files", Result: "success", ReasonCode: "uploaded"})
 	if err != nil {
 		if rollbackErr := s.fileStorage.Delete(ctx.Request.Context(), metadata.Key); rollbackErr != nil {
-			s.recordInternalError(ctx, "APP_FILE_METADATA_CREATE_FAILED", err)
-			s.recordInternalError(ctx, "APP_FILE_ROLLBACK_DELETE_FAILED", rollbackErr)
 			s.recordFileCleanup(ctx, metadata.Key)
-			writeFileError(ctx, http.StatusInternalServerError, "APP_FILE_ROLLBACK_FAILED", "file upload rollback failed")
+			writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppFileRollbackFailed, rollbackErr)
 			return
 		}
-		writeAdminResourceErrorWithoutSink(ctx, err)
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppFileMetadataFailed, err)
 		return
 	}
 	record := mutation.Record
 	s.invalidateCachesForResource(ctx.Request.Context(), "files")
 	projected, err := s.resources.ProjectRecord("files", record, adminresource.ProjectionResponse)
 	if err != nil {
-		writeAdminResourceErrorWithoutSink(ctx, err)
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppFileMetadataFailed, err)
 		return
 	}
 	ctx.JSON(http.StatusCreated, Response[adminResourceRecordResponse]{
@@ -1725,40 +1714,44 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 func (s *Server) appFileContent(ctx *gin.Context) {
 	appSession, ok := AppSessionFromContext(ctx)
 	if !ok {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
-	if !s.refreshResourceStateLegacy(ctx, "APP_FILE_STATE_REFRESH_FAILED", "file authorization state is unavailable") {
+	if !s.refreshAdminResourceState(ctx, errorcode.CodeAppFileStateRefreshFailed) {
 		return
 	}
 	record, err := s.adminResourceRecordByID("files", ctx.Param("id"))
 	if err != nil {
-		writeFileError(ctx, http.StatusNotFound, "APP_FILE_NOT_FOUND", "file not found")
+		code := appFileRecordErrorCode(err)
+		if code == errorcode.CodeAppFileNotFound {
+			writePlatformError(ctx, code)
+		} else {
+			writePlatformErrorWithCause(ctx, s.internalErrorSink, code, err)
+		}
 		return
 	}
 	username := appUsername(appSession.Username)
 	if !appFileVisibleToSession(record, username) {
-		writeFileError(ctx, http.StatusNotFound, "APP_FILE_NOT_FOUND", "file not found")
+		writePlatformError(ctx, errorcode.CodeAppFileNotFound)
 		return
 	}
 	key := fileStorageKey(record)
 	if key == "" {
-		writeFileError(ctx, http.StatusNotFound, "APP_FILE_OBJECT_NOT_FOUND", "file object not found")
+		writePlatformError(ctx, errorcode.CodeAppFileObjectNotFound)
 		return
 	}
 	body, err := s.fileStorage.Open(ctx.Request.Context(), key)
 	if errors.Is(err, storage.ErrObjectNotFound) {
-		writeFileError(ctx, http.StatusNotFound, "APP_FILE_OBJECT_NOT_FOUND", "file object not found")
+		writePlatformError(ctx, errorcode.CodeAppFileObjectNotFound)
 		return
 	}
 	if err != nil {
-		s.recordInternalError(ctx, "APP_FILE_OPEN_FAILED", err)
-		writeFileError(ctx, http.StatusInternalServerError, "APP_FILE_OPEN_FAILED", "file open failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppFileOpenFailed, err)
 		return
 	}
 	defer body.Close()
 	if err := s.recordFileAuditForActor("file.content", appUserID(username), record); err != nil {
-		writeAdminResourceErrorWithoutSink(ctx, err)
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppFileMetadataFailed, err)
 		return
 	}
 
@@ -1780,6 +1773,13 @@ func appFileVisibleToSession(record adminresource.Record, username string) bool 
 		return ownerID == appUserID(username) || ownerID == legacyAppUserID(username)
 	}
 	return strings.TrimSpace(record.Values["uploadedBy"]) == username
+}
+
+func appFileRecordErrorCode(err error) errorcode.Code {
+	if errors.Is(err, adminresource.ErrRecordNotFound) || errors.Is(err, adminresource.ErrUnknownResource) {
+		return errorcode.CodeAppFileNotFound
+	}
+	return errorcode.CodeAppFileMetadataFailed
 }
 
 func legacyAppUserID(username string) string {
@@ -2317,13 +2317,7 @@ func (s *Server) authSessionFromBearerContext(ctx *gin.Context) (session.Session
 }
 
 func (s *Server) appSessionFromBearer(ctx *gin.Context) (session.Session, bool) {
-	appSession, ok, err := s.appSessionFromBearerContext(ctx)
-	if err != nil {
-		if ctx.Request.Method == http.MethodPost && ctx.Request.URL.Path == "/api/app/auth/logout" {
-			ctx.Set(appLogoutResolveErrorKey, true)
-		}
-		return session.Session{}, false
-	}
+	appSession, ok, _ := s.appSessionFromBearerContext(ctx)
 	return appSession, ok
 }
 
@@ -2559,17 +2553,6 @@ func (s *Server) refreshAdminResourceState(ctx *gin.Context, code errorcode.Code
 	return true
 }
 
-func (s *Server) refreshResourceStateLegacy(ctx *gin.Context, code string, message string) bool {
-	if err := s.refreshResourceState(ctx); err != nil {
-		s.recordInternalError(ctx, code, err)
-		ctx.JSON(http.StatusServiceUnavailable, Response[gin.H]{
-			Error: legacyErrorBody(ctx, code, message),
-		})
-		return false
-	}
-	return true
-}
-
 func (s *Server) refreshResourceState(ctx *gin.Context) error {
 	changed, err := s.resources.RefreshContext(ctx.Request.Context())
 	if err != nil {
@@ -2638,30 +2621,6 @@ func (s *Server) invalidatePolicyAuthorizer() {
 	s.policyAuthorizer = nil
 }
 
-func writeForbidden(ctx *gin.Context) {
-	ctx.JSON(http.StatusForbidden, Response[gin.H]{
-		Error: legacyErrorBody(ctx, "ADMIN_FORBIDDEN", "permission denied"),
-	})
-}
-
-func writeUnauthorized(ctx *gin.Context) {
-	if resolveError, exists := ctx.Get(appLogoutResolveErrorKey); exists {
-		if flagged, ok := resolveError.(bool); ok && flagged {
-			writeAuthError(ctx, http.StatusInternalServerError, "APP_AUTH_SESSION_REVOKE_FAILED", "app session revoke failed")
-			return
-		}
-	}
-	ctx.JSON(http.StatusUnauthorized, Response[gin.H]{
-		Error: legacyErrorBody(ctx, "AUTH_UNAUTHORIZED", "unauthorized"),
-	})
-}
-
-func writeAuthError(ctx *gin.Context, status int, code string, message string) {
-	ctx.JSON(status, Response[gin.H]{
-		Error: legacyErrorBody(ctx, code, message),
-	})
-}
-
 func bearerToken(header string) (string, bool) {
 	const prefix = "Bearer "
 	if !strings.HasPrefix(header, prefix) {
@@ -2694,12 +2653,6 @@ func fileRecordContentType(record adminresource.Record) string {
 		return "application/octet-stream"
 	}
 	return contentType
-}
-
-func writeFileError(ctx *gin.Context, status int, code string, message string) {
-	ctx.JSON(status, Response[gin.H]{
-		Error: legacyErrorBody(ctx, code, message),
-	})
 }
 
 func (s *Server) recordInternalError(ctx *gin.Context, code string, err error) {
@@ -2807,15 +2760,4 @@ func (sink resourceFileCleanupSink) Record(_ context.Context, record FileCleanup
 		Description: record.ReasonCode,
 	})
 	return err
-}
-
-func writeUploadPolicyError(ctx *gin.Context, err error) {
-	var policyErr *uploadPolicyError
-	if errors.As(err, &policyErr) {
-		if _, ok := errorcode.Lookup(policyErr.Code); ok {
-			writePlatformError(ctx, policyErr.Code)
-			return
-		}
-	}
-	writePlatformError(ctx, errorcode.CodeFileUploadInvalid)
 }

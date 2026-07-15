@@ -2335,7 +2335,7 @@ func TestAppRouteRegistrationUsesManifestSessionAndPermissionPolicy(t *testing.T
 				Handler: func(ctx *gin.Context) {
 					appSession, ok := AppSessionFromContext(ctx)
 					if !ok {
-						ctx.JSON(http.StatusInternalServerError, Response[gin.H]{Error: legacyErrorBody(ctx, "TEST_APP_SESSION_MISSING", "app session missing")})
+						writePlatformError(ctx, errorcode.CodeInternal)
 						return
 					}
 					ctx.JSON(http.StatusOK, Response[gin.H]{
@@ -2403,6 +2403,9 @@ func TestAppRouteRegistrationRejectsMissingAppPermission(t *testing.T) {
 
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("GET app orders without permission status = %d body = %s, want 403", recorder.Code, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"code":"APP_FORBIDDEN"`) || strings.Contains(recorder.Body.String(), "ADMIN_") {
+		t.Fatalf("GET app orders without permission body = %s, want App-plane forbidden code", recorder.Body.String())
 	}
 	if strings.Contains(recorder.Body.String(), "unexpected") {
 		t.Fatalf("GET app orders without permission reached handler: %s", recorder.Body.String())
@@ -5838,7 +5841,8 @@ func TestAppFileUploadReportsRollbackFailureWithoutLeakingDetails(t *testing.T) 
 	}
 	fileStore := &recordingObjectStore{key: objectKey, deleteErr: errors.New("delete-private/object-secret")}
 	cleanupSink := &recordingFileCleanupSink{}
-	server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources, FileStorage: fileStore, FileCleanupSink: cleanupSink, Now: func() time.Time { return now }})
+	internalErrors := &recordingInternalErrorSink{}
+	server := newTestServer(ServerOptions{Capabilities: capabilities, Resources: resources, FileStorage: fileStore, FileCleanupSink: cleanupSink, InternalErrorSink: internalErrors, Now: func() time.Time { return now }})
 	login := appLoginForTest(t, server, "buyer")
 	repository.saveErr = errors.New("metadata-private-detail")
 	body, contentType := multipartUploadBodyWithMediaType(t, "report.txt", "text/plain", "private")
@@ -5861,9 +5865,15 @@ func TestAppFileUploadReportsRollbackFailureWithoutLeakingDetails(t *testing.T) 
 		t.Fatalf("object store calls save/delete = %d/%d, want 1/1", fileStore.saveCalls, fileStore.deleteCalls)
 	}
 	assertSafeCleanupRecord(t, cleanupSink.records, "object:"+opaqueID, now, "metadata-private-detail", "delete-private", objectKey, "report.txt")
+	assertInternalErrorRecorded(t, internalErrors.events, "APP_FILE_ROLLBACK_FAILED", "metadata-private-detail")
+	for _, secret := range []string{"delete-private", objectKey} {
+		if strings.Contains(fmt.Sprintf("%+v", internalErrors.events), secret) {
+			t.Fatalf("app rollback internal event leaked %q: %+v", secret, internalErrors.events)
+		}
+	}
 }
 
-func TestAppFileMetadataGenericFailureDoesNotRecordAdminResourceEvent(t *testing.T) {
+func TestAppFileMetadataGenericFailureUsesRegisteredAppCauseEvent(t *testing.T) {
 	const marker = "physical_table=files email=private@example.test"
 	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "parameter", "file-storage", "admin-shell"})
 	repository := &controllableAdminResourceRepository{}
@@ -5884,15 +5894,13 @@ func TestAppFileMetadataGenericFailureDoesNotRecordAdminResourceEvent(t *testing
 
 	server.Router().ServeHTTP(recorder, request)
 
-	if recorder.Code != http.StatusInternalServerError || !strings.Contains(recorder.Body.String(), `"code":"ADMIN_RESOURCE_ERROR"`) || !strings.Contains(recorder.Body.String(), `"message":"admin resource operation failed"`) {
-		t.Fatalf("POST app file metadata failure status/body = %d/%s, want canonical ADMIN_RESOURCE_ERROR", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusInternalServerError || !strings.Contains(recorder.Body.String(), `"code":"APP_FILE_METADATA_FAILED"`) || !strings.Contains(recorder.Body.String(), `"message":"file metadata operation failed"`) {
+		t.Fatalf("POST app file metadata failure status/body = %d/%s, want canonical APP_FILE_METADATA_FAILED", recorder.Code, recorder.Body.String())
 	}
 	if strings.Contains(recorder.Body.String(), "physical_table") || strings.Contains(recorder.Body.String(), "private@example.test") {
 		t.Fatalf("app metadata failure leaked cause: %s", recorder.Body.String())
 	}
-	if len(sink.events) != 0 {
-		t.Fatalf("app metadata failure recorded Task-3 Admin events: %+v", sink.events)
-	}
+	assertInternalErrorRecorded(t, sink.events, "APP_FILE_METADATA_FAILED", marker)
 }
 
 func TestResourceFileCleanupSinkPersistsOnlySafeRetryMetadata(t *testing.T) {

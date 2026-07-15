@@ -171,7 +171,7 @@ func TestHTTPAPIErrorBodyConstructionIsCentralized(t *testing.T) {
 			}
 			identifier, ok := literal.Type.(*ast.Ident)
 			if ok && identifier.Name == "ErrorBody" {
-				t.Errorf("%s constructs ErrorBody directly; use writePlatformError or legacyErrorBody", name)
+				t.Errorf("%s constructs ErrorBody directly; use writePlatformError", name)
 			}
 			return true
 		})

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"platform-go/internal/platform/adminresource"
+	"platform-go/internal/platform/errorcode"
 	"platform-go/internal/platform/ratelimit"
 )
 
@@ -51,17 +53,17 @@ type appPhoneBindingResponse struct {
 func (s *Server) appPhoneCreateVerification(ctx *gin.Context) {
 	appSession, ok := AppSessionFromContext(ctx)
 	if !ok {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
 	var input appPhoneVerificationRequest
 	if err := ctx.ShouldBindJSON(&input); err != nil {
-		writeAuthError(ctx, http.StatusBadRequest, "APP_PHONE_INVALID_REQUEST", "invalid app phone verification request")
+		writePlatformError(ctx, errorcode.CodeAppPhoneInvalidRequest)
 		return
 	}
 	phone, ok := normalizeAppPhone(input.Phone)
 	if !ok {
-		writeAuthError(ctx, http.StatusBadRequest, "APP_PHONE_INVALID_PHONE", "invalid phone number")
+		writePlatformError(ctx, errorcode.CodeAppPhoneInvalidPhone)
 		return
 	}
 	purpose := strings.TrimSpace(input.Purpose)
@@ -69,7 +71,7 @@ func (s *Server) appPhoneCreateVerification(ctx *gin.Context) {
 		purpose = appPhoneVerificationPurpose
 	}
 	if purpose != appPhoneVerificationPurpose {
-		writeAuthError(ctx, http.StatusBadRequest, "APP_PHONE_PURPOSE_UNSUPPORTED", "app phone purpose is unsupported")
+		writePlatformError(ctx, errorcode.CodeAppPhonePurposeUnsupported)
 		return
 	}
 	username := appUsername(appSession.Username)
@@ -77,12 +79,12 @@ func (s *Server) appPhoneCreateVerification(ctx *gin.Context) {
 		return
 	}
 	if s.phoneProtector == nil || s.phoneVerificationSender == nil {
-		writeAuthError(ctx, http.StatusServiceUnavailable, "APP_PHONE_VERIFICATION_UNAVAILABLE", "app phone verification is unavailable")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneVerificationUnavailable, errors.New("app phone verification dependency is not configured"))
 		return
 	}
 	phoneDigest, err := s.phoneProtector.PhoneDigest(phone)
 	if err != nil {
-		writeAuthError(ctx, http.StatusServiceUnavailable, "APP_PHONE_VERIFICATION_UNAVAILABLE", "app phone verification is unavailable")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneVerificationUnavailable, err)
 		return
 	}
 	now := s.now().UTC()
@@ -90,16 +92,16 @@ func (s *Server) appPhoneCreateVerification(ctx *gin.Context) {
 	maskedPhone := maskAppPhone(phone)
 	verificationCode, err := newAppPhoneDebugCode()
 	if err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "APP_PHONE_CODE_GENERATION_FAILED", "app phone code generation failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneCodeGenerationFailed, err)
 		return
 	}
 	codeDigest, err := s.phoneProtector.CodeDigest(phoneDigest, purpose, verificationCode)
 	if err != nil {
-		writeAuthError(ctx, http.StatusServiceUnavailable, "APP_PHONE_VERIFICATION_UNAVAILABLE", "app phone verification is unavailable")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneVerificationUnavailable, err)
 		return
 	}
 	if err := s.phoneVerificationSender.Send(ctx.Request.Context(), phone, purpose, verificationCode); err != nil {
-		writeAuthError(ctx, http.StatusBadGateway, "APP_PHONE_VERIFICATION_DELIVERY_FAILED", "app phone verification delivery failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneVerificationDeliveryFailed, err)
 		return
 	}
 	record, err := s.resources.CreateInternal(appPhoneVerificationsResource, adminresource.WriteInput{
@@ -118,7 +120,7 @@ func (s *Server) appPhoneCreateVerification(ctx *gin.Context) {
 		},
 	})
 	if err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "APP_PHONE_VERIFICATION_CREATE_FAILED", "app phone verification create failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneVerificationCreateFailed, err)
 		return
 	}
 	response := appPhoneVerificationResponse{
@@ -138,22 +140,22 @@ func (s *Server) appPhoneCreateVerification(ctx *gin.Context) {
 func (s *Server) appPhoneCreateBinding(ctx *gin.Context) {
 	appSession, ok := AppSessionFromContext(ctx)
 	if !ok {
-		writeUnauthorized(ctx)
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
 	var input appPhoneBindingRequest
 	if err := ctx.ShouldBindJSON(&input); err != nil {
-		writeAuthError(ctx, http.StatusBadRequest, "APP_PHONE_INVALID_REQUEST", "invalid app phone binding request")
+		writePlatformError(ctx, errorcode.CodeAppPhoneInvalidRequest)
 		return
 	}
 	phone, ok := normalizeAppPhone(input.Phone)
 	if !ok {
-		writeAuthError(ctx, http.StatusBadRequest, "APP_PHONE_INVALID_PHONE", "invalid phone number")
+		writePlatformError(ctx, errorcode.CodeAppPhoneInvalidPhone)
 		return
 	}
 	code := strings.TrimSpace(input.Code)
 	if code == "" {
-		writeAuthError(ctx, http.StatusBadRequest, "APP_PHONE_CODE_REQUIRED", "app phone verification code is required")
+		writePlatformError(ctx, errorcode.CodeAppPhoneCodeRequired)
 		return
 	}
 	username := appUsername(appSession.Username)
@@ -162,28 +164,37 @@ func (s *Server) appPhoneCreateBinding(ctx *gin.Context) {
 	}
 
 	if s.phoneProtector == nil {
-		writeAuthError(ctx, http.StatusServiceUnavailable, "APP_PHONE_VERIFICATION_UNAVAILABLE", "app phone verification is unavailable")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneVerificationUnavailable, errors.New("app phone verification protector is not configured"))
 		return
 	}
 	phoneDigest, err := s.phoneProtector.PhoneDigest(phone)
 	if err != nil {
-		writeAuthError(ctx, http.StatusServiceUnavailable, "APP_PHONE_VERIFICATION_UNAVAILABLE", "app phone verification is unavailable")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneVerificationUnavailable, err)
 		return
 	}
 	codeDigest, err := s.phoneProtector.CodeDigest(phoneDigest, appPhoneVerificationPurpose, code)
 	if err != nil {
-		writeAuthError(ctx, http.StatusServiceUnavailable, "APP_PHONE_VERIFICATION_UNAVAILABLE", "app phone verification is unavailable")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneVerificationUnavailable, err)
 		return
 	}
 	maskedPhone := maskAppPhone(phone)
-	if s.appPhoneBindingExists(phoneDigest) {
-		writeAuthError(ctx, http.StatusConflict, "APP_PHONE_ALREADY_BOUND", "app phone is already bound")
+	bindingExists, err := s.appPhoneBindingExists(ctx.Request.Context(), phoneDigest)
+	if err != nil {
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneVerificationUnavailable, err)
+		return
+	}
+	if bindingExists {
+		writePlatformError(ctx, errorcode.CodeAppPhoneAlreadyBound)
 		return
 	}
 	now := s.now().UTC()
-	verification, ok := s.validAppPhoneVerification(username, phoneDigest, appPhoneVerificationPurpose, codeDigest, now)
+	verification, ok, err := s.validAppPhoneVerification(ctx.Request.Context(), username, phoneDigest, appPhoneVerificationPurpose, codeDigest, now)
+	if err != nil {
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneVerificationUnavailable, err)
+		return
+	}
 	if !ok {
-		writeAuthError(ctx, http.StatusBadRequest, "APP_PHONE_VERIFICATION_INVALID", "app phone verification is invalid")
+		writePlatformError(ctx, errorcode.CodeAppPhoneVerificationInvalid)
 		return
 	}
 
@@ -201,16 +212,16 @@ func (s *Server) appPhoneCreateBinding(ctx *gin.Context) {
 		},
 	})
 	if err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "APP_PHONE_BINDING_CREATE_FAILED", "app phone binding create failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneBindingCreateFailed, err)
 		return
 	}
 	if err := s.markAppPhoneVerificationUsed(verification, now); err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "APP_PHONE_VERIFICATION_UPDATE_FAILED", "app phone verification update failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneVerificationUpdateFailed, err)
 		return
 	}
 	actorID := appUserID(username)
 	if err := s.recordAudit("app.phone.bind", actorID, actorID, "success", "phone-bound"); err != nil {
-		writeAuthError(ctx, http.StatusInternalServerError, "APP_PHONE_AUDIT_FAILED", "app phone audit failed")
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneAuditFailed, err)
 		return
 	}
 	ctx.JSON(http.StatusCreated, Response[appPhoneBindingResponse]{
@@ -223,29 +234,26 @@ func (s *Server) appPhoneCreateBinding(ctx *gin.Context) {
 	})
 }
 
-func (s *Server) appPhoneBindingExists(phoneHash string) bool {
-	records, err := s.resources.List(appPhoneBindingsResource)
-	if errors.Is(err, adminresource.ErrUnknownResource) {
-		return false
-	}
+func (s *Server) appPhoneBindingExists(ctx context.Context, phoneHash string) (bool, error) {
+	records, err := s.resources.InternalRecordsContext(ctx, appPhoneBindingsResource)
 	if err != nil {
-		return false
+		return false, err
 	}
 	for _, record := range records {
 		if record.Status == "disabled" {
 			continue
 		}
 		if record.Values["phoneHash"] == phoneHash {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
-func (s *Server) validAppPhoneVerification(username string, phoneHash string, purpose string, codeDigest string, now time.Time) (adminresource.Record, bool) {
-	records, err := s.resources.List(appPhoneVerificationsResource)
+func (s *Server) validAppPhoneVerification(ctx context.Context, username string, phoneHash string, purpose string, codeDigest string, now time.Time) (adminresource.Record, bool, error) {
+	records, err := s.resources.InternalRecordsContext(ctx, appPhoneVerificationsResource)
 	if err != nil {
-		return adminresource.Record{}, false
+		return adminresource.Record{}, false, err
 	}
 	for index := len(records) - 1; index >= 0; index-- {
 		record := records[index]
@@ -259,9 +267,9 @@ func (s *Server) validAppPhoneVerification(username string, phoneHash string, pu
 		if subtle.ConstantTimeCompare([]byte(record.Values["codeHash"]), []byte(codeDigest)) != 1 {
 			continue
 		}
-		return record, true
+		return record, true, nil
 	}
-	return adminresource.Record{}, false
+	return adminresource.Record{}, false, nil
 }
 
 func (s *Server) markAppPhoneVerificationUsed(record adminresource.Record, now time.Time) error {

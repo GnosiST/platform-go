@@ -79,16 +79,6 @@ func writeRegisteredError(ctx *gin.Context, definition errorcode.Definition) {
 	}})
 }
 
-func legacyErrorBody(ctx *gin.Context, code string, message string) *ErrorBody {
-	correlation := correlationFromGinContext(ctx)
-	return &ErrorBody{
-		Code:      errorcode.Code(code),
-		Message:   message,
-		RequestID: correlation.RequestID,
-		TraceID:   correlation.TraceID,
-	}
-}
-
 func correlationFromGinContext(ctx *gin.Context) kernel.Correlation {
 	if ctx == nil || ctx.Request == nil {
 		return kernel.Correlation{}

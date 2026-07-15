@@ -132,18 +132,30 @@ func (s *Server) withAppRoutePolicy(route capability.AppRouteContract, handler g
 			handler(ctx)
 			return
 		}
-		appSession, ok := s.appSessionFromBearer(ctx)
+		appSession, ok, err := s.appSessionFromBearerContext(ctx)
+		if err != nil {
+			if isAppLogoutRoute(route) {
+				writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppAuthSessionRevokeFailed, err)
+				return
+			}
+			writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
+			return
+		}
 		if !ok {
-			writeUnauthorized(ctx)
+			writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 			return
 		}
 		if !s.canApp(appSession, route.Permission) {
-			writeForbidden(ctx)
+			writePlatformError(ctx, errorcode.CodeAppForbidden)
 			return
 		}
 		ctx.Set(approute.SessionContextKey, appSession)
 		handler(ctx)
 	}
+}
+
+func isAppLogoutRoute(route capability.AppRouteContract) bool {
+	return strings.EqualFold(strings.TrimSpace(route.Method), http.MethodPost) && strings.TrimSpace(route.Path) == "/api/app/auth/logout"
 }
 
 func (s *Server) canApp(appSession session.Session, permission string) bool {

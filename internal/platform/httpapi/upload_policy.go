@@ -85,6 +85,16 @@ func (err *uploadPolicyError) Error() string {
 	return string(err.Code)
 }
 
+func uploadPolicyErrorCode(err error) errorcode.Code {
+	var policyErr *uploadPolicyError
+	if errors.As(err, &policyErr) {
+		if _, ok := errorcode.Lookup(policyErr.Code); ok {
+			return policyErr.Code
+		}
+	}
+	return errorcode.CodeFileUploadInvalid
+}
+
 func NewUploadPolicy(maxBytes int64, allowedMediaTypes []string) (UploadPolicy, error) {
 	if maxBytes <= 0 || maxBytes > maxFileUploadBytes {
 		return UploadPolicy{}, fmt.Errorf("file upload max bytes must be between 1 and %d", maxFileUploadBytes)

@@ -102,7 +102,7 @@ func TestReadValidatedUploadUsesMultipartOpenCode(t *testing.T) {
 	}
 }
 
-func TestWriteUploadPolicyErrorUsesRegistryAndUnknownFallback(t *testing.T) {
+func TestUploadPolicyErrorCodeUsesRegistryAndUnknownFallback(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	tests := []struct {
 		name       string
@@ -119,7 +119,7 @@ func TestWriteUploadPolicyErrorUsesRegistryAndUnknownFallback(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			ctx, _ := gin.CreateTestContext(recorder)
 			ctx.Request = httptest.NewRequest(http.MethodPost, "/upload", nil)
-			writeUploadPolicyError(ctx, test.err)
+			writePlatformError(ctx, uploadPolicyErrorCode(test.err))
 			if recorder.Code != test.wantStatus || !strings.Contains(recorder.Body.String(), `"code":"`+test.wantCode+`"`) {
 				t.Fatalf("response = %d/%s, want code %s", recorder.Code, recorder.Body.String(), test.wantCode)
 			}
