@@ -265,6 +265,9 @@
     "directory": {
       "route": "must-be-empty",
       "componentKey": "must-be-empty",
+      "resourceCode": "must-be-empty",
+      "externalUrl": "must-be-empty",
+      "pageButtons": "must-be-empty",
       "interaction": "expand-collapse-only",
       "visibility": "derived-from-visible-descendant-pages"
     },
@@ -274,13 +277,35 @@
       "resourceCode": "optional-registered-resource",
       "mustBeLeaf": true,
       "routeParameters": "typed-static-key-value-list-no-script-or-expression",
+      "parameterTypes": ["string", "number", "boolean"],
+      "parameterValueSource": "static-literal-only",
+      "maximumParameters": 32,
+      "externalUrl": "https-required-for-external-pages",
+      "openModes": ["same-tab", "new-tab"],
       "advancedMetadata": ["external", "externalUrl", "openMode", "cacheEnabled", "hidden", "activeMenuCode", "breadcrumbVisible"]
+    },
+    "pageButtons": {
+      "placement": "selected-page-detail-only",
+      "requiredFields": ["menuCode", "buttonKey", "labelZh", "labelEn", "action", "sortOrder", "status", "permissionCode"],
+      "permissionResourceType": "page-button",
+      "permissionMetadataMatch": ["menuCode", "buttonKey", "action"],
+      "transactionBoundary": "button-and-permission-relation-one-native-transaction",
+      "apiAuthorization": "visibility-only-casbin-api-permission-still-required"
     },
     "assignment": {
       "storedNodes": "page-only",
       "effectiveDirectories": "ancestor-closure-of-visible-pages",
       "multipleRoleResolution": "union-of-enabled-role-page-bindings",
+      "directorySelection": "bulk-current-eligible-descendant-pages-only",
+      "futureDescendantGrant": "forbidden",
       "routeGuard": "frontend-navigation-boundary-only"
+    },
+    "servingModes": {
+      "default": "legacy",
+      "explicit": ["legacy", "dual-read", "target"],
+      "legacy": "permission-derived-pages",
+      "dualRead": "serve-legacy-and-compare-target-value-free",
+      "target": "role-page-bindings-with-derived-directory-ancestors"
     }
   },
   "permissionContract": {

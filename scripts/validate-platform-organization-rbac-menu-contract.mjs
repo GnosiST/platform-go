@@ -206,9 +206,39 @@ function validateContract(contract, serviceRuntime, errors) {
   requireIncludes(conflict.audit?.requiredFields, ["actorType", "beforeRevision", "afterRevision", "requestId", "traceId", "conflictCount", "changeSetHash"], "conflictContract.audit.requiredFields", errors);
 
   requireEqual(contract.menuContract?.directory?.route, "must-be-empty", "menuContract.directory.route", errors);
+  requireEqual(contract.menuContract?.directory?.componentKey, "must-be-empty", "menuContract.directory.componentKey", errors);
+  requireEqual(contract.menuContract?.directory?.resourceCode, "must-be-empty", "menuContract.directory.resourceCode", errors);
+  requireEqual(contract.menuContract?.directory?.externalUrl, "must-be-empty", "menuContract.directory.externalUrl", errors);
+  requireEqual(contract.menuContract?.directory?.pageButtons, "must-be-empty", "menuContract.directory.pageButtons", errors);
   requireEqual(contract.menuContract?.directory?.interaction, "expand-collapse-only", "menuContract.directory.interaction", errors);
   requireEqual(contract.menuContract?.page?.mustBeLeaf, true, "menuContract.page.mustBeLeaf", errors);
+  if (!sameList(values(contract.menuContract?.page?.parameterTypes), ["string", "number", "boolean"])) {
+    errors.push("menuContract.page.parameterTypes must be string then number then boolean");
+  }
+  requireEqual(contract.menuContract?.page?.parameterValueSource, "static-literal-only", "menuContract.page.parameterValueSource", errors);
+  requireEqual(contract.menuContract?.page?.maximumParameters, 32, "menuContract.page.maximumParameters", errors);
+  requireEqual(contract.menuContract?.page?.externalUrl, "https-required-for-external-pages", "menuContract.page.externalUrl", errors);
+  if (!sameList(values(contract.menuContract?.page?.openModes), ["same-tab", "new-tab"])) {
+    errors.push("menuContract.page.openModes must be same-tab then new-tab");
+  }
+  requireEqual(contract.menuContract?.pageButtons?.placement, "selected-page-detail-only", "menuContract.pageButtons.placement", errors);
+  requireIncludes(contract.menuContract?.pageButtons?.requiredFields, [
+    "menuCode", "buttonKey", "labelZh", "labelEn", "action", "sortOrder", "status", "permissionCode",
+  ], "menuContract.pageButtons.requiredFields", errors);
+  requireEqual(contract.menuContract?.pageButtons?.permissionResourceType, "page-button", "menuContract.pageButtons.permissionResourceType", errors);
+  requireIncludes(contract.menuContract?.pageButtons?.permissionMetadataMatch, ["menuCode", "buttonKey", "action"], "menuContract.pageButtons.permissionMetadataMatch", errors);
+  requireEqual(contract.menuContract?.pageButtons?.transactionBoundary, "button-and-permission-relation-one-native-transaction", "menuContract.pageButtons.transactionBoundary", errors);
+  requireEqual(contract.menuContract?.pageButtons?.apiAuthorization, "visibility-only-casbin-api-permission-still-required", "menuContract.pageButtons.apiAuthorization", errors);
   requireEqual(contract.menuContract?.assignment?.storedNodes, "page-only", "menuContract.assignment.storedNodes", errors);
+  requireEqual(contract.menuContract?.assignment?.directorySelection, "bulk-current-eligible-descendant-pages-only", "menuContract.assignment.directorySelection", errors);
+  requireEqual(contract.menuContract?.assignment?.futureDescendantGrant, "forbidden", "menuContract.assignment.futureDescendantGrant", errors);
+  requireEqual(contract.menuContract?.servingModes?.default, "legacy", "menuContract.servingModes.default", errors);
+  if (!sameList(values(contract.menuContract?.servingModes?.explicit), ["legacy", "dual-read", "target"])) {
+    errors.push("menuContract.servingModes.explicit must be legacy then dual-read then target");
+  }
+  requireEqual(contract.menuContract?.servingModes?.legacy, "permission-derived-pages", "menuContract.servingModes.legacy", errors);
+  requireEqual(contract.menuContract?.servingModes?.dualRead, "serve-legacy-and-compare-target-value-free", "menuContract.servingModes.dualRead", errors);
+  requireEqual(contract.menuContract?.servingModes?.target, "role-page-bindings-with-derived-directory-ancestors", "menuContract.servingModes.target", errors);
   requireEqual(contract.permissionContract?.pageButton?.apiPermissionStillRequired, true, "permissionContract.pageButton.apiPermissionStillRequired", errors);
   requireEqual(contract.permissionContract?.owners?.menuVisibility, "role_menu", "permissionContract.owners.menuVisibility", errors);
 

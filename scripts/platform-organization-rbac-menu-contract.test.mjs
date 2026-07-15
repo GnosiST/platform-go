@@ -159,6 +159,66 @@ describe("platform organization RBAC menu contract", () => {
     assert.match(result.stderr, /page\.mustBeLeaf must be true/);
   });
 
+  it("rejects directories with navigation or page-only metadata", () => {
+    const contract = readJSON("resources/platform-organization-rbac-menu-contract.json");
+    contract.menuContract.directory.componentKey = "registered-key-allowed";
+    contract.menuContract.directory.resourceCode = "registered-resource-allowed";
+    contract.menuContract.directory.externalUrl = "https-allowed";
+
+    const result = runValidator(["--contract", tempJSON("contract.json", contract)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /directory\.componentKey must be must-be-empty/);
+    assert.match(result.stderr, /directory\.resourceCode must be must-be-empty/);
+    assert.match(result.stderr, /directory\.externalUrl must be must-be-empty/);
+  });
+
+  it("rejects unbounded or executable page parameters", () => {
+    const contract = readJSON("resources/platform-organization-rbac-menu-contract.json");
+    contract.menuContract.page.parameterTypes = ["string", "number", "boolean", "expression"];
+    contract.menuContract.page.parameterValueSource = "static-or-script";
+    contract.menuContract.page.maximumParameters = 0;
+
+    const result = runValidator(["--contract", tempJSON("contract.json", contract)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /page\.parameterTypes must be string then number then boolean/);
+    assert.match(result.stderr, /page\.parameterValueSource must be static-literal-only/);
+    assert.match(result.stderr, /page\.maximumParameters must be 32/);
+  });
+
+  it("rejects page buttons without stable permission metadata and one transaction", () => {
+    const contract = readJSON("resources/platform-organization-rbac-menu-contract.json");
+    contract.menuContract.pageButtons ??= {};
+    contract.menuContract.pageButtons.requiredFields = ["menuCode", "buttonKey", "label", "action"];
+    contract.menuContract.pageButtons.permissionResourceType = "api";
+    contract.menuContract.pageButtons.transactionBoundary = "button-then-permission-eventually";
+
+    const result = runValidator(["--contract", tempJSON("contract.json", contract)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /pageButtons\.requiredFields must include permissionCode/);
+    assert.match(result.stderr, /pageButtons\.permissionResourceType must be page-button/);
+    assert.match(result.stderr, /pageButtons\.transactionBoundary must be button-and-permission-relation-one-native-transaction/);
+  });
+
+  it("rejects implicit future role-menu grants and ambiguous serving modes", () => {
+    const contract = readJSON("resources/platform-organization-rbac-menu-contract.json");
+    contract.menuContract.servingModes ??= {};
+    contract.menuContract.assignment.directorySelection = "persist-directory-binding";
+    contract.menuContract.assignment.futureDescendantGrant = "implicit";
+    contract.menuContract.servingModes.default = "target";
+    contract.menuContract.servingModes.explicit = ["legacy", "target"];
+
+    const result = runValidator(["--contract", tempJSON("contract.json", contract)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /assignment\.directorySelection must be bulk-current-eligible-descendant-pages-only/);
+    assert.match(result.stderr, /assignment\.futureDescendantGrant must be forbidden/);
+    assert.match(result.stderr, /servingModes\.default must be legacy/);
+    assert.match(result.stderr, /servingModes\.explicit must be legacy then dual-read then target/);
+  });
+
   it("rejects migration plans without principal-level comparison", () => {
     const contract = readJSON("resources/platform-organization-rbac-menu-contract.json");
     contract.menuPermissionMigration.phases = contract.menuPermissionMigration.phases.filter(
