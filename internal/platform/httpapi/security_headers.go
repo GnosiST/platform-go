@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+
+	"platform-go/internal/platform/errorcode"
 )
 
 const defaultHTTPMaxBodyBytes = int64(1 << 20)
@@ -60,7 +62,7 @@ func jsonRequestBodyLimit(maxBytes int64) gin.HandlerFunc {
 		body, err := io.ReadAll(io.LimitReader(ctx.Request.Body, maxBytes+1))
 		_ = ctx.Request.Body.Close()
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, Response[any]{Error: &ErrorBody{Code: "REQUEST_BODY_INVALID", Message: "request body is invalid"}})
+			writePlatformError(ctx, errorcode.CodeRequestBodyInvalid)
 			return
 		}
 		if int64(len(body)) > maxBytes {
@@ -74,7 +76,7 @@ func jsonRequestBodyLimit(maxBytes int64) gin.HandlerFunc {
 }
 
 func writeRequestBodyTooLarge(ctx *gin.Context) {
-	ctx.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, Response[any]{Error: &ErrorBody{Code: "REQUEST_BODY_TOO_LARGE", Message: "request body exceeds configured limit"}})
+	writePlatformError(ctx, errorcode.CodeRequestBodyTooLarge)
 }
 
 func isMultipartContentType(raw string) bool {

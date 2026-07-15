@@ -28,6 +28,7 @@ import (
 	"platform-go/internal/platform/cache"
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/dataprotection"
+	"platform-go/internal/platform/errorcode"
 	"platform-go/internal/platform/kernel"
 	"platform-go/internal/platform/ratelimit"
 	"platform-go/internal/platform/rbac"
@@ -82,10 +83,16 @@ type Authorizer interface {
 }
 
 type InternalErrorEvent struct {
-	Code       string
-	CauseClass string
-	EventID    string
-	Err        error
+	Code           string
+	CauseClass     string
+	EventID        string
+	Err            error
+	Owner          string
+	Category       errorcode.Category
+	RetryPolicy    errorcode.RetryPolicy
+	RedactionClass errorcode.RedactionClass
+	RequestID      string
+	TraceID        string
 }
 
 type InternalErrorSink interface {
@@ -166,9 +173,10 @@ func New(options ServerOptions) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	configureTrustedProxies(router, options.Security.TrustedProxies)
+	router.Use(requestCorrelation())
+	router.Use(recoveryMiddleware(options.InternalErrorSink))
 	router.Use(securityHeaders(options.Security))
 	router.Use(jsonRequestBodyLimit(options.Security.MaxBodyBytes))
-	router.Use(gin.Recovery())
 	resources := options.Resources
 	if resources == nil {
 		var err error
@@ -2532,7 +2540,7 @@ func (s *Server) refreshAdminResourceState(ctx *gin.Context, code string, messag
 	if err != nil {
 		s.recordInternalError(ctx, code, err)
 		ctx.JSON(http.StatusServiceUnavailable, Response[gin.H]{
-			Error: &ErrorBody{Code: code, Message: message},
+			Error: legacyErrorBody(ctx, code, message),
 		})
 		return false
 	}
@@ -2619,7 +2627,7 @@ func writeUnauthorized(ctx *gin.Context) {
 
 func writeAuthError(ctx *gin.Context, status int, code string, message string) {
 	ctx.JSON(status, Response[gin.H]{
-		Error: &ErrorBody{Code: code, Message: message},
+		Error: legacyErrorBody(ctx, code, message),
 	})
 }
 
@@ -2678,7 +2686,7 @@ func fileRecordContentType(record adminresource.Record) string {
 
 func writeFileError(ctx *gin.Context, status int, code string, message string) {
 	ctx.JSON(status, Response[gin.H]{
-		Error: &ErrorBody{Code: code, Message: message},
+		Error: legacyErrorBody(ctx, code, message),
 	})
 }
 
@@ -2687,11 +2695,20 @@ func (s *Server) recordInternalError(ctx *gin.Context, code string, err error) {
 		return
 	}
 	publicErr := errors.New(code)
+	correlation := correlationFromGinContext(ctx)
 	event := InternalErrorEvent{
 		Code:       code,
 		CauseClass: internalErrorCauseClass(code),
 		EventID:    internalErrorEventID(ctx),
 		Err:        publicErr,
+		RequestID:  correlation.RequestID,
+		TraceID:    correlation.TraceID,
+	}
+	if definition, ok := errorcode.Lookup(errorcode.Code(code)); ok {
+		event.Owner = definition.Owner
+		event.Category = definition.Category
+		event.RetryPolicy = definition.RetryPolicy
+		event.RedactionClass = definition.RedactionClass
 	}
 	_ = ctx.Error(publicErr).SetMeta(event)
 	if s.internalErrorSink != nil {
@@ -2719,9 +2736,9 @@ func internalErrorCauseClass(code string) string {
 }
 
 func internalErrorEventID(ctx *gin.Context) string {
-	if ctx != nil {
-		if requestID := strings.TrimSpace(ctx.GetHeader("X-Request-ID")); requestID != "" {
-			digest := sha256.Sum256([]byte("platform-go:request-correlation:v1\x00" + requestID))
+	if ctx != nil && ctx.Request != nil {
+		if correlation, ok := kernel.CorrelationFromContext(ctx.Request.Context()); ok {
+			digest := sha256.Sum256([]byte("platform-go:request-correlation:v1\x00" + correlation.RequestID))
 			return "request:v1:" + hex.EncodeToString(digest[:])
 		}
 	}
@@ -2831,5 +2848,5 @@ func writeAdminResourceError(ctx *gin.Context, err error) {
 			message = "invalid admin resource record"
 		}
 	}
-	ctx.JSON(status, Response[gin.H]{Error: &ErrorBody{Code: code, Message: message}})
+	ctx.JSON(status, Response[gin.H]{Error: legacyErrorBody(ctx, code, message)})
 }

@@ -25,6 +25,7 @@ import (
 	"platform-go/internal/platform/cache"
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/core"
+	"platform-go/internal/platform/errorcode"
 	"platform-go/internal/platform/ratelimit"
 	"platform-go/internal/platform/session"
 	"platform-go/internal/platform/storage"
@@ -340,6 +341,64 @@ func newTestServer(options ServerOptions) *Server {
 		options.DebugCodeEnabled = true
 	}
 	return New(options)
+}
+
+func TestErrorResponseCarriesServerOwnedRequestAndTraceIDs(t *testing.T) {
+	server := New(ServerOptions{})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader("{"))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Request-ID", "email@example.test/private/path")
+
+	server.Router().ServeHTTP(recorder, request)
+
+	var body Response[any]
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Error == nil || body.Error.RequestID == "" || body.Error.TraceID == "" {
+		t.Fatalf("body = %+v", body)
+	}
+	if strings.Contains(recorder.Body.String(), "email@example.test") {
+		t.Fatal("client request id reflected")
+	}
+}
+
+func TestRecoveryUsesRegisteredInternalErrorEnvelope(t *testing.T) {
+	const marker = "private-panic-marker"
+	internalErrors := &recordingInternalErrorSink{}
+	server := New(ServerOptions{
+		InternalErrorSink: internalErrors,
+		AdminRoutes: []AdminRouteRegistration{{
+			Method: http.MethodGet,
+			Path:   "/api/admin/test-panic",
+			Handler: func(*gin.Context) {
+				panic(marker)
+			},
+		}},
+	})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/admin/test-panic", strings.NewReader("request-private-body"))
+	request.Header.Set("Authorization", "Bearer request-private-token")
+
+	server.Router().ServeHTTP(recorder, request)
+
+	var body Response[any]
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if recorder.Code != http.StatusInternalServerError || body.Error == nil || body.Error.Code != errorcode.CodeInternal {
+		t.Fatalf("status = %d body = %+v", recorder.Code, body)
+	}
+	if body.Error.RequestID == "" || body.Error.TraceID == "" {
+		t.Fatalf("missing recovery correlation: %+v", body.Error)
+	}
+	surfaces := recorder.Body.String() + fmt.Sprintf("%+v", internalErrors.events)
+	for _, forbidden := range []string{marker, "request-private-token", "request-private-body"} {
+		if strings.Contains(surfaces, forbidden) {
+			t.Fatalf("unsafe recovery surface contains %q: %s", forbidden, surfaces)
+		}
+	}
 }
 
 type adminMenuListTestPayload struct {

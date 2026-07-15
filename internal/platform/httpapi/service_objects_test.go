@@ -89,7 +89,13 @@ func TestAdminServiceObjectTransportDoesNotEnumerateDeniedDefinitions(t *testing
 	token := loginServiceObjectAdmin(t, server)
 	known := serviceObjectRequest(server, token, "/api/admin/service-objects/query", `{"queryId":"platform.reference-records.list","version":"1.0.0"}`)
 	missing := serviceObjectRequest(server, token, "/api/admin/service-objects/query", `{"queryId":"platform.missing.list","version":"1.0.0"}`)
-	if known.Code != http.StatusNotFound || missing.Code != http.StatusNotFound || known.Body.String() != missing.Body.String() {
+	var knownBody Response[any]
+	var missingBody Response[any]
+	knownDecodeErr := json.Unmarshal(known.Body.Bytes(), &knownBody)
+	missingDecodeErr := json.Unmarshal(missing.Body.Bytes(), &missingBody)
+	if known.Code != http.StatusNotFound || missing.Code != http.StatusNotFound || knownDecodeErr != nil || missingDecodeErr != nil ||
+		knownBody.Error == nil || missingBody.Error == nil || knownBody.Error.Code != missingBody.Error.Code || knownBody.Error.Message != missingBody.Error.Message ||
+		knownBody.Error.RequestID == "" || knownBody.Error.TraceID == "" || missingBody.Error.RequestID == "" || missingBody.Error.TraceID == "" {
 		t.Fatalf("known denied=%d %s missing=%d %s, want indistinguishable 404", known.Code, known.Body.String(), missing.Code, missing.Body.String())
 	}
 }
