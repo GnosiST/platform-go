@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"net/textproto"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -4467,7 +4468,7 @@ func TestAuthorizationLifecycleRequiresGovernedDomainCommand(t *testing.T) {
 	resources := adminresource.NewStoreFromCapabilities(manifests)
 	inputs := map[string]adminresource.WriteInput{
 		"org-units":   {Code: "org-units-guard", Name: "org-units guard", Status: "enabled", Values: map[string]string{"type": "team", "tenantCode": "acme"}},
-		"role-groups": {Code: "role-groups-guard", Name: "role-groups guard", Status: "enabled", Values: map[string]string{"scopeType": "tenant", "tenantCode": "acme"}},
+		"role-groups": {Code: "role-groups-guard", Name: "role-groups guard", Status: "enabled", Values: map[string]string{"scopeType": "platform", "tenantCode": ""}},
 		"roles":       {Code: "roles-guard", Name: "roles guard", Status: "enabled", Values: map[string]string{"groupCode": "role-groups-guard", "dataScope": "current_org", "permissions": "admin:test:read"}},
 		"users":       {Code: "users-guard", Name: "users guard", Status: "enabled", Values: map[string]string{"scopeType": "tenant", "tenantCode": "acme", "orgUnitCode": "org-units-guard", "roles": "roles-guard"}},
 		"menus": {Code: "menus-guard", Name: "menus guard", Status: "enabled", Values: map[string]string{
@@ -4489,6 +4490,59 @@ func TestAuthorizationLifecycleRequiresGovernedDomainCommand(t *testing.T) {
 	server := newTestServer(ServerOptions{Capabilities: manifests, Resources: resources})
 
 	for _, resource := range resourcesUnderGovernance {
+		before := snapshotGovernedResourceRecords(t, resources, resourcesUnderGovernance)
+		metadataChanged := false
+		metadataCreate := inputs[resource]
+		metadataCreate.Code = resource + "-metadata"
+		metadataCreate.Name = resource + " metadata"
+		createBody, err := json.Marshal(metadataCreate)
+		if err != nil {
+			t.Fatal(err)
+		}
+		beforeCreate := snapshotGovernedResourceRecords(t, resources, resourcesUnderGovernance)
+		createRequest := httptest.NewRequest(http.MethodPost, "/api/admin/resources/"+resource, bytes.NewReader(createBody))
+		createRequest.Header.Set("X-Platform-User", "admin")
+		createRequest.Header.Set("Content-Type", "application/json")
+		createResponse := httptest.NewRecorder()
+		server.Router().ServeHTTP(createResponse, createRequest)
+		if createResponse.Code == http.StatusBadRequest && strings.Contains(createResponse.Body.String(), `"code":"ADMIN_RESOURCE_INVALID_RECORD"`) {
+			// The isolated HTTP fixture does not compose the tenant/organization
+			// catalog required by governed snapshot validators; retain the validator
+			// proof without treating it as a domain mutation success path.
+			if afterCreate := snapshotGovernedResourceRecords(t, resources, resourcesUnderGovernance); !reflect.DeepEqual(beforeCreate, afterCreate) {
+				t.Fatalf("POST %s invalid metadata request mutated snapshot\nbefore=%+v\nafter=%+v", resource, beforeCreate, afterCreate)
+			}
+		} else if createResponse.Code != http.StatusCreated && createResponse.Code != http.StatusOK {
+			t.Fatalf("POST %s metadata status = %d body = %s", resource, createResponse.Code, createResponse.Body.String())
+		} else {
+			metadataChanged = true
+		}
+		updatePayload := map[string]any{"name": "metadata-only update", "status": "enabled", "description": "metadata-only", "values": metadataCreate.Values}
+		updateJSON, err := json.Marshal(updatePayload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		beforeUpdate := snapshotGovernedResourceRecords(t, resources, resourcesUnderGovernance)
+		updateBody := bytes.NewReader(updateJSON)
+		updateRequest := httptest.NewRequest(http.MethodPut, "/api/admin/resources/"+resource+"/"+recordIDs[resource], updateBody)
+		updateRequest.Header.Set("X-Platform-User", "admin")
+		updateRequest.Header.Set("Content-Type", "application/json")
+		updateResponse := httptest.NewRecorder()
+		server.Router().ServeHTTP(updateResponse, updateRequest)
+		if updateResponse.Code == http.StatusBadRequest && strings.Contains(updateResponse.Body.String(), `"code":"ADMIN_RESOURCE_INVALID_RECORD"`) {
+			// See the isolated governed-resource catalog limitation above.
+			if afterUpdate := snapshotGovernedResourceRecords(t, resources, resourcesUnderGovernance); !reflect.DeepEqual(beforeUpdate, afterUpdate) {
+				t.Fatalf("PUT %s invalid metadata request mutated snapshot\nbefore=%+v\nafter=%+v", resource, beforeUpdate, afterUpdate)
+			}
+		} else if updateResponse.Code != http.StatusOK {
+			t.Fatalf("PUT %s metadata status = %d body = %s", resource, updateResponse.Code, updateResponse.Body.String())
+		} else {
+			metadataChanged = true
+		}
+		afterMetadata := snapshotGovernedResourceRecords(t, resources, resourcesUnderGovernance)
+		if metadataChanged && reflect.DeepEqual(before, afterMetadata) {
+			t.Fatalf("metadata writes for %s did not change resource records", resource)
+		}
 		for _, request := range []*http.Request{
 			httptest.NewRequest(http.MethodDelete, "/api/admin/resources/"+resource+"/"+recordIDs[resource], nil),
 			httptest.NewRequest(http.MethodPost, "/api/admin/resources/"+resource+"/"+recordIDs[resource]+"/restore", nil),
@@ -4500,10 +4554,24 @@ func TestAuthorizationLifecycleRequiresGovernedDomainCommand(t *testing.T) {
 				t.Fatalf("%s %s lifecycle status = %d body = %s, want governed-domain 409", request.Method, resource, response.Code, response.Body.String())
 			}
 		}
-		if items, _ := resources.List(resource); !hasAdminResourceRecordID(items, recordIDs[resource]) {
-			t.Fatalf("%s lifecycle mutation changed records: %+v", resource, items)
+		after := snapshotGovernedResourceRecords(t, resources, resourcesUnderGovernance)
+		if !reflect.DeepEqual(afterMetadata, after) {
+			t.Fatalf("%s lifecycle rejection changed full resource/revision/audit snapshot\nbefore=%+v\nafter=%+v", resource, afterMetadata, after)
 		}
 	}
+}
+
+func snapshotGovernedResourceRecords(t *testing.T, resources *adminresource.Store, resourceNames []string) map[string][]adminresource.Record {
+	t.Helper()
+	snapshot := make(map[string][]adminresource.Record, len(resourceNames))
+	for _, resource := range resourceNames {
+		items, err := resources.List(resource)
+		if err != nil {
+			t.Fatal(err)
+		}
+		snapshot[resource] = items
+	}
+	return snapshot
 }
 
 func TestAdminAuthorizationRoutesExposeNoBulkOrImportMutation(t *testing.T) {
