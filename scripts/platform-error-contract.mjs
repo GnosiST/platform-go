@@ -119,10 +119,38 @@ function componentResponseName(reference) {
 }
 
 function validateJSONErrorResponse(response, location, errors) {
-  const schema = response?.content?.["application/json"]?.schema;
-  if (schema && !sameJSON(schema, errorResponseSchema)) {
+  if (!response?.content || !Object.hasOwn(response.content, "application/json")) return;
+  const schema = response.content["application/json"]?.schema;
+  if (!sameJSON(schema, errorResponseSchema)) {
     errors.push(`${location} application/json schema must reference ErrorResponse`);
   }
+}
+
+function validateComponentErrorResponse(openapi, name, label, errors, visiting, validated) {
+  if (validated.has(name)) return;
+  const location = `${label} components.responses.${name}`;
+  if (visiting.has(name)) {
+    errors.push(`${location} contains a circular component response reference`);
+    return;
+  }
+  const response = openapi.components?.responses?.[name];
+  if (!response) {
+    errors.push(`${location} is missing`);
+    return;
+  }
+  visiting.add(name);
+  if (response.$ref) {
+    const referencedName = componentResponseName(response.$ref);
+    if (!referencedName) {
+      errors.push(`${location} must reference a component response`);
+    } else {
+      validateComponentErrorResponse(openapi, referencedName, label, errors, visiting, validated);
+    }
+  } else {
+    validateJSONErrorResponse(response, location, errors);
+  }
+  visiting.delete(name);
+  validated.add(name);
 }
 
 function validateOpenAPIErrorResponses(openapi, label, errors) {
@@ -150,12 +178,9 @@ function validateOpenAPIErrorResponses(openapi, label, errors) {
       }
     }
   }
+  const validatedComponents = new Set();
   for (const name of referencedComponents) {
-    validateJSONErrorResponse(
-      openapi.components.responses[name],
-      `${label} components.responses.${name}`,
-      errors,
-    );
+    validateComponentErrorResponse(openapi, name, label, errors, new Set(), validatedComponents);
   }
 }
 

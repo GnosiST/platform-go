@@ -349,6 +349,23 @@ describe("admin resource contract generators", () => {
     assert.notEqual(invalid.status, 0);
     assert.match(invalid.stderr, /components\.responses\.BadRequest application\/json schema must reference ErrorResponse/);
 
+    const nested = runAdminOpenAPIForContract(contract);
+    nested.components.responses.BrokenBadRequest = {
+      $ref: "#/components/schemas/ErrorResponse",
+    };
+    nested.components.responses.BadRequest = {
+      $ref: "#/components/responses/BrokenBadRequest",
+    };
+    const invalidNestedRef = runAdminAPIBoundaryValidator(nested);
+    assert.notEqual(invalidNestedRef.status, 0);
+    assert.match(invalidNestedRef.stderr, /components\.responses\.BrokenBadRequest must reference a component response/);
+
+    const validNested = runAdminOpenAPIForContract(contract);
+    validNested.components.responses.NestedBadRequest = validNested.components.responses.BadRequest;
+    validNested.components.responses.BadRequest = { $ref: "#/components/responses/NestedBadRequest" };
+    const acceptedNestedRef = runAdminAPIBoundaryValidator(validNested);
+    assert.equal(acceptedNestedRef.status, 0, acceptedNestedRef.stderr);
+
     const success = runAdminOpenAPIForContract(contract);
     success.paths["/api/admin/service-objects/query"].post.responses["200"].content["application/json"].schema = {
       type: "object",
