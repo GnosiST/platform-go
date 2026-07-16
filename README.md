@@ -13,7 +13,7 @@
 
 `platform-go` 是可复用、可审计、可扩展的 Go 平台基础层。它不绑定具体业务领域，也不把业务菜单、业务数据或业务工作流写进平台核心；业务包通过 capability manifest、公开端口和稳定合同接入。
 
-`zshenmez` 只作为可复用管理模式的外部参考证据。`platform-go` is not a business migration target：平台不会交付其具体业务资源、路由、存储、状态机、菜单、夹具或写入切换方案。
+`platform-go` is not a business migration target or an application package. 平台保持业务中立，不交付具体业务资源、路由、存储、状态机、菜单或工作流。
 
 适合需要以下基础能力的团队：
 

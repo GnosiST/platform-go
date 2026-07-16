@@ -13,7 +13,7 @@
 
 `platform-go` is a reusable, auditable and extensible foundation for Go operations services. It is intentionally business-neutral: domain resources, menus and workflows stay outside platform core and attach through capability manifests, public ports and versioned contracts.
 
-`zshenmez` is external reference evidence for reusable management patterns only. `platform-go` is not a business migration target and does not ship its concrete business resources, routes, stores, state machines, menus, fixtures or write-cutover plans.
+`platform-go` is not a business migration target or an application package. It stays business-neutral and does not ship domain-specific resources, routes, stores, state machines, menus or workflows.
 
 It is a good fit for teams that need to:
 
