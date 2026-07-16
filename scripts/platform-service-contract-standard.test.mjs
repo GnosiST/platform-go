@@ -196,6 +196,25 @@ describe("platform service contract standard", () => {
     assert.deepEqual(content.responses["200"].content["application/octet-stream"].schema, { type: "string", format: "binary" });
   });
 
+  it("rejects permissive External error responses without constraining success responses", () => {
+    const invalid = readJSON("resources/generated/openapi.external.json");
+    invalid.paths["/api/app/files"].post.responses["400"].content["application/json"].schema = {
+      type: "object",
+      properties: { data: {}, error: {} },
+    };
+    const rejected = runValidator(["--external-openapi", tempJSON("openapi.external.json", invalid)]);
+    assert.notEqual(rejected.status, 0);
+    assert.match(rejected.stderr, /POST \/api\/app\/files response 400 application\/json schema must reference ErrorResponse/);
+
+    const success = readJSON("resources/generated/openapi.external.json");
+    success.paths["/api/app/files"].post.responses["201"].content["application/json"].schema = {
+      type: "object",
+      properties: { data: {}, error: {} },
+    };
+    const accepted = runValidator(["--external-openapi", tempJSON("openapi.external.json", success)]);
+    assert.equal(accepted.status, 0, accepted.stderr);
+  });
+
   it("closes request payloads and explicitly rejects physical routing fields", () => {
     const forbidden = ["database", "datasource", "dsn", "schema", "shard"];
     for (const relativePath of ["resources/generated/openapi.service.json", "resources/generated/openapi.control.json", "resources/generated/openapi.external.json"]) {

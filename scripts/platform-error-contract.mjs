@@ -109,6 +109,56 @@ function sameJSON(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+const openAPIHTTPMethods = new Set(["get", "post", "put", "patch", "delete", "head", "options", "trace"]);
+const errorResponseSchema = { $ref: "#/components/schemas/ErrorResponse" };
+
+function componentResponseName(reference) {
+  const prefix = "#/components/responses/";
+  if (typeof reference !== "string" || !reference.startsWith(prefix)) return "";
+  return reference.slice(prefix.length).replaceAll("~1", "/").replaceAll("~0", "~");
+}
+
+function validateJSONErrorResponse(response, location, errors) {
+  const schema = response?.content?.["application/json"]?.schema;
+  if (schema && !sameJSON(schema, errorResponseSchema)) {
+    errors.push(`${location} application/json schema must reference ErrorResponse`);
+  }
+}
+
+function validateOpenAPIErrorResponses(openapi, label, errors) {
+  const referencedComponents = new Set();
+  for (const [apiPath, pathItem] of Object.entries(openapi.paths ?? {})) {
+    for (const [method, operation] of Object.entries(pathItem ?? {})) {
+      if (!openAPIHTTPMethods.has(method)) continue;
+      for (const [status, response] of Object.entries(operation?.responses ?? {})) {
+        if (!/^[45](?:[0-9]{2}|XX)$/i.test(status)) continue;
+        const location = `${label} ${method.toUpperCase()} ${apiPath} response ${status}`;
+        if (response?.$ref) {
+          const name = componentResponseName(response.$ref);
+          if (!name) {
+            errors.push(`${location} must reference a component response`);
+            continue;
+          }
+          if (!openapi.components?.responses?.[name]) {
+            errors.push(`${location} references missing component response ${name}`);
+            continue;
+          }
+          referencedComponents.add(name);
+          continue;
+        }
+        validateJSONErrorResponse(response, location, errors);
+      }
+    }
+  }
+  for (const name of referencedComponents) {
+    validateJSONErrorResponse(
+      openapi.components.responses[name],
+      `${label} components.responses.${name}`,
+      errors,
+    );
+  }
+}
+
 export function validateOpenAPIErrorContract(openapi, contract, { label, planes }) {
   const errors = [];
   const expectedSchemas = platformErrorOpenAPISchemas(contract);
@@ -158,5 +208,6 @@ export function validateOpenAPIErrorContract(openapi, contract, { label, planes 
     }
   }
   visit(openapi, planes, "document");
+  validateOpenAPIErrorResponses(openapi, label, errors);
   return errors;
 }

@@ -338,6 +338,26 @@ describe("admin resource contract generators", () => {
     assert.match(result.stderr, /platform error code APP_AUTH_INVALID_REQUEST does not belong to plane admin/);
   });
 
+  it("rejects permissive Admin component error responses without constraining success responses", () => {
+    const contract = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, "..", "resources", "generated", "admin-resource-contract.json"), "utf8"));
+    const openapi = runAdminOpenAPIForContract(contract);
+    openapi.components.responses.BadRequest.content["application/json"].schema = {
+      type: "object",
+      properties: { data: {}, error: {} },
+    };
+    const invalid = runAdminAPIBoundaryValidator(openapi);
+    assert.notEqual(invalid.status, 0);
+    assert.match(invalid.stderr, /components\.responses\.BadRequest application\/json schema must reference ErrorResponse/);
+
+    const success = runAdminOpenAPIForContract(contract);
+    success.paths["/api/admin/service-objects/query"].post.responses["200"].content["application/json"].schema = {
+      type: "object",
+      properties: { data: {}, error: {} },
+    };
+    const accepted = runAdminAPIBoundaryValidator(success);
+    assert.equal(accepted.status, 0, accepted.stderr);
+  });
+
   it("generates deterministic standalone Go and TypeScript error SDKs", () => {
     const repoRoot = path.resolve(import.meta.dirname, "..");
     const first = fs.mkdtempSync(path.join(os.tmpdir(), "platform-error-sdk-a-"));

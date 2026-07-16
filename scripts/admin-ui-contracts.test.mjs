@@ -1629,16 +1629,23 @@ describe("validate-admin-ui-contracts", () => {
             && error.traceId === traceId,
         );
       }
-      await assert.rejects(
-        parsePlatformResponse(new Response("not-json", {
-          status: 500,
-          headers: { "X-Request-ID": "caller-owned", traceparent: "invalid" },
-        }), ""),
-        (error) => error instanceof AdminAPIError
-          && error.code === "INTERNAL_ERROR"
-          && error.requestId === ""
-          && error.traceId === "",
-      );
+      for (const [traceparent, expectedTraceId] of [
+        ["00-" + traceId + "-0123456789abcdef-01", traceId],
+        ["00-00000000000000000000000000000000-0123456789abcdef-01", ""],
+        ["00-" + traceId + "-0000000000000000-01", ""],
+        ["invalid", ""],
+      ]) {
+        await assert.rejects(
+          parsePlatformResponse(new Response("not-json", {
+            status: 500,
+            headers: { "X-Request-ID": "caller-owned", traceparent },
+          }), ""),
+          (error) => error instanceof AdminAPIError
+            && error.code === "INTERNAL_ERROR"
+            && error.requestId === ""
+            && error.traceId === expectedTraceId,
+        );
+      }
       await assert.rejects(
         parsePlatformResponse(new Response(JSON.stringify({
           error: { code: "ADMIN_FORBIDDEN", message: "permission denied", requestId, traceId },

@@ -498,10 +498,16 @@ function handleUnauthorizedResponse(statusCode: number, requestToken: string, er
 
 const requestIdPattern = /^req_[0-9a-f]{32}$/;
 const traceIdPattern = /^[0-9a-f]{32}$/;
-const traceparentPattern = /^00-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$/;
+const traceparentPattern = /^00-([0-9a-f]{32})-([0-9a-f]{16})-[0-9a-f]{2}$/;
 
 function correlationValue(value: unknown, pattern: RegExp) {
   return typeof value === "string" && pattern.test(value) ? value : "";
+}
+
+function traceIdFromTraceparent(value: string) {
+  const match = value.match(traceparentPattern);
+  if (!match || /^0+$/.test(match[1]) || /^0+$/.test(match[2])) return "";
+  return match[1];
 }
 
 function normalizedErrorBody(payload: unknown, response: Response): PlatformErrorBody {
@@ -518,7 +524,7 @@ function normalizedErrorBody(payload: unknown, response: Response): PlatformErro
     requestId: correlationValue(error.requestId, requestIdPattern)
       || correlationValue(response.headers.get("X-Request-ID"), requestIdPattern),
     traceId: correlationValue(error.traceId, traceIdPattern)
-      || (traceparent.match(traceparentPattern)?.[1] ?? ""),
+      || traceIdFromTraceparent(traceparent),
   };
 }
 

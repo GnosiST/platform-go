@@ -108,4 +108,15 @@ describe("validate-platform-app-client-api-boundary", () => {
     assert.match(result.stderr, /unknown platform error code UNKNOWN_PLATFORM_ERROR/);
     assert.match(result.stderr, /platform error code ADMIN_FORBIDDEN does not belong to plane app/);
   });
+
+  it("rejects App error responses that reference the wrong OpenAPI component", () => {
+    const openapi = readJSON("resources/generated/openapi.app.json");
+    openapi.paths["/api/app/auth/login"].post.responses["400"] = {
+      $ref: "#/components/schemas/ErrorResponse",
+    };
+    const result = runValidator(["--app-openapi", tempJSON("openapi.app.json", openapi)]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /POST \/api\/app\/auth\/login response 400 must reference a component response/);
+  });
 });
