@@ -19,6 +19,7 @@ and releases follow [Semantic Versioning](https://semver.org/).
 
 - Reconciled the foundation task graph to 67 total, 58 implemented and nine explicitly deferred nodes.
 - Kept local agent and design process files available to maintainers while excluding them from tracked release trees and source archives.
+- Updated GitHub Actions to the current Node 24-based major versions.
 
 ### Fixed
 
