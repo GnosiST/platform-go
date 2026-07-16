@@ -6,6 +6,8 @@ import {
   BellOutlined,
   BookOutlined,
   BranchesOutlined,
+  CaretLeftOutlined,
+  CaretRightOutlined,
   CloudServerOutlined,
   CloseOutlined,
   ControlOutlined,
@@ -16,16 +18,18 @@ import {
   MenuFoldOutlined,
   MenuOutlined,
   MenuUnfoldOutlined,
+  MoonOutlined,
   PartitionOutlined,
   PushpinOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
   SettingOutlined,
+  SunOutlined,
   TeamOutlined,
   UploadOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Avatar, Badge, Button, Drawer, Dropdown, Input, Space, Tag, Tooltip, Typography, type MenuProps } from "antd";
+import { Avatar, Button, Drawer, Dropdown, Input, Space, Tag, Tooltip, Typography, type MenuProps } from "antd";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { AdminCurrentSession, BrandingConfig } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
@@ -111,7 +115,10 @@ export function AdminShell({
 }: AdminShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [openContext, setOpenContext] = useState<"environment" | "tenant" | "mobile-work" | "mobile-runtime" | null>(null);
+  const [openContext, setOpenContext] = useState<"mobile-work" | "mobile-runtime" | null>(null);
+  const [globalSearchQuery, setGlobalSearchQuery] = useState("");
+  const workTabsRef = useRef<HTMLElement | null>(null);
+  const [workTabsOverflow, setWorkTabsOverflow] = useState({ left: false, right: false });
   const [openTabRoutes, setOpenTabRoutes] = useState<string[]>(() => uniqueRoutes([HOME_ROUTE, activeRoute]));
   const mainRef = useRef<HTMLElement | null>(null);
   const previousRouteRef = useRef(activeRoute);
@@ -130,6 +137,14 @@ export function AdminShell({
     [dictionary, resources],
   );
   const activeGroup = groupedResources.find((group) => group.resources.some((resource) => resource.route === activeRoute)) ?? groupedResources[0];
+  const globalSearchResults = useMemo(() => {
+    const normalizedQuery = globalSearchQuery.trim().toLowerCase();
+    if (!normalizedQuery) return [];
+    return resources.filter((resource) =>
+      [resource.name, resource.title.zh, resource.title.en, resource.description.zh, resource.description.en]
+        .some((value) => value.toLowerCase().includes(normalizedQuery)),
+    ).slice(0, 8);
+  }, [globalSearchQuery, resources]);
   const openTabs = openTabRoutes
     .map((route) => resourcesByRoute.get(route))
     .filter((resource): resource is AdminResourceDefinition => Boolean(resource));
@@ -150,6 +165,17 @@ export function AdminShell({
     }
     setOpenTabRoutes((current) => uniqueRoutes([HOME_ROUTE, ...current.filter((route) => resourcesByRoute.has(route)), activeRoute]));
   }, [activeRoute, resourcesByRoute]);
+
+  useEffect(() => {
+    const updateWorkTabsOverflow = () => {
+      const element = workTabsRef.current;
+      if (!element) return;
+      setWorkTabsOverflow({ left: element.scrollLeft > 2, right: element.scrollLeft + element.clientWidth < element.scrollWidth - 2 });
+    };
+    updateWorkTabsOverflow();
+    window.addEventListener("resize", updateWorkTabsOverflow);
+    return () => window.removeEventListener("resize", updateWorkTabsOverflow);
+  }, [openTabs.length, uiConfig.showWorkTabs]);
 
   useEffect(() => {
     if (previousRouteRef.current === activeRoute) {
@@ -268,7 +294,7 @@ export function AdminShell({
           <SplitPrimaryNav groupedResources={groupedResources} activeRoute={activeRoute} onResourceOpen={openResource} />
         ) : (
           <SideNavigation
-            groupedResources={groupedResources}
+            groupedResources={layoutMode === "mixed" && activeGroup ? [activeGroup] : groupedResources}
             activeRoute={activeRoute}
             language={language}
             dictionary={dictionary}
@@ -301,28 +327,39 @@ export function AdminShell({
               icon={<MenuOutlined />}
               onClick={() => setMobileNavOpen(true)}
             />
-            {layoutMode !== "top" ? (
-              <Tooltip title={uiConfig.sidebarCollapsed ? dictionary.expandSidebar : dictionary.collapseSidebar}>
-                <Button
-                  aria-label={uiConfig.sidebarCollapsed ? dictionary.expandSidebar : dictionary.collapseSidebar}
-                  className="desktop-sider-toggle"
-                  icon={uiConfig.sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                  onClick={toggleSidebar}
-                />
-              </Tooltip>
-            ) : null}
             <BreadcrumbLabel dictionary={dictionary} activeTitle={activeResource?.title[language] ?? ""} />
           </div>
-          <Input
-            aria-label={dictionary.topSearch}
-            autoComplete="off"
-            className="global-search desktop-global-search"
-            id="platform-global-search"
-            name="globalSearch"
-            prefix={<SearchOutlined />}
-            suffix={<span className="keyboard-hint">⌘ {dictionary.commandHint}</span>}
-            placeholder={dictionary.topSearch}
-          />
+          <Dropdown
+            open={Boolean(globalSearchQuery.trim()) && globalSearchResults.length > 0}
+            menu={{
+              items: globalSearchResults.map((resource) => ({ key: resource.route, label: resource.title[language] })),
+              onClick: ({ key }) => {
+                const resource = resourcesByRoute.get(String(key));
+                if (resource) openResource(resource);
+                setGlobalSearchQuery("");
+              },
+            }}
+            placement="bottomLeft"
+            trigger={[]}
+          >
+            <Input
+              aria-label={dictionary.topSearch}
+              autoComplete="off"
+              className="global-search desktop-global-search"
+              id="platform-global-search"
+              name="globalSearch"
+              prefix={<SearchOutlined />}
+              suffix={<span className="keyboard-hint">⌘ {dictionary.commandHint}</span>}
+              placeholder={dictionary.topSearch}
+              value={globalSearchQuery}
+              onChange={(event) => setGlobalSearchQuery(event.target.value)}
+              onPressEnter={() => {
+                const resource = globalSearchResults[0];
+                if (resource) openResource(resource);
+                setGlobalSearchQuery("");
+              }}
+            />
+          </Dropdown>
           <Space className="topbar-actions" size={8}>
             <Tooltip title={`${dictionary.switchLanguage}: ${targetLanguage === "zh" ? dictionary.cn : dictionary.en}`}>
               <Button
@@ -333,9 +370,15 @@ export function AdminShell({
               />
             </Tooltip>
             <Tooltip title={dictionary.alerts}>
-              <Badge count={3} size="small">
-                <Button aria-label={dictionary.alerts} className="topbar-icon-button" icon={<BellOutlined />} />
-              </Badge>
+              <Button aria-label={dictionary.alerts} className="topbar-icon-button" icon={<BellOutlined />} />
+            </Tooltip>
+            <Tooltip title={themeName === "black" ? dictionary.switchToDayMode : dictionary.switchToNightMode}>
+              <Button
+                aria-label={themeName === "black" ? dictionary.switchToDayMode : dictionary.switchToNightMode}
+                className="topbar-icon-button theme-toggle-button"
+                icon={themeName === "black" ? <SunOutlined /> : <MoonOutlined />}
+                onClick={() => changeTheme(themeName === "black" ? "tech" : "black")}
+              />
             </Tooltip>
             <Button className="user-menu-trigger" aria-label={dictionary.userSettings} onClick={() => setSettingsOpen(true)}>
               <Avatar size={28} className="admin-avatar">
@@ -436,17 +479,20 @@ export function AdminShell({
             placement="bottomRight"
             onOpenChange={(open) => setOpenContext(open ? "mobile-runtime" : null)}
           >
-            <Button className="platform-mobile-context-button" aria-label={dictionary.mobileRuntimeContext}>
+            <div className="platform-mobile-context-button context-readonly" aria-label={dictionary.mobileRuntimeContext}>
               <span>{dictionary.environment}</span>
               <strong>{`${dictionary.production} · ${dictionary.platformTenant}`}</strong>
-              <DownOutlined />
-            </Button>
+              <Tag>{dictionary.readOnlyContext}</Tag>
+            </div>
           </PlatformDropdownPlugin>
         </section>
 
         <section className={uiConfig.showWorkTabs ? "platform-workbar" : "platform-workbar without-tabs"}>
           {uiConfig.showWorkTabs ? (
-            <nav className="platform-work-tabs" aria-label={dictionary.workTabs}>
+            <nav ref={workTabsRef} className="platform-work-tabs" aria-label={dictionary.workTabs} onScroll={() => {
+              const element = workTabsRef.current;
+              if (element) setWorkTabsOverflow({ left: element.scrollLeft > 2, right: element.scrollLeft + element.clientWidth < element.scrollWidth - 2 });
+            }}>
               {openTabs.map((resource) => {
                 const Icon = iconMap[resource.icon as keyof typeof iconMap] ?? BookOutlined;
                 const isPinned = resource.route === HOME_ROUTE;
@@ -487,45 +533,27 @@ export function AdminShell({
               })}
             </nav>
           ) : null}
+          {uiConfig.showWorkTabs && workTabsOverflow.left ? (
+            <button className="work-tabs-scroll-button left" aria-label={dictionary.scrollWorkTabsLeft} type="button" onClick={() => workTabsRef.current?.scrollBy({ left: -240, behavior: "smooth" })}>
+              <CaretLeftOutlined />
+            </button>
+          ) : null}
+          {uiConfig.showWorkTabs && workTabsOverflow.right ? (
+            <button className="work-tabs-scroll-button right" aria-label={dictionary.scrollWorkTabsRight} type="button" onClick={() => workTabsRef.current?.scrollBy({ left: 240, behavior: "smooth" })}>
+              <CaretRightOutlined />
+            </button>
+          ) : null}
           <div className="context-controls">
-            <PlatformDropdownPlugin
-              open={openContext === "environment"}
-              content={(
-                <ContextPanel
-                  title={dictionary.environmentContext}
-                  description={dictionary.environmentContextHelp}
-                  label={dictionary.environment}
-                  value={dictionary.production}
-                  dictionary={dictionary}
-                />
-              )}
-              onOpenChange={(open) => setOpenContext(open ? "environment" : null)}
-            >
-              <Button className="context-chip" aria-label={dictionary.environmentContext}>
-                <span>{dictionary.environment}</span>
-                <strong>{dictionary.production}</strong>
-                <DownOutlined />
-              </Button>
-            </PlatformDropdownPlugin>
-            <PlatformDropdownPlugin
-              open={openContext === "tenant"}
-              content={(
-                <ContextPanel
-                  title={dictionary.tenantContext}
-                  description={dictionary.tenantContextHelp}
-                  label={dictionary.tenant}
-                  value={`${dictionary.platformTenant} (platform)`}
-                  dictionary={dictionary}
-                />
-              )}
-              onOpenChange={(open) => setOpenContext(open ? "tenant" : null)}
-            >
-              <Button className="context-chip" aria-label={dictionary.tenantContext}>
-                <span>{dictionary.tenant}</span>
-                <strong>{`${dictionary.platformTenant} (platform)`}</strong>
-                <DownOutlined />
-              </Button>
-            </PlatformDropdownPlugin>
+            <div className="context-chip context-readonly" aria-label={dictionary.environmentContext}>
+              <span>{dictionary.environment}</span>
+              <strong>{dictionary.production}</strong>
+              <Tag>{dictionary.readOnlyContext}</Tag>
+            </div>
+            <div className="context-chip context-readonly" aria-label={dictionary.tenantContext}>
+              <span>{dictionary.tenant}</span>
+              <strong>{`${dictionary.platformTenant} (platform)`}</strong>
+              <Tag>{dictionary.readOnlyContext}</Tag>
+            </div>
           </div>
         </section>
 
@@ -935,36 +963,6 @@ function workTabMenuItems(dictionary: Dictionary, route: string, routes: string[
     { key: "left", label: dictionary.closeTabsToLeft, disabled: index <= 1 },
     { key: "right", label: dictionary.closeTabsToRight, disabled: index < 0 || index >= routes.length - 1 },
   ];
-}
-
-function ContextPanel({
-  title,
-  description,
-  label,
-  value,
-  dictionary,
-}: {
-  title: string;
-  description: string;
-  label: string;
-  value: string;
-  dictionary: Dictionary;
-}) {
-  return (
-    <PlatformDropdownPanel
-      className="context-dropdown-panel"
-      title={title}
-      description={description}
-      width={320}
-      footer={<Tag>{dictionary.readOnlyContext}</Tag>}
-    >
-      <div className="context-dropdown-current">
-        <Typography.Text type="secondary">{dictionary.currentContext}</Typography.Text>
-        <strong>{label}</strong>
-        <Typography.Text>{value}</Typography.Text>
-      </div>
-    </PlatformDropdownPanel>
-  );
 }
 
 function uniqueRoutes(routes: string[]) {

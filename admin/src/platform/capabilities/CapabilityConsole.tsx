@@ -1,16 +1,9 @@
 import {
   ApiOutlined,
   CloudUploadOutlined,
-  CopyOutlined,
-  DownloadOutlined,
-  EditOutlined,
   EyeOutlined,
-  FileSearchOutlined,
-  PlusOutlined,
-  SettingOutlined,
-  StopOutlined,
 } from "@ant-design/icons";
-import { Button, Progress, Segmented, Space, Tag, Typography } from "antd";
+import { Progress, Segmented, Space, Tag, Typography } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import type { Dictionary, Language } from "../i18n";
 import {
@@ -49,20 +42,7 @@ export function CapabilityConsole({
   const [filter, setFilter] = useState<CapabilityFilter>("all");
   const [tableFilters, setTableFilters] = useState<Record<string, PlatformDataTableFilterValue>>({});
   const [selectedID, setSelectedID] = useState("");
-  const [installedOptionals, setInstalledOptionals] = useState<string[]>([]);
-
-  const installedOptionalViews = useMemo(
-    () =>
-      optionalCapabilities
-        .filter((capability) => installedOptionals.includes(capability.id))
-        .map((capability) => ({ ...capability, kind: "plugin" as const })),
-    [installedOptionals, optionalCapabilities],
-  );
-
-  const allCapabilities = useMemo(
-    () => [...capabilities, ...installedOptionalViews],
-    [capabilities, installedOptionalViews],
-  );
+  const allCapabilities = capabilities;
 
   const filteredCapabilities = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -99,7 +79,7 @@ export function CapabilityConsole({
   }, [allCapabilities, selectedID]);
 
   const enabledCount = allCapabilities.filter((capability) => capability.kind !== "disabled").length;
-  const optionalCount = optionalCapabilities.length - installedOptionals.length;
+  const optionalCount = optionalCapabilities.length;
   const disabledCount = allCapabilities.filter((capability) => capability.kind === "disabled").length;
   const domainCount = new Set(allCapabilities.map((capability) => capability.domain.en)).size;
   const healthyCount = allCapabilities.filter((capability) => capability.health === "healthy").length;
@@ -207,8 +187,6 @@ export function CapabilityConsole({
             type="text"
             onClick={() => setSelectedID(record.id)}
           />
-          <AdminActionButton icon={<EditOutlined />} label={dictionary.edit} size="small" type="text" />
-          <AdminActionButton icon={<CopyOutlined />} label={dictionary.copy} size="small" type="text" />
         </Space>
       ),
     },
@@ -219,16 +197,6 @@ export function CapabilityConsole({
       className="capability-console"
       title={dictionary.pageTitle}
       description={dictionary.pageSubtitle}
-      actions={
-        <Space>
-          <AdminActionButton icon={<DownloadOutlined />} label={dictionary.import}>
-            {dictionary.import}
-          </AdminActionButton>
-          <AdminActionButton icon={<PlusOutlined />} label={dictionary.addCapability} type="primary">
-            {dictionary.addCapability}
-          </AdminActionButton>
-        </Space>
-      }
       summary={
         <div className="summary-band">
           <AdminMetricStrip
@@ -239,7 +207,7 @@ export function CapabilityConsole({
               { key: "optional", label: dictionary.optional, value: optionalCount, tone: "warning" },
               { key: "disabled", label: dictionary.disabled, value: disabledCount },
               { key: "domains", label: dictionary.domains, value: domainCount },
-              { key: "installed", label: dictionary.installedPlugins, value: installedOptionals.length },
+              { key: "installed", label: dictionary.installedPlugins, value: 0 },
             ]}
           />
           <div className="health-panel">
@@ -356,7 +324,6 @@ export function CapabilityConsole({
             </div>
             <div className="optional-grid">
               {optionalCapabilities.map((capability) => {
-                const installed = installedOptionals.includes(capability.id);
                 return (
                   <article className="optional-card" key={capability.id}>
                     <CloudUploadOutlined />
@@ -364,19 +331,7 @@ export function CapabilityConsole({
                       <Typography.Text strong>{capability.label[language]}</Typography.Text>
                       <Typography.Text className="secondary-text">{capability.version}</Typography.Text>
                     </div>
-                    <Button
-                      size="small"
-                      type={installed ? "default" : "primary"}
-                      onClick={() =>
-                        setInstalledOptionals((current) =>
-                          current.includes(capability.id)
-                            ? current.filter((id) => id !== capability.id)
-                            : [...current, capability.id],
-                        )
-                      }
-                    >
-                      {installed ? dictionary.enabled : dictionary.install}
-                    </Button>
+                    <Tag>{dictionary.capabilityActionUnavailable}</Tag>
                   </article>
                 );
               })}
@@ -452,12 +407,7 @@ function CapabilityInspector({
       </section>
 
       <section className="inspector-section">
-        <div className="section-title-row compact">
-          <Typography.Text strong>{dictionary.providedApis}</Typography.Text>
-          <Button size="small" type="link">
-            {dictionary.viewDocs}
-          </Button>
-        </div>
+        <Typography.Text strong>{dictionary.providedApis}</Typography.Text>
         <div className="api-list">
           {capability.apis.length > 0 ? (
             capability.apis.map((api) => (
@@ -473,13 +423,6 @@ function CapabilityInspector({
         </div>
       </section>
 
-      <div className="inspector-actions">
-        <Button icon={<StopOutlined />} danger>
-          {dictionary.disable}
-        </Button>
-        <Button icon={<SettingOutlined />}>{dictionary.configure}</Button>
-        <Button icon={<FileSearchOutlined />}>{dictionary.viewDocs}</Button>
-      </div>
     </aside>
   );
 }

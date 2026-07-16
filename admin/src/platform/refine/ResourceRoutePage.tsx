@@ -4,6 +4,7 @@ import type { Dictionary, Language } from "../i18n";
 import { GenericResourceConsole } from "../resources/GenericResourceConsole";
 import { MenuGovernanceConsole } from "../resources/MenuGovernanceConsole";
 import { RoleGovernanceConsole } from "../resources/RoleGovernanceConsole";
+import { SessionConsole } from "../resources/SessionConsole";
 import type { AdminResourceDefinition } from "../resources/registry";
 import type { AdminSensitiveRevealFactorComplete } from "../api/client";
 import type { SensitiveRevealOIDCResume } from "../security/sensitiveRevealOIDC";
@@ -63,6 +64,10 @@ export function ResourceRoutePage({ resource, availableResourceRoutes, language,
         deniedPermissions={deniedPermissions}
       />
     );
+  }
+
+  if (resource.route === "/sessions") {
+    return <SessionConsole resource={resource} language={language} dictionary={dictionary} />;
   }
 
   return (

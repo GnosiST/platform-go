@@ -149,6 +149,17 @@ export const coreResources: AdminResourceDefinition[] = [
     icon: "audit",
   },
   {
+    name: "sessions",
+    route: "/sessions",
+    parent: "security",
+    cacheEnabled: true,
+    title: { zh: "在线会话", en: "Sessions" },
+    description: { zh: "展示后端返回的在线会话只读记录。", en: "Display read-only online session records returned by the backend." },
+    permission: "admin:session:read",
+    group: "operations",
+    icon: "wifi",
+  },
+  {
     name: "apiResources",
     route: "/api-resources",
     parent: "resources",

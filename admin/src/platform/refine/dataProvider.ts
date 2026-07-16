@@ -99,15 +99,15 @@ function toAdminResourceInput(variables: unknown): AdminResourceInput {
     name: stringValue(source.name) ?? "",
     status: stringValue(source.status),
     description: stringValue(source.description),
-    values: isStringMap(source.values) ? source.values : {},
+    values: isValueMap(source.values) ? Object.fromEntries(Object.entries(source.values).map(([key, value]) => [key, storageValue(value)])) : {},
   };
 
   for (const [key, value] of Object.entries(source)) {
     if (key === "id" || key === "code" || key === "name" || key === "status" || key === "description" || key === "values") {
       continue;
     }
-    if (typeof value === "string") {
-      input.values = { ...(input.values ?? {}), [key]: value };
+    if (value !== undefined) {
+      input.values = { ...(input.values ?? {}), [key]: storageValue(value) };
     }
   }
 
@@ -191,8 +191,19 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isStringMap(value: unknown): value is Record<string, string> {
-  return isObjectRecord(value) && Object.values(value).every((item) => typeof item === "string");
+function isValueMap(value: unknown): value is Record<string, unknown> {
+  return isObjectRecord(value);
+}
+
+function storageValue(value: unknown): string {
+  if (value === null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 function stringValue(value: unknown) {

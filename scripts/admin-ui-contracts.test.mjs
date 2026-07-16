@@ -106,6 +106,66 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stdout, /Admin UI contract validation passed/);
   });
 
+  it("rejects resource writes that drop structured field values", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      'if (typeof raw === "object")',
+      'if (false && typeof raw === "object")',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must JSON-encode structured values/);
+  });
+
+  it("rejects resource writes that flatten array boundaries", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "JSON.stringify(raw.map((item) => String(item)))",
+      'raw.map((item) => String(item)).join(",")',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must preserve array boundaries/);
+  });
+
+  it("rejects relation option loading without stale-response protection", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "relationRequestVersionRef",
+      "removedRelationRequestVersionRef",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must discard stale responses/);
+  });
+
+  it("rejects interactive hover feedback on read-only runtime context chips", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/styles.css",
+      ".context-chip:not(.context-readonly):hover",
+      ".context-chip:hover",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must not expose interactive hover feedback/);
+  });
+
   it("rejects an Admin runtime that enables Refine third-party telemetry", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(

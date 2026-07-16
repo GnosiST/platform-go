@@ -1202,6 +1202,29 @@ select {
   flex: 1;
   gap: 6px;
   overflow: auto;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+}
+
+.platform-work-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.work-tabs-scroll-button {
+  display: inline-grid;
+  width: 28px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  color: var(--muted);
+}
+
+.work-tabs-scroll-button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .work-tab {
@@ -1263,6 +1286,15 @@ select {
   font-size: 12px;
 }
 
+.context-readonly {
+  cursor: default;
+}
+
+.context-readonly .ant-tag {
+  margin-inline-start: 4px;
+  color: var(--muted);
+}
+
 .context-controls {
   display: flex;
   flex: 0 0 auto;
@@ -1283,8 +1315,8 @@ select {
   transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
-.context-chip:hover,
-.context-chip:focus-visible {
+.context-chip:not(.context-readonly):hover,
+.context-chip:not(.context-readonly):focus-visible {
   border-color: color-mix(in srgb, var(--primary) 40%, var(--border) 60%);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 11%, transparent);
   transform: translateY(-1px);

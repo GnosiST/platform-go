@@ -18,6 +18,7 @@ const files = {
   oidcPolicy: readSource("admin/src/platform/auth/oidcPolicy.ts"),
   capabilityMetadata: readSource("admin/src/platform/capabilities/metadata.ts"),
   client: readSource("admin/src/platform/api/client.ts"),
+  dataProvider: readSource("admin/src/platform/refine/dataProvider.ts"),
   organizationRBAC: readSource("admin/src/platform/api/organizationRBAC.ts"),
   sessionExpiry: readSource("admin/src/platform/api/sessionExpiry.ts"),
   i18n: readSource("admin/src/platform/i18n.ts"),
@@ -438,9 +439,11 @@ requireIncludes(files.capabilityMetadata, "默认平台底座已提供组织机�
 requireIncludes(files.shell, "SystemSettingsDrawer", "AdminShell must expose account/system settings through the shared drawer.");
 requireIncludes(files.shell, "user-menu-trigger", "AdminShell must keep the avatar/settings trigger in the topbar.");
 requireIncludes(files.shell, "language-toggle-button", "AdminShell must use an icon language toggle, not a language dropdown.");
-requireIncludes(files.shell, "desktop-sider-toggle", "AdminShell must keep a desktop sidebar collapse affordance.");
-requireIncludes(files.shell, "brand-collapse-button", "AdminShell must keep the brand-area sidebar collapse affordance.");
+requireCountExactly(files.shell, 'className="brand-collapse-button"', 1, "AdminShell must expose one sidebar collapse affordance in the brand area.");
 requireIncludes(files.shell, "platform-work-tabs", "AdminShell must keep browser-like work tabs.");
+requireIncludes(files.shell, "setWorkTabsOverflow", "AdminShell must track work-tab overflow state for directional scrolling.");
+requireIncludes(files.shell, "scrollBy({ left: -240, behavior: \"smooth\" })", "AdminShell must expose a left work-tab overflow control.");
+requireIncludes(files.shell, "scrollBy({ left: 240, behavior: \"smooth\" })", "AdminShell must expose a right work-tab overflow control.");
 requireIncludes(files.shell, "workTabMenuItems", "AdminShell work tabs must keep the close/current/left/right context menu.");
 requireIncludes(files.shell, "buildNavigationTree", "AdminShell must build multi-level navigation from resource parents.");
 requireIncludes(files.shell, '"business/access"', "AdminShell must label business/access through a full parent path.");
@@ -629,6 +632,11 @@ requireIncludes(files.resourceConsole, "const provider = dataProvider();", "Gene
 requireIncludes(files.resourceConsole, "provider.getList<AdminResourceRecord>", "Relation option loading must query target resources through dataProvider.getList.");
 requireNotIncludes(files.resourceConsole, "queryAdminResource(", "GenericResourceConsole must not bypass Refine CRUD for relation option loading.");
 requireIncludes(files.resourceConsole, "dictionary.relationOptionsLoadFailed", "Relation option failures must use localized i18n copy.");
+requireIncludes(files.resourceConsole, "RELATION_OPTION_PAGE_SIZE = 30", "Relation option loading must use a bounded server page instead of a fixed first-100 fetch.");
+requireIncludes(files.resourceConsole, "pagination: { currentPage: 1, pageSize: 1, mode: \"server\" }", "Selected relation values outside the search page must be hydrated through a targeted server query.");
+requireIncludes(files.resourceConsole, "keywords: input.search?.trim() ? [input.search.trim()] : undefined", "Relation option search must reach the structured server keyword contract.");
+requireIncludes(files.resourceConsole, "relationRequestVersionRef", "Relation option search must discard stale responses.");
+requireIncludes(files.resourceConsole, "relationValuesFromInput(form.getFieldValue(field.key))", "Relation option search must retain selected values while the remote option page changes.");
 requireIncludes(files.resourceConsole, "mergeRelationOptions(currentSchema, results)", "Relation option loading must merge dynamic options back into the schema.");
 requireIncludes(files.resourceConsole, "relation.parentField", "GenericResourceConsole relation options must preserve tree parent values.");
 requireIncludes(files.resourceConsole, "relation.pathField", "GenericResourceConsole relation options must preserve tree path values.");
@@ -657,6 +665,15 @@ requireOrder(files.resourceConsole, "initializedFormKeyRef.current = initializat
 requireIncludes(files.resourceConsole, "form.setFieldsValue(activeFormInitialValues)", "Form initialization must apply the active resource experience initial values.");
 requireOrder(files.resourceConsole, 'initializedFormKeyRef.current = "";', "form.setFieldsValue(activeFormInitialValues)", "Closing a form must clear its initialization key before a later modal lifecycle can initialize.");
 requireIncludes(files.resourceConsole, "field.type === \"multiselect\"", "Form hydration must preserve multiselect arrays for relation fields.");
+requireIncludes(files.resourceConsole, "function serializeFieldValue(field: AdminResourceField, raw: unknown)", "Generic resource writes must normalize schema field values through one typed serializer.");
+requireIncludes(files.resourceConsole, 'field.type === "switch"', "Generic resource writes must preserve explicit boolean values in the string storage contract.");
+requireIncludes(files.resourceConsole, 'field.type === "number"', "Generic resource writes must preserve numeric values in the string storage contract.");
+requireIncludes(files.resourceConsole, "JSON.stringify(raw.map((item) => String(item)))", "Generic resource writes must preserve array boundaries in the string storage contract.");
+requireIncludes(files.resourceConsole, "function parseListValue(value: string)", "Generic resource hydration must parse JSON arrays while keeping legacy delimiter values compatible.");
+requireIncludes(files.resourceConsole, "if (typeof raw === \"object\")", "Generic resource writes must JSON-encode structured values instead of dropping them.");
+requireIncludes(files.dataProvider, "isValueMap(source.values)", "Refine writes must accept structured values maps from resource forms.");
+requireIncludes(files.dataProvider, "storageValue(value)", "Refine writes must encode non-string values without dropping them.");
+requireIncludes(files.dataProvider, "JSON.stringify(value)", "Refine writes must preserve arrays and objects through the API string-value contract.");
 requireRegex(
   files.resourceConsole,
   /function formValueFromRecord\(record: AdminResourceRecord, field: AdminResourceField\) \{\s*if \(field\.storageMode === "encrypted"\) \{\s*return undefined;\s*\}/,
@@ -747,6 +764,8 @@ for (const [token, expected] of [
 }
 requireIncludes(files.styles, ".platform-pagination-bar .ant-pagination.ant-pagination-mini", "styles.css must override AntD mini pagination inside the platform pagination bar.");
 requireIncludes(files.styles, ".platform-table-row-actions", "styles.css must keep row action slot alignment for PlatformDataTable.");
+requireIncludes(files.styles, ".context-chip:not(.context-readonly):hover", "Read-only runtime context chips must not expose interactive hover feedback.");
+requireIncludes(files.styles, ".context-chip:not(.context-readonly):focus-visible", "Read-only runtime context chips must not expose interactive focus feedback.");
 requireIncludes(files.styles, "grid-template-columns: minmax(var(--pagination-side-width), 1fr) max-content minmax(var(--pagination-side-width), 1fr);", "PlatformPaginationBar must keep a true centered pager axis on desktop.");
 requireIncludes(files.styles, "padding: 4px calc(var(--pagination-side-width) + 18px);", "Direct AntD table pagination must reserve side zones so the pager stays centered.");
 requireIncludes(files.styles, "@media (max-width: 767px)", "styles.css must keep mobile responsive rules.");

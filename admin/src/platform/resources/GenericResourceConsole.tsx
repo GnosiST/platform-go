@@ -78,6 +78,8 @@ type RelationOptionResult = {
   options: NonNullable<AdminResourceField["options"]>;
 };
 
+const RELATION_OPTION_PAGE_SIZE = 30;
+
 type FilePreviewState = {
   recordId: string;
   status: "idle" | "loading" | "ready" | "unsupported" | "error";
@@ -107,6 +109,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
   const hasAuditResource = availableResourceRoutes.includes("/audit-logs");
   const fallbackSchema = useMemo(() => createFallbackSchema(resourceKey, resource), [resource, resourceKey]);
   const [schema, setSchema] = useState<AdminResourceSchema>(fallbackSchema);
+  const [relationLoadingFields, setRelationLoadingFields] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [fileUploading, setFileUploading] = useState(false);
   const [fileDownloadingID, setFileDownloadingID] = useState("");
@@ -136,6 +139,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const oidcResumeOpeningRef = useRef("");
   const initializedFormKeyRef = useRef("");
+  const relationRequestVersionRef = useRef(new Map<string, number>());
   const dataProvider = useDataProvider();
 
   const relationOptionSignature = useMemo(() => relationSignature(schema.fields), [schema.fields]);
@@ -288,7 +292,9 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
     }
     let cancelled = false;
     const provider = dataProvider();
-    Promise.all(relationFields.map((field) => loadRelationOptions(field, provider)))
+    Promise.all(relationFields.map((field) => loadRelationOptions(field, provider, {
+      selectedValues: relationValuesFromRecord(editingRecord, field),
+    })))
       .then((results) => {
         if (cancelled) {
           return;
@@ -304,7 +310,36 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
     return () => {
       cancelled = true;
     };
-  }, [dataProvider, dictionary.relationOptionsLoadFailed, relationOptionSignature, schemaReady]);
+  }, [dataProvider, dictionary.relationOptionsLoadFailed, editingRecord?.id, relationOptionSignature, schemaReady]);
+
+  const requestRelationOptions = useCallback((field: AdminResourceField, search: string) => {
+    if (!hasRelationSource(field)) return;
+    const requestKey = field.key;
+    const requestVersion = (relationRequestVersionRef.current.get(requestKey) ?? 0) + 1;
+    relationRequestVersionRef.current.set(requestKey, requestVersion);
+    setRelationLoadingFields((current) => ({ ...current, [requestKey]: true }));
+    void loadRelationOptions(field, dataProvider(), {
+      search,
+      selectedValues: relationValuesFromInput(form.getFieldValue(field.key)),
+    })
+      .then((result) => {
+        if (relationRequestVersionRef.current.get(requestKey) !== requestVersion) return;
+        setSchema((currentSchema) => {
+          const currentField = currentSchema.fields.find((candidate) => candidate.key === field.key);
+          return mergeRelationOptions(currentSchema, [{ fieldKey: field.key, options: mergeFieldOptions(result.options, currentField?.options ?? []) }]);
+        });
+      })
+      .catch((nextError: unknown) => {
+        if (relationRequestVersionRef.current.get(requestKey) === requestVersion) {
+          setError(nextError instanceof Error ? nextError.message : dictionary.relationOptionsLoadFailed);
+        }
+      })
+      .finally(() => {
+        if (relationRequestVersionRef.current.get(requestKey) === requestVersion) {
+          setRelationLoadingFields((current) => ({ ...current, [requestKey]: false }));
+        }
+      });
+  }, [dataProvider, dictionary.relationOptionsLoadFailed, form]);
 
   const refreshResource = useCallback(async () => {
     if (!schemaReady) {
@@ -781,7 +816,6 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
 
       <div className="resource-grid single">
         <PlatformDataTable
-          title={dictionary.resourceList}
           columns={columns}
           dataSource={items}
           rowKey="id"
@@ -989,7 +1023,14 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
           key={editingRecord?.id ?? "create"}
           layoutPreset={formLayoutPreset}
           sections={formSections}
-          renderField={(field) => experience.renderField(field, <FieldInput field={field} language={language} />)}
+          renderField={(field) => experience.renderField(field, (
+            <FieldInput
+              field={field}
+              language={language}
+              relationLoading={relationLoadingFields[field.key] === true}
+              onRelationSearch={hasRelationSource(field) ? (search) => requestRelationOptions(field, search) : undefined}
+            />
+          ))}
           renderFieldExtra={(field) => experience.fieldExtra?.(field, fieldExtra(field, Boolean(editingRecord), language, dictionary)) ?? fieldExtra(field, Boolean(editingRecord), language, dictionary)}
           renderFieldLabel={(field) => localizedText(field.label, language)}
           rules={(field) => fieldRules(field, language, dictionary, Boolean(editingRecord))}
@@ -1633,7 +1674,11 @@ function CustomBatchActions({
   );
 }
 
-async function loadRelationOptions(field: AdminResourceField, provider: DataProvider): Promise<RelationOptionResult> {
+async function loadRelationOptions(
+  field: AdminResourceField,
+  provider: DataProvider,
+  input: { search?: string; selectedValues?: string[] } = {},
+): Promise<RelationOptionResult> {
   const relation = field.relation;
   if (!relation) {
     return { fieldKey: field.key, options: field.options ?? [] };
@@ -1643,15 +1688,25 @@ async function loadRelationOptions(field: AdminResourceField, provider: DataProv
     resource: relation.resource,
     pagination: {
       currentPage: 1,
-      pageSize: 100,
+      pageSize: RELATION_OPTION_PAGE_SIZE,
       mode: "server",
     },
     sorters: sortField ? [{ field: sortField, order: relation.sortOrder === "desc" ? "desc" : "asc" }] : undefined,
     meta: {
+      keywords: input.search?.trim() ? [input.search.trim()] : undefined,
       conditions: relation.filters ?? [],
     },
   });
-  const dynamicOptions = result.data.map((record) => relationOptionFromRecord(record, relation));
+  const selectedValues = [...new Set((input.selectedValues ?? []).filter(Boolean))];
+  const loadedValues = new Set(result.data.map((record) => recordValueByField(record, relation.valueField)));
+  const selectedResults = await Promise.all(
+    selectedValues.filter((value) => !loadedValues.has(value)).map((value) => provider.getList<AdminResourceRecord>({
+      resource: relation.resource,
+      pagination: { currentPage: 1, pageSize: 1, mode: "server" },
+      meta: { conditions: [...(relation.filters ?? []), { field: relation.valueField, operator: "=", value }] },
+    })),
+  );
+  const dynamicOptions = [...result.data, ...selectedResults.flatMap((selectedResult) => selectedResult.data)].map((record) => relationOptionFromRecord(record, relation));
   return {
     fieldKey: field.key,
     options: mergeFieldOptions(dynamicOptions, field.options ?? []),
@@ -1728,6 +1783,15 @@ function hasRelationSource(field: AdminResourceField) {
   return Boolean(field.relation?.resource && field.relation.valueField && field.relation.labelField);
 }
 
+function relationValuesFromRecord(record: AdminResourceRecord | null, field: AdminResourceField) {
+  return relationValuesFromInput(record ? getRecordFieldValue(record, field) : undefined);
+}
+
+function relationValuesFromInput(value: unknown) {
+  if (Array.isArray(value)) return value.filter((item) => (typeof item === "string" || typeof item === "number") && String(item).trim() !== "").map(String);
+  return typeof value === "string" ? parseListValue(value) : [];
+}
+
 function relationSignature(fields: AdminResourceField[]) {
   return fields
     .filter(hasRelationSource)
@@ -1755,9 +1819,15 @@ function mergeResourceFormSlots(
 type FieldInputProps = {
   field: AdminResourceField;
   language: Language;
+  relationLoading?: boolean;
+  onRelationSearch?: (search: string) => void;
 } & Record<string, unknown>;
 
 function FieldInput({ field, language, ...controlProps }: FieldInputProps) {
+  const relationLoading = controlProps.relationLoading === true;
+  const onRelationSearch = typeof controlProps.onRelationSearch === "function" ? controlProps.onRelationSearch as (search: string) => void : undefined;
+  delete controlProps.relationLoading;
+  delete controlProps.onRelationSearch;
   const maxLength = field.validation?.maxLength;
   const numericMin = field.validation?.min;
   const numericMax = field.validation?.max;
@@ -1777,15 +1847,19 @@ function FieldInput({ field, language, ...controlProps }: FieldInputProps) {
     if (isTreeRelationField(field)) {
       return (
         <PlatformTreeSelect
-          {...(controlProps as ComponentProps<typeof PlatformTreeSelect>)}
-          multiple
-          options={treeSelectOptions(field, language)}
+        {...(controlProps as ComponentProps<typeof PlatformTreeSelect>)}
+        multiple
+        filterTreeNode={onRelationSearch ? false : undefined}
+        loading={relationLoading}
+        onSearch={onRelationSearch}
+        options={treeSelectOptions(field, language)}
         />
       );
     }
     return (
       <Select
         {...(controlProps as ComponentProps<typeof Select>)}
+        filterOption={onRelationSearch ? false : undefined}
         mode="multiple"
         allowClear
         getPopupContainer={platformPopupContainer}
@@ -1795,6 +1869,8 @@ function FieldInput({ field, language, ...controlProps }: FieldInputProps) {
           value: option.value,
           label: localizedText(option.label, language),
         }))}
+        loading={relationLoading}
+        onSearch={onRelationSearch}
         showSearch
       />
     );
@@ -1803,15 +1879,19 @@ function FieldInput({ field, language, ...controlProps }: FieldInputProps) {
     if (isTreeRelationField(field)) {
       return (
         <PlatformTreeSelect
-          {...(controlProps as ComponentProps<typeof PlatformTreeSelect>)}
-          allowClear={!field.required}
-          options={treeSelectOptions(field, language)}
+        {...(controlProps as ComponentProps<typeof PlatformTreeSelect>)}
+        allowClear={!field.required}
+        filterTreeNode={onRelationSearch ? false : undefined}
+        loading={relationLoading}
+        onSearch={onRelationSearch}
+        options={treeSelectOptions(field, language)}
         />
       );
     }
     return (
       <Select
         {...(controlProps as ComponentProps<typeof Select>)}
+        filterOption={onRelationSearch ? false : undefined}
         allowClear={!field.required}
         getPopupContainer={platformPopupContainer}
         optionFilterProp="label"
@@ -1819,6 +1899,8 @@ function FieldInput({ field, language, ...controlProps }: FieldInputProps) {
           value: option.value,
           label: localizedText(option.label, language),
         }))}
+        loading={relationLoading}
+        onSearch={onRelationSearch}
         showSearch
       />
     );
@@ -2183,7 +2265,7 @@ function renderFieldValue(
     return <Tag>{value}</Tag>;
   }
   if (field.type === "multiselect") {
-    const values = splitList(getRecordFieldValue(record, field));
+    const values = parseListValue(getRecordFieldValue(record, field));
     if (values.length === 0) {
       return "-";
     }
@@ -2242,7 +2324,7 @@ function renderPlainFieldValue(
     return optionLabel(field, value, language);
   }
   if (field.type === "multiselect") {
-    return splitList(value)
+    return parseListValue(value)
       .map((item) => optionLabel(field, item, language))
       .join(", ");
   }
@@ -2290,7 +2372,7 @@ function formValueFromRecord(record: AdminResourceRecord, field: AdminResourceFi
   }
   const value = getRecordFieldValue(record, field);
   if (field.type === "multiselect") {
-    return splitList(value);
+    return parseListValue(value);
   }
   if (field.type === "switch") {
     return isTruthyValue(value);
@@ -2326,7 +2408,7 @@ function inputFromFormValues(values: ResourceFormValues, fields: AdminResourceFi
   const nestedValues: Record<string, string> = {};
   for (const field of fields) {
     const raw = values[field.key];
-    const value = Array.isArray(raw) ? raw.join(",") : raw == null ? "" : String(raw);
+    const value = serializeFieldValue(field, raw);
     if (field.source === "values") {
       if (value.trim() !== "") {
         nestedValues[field.key] = value;
@@ -2352,6 +2434,25 @@ function inputFromFormValues(values: ResourceFormValues, fields: AdminResourceFi
     input.values = nestedValues;
   }
   return input;
+}
+
+function serializeFieldValue(field: AdminResourceField, raw: unknown): string {
+  if (Array.isArray(raw)) {
+    return JSON.stringify(raw.map((item) => String(item)));
+  }
+  if (raw == null) {
+    return "";
+  }
+  if (field.type === "switch") {
+    return raw === true ? "true" : "false";
+  }
+  if (field.type === "number") {
+    return String(raw);
+  }
+  if (typeof raw === "object") {
+    return JSON.stringify(raw);
+  }
+  return String(raw);
 }
 
 function inputFromRecord(record: AdminResourceRecord, fields: AdminResourceField[], overrides: Partial<AdminResourceInput> = {}): AdminResourceInput {
@@ -2418,7 +2519,21 @@ function isEncryptedExactMatchField(field: AdminResourceField) {
   return field.storageMode === "encrypted" && Boolean(field.protection?.blindIndexNamespace);
 }
 
-function splitList(value: string) {
+function parseListValue(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((item) => typeof item === "string" || typeof item === "number")
+          .map((item) => String(item).trim())
+          .filter(Boolean);
+      }
+    } catch {
+      // Keep accepting the legacy delimiter-based storage format below.
+    }
+  }
   return value
     .split(/[,\n\t ]+/)
     .map((item) => item.trim())
