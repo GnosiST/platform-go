@@ -31,6 +31,10 @@ import { DemoDataConsole } from "./platform/demo-data/DemoDataConsole";
 import { DashboardHome } from "./platform/dashboard/DashboardHome";
 import { AdminLoginView } from "./platform/auth/AdminLoginView";
 import { PolicyReviewConsole } from "./platform/policy-review/PolicyReviewConsole";
+import {
+  projectRoleManagementNavigation,
+  resolveRoleManagementActiveRoute,
+} from "./platform/resources/roleManagementNavigation";
 import { coreResources, type AdminResourceDefinition } from "./platform/resources/registry";
 import { ResourceRoutePage } from "./platform/refine/ResourceRoutePage";
 import {
@@ -87,6 +91,14 @@ function PlatformApp() {
   const dictionary = dictionaries[language];
   const capabilities = useMemo(() => enrichCapabilities(capabilityItems), [capabilityItems]);
   const refineResources = useMemo(() => resources.map(resourceDefinitionToRefineResource), [resources]);
+  const navigationResources = useMemo(
+    () => projectRoleManagementNavigation(resources, {
+      zh: dictionaries.zh.roleManagement,
+      en: dictionaries.en.roleManagement,
+    }),
+    [resources],
+  );
+  const navigationActiveRoute = resolveRoleManagementActiveRoute(activeRoute, navigationResources);
   const hasStoredTheme = useMemo(() => readStorageValue(adminPreferenceStorageKeys.theme) !== null, []);
   const changeLanguage = useCallback((nextLanguage: Language) => {
     setLanguageState(nextLanguage);
@@ -323,14 +335,14 @@ function PlatformApp() {
   return (
     <PlatformRefineRuntime resources={refineResources} language={language} themeName={themeName} customPrimary={uiConfig.customPrimary}>
       <AdminShell
-        resources={resources}
+        resources={navigationResources}
         language={language}
         dictionary={dictionary}
         themeName={themeName}
         layoutMode={layoutMode}
         branding={branding}
         session={session}
-        activeRoute={activeRoute}
+        activeRoute={navigationActiveRoute}
         onLanguageChange={changeLanguage}
         uiConfig={uiConfig}
         onThemeChange={applyThemeName}

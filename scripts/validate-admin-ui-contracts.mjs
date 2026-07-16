@@ -19,6 +19,7 @@ const files = {
   capabilityMetadata: readSource("admin/src/platform/capabilities/metadata.ts"),
   client: readSource("admin/src/platform/api/client.ts"),
   dataProvider: readSource("admin/src/platform/refine/dataProvider.ts"),
+  dashboard: readSource("admin/src/platform/dashboard/DashboardHome.tsx"),
   organizationRBAC: readSource("admin/src/platform/api/organizationRBAC.ts"),
   sessionExpiry: readSource("admin/src/platform/api/sessionExpiry.ts"),
   i18n: readSource("admin/src/platform/i18n.ts"),
@@ -28,6 +29,7 @@ const files = {
   resourceExperience: readSource("admin/src/platform/resources/resourceExperience.ts"),
   organizationUserExperience: readSource("admin/src/platform/resources/organizationUserExperience.tsx"),
   roleGovernance: readSource("admin/src/platform/resources/RoleGovernanceConsole.tsx"),
+  roleManagementNavigation: readSource("admin/src/platform/resources/roleManagementNavigation.ts"),
   menuGovernance: readSourceOptional("admin/src/platform/resources/MenuGovernanceConsole.tsx"),
   menuGovernanceValidation: readSourceOptional("admin/src/platform/resources/menuGovernanceValidation.ts"),
   resourceRoute: readSource("admin/src/platform/refine/ResourceRoutePage.tsx"),
@@ -58,6 +60,53 @@ requireIncludes(files.app, "defaultAdminUIConfig", "App must fall back to the sh
 requireIncludes(files.app, "disableTelemetry: true", "The reusable Admin foundation must disable Refine third-party telemetry by default.");
 requireIncludes(files.app, "PolicyReviewConsole", "App must mount the policy-review custom governance console when the resource is enabled.");
 requireIncludes(files.app, 'resource.route !== "/policy-reviews"', "Generic resource routing must not also mount policy-reviews when the custom console is active.");
+requireIncludes(files.app, "projectRoleManagementNavigation", "App must use the approved role-management navigation projection.");
+requireIncludes(files.app, "resolveRoleManagementActiveRoute", "App must map legacy role URLs to the projected navigation entry.");
+requireRegex(
+  files.app,
+  /const navigationResources = useMemo\([\s\S]*?projectRoleManagementNavigation\(resources,/,
+  "App must derive visible navigation from the complete authorized resource list.",
+);
+requireIncludes(
+  files.app,
+  "const navigationActiveRoute = resolveRoleManagementActiveRoute(activeRoute, navigationResources);",
+  "App must resolve the active shell route against projected role-management navigation.",
+);
+requireRegex(
+  files.app,
+  /<AdminShell[^>]*resources=\{navigationResources\}[^>]*>/,
+  "AdminShell must receive only the projected role-management navigation resources.",
+);
+requireRegex(
+  files.app,
+  /<AdminShell[^>]*activeRoute=\{navigationActiveRoute\}[^>]*>/,
+  "AdminShell must highlight the projected role-management route.",
+);
+requireIncludes(
+  files.app,
+  "const refineResources = useMemo(() => resources.map(resourceDefinitionToRefineResource), [resources]);",
+  "Refine resource registration must retain the complete authorized resource list.",
+);
+requireRegex(
+  files.app,
+  /<PlatformRoutePages\s+activeRoute=\{activeRoute\}[\s\S]*?permissions=\{permissions\}\s+deniedPermissions=\{deniedPermissions\}\s+exportWatermark=\{uiConfig\.watermark && uiConfig\.watermarkScopes\.includes\("export"\)\}\s+resources=\{resources\}\s+session=\{session\}/,
+  "Platform route pages must retain the complete authorized resource list with its permissions.",
+);
+requireIncludes(files.app, "resources.some((resource) => resource.route === locationRoute)", "Route validation must retain the complete authorized resource list.");
+requireIncludes(files.app, "sensitiveRevealResourceRoute(resources,", "Sensitive-field resume routing must retain the complete authorized resource list.");
+requireIncludes(files.dashboard, "projectRoleManagementNavigation(resources,", "Dashboard role management must use the approved navigation projection.");
+requireIncludes(files.dashboard, "label: dictionary.roleManagement", "Dashboard role management must use the shared visible label.");
+requireIncludes(files.dashboard, "route: roleManagementResource.route", "Dashboard role management must target the projected authorized role resource.");
+requireNotIncludes(files.dashboard, '{ key: "roles", label: dictionary.roles, route: "/roles"', "Dashboard must not restore the duplicate roles-only quick action.");
+requireIncludes(files.roleManagementNavigation, 'const ROLES_ROUTE = "/roles";', "Role-management navigation must preserve the roles route.");
+requireIncludes(files.roleManagementNavigation, 'const ROLE_GROUPS_ROUTE = "/role-groups";', "Role-management navigation must preserve the role-groups route.");
+requireIncludes(files.resourceRoute, 'resource.route === "/roles" || resource.route === "/role-groups"', "Both legacy role routes must retain the shared route adapter.");
+requireCountExactly(files.i18n, "roleManagement:", 2, "Role management navigation must declare matching Chinese and English dictionary keys.");
+requireIncludes(files.i18n, 'roleManagement: "角色管理"', "Role management navigation must declare the exact Chinese label.");
+requireIncludes(files.i18n, 'roleManagement: "Role Management"', "Role management navigation must declare the exact English label.");
+requireIncludes(files.i18n, 'roleGovernanceTitle: "角色管理"', "Shared role governance page must display Role Management as its Chinese H1.");
+requireIncludes(files.i18n, 'roleGovernanceTitle: "Role Management"', "Shared role governance page must display Role Management as its English H1.");
+requireIncludes(files.roleGovernance, "title={dictionary.roleGovernanceTitle}", "Shared role governance page must keep its localized H1 binding.");
 requireIncludes(files.client, "export class AdminAPIError", "Admin API failures must expose typed status codes.");
 requireIncludes(files.client, "type PlatformErrorCode", "Admin API failures must consume the generated PlatformErrorCode type.");
 requireIncludes(files.client, "type PlatformErrorBody", "Admin API responses must consume the generated PlatformErrorBody type.");

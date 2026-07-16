@@ -12,7 +12,8 @@ import {
 import { Button, Table, Typography } from "antd";
 import { useMemo, useState, type CSSProperties } from "react";
 import type { AdminCurrentSession, CapabilityItem, LocalizedText } from "../api/client";
-import type { Dictionary, Language } from "../i18n";
+import { dictionaries, type Dictionary, type Language } from "../i18n";
+import { projectRoleManagementNavigation } from "../resources/roleManagementNavigation";
 import type { AdminResourceDefinition } from "../resources/registry";
 import { PlatformPaginationBar } from "../ui";
 import { dashboardAnnouncements, dashboardPlugins, dashboardUpdates } from "./dashboardData";
@@ -47,10 +48,16 @@ export function DashboardHome({
     const start = (pluginPage - 1) * dashboardPluginPageSize;
     return dashboardPlugins.slice(start, start + dashboardPluginPageSize);
   }, [pluginPage]);
+  const roleManagementResource = projectRoleManagementNavigation(resources, {
+    zh: dictionaries.zh.roleManagement,
+    en: dictionaries.en.roleManagement,
+  }).find((resource) => resource.route === "/roles" || resource.route === "/role-groups");
   const quickActions = [
     { key: "menus", label: dictionary.menus, route: "/menus", icon: AppstoreOutlined },
     { key: "api", label: dictionary.apiResources, route: "/api-resources", icon: ApiOutlined },
-    { key: "roles", label: dictionary.roles, route: "/roles", icon: TeamOutlined },
+    ...(roleManagementResource
+      ? [{ key: "role-management", label: dictionary.roleManagement, route: roleManagementResource.route, icon: TeamOutlined }]
+      : []),
     { key: "users", label: dictionary.users, route: "/users", icon: UserOutlined },
     { key: "capabilities", label: dictionary.capabilities, route: "/capabilities", icon: CodeOutlined },
     { key: "demo-data", label: dictionary.demoData, route: "/demo-data", icon: SafetyCertificateOutlined },

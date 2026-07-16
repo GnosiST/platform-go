@@ -22,7 +22,7 @@ export function projectRoleManagementNavigation<T extends RoleManagementNavigati
     ?? resources.find((resource) => resource.route === ROLE_GROUPS_ROUTE);
   if (!selected) return [...resources];
 
-  const projectedSelected = { ...selected, title: { ...title } } as T;
+  const projectedSelected = Object.assign({}, selected, { title: { ...title } });
   const projected: T[] = [];
   resources.forEach((resource, index) => {
     if (index === firstRoleIndex) projected.push(projectedSelected);

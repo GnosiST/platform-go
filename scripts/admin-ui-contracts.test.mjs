@@ -139,6 +139,71 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stdout, /Admin UI contract validation passed/);
   });
 
+  it("rejects passing the complete role resource list to visible shell navigation", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/App.tsx", "resources={navigationResources}", "resources={resources}");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /AdminShell must receive only the projected role-management navigation resources/);
+  });
+
+  it("rejects highlighting a legacy role route without mapping it to the projected entry", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/App.tsx", "activeRoute={navigationActiveRoute}", "activeRoute={activeRoute}");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /AdminShell must highlight the projected role-management route/);
+  });
+
+  it("rejects a dashboard role-management action that drops the role-groups-only fallback", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/platform/dashboard/DashboardHome.tsx", "route: roleManagementResource.route", 'route: "/roles"');
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Dashboard role management must target the projected authorized role resource/);
+  });
+
+  it("rejects using projected navigation resources for route page registration", () => {
+    const tempRoot = tempAdminRoot();
+    replaceRegexInTemp(
+      tempRoot,
+      "admin/src/App.tsx",
+      /(<PlatformRoutePages[\s\S]*?resources=)\{resources\}/,
+      "$1{navigationResources}",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Platform route pages must retain the complete authorized resource list/);
+  });
+
+  it("rejects changing the exact bilingual Role Management navigation label", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/platform/i18n.ts", 'roleManagement: "Role Management"', 'roleManagement: "Roles"');
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Role management navigation must declare the exact English label/);
+  });
+
+  it("rejects restoring the legacy Role Governance page H1", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/platform/i18n.ts", 'roleGovernanceTitle: "Role Management"', 'roleGovernanceTitle: "Role Governance"');
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Shared role governance page must display Role Management as its English H1/);
+  });
+
   it("rejects resource writes that drop structured field values", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
