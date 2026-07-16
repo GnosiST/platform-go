@@ -158,6 +158,7 @@ describe("validate-platform-engineering-capabilities", () => {
       "organization-user-admin-experience",
       "role-tree-and-authorization-entry",
       "menu-tree-and-button-permission-configuration",
+      "unified-error-code-governance",
     ]);
     for (const capability of capabilities.filter((item) => implementedCapabilityIDs.has(item.id))) {
       assert.equal(capability.status, "implemented");

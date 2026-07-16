@@ -82,7 +82,6 @@ const completionProgramTaskIDs = [
 
 const releaseBlockingNodes = [
   "organization-rbac-menu-e2e-qa",
-  "unified-error-code-governance",
   "open-source-portability",
   "public-docs-community",
   "public-docs-site",
@@ -368,7 +367,7 @@ describe("validate-platform-foundation-task-graph", () => {
       closedGates: ["target-menu-serving", "role-menu-migration-writes", "all-principal-dual-read", "cutover-rollback"],
       ownerTask: "organization-rbac-menu-e2e-qa",
     });
-    assert.equal(graph.tasks.find((item) => item.id === "unified-error-code-governance")?.status, "pending");
+    assert.equal(graph.tasks.find((item) => item.id === "unified-error-code-governance")?.status, "implemented");
     assert.ok(postReleaseOptionalNodes.every((id) => graph.tasks.find((item) => item.id === id)?.status === "deferred"));
     assert.deepEqual(graph.tasks.find((item) => item.id === "open-source-portability")?.dependsOn, [
       "admin-watermark-export-governance",
@@ -411,10 +410,10 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /release blocker organization-rbac-menu-e2e-qa must not be deferred/);
 
     const transitive = structuredClone(graph);
-    transitive.tasks.find((item) => item.id === "unified-error-code-governance").dependsOn.push("multi-datasource-contract-and-runtime");
+    transitive.tasks.find((item) => item.id === "organization-rbac-menu-e2e-qa").dependsOn.push("multi-datasource-contract-and-runtime");
     result = runValidator(["--graph", tempJSON("blocker-depends-on-optional.json", transitive)]);
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /release blocker unified-error-code-governance must not depend on post-release optional task multi-datasource-contract-and-runtime/);
+    assert.match(result.stderr, /release blocker organization-rbac-menu-e2e-qa must not depend on post-release optional task multi-datasource-contract-and-runtime/);
   });
 
   it("rejects stale unimplemented rationale on the implemented menu node", () => {
@@ -442,7 +441,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /menu-tree-and-button-permission-configuration implementationBoundary must preserve implemented scope, closed gates and owner task/);
   });
 
-  it("preserves the closed 37-node baseline, implements fifteen completion nodes, and tracks 15 controlled unfinished nodes", () => {
+  it("preserves the closed 37-node baseline, implements sixteen completion nodes, and tracks 14 controlled unfinished nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
@@ -476,7 +475,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
     assert.equal(graph.tasks.length, 67);
-    assert.equal(implemented.length, 52);
+    assert.equal(implemented.length, 53);
     assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "admin-watermark-export-governance")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-protection-runtime")?.status, "implemented");
@@ -495,7 +494,7 @@ describe("validate-platform-foundation-task-graph", () => {
     const menuTask = graph.tasks.find((item) => item.id === "menu-tree-and-button-permission-configuration");
     assert.equal(menuTask?.status, "implemented");
     assert.deepEqual(menuTask?.evidence?.screenshots, ["resources/evidence/menu-tree-and-button-permission-configuration-20260715.json"]);
-    assert.equal(graph.tasks.find((item) => item.id === "unified-error-code-governance")?.status, "pending");
+    assert.equal(graph.tasks.find((item) => item.id === "unified-error-code-governance")?.status, "implemented");
     const integrationPorts = graph.tasks.find((item) => item.id === "integration-ports-disabled-default");
     assert.equal(integrationPorts?.status, "implemented");
     assert.ok(integrationPorts?.evidence?.validators?.includes("scripts/validate-platform-integration-ports.mjs"));

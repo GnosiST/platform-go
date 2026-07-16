@@ -9,7 +9,6 @@ const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
   "organization-rbac-menu-e2e-qa",
-  "unified-error-code-governance",
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",
   "datasource-read-write-routing",
