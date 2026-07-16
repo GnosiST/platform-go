@@ -520,7 +520,8 @@ describe("validate-admin-ui-contracts", () => {
   it("requires Tree Transfer directory state to be derived without persisting branch keys", () => {
     const treeTransfer = adminSource("admin/src/platform/ui/PlatformTreeTransfer.tsx");
 
-    assert.match(treeTransfer, /const normalizedValue = useMemo\(\(\) => leafValues\(nodes, value\), \[nodes, value\]\);/);
+    assert.match(treeTransfer, /const index = useMemo\(\(\) => buildTreeTransferIndex\(nodes\), \[nodes\]\);/);
+    assert.match(treeTransfer, /const normalizedValue = useMemo\(\(\) => leafValues\(index, value\), \[index, value\]\);/);
     assert.match(treeTransfer, /halfCheckedKeys/);
     assert.match(treeTransfer, /checkStrictly/);
   });
@@ -712,9 +713,9 @@ describe("validate-admin-ui-contracts", () => {
     const treeTransfer = adminSource("admin/src/platform/ui/PlatformTreeTransfer.tsx");
 
     assert.match(treeTransfer, /const selectedEligibleLeafKeySet = useMemo/);
-    assert.match(treeTransfer, /derivedTreeSelection\(nodes, normalizedValue, leafValues\(nodes, visibleCheckedKeys\), filteredKeys, selectableLeafKeySet\)/);
-    assert.match(treeTransfer, /derivedTreeSelection\(nodes, normalizedValue, leafValues\(nodes, visibleCheckedKeys\), filteredKeys, selectedEligibleLeafKeySet\)/);
-    assert.match(treeTransfer, /leafDescendants\(nodes, node\.key\)\.filter\(\(key\) => eligibleLeafKeys\.has\(key\)\)/);
+    assert.match(treeTransfer, /deriveTreeTransferSelection\(index, normalizedValue, filteredKeys, selectableLeafKeySet\)/);
+    assert.match(treeTransfer, /deriveTreeTransferSelection\(index, normalizedValue, filteredKeys, selectedEligibleLeafKeySet\)/);
+    assert.match(treeTransfer, /index\.leafDescendantsByBranch\.get\(key\)/);
   });
 
   it("only renders legacy read-only messaging while role-menu assignment is read-only", () => {

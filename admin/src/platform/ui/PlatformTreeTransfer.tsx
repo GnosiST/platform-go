@@ -1,18 +1,9 @@
 import { DeleteOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
 import { Button, Empty, Grid, Input, Space, Tabs, Tooltip, Tree, Typography, type TreeDataNode, type TreeProps } from "antd";
 import { useEffect, useMemo, useState, type RefObject } from "react";
+import { buildTreeTransferIndex, deriveTreeTransferSelection, filteredNodeKeys, leafValues, type TreeTransferIndex, type TreeTransferNode } from "./treeTransferModel";
 
-export type PlatformTreeTransferNode = {
-  key: string;
-  parentKey?: string;
-  kind: "branch" | "leaf";
-  label: string;
-  code?: string;
-  status?: string;
-  disabledReason?: string;
-  availableDisabledReason?: string;
-  childCount?: number;
-};
+export type PlatformTreeTransferNode = TreeTransferNode;
 
 export type PlatformTreeTransferLabels = {
   available: string;
@@ -55,19 +46,20 @@ export function PlatformTreeTransfer({
   const screens = Grid.useBreakpoint();
   const mobile = !screens.md;
   const [search, setSearch] = useState("");
-  const normalizedValue = useMemo(() => leafValues(nodes, value), [nodes, value]);
+  const index = useMemo(() => buildTreeTransferIndex(nodes), [nodes]);
+  const normalizedValue = useMemo(() => leafValues(index, value), [index, value]);
   const valueSet = useMemo(() => new Set(normalizedValue), [normalizedValue]);
   const mutableLeafKeys = useMemo(() => nodes.filter((node) => node.kind === "leaf" && !node.disabledReason).map((node) => node.key), [nodes]);
   const mutableLeafKeySet = useMemo(() => new Set(mutableLeafKeys), [mutableLeafKeys]);
   const selectableLeafKeys = useMemo(() => nodes.filter((node) => node.kind === "leaf" && !node.disabledReason && !node.availableDisabledReason).map((node) => node.key), [nodes]);
   const selectableLeafKeySet = useMemo(() => new Set(selectableLeafKeys), [selectableLeafKeys]);
   const selectedEligibleLeafKeySet = useMemo(() => new Set(normalizedValue.filter((key) => mutableLeafKeySet.has(key))), [mutableLeafKeySet, normalizedValue]);
-  const filteredKeys = useMemo(() => filteredNodeKeys(nodes, search), [nodes, search]);
+  const filteredKeys = useMemo(() => filteredNodeKeys(index, search), [index, search]);
   const visibleCheckedKeys = useMemo(() => value.filter((key) => filteredKeys.has(key)), [filteredKeys, value]);
-  const availableTreeSelection = useMemo(() => derivedTreeSelection(nodes, normalizedValue, leafValues(nodes, visibleCheckedKeys), filteredKeys, selectableLeafKeySet), [filteredKeys, nodes, normalizedValue, selectableLeafKeySet, visibleCheckedKeys]);
-  const selectedTreeSelection = useMemo(() => derivedTreeSelection(nodes, normalizedValue, leafValues(nodes, visibleCheckedKeys), filteredKeys, selectedEligibleLeafKeySet), [filteredKeys, nodes, normalizedValue, selectedEligibleLeafKeySet, visibleCheckedKeys]);
-  const availableTree = useMemo(() => transferTreeData(nodes, filteredKeys, valueSet, labels, false), [filteredKeys, labels, nodes, valueSet]);
-  const selectedTree = useMemo(() => transferTreeData(nodes, filteredKeys, valueSet, labels, true), [filteredKeys, labels, nodes, valueSet]);
+  const availableTreeSelection = useMemo(() => deriveTreeTransferSelection(index, normalizedValue, filteredKeys, selectableLeafKeySet), [filteredKeys, index, normalizedValue, selectableLeafKeySet]);
+  const selectedTreeSelection = useMemo(() => deriveTreeTransferSelection(index, normalizedValue, filteredKeys, selectedEligibleLeafKeySet), [filteredKeys, index, normalizedValue, selectedEligibleLeafKeySet]);
+  const availableTree = useMemo(() => transferTreeData(index, filteredKeys, valueSet, labels, false), [filteredKeys, index, labels, valueSet]);
+  const selectedTree = useMemo(() => transferTreeData(index, filteredKeys, valueSet, labels, true), [filteredKeys, index, labels, valueSet]);
   useEffect(() => () => {
     returnFocusRef?.current?.focus({ preventScroll: true });
   }, [returnFocusRef]);
@@ -80,7 +72,7 @@ export function PlatformTreeTransfer({
     const mutableVisibleSet = new Set(visibleLeafKeys.filter((candidate) => allowedLeafKeys.has(candidate)));
     const targets = node.kind === "leaf"
       ? mutableVisibleSet.has(key) ? [key] : []
-      : leafDescendants(nodes, key).filter((candidate) => mutableVisibleSet.has(candidate));
+      : (index.leafDescendantsByBranch.get(key) ?? []).filter((candidate) => mutableVisibleSet.has(candidate));
     if (targets.length === 0) return;
     const preserved = value.filter((key) => !mutableVisibleSet.has(key));
     const nextVisible = new Set(normalizedValue.filter((candidate) => mutableVisibleSet.has(candidate)));
@@ -91,7 +83,7 @@ export function PlatformTreeTransfer({
       if (shouldAdd) nextVisible.add(target);
       else nextVisible.delete(target);
     }
-    onChange(leafValues(nodes, [...preserved, ...nextVisible]));
+    onChange(leafValues(index, [...preserved, ...nextVisible]));
   };
 
   const filteredSelectableLeafKeys = selectableLeafKeys.filter((key) => filteredKeys.has(key));
@@ -151,7 +143,7 @@ export function PlatformTreeTransfer({
           >
             {labels.selectAllFiltered}
           </Button>
-          <Button disabled={readOnly || normalizedValue.every((key) => !mutableLeafKeySet.has(key))} icon={<DeleteOutlined />} onClick={() => onChange(leafValues(nodes, preservedDisabled))}>
+          <Button disabled={readOnly || normalizedValue.every((key) => !mutableLeafKeySet.has(key))} icon={<DeleteOutlined />} onClick={() => onChange(leafValues(index, preservedDisabled))}>
             {labels.clear}
           </Button>
         </Space>
@@ -223,20 +215,17 @@ function TransferPane({
 }
 
 function transferTreeData(
-  nodes: PlatformTreeTransferNode[],
+  index: TreeTransferIndex,
   filteredKeys: Set<string>,
   selectedKeys: Set<string>,
   labels: PlatformTreeTransferLabels,
   selectedOnly: boolean,
 ): TreeDataNode[] {
-  const childrenByParent = new Map<string, PlatformTreeTransferNode[]>();
-  for (const node of nodes) {
-    if (!filteredKeys.has(node.key) || selectedOnly && node.kind === "leaf" && !selectedKeys.has(node.key)) continue;
-    const parent = node.parentKey ?? "";
-    childrenByParent.set(parent, [...(childrenByParent.get(parent) ?? []), node]);
-  }
   const build = (node: PlatformTreeTransferNode): TreeDataNode => {
-    const children = childrenByParent.get(node.key) ?? [];
+    const children = (index.childrenByParent.get(node.key) ?? [])
+      .map((key) => index.byKey.get(key))
+      .filter((child): child is PlatformTreeTransferNode => child !== undefined)
+      .filter((child) => filteredKeys.has(child.key) && !(selectedOnly && child.kind === "leaf" && !selectedKeys.has(child.key)));
     const unavailable = Boolean(node.disabledReason || !selectedOnly && node.availableDisabledReason);
     const unavailableReason = node.disabledReason ?? node.availableDisabledReason;
     return {
@@ -254,65 +243,12 @@ function transferTreeData(
       children: children.length > 0 ? children.map(build) : undefined,
     };
   };
-  return (childrenByParent.get("") ?? []).map(build).filter((node) => !selectedOnly || node.children?.length);
-}
-
-function filteredNodeKeys(nodes: PlatformTreeTransferNode[], search: string) {
-  const normalized = search.trim().toLocaleLowerCase();
-  if (!normalized) return new Set(nodes.map((node) => node.key));
-  const byKey = new Map(nodes.map((node) => [node.key, node]));
-  const keys = new Set<string>();
-  for (const node of nodes) {
-    if (`${node.label} ${node.code ?? ""}`.toLocaleLowerCase().includes(normalized)) {
-      keys.add(node.key);
-      let parentKey = node.parentKey;
-      while (parentKey) {
-        keys.add(parentKey);
-        parentKey = byKey.get(parentKey)?.parentKey;
-      }
-    }
-  }
-  return keys;
-}
-
-function leafValues(nodes: PlatformTreeTransferNode[], value: string[]) {
-  const leafKeys = new Set(nodes.filter((node) => node.kind === "leaf").map((node) => node.key));
-  return uniqueSorted(value.filter((key) => leafKeys.has(key)));
-}
-
-function derivedTreeSelection(nodes: PlatformTreeTransferNode[], value: string[], visibleValue: string[], filteredKeys: Set<string>, eligibleLeafKeys: Set<string>) {
-  const selected = new Set(value);
-  const checkedBranches: string[] = [];
-  const halfCheckedKeys: string[] = [];
-  for (const node of nodes) {
-    if (node.kind !== "branch") continue;
-    const descendants = leafDescendants(nodes, node.key).filter((key) => eligibleLeafKeys.has(key));
-    const selectedCount = descendants.filter((key) => selected.has(key)).length;
-    if (!filteredKeys.has(node.key)) continue;
-    if (descendants.length > 0 && selectedCount === descendants.length) checkedBranches.push(node.key);
-    else if (selectedCount > 0) halfCheckedKeys.push(node.key);
-  }
-  return {
-    checkedKeys: uniqueSorted([...visibleValue, ...checkedBranches]),
-    halfCheckedKeys: uniqueSorted(halfCheckedKeys),
-  };
-}
-
-function leafDescendants(nodes: PlatformTreeTransferNode[], parentKey: string) {
-  const childrenByParent = new Map<string, PlatformTreeTransferNode[]>();
-  for (const node of nodes) {
-    if (!node.parentKey) continue;
-    childrenByParent.set(node.parentKey, [...(childrenByParent.get(node.parentKey) ?? []), node]);
-  }
-  const leaves: string[] = [];
-  const pending = [...(childrenByParent.get(parentKey) ?? [])];
-  while (pending.length > 0) {
-    const node = pending.pop();
-    if (!node) continue;
-    if (node.kind === "leaf") leaves.push(node.key);
-    else pending.push(...(childrenByParent.get(node.key) ?? []));
-  }
-  return uniqueSorted(leaves);
+  return (index.childrenByParent.get("") ?? [])
+    .map((key) => index.byKey.get(key))
+    .filter((node): node is PlatformTreeTransferNode => node !== undefined)
+    .filter((node) => filteredKeys.has(node.key) && !(selectedOnly && node.kind === "leaf" && !selectedKeys.has(node.key)))
+    .map(build)
+    .filter((node) => !selectedOnly || Boolean(node.children?.length));
 }
 
 function uniqueSorted(values: string[]) {
