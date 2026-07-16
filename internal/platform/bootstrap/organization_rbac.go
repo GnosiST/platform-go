@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"platform-go/internal/platform/adminresource"
 	"platform-go/internal/platform/config"
@@ -18,10 +19,11 @@ import (
 )
 
 type OrganizationRBAC struct {
-	Repository     *organizationrbac.GORMRepository
-	ServiceObjects *serviceobject.Runtime
-	AdminMenus     httpapi.AdminMenuResolver
-	close          func() error
+	Repository         *organizationrbac.GORMRepository
+	ServiceObjects     *serviceobject.Runtime
+	AdminMenus         httpapi.AdminMenuResolver
+	MenuComparisonSink httpapi.AdminMenuComparisonSink
+	close              func() error
 }
 
 type OrganizationRBACMigration struct {
@@ -59,6 +61,10 @@ func OpenOrganizationRBAC(ctx context.Context, cfg config.Config) (*Organization
 		_ = closeDB()
 		return nil, err
 	}
+	if _, err := repository.ValidateMenuPromotion(ctx, cfg.AdminMenuServingMode, cfg.AdminRoleMenuWriteEnabled); err != nil {
+		_ = closeDB()
+		return nil, err
+	}
 	idempotency, err := serviceobject.OpenGORMIdempotencyStore(ctx, db, serviceobject.GORMIdempotencyStoreOptions{})
 	if err != nil {
 		_ = closeDB()
@@ -89,8 +95,20 @@ func OpenOrganizationRBAC(ctx context.Context, cfg config.Config) (*Organization
 	}
 	return &OrganizationRBAC{
 		Repository: repository, ServiceObjects: runtime,
-		AdminMenus: organizationRBACAdminMenuResolver{repository: repository}, close: closeDB,
+		AdminMenus:         organizationRBACAdminMenuResolver{repository: repository},
+		MenuComparisonSink: organizationRBACMenuComparisonSink{repository: repository}, close: closeDB,
 	}, nil
+}
+
+type organizationRBACMenuComparisonSink struct {
+	repository *organizationrbac.GORMRepository
+}
+
+func (s organizationRBACMenuComparisonSink) Record(ctx context.Context, principal rbac.Principal, comparison httpapi.AdminMenuComparison) {
+	if s.repository == nil {
+		return
+	}
+	_ = s.repository.RecordMenuDualReadComparison(ctx, strings.TrimSpace(principal.User.Username), comparison)
 }
 
 type organizationRBACAdminMenuResolver struct {

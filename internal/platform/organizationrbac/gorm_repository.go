@@ -796,6 +796,7 @@ func repositoryModels() []any {
 		&gormOrgUnitRoleGroup{}, &gormOrgUnitRoleGroupRevision{}, &gormAdminResourceState{},
 		&gormOrganizationRBACPreview{}, &gormOrganizationRBACAuditEvent{},
 		&gormOrganizationRBACMigrationRun{}, &gormOrganizationRBACMigrationConflict{},
+		&gormOrganizationRBACPromotion{}, &gormOrganizationRBACPromotionEvent{}, &gormOrganizationRBACPromotionObservation{},
 	}
 }
 

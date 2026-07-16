@@ -358,7 +358,9 @@ func (c Config) ValidateRuntime() error {
 	switch menuServingMode {
 	case AdminMenuServingModeLegacy:
 	case AdminMenuServingModeDualRead, AdminMenuServingModeTarget:
-		errs = append(errs, errors.New("PLATFORM_ADMIN_MENU_SERVING_MODE menu serving gate is closed"))
+		if organizationRBACMode != OrganizationRBACModeTarget {
+			errs = append(errs, errors.New("target or dual-read menu serving requires organization RBAC target mode"))
+		}
 	default:
 		errs = append(errs, errors.New("PLATFORM_ADMIN_MENU_SERVING_MODE must be legacy, dual-read, or target"))
 	}
@@ -366,7 +368,9 @@ func (c Config) ValidateRuntime() error {
 		errs = append(errs, errors.New("PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED is invalid"))
 	}
 	if c.AdminRoleMenuWriteEnabled {
-		errs = append(errs, errors.New("PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED role menu write gate is closed"))
+		if menuServingMode != AdminMenuServingModeTarget {
+			errs = append(errs, errors.New("role menu writes require target menu serving"))
+		}
 	}
 	errs = append(errs, validateDriverPair("session", c.SessionDriver, c.SessionDSN)...)
 	errs = append(errs, validateDriverPair("lifecycle history", c.LifecycleHistoryDriver, c.LifecycleHistoryDSN)...)

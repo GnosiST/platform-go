@@ -529,24 +529,37 @@ func TestLoadParsesMenuGovernanceConfiguration(t *testing.T) {
 	}
 }
 
-func TestValidateRuntimeKeepsMenuCutoverGatesClosed(t *testing.T) {
+func TestValidateRuntimeAppliesMenuCutoverSyntaxGates(t *testing.T) {
 	base := validDataProtectionConfig(RuntimeEnvironmentDevelopment, "env-aes256")
 	base.AdminMenuServingMode = AdminMenuServingModeLegacy
+	base.OrganizationRBACMode = OrganizationRBACModeTarget
+	base.AdminResourceDriver = "sqlite"
+	base.AdminResourceDSN = "file:organization-rbac"
 	tests := []struct {
 		name      string
 		configure func(*Config)
 		contains  string
 	}{
-		{name: "dual read", configure: func(cfg *Config) { cfg.AdminMenuServingMode = AdminMenuServingModeDualRead }, contains: "menu serving gate is closed"},
-		{name: "target", configure: func(cfg *Config) { cfg.AdminMenuServingMode = AdminMenuServingModeTarget }, contains: "menu serving gate is closed"},
+		{name: "dual read", configure: func(cfg *Config) { cfg.AdminMenuServingMode = AdminMenuServingModeDualRead }, contains: ""},
+		{name: "target", configure: func(cfg *Config) { cfg.AdminMenuServingMode = AdminMenuServingModeTarget }, contains: ""},
 		{name: "unknown mode", configure: func(cfg *Config) { cfg.AdminMenuServingMode = "automatic" }, contains: "must be legacy, dual-read, or target"},
-		{name: "role menu writes", configure: func(cfg *Config) { cfg.AdminRoleMenuWriteEnabled = true }, contains: "role menu write gate is closed"},
+		{name: "role menu writes", configure: func(cfg *Config) {
+			cfg.AdminRoleMenuWriteEnabled = true
+			cfg.AdminMenuServingMode = AdminMenuServingModeLegacy
+		}, contains: "role menu writes require target menu serving"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			cfg := base
 			test.configure(&cfg)
-			if err := cfg.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), test.contains) {
+			err := cfg.ValidateRuntime()
+			if test.contains == "" {
+				if err != nil {
+					t.Fatalf("ValidateRuntime() error = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), test.contains) {
 				t.Fatalf("ValidateRuntime() error = %v, want %q", err, test.contains)
 			}
 		})

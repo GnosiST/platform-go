@@ -75,7 +75,7 @@ type ServerOptions struct {
 	RateLimitKeyBuilder      *ratelimit.KeyBuilder
 	AdminMenuServingMode     AdminMenuServingMode
 	AdminMenuResolver        AdminMenuResolver
-	AdminMenuComparisonSink  AdminMenuComparisonSink
+	AdminMenuComparisonSink  any
 	tokenService             authTokenService
 	appPhoneCodeGenerator    func() (string, error)
 }
@@ -153,7 +153,7 @@ type Server struct {
 	rateLimitKeyBuilder      *ratelimit.KeyBuilder
 	adminMenuServingMode     AdminMenuServingMode
 	adminMenuResolver        AdminMenuResolver
-	adminMenuComparisonSink  AdminMenuComparisonSink
+	adminMenuComparisonSink  any
 }
 
 const (

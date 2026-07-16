@@ -20,6 +20,7 @@ func TestPrepareAndOpenOrganizationRBAC(t *testing.T) {
 	cfg := config.Config{
 		AdminResourceDriver: "sqlite", AdminResourceDSN: dsn,
 		OrganizationRBACMode: config.OrganizationRBACModeTarget,
+		AdminMenuServingMode: config.AdminMenuServingModeTarget,
 	}
 	db, err := storage.OpenGORM(storage.Config{Driver: "sqlite", DSN: dsn})
 	if err != nil {

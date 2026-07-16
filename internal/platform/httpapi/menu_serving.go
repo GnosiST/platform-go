@@ -43,6 +43,10 @@ type AdminMenuComparison struct {
 }
 
 type AdminMenuComparisonSink interface {
+	Record(context.Context, rbac.Principal, AdminMenuComparison)
+}
+
+type legacyAdminMenuComparisonSink interface {
 	Record(context.Context, AdminMenuComparison)
 }
 
@@ -94,7 +98,12 @@ func (s *Server) resolveAdminMenus(ctx context.Context, principal rbac.Principal
 		return nil, err
 	}
 	if value.Comparison != nil && s.adminMenuComparisonSink != nil {
-		s.adminMenuComparisonSink.Record(ctx, *value.Comparison)
+		switch sink := s.adminMenuComparisonSink.(type) {
+		case AdminMenuComparisonSink:
+			sink.Record(ctx, principal, *value.Comparison)
+		case legacyAdminMenuComparisonSink:
+			sink.Record(ctx, *value.Comparison)
+		}
 	}
 	return value.Items, nil
 }

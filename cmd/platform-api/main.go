@@ -17,6 +17,7 @@ import (
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/config"
 	"platform-go/internal/platform/httpapi"
+	"platform-go/internal/platform/rbac"
 	"platform-go/internal/platform/serviceobject"
 )
 
@@ -129,9 +130,11 @@ func main() {
 	}
 	var serviceObjects *serviceobject.Runtime
 	var adminMenuResolver httpapi.AdminMenuResolver
+	var adminMenuComparisonSink any = adminMenuComparisonLogSink{}
 	if organizationRBAC != nil {
 		serviceObjects = organizationRBAC.ServiceObjects
 		adminMenuResolver = organizationRBAC.AdminMenus
+		adminMenuComparisonSink = organizationRBAC.MenuComparisonSink
 	}
 	server := httpapi.New(httpapi.ServerOptions{
 		Capabilities:             ordered,
@@ -161,7 +164,7 @@ func main() {
 		RateLimitKeyBuilder:      rateLimitRuntime.KeyBuilder,
 		AdminMenuServingMode:     httpapi.AdminMenuServingMode(cfg.AdminMenuServingMode),
 		AdminMenuResolver:        adminMenuResolver,
-		AdminMenuComparisonSink:  adminMenuComparisonLogSink{},
+		AdminMenuComparisonSink:  adminMenuComparisonSink,
 	})
 	dataLifecycle, scheduler, err := startRetentionRuntime(ctx, cfg, apps.DefaultManifests(), bootstrap.OpenDataLifecycle)
 	if err != nil {
@@ -186,7 +189,7 @@ func main() {
 
 type adminMenuComparisonLogSink struct{}
 
-func (adminMenuComparisonLogSink) Record(_ context.Context, comparison httpapi.AdminMenuComparison) {
+func (adminMenuComparisonLogSink) Record(_ context.Context, _ rbac.Principal, comparison httpapi.AdminMenuComparison) {
 	log.Printf(
 		"admin menu dual-read equal=%t addedCount=%d removedCount=%d globalRevision=%d",
 		comparison.Equal, comparison.AddedCount, comparison.RemovedCount, comparison.GlobalRevision,

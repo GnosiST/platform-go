@@ -47,7 +47,10 @@ type MigrationEvidence struct {
 	BackupURI     string
 	BackupSHA256  string
 	CheckpointRef string
-	AppliedAt     time.Time
+	// LegacySnapshotHash is exported with the reviewed rollback packet so
+	// verification survives restoring a checkpoint that predates the run row.
+	LegacySnapshotHash string
+	AppliedAt          time.Time
 }
 
 type MigrationConflict struct {
@@ -66,17 +69,18 @@ type MigrationReport struct {
 }
 
 type gormOrganizationRBACMigrationRun struct {
-	RunID         string    `gorm:"column:run_id;size:191;primaryKey"`
-	ManifestHash  string    `gorm:"column:manifest_hash;size:64;index;not null"`
-	Status        string    `gorm:"column:status;size:32;index;not null"`
-	ActorID       string    `gorm:"column:actor_id;size:191;not null"`
-	Reason        string    `gorm:"column:reason;size:512;not null"`
-	ApprovalRef   string    `gorm:"column:approval_ref;size:512;not null"`
-	BackupURI     string    `gorm:"column:backup_uri;size:1024;not null"`
-	BackupSHA256  string    `gorm:"column:backup_sha256;size:64;not null"`
-	CheckpointRef string    `gorm:"column:checkpoint_ref;size:1024;not null"`
-	CreatedAt     time.Time `gorm:"column:created_at;not null"`
-	UpdatedAt     time.Time `gorm:"column:updated_at;not null"`
+	RunID              string    `gorm:"column:run_id;size:191;primaryKey"`
+	ManifestHash       string    `gorm:"column:manifest_hash;size:64;index;not null"`
+	Status             string    `gorm:"column:status;size:32;index;not null"`
+	ActorID            string    `gorm:"column:actor_id;size:191;not null"`
+	Reason             string    `gorm:"column:reason;size:512;not null"`
+	ApprovalRef        string    `gorm:"column:approval_ref;size:512;not null"`
+	BackupURI          string    `gorm:"column:backup_uri;size:1024;not null"`
+	BackupSHA256       string    `gorm:"column:backup_sha256;size:64;not null"`
+	CheckpointRef      string    `gorm:"column:checkpoint_ref;size:1024;not null"`
+	LegacySnapshotHash string    `gorm:"column:legacy_snapshot_hash;size:64;not null"`
+	CreatedAt          time.Time `gorm:"column:created_at;not null"`
+	UpdatedAt          time.Time `gorm:"column:updated_at;not null"`
 }
 
 type gormOrganizationRBACMigrationConflict struct {
@@ -154,10 +158,36 @@ func (r *GORMRepository) RunMigration(ctx context.Context, mode MigrationMode, m
 		if !validMigrationEvidence(evidence) {
 			return MigrationReport{}, &ValidationError{Field: "migrationEvidence", Reason: "approval, backup and checkpoint evidence are required"}
 		}
-		if err := r.recordRollbackRequired(ctx, manifestHash, evidence); err != nil {
+		var existing gormOrganizationRBACMigrationRun
+		existingErr := r.db.WithContext(ctx).Where("run_id = ?", evidence.RunID).Take(&existing).Error
+		if errors.Is(existingErr, gorm.ErrRecordNotFound) {
+			if canonicalDigest(evidence.LegacySnapshotHash) {
+				if err := r.verifyRollback(ctx, manifestHash, manifest, evidence); err != nil {
+					return MigrationReport{}, err
+				}
+				report.Status = "rolled-back-verified"
+				return report, nil
+			}
+			if err := r.recordRollbackRequired(ctx, manifestHash, evidence); err != nil {
+				return MigrationReport{}, err
+			}
+			report.Status = "external-checkpoint-restore-required"
+			return report, nil
+		}
+		if existingErr != nil {
+			return MigrationReport{}, repositoryError(existingErr)
+		}
+		if existing.Status == "external-checkpoint-restore-required" && existing.LegacySnapshotHash == "" {
+			if !migrationRunMatches(existing, manifestHash, evidence) {
+				return MigrationReport{}, &ValidationError{Field: "migrationEvidence.runId", Reason: "already belongs to a different immutable migration execution"}
+			}
+			report.Status = "external-checkpoint-restore-required"
+			return report, nil
+		}
+		if err := r.verifyRollback(ctx, manifestHash, manifest, evidence); err != nil {
 			return MigrationReport{}, err
 		}
-		report.Status = "external-checkpoint-restore-required"
+		report.Status = "rolled-back-verified"
 		return report, nil
 	default:
 		return MigrationReport{}, &ValidationError{Field: "mode", Reason: "must be inventory, verify, apply or rollback"}
@@ -436,6 +466,10 @@ func (r *GORMRepository) applyMigration(ctx context.Context, manifest MigrationM
 	var cutover CutoverReport
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		txRepository := &GORMRepository{db: tx}
+		legacyHash, err := txRepository.LegacySnapshotHash(ctx, manifest)
+		if err != nil {
+			return err
+		}
 		candidate, err := txRepository.CompareAllActivePrincipals(ctx, manifest, PrincipalComparisonCandidate)
 		if err != nil {
 			return err
@@ -446,7 +480,7 @@ func (r *GORMRepository) applyMigration(ctx context.Context, manifest MigrationM
 		run := gormOrganizationRBACMigrationRun{
 			RunID: evidence.RunID, ManifestHash: manifestHash, Status: "applying", ActorID: evidence.ActorID,
 			Reason: evidence.Reason, ApprovalRef: evidence.ApprovalRef, BackupURI: evidence.BackupURI,
-			BackupSHA256: evidence.BackupSHA256, CheckpointRef: evidence.CheckpointRef,
+			BackupSHA256: evidence.BackupSHA256, CheckpointRef: evidence.CheckpointRef, LegacySnapshotHash: legacyHash,
 			CreatedAt: evidence.AppliedAt.UTC(), UpdatedAt: evidence.AppliedAt.UTC(),
 		}
 		result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&run)
@@ -624,7 +658,18 @@ func (r *GORMRepository) applyMigration(ctx context.Context, manifest MigrationM
 		if _, err := bumpGlobalRevision(tx); err != nil {
 			return err
 		}
-		result = tx.Model(&gormOrganizationRBACMigrationRun{}).Where("run_id = ? AND status = ?", evidence.RunID, "applying").Updates(map[string]any{"status": "applied", "updated_at": evidence.AppliedAt.UTC()})
+		currentRevision, err := loadGlobalRevision(tx)
+		if err != nil {
+			return err
+		}
+		promotion := gormOrganizationRBACPromotion{RunID: evidence.RunID, ManifestHash: manifestHash, Phase: PromotionTargetRead, FrozenRevision: currentRevision, ActivePrincipals: persisted.ActivePrincipals, Equivalent: persisted.Equivalent, ComparisonHash: persisted.ComparisonHash, LegacySnapshotHash: legacyHash, CheckpointRef: evidence.CheckpointRef, ObservedAt: evidence.AppliedAt.UTC(), UpdatedAt: evidence.AppliedAt.UTC()}
+		if err := tx.Clauses(clause.OnConflict{UpdateAll: true}).Create(&promotion).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&gormOrganizationRBACPromotionEvent{RunID: evidence.RunID, Sequence: 1, ToPhase: PromotionTargetRead, FrozenRevision: currentRevision, ObservedAt: evidence.AppliedAt.UTC()}).Error; err != nil {
+			return err
+		}
+		result = tx.Model(&gormOrganizationRBACMigrationRun{}).Where("run_id = ? AND status = ?", evidence.RunID, "applying").Updates(map[string]any{"status": "applied", "updated_at": evidence.AppliedAt.UTC(), "legacy_snapshot_hash": legacyHash})
 		if result.Error != nil {
 			return result.Error
 		}
@@ -663,6 +708,87 @@ func (r *GORMRepository) recordRollbackRequired(ctx context.Context, manifestHas
 		return nil
 	})
 	return repositoryError(err)
+}
+
+func (r *GORMRepository) verifyRollback(ctx context.Context, manifestHash string, manifest MigrationManifest, evidence MigrationEvidence) error {
+	var existing gormOrganizationRBACMigrationRun
+	err := r.db.WithContext(ctx).Where("run_id = ?", evidence.RunID).Take(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if !canonicalDigest(evidence.LegacySnapshotHash) {
+			return &ValidationError{Field: "rollback.legacySnapshotHash", Reason: "external rollback evidence is required after checkpoint restore"}
+		}
+		currentHash, hashErr := r.LegacySnapshotHash(ctx, manifest)
+		if hashErr != nil {
+			return hashErr
+		}
+		if currentHash != evidence.LegacySnapshotHash {
+			return &ValidationError{Field: "rollback.legacySnapshotHash", Reason: "restored checkpoint does not match the exported legacy snapshot"}
+		}
+		return repositoryError(r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			run := gormOrganizationRBACMigrationRun{
+				RunID: evidence.RunID, ManifestHash: manifestHash, Status: "rolled-back-verified", ActorID: evidence.ActorID,
+				Reason: evidence.Reason, ApprovalRef: evidence.ApprovalRef, BackupURI: evidence.BackupURI,
+				BackupSHA256: evidence.BackupSHA256, CheckpointRef: evidence.CheckpointRef,
+				LegacySnapshotHash: evidence.LegacySnapshotHash, CreatedAt: evidence.AppliedAt.UTC(), UpdatedAt: evidence.AppliedAt.UTC(),
+			}
+			if err := tx.Create(&run).Error; err != nil {
+				return err
+			}
+			promotion := gormOrganizationRBACPromotion{
+				RunID: evidence.RunID, ManifestHash: manifestHash, Phase: PromotionRolledBack,
+				ComparisonHash: evidence.LegacySnapshotHash, LegacySnapshotHash: evidence.LegacySnapshotHash,
+				CheckpointRef: evidence.CheckpointRef, ObservedAt: evidence.AppliedAt.UTC(), UpdatedAt: evidence.AppliedAt.UTC(),
+			}
+			if err := tx.Create(&promotion).Error; err != nil {
+				return err
+			}
+			return tx.Create(&gormOrganizationRBACPromotionEvent{RunID: evidence.RunID, Sequence: 1, ToPhase: PromotionRolledBack, ObservedAt: evidence.AppliedAt.UTC()}).Error
+		}))
+	}
+	if err != nil {
+		return repositoryError(err)
+	}
+	if existing.ManifestHash != manifestHash || !migrationRunMatches(existing, manifestHash, evidence) {
+		return &ValidationError{Field: "migrationEvidence.runId", Reason: "rollback evidence does not match applied migration"}
+	}
+	if existing.Status == "rolled-back-verified" {
+		return nil
+	}
+	if existing.Status != "applied" && existing.Status != "external-checkpoint-restore-required" {
+		return &ValidationError{Field: "migrationEvidence.runId", Reason: "migration is not eligible for rollback"}
+	}
+	currentHash, err := r.LegacySnapshotHash(ctx, manifest)
+	if err != nil {
+		return err
+	}
+	if existing.LegacySnapshotHash == "" || currentHash != existing.LegacySnapshotHash {
+		return &ValidationError{Field: "rollback.legacySnapshotHash", Reason: "restored checkpoint does not match the applied legacy snapshot"}
+	}
+	if err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&gormOrganizationRBACMigrationRun{}).Where("run_id = ?", evidence.RunID).Updates(map[string]any{"status": "rolled-back-verified", "updated_at": evidence.AppliedAt.UTC()}).Error; err != nil {
+			return err
+		}
+		var promotion gormOrganizationRBACPromotion
+		if err := tx.Where("run_id = ?", evidence.RunID).Take(&promotion).Error; err == nil {
+			promotion.Phase = PromotionRolledBack
+			promotion.ObservedAt = evidence.AppliedAt.UTC()
+			promotion.UpdatedAt = evidence.AppliedAt.UTC()
+			var count int64
+			if err := tx.Model(&gormOrganizationRBACPromotionEvent{}).Where("run_id = ?", evidence.RunID).Count(&count).Error; err != nil {
+				return err
+			}
+			if err := tx.Save(&promotion).Error; err != nil {
+				return err
+			}
+			if err := tx.Create(&gormOrganizationRBACPromotionEvent{RunID: evidence.RunID, Sequence: int(count) + 1, FromPhase: PromotionTargetRead, ToPhase: PromotionRolledBack, FrozenRevision: promotion.FrozenRevision, ObservedAt: evidence.AppliedAt.UTC()}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return repositoryError(err)
+	}
+	return nil
 }
 
 func migrationRunMatches(existing gormOrganizationRBACMigrationRun, manifestHash string, evidence MigrationEvidence) bool {
