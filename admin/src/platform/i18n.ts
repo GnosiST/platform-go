@@ -4,6 +4,7 @@ export const dictionaries = {
   zh: {
     appSubtitle: "底座控制台",
     topSearch: "搜索能力、接口、文档...",
+    globalSearchNoResults: "未找到匹配的页面",
     commandHint: "K",
     language: "语言",
     theme: "主题",
@@ -677,6 +678,7 @@ export const dictionaries = {
   en: {
     appSubtitle: "Foundation Console",
     topSearch: "Search capabilities, APIs, docs...",
+    globalSearchNoResults: "No matching pages found",
     commandHint: "K",
     language: "Language",
     theme: "Theme",

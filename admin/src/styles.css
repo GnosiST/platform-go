@@ -5098,6 +5098,12 @@ select {
 }
 
 @media (max-width: 767px) {
+  .platform-topbar .user-menu-trigger {
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+
   .login-page {
     grid-template-columns: minmax(0, 1fr);
     overflow: auto;

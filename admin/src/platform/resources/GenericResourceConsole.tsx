@@ -57,6 +57,7 @@ import {
 import type { AdminResourceDefinition } from "./registry";
 import { SensitiveFieldRevealModal } from "./SensitiveFieldRevealModal";
 import { useOrganizationUserExperience } from "./organizationUserExperience";
+import { createRelationOptionSearchScheduler } from "./relationOptionSearch";
 import { ResourceExperienceCancelledError, type ResourceExperienceDetailTab, type ResourceExperienceKey, type ResourceFormValues } from "./resourceExperience";
 
 type GenericResourceConsoleProps = {
@@ -79,6 +80,7 @@ type RelationOptionResult = {
 };
 
 const RELATION_OPTION_PAGE_SIZE = 30;
+const RELATION_OPTION_SEARCH_DELAY_MS = 250;
 
 type FilePreviewState = {
   recordId: string;
@@ -139,7 +141,11 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const oidcResumeOpeningRef = useRef("");
   const initializedFormKeyRef = useRef("");
-  const relationRequestVersionRef = useRef(new Map<string, number>());
+  const relationSearchScheduler = useMemo(() => createRelationOptionSearchScheduler({
+    delayMs: RELATION_OPTION_SEARCH_DELAY_MS,
+    setTimer: (task, delayMs) => window.setTimeout(task, delayMs),
+    clearTimer: (timer) => window.clearTimeout(timer),
+  }), []);
   const dataProvider = useDataProvider();
 
   const relationOptionSignature = useMemo(() => relationSignature(schema.fields), [schema.fields]);
@@ -252,6 +258,14 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
   const errorMessage = error || (listError instanceof Error ? listError.message : "");
 
   useEffect(() => {
+    relationSearchScheduler.invalidateAll();
+    setRelationLoadingFields({});
+    return () => {
+      relationSearchScheduler.invalidateAll();
+    };
+  }, [relationSearchScheduler, resourceKey]);
+
+  useEffect(() => {
     let cancelled = false;
     setSchema(fallbackSchema);
     setSchemaReady(false);
@@ -315,31 +329,31 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
   const requestRelationOptions = useCallback((field: AdminResourceField, search: string) => {
     if (!hasRelationSource(field)) return;
     const requestKey = field.key;
-    const requestVersion = (relationRequestVersionRef.current.get(requestKey) ?? 0) + 1;
-    relationRequestVersionRef.current.set(requestKey, requestVersion);
-    setRelationLoadingFields((current) => ({ ...current, [requestKey]: true }));
-    void loadRelationOptions(field, dataProvider(), {
-      search,
-      selectedValues: relationValuesFromInput(form.getFieldValue(field.key)),
-    })
-      .then((result) => {
-        if (relationRequestVersionRef.current.get(requestKey) !== requestVersion) return;
-        setSchema((currentSchema) => {
-          const currentField = currentSchema.fields.find((candidate) => candidate.key === field.key);
-          return mergeRelationOptions(currentSchema, [{ fieldKey: field.key, options: mergeFieldOptions(result.options, currentField?.options ?? []) }]);
+    relationSearchScheduler.schedule(requestKey, (requestGeneration) => {
+      setRelationLoadingFields((current) => ({ ...current, [requestKey]: true }));
+      void loadRelationOptions(field, dataProvider(), {
+        search,
+        selectedValues: relationValuesFromInput(form.getFieldValue(field.key)),
+      })
+        .then((result) => {
+          if (!relationSearchScheduler.isCurrent(requestKey, requestGeneration)) return;
+          setSchema((currentSchema) => {
+            const currentField = currentSchema.fields.find((candidate) => candidate.key === field.key);
+            return mergeRelationOptions(currentSchema, [{ fieldKey: field.key, options: mergeFieldOptions(result.options, currentField?.options ?? []) }]);
+          });
+        })
+        .catch((nextError: unknown) => {
+          if (relationSearchScheduler.isCurrent(requestKey, requestGeneration)) {
+            setError(nextError instanceof Error ? nextError.message : dictionary.relationOptionsLoadFailed);
+          }
+        })
+        .finally(() => {
+          if (relationSearchScheduler.isCurrent(requestKey, requestGeneration)) {
+            setRelationLoadingFields((current) => ({ ...current, [requestKey]: false }));
+          }
         });
-      })
-      .catch((nextError: unknown) => {
-        if (relationRequestVersionRef.current.get(requestKey) === requestVersion) {
-          setError(nextError instanceof Error ? nextError.message : dictionary.relationOptionsLoadFailed);
-        }
-      })
-      .finally(() => {
-        if (relationRequestVersionRef.current.get(requestKey) === requestVersion) {
-          setRelationLoadingFields((current) => ({ ...current, [requestKey]: false }));
-        }
-      });
-  }, [dataProvider, dictionary.relationOptionsLoadFailed, form]);
+    });
+  }, [dataProvider, dictionary.relationOptionsLoadFailed, form, relationSearchScheduler]);
 
   const refreshResource = useCallback(async () => {
     if (!schemaReady) {
@@ -369,13 +383,23 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
   );
   const canReadAuditLogs = useMemo(() => hasAuditResource && permissionAllows(permissions, "admin:audit-log:read", deniedPermissions), [deniedPermissions, hasAuditResource, permissions]);
   const openCreate = () => {
+    relationSearchScheduler.invalidateAll();
+    setRelationLoadingFields({});
     setEditingRecord(null);
     setModalOpen(true);
   };
 
   const openEdit = (record: AdminResourceRecord) => {
+    relationSearchScheduler.invalidateAll();
+    setRelationLoadingFields({});
     setEditingRecord(record);
     setModalOpen(true);
+  };
+
+  const closeFormModal = () => {
+    relationSearchScheduler.invalidateAll();
+    setRelationLoadingFields({});
+    setModalOpen(false);
   };
 
   const openDetail = (record: AdminResourceRecord) => {
@@ -486,7 +510,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
         refreshFailed = true;
       }
       setSelectedID(String(result.id));
-      setModalOpen(false);
+      closeFormModal();
       const issuedToken = issuedTokenFromRefineRecord(result);
       if (issuedToken) {
         setIssuedToken(issuedToken);
@@ -1014,7 +1038,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
             focusFirstEditableFormField(form, formFields);
           });
         }}
-        onCancel={() => setModalOpen(false)}
+        onCancel={closeFormModal}
         onOk={() => form.submit()}
       >
         <PlatformResourceForm

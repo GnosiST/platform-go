@@ -145,6 +145,9 @@ export function AdminShell({
         .some((value) => value.toLowerCase().includes(normalizedQuery)),
     ).slice(0, 8);
   }, [globalSearchQuery, resources]);
+  const globalSearchMenuItems = globalSearchResults.length > 0
+    ? globalSearchResults.map((resource) => ({ key: resource.route, label: resource.title[language] }))
+    : [{ key: "__no_results__", label: dictionary.globalSearchNoResults, disabled: true }];
   const openTabs = openTabRoutes
     .map((route) => resourcesByRoute.get(route))
     .filter((resource): resource is AdminResourceDefinition => Boolean(resource));
@@ -330,9 +333,9 @@ export function AdminShell({
             <BreadcrumbLabel dictionary={dictionary} activeTitle={activeResource?.title[language] ?? ""} />
           </div>
           <Dropdown
-            open={Boolean(globalSearchQuery.trim()) && globalSearchResults.length > 0}
+            open={Boolean(globalSearchQuery.trim())}
             menu={{
-              items: globalSearchResults.map((resource) => ({ key: resource.route, label: resource.title[language] })),
+              items: globalSearchMenuItems,
               onClick: ({ key }) => {
                 const resource = resourcesByRoute.get(String(key));
                 if (resource) openResource(resource);
@@ -355,8 +358,10 @@ export function AdminShell({
               onChange={(event) => setGlobalSearchQuery(event.target.value)}
               onPressEnter={() => {
                 const resource = globalSearchResults[0];
-                if (resource) openResource(resource);
-                setGlobalSearchQuery("");
+                if (resource) {
+                  openResource(resource);
+                  setGlobalSearchQuery("");
+                }
               }}
             />
           </Dropdown>

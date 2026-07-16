@@ -24,6 +24,7 @@ const files = {
   i18n: readSource("admin/src/platform/i18n.ts"),
   primitives: readSource("admin/src/platform/ui/AdminPrimitives.tsx"),
   resourceConsole: readSource("admin/src/platform/resources/GenericResourceConsole.tsx"),
+  relationOptionSearch: readSource("admin/src/platform/resources/relationOptionSearch.ts"),
   resourceExperience: readSource("admin/src/platform/resources/resourceExperience.ts"),
   organizationUserExperience: readSource("admin/src/platform/resources/organizationUserExperience.tsx"),
   roleGovernance: readSource("admin/src/platform/resources/RoleGovernanceConsole.tsx"),
@@ -445,6 +446,9 @@ requireIncludes(files.shell, "setWorkTabsOverflow", "AdminShell must track work-
 requireIncludes(files.shell, "scrollBy({ left: -240, behavior: \"smooth\" })", "AdminShell must expose a left work-tab overflow control.");
 requireIncludes(files.shell, "scrollBy({ left: 240, behavior: \"smooth\" })", "AdminShell must expose a right work-tab overflow control.");
 requireIncludes(files.shell, "workTabMenuItems", "AdminShell work tabs must keep the close/current/left/right context menu.");
+requireIncludes(files.shell, "dictionary.globalSearchNoResults", "Global search must expose a localized no-results state.");
+requireIncludes(files.shell, "open={Boolean(globalSearchQuery.trim())}", "Global search must keep its result surface open for no-results feedback.");
+requireIncludes(files.shell, "items: globalSearchMenuItems", "Global search must use the result-or-empty menu contract.");
 requireIncludes(files.shell, "buildNavigationTree", "AdminShell must build multi-level navigation from resource parents.");
 requireIncludes(files.shell, '"business/access"', "AdminShell must label business/access through a full parent path.");
 requireIncludes(files.shell, '"business/dispatch"', "AdminShell must label business/dispatch through a full parent path.");
@@ -635,7 +639,29 @@ requireIncludes(files.resourceConsole, "dictionary.relationOptionsLoadFailed", "
 requireIncludes(files.resourceConsole, "RELATION_OPTION_PAGE_SIZE = 30", "Relation option loading must use a bounded server page instead of a fixed first-100 fetch.");
 requireIncludes(files.resourceConsole, "pagination: { currentPage: 1, pageSize: 1, mode: \"server\" }", "Selected relation values outside the search page must be hydrated through a targeted server query.");
 requireIncludes(files.resourceConsole, "keywords: input.search?.trim() ? [input.search.trim()] : undefined", "Relation option search must reach the structured server keyword contract.");
-requireIncludes(files.resourceConsole, "relationRequestVersionRef", "Relation option search must discard stale responses.");
+requireIncludes(files.resourceConsole, "relationSearchScheduler.isCurrent", "Relation option search must discard stale responses.");
+requireIncludes(files.resourceConsole, "const RELATION_OPTION_SEARCH_DELAY_MS = 250;", "Relation option search must use the platform 250ms debounce interval.");
+requireIncludes(files.resourceConsole, "createRelationOptionSearchScheduler", "Relation option search must use the shared session-aware scheduler.");
+requireRegex(
+  files.resourceConsole,
+  /const closeFormModal = \(\) => \{\s*relationSearchScheduler\.invalidateAll\(\);\s*setRelationLoadingFields\(\{\}\);\s*setModalOpen\(false\);\s*\};/,
+  "Resource form close must invalidate relation searches and clear their loading state.",
+);
+requireIncludes(files.resourceConsole, "onCancel={closeFormModal}", "Resource form cancellation must close the relation search session.");
+requireRegex(
+  files.resourceConsole,
+  /setSelectedID\(String\(result\.id\)\);\s*closeFormModal\(\);/,
+  "A successful save must close the relation search session.",
+);
+requireRegex(
+  files.resourceConsole,
+  /useEffect\(\(\) => \{\s*relationSearchScheduler\.invalidateAll\(\);\s*setRelationLoadingFields\(\{\}\);\s*return \(\) => \{\s*relationSearchScheduler\.invalidateAll\(\);\s*\};\s*\}, \[relationSearchScheduler, resourceKey\]\);/,
+  "Resource cleanup must invalidate relation searches on resource change and unmount.",
+);
+requireIncludes(files.relationOptionSearch, "currentGenerations", "Relation option search must isolate current work by field generation.");
+requireIncludes(files.relationOptionSearch, "timers", "Relation option search must debounce independently per relation field.");
+requireIncludes(files.relationOptionSearch, "clearTimer(pendingTimer)", "Relation option search must cancel superseded pending requests.");
+requireIncludes(files.relationOptionSearch, "currentGenerations.clear()", "Relation option search must invalidate in-flight generations when a form session closes.");
 requireIncludes(files.resourceConsole, "relationValuesFromInput(form.getFieldValue(field.key))", "Relation option search must retain selected values while the remote option page changes.");
 requireIncludes(files.resourceConsole, "mergeRelationOptions(currentSchema, results)", "Relation option loading must merge dynamic options back into the schema.");
 requireIncludes(files.resourceConsole, "relation.parentField", "GenericResourceConsole relation options must preserve tree parent values.");
@@ -826,6 +852,7 @@ requireRegex(
   "Mobile Drawer search must use a 44px minimum target below the desktop breakpoint.",
 );
 requireCssRule(mobileStyles, ".platform-data-table-panel .platform-table-search", ["min-height: 44px;"], "Mobile resource search must expose a 44px touch target.");
+requireCssRule(mobileStyles, ".platform-topbar .user-menu-trigger", ["min-width: 44px;", "height: 44px;", "min-height: 44px;"], "Mobile account/settings trigger must expose a 44px touch target.");
 requireCssRule(
   mobileStyles,
   ".login-submit,\n  .login-oidc-action,\n  .login-recovery-action",

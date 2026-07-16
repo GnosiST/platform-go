@@ -54,6 +54,39 @@ function runTypeScriptProbe(relativePath, body) {
   );
 }
 
+function relationSearchSchedulerProbe(body) {
+  return runTypeScriptProbe("admin/src/platform/resources/relationOptionSearch.ts", (moduleURL) => `
+    import assert from "node:assert/strict";
+    import { createRelationOptionSearchScheduler } from ${JSON.stringify(moduleURL)};
+
+    function createFakeTimers() {
+      let nextID = 1;
+      const tasks = new Map();
+      return {
+        clearTimer(id) {
+          tasks.delete(id);
+        },
+        pendingCount() {
+          return tasks.size;
+        },
+        runAll() {
+          const pending = [...tasks.values()];
+          tasks.clear();
+          for (const task of pending) task();
+        },
+        setTimer(task, delay) {
+          assert.equal(delay, 250);
+          const id = nextID++;
+          tasks.set(id, task);
+          return id;
+        },
+      };
+    }
+
+    ${body}
+  `);
+}
+
 function runAdminClientProbe(body) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "admin-api-client-probe-"));
   const apiDir = path.join(tempDir, "admin", "src", "platform", "api");
@@ -141,14 +174,142 @@ describe("validate-admin-ui-contracts", () => {
     replaceInTemp(
       tempRoot,
       "admin/src/platform/resources/GenericResourceConsole.tsx",
-      "relationRequestVersionRef",
-      "removedRelationRequestVersionRef",
+      "relationSearchScheduler.isCurrent",
+      "removedRelationSearchScheduler.isCurrent",
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /must discard stale responses/);
+  });
+
+  it("executes only the latest pending relation search for one field", () => {
+    const result = relationSearchSchedulerProbe(`
+      const timers = createFakeTimers();
+      const scheduler = createRelationOptionSearchScheduler({
+        delayMs: 250,
+        setTimer: timers.setTimer,
+        clearTimer: timers.clearTimer,
+      });
+      const calls = [];
+      scheduler.schedule("orgId", () => calls.push("first"));
+      const generation = scheduler.schedule("orgId", () => calls.push("second"));
+      assert.equal(timers.pendingCount(), 1);
+      timers.runAll();
+      assert.deepEqual(calls, ["second"]);
+      assert.equal(scheduler.isCurrent("orgId", generation), true);
+    `);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  it("keeps pending relation searches isolated by field", () => {
+    const result = relationSearchSchedulerProbe(`
+      const timers = createFakeTimers();
+      const scheduler = createRelationOptionSearchScheduler({
+        delayMs: 250,
+        setTimer: timers.setTimer,
+        clearTimer: timers.clearTimer,
+      });
+      const calls = [];
+      scheduler.schedule("orgId", () => calls.push("orgId"));
+      scheduler.schedule("roleId", () => calls.push("roleId"));
+      assert.equal(timers.pendingCount(), 2);
+      timers.runAll();
+      assert.deepEqual(calls.sort(), ["orgId", "roleId"]);
+    `);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  it("invalidates pending relation searches when the form session closes", () => {
+    const result = relationSearchSchedulerProbe(`
+      const timers = createFakeTimers();
+      const scheduler = createRelationOptionSearchScheduler({
+        delayMs: 250,
+        setTimer: timers.setTimer,
+        clearTimer: timers.clearTimer,
+      });
+      const calls = [];
+      scheduler.schedule("orgId", () => calls.push("stale"));
+      scheduler.invalidateAll();
+      assert.equal(timers.pendingCount(), 0);
+      timers.runAll();
+      assert.deepEqual(calls, []);
+    `);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  it("rejects in-flight relation search generations after invalidation", () => {
+    const result = relationSearchSchedulerProbe(`
+      const timers = createFakeTimers();
+      const scheduler = createRelationOptionSearchScheduler({
+        delayMs: 250,
+        setTimer: timers.setTimer,
+        clearTimer: timers.clearTimer,
+      });
+      let staleGeneration = 0;
+      scheduler.schedule("orgId", (generation) => {
+        staleGeneration = generation;
+      });
+      timers.runAll();
+      assert.equal(scheduler.isCurrent("orgId", staleGeneration), true);
+      scheduler.invalidateAll();
+      assert.equal(scheduler.isCurrent("orgId", staleGeneration), false);
+      const nextGeneration = scheduler.schedule("orgId", () => {});
+      assert.notEqual(nextGeneration, staleGeneration);
+      assert.equal(scheduler.isCurrent("orgId", staleGeneration), false);
+      assert.equal(scheduler.isCurrent("orgId", nextGeneration), true);
+    `);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  it("rejects closing a resource form without invalidating relation searches", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "const closeFormModal = () => {\n    relationSearchScheduler.invalidateAll();",
+      "const closeFormModal = () => {",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /form close must invalidate relation searches/);
+  });
+
+  it("rejects a successful save that bypasses relation search session cleanup", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "setSelectedID(String(result.id));\n      closeFormModal();",
+      "setSelectedID(String(result.id));\n      setModalOpen(false);",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /successful save must close the relation search session/);
+  });
+
+  it("rejects resource cleanup that leaves relation searches active", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "return () => {\n      relationSearchScheduler.invalidateAll();\n    };\n  }, [relationSearchScheduler, resourceKey]);",
+      "return () => {};\n  }, [relationSearchScheduler, resourceKey]);",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Resource cleanup must invalidate relation searches/);
   });
 
   it("rejects interactive hover feedback on read-only runtime context chips", () => {
@@ -2387,7 +2548,38 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /must not depend on a global field id/);
   });
 
+  it("rejects global search that hides the no-results state", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/shell/AdminShell.tsx",
+      "open={Boolean(globalSearchQuery.trim())}",
+      "open={Boolean(globalSearchQuery.trim()) && globalSearchResults.length > 0}",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /no-results feedback/);
+  });
+
+  it("rejects relation option search without the platform debounce interval", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/GenericResourceConsole.tsx",
+      "const RELATION_OPTION_SEARCH_DELAY_MS = 250;",
+      "const RELATION_OPTION_SEARCH_DELAY_MS = 0;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /250ms debounce interval/);
+  });
+
   for (const [name, selector, message] of [
+    ["account/settings trigger", ".platform-topbar .user-menu-trigger {", "Mobile account/settings trigger must expose a 44px touch target"],
     ["resource search", ".platform-data-table-panel .platform-table-search {", "Mobile resource search must expose a 44px touch target"],
     ["resource toolbar", ".platform-data-table-panel .table-actions .ant-btn {", "Mobile resource table actions must expose 44px touch targets"],
     ["pagination main controls", ".platform-pagination-main :where(.ant-pagination-prev, .ant-pagination-item, .ant-pagination-jump-prev, .ant-pagination-jump-next, .ant-pagination-next, .ant-pagination-item-link, a) {", "Mobile pagination main controls must expose 44px touch targets"],
