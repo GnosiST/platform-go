@@ -11,7 +11,8 @@ const allowedStatuses = new Set(["implemented", "pending", "preview", "planned",
 const allowedScopes = new Set(["foundation", "governance", "admin-ui", "business-extension"]);
 const allowedLockModes = new Set(["exclusive", "shared"]);
 const requiredVisualDesignGate = ["superpowers:brainstorming", "product-design"];
-const allowedVisualDesignGates = new Set(requiredVisualDesignGate);
+const optionalVisualDesignGates = new Set(["design-taste-frontend"]);
+const allowedVisualDesignGates = new Set([...requiredVisualDesignGate, ...optionalVisualDesignGates]);
 const evidencePathKeys = ["docs", "validators", "tests", "screenshots"];
 const requiredAdminUIContractTests = ["scripts/admin-ui-contracts.test.mjs"];
 const requiredWatermarkEvidenceManifest = "resources/evidence/admin-watermark-export-governance-20260713.json";
@@ -20,9 +21,6 @@ const requiredOrganizationUserEvidenceManifest = "resources/evidence/organizatio
 const requiredRoleTreeEvidenceManifest = "resources/evidence/role-tree-and-authorization-entry-20260715.json";
 const requiredMenuEvidenceManifest = "resources/evidence/menu-tree-and-button-permission-configuration-20260715.json";
 const releaseBlockingNodes = [
-  "open-source-portability",
-  "public-docs-community",
-  "public-docs-site",
   "github-release-publication",
 ];
 const postReleaseOptionalNodes = [

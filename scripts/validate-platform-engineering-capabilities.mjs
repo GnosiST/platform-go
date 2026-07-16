@@ -69,9 +69,9 @@ const requiredImplementedCapabilityIDs = [
   "menu-tree-and-button-permission-configuration",
   "organization-rbac-menu-e2e-qa",
   "unified-error-code-governance",
+  "open-source-portability",
 ];
 const requiredPartialCapabilityIDs = [
-  "open-source-portability",
   "public-documentation-and-release",
 ];
 const requiredDeferredCapabilityIDs = [

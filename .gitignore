@@ -4,6 +4,8 @@ node_modules/
 # frontend build output
 dist/
 admin/dist/
+website/build/
+website/.docusaurus/
 
 # local environment
 .env
