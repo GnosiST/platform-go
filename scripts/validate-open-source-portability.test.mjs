@@ -167,10 +167,13 @@ describe("validate-open-source-portability", () => {
     ]) {
       const target = path.join(root, file);
       fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, "local only\n");
+      fs.writeFileSync(
+        target,
+        file.startsWith("website/.docusaurus/") ? "generated from /Users/alice/project\n" : "local only\n",
+      );
     }
     try {
-      const result = run(root);
+      const result = run(root, ["--strict-paths"]);
       assert.equal(result.status, 0, result.stderr);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });

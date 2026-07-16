@@ -28,6 +28,7 @@ const ignoredDirectories = new Set([
   ".git",
   ".codegraph",
   ".codex",
+  ".docusaurus",
   ".superpowers",
   ".worktrees",
   "node_modules",
