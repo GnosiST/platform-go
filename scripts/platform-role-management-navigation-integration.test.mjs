@@ -46,9 +46,9 @@ describe("role management navigation integration", () => {
     assert.doesNotMatch(dashboard, /\{ key: "roles", label: dictionary\.roles, route: "\/roles"/);
   });
 
-  it("declares exact bilingual navigation labels and uses Role Management as the shared page H1", () => {
-    assert.equal((i18n.match(/roleManagement: "角色管理"/g) ?? []).length, 1);
-    assert.equal((i18n.match(/roleManagement: "Role Management"/g) ?? []).length, 1);
+  it("declares concise bilingual navigation labels and keeps Role Management as the shared page H1", () => {
+    assert.equal((i18n.match(/roleManagement: "角色"/g) ?? []).length, 1);
+    assert.equal((i18n.match(/roleManagement: "Roles"/g) ?? []).length, 1);
     assert.match(i18n, /roleGovernanceTitle: "角色管理"/);
     assert.match(i18n, /roleGovernanceTitle: "Role Management"/);
     assert.match(roleConsole, /<AdminPage title=\{dictionary\.roleGovernanceTitle\} description=\{dictionary\.roleGovernanceDescription\}>/);

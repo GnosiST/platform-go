@@ -124,6 +124,7 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [definitionLoading, setDefinitionLoading] = useState(false);
+  const [menuDefinitionWritable, setMenuDefinitionWritable] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -183,6 +184,22 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
       setSelectedRevision(0);
       return;
     }
+    const selectedRecord = records.find((record) => record.code === selectedKey);
+    if (!selectedRecord) {
+      setDefinitionLoading(false);
+      setSelectedDefinition(null);
+      setSelectedRevision(0);
+      return;
+    }
+    if (!hasTargetMenuDefinition(selectedRecord)) {
+      definitionRequest.current += 1;
+      setDefinitionLoading(false);
+      setSelectedDefinition(legacyMenuDefinition(selectedRecord));
+      setSelectedRevision(0);
+      setMenuDefinitionWritable(false);
+      setError("");
+      return;
+    }
     const requestID = ++definitionRequest.current;
     if (definitionRequest.current !== requestID) return;
     setSelectedDefinition(null);
@@ -193,6 +210,7 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
         if (definitionRequest.current !== requestID) return;
         setSelectedDefinition(result.definition);
         setSelectedRevision(result.revision);
+        setMenuDefinitionWritable(true);
         setError("");
       })
       .catch((nextError) => {
@@ -203,7 +221,7 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
       .finally(() => {
         if (definitionRequest.current === requestID) setDefinitionLoading(false);
       });
-  }, [canRead, definitionRefresh, dictionary.menuLoadFailed, selectedKey]);
+  }, [canRead, definitionRefresh, dictionary.menuLoadFailed, records, selectedKey]);
 
   const directoryRecords = useMemo(() => records.filter((record) => nodeType(record) === "directory"), [records]);
   const pageRecords = useMemo(() => records.filter((record) => nodeType(record) === "page"), [records]);
@@ -290,7 +308,7 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
       definition={currentDefinition}
       dictionary={dictionary}
       language={language}
-      canUpdate={canUpdate}
+      canUpdate={canUpdate && menuDefinitionWritable}
       onEdit={(trigger) => openEditor(
         currentDefinition.node.nodeType === "directory" ? "edit-directory" : "edit-page",
         trigger,
@@ -309,7 +327,7 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
       {error ? <AdminFeedback className="api-alert" type="warning" message={dictionary.menuSaveFailed} description={error} closable onClose={() => setError("")} /> : null}
       {notice ? <AdminFeedback className="api-alert" type="success" message={notice} closable onClose={() => setNotice("")} /> : null}
       <AdminTreeWorkbench
-        actions={canCreate ? (
+        actions={canCreate && menuDefinitionWritable ? (
           <Space size={6} wrap>
             <AdminActionButton
               disabled={definitionLoading || records.length > 0 && !currentDefinition}
@@ -588,6 +606,47 @@ function MenuDefinitionDetail({ definition, dictionary, language, canUpdate, onE
   );
 }
 
+function hasTargetMenuDefinition(record: AdminResourceRecord) {
+  const type = valueOf(record, "nodeType");
+  return type === "directory" || type === "page";
+}
+
+function legacyMenuDefinition(record: AdminResourceRecord): MenuDefinition {
+  const external = booleanValue(record, "isExternal") || booleanValue(record, "external");
+  const openMode = external && valueOf(record, "openMode") === "new-tab" ? "new-tab" : external ? "same-tab" : "";
+  const visible = valueOf(record, "visible");
+  return {
+    id: record.id,
+    name: record.name,
+    description: record.description ?? "",
+    updatedAt: record.updatedAt,
+    node: {
+      code: record.code,
+      parentCode: parentCodeOf(record),
+      nodeType: nodeType(record),
+      titleZh: valueOf(record, "titleZh") || valueOf(record, "nameZh") || record.name,
+      titleEn: valueOf(record, "titleEn") || valueOf(record, "nameEn") || record.name,
+      descriptionZh: valueOf(record, "descriptionZh") || record.description || "",
+      descriptionEn: valueOf(record, "descriptionEn") || record.description || "",
+      status: record.status === "disabled" ? "disabled" : "enabled",
+      icon: valueOf(record, "icon"),
+      sortOrder: numberValue(record, "order"),
+      route: valueOf(record, "route") || valueOf(record, "path"),
+      componentKey: valueOf(record, "componentKey") || valueOf(record, "resource"),
+      resourceCode: valueOf(record, "resourceCode") || valueOf(record, "resource"),
+      external,
+      externalUrl: valueOf(record, "externalUrl"),
+      openMode,
+      parameters: [],
+      cacheEnabled: booleanValue(record, "cacheEnabled") || booleanValue(record, "keepAlive"),
+      hidden: booleanValue(record, "hidden") || visible === "false",
+      activeMenuCode: valueOf(record, "activeMenuCode"),
+      breadcrumbVisible: valueOf(record, "breadcrumbVisible") !== "false",
+    },
+    buttons: [],
+  };
+}
+
 function buildMenuDefinition(values: MenuEditorValues, directoryMode: boolean, existing?: MenuDefinition): MenuDefinition {
   const code = values.code.trim();
   const parameters: MenuParameter[] = directoryMode ? [] : (values.parameters ?? []).map(toMenuParameter);
@@ -701,14 +760,14 @@ function menuTreeNodes(records: AdminResourceRecord[], language: Language): Admi
   const visibleCodes = new Set(records.map((record) => record.code));
   const childCounts = new Map<string, number>();
   for (const record of records) {
-    const parentCode = valueOf(record, "parentCode");
+    const parentCode = parentCodeOf(record);
     if (parentCode) childCounts.set(parentCode, (childCounts.get(parentCode) ?? 0) + 1);
   }
   return [...records]
     .sort((left, right) => numberValue(left, "order") - numberValue(right, "order") || left.code.localeCompare(right.code))
     .map((record) => ({
       key: record.code,
-      parentKey: visibleCodes.has(valueOf(record, "parentCode")) ? valueOf(record, "parentCode") : undefined,
+      parentKey: visibleCodes.has(parentCodeOf(record)) ? parentCodeOf(record) : undefined,
       kind: nodeType(record) === "directory" ? "group" : "item",
       label: localizedTitle(record, language),
       searchText: `${record.code} ${record.name}`,
@@ -741,11 +800,11 @@ function filterMenuRecords(records: AdminResourceRecord[], query: string) {
     const searchText = [record.code, record.name, valueOf(record, "titleZh"), valueOf(record, "titleEn")].join(" ").toLocaleLowerCase();
     if (!searchText.includes(normalized)) continue;
     visible.add(record.code);
-    let parentCode = valueOf(record, "parentCode");
+    let parentCode = parentCodeOf(record);
     while (parentCode && !visible.has(parentCode)) {
       visible.add(parentCode);
       const parent = byCode.get(parentCode);
-      parentCode = parent ? valueOf(parent, "parentCode") : "";
+      parentCode = parent ? parentCodeOf(parent) : "";
     }
     if (nodeType(record) === "directory") {
       descendantCodes(record.code, records).forEach((code) => visible.add(code));
@@ -760,7 +819,7 @@ function descendantCodes(code: string, records: AdminResourceRecord[]) {
   while (pending.length > 0) {
     const parent = pending.shift();
     for (const record of records) {
-      if (valueOf(record, "parentCode") !== parent || descendants.includes(record.code)) continue;
+      if (parentCodeOf(record) !== parent || descendants.includes(record.code)) continue;
       descendants.push(record.code);
       pending.push(record.code);
     }
@@ -770,6 +829,10 @@ function descendantCodes(code: string, records: AdminResourceRecord[]) {
 
 function nodeType(record: AdminResourceRecord) {
   return valueOf(record, "nodeType") === "directory" ? "directory" : "page";
+}
+
+function parentCodeOf(record: AdminResourceRecord) {
+  return valueOf(record, "parentCode") || valueOf(record, "parent");
 }
 
 function localizedTitle(record: AdminResourceRecord, language: Language) {
@@ -783,6 +846,10 @@ function valueOf(record: AdminResourceRecord, key: string) {
 function numberValue(record: AdminResourceRecord, key: string) {
   const value = Number(valueOf(record, key));
   return Number.isFinite(value) ? value : 0;
+}
+
+function booleanValue(record: AdminResourceRecord, key: string) {
+  return valueOf(record, key) === "true";
 }
 
 function normalizeRoute(value: string) {

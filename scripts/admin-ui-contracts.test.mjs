@@ -214,14 +214,14 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /Platform route pages must retain the complete authorized resource list/);
   });
 
-  it("rejects changing the exact bilingual Role Management navigation label", () => {
+  it("rejects restoring the verbose Role Management navigation label", () => {
     const tempRoot = tempAdminRoot();
-    replaceInTemp(tempRoot, "admin/src/platform/i18n.ts", 'roleManagement: "Role Management"', 'roleManagement: "Roles"');
+    replaceInTemp(tempRoot, "admin/src/platform/i18n.ts", 'roleManagement: "Roles"', 'roleManagement: "Role Management"');
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /Role management navigation must declare the exact English label/);
+    assert.match(result.stderr, /Role navigation must declare the concise English label/);
   });
 
   it("rejects restoring the legacy Role Governance page H1", () => {
@@ -735,6 +735,36 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /menu-definition replace wrapper must use the generated service-object client/);
+  });
+
+  it("rejects menu governance that sends legacy snapshots to target service objects", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "setSelectedDefinition(legacyMenuDefinition(selectedRecord))",
+      "setSelectedDefinition(null)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Legacy menu snapshots must render a compatible read-only definition/);
+  });
+
+  it("rejects layout options without an accessible selected state", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/ui/SystemSettingsDrawer.tsx",
+      "aria-pressed={active === mode}",
+      "aria-pressed={false}",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Layout-mode options must expose their selected state/);
   });
 
   it("rejects menu creation that hard-codes the initial global revision", () => {

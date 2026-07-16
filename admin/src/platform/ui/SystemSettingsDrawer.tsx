@@ -1,5 +1,6 @@
 import {
   BgColorsOutlined,
+  CheckOutlined,
   DownloadOutlined,
   EyeOutlined,
   LayoutOutlined,
@@ -57,10 +58,6 @@ export function SystemSettingsDrawer({
 }: SystemSettingsDrawerProps) {
   const displayName = session.user.name || session.user.username || dictionary.admin;
   const avatarLetter = (displayName.trim()[0] || "A").toUpperCase();
-  const layoutOptions = useMemo(
-    () => adminLayoutModes.map((mode) => ({ label: layoutLabel(dictionary, mode), value: mode })),
-    [dictionary],
-  );
   const densityOptions = useMemo(
     () => [
       { label: dictionary.densityCompact, value: "compact" },
@@ -197,9 +194,12 @@ export function SystemSettingsDrawer({
             icon: <LayoutOutlined />,
             children: (
               <div className="settings-section">
-                <SettingRow label={dictionary.layoutMode}>
-                  <Segmented block options={layoutOptions} value={layoutMode} onChange={(value) => onLayoutModeChange(value as AdminLayoutMode)} />
-                </SettingRow>
+                <LayoutModeSelector
+                  active={layoutMode}
+                  dictionary={dictionary}
+                  showPreviews={uiConfig.showLayoutLegend}
+                  onChange={onLayoutModeChange}
+                />
                 <div className="settings-switch-grid">
                   <SettingSwitchCard
                     checked={uiConfig.showWorkTabs}
@@ -222,7 +222,6 @@ export function SystemSettingsDrawer({
                     onChange={(checked) => updateConfig({ showLayoutLegend: checked })}
                   />
                 </div>
-                {uiConfig.showLayoutLegend ? <LayoutLegend dictionary={dictionary} active={layoutMode} onChange={onLayoutModeChange} /> : null}
                 <SettingRow label={dictionary.densitySetting}>
                   <Segmented block options={densityOptions} value={uiConfig.density} onChange={(value) => updateConfig({ density: value as AdminUIConfig["density"] })} />
                 </SettingRow>
@@ -342,33 +341,50 @@ export function SystemSettingsDrawer({
   );
 }
 
-function LayoutLegend({
+function LayoutModeSelector({
   dictionary,
   active,
+  showPreviews,
   onChange,
 }: {
   dictionary: Dictionary;
   active: AdminLayoutMode;
+  showPreviews: boolean;
   onChange: (mode: AdminLayoutMode) => void;
 }) {
   return (
-    <div className="layout-legend-grid" aria-label={dictionary.layoutLegend}>
-      {adminLayoutModes.map((mode) => (
-        <button
-          className={active === mode ? `layout-legend-card ${mode} active` : `layout-legend-card ${mode}`}
-          key={mode}
-          type="button"
-          onClick={() => onChange(mode)}
-        >
-          <span className="layout-legend-visual">
-            <i />
-            <b />
-            <em />
-          </span>
-          <strong>{layoutLabel(dictionary, mode)}</strong>
-        </button>
-      ))}
-    </div>
+    <section className="layout-mode-selector" aria-labelledby="layout-mode-selector-title">
+      <header className="layout-mode-selector-header">
+        <Typography.Title id="layout-mode-selector-title" level={5}>{dictionary.layoutMode}</Typography.Title>
+        <Typography.Text type="secondary">{dictionary.layoutModeDescription}</Typography.Text>
+      </header>
+      <div className={showPreviews ? "layout-mode-options" : "layout-mode-options no-previews"}>
+        {adminLayoutModes.map((mode) => (
+          <button
+            aria-pressed={active === mode}
+            className={active === mode ? `layout-mode-option ${mode} active` : `layout-mode-option ${mode}`}
+            key={mode}
+            type="button"
+            onClick={() => onChange(mode)}
+          >
+            {showPreviews ? (
+              <span className="layout-mode-preview" aria-hidden="true">
+                <i />
+                <b />
+                <em />
+              </span>
+            ) : null}
+            <span className="layout-mode-copy">
+              <strong>{layoutLabel(dictionary, mode)}</strong>
+              <span>{layoutDescription(dictionary, mode)}</span>
+            </span>
+            <span className="layout-mode-state" aria-hidden="true">
+              {active === mode ? <CheckOutlined /> : null}
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -429,4 +445,14 @@ function layoutLabel(dictionary: Dictionary, mode: AdminLayoutMode) {
     split: dictionary.layoutSplit,
   };
   return labels[mode];
+}
+
+function layoutDescription(dictionary: Dictionary, mode: AdminLayoutMode) {
+  const descriptions = {
+    side: dictionary.layoutSideDescription,
+    top: dictionary.layoutTopDescription,
+    mixed: dictionary.layoutMixedDescription,
+    split: dictionary.layoutSplitDescription,
+  };
+  return descriptions[mode];
 }

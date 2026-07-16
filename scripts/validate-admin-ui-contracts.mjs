@@ -118,8 +118,8 @@ requireNotIncludes(files.roleManagementNavigation, "Object.assign", "Role-manage
 requireNotIncludes(files.roleManagementNavigation, "as T", "Role-management projection must not cast the replaced title back to an arbitrary input subtype.");
 requireIncludes(files.resourceRoute, 'resource.route === "/roles" || resource.route === "/role-groups"', "Both legacy role routes must retain the shared route adapter.");
 requireCountExactly(files.i18n, "roleManagement:", 2, "Role management navigation must declare matching Chinese and English dictionary keys.");
-requireIncludes(files.i18n, 'roleManagement: "角色管理"', "Role management navigation must declare the exact Chinese label.");
-requireIncludes(files.i18n, 'roleManagement: "Role Management"', "Role management navigation must declare the exact English label.");
+requireIncludes(files.i18n, 'roleManagement: "角色"', "Role navigation must declare the concise Chinese label.");
+requireIncludes(files.i18n, 'roleManagement: "Roles"', "Role navigation must declare the concise English label.");
 requireIncludes(files.i18n, 'roleGovernanceTitle: "角色管理"', "Shared role governance page must display Role Management as its Chinese H1.");
 requireIncludes(files.i18n, 'roleGovernanceTitle: "Role Management"', "Shared role governance page must display Role Management as its English H1.");
 requireIncludes(files.roleGovernance, "title={dictionary.roleGovernanceTitle}", "Shared role governance page must keep its localized H1 binding.");
@@ -336,6 +336,10 @@ requireIncludes(files.menuGovernance, 'const canRead = hasPermission(permissions
 requireIncludes(files.menuGovernance, 'const canCreate = hasPermission(permissions, "admin:menu:create", deniedPermissions);', "Menu creation must require admin:menu:create and respect denied permissions.");
 requireIncludes(files.menuGovernance, 'const canUpdate = hasPermission(permissions, "admin:menu:update", deniedPermissions);', "Menu updates must require admin:menu:update and respect denied permissions.");
 requireIncludes(files.menuGovernance, "getMenuDefinition", "Menu governance must load selected button metadata through the atomic menu-definition service object.");
+requireIncludes(files.menuGovernance, "hasTargetMenuDefinition(selectedRecord)", "Menu governance must distinguish target definitions from legacy menu snapshots before calling service objects.");
+requireIncludes(files.menuGovernance, "setSelectedDefinition(legacyMenuDefinition(selectedRecord))", "Legacy menu snapshots must render a compatible read-only definition instead of raising a service-object error.");
+requireIncludes(files.menuGovernance, "canCreate && menuDefinitionWritable", "Legacy menu snapshots must not expose target-only create actions.");
+requireIncludes(files.menuGovernance, "canUpdate && menuDefinitionWritable", "Legacy menu snapshots must not expose target-only update actions.");
 requireIncludes(files.menuGovernance, "createMenuDefinition", "Menu governance must create menus through the atomic menu-definition service object.");
 requireIncludes(files.menuGovernance, "replaceMenuDefinition", "Menu governance must replace menus through the atomic menu-definition service object.");
 requireNotIncludes(files.menuGovernance, "createAdminResource", "Menu governance must not compose atomic menu definitions from generic menu CRUD.");
@@ -401,6 +405,11 @@ for (const key of [
 ]) {
   requireCountExactly(files.i18n, `${key}:`, 2, `Menu governance i18n key ${key} must exist in matching Chinese and English dictionaries.`);
 }
+requireIncludes(files.settings, "LayoutModeSelector", "SystemSettingsDrawer must use the illustrated layout-mode selector.");
+requireIncludes(files.settings, "aria-pressed={active === mode}", "Layout-mode options must expose their selected state to assistive technology.");
+requireIncludes(files.settings, "layoutDescription(dictionary, mode)", "Layout-mode options must include the approved explanatory copy.");
+requireIncludes(files.settings, "showPreviews={uiConfig.showLayoutLegend}", "The persisted layout-legend preference must control preview visibility without hiding the selector.");
+requireRegex(files.styles, /\.layout-mode-option\s*\{[\s\S]*?grid-template-columns:\s*minmax\([^;]+\)\s+minmax\([^;]+\)\s+44px/, "Layout-mode options must keep preview, copy, and selection state in stable columns.");
 requireIncludes(files.roleGovernance, "AdminTreeWorkbench", "Role governance must use the platform tree workbench wrapper.");
 requireIncludes(files.roleGovernance, "PlatformTreeTransfer", "Role permission and menu entry points must use the platform Tree Transfer wrapper.");
 requireIncludes(files.primitives, "export function AdminModal", "Shared platform dialogs must expose the AdminModal wrapper.");

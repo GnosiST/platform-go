@@ -16,7 +16,7 @@ function runProjection(testBody) {
       selectRoleManagementNavigationResource,
     } from ${JSON.stringify(projectionURL)};
 
-    const title = { zh: "角色管理", en: "Role Management" };
+    const title = { zh: "角色", en: "Roles" };
     const resource = (route, name = route.slice(1)) => ({
       route,
       name,
@@ -57,7 +57,7 @@ describe("role management navigation projection", () => {
       const projected = projectRoleManagementNavigation(input, title);
 
       assert.deepEqual(projected.map((item) => item.route), ["/overview", "/roles", "/settings"]);
-      assert.deepEqual(projected[1].title, { zh: "角色管理", en: "Role Management" });
+      assert.deepEqual(projected[1].title, { zh: "角色", en: "Roles" });
       assert.equal(projected[1].marker, "marker:roles");
     `);
   });
