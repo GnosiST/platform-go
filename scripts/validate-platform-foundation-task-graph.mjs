@@ -807,8 +807,9 @@ function validateReleaseLanes(graph, tasks, tasksByID, errors) {
   }
 
   const unfinished = tasks.filter((task) => task.status !== "implemented").map((task) => task.id);
-  const laneUnion = tasks.filter((task) => releaseSet.has(task.id) || optionalSet.has(task.id)).map((task) => task.id);
-  if (!sameList(laneUnion, unfinished) || release.length + optional.length !== unfinished.length) {
+  const activeRelease = release.filter((taskID) => tasksByID.get(taskID)?.status !== "implemented");
+  const laneUnion = tasks.filter((task) => activeRelease.includes(task.id) || optionalSet.has(task.id)).map((task) => task.id);
+  if (!sameList(laneUnion, unfinished) || activeRelease.length + optional.length !== unfinished.length) {
     errors.push("release lane union must exactly match unfinished task graph nodes in graph order");
   }
 
@@ -829,8 +830,8 @@ function validateReleaseLanes(graph, tasks, tasksByID, errors) {
     if (task?.status === "deferred") {
       errors.push(`release blocker ${taskID} must not be deferred`);
     }
-    if (task?.status === "implemented") {
-      errors.push(`release blocker ${taskID} must remain unfinished while listed`);
+    if (task?.status === "implemented" && !values(task.evidence?.artifacts).includes("resources/evidence/github-release-publication-20260716.json")) {
+      errors.push(`implemented release blocker ${taskID} must declare release evidence`);
     }
     for (const optionalTaskID of postReleaseOptionalNodes) {
       if (hasDependencyPath(tasksByID, taskID, optionalTaskID)) {

@@ -43,8 +43,7 @@
     "xa-optional-adapter",
     "database-certification-matrix",
     "transactional-outbox-and-one-mq-adapter",
-    "asynchronous-search-projection",
-    "github-release-publication"
+    "asynchronous-search-projection"
   ],
   "nodeCloseouts": [
     {
@@ -1529,8 +1528,7 @@
         "scripts/validate-platform-organization-rbac-menu-contract.mjs",
         "scripts/admin-ui-contracts.test.mjs",
         "scripts/validate-admin-ui-contracts.mjs",
-        "scripts/validate-admin-i18n.mjs",
-        ".superpowers/sdd/menu-task-6-report.md"
+        "scripts/validate-admin-i18n.mjs"
       ],
       "visualEvidence": [
         "superpowers:brainstorming",
@@ -1666,6 +1664,19 @@
       ],
       "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"],
       "visualEvidence": ["superpowers:brainstorming", "product-design", "design-taste-frontend"]
+    },
+    {
+      "taskId": "github-release-publication",
+      "status": "closed",
+      "neatFreak": false,
+      "cleanupMode": "focused",
+      "cleanupEvidence": [
+        "resources/evidence/github-release-publication-20260716.json",
+        "README.md",
+        ".github/workflows/ci.yml",
+        ".github/workflows/pages.yml"
+      ],
+      "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"]
     }
   ]
 }

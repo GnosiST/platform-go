@@ -1,0 +1,17 @@
+{
+  "$schema": "https://platform-go.local/schemas/github-release-publication-evidence.json",
+  "taskId": "github-release-publication",
+  "capturedAt": "2026-07-16",
+  "status": "verified",
+  "repository": "https://github.com/GnosiST/platform-go",
+  "visibility": "public",
+  "defaultBranch": "main",
+  "release": "https://github.com/GnosiST/platform-go/releases/tag/v0.1.0",
+  "ciRun": "https://github.com/GnosiST/platform-go/actions/runs/29478381727",
+  "pagesRun": "https://github.com/GnosiST/platform-go/actions/runs/29478948642",
+  "pagesUrl": "https://gnosist.github.io/platform-go/",
+  "branchPolicy": {
+    "longLivedProjectBranches": ["main"],
+    "dependabotBranches": "automated transient pull-request branches"
+  }
+}

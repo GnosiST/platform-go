@@ -182,7 +182,6 @@ const requiredCleanupEvidenceByTask = new Map([
       "scripts/validate-admin-i18n.mjs",
       "scripts/validate-admin-ui-contracts.mjs",
       "scripts/admin-ui-contracts.test.mjs",
-      ".superpowers/sdd/menu-task-6-report.md",
     ],
   ],
 ]);

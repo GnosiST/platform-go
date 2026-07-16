@@ -378,7 +378,7 @@ describe("validate-platform-foundation-task-graph", () => {
       ["unknown", (value) => value.releaseBlockingNodes.push("missing-task"), /releaseBlockingNodes references unknown task missing-task/],
       ["duplicate", (value) => value.releaseBlockingNodes.push(value.releaseBlockingNodes[0]), /releaseBlockingNodes contains duplicate value/],
       ["overlap", (value) => value.releaseBlockingNodes.push(value.postReleaseOptionalNodes[0]), /release lanes overlap at/],
-      ["omitted", (value) => value.releaseBlockingNodes.shift(), /release lane union must exactly match unfinished task graph nodes in graph order/],
+      ["omitted", (value) => value.releaseBlockingNodes.shift(), /releaseBlockingNodes must include github-release-publication/],
     ];
 
     for (const [name, mutate, expected] of cases) {
@@ -403,13 +403,13 @@ describe("validate-platform-foundation-task-graph", () => {
     blockerDeferred.tasks.find((item) => item.id === releaseBlockingNodes[0]).status = "deferred";
     result = runValidator(["--graph", tempJSON("blocker-deferred.json", blockerDeferred)]);
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /release blocker open-source-portability must not be deferred/);
+    assert.match(result.stderr, /release blocker github-release-publication must not be deferred/);
 
     const transitive = structuredClone(graph);
     transitive.tasks.find((item) => item.id === "open-source-portability").dependsOn.push("multi-datasource-contract-and-runtime");
     result = runValidator(["--graph", tempJSON("blocker-depends-on-optional.json", transitive)]);
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /release blocker open-source-portability must not depend on post-release optional task multi-datasource-contract-and-runtime/);
+    assert.match(result.stderr, /release blocker github-release-publication must not depend on post-release optional task multi-datasource-contract-and-runtime/);
   });
 
   it("rejects stale unimplemented rationale on the implemented menu node", () => {
@@ -471,7 +471,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
     assert.equal(graph.tasks.length, 67);
-    assert.equal(implemented.length, 54);
+    assert.equal(implemented.length, 58);
     assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "admin-watermark-export-governance")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-protection-runtime")?.status, "implemented");
@@ -551,7 +551,7 @@ describe("validate-platform-foundation-task-graph", () => {
       "active parallel batches must not schedule deferred tasks",
     );
     assert.equal(graph.parallelBatches.find((item) => item.id === "release-blocker-contract-lanes"), undefined);
-    assert.deepEqual(pending.map((item) => item.id), releaseBlockingNodes);
+    assert.deepEqual(pending.map((item) => item.id), releaseBlockingNodes.filter((id) => graph.tasks.find((task) => task.id === id)?.status !== "implemented"));
     assert.deepEqual(deferred.map((item) => item.id), postReleaseOptionalNodes);
     assert.equal(blocked.length, 0);
   });

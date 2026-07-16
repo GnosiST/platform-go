@@ -3460,14 +3460,14 @@
       },
       "phase": "production-governance",
       "scope": "governance",
-      "status": "pending",
+      "status": "implemented",
       "statusReason": {
-        "zh": "目标仓库尚未创建，净化分支、CI、Pages、Release 和公开可见性尚未验证。",
-        "en": "The target repository does not exist and the sanitized branch, CI, Pages, Release and public visibility are not verified."
+        "zh": "已完成公开仓库、main 默认分支、CI、Pages、v0.1.0 Release 和仓库可见性验证。",
+        "en": "The public repository, main default branch, CI, Pages, v0.1.0 release and repository visibility are verified."
       },
       "completionGate": {
-        "zh": "在本地 RC 完成后创建私有 staging 仓库，验证净化提交、CI/Pages/v0.1.0，再公开并完成仓库装修。",
-        "en": "After the local RC is complete, create a private staging repository, verify the sanitized commit, CI, Pages and v0.1.0, then publish and finish repository presentation."
+        "zh": "创建公开仓库并以 main 作为唯一长期分支，验证净化提交、CI、Pages、v0.1.0 和仓库展示。",
+        "en": "Create the public repository with main as the only long-lived project branch and verify the sanitized commit, CI, Pages, v0.1.0 and repository presentation."
       },
       "resourceLocks": [
         "github-publication",
@@ -3483,7 +3483,11 @@
           "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
           "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
           "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
-        ]
+        ],
+        "validators": ["scripts/validate-open-source-portability.mjs"],
+        "tests": [".github/workflows/ci.yml", ".github/workflows/pages.yml"],
+        "screenshots": [],
+        "artifacts": ["resources/evidence/github-release-publication-20260716.json"]
       }
     }
   ],
@@ -3519,9 +3523,7 @@
       ]
     }
   ],
-  "releaseBlockingNodes": [
-    "github-release-publication"
-  ],
+  "releaseBlockingNodes": ["github-release-publication"],
   "postReleaseOptionalNodes": [
     "multi-datasource-contract-and-runtime",
     "tenant-placement-and-request-routing",

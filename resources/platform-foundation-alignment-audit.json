@@ -90,8 +90,7 @@
     "xa-optional-adapter",
     "database-certification-matrix",
     "transactional-outbox-and-one-mq-adapter",
-    "asynchronous-search-projection",
-    "github-release-publication"
+    "asynchronous-search-projection"
   ],
   "nonDroppableGoalNodes": [
     "stack-alignment-and-architecture",
@@ -128,8 +127,7 @@
     "asynchronous-search-projection",
     "open-source-portability",
     "public-docs-community",
-    "public-docs-site",
-    "github-release-publication"
+    "public-docs-site"
   ],
   "nonDroppableEngineeringCapabilities": [
     "form-schema-layout-slot-gate",

@@ -3636,7 +3636,7 @@
         "zh": "公开文档与发布",
         "en": "Public Documentation And Release"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Deliver public community documentation, a bilingual Docusaurus site, GitHub Pages, CI and the sanitized v0.1.0 repository release.",
       "dependsOn": [
         "open-source-portability"
