@@ -17,6 +17,10 @@ import {
   type RoleStateOrGroupChangeImpactV1_0_0Item,
   type RoleStateOrGroupChangePrepareV1_0_0Values,
   type UserOrganizationChangePrepareV1_0_0Values,
+  type MenuAssignmentTreeSearchV1_0_0Item,
+  type MenuAssignmentTreeHydrateV1_0_0Item,
+  type PermissionAssignmentTreeSearchV1_0_0Item,
+  type PermissionAssignmentTreeHydrateV1_0_0Item,
 } from "../../../../resources/generated/admin-service-object-client";
 import { request } from "./client";
 
@@ -46,6 +50,30 @@ export type RoleChangeConflict = RoleStateOrGroupChangeConflictsV1_0_0Item;
 export type MenuDefinition = AdminServiceObjectMenuDefinition;
 export type MenuParameter = AdminServiceObjectMenuParameter;
 export type PageButton = AdminServiceObjectPageButton;
+export type MenuAssignmentTreeItem = MenuAssignmentTreeSearchV1_0_0Item;
+export type MenuAssignmentTreeHydratedItem = MenuAssignmentTreeHydrateV1_0_0Item;
+export type PermissionAssignmentTreeItem = PermissionAssignmentTreeSearchV1_0_0Item;
+export type PermissionAssignmentTreeHydratedItem = PermissionAssignmentTreeHydrateV1_0_0Item;
+
+export async function searchMenuAssignmentTree(roleCode: string, query: string, page = 1, pageSize = 100) {
+  return requireData(await client.searchMenuAssignmentTree({ arguments: { roleCode, query }, pagination: { page, pageSize } })).items;
+}
+
+export async function hydrateMenuAssignmentTree(roleCode: string) {
+  return collectPages(async (page, pageSize) => requireData(await client.hydrateMenuAssignmentTree({
+    arguments: { roleCode }, pagination: { page, pageSize },
+  })));
+}
+
+export async function searchPermissionAssignmentTree(roleCode: string, query: string, page = 1, pageSize = 100) {
+  return requireData(await client.searchPermissionAssignmentTree({ arguments: { roleCode, query }, pagination: { page, pageSize } })).items;
+}
+
+export async function hydratePermissionAssignmentTree(roleCode: string) {
+  return collectPages(async (page, pageSize) => requireData(await client.hydratePermissionAssignmentTree({
+    arguments: { roleCode }, pagination: { page, pageSize },
+  })));
+}
 
 export async function getMenuDefinition(menuCode: string) {
   const result = requireData(await client.getMenuDefinition({

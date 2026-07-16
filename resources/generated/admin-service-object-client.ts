@@ -410,6 +410,164 @@ export type NavigationMenuDefinitionGetV1_0_0QueryData = {
   readonly pageSize: number;
 };
 
+export type MenuAssignmentTreeSearchV1_0_0Arguments = {
+  "roleCode": string;
+  "query"?: string;
+};
+
+export type MenuAssignmentTreeSearchV1_0_0Sort = {
+  readonly name: never;
+  readonly order: "asc" | "desc";
+};
+
+export type MenuAssignmentTreeSearchV1_0_0Item = {
+  readonly "code": string;
+  readonly "name": string;
+  readonly "parentCode": string;
+  readonly "status": string;
+  readonly "selected": boolean;
+  readonly "disabledReason": string;
+  readonly "nodeType": string;
+};
+
+export type MenuAssignmentTreeSearchV1_0_0QueryInput = {
+  readonly arguments: MenuAssignmentTreeSearchV1_0_0Arguments;
+  readonly pagination?: {
+    readonly page?: number;
+    readonly pageSize?: number;
+  };
+  readonly sort?: ReadonlyArray<MenuAssignmentTreeSearchV1_0_0Sort>;
+};
+
+export type MenuAssignmentTreeSearchV1_0_0QueryRequest = MenuAssignmentTreeSearchV1_0_0QueryInput & {
+  readonly queryId: "platform.navigation.menu-assignment-tree.search";
+  readonly version: "1.0.0";
+};
+
+export type MenuAssignmentTreeSearchV1_0_0QueryData = {
+  readonly items: ReadonlyArray<MenuAssignmentTreeSearchV1_0_0Item>;
+  readonly page: number;
+  readonly pageSize: number;
+};
+
+export type MenuAssignmentTreeHydrateV1_0_0Arguments = {
+  "roleCode": string;
+};
+
+export type MenuAssignmentTreeHydrateV1_0_0Sort = {
+  readonly name: never;
+  readonly order: "asc" | "desc";
+};
+
+export type MenuAssignmentTreeHydrateV1_0_0Item = {
+  readonly "code": string;
+  readonly "name": string;
+  readonly "parentCode": string;
+  readonly "status": string;
+  readonly "selected": boolean;
+  readonly "disabledReason": string;
+  readonly "nodeType": string;
+};
+
+export type MenuAssignmentTreeHydrateV1_0_0QueryInput = {
+  readonly arguments: MenuAssignmentTreeHydrateV1_0_0Arguments;
+  readonly pagination?: {
+    readonly page?: number;
+    readonly pageSize?: number;
+  };
+  readonly sort?: ReadonlyArray<MenuAssignmentTreeHydrateV1_0_0Sort>;
+};
+
+export type MenuAssignmentTreeHydrateV1_0_0QueryRequest = MenuAssignmentTreeHydrateV1_0_0QueryInput & {
+  readonly queryId: "platform.navigation.menu-assignment-tree.hydrate";
+  readonly version: "1.0.0";
+};
+
+export type MenuAssignmentTreeHydrateV1_0_0QueryData = {
+  readonly items: ReadonlyArray<MenuAssignmentTreeHydrateV1_0_0Item>;
+  readonly page: number;
+  readonly pageSize: number;
+};
+
+export type PermissionAssignmentTreeSearchV1_0_0Arguments = {
+  "roleCode": string;
+  "query"?: string;
+};
+
+export type PermissionAssignmentTreeSearchV1_0_0Sort = {
+  readonly name: never;
+  readonly order: "asc" | "desc";
+};
+
+export type PermissionAssignmentTreeSearchV1_0_0Item = {
+  readonly "code": string;
+  readonly "name": string;
+  readonly "parentCode": string;
+  readonly "status": string;
+  readonly "selected": boolean;
+  readonly "disabledReason": string;
+  readonly "resourceType": string;
+};
+
+export type PermissionAssignmentTreeSearchV1_0_0QueryInput = {
+  readonly arguments: PermissionAssignmentTreeSearchV1_0_0Arguments;
+  readonly pagination?: {
+    readonly page?: number;
+    readonly pageSize?: number;
+  };
+  readonly sort?: ReadonlyArray<PermissionAssignmentTreeSearchV1_0_0Sort>;
+};
+
+export type PermissionAssignmentTreeSearchV1_0_0QueryRequest = PermissionAssignmentTreeSearchV1_0_0QueryInput & {
+  readonly queryId: "platform.authorization.permission-assignment-tree.search";
+  readonly version: "1.0.0";
+};
+
+export type PermissionAssignmentTreeSearchV1_0_0QueryData = {
+  readonly items: ReadonlyArray<PermissionAssignmentTreeSearchV1_0_0Item>;
+  readonly page: number;
+  readonly pageSize: number;
+};
+
+export type PermissionAssignmentTreeHydrateV1_0_0Arguments = {
+  "roleCode": string;
+};
+
+export type PermissionAssignmentTreeHydrateV1_0_0Sort = {
+  readonly name: never;
+  readonly order: "asc" | "desc";
+};
+
+export type PermissionAssignmentTreeHydrateV1_0_0Item = {
+  readonly "code": string;
+  readonly "name": string;
+  readonly "parentCode": string;
+  readonly "status": string;
+  readonly "selected": boolean;
+  readonly "disabledReason": string;
+  readonly "resourceType": string;
+};
+
+export type PermissionAssignmentTreeHydrateV1_0_0QueryInput = {
+  readonly arguments: PermissionAssignmentTreeHydrateV1_0_0Arguments;
+  readonly pagination?: {
+    readonly page?: number;
+    readonly pageSize?: number;
+  };
+  readonly sort?: ReadonlyArray<PermissionAssignmentTreeHydrateV1_0_0Sort>;
+};
+
+export type PermissionAssignmentTreeHydrateV1_0_0QueryRequest = PermissionAssignmentTreeHydrateV1_0_0QueryInput & {
+  readonly queryId: "platform.authorization.permission-assignment-tree.hydrate";
+  readonly version: "1.0.0";
+};
+
+export type PermissionAssignmentTreeHydrateV1_0_0QueryData = {
+  readonly items: ReadonlyArray<PermissionAssignmentTreeHydrateV1_0_0Item>;
+  readonly page: number;
+  readonly pageSize: number;
+};
+
 export type NavigationRoleMenusGetV1_0_0Arguments = {
   "roleCode": string;
 };
@@ -1071,6 +1229,42 @@ export class AdminServiceObjectClient {
       version: "1.0.0",
     };
     return this.transport.post<NavigationMenuDefinitionGetV1_0_0QueryData, NavigationMenuDefinitionGetV1_0_0QueryRequest>("/api/admin/service-objects/query", request);
+  }
+
+  searchMenuAssignmentTree(input: MenuAssignmentTreeSearchV1_0_0QueryInput): Promise<AdminServiceObjectResponse<MenuAssignmentTreeSearchV1_0_0QueryData>> {
+    const request: MenuAssignmentTreeSearchV1_0_0QueryRequest = {
+      ...input,
+      queryId: "platform.navigation.menu-assignment-tree.search",
+      version: "1.0.0",
+    };
+    return this.transport.post<MenuAssignmentTreeSearchV1_0_0QueryData, MenuAssignmentTreeSearchV1_0_0QueryRequest>("/api/admin/service-objects/query", request);
+  }
+
+  hydrateMenuAssignmentTree(input: MenuAssignmentTreeHydrateV1_0_0QueryInput): Promise<AdminServiceObjectResponse<MenuAssignmentTreeHydrateV1_0_0QueryData>> {
+    const request: MenuAssignmentTreeHydrateV1_0_0QueryRequest = {
+      ...input,
+      queryId: "platform.navigation.menu-assignment-tree.hydrate",
+      version: "1.0.0",
+    };
+    return this.transport.post<MenuAssignmentTreeHydrateV1_0_0QueryData, MenuAssignmentTreeHydrateV1_0_0QueryRequest>("/api/admin/service-objects/query", request);
+  }
+
+  searchPermissionAssignmentTree(input: PermissionAssignmentTreeSearchV1_0_0QueryInput): Promise<AdminServiceObjectResponse<PermissionAssignmentTreeSearchV1_0_0QueryData>> {
+    const request: PermissionAssignmentTreeSearchV1_0_0QueryRequest = {
+      ...input,
+      queryId: "platform.authorization.permission-assignment-tree.search",
+      version: "1.0.0",
+    };
+    return this.transport.post<PermissionAssignmentTreeSearchV1_0_0QueryData, PermissionAssignmentTreeSearchV1_0_0QueryRequest>("/api/admin/service-objects/query", request);
+  }
+
+  hydratePermissionAssignmentTree(input: PermissionAssignmentTreeHydrateV1_0_0QueryInput): Promise<AdminServiceObjectResponse<PermissionAssignmentTreeHydrateV1_0_0QueryData>> {
+    const request: PermissionAssignmentTreeHydrateV1_0_0QueryRequest = {
+      ...input,
+      queryId: "platform.authorization.permission-assignment-tree.hydrate",
+      version: "1.0.0",
+    };
+    return this.transport.post<PermissionAssignmentTreeHydrateV1_0_0QueryData, PermissionAssignmentTreeHydrateV1_0_0QueryRequest>("/api/admin/service-objects/query", request);
   }
 
   getRoleMenus(input: NavigationRoleMenusGetV1_0_0QueryInput): Promise<AdminServiceObjectResponse<NavigationRoleMenusGetV1_0_0QueryData>> {

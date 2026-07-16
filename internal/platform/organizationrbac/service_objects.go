@@ -187,7 +187,8 @@ func OrganizationQueryDefinitions() []serviceobject.QueryDefinition {
 		impactQueryDefinition(RolePermissionImpactQueryID, "roles", "admin:role:update"),
 		resourceLifecycleImpactQueryDefinition(),
 	}
-	return append(definitions, navigationQueryDefinitions()...)
+	definitions = append(definitions, navigationQueryDefinitions()...)
+	return append(definitions, assignmentTreeQueryDefinitions()...)
 }
 
 func OrganizationDomainCommandDefinitions() []serviceobject.DomainCommandDefinition {
@@ -337,6 +338,8 @@ func (e *ServiceObjectExecutor) ExecuteQuery(ctx context.Context, plan serviceob
 		return e.getRoleMenuImpact(ctx, plan)
 	case RoleMenuMigrationCompareQueryID:
 		return e.compareRoleMenuMigration(ctx, plan)
+	case MenuAssignmentTreeSearchQueryID, MenuAssignmentTreeHydrateQueryID, PermissionAssignmentTreeSearchQueryID, PermissionAssignmentTreeHydrateQueryID:
+		return e.executeAssignmentTreeQuery(ctx, plan)
 	case OrganizationRolePoolQueryID:
 		orgUnitCode, ok := predicateString(plan.AST, "orgUnitCode")
 		if !ok {

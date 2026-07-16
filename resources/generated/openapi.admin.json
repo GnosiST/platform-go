@@ -10649,6 +10649,538 @@
           "timeoutMs": 2000
         }
       },
+      "MenuAssignmentTreeSearchV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleCode": {
+            "type": "string",
+            "maxLength": 191
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 191
+          }
+        },
+        "required": [
+          "roleCode"
+        ]
+      },
+      "MenuAssignmentTreeSearchV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentCode": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "selected": {
+            "type": "boolean"
+          },
+          "disabledReason": {
+            "type": "string"
+          },
+          "nodeType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "parentCode",
+          "status",
+          "selected",
+          "disabledReason",
+          "nodeType"
+        ]
+      },
+      "MenuAssignmentTreeSearchV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuAssignmentTreeSearchV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      },
+      "MenuAssignmentTreeSearchV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version",
+          "arguments"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.navigation.menu-assignment-tree.search"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/MenuAssignmentTreeSearchV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              }
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "menus",
+          "permission": "admin:role:read",
+          "action": "read",
+          "additionalPermissions": [],
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 2,
+            "perRowCost": 1,
+            "perOffsetCost": 1,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 2000,
+            "limit": 2005
+          },
+          "timeoutMs": 3000
+        }
+      },
+      "MenuAssignmentTreeHydrateV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleCode": {
+            "type": "string",
+            "maxLength": 191
+          }
+        },
+        "required": [
+          "roleCode"
+        ]
+      },
+      "MenuAssignmentTreeHydrateV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentCode": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "selected": {
+            "type": "boolean"
+          },
+          "disabledReason": {
+            "type": "string"
+          },
+          "nodeType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "parentCode",
+          "status",
+          "selected",
+          "disabledReason",
+          "nodeType"
+        ]
+      },
+      "MenuAssignmentTreeHydrateV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuAssignmentTreeHydrateV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        }
+      },
+      "MenuAssignmentTreeHydrateV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version",
+          "arguments"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.navigation.menu-assignment-tree.hydrate"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/MenuAssignmentTreeHydrateV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              }
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "menus",
+          "permission": "admin:role:read",
+          "action": "read",
+          "additionalPermissions": [],
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 2,
+            "perRowCost": 1,
+            "perOffsetCost": 1,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 2000,
+            "limit": 2005
+          },
+          "timeoutMs": 3000
+        }
+      },
+      "PermissionAssignmentTreeSearchV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleCode": {
+            "type": "string",
+            "maxLength": 191
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 191
+          }
+        },
+        "required": [
+          "roleCode"
+        ]
+      },
+      "PermissionAssignmentTreeSearchV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentCode": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "selected": {
+            "type": "boolean"
+          },
+          "disabledReason": {
+            "type": "string"
+          },
+          "resourceType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "parentCode",
+          "status",
+          "selected",
+          "disabledReason",
+          "resourceType"
+        ]
+      },
+      "PermissionAssignmentTreeSearchV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PermissionAssignmentTreeSearchV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      },
+      "PermissionAssignmentTreeSearchV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version",
+          "arguments"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.authorization.permission-assignment-tree.search"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/PermissionAssignmentTreeSearchV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              }
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "permissions",
+          "permission": "admin:role:read",
+          "action": "read",
+          "additionalPermissions": [],
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 2,
+            "perRowCost": 1,
+            "perOffsetCost": 1,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 2000,
+            "limit": 2005
+          },
+          "timeoutMs": 3000
+        }
+      },
+      "PermissionAssignmentTreeHydrateV1_0_0Arguments": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleCode": {
+            "type": "string",
+            "maxLength": 191
+          }
+        },
+        "required": [
+          "roleCode"
+        ]
+      },
+      "PermissionAssignmentTreeHydrateV1_0_0Item": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentCode": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "selected": {
+            "type": "boolean"
+          },
+          "disabledReason": {
+            "type": "string"
+          },
+          "resourceType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "parentCode",
+          "status",
+          "selected",
+          "disabledReason",
+          "resourceType"
+        ]
+      },
+      "PermissionAssignmentTreeHydrateV1_0_0QueryData": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PermissionAssignmentTreeHydrateV1_0_0Item"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        }
+      },
+      "PermissionAssignmentTreeHydrateV1_0_0QueryRequest": {
+        "type": "object",
+        "required": [
+          "queryId",
+          "version",
+          "arguments"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "const": "platform.authorization.permission-assignment-tree.hydrate"
+          },
+          "version": {
+            "type": "string",
+            "const": "1.0.0"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/PermissionAssignmentTreeHydrateV1_0_0Arguments"
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              }
+            }
+          }
+        },
+        "x-platform-definition": {
+          "resource": "permissions",
+          "permission": "admin:role:read",
+          "action": "read",
+          "additionalPermissions": [],
+          "tenantMode": "platform",
+          "dataScope": "platform",
+          "cost": {
+            "baseCost": 2,
+            "perRowCost": 1,
+            "perOffsetCost": 1,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 2005,
+            "maxOffset": 2000,
+            "limit": 2005
+          },
+          "timeoutMs": 3000
+        }
+      },
       "NavigationRoleMenusGetV1_0_0Arguments": {
         "type": "object",
         "additionalProperties": false,
@@ -13178,6 +13710,18 @@
             "$ref": "#/components/schemas/NavigationMenuDefinitionGetV1_0_0QueryRequest"
           },
           {
+            "$ref": "#/components/schemas/MenuAssignmentTreeSearchV1_0_0QueryRequest"
+          },
+          {
+            "$ref": "#/components/schemas/MenuAssignmentTreeHydrateV1_0_0QueryRequest"
+          },
+          {
+            "$ref": "#/components/schemas/PermissionAssignmentTreeSearchV1_0_0QueryRequest"
+          },
+          {
+            "$ref": "#/components/schemas/PermissionAssignmentTreeHydrateV1_0_0QueryRequest"
+          },
+          {
             "$ref": "#/components/schemas/NavigationRoleMenusGetV1_0_0QueryRequest"
           },
           {
@@ -13233,6 +13777,22 @@
               "version": "1.0.0"
             },
             {
+              "queryId": "platform.navigation.menu-assignment-tree.search",
+              "version": "1.0.0"
+            },
+            {
+              "queryId": "platform.navigation.menu-assignment-tree.hydrate",
+              "version": "1.0.0"
+            },
+            {
+              "queryId": "platform.authorization.permission-assignment-tree.search",
+              "version": "1.0.0"
+            },
+            {
+              "queryId": "platform.authorization.permission-assignment-tree.hydrate",
+              "version": "1.0.0"
+            },
+            {
               "queryId": "platform.navigation.role-menus.get",
               "version": "1.0.0"
             },
@@ -13262,6 +13822,10 @@
             "platform.identity.role-state-or-group-change.conflicts.list": "#/components/schemas/RoleStateOrGroupChangeConflictsV1_0_0QueryRequest",
             "platform.authorization.role-permission-change.impact": "#/components/schemas/RolePermissionChangeImpactV1_0_0QueryRequest",
             "platform.navigation.menu-definition.get": "#/components/schemas/NavigationMenuDefinitionGetV1_0_0QueryRequest",
+            "platform.navigation.menu-assignment-tree.search": "#/components/schemas/MenuAssignmentTreeSearchV1_0_0QueryRequest",
+            "platform.navigation.menu-assignment-tree.hydrate": "#/components/schemas/MenuAssignmentTreeHydrateV1_0_0QueryRequest",
+            "platform.authorization.permission-assignment-tree.search": "#/components/schemas/PermissionAssignmentTreeSearchV1_0_0QueryRequest",
+            "platform.authorization.permission-assignment-tree.hydrate": "#/components/schemas/PermissionAssignmentTreeHydrateV1_0_0QueryRequest",
             "platform.navigation.role-menus.get": "#/components/schemas/NavigationRoleMenusGetV1_0_0QueryRequest",
             "platform.navigation.role-menu-change.impact": "#/components/schemas/NavigationRoleMenuChangeImpactV1_0_0QueryRequest",
             "platform.navigation.role-menu-migration.compare": "#/components/schemas/NavigationRoleMenuMigrationCompareV1_0_0QueryRequest",
@@ -13442,6 +14006,18 @@
           },
           {
             "$ref": "#/components/schemas/NavigationMenuDefinitionGetV1_0_0QueryData"
+          },
+          {
+            "$ref": "#/components/schemas/MenuAssignmentTreeSearchV1_0_0QueryData"
+          },
+          {
+            "$ref": "#/components/schemas/MenuAssignmentTreeHydrateV1_0_0QueryData"
+          },
+          {
+            "$ref": "#/components/schemas/PermissionAssignmentTreeSearchV1_0_0QueryData"
+          },
+          {
+            "$ref": "#/components/schemas/PermissionAssignmentTreeHydrateV1_0_0QueryData"
           },
           {
             "$ref": "#/components/schemas/NavigationRoleMenusGetV1_0_0QueryData"

@@ -507,6 +507,124 @@
       },
       {
         "kind": "query",
+        "id": "platform.navigation.menu-assignment-tree.search",
+        "version": "1.0.0",
+        "clientMethod": "searchMenuAssignmentTree",
+        "requestType": "MenuAssignmentTreeSearchV1_0_0QueryRequest",
+        "inputType": "MenuAssignmentTreeSearchV1_0_0QueryInput",
+        "responseType": "MenuAssignmentTreeSearchV1_0_0QueryData",
+        "argumentNames": [
+          "roleCode",
+          "query"
+        ],
+        "additionalPermissions": [],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 3000,
+          "cost": {
+            "baseCost": 2,
+            "perRowCost": 1,
+            "perOffsetCost": 1,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 2000,
+            "limit": 2005
+          },
+          "maxPageSize": 100,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "query",
+        "id": "platform.navigation.menu-assignment-tree.hydrate",
+        "version": "1.0.0",
+        "clientMethod": "hydrateMenuAssignmentTree",
+        "requestType": "MenuAssignmentTreeHydrateV1_0_0QueryRequest",
+        "inputType": "MenuAssignmentTreeHydrateV1_0_0QueryInput",
+        "responseType": "MenuAssignmentTreeHydrateV1_0_0QueryData",
+        "argumentNames": [
+          "roleCode"
+        ],
+        "additionalPermissions": [],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 3000,
+          "cost": {
+            "baseCost": 2,
+            "perRowCost": 1,
+            "perOffsetCost": 1,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 2000,
+            "limit": 2005
+          },
+          "maxPageSize": 1000,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "query",
+        "id": "platform.authorization.permission-assignment-tree.search",
+        "version": "1.0.0",
+        "clientMethod": "searchPermissionAssignmentTree",
+        "requestType": "PermissionAssignmentTreeSearchV1_0_0QueryRequest",
+        "inputType": "PermissionAssignmentTreeSearchV1_0_0QueryInput",
+        "responseType": "PermissionAssignmentTreeSearchV1_0_0QueryData",
+        "argumentNames": [
+          "roleCode",
+          "query"
+        ],
+        "additionalPermissions": [],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 3000,
+          "cost": {
+            "baseCost": 2,
+            "perRowCost": 1,
+            "perOffsetCost": 1,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 0,
+            "maxOffset": 2000,
+            "limit": 2005
+          },
+          "maxPageSize": 100,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "query",
+        "id": "platform.authorization.permission-assignment-tree.hydrate",
+        "version": "1.0.0",
+        "clientMethod": "hydratePermissionAssignmentTree",
+        "requestType": "PermissionAssignmentTreeHydrateV1_0_0QueryRequest",
+        "inputType": "PermissionAssignmentTreeHydrateV1_0_0QueryInput",
+        "responseType": "PermissionAssignmentTreeHydrateV1_0_0QueryData",
+        "argumentNames": [
+          "roleCode"
+        ],
+        "additionalPermissions": [],
+        "logicalSortNames": [],
+        "limits": {
+          "timeoutMs": 3000,
+          "cost": {
+            "baseCost": 2,
+            "perRowCost": 1,
+            "perOffsetCost": 1,
+            "predicateCost": 1,
+            "sortCost": 0,
+            "totalCost": 2005,
+            "maxOffset": 2000,
+            "limit": 2005
+          },
+          "maxPageSize": 1000,
+          "exposeTotal": false
+        }
+      },
+      {
+        "kind": "query",
         "id": "platform.navigation.role-menus.get",
         "version": "1.0.0",
         "clientMethod": "getRoleMenus",
