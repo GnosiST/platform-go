@@ -11,6 +11,7 @@ import (
 
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/dataprotection"
+	"platform-go/internal/platform/kernel"
 	"platform-go/internal/platform/masking"
 )
 
@@ -63,6 +64,7 @@ type Store struct {
 	nextID        int
 	revision      uint64
 	now           func() time.Time
+	correlationFn func() (kernel.Correlation, error)
 	repository    AdminResourceRepository
 	protection    dataprotection.Runtime
 	masking       masking.Runtime
@@ -115,6 +117,7 @@ func newStore(resources map[string][]Record, schemas map[string]Schema) *Store {
 		schemas:       schemas,
 		nextID:        1000,
 		now:           time.Now,
+		correlationFn: kernel.GenerateCorrelation,
 		masking:       masking.NewRuntime(),
 	}
 	return store

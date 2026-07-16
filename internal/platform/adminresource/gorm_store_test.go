@@ -435,11 +435,21 @@ func TestGORMAdminAuditMigrationPreservesHistoricalRowWithoutCanonicalBackfill(t
 			t.Fatalf("audit migration missing %s", column)
 		}
 	}
+	for _, index := range []string{"idx_platform_audit_logs_request_id", "idx_platform_audit_logs_trace_id"} {
+		if !db.Migrator().HasIndex(&gormAdminAuditLog{}, index) {
+			t.Fatalf("audit migration missing index %s", index)
+		}
+	}
 	var migrated gormAdminAuditLog
 	if err := db.First(&migrated, "id = ?", historical.ID).Error; err != nil {
 		t.Fatalf("load migrated audit row error = %v", err)
 	}
-	if migrated.ID != historical.ID || migrated.Code != historical.Code || migrated.ValuesJSON != historical.ValuesJSON || migrated.RequestID != nil || migrated.TraceID != nil {
+	wantMigrated := gormAdminAuditLog{
+		ID: "audit-historical", Code: "audit-historical", Name: "Historical", Status: "recorded", Description: "pre-Task6 row",
+		UpdatedAt: "2026-07-15T00:00:00Z", Actor: "admin", Action: "legacy.action", Resource: "roles", CreatedAt: "2026-07-15T00:00:00Z",
+		ValuesJSON: `{"targetId":"role-1","outcome":"success","eventId":"legacy-event","reasonCode":"completed","traceId":"` + legacyTrace + `"}`,
+	}
+	if !reflect.DeepEqual(migrated, wantMigrated) {
 		t.Fatalf("migrated audit row changed history or backfilled correlation: %+v", migrated)
 	}
 

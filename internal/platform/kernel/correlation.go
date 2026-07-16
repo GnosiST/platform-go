@@ -3,21 +3,16 @@ package kernel
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
-	"os"
+	"fmt"
+	"io"
 	"regexp"
-	"strconv"
 	"strings"
-	"sync/atomic"
-	"time"
 )
 
 var (
 	requestIDPattern = regexp.MustCompile(`^req_[0-9a-f]{32}$`)
 	traceIDPattern   = regexp.MustCompile(`^[0-9a-f]{32}$`)
-	fallbackSalt     = sha256.Sum256([]byte(strconv.FormatInt(time.Now().UnixNano(), 10) + ":" + strconv.Itoa(os.Getpid())))
-	fallbackSequence atomic.Uint64
 )
 
 type Correlation struct {
@@ -28,25 +23,23 @@ type Correlation struct {
 
 type correlationContextKey struct{}
 
-func GenerateCorrelation() Correlation {
-	return Correlation{
-		RequestID: "req_" + opaqueCorrelationHex(),
-		TraceID:   opaqueCorrelationHex(),
-	}
+func GenerateCorrelation() (Correlation, error) {
+	return generateCorrelation(rand.Reader)
 }
 
 func ValidCorrelation(correlation Correlation) bool {
 	return requestIDPattern.MatchString(correlation.RequestID) && traceIDPattern.MatchString(correlation.TraceID)
 }
 
-func opaqueCorrelationHex() string {
-	var value [16]byte
-	if _, err := rand.Read(value[:]); err == nil {
-		return hex.EncodeToString(value[:])
+func generateCorrelation(random io.Reader) (Correlation, error) {
+	var value [32]byte
+	if _, err := io.ReadFull(random, value[:]); err != nil {
+		return Correlation{}, fmt.Errorf("generate correlation: %w", err)
 	}
-	sequence := fallbackSequence.Add(1)
-	digest := sha256.Sum256([]byte(hex.EncodeToString(fallbackSalt[:]) + ":" + strconv.FormatUint(sequence, 10)))
-	return hex.EncodeToString(digest[:16])
+	return Correlation{
+		RequestID: "req_" + hex.EncodeToString(value[:16]),
+		TraceID:   hex.EncodeToString(value[16:]),
+	}, nil
 }
 
 func WithCorrelation(ctx context.Context, correlation Correlation) context.Context {

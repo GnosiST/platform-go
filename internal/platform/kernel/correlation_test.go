@@ -2,16 +2,31 @@ package kernel
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"testing"
 )
+
+type failingCorrelationReader struct {
+	err error
+}
+
+func (reader failingCorrelationReader) Read([]byte) (int, error) {
+	return 0, reader.err
+}
 
 func TestGenerateCorrelationReturnsOpaqueValidPair(t *testing.T) {
 	requestPattern := regexp.MustCompile(`^req_[0-9a-f]{32}$`)
 	tracePattern := regexp.MustCompile(`^[0-9a-f]{32}$`)
 
-	first := GenerateCorrelation()
-	second := GenerateCorrelation()
+	first, err := GenerateCorrelation()
+	if err != nil {
+		t.Fatalf("GenerateCorrelation(first) error = %v", err)
+	}
+	second, err := GenerateCorrelation()
+	if err != nil {
+		t.Fatalf("GenerateCorrelation(second) error = %v", err)
+	}
 	for _, correlation := range []Correlation{first, second} {
 		if !requestPattern.MatchString(correlation.RequestID) || !tracePattern.MatchString(correlation.TraceID) {
 			t.Fatalf("GenerateCorrelation() = %+v, want opaque request/trace pair", correlation)
@@ -22,6 +37,17 @@ func TestGenerateCorrelationReturnsOpaqueValidPair(t *testing.T) {
 	}
 	if first.RequestID == second.RequestID || first.TraceID == second.TraceID {
 		t.Fatalf("GenerateCorrelation() repeated identifiers: first=%+v second=%+v", first, second)
+	}
+}
+
+func TestGenerateCorrelationFailsClosedWhenRandomnessIsUnavailable(t *testing.T) {
+	wantErr := errors.New("random source unavailable")
+	correlation, err := generateCorrelation(failingCorrelationReader{err: wantErr})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("generateCorrelation() error = %v, want %v", err, wantErr)
+	}
+	if correlation != (Correlation{}) {
+		t.Fatalf("generateCorrelation() = %+v, want no correlation on RNG failure", correlation)
 	}
 }
 

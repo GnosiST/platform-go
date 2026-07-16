@@ -625,7 +625,11 @@ func (s *Store) auditRecordLocked(event AuditEvent, nextID int) (Record, error) 
 		TraceID:   strings.TrimSpace(event.TraceID),
 	}
 	if !kernel.ValidCorrelation(correlation) {
-		correlation = kernel.GenerateCorrelation()
+		var err error
+		correlation, err = s.correlationFn()
+		if err != nil {
+			return Record{}, fmt.Errorf("generate audit correlation: %w", err)
+		}
 	}
 	values := map[string]string{
 		"actor": event.Actor, "action": event.Action, "resource": event.Resource,

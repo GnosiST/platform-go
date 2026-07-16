@@ -1270,6 +1270,36 @@ func TestRecordAuditWithoutContextGeneratesCanonicalCorrelation(t *testing.T) {
 	}
 }
 
+func TestRecordAuditDoesNotPersistWhenCorrelationGenerationFails(t *testing.T) {
+	repository := &recordingRepository{snapshot: ResourceSnapshot{Resources: map[string][]Record{}}}
+	store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	if err != nil {
+		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+	}
+	wantErr := errors.New("random source unavailable")
+	store.correlationFn = func() (kernel.Correlation, error) {
+		return kernel.Correlation{}, wantErr
+	}
+	beforeCount := len(store.resources["audit-logs"])
+	beforeNextID := store.nextID
+
+	record, err := store.RecordAudit(AuditEvent{
+		Actor: "system", Action: "retention.run", Resource: "files", TargetID: "file-1",
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("RecordAudit() error = %v, want %v", err, wantErr)
+	}
+	if !reflect.DeepEqual(record, Record{}) {
+		t.Fatalf("RecordAudit() = %+v, want no record on correlation failure", record)
+	}
+	if len(store.resources["audit-logs"]) != beforeCount || store.nextID != beforeNextID {
+		t.Fatalf("correlation failure mutated store: audits=%d nextID=%d", len(store.resources["audit-logs"]), store.nextID)
+	}
+	if repository.saveCount != 0 {
+		t.Fatalf("correlation failure persisted a snapshot: saveCount=%d", repository.saveCount)
+	}
+}
+
 func TestRepositoryBackedStoreNormalizesLegacyTraceWithoutCanonicalizingIt(t *testing.T) {
 	const legacy = "legacy-secret-email@example.test"
 	repository := &recordingRepository{snapshot: ResourceSnapshot{Resources: map[string][]Record{
