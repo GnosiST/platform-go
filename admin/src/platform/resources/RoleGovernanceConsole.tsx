@@ -23,11 +23,15 @@ import {
   getRolePermissionChangeImpact,
   getRoleStateOrGroupChangeConflicts,
   getRoleStateOrGroupChangeImpact,
+  hydrateMenuAssignmentTree,
+  hydratePermissionAssignmentTree,
   prepareRoleMenuChange,
   prepareRolePermissionChange,
   prepareRoleStateOrGroupChange,
   replaceRoleMenus,
   replaceRolePermissions,
+  searchMenuAssignmentTree,
+  searchPermissionAssignmentTree,
   roleMenuMigrationWriteEnabled,
   type OrganizationRoleRemediation,
   type RoleChangeConflict,
@@ -115,6 +119,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const [metadataForm] = Form.useForm<MetadataValues>();
   const authorizationTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const authorizationRequest = useRef(0);
   const governanceRequest = useRef(0);
   const menuRequest = useRef(0);
   const canReadGroups = hasPermission(permissions, "admin:role-group:read", deniedPermissions);
@@ -214,12 +219,14 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
 
   const openAuthorization = async (role: AdminResourceRecord) => {
     if (!canReadAuthorizationInputs) return;
+    const requestID = ++authorizationRequest.current;
     try {
       const [nextPermissions, nextOrgUnits, nextAreaCodes] = await Promise.all([
-        permissionCatalog.length ? permissionCatalog : loadAllRecords("permissions"),
+        permissionCatalog.length ? permissionCatalog : assignmentPermissionRecords(role.code),
         orgUnits.length ? orgUnits : loadAllRecords("org-units"),
         areaCodes.length ? areaCodes : loadAllRecords("area-codes"),
       ]);
+      if (authorizationRequest.current !== requestID) return;
       setPermissionCatalog(nextPermissions);
       setOrgUnits(nextOrgUnits);
       setAreaCodes(nextAreaCodes);
@@ -233,7 +240,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
         dataScopeAreaCodes: csv(valueOf(role, "dataScopeAreaCodes")),
       });
     } catch (nextError) {
-      setError(errorMessage(nextError, dictionary.loadResourceFailed));
+      if (authorizationRequest.current === requestID) setError(errorMessage(nextError, dictionary.loadResourceFailed));
     }
   };
 
@@ -272,7 +279,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
     try {
       const targetRequest = roleMenuMigrationWriteEnabled ? getRoleMenus(role.code) : Promise.resolve(null);
       const [nextMenus, targetAssignment] = await Promise.all([
-        menus.length > 0 ? Promise.resolve(menus) : loadAllRecords("menus"),
+        menus.length > 0 ? Promise.resolve(menus) : assignmentMenuRecords(role.code),
         targetRequest,
       ]);
       if (menuRequest.current !== requestID) return;
@@ -478,7 +485,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
         permissionCatalog={permissionCatalog}
         returnFocusRef={authorizationTriggerRef}
         onAuthorizationChange={setAuthorization}
-        onCancel={() => setAuthorization(null)}
+        onCancel={() => { authorizationRequest.current += 1; setAuthorization(null); }}
         onModeChange={setPermissionMode}
         onSave={() => void saveAuthorization()}
       />
@@ -738,6 +745,46 @@ function MenuVisibilityModal({
       />
     </Modal>
   );
+}
+
+async function assignmentPermissionRecords(roleCode: string): Promise<AdminResourceRecord[]> {
+  const [searchResults, selectedResults] = await Promise.all([
+    searchPermissionAssignmentTree(roleCode, "", 1, 1000),
+    hydratePermissionAssignmentTree(roleCode),
+  ]);
+  return mergeAssignmentRecords([...searchResults, ...selectedResults], (item) => ({
+    resourceType: item.resourceType,
+    parentCode: item.parentCode,
+    disabledReason: item.disabledReason,
+  }));
+}
+
+async function assignmentMenuRecords(roleCode: string): Promise<AdminResourceRecord[]> {
+  const [searchResults, selectedResults] = await Promise.all([
+    searchMenuAssignmentTree(roleCode, "", 1, 1000),
+    hydrateMenuAssignmentTree(roleCode),
+  ]);
+  return mergeAssignmentRecords([...searchResults, ...selectedResults], (item) => ({
+    nodeType: item.nodeType,
+    parentCode: item.parentCode,
+    disabledReason: item.disabledReason,
+  }));
+}
+
+function mergeAssignmentRecords<T extends { code: string; name: string; status: string }>(items: readonly T[], values: (item: T) => Record<string, string>): AdminResourceRecord[] {
+  const byCode = new Map<string, AdminResourceRecord>();
+  for (const item of items) {
+    if (byCode.has(item.code)) continue;
+    byCode.set(item.code, {
+      id: `assignment:${item.code}`,
+      code: item.code,
+      name: item.name,
+      status: item.status,
+      updatedAt: "",
+      values: values(item),
+    });
+  }
+  return [...byCode.values()].sort((left, right) => left.code.localeCompare(right.code));
 }
 
 function roleTreeNodes(groups: AdminResourceRecord[], roles: AdminResourceRecord[], search: string, includeReferencedGroups = false): AdminTreeWorkbenchNode[] {
