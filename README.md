@@ -21,7 +21,7 @@ The `zshenmez` project is only external reference evidence for reusable capabili
 
 ## Active Completion Program
 
-The original 37-node foundation baseline remains implemented and closed. The active completion program now contains 30 nodes beyond that baseline; seventeen continuation nodes, including `platform-service-contract-standard`, `persisted-query-command-object-runtime`, `integration-ports-disabled-default`, the organization/RBAC/menu contract gate, the organization role-pool backend/migration runtime, `organization-user-admin-experience`, `role-tree-and-authorization-entry`, `menu-tree-and-button-permission-configuration`, unified error-code governance and the organization E2E gate, are `implemented`, so the current governance state is `67 total / 54 implemented / 13 controlled unfinished` with `completionStatus=not-complete-controlled`.
+The original 37-node foundation baseline remains implemented and closed. The active completion program now contains 30 nodes beyond that baseline; seventeen continuation nodes, including `platform-service-contract-standard`, `persisted-query-command-object-runtime`, `integration-ports-disabled-default`, the organization/RBAC/menu contract gate, the organization role-pool backend/migration runtime, `organization-user-admin-experience`, `role-tree-and-authorization-entry`, `menu-tree-and-button-permission-configuration`, unified error-code governance and the organization E2E gate, are `implemented`, so the current governance state is `67 total / 58 implemented / 9 controlled unfinished` with `completionStatus=not-complete-controlled`.
 
 The closed security and experience nodes `runtime-security-containment`, `sensitive-data-protection-runtime`, `sensitive-data-historical-migration` and `admin-watermark-export-governance` remain `implemented`; this runtime node does not reopen or weaken their evidence gates.
 
@@ -37,18 +37,9 @@ For v0.1.0, release blockers are `open-source-portability`, `public-docs-communi
 
 Admin watermark preferences use one normalized switch with independent `screen` and `export` scopes. Screen watermarks render exactly `1`, `4`, `9` or `16` inert DOM marks in one fixed viewport layer covering the topbar, sidebar, data surfaces, drawers, dropdowns and modals; narrow sixteen-mark layouts reflow to `2x8`. Export watermarking is intentionally limited to `GET /api/admin/policy-reviews/export?watermark=true|false`: the returned JSON carries structured product, actor and timestamp provenance, while the audit record stores only `watermarkApplied=true|false`. Canonical OpenAPI output, original file bytes and unsupported export formats remain unchanged.
 
-Approved 2026-07-12 specifications:
-
-- [completion program](docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md);
-- [runtime security hardening](docs/superpowers/specs/2026-07-12-runtime-security-hardening-design.md);
-- [admin watermark and export governance](docs/superpowers/specs/2026-07-12-admin-watermark-export-design.md);
-- [sensitive data encryption](docs/superpowers/specs/2026-07-12-sensitive-data-encryption-design.md);
-- [open-source documentation and site](docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md).
-
-Approved 2026-07-13 specifications:
-
-- [mask strategy runtime](docs/superpowers/specs/2026-07-13-mask-strategy-runtime-design.md);
-- [sensitive data reveal step-up](docs/superpowers/specs/2026-07-13-sensitive-data-reveal-step-up-design.md).
+Public implementation contracts and operational guidance are maintained under
+[`docs/`](docs/). Internal planning and review artifacts are intentionally kept
+out of the public repository.
 
 ## Run
 

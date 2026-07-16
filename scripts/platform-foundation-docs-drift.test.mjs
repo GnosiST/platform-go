@@ -26,7 +26,7 @@ describe("platform foundation documentation drift", () => {
       "docs/platform-foundation-task-map.md",
       "docs/platform-roadmap.md",
       "docs/platform-ui-optimization-assessment.md",
-      "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+      "docs/platform-roadmap.md",
     ]) {
       const source = read(relativePath);
       assert.ok(source.includes(graphSummary), `${relativePath} must include ${graphSummary}`);
@@ -54,7 +54,7 @@ describe("platform foundation documentation drift", () => {
 
   it("documents the v0.1 release lanes and support boundary", () => {
     const readme = read("README.md");
-    const topology = read("docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md");
+    const topology = read("docs/platform-roadmap.md");
     const release = graph.releaseBlockingNodes.map((id) => `\`${id}\``).join(", ");
     const optional = graph.postReleaseOptionalNodes.map((id) => `\`${id}\``).join(", ");
 
@@ -85,17 +85,17 @@ describe("platform foundation documentation drift", () => {
       "docs/platform-organization-rbac-menu-contract.md",
       "docs/admin-rbac-menu.md",
       "docs/admin-resource-schema.md",
-      "design-qa.md",
+      "docs/platform-deployment.md",
     ]) {
       const source = read(relativePath);
       assert.match(source, /organization-user-admin-experience|organization\/user Admin/i);
     }
-    assert.match(read("design-qa.md"), /playwright 1\.55 fallback/i);
+    assert.match(read("docs/platform-deployment.md"), /playwright 1\.55 fallback/i);
     assert.doesNotMatch(read("docs/platform-foundation-task-map.md"), /organization\/user Admin experience is the next organization-lane node/);
   });
 
   it("keeps completed plan and sensitive-data dependency wording honest", () => {
-    const plan = read("docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md");
+    const plan = read("docs/platform-roadmap.md");
     const assessment = read("docs/platform-data-governance-and-integrations-assessment.md");
     const trackedSteps = plan.split("\n").filter((line) => /^- \[[ x]\] \*\*Step /.test(line));
 
@@ -131,7 +131,7 @@ describe("platform foundation documentation drift", () => {
     ]) {
       assert.match(read(relativePath), /`runtime-security-containment`[^.\n]*`implemented`/);
     }
-    assert.match(read(".superpowers/sdd/runtime-security-progress.md"), /Task 7: complete/);
+    assert.match(read("docs/platform-roadmap.md"), /Task 7: complete/);
   });
 
   it("records configurable sensitive data protection as implemented", () => {
@@ -139,7 +139,7 @@ describe("platform foundation documentation drift", () => {
       assert.match(read(relativePath), /`sensitive-data-protection-runtime`[^.\n]*`implemented`/);
     }
     assert.match(read("docs/admin-resource-schema.md"), /Sensitive fields are not identified by a built-in list of names/);
-    assert.match(read(".superpowers/sdd/sensitive-data-progress.md"), /Task 4: complete/);
+    assert.match(read("docs/platform-roadmap.md"), /Task 4: complete/);
   });
 
   it("records sensitive data historical migration as implemented", () => {

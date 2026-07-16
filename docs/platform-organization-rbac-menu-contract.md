@@ -183,3 +183,6 @@ The organization/user, focused role and menu nodes cover their bounded form, rol
 The remaining organization-lane work is owned only by `organization-rbac-menu-e2e-qa`: complete Tree Transfer 10,000-node acceptance, all-principal dual-read equivalence, cutover, rollback and end-to-end authorization proof.
 
 Datasource routing, federation, XA, Outbox/MQ, search projection and workload identity remain outside this lane.
+Runtime implementation is intentionally deferred behind the published
+organization, role-pool and menu contracts; this document is the public source
+of truth for the boundary and migration expectations.

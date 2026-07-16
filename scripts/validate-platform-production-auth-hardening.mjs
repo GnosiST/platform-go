@@ -17,8 +17,8 @@ const readinessPath = path.resolve(repoRoot, argValue("--production-readiness", 
 const capabilityAuditPath = path.resolve(repoRoot, argValue("--capability-audit", "resources/generated/platform-capability-audit.json"));
 const refreshTokenFamilyPromotionPath = path.resolve(repoRoot, argValue("--refresh-token-family-promotion", "resources/platform-refresh-token-family-promotion.json"));
 const promotionReviewPath = path.resolve(repoRoot, argValue("--promotion-review", "resources/generated/production-auth-promotion-review.json"));
-const sessionPolicyDocPath = path.resolve(repoRoot, argValue("--session-policy-doc", "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md"));
-const oidcDesignDocPath = path.resolve(repoRoot, argValue("--oidc-design-doc", "docs/superpowers/specs/2026-07-11-production-admin-oidc-auth-design.md"));
+const sessionPolicyDocPath = path.resolve(repoRoot, argValue("--session-policy-doc", "docs/platform-auth.md"));
+const oidcDesignDocPath = path.resolve(repoRoot, argValue("--oidc-design-doc", "docs/platform-auth.md"));
 const adminResourceSchemaDocPath = path.resolve(repoRoot, argValue("--admin-resource-schema-doc", "docs/admin-resource-schema.md"));
 const mainGoPath = path.resolve(repoRoot, argValue("--main-go", "cmd/platform-api/main.go"));
 

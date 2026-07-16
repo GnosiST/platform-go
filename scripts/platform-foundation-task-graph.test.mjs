@@ -638,10 +638,10 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(organizationTask.evidence.screenshots, ["resources/evidence/organization-user-admin-experience-20260715.json"]);
     assert.deepEqual(roleTask.evidence.screenshots, ["resources/evidence/role-tree-and-authorization-entry-20260715.json"]);
 
-    watermarkTask.evidence.screenshots = [".superpowers/product-design-audit/watermark/09-full-viewport-dashboard.png"];
-    revealTask.evidence.screenshots = [".superpowers/product-design-audit/sensitive-reveal/01-factor-selection.png"];
-    organizationTask.evidence.screenshots = [".superpowers/product-design-audit/organization-user-admin-experience/2026-07-15/users-create-375.png"];
-    roleTask.evidence.screenshots = [".superpowers/product-design-audit/role-tree-and-authorization-entry/2026-07-15/roles-375x812.png"];
+    watermarkTask.evidence.screenshots = ["docs/platform-roadmap.md"];
+    revealTask.evidence.screenshots = ["docs/platform-roadmap.md"];
+    organizationTask.evidence.screenshots = ["docs/platform-roadmap.md"];
+    roleTask.evidence.screenshots = ["docs/platform-roadmap.md"];
     const result = runValidator(["--graph", tempJSON("ignored-current-visual-evidence.json", graph)]);
 
     assert.notEqual(result.status, 0, result.stdout);
@@ -781,7 +781,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.ok(scaffoldTask.evidence.validators.includes("scripts/generate-admin-scaffold-files.mjs"));
     assert.ok(scaffoldTask.evidence.validators.includes("scripts/generate-admin-scaffold-promotion-review.mjs"));
     assert.ok(scaffoldTask.evidence.tests.includes("scripts/admin-scaffold-plan.test.mjs"));
-    assert.ok(scaffoldTask.evidence.docs.includes("docs/superpowers/specs/2026-07-06-platform-go-codegen-source-writing-readiness-design.md"));
+    assert.ok(scaffoldTask.evidence.docs.includes("docs/platform-roadmap.md"));
   });
 
   it("rejects implemented policy review tasks without any evidence", () => {

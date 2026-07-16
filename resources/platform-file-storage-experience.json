@@ -70,7 +70,7 @@
       "screenshots": [
         {
           "label": "desktop files list with preview drawer",
-          "path": "tmp/product-design/file-storage-experience-20260707/01-files-preview-drawer-desktop-1440x1024.png",
+          "path": "external-review-artifacts://platform-go/file-storage/2026-07-07/01-files-preview-drawer-desktop-1440x1024.png",
           "viewport": "1440x1024",
           "assertions": [
             "files route stays inside GenericResourceConsole",
@@ -80,7 +80,7 @@
         },
         {
           "label": "desktop files audit panel",
-          "path": "tmp/product-design/file-storage-experience-20260707/02-files-audit-drawer-desktop-1440x1024.png",
+          "path": "external-review-artifacts://platform-go/file-storage/2026-07-07/02-files-audit-drawer-desktop-1440x1024.png",
           "viewport": "1440x1024",
           "assertions": [
             "audit tab is visible in the drawer",
@@ -90,7 +90,7 @@
         },
         {
           "label": "mobile files card and pagination",
-          "path": "tmp/product-design/file-storage-experience-20260707/03-files-mobile-card-pagination-390x844.png",
+          "path": "external-review-artifacts://platform-go/file-storage/2026-07-07/03-files-mobile-card-pagination-390x844.png",
           "viewport": "390x844",
           "assertions": [
             "mobile file card replaces the table before pagination",
@@ -100,7 +100,7 @@
         },
         {
           "label": "mobile files preview drawer",
-          "path": "tmp/product-design/file-storage-experience-20260707/04-files-mobile-preview-drawer-390x844.png",
+          "path": "external-review-artifacts://platform-go/file-storage/2026-07-07/04-files-mobile-preview-drawer-390x844.png",
           "viewport": "390x844",
           "assertions": [
             "drawer opens from the mobile file card",

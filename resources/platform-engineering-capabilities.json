@@ -260,7 +260,7 @@
           "resources/platform-governance-topology.json",
           "internal/platform/adminresource/schema.go",
           "internal/platform/adminresource/data_scope.go",
-          "docs/superpowers/specs/2026-07-06-platform-go-governance-boundary-design.md"
+          "docs/platform-roadmap.md"
         ],
         "validators": [
           "scripts/validate-admin-resources.mjs",
@@ -1019,10 +1019,10 @@
           "rtk npm --prefix admin run build"
         ],
         "screenshots": [
-          "tmp/product-design/file-storage-experience-20260707/01-files-preview-drawer-desktop-1440x1024.png",
-          "tmp/product-design/file-storage-experience-20260707/02-files-audit-drawer-desktop-1440x1024.png",
-          "tmp/product-design/file-storage-experience-20260707/03-files-mobile-card-pagination-390x844.png",
-          "tmp/product-design/file-storage-experience-20260707/04-files-mobile-preview-drawer-390x844.png"
+          "external-review-artifacts://platform-go/file-storage/2026-07-07/01-files-preview-drawer-desktop-1440x1024.png",
+          "external-review-artifacts://platform-go/file-storage/2026-07-07/02-files-audit-drawer-desktop-1440x1024.png",
+          "external-review-artifacts://platform-go/file-storage/2026-07-07/03-files-mobile-card-pagination-390x844.png",
+          "external-review-artifacts://platform-go/file-storage/2026-07-07/04-files-mobile-preview-drawer-390x844.png"
         ],
         "requiredSourceSnippets": [
           {
@@ -1403,7 +1403,7 @@
           "resources/platform-foundation-task-graph.json",
           "resources/evidence/production-admin-oidc-auth-20260711.json",
           "scripts/generate-production-auth-promotion-review.mjs",
-          "docs/superpowers/specs/2026-07-11-production-admin-oidc-auth-design.md",
+          "docs/platform-roadmap.md",
           "docs/platform-auth.md",
           "docs/platform-foundation-task-map.md",
           "docs/platform-roadmap.md",
@@ -1738,12 +1738,12 @@
           "internal/platform/adminresource/file_store.go",
           "internal/platform/adminresource/sql_store.go",
           "internal/platform/httpapi/server.go",
-          "docs/superpowers/specs/2026-07-10-platform-production-persistence-correctness-design.md",
+          "docs/platform-roadmap.md",
           "docs/platform-cache.md",
-          ".superpowers/sdd/task-1-report.md",
-          ".superpowers/sdd/task-2-report.md",
-          ".superpowers/sdd/task-3-report.md",
-          ".superpowers/sdd/task-4-report.md"
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md"
         ],
         "validators": [
           "scripts/validate-platform-cache-invalidation.mjs",
@@ -2608,8 +2608,8 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-12-runtime-security-hardening-design.md",
-          "docs/superpowers/plans/2026-07-12-runtime-security-containment.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "internal/platform/adminresource/audit.go",
           "internal/platform/adminresource/security.go",
           "internal/platform/httpapi/server.go",
@@ -2654,8 +2654,8 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-12-admin-watermark-export-design.md",
-          "docs/superpowers/plans/2026-07-12-admin-watermark-export-governance.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "admin/src/platform/ui/adminUIConfig.ts",
           "admin/src/platform/ui/SystemSettingsDrawer.tsx",
           "admin/src/platform/shell/AdminShell.tsx",
@@ -2696,11 +2696,11 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-12-sensitive-data-encryption-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
-          "docs/superpowers/plans/2026-07-12-sensitive-data-protection-runtime.md",
-          "docs/superpowers/specs/2026-07-12-sensitive-data-historical-migration-design.md",
-          "docs/superpowers/plans/2026-07-12-sensitive-data-historical-migration.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/platform-sensitive-data-migration.md",
           "resources/platform-sensitive-data-migration-source-lock.json",
           "internal/platform/capability/manifest.go",
@@ -2755,8 +2755,8 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-13-mask-strategy-runtime-design.md",
-          "docs/superpowers/plans/2026-07-13-mask-strategy-runtime.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-ui-optimization-assessment.md",
           "docs/platform-roadmap.md",
@@ -2809,8 +2809,8 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-13-sensitive-data-reveal-step-up-design.md",
-          "docs/superpowers/plans/2026-07-13-sensitive-data-reveal-step-up.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md",
           "docs/platform-auth.md",
@@ -2949,7 +2949,7 @@
           "cmd/platform-contracts/main.go",
           "docs/platform-service-contract-standard.md",
           "docs/platform-capability-development.md",
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -3008,7 +3008,7 @@
           "internal/platform/serviceobject/reference.go",
           "internal/platform/httpapi/server.go",
           "docs/platform-service-objects.md",
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -3067,7 +3067,7 @@
           "deploy/env/production.example.env",
           "deploy/compose/docker-compose.prod.yml",
           "docs/platform-integration-ports.md",
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -3111,8 +3111,8 @@
         "sourcePaths": [
           "resources/platform-organization-rbac-menu-contract.json",
           "docs/platform-organization-rbac-menu-contract.md",
-          "docs/superpowers/specs/2026-07-15-organization-rbac-menu-contract-and-migration-design.md",
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -3206,9 +3206,9 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
-          "docs/superpowers/specs/2026-07-15-organization-user-admin-experience-design.md",
-          "docs/superpowers/plans/2026-07-15-organization-user-admin-experience.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md",
           "admin/src/platform/api/organizationRBAC.ts",
@@ -3253,9 +3253,9 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
-          "docs/superpowers/specs/2026-07-15-role-tree-and-authorization-entry-design.md",
-          "docs/superpowers/plans/2026-07-15-role-tree-and-authorization-entry.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md",
           "admin/src/platform/resources/RoleGovernanceConsole.tsx",
@@ -3340,7 +3340,7 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md",
           "resources/evidence/organization-rbac-menu-e2e-qa-20260716.json"
@@ -3380,7 +3380,7 @@
           "internal/platform/httpapi/response.go",
           "docs/platform-error-code-governance.md",
           "docs/platform-service-contract-standard.md",
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "resources/evidence/unified-error-code-governance-20260716.json"
         ],
         "generatedFiles": [
@@ -3414,7 +3414,7 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -3437,7 +3437,7 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -3459,7 +3459,7 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -3481,7 +3481,7 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -3504,7 +3504,7 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -3526,7 +3526,7 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -3548,7 +3548,7 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -3571,7 +3571,7 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -3594,7 +3594,7 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -3620,9 +3620,9 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md"
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md"
         ],
         "taskIds": ["open-source-portability"],
         "validators": ["scripts/validate-open-source-portability.mjs", "scripts/validate-open-source-portability.test.mjs"],
@@ -3643,15 +3643,18 @@
       ],
       "evidence": {
         "sourcePaths": [
-          "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md"
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md"
         ],
         "taskIds": [
           "public-docs-community",
           "public-docs-site",
           "github-release-publication"
-        ]
+        ],
+        "validators": ["scripts/validate-open-source-portability.mjs"],
+        "tests": ["scripts/validate-open-source-portability.test.mjs"],
+        "artifacts": ["resources/evidence/public-docs-site-20260716.json"]
       }
     }
   ]

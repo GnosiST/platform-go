@@ -24,7 +24,7 @@
         "contains": "sliding session renewal, not a separate refresh-token rotation model"
       },
       {
-        "path": "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md",
+        "path": "docs/platform-roadmap.md",
         "contains": "It is not a refresh-token-family model"
       }
     ]
@@ -259,7 +259,7 @@
       "docs/platform-capability-development.md",
       "docs/platform-roadmap.md",
       "docs/platform-foundation-task-map.md",
-      "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md"
+      "docs/platform-roadmap.md"
     ],
     "validators": [
       "scripts/validate-platform-refresh-token-family-promotion.mjs",

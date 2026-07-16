@@ -22,8 +22,8 @@ const completionProgramCapabilityIDs = [
   "organization-user-admin-experience",
   "role-tree-and-authorization-entry",
   "menu-tree-and-button-permission-configuration",
-  "organization-rbac-menu-e2e-qa",
-  "unified-error-code-governance",
+      "organization-rbac-menu-e2e-qa",
+      "unified-error-code-governance",
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",
   "datasource-read-write-routing",
@@ -79,14 +79,14 @@ const governedCapabilityDependencies = {
   "public-documentation-and-release": ["open-source-portability"],
 };
 const governedCapabilityDocs = [
-  "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+  "docs/platform-roadmap.md",
   "docs/platform-data-governance-and-integrations-assessment.md",
   "docs/platform-roadmap.md",
 ];
 const openSourceCapabilityDocs = [
-  "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
-  "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
-  "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+  "docs/platform-roadmap.md",
+  "docs/platform-roadmap.md",
+  "docs/platform-roadmap.md",
 ];
 
 function runValidator(args = []) {
@@ -160,6 +160,8 @@ describe("validate-platform-engineering-capabilities", () => {
     "menu-tree-and-button-permission-configuration",
     "organization-rbac-menu-e2e-qa",
     "unified-error-code-governance",
+    "open-source-portability",
+    "public-documentation-and-release",
     ]);
     for (const capability of capabilities.filter((item) => implementedCapabilityIDs.has(item.id))) {
       assert.equal(capability.status, "implemented");
@@ -545,7 +547,7 @@ describe("validate-platform-engineering-capabilities", () => {
     const matrix = readJSON("resources/platform-engineering-capabilities.json");
     const capability = matrix.capabilities.find((item) => item.id === "production-auth-hardening-gate");
 
-    assert.ok(capability.evidence.sourcePaths.includes("docs/superpowers/specs/2026-07-11-production-admin-oidc-auth-design.md"));
+    assert.ok(capability.evidence.sourcePaths.includes("docs/platform-roadmap.md"));
     assert.ok(capability.evidence.sourcePaths.includes("resources/platform-foundation-task-graph.json"));
     assert.ok(capability.evidence.sourcePaths.includes("resources/evidence/production-admin-oidc-auth-20260711.json"));
     assert.ok(capability.evidence.tests.includes("internal/platform/authprovider/oidc/resolver_test.go"));

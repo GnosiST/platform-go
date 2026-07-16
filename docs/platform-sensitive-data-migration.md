@@ -107,9 +107,12 @@ Do not delete journal rows, edit checkpoints, disable hash guards, retry with ch
 
 ## Implementation Facts
 
+The historical migration design is intentionally deferred from the default
+runtime path: it is an operator-controlled, approval-gated maintenance
+workflow and does not change ordinary request handling.
+
 - The plan is derived from every enabled manifest-declared encrypted field with `Source="values"`; no field-name heuristic is used.
 - Inventory, dry-run and verify do not call `AutoMigrate`; `prepare` is the sole journal-creation mode.
 - The journal stores encrypted escrow and value-free coordinates, counts, hashes and event metadata. Reports never expose values.
 - Rollback uses the recorded post-migration value hash and refuses application edits made after migration.
 - The maintenance command has no HTTP route and does not alter ordinary Store behavior.
-

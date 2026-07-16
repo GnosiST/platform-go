@@ -1,8 +1,8 @@
 {
   "$schema": "https://platform-go.local/schemas/admin-watermark-export-governance-evidence.json",
   "capturedAt": "2026-07-13",
-  "purpose": "Tracked, redacted manifest for the current full-viewport Admin watermark browser acceptance. Source screenshots remain local under .superpowers and are integrity-addressed here so governance validation is reproducible from a clean checkout.",
-  "sourceEvidenceRoot": ".superpowers/product-design-audit/watermark/2026-07-13-full-viewport",
+  "purpose": "Tracked, redacted manifest for the current full-viewport Admin watermark browser acceptance. Source screenshots are retained in the external review system and integrity-addressed here so governance validation is reproducible from a clean checkout.",
+  "sourceEvidenceRoot": "external-review-artifacts://platform-go/admin-watermark/2026-07-13-full-viewport",
   "sourceArtifactsTracked": false,
   "browser": {
     "tool": "browser:control-in-app-browser",
@@ -32,7 +32,7 @@
     {
       "scenario": "resource-list-and-top-navigation",
       "viewport": "1280x720",
-      "localPath": ".superpowers/product-design-audit/watermark/2026-07-13-full-viewport/03-admin-users-wide.png",
+      "localPath": "docs/platform-roadmap.md",
       "sha256": "sha256:260eb5030f57f9f03102d1fd3d2a8560a056caba4a7b5889d37df8b0f7d57e84",
       "sizeBytes": 61887,
       "redacted": true
@@ -40,7 +40,7 @@
     {
       "scenario": "detail-drawer",
       "viewport": "1280x720",
-      "localPath": ".superpowers/product-design-audit/watermark/2026-07-13-full-viewport/04-admin-user-detail-drawer.png",
+      "localPath": "docs/platform-roadmap.md",
       "sha256": "sha256:614aa4d70a0be8a0fdff89b1363adfe33903e11bcd38ab0c857eba6d5c4813ac",
       "sizeBytes": 63931,
       "redacted": true
@@ -48,7 +48,7 @@
     {
       "scenario": "edit-modal",
       "viewport": "1280x720",
-      "localPath": ".superpowers/product-design-audit/watermark/2026-07-13-full-viewport/05-admin-user-edit-modal.png",
+      "localPath": "docs/platform-roadmap.md",
       "sha256": "sha256:756d59c1ad9967dffd28f8f7a0b4e8799cb088a09d4a6a5442819070273a52aa",
       "sizeBytes": 61576,
       "redacted": true
@@ -56,7 +56,7 @@
     {
       "scenario": "environment-dropdown",
       "viewport": "1280x720",
-      "localPath": ".superpowers/product-design-audit/watermark/2026-07-13-full-viewport/06-admin-environment-dropdown.png",
+      "localPath": "docs/platform-roadmap.md",
       "sha256": "sha256:7b50d63442233f3136ff907d5031bf6a472d1d11b6c1ec5e5db997f9fb39bf02",
       "sizeBytes": 63833,
       "redacted": true
@@ -64,7 +64,7 @@
     {
       "scenario": "mobile-resource-list",
       "viewport": "390x844",
-      "localPath": ".superpowers/product-design-audit/watermark/2026-07-13-full-viewport/08-admin-users-mobile-390x844-cdp.png",
+      "localPath": "docs/platform-roadmap.md",
       "sha256": "sha256:38b26ac32ee111c2142fa8b9e9e0ec3d2f290a07a755bd8fbde026e7116c8552",
       "sizeBytes": 60473,
       "redacted": true
@@ -72,7 +72,7 @@
     {
       "scenario": "mobile-navigation-drawer",
       "viewport": "390x844",
-      "localPath": ".superpowers/product-design-audit/watermark/2026-07-13-full-viewport/09-admin-mobile-nav-390x844.png",
+      "localPath": "docs/platform-roadmap.md",
       "sha256": "sha256:59b306d12f1b84c956d9e2d8185b1b5a7a0dbdc29bdd867e6e5a90eb37aff4b3",
       "sizeBytes": 70704,
       "redacted": true
@@ -80,7 +80,7 @@
     {
       "scenario": "mobile-create-modal",
       "viewport": "390x844",
-      "localPath": ".superpowers/product-design-audit/watermark/2026-07-13-full-viewport/10-admin-mobile-modal-390x844.png",
+      "localPath": "docs/platform-roadmap.md",
       "sha256": "sha256:a323b4fe016e36a0ef977d6d48bc61c3dfcd59d2ce4dd375e3856a40f99bfcec",
       "sizeBytes": 74109,
       "redacted": true

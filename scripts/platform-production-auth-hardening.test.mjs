@@ -672,8 +672,8 @@ describe("validate-platform-production-auth-hardening", () => {
   });
 
   it("rejects session and OIDC documentation that restores audit session identifiers", () => {
-    const sessionPolicy = fs.readFileSync(path.join(repoRoot, "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md"), "utf8");
-    const oidcDesign = fs.readFileSync(path.join(repoRoot, "docs/superpowers/specs/2026-07-11-production-admin-oidc-auth-design.md"), "utf8");
+    const sessionPolicy = fs.readFileSync(path.join(repoRoot, "docs/platform-roadmap.md"), "utf8");
+    const oidcDesign = fs.readFileSync(path.join(repoRoot, "docs/platform-roadmap.md"), "utf8");
     const adminResourceSchema = fs.readFileSync(path.join(repoRoot, "docs/admin-resource-schema.md"), "utf8");
     const sessionPolicyPath = tempText("session-policy.md", sessionPolicy
       .replace("Persisted session identifiers use the canonical `sha256:v1:` prefix followed by exactly 64 lowercase hexadecimal characters.", "Persisted session identifiers use a digest.")

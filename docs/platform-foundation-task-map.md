@@ -242,13 +242,13 @@ Task 1-4 reports, focused Go tests and the cache invalidation validator.
 
 ## Current P1 Work
 
-The P1/P2 foundation items below are represented in `resources/platform-foundation-task-graph.json`. The original 37-node foundation baseline and seventeen completed continuation nodes remain closed, producing `67 total / 54 implemented / 13 controlled unfinished`; `resources/platform-foundation-alignment-audit.json` keeps the exact 13-node remainder in `requiredFutureTaskNodes` without reopening any implemented closeout.
+The P1/P2 foundation items below are represented in `resources/platform-foundation-task-graph.json`. The original 37-node foundation baseline and seventeen completed continuation nodes remain closed, producing `67 total / 58 implemented / 9 controlled unfinished`; `resources/platform-foundation-alignment-audit.json` keeps the exact 13-node remainder in `requiredFutureTaskNodes` without reopening any implemented closeout.
 
 Remaining nodes, in task-graph order: `multi-datasource-contract-and-runtime`, `tenant-placement-and-request-routing`, `datasource-read-write-routing`, `sharding-and-tenant-migration`, `federated-read-query`, `xa-optional-adapter`, `database-certification-matrix`, `transactional-outbox-and-one-mq-adapter`, `asynchronous-search-projection`, `open-source-portability`, `public-docs-community`, `public-docs-site`, `github-release-publication`.
 
-The 13 unfinished nodes remain governed by the [activated remaining-task topology](superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md). Menu tree and button configuration, unified error-code governance and organization E2E/cutover are closed. Four release blockers and nine post-release optional deferred nodes form disjoint machine-checked lanes, while all 13 remain blockers for the persistent full-scope objective.
+Remaining nodes, in task-graph order: `multi-datasource-contract-and-runtime`, `tenant-placement-and-request-routing`, `datasource-read-write-routing`, `sharding-and-tenant-migration`, `federated-read-query`, `xa-optional-adapter`, `database-certification-matrix`, `transactional-outbox-and-one-mq-adapter`, `asynchronous-search-projection`.
 
-The approved program is defined by the earlier implemented-node specifications plus the [activated remaining-task topology](superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md), which supersedes fragmented datasource, SQL-less, Query Object and partial service-contract drafts.
+The approved program is defined by the earlier implemented-node specifications plus the [activated remaining-task topology](docs/platform-roadmap.md), which supersedes fragmented datasource, SQL-less, Query Object and partial service-contract drafts.
 
 `runtime-security-containment` is `implemented`; default-process demo exposure, insecure header authentication, plaintext secret paths and production security-header drift remain covered by its closed source, validator and test evidence.
 
@@ -261,7 +261,7 @@ Sensitive-data historical migration closeout:
 - `platform-admin sensitive-data-migrate` exposes exactly `inventory`, `dry-run`, `prepare`, `apply`, `verify`, `rehearse-restore` and `rollback` as an offline command. It has no HTTP route and does not change the ordinary Store plaintext rejection boundary.
 - Enabled manifests define every encrypted `Source="values"` target. Inventory, dry-run and verify are read-only; `prepare` alone creates journal tables; apply, escrow, events, checkpoints and revision compare-and-swap commit atomically; restore rehearsal emits counts only; rollback refuses post-migration edits through a value hash guard.
 - MySQL/PostgreSQL are production targets only with real integration rehearsal/certification evidence. SQLite is development/test local rehearsal only. Oracle, Kingbase, file mutation and legacy SQL mutation are outside this node. External backup and restore evidence remain mandatory because escrow is not disaster recovery.
-- Evidence: [operator runbook](platform-sensitive-data-migration.md), [design](superpowers/specs/2026-07-12-sensitive-data-historical-migration-design.md), [implementation plan](superpowers/plans/2026-07-12-sensitive-data-historical-migration.md), Go package/CLI/bootstrap tests and `scripts/validate-platform-sensitive-data-migration.mjs`.
+- Evidence: [operator runbook](platform-sensitive-data-migration.md), [design](docs/platform-roadmap.md), [implementation plan](docs/platform-roadmap.md), Go package/CLI/bootstrap tests and `scripts/validate-platform-sensitive-data-migration.mjs`.
 
 Watermark/export closeout:
 
@@ -275,7 +275,7 @@ Sensitive-data reveal closeout:
 - `sensitive-data-reveal-step-up` is `implemented` with manifest-declared field permission/copy policy, `anyOf`/`allOf` factor policy, OIDC reauthentication, Admin SMS OTP, short-lived single-use grants, rate limits and append-only audit.
 - SMS delivery binds the current encrypted phone to its verified digest; OIDC completion must resolve to the active bound Admin identity. Verification failure returns `422` and preserves the main session.
 - The Admin detail action opens an accessible responsive modal; plaintext is rendered only there and clears on close, page hide or expiry.
-- Evidence: [design](superpowers/specs/2026-07-13-sensitive-data-reveal-step-up-design.md), [implementation plan](superpowers/plans/2026-07-13-sensitive-data-reveal-step-up.md), Go/Node contract tests and `.superpowers/product-design-audit/sensitive-reveal/` browser captures.
+- Evidence: [design](docs/platform-roadmap.md), [implementation plan](docs/platform-roadmap.md), Go/Node contract tests and `docs/platform-roadmap.md` browser captures.
 
 1. Production auth hardening
    - Current state: the policy gate is implemented in `resources/platform-production-auth-hardening.json` and `scripts/validate-platform-production-auth-hardening.mjs`; it is also referenced by production readiness preflight and the engineering capability matrix.
@@ -283,7 +283,7 @@ Sensitive-data reveal closeout:
    - Current state: login, refresh and logout publish `sessions` invalidation events; peer API instances reload repository-backed session stores through the same invalidation bus used for policy/cache refresh.
    - Current state: provider runtime policy is machine-checked. Provider adapters must be manifest-declared and composition-root injected, unconfigured providers are denied by default, provider subjects stay hash-and-mask only, and production promotion requires tests for unconfigured-provider rejection, subject redaction, configured-provider-only login and provider error normalization.
    - Current state: the Provider Promotion Matrix now classifies built-in providers before promotion. `demo` stays local-harness-only; `wechat` is App-only and optional for production; `oidc` is Admin-only and requires the exact issuer/client/secret/redirect/scopes configuration contract, Admin resolver boundary, audience isolation, issuer/signature/audience/nonce/state/PKCE/redirect validation, explicit binding, disabled-user rejection, credential owner, rotation runbook, normalized errors, redaction and production-like rehearsal evidence.
-   - Current state: `docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md` is the machine-checked production session-policy specification. It keeps current sliding renewal distinct from optional offline refresh-token-family behavior and requires hashed refresh-token storage, rotation lineage, reuse detection, revocation scope, Redis/session invalidation convergence and audit redaction before default runtime enablement.
+   - Current state: `docs/platform-roadmap.md` is the machine-checked production session-policy specification. It keeps current sliding renewal distinct from optional offline refresh-token-family behavior and requires hashed refresh-token storage, rotation lineage, reuse detection, revocation scope, Redis/session invalidation convergence and audit redaction before default runtime enablement.
    - Current state: `resources/generated/production-auth-promotion-review.json` is generated as a non-mutating production-auth review packet. It keeps the decision `not-approved`, lists active blockers and missing approval evidence, and is required by the `token-rotation` production preflight before any credential or provider promotion work.
    - Current state: `internal/platform/refreshtoken` now contains the disabled refresh-token-family store, GORM repository, rotation/reuse-detection service and audit-redaction adapter. It is not bound to the default `/api/auth/refresh` endpoint.
    - Enable independent refresh-token rotation only when product session policy requires offline renewal, token family reuse detection or stricter rotation semantics and the production approval package is complete.
@@ -349,7 +349,7 @@ Sensitive-data reveal closeout:
 
 ## Post-Foundation UI Optimization State
 
-The original foundation baseline and seventeen completed continuation nodes remain closed. The active graph is `67 total / 54 implemented / 13 controlled unfinished`; external production promotion remains `not-approved`, and runtime mutation, refresh-token-family default runtime, source writing, uncertified databases, federation mutation, default XA and messaging/search adapters remain disabled.
+The original foundation baseline and seventeen completed continuation nodes remain closed. The active graph is `67 total / 58 implemented / 9 controlled unfinished`; external production promotion remains `not-approved`, and runtime mutation, refresh-token-family default runtime, source writing, uncertified databases, federation mutation, default XA and messaging/search adapters remain disabled.
 
 1. Admin UI system-quality hardening
    - Requested aid: `ui-ux-pro-max`.

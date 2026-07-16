@@ -429,7 +429,7 @@ function validateTask(task, context, errors) {
     }
     requireIncludes(
       task.evidence?.docs,
-      ["docs/platform-sensitive-data-migration.md", "docs/superpowers/specs/2026-07-12-sensitive-data-historical-migration-design.md"],
+      ["docs/platform-sensitive-data-migration.md", "docs/platform-roadmap.md"],
       `${task.id} evidence.docs`,
       errors,
     );

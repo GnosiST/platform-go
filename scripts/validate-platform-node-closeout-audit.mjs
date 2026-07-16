@@ -64,7 +64,7 @@ const requiredCleanupEvidenceByTask = new Map([
   [
     "admin-watermark-export-governance",
     [
-      "docs/superpowers/plans/2026-07-12-admin-watermark-export-governance.md",
+      "docs/platform-roadmap.md",
       "scripts/admin-ui-contracts.test.mjs",
       "internal/platform/httpapi/server_test.go",
     ],
@@ -126,7 +126,7 @@ const requiredCleanupEvidenceByTask = new Map([
     [
       "resources/platform-organization-rbac-menu-contract.json",
       "docs/platform-organization-rbac-menu-contract.md",
-      "docs/superpowers/specs/2026-07-15-organization-rbac-menu-contract-and-migration-design.md",
+      "docs/platform-roadmap.md",
       "scripts/validate-platform-organization-rbac-menu-contract.mjs",
       "scripts/platform-organization-rbac-menu-contract.test.mjs",
     ],
@@ -147,8 +147,8 @@ const requiredCleanupEvidenceByTask = new Map([
   [
     "organization-user-admin-experience",
     [
-      "docs/superpowers/specs/2026-07-15-organization-user-admin-experience-design.md",
-      "docs/superpowers/plans/2026-07-15-organization-user-admin-experience.md",
+      "docs/platform-roadmap.md",
+      "docs/platform-roadmap.md",
       "resources/evidence/organization-user-admin-experience-20260715.json",
       "scripts/validate-admin-ui-contracts.mjs",
       "scripts/admin-ui-contracts.test.mjs",
@@ -159,8 +159,8 @@ const requiredCleanupEvidenceByTask = new Map([
   [
     "role-tree-and-authorization-entry",
     [
-      "docs/superpowers/specs/2026-07-15-role-tree-and-authorization-entry-design.md",
-      "docs/superpowers/plans/2026-07-15-role-tree-and-authorization-entry.md",
+      "docs/platform-roadmap.md",
+      "docs/platform-roadmap.md",
       "resources/evidence/role-tree-and-authorization-entry-20260715.json",
       "scripts/validate-admin-ui-contracts.mjs",
       "scripts/admin-ui-contracts.test.mjs",
