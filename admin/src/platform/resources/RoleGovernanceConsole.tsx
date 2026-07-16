@@ -222,7 +222,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
     const requestID = ++authorizationRequest.current;
     try {
       const [nextPermissions, nextOrgUnits, nextAreaCodes] = await Promise.all([
-        permissionCatalog.length ? permissionCatalog : assignmentPermissionRecords(role.code),
+        permissionCatalog.length ? permissionCatalog : roleMenuMigrationWriteEnabled ? assignmentPermissionRecords(role.code) : loadAllRecords("permissions"),
         orgUnits.length ? orgUnits : loadAllRecords("org-units"),
         areaCodes.length ? areaCodes : loadAllRecords("area-codes"),
       ]);
@@ -279,7 +279,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
     try {
       const targetRequest = roleMenuMigrationWriteEnabled ? getRoleMenus(role.code) : Promise.resolve(null);
       const [nextMenus, targetAssignment] = await Promise.all([
-        menus.length > 0 ? Promise.resolve(menus) : assignmentMenuRecords(role.code),
+        menus.length > 0 ? Promise.resolve(menus) : roleMenuMigrationWriteEnabled ? assignmentMenuRecords(role.code) : loadAllRecords("menus"),
         targetRequest,
       ]);
       if (menuRequest.current !== requestID) return;

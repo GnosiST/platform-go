@@ -794,6 +794,14 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(roleGovernance, /const value = migrationReadOnly \? legacyVisible : menuAssignment\.menuCodes;/);
   });
 
+  it("keeps closed-gate legacy catalogs independent from target assignment reads", () => {
+    const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+
+    assert.match(roleGovernance, /permissionCatalog\.length \? permissionCatalog : roleMenuMigrationWriteEnabled \? assignmentPermissionRecords\(role\.code\) : loadAllRecords\("permissions"\)/);
+    assert.match(roleGovernance, /menus\.length > 0 \? Promise\.resolve\(menus\) : roleMenuMigrationWriteEnabled \? assignmentMenuRecords\(role\.code\) : loadAllRecords\("menus"\)/);
+    assert.match(roleGovernance, /const targetRequest = roleMenuMigrationWriteEnabled \? getRoleMenus\(role\.code\) : Promise\.resolve\(null\);/);
+  });
+
   it("requires stale role-menu opens and closes to invalidate older async results", () => {
     const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
     const openMenus = roleGovernance.slice(roleGovernance.indexOf("const openMenus"), roleGovernance.indexOf("const closeMenus"));
