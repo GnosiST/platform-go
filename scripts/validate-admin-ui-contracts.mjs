@@ -475,11 +475,11 @@ for (const key of ["rolePermissionReadonlyTitle", "rolePermissionReadonlySchemaD
 }
 requireIncludes(files.roleGovernance, "sameRoleGroupBoundary(group, moveSourceGroup)", "Role move options must stay inside the current scope and tenant boundary.");
 requireCountAtLeast(files.roleGovernance, 'disabled={!canUpdateRole || record.status !== "enabled"}', 2, "Disabled roles must not expose move or permission mutation actions.");
-requireIncludes(files.roleGovernance, 'const canEditMenus = roleMenuMigrationWriteEnabled && canAssignMenus && record.status === "enabled";', "Role menu entry editability must include migration, permission and enabled-role state.");
-requireIncludes(files.roleGovernance, 'const canEditMenus = roleMenuMigrationWriteEnabled && canAssignMenus && menuAssignment.role.status === "enabled";', "Role menu modal editability must include migration, permission and enabled-role state.");
-requireIncludes(files.roleGovernance, 'if (!menuAssignment || !roleMenuMigrationWriteEnabled || !canAssignMenus || menuAssignment.role.status !== "enabled") return;', "Role menu saves must reject disabled roles as well as closed migration and missing permission.");
-requireIncludes(files.roleGovernance, "canEditMenus ? dictionary.assignMenus : dictionary.viewMenus", "Read-only role menu entry points must use the localized View Menus label.");
-requireIncludes(roleMenuModal, "readOnly={!canEditMenus}", "Role menu Tree Transfer must be read-only whenever menu editing is ineligible.");
+requireIncludes(files.roleGovernance, "resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, record.status)", "Role menu entry points must use the shared access resolver.");
+requireIncludes(files.roleGovernance, "resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, menuAssignment?.role.status ?? \"\")", "Role menu modals must use the shared access resolver.");
+requireIncludes(files.roleGovernance, "!resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, menuAssignment.role.status).editable", "Role menu saves must use the shared access resolver.");
+requireIncludes(files.roleGovernance, "menuAccess.editable ? dictionary.assignMenus : dictionary.viewMenus", "Read-only role menu entry points must use the localized View Menus label.");
+requireIncludes(roleMenuModal, "readOnly={menuAccess.readOnly}", "Role menu Tree Transfer must use the resolved read-only state.");
 requireIncludes(roleMenuModal, "readOnlyMessage={readOnlyReason}", "Role menu inspection must expose the state-specific localized read-only reason.");
 for (const key of ["roleMenuLegacyReadonlyDescription", "roleMenuReadonlyAccessDescription", "roleMenuReadonlyDisabledDescription"]) {
   requireIncludes(files.roleGovernance, `dictionary.${key}`, `Role menu inspection must use ${key} when that read-only state applies.`);
@@ -506,6 +506,12 @@ requireIncludes(files.treeWorkbench, '"aria-selected": node.key === selectedKey'
 requireIncludes(files.treeWorkbench, '"aria-level": depth', "Tree workbench nodes must expose their explicit hierarchy depth.");
 requireIncludes(files.treeWorkbench, "children.map((child) => build(child, depth + 1))", "Tree workbench descendants must increment their aria-level.");
 requireIncludes(files.roleGovernance, 'className="role-governance-detail-focus-target" tabIndex={-1}', "Role governance must expose a stable programmatic detail focus target.");
+for (const triggerRef of ["metadataTriggerRef", "moveTriggerRef", "authorizationTriggerRef", "menuTriggerRef"]) {
+  requireIncludes(files.roleGovernance, `afterClose={() => restoreRoleModalFocus(${triggerRef}.current, detailFocusRef.current)}`, `Role modal ${triggerRef} must restore focus to its connected trigger or the detail fallback after close.`);
+}
+requireCountExactly(files.roleGovernance, "focusTriggerAfterClose={false}", 4, "Role modals must disable Ant automatic trigger focus when using explicit restoration.");
+requireNotIncludes(roleAuthorizationModal, "returnFocusRef=", "Role authorization must not delegate focus restoration to Tree Transfer.");
+requireNotIncludes(roleMenuModal, "returnFocusRef=", "Role menu visibility must not delegate focus restoration to Tree Transfer.");
 requireIncludes(files.roleGovernance, "<Typography.Title level={4}>", "Role detail must use the compact platform title hierarchy.");
 requireIncludes(files.roleGovernance, "column={{ xs: 1, md: 2 }}", "Role summaries must reflow from two columns to one.");
 requireIncludes(files.roleGovernance, "roleStatusLabel(record.status, dictionary)", "Role status summaries must be localized.");

@@ -44,3 +44,27 @@ Regression-first evidence:
 - No backend API, capability manifest, generated resource contract, runtime schema logic, permission code, route, version, or tag changed.
 - No new visual identity, palette, radius, typography system, icon dependency, nested card, or page-specific hard-coded color was introduced.
 - Browser QA was intentionally not run in this implementation subtask. Consolidated desktop/mobile/dark/zoom/focus acceptance remains with the owning agent per the Task 5 brief.
+
+## P2 Review Fix: Modal Focus And Menu Access Behavior
+
+- Added executable behavior coverage for connected-trigger focus restoration, disconnected-trigger fallback to the stable detail target, the editable role-menu state, and the legacy/access/disabled read-only states with no save affordance.
+- Added `roleWorkbenchBehavior.ts` as the narrow pure boundary for focus target selection and role-menu access resolution. Role detail, menu modal presentation, and the menu save guard now share the same access decision.
+- Metadata, move, authorization, and menu modals now restore focus once from `afterClose`: the connected opening trigger wins, otherwise the connected detail target receives focus with `preventScroll`.
+- Disabled Ant Modal automatic trigger focus for those four modals and removed their nested Tree Transfer `returnFocusRef` wiring to prevent duplicate focus restoration.
+- Kept the Admin UI source validator at the integration boundary: it checks resolver wiring, four modal callbacks, automatic-focus suppression, and absence of nested Tree Transfer restoration. State and focus selection behavior are executed through the focused TypeScript probe.
+
+Review-fix regression evidence:
+
+- Red: `rtk node --test scripts/platform-role-workbench-redesign.test.mjs` failed as expected before implementation with 5 passed and 6 failed. The four executable probes reported `ERR_MODULE_NOT_FOUND` for `roleWorkbenchBehavior.ts`; the two integration checks reported missing resolver and modal-focus wiring.
+- Green: `rtk node --test scripts/platform-role-workbench-redesign.test.mjs` - 11/11 passed.
+- `rtk node --test scripts/platform-tree-transfer-model.test.mjs` - 3/3 passed.
+- `rtk node scripts/validate-admin-ui-contracts.mjs` - passed.
+- `rtk node --test scripts/admin-ui-contracts.test.mjs` - 206/206 passed.
+- `rtk node scripts/validate-admin-i18n.mjs` - passed.
+- `rtk npm --prefix admin run typecheck` - passed.
+- `rtk npm --prefix admin run build` - passed; 3781 modules transformed.
+- `rtk git diff --check` - passed.
+- `rtk codegraph sync .` - synced 5 changed files; 1 added and 4 modified.
+- `rtk codegraph status` - passed; 500 files indexed and the index is up to date.
+
+Review-fix scope remains limited to Role Governance focus/menu behavior and its executable/integration coverage. Backend APIs, capability manifests, generated contracts, routes, permission codes, versions, tags, and `rolePermissionWorkflow.ts` remain unchanged.

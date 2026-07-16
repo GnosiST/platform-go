@@ -58,6 +58,7 @@ import { pageMenuCodes, projectMenuTreeNodes } from "./menuTreeProjection";
 import type { AdminResourceDefinition } from "./registry";
 import { resolveRolePermissionWriteMode, type RolePermissionWriteMode } from "./rolePermissionWriteMode";
 import { executeRolePermissionWrite, loadRolePermissionCatalog, type RolePermissionAuthorization } from "./rolePermissionWorkflow";
+import { resolveRoleMenuAccess, restoreRoleModalFocus, type RoleMenuReadOnlyReason } from "./roleWorkbenchBehavior";
 
 type RoleGovernanceConsoleProps = {
   resource: AdminResourceDefinition;
@@ -115,6 +116,8 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const [permissionWriteMode, setPermissionWriteMode] = useState<RolePermissionWriteMode>("readonly");
   const [menuAssignment, setMenuAssignment] = useState<MenuAssignmentState | null>(null);
   const [metadataForm] = Form.useForm<MetadataValues>();
+  const metadataTriggerRef = useRef<HTMLElement | null>(null);
+  const moveTriggerRef = useRef<HTMLElement | null>(null);
   const authorizationTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const detailFocusRef = useRef<HTMLDivElement | null>(null);
@@ -320,7 +323,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   };
 
   const saveMenus = async () => {
-    if (!menuAssignment || !roleMenuMigrationWriteEnabled || !canAssignMenus || menuAssignment.role.status !== "enabled") return;
+    if (!menuAssignment || !resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, menuAssignment.role.status).editable) return;
     const requestID = menuRequest.current;
     const menuCodes = pageMenuCodes(menuTreeNodes(menus, menuAssignment.menuCodes, dictionary), menuAssignment.menuCodes);
     setActing("menus");
@@ -394,10 +397,10 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
       type={selected.type}
       onAssignMenus={openMenus}
       onAssignPermissions={openAuthorization}
-      onCreateRole={(groupCode) => void openEditor({ kind: "role", groupCode })}
+      onCreateRole={(groupCode, trigger) => { metadataTriggerRef.current = trigger; void openEditor({ kind: "role", groupCode }); }}
       onDisable={(role) => void executeRoleChange(role, "disable")}
-      onEdit={(kind, record) => void openEditor({ kind, record })}
-      onMove={(role) => { setMoveRole(role); setMoveTargetGroup(""); }}
+      onEdit={(kind, record, trigger) => { metadataTriggerRef.current = trigger; void openEditor({ kind, record }); }}
+      onMove={(role, trigger) => { moveTriggerRef.current = trigger; setMoveRole(role); setMoveTargetGroup(""); }}
       authorizationTriggerRef={authorizationTriggerRef}
       menuTriggerRef={menuTriggerRef}
     />
@@ -420,8 +423,8 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
       <AdminTreeWorkbench
         actions={(
           <Space size={6} wrap>
-            {canCreateGroup ? <AdminActionButton icon={<PlusOutlined />} label={dictionary.roleGroupAdd} onClick={() => void openEditor({ kind: "group" })}>{dictionary.roleGroupAdd}</AdminActionButton> : null}
-            {canCreateRole ? <AdminActionButton icon={<PlusOutlined />} label={dictionary.roleAdd} type="primary" onClick={() => void openEditor({ kind: "role" })}>{dictionary.roleAdd}</AdminActionButton> : null}
+            {canCreateGroup ? <AdminActionButton icon={<PlusOutlined />} label={dictionary.roleGroupAdd} onClick={(event) => { metadataTriggerRef.current = event.currentTarget; void openEditor({ kind: "group" }); }}>{dictionary.roleGroupAdd}</AdminActionButton> : null}
+            {canCreateRole ? <AdminActionButton icon={<PlusOutlined />} label={dictionary.roleAdd} type="primary" onClick={(event) => { metadataTriggerRef.current = event.currentTarget; void openEditor({ kind: "role" }); }}>{dictionary.roleAdd}</AdminActionButton> : null}
           </Space>
         )}
         ariaLabel={dictionary.roleTreeAriaLabel}
@@ -443,7 +446,9 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
       />
 
       <AdminFormModal
+        afterClose={() => restoreRoleModalFocus(metadataTriggerRef.current, detailFocusRef.current)}
         confirmLoading={acting === "metadata"}
+        focusTriggerAfterClose={false}
         okText={dictionary.save}
         open={Boolean(editor)}
         title={editor?.kind === "group" ? dictionary.roleGroupMetadata : dictionary.roleMetadata}
@@ -477,7 +482,9 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
       </AdminFormModal>
 
       <AdminModal
+        afterClose={() => restoreRoleModalFocus(moveTriggerRef.current, detailFocusRef.current)}
         confirmLoading={acting === "move"}
+        focusTriggerAfterClose={false}
         okText={dictionary.reviewAndApply}
         open={Boolean(moveRole)}
         title={dictionary.roleMoveTitle}
@@ -507,7 +514,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
         permissionCatalog={permissionCatalog}
         readOnly={authorization?.writeMode === "readonly" || !canUpdateRole || authorization?.role.status !== "enabled"}
         readOnlyReason={authorization ? rolePermissionReadOnlyReason(authorization.writeMode, canUpdateRole, authorization.role, dictionary) : ""}
-        returnFocusRef={authorizationTriggerRef}
+        afterClose={() => restoreRoleModalFocus(authorizationTriggerRef.current, detailFocusRef.current)}
         onAuthorizationChange={setAuthorization}
         onCancel={() => { authorizationRequest.current += 1; setAuthorization(null); }}
         onModeChange={setPermissionMode}
@@ -520,7 +527,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
         dictionary={dictionary}
         menuAssignment={menuAssignment}
         menus={menus}
-        returnFocusRef={menuTriggerRef}
+        afterClose={() => restoreRoleModalFocus(menuTriggerRef.current, detailFocusRef.current)}
         onAssignmentChange={setMenuAssignment}
         onClose={closeMenus}
         onSave={() => void saveMenus()}
@@ -561,16 +568,16 @@ function RoleGovernanceDetail({
   canUpdateRole: boolean;
   authorizationTriggerRef: React.RefObject<HTMLButtonElement>;
   menuTriggerRef: React.RefObject<HTMLButtonElement>;
-  onEdit: (kind: "group" | "role", record: AdminResourceRecord) => void;
-  onCreateRole: (groupCode: string) => void;
-  onMove: (role: AdminResourceRecord) => void;
+  onEdit: (kind: "group" | "role", record: AdminResourceRecord, trigger: HTMLElement) => void;
+  onCreateRole: (groupCode: string, trigger: HTMLElement) => void;
+  onMove: (role: AdminResourceRecord, trigger: HTMLElement) => void;
   onDisable: (role: AdminResourceRecord) => void;
   onAssignPermissions: (role: AdminResourceRecord) => void;
   onAssignMenus: (role: AdminResourceRecord) => void;
 }) {
   const group = type === "role" ? groupByCode.get(valueOf(record, "groupCode")) : undefined;
-  const canEditMenus = roleMenuMigrationWriteEnabled && canAssignMenus && record.status === "enabled";
-  const menuActionLabel = canEditMenus ? dictionary.assignMenus : dictionary.viewMenus;
+  const menuAccess = resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, record.status);
+  const menuActionLabel = menuAccess.editable ? dictionary.assignMenus : dictionary.viewMenus;
   const groupScope = valueOf(record, "scopeType");
   return (
     <AdminListPanel
@@ -578,8 +585,8 @@ function RoleGovernanceDetail({
       title={type === "group" ? dictionary.roleGroupMetadata : dictionary.roleMetadata}
       actions={(
         <Space size={6} wrap>
-          {type === "group" && canCreateRole ? <AdminActionButton icon={<PlusOutlined />} label={dictionary.roleAdd} onClick={() => onCreateRole(record.code)}>{dictionary.roleAdd}</AdminActionButton> : null}
-          {(type === "group" ? canUpdateGroup : canUpdateRole) ? <AdminActionButton icon={<EditOutlined />} label={dictionary.editRecord} onClick={() => onEdit(type, record)}>{dictionary.editRecord}</AdminActionButton> : null}
+          {type === "group" && canCreateRole ? <AdminActionButton icon={<PlusOutlined />} label={dictionary.roleAdd} onClick={(event) => onCreateRole(record.code, event.currentTarget)}>{dictionary.roleAdd}</AdminActionButton> : null}
+          {(type === "group" ? canUpdateGroup : canUpdateRole) ? <AdminActionButton icon={<EditOutlined />} label={dictionary.editRecord} onClick={(event) => onEdit(type, record, event.currentTarget)}>{dictionary.editRecord}</AdminActionButton> : null}
         </Space>
       )}
     >
@@ -617,7 +624,7 @@ function RoleGovernanceDetail({
             <section className="role-governance-lifecycle" aria-labelledby="role-governance-lifecycle-title">
               <Typography.Title id="role-governance-lifecycle-title" level={5}>{dictionary.roleLifecycle}</Typography.Title>
               <div className="role-governance-section-actions role-governance-lifecycle-actions">
-                <AdminActionButton disabled={!canUpdateRole || record.status !== "enabled"} icon={<SwapOutlined />} label={dictionary.roleMove} onClick={() => onMove(record)}>{dictionary.roleMove}</AdminActionButton>
+                <AdminActionButton disabled={!canUpdateRole || record.status !== "enabled"} icon={<SwapOutlined />} label={dictionary.roleMove} onClick={(event) => onMove(record, event.currentTarget)}>{dictionary.roleMove}</AdminActionButton>
                 <AdminActionButton danger disabled={!canUpdateRole || record.status !== "enabled"} icon={<StopOutlined />} label={dictionary.roleDisable} onClick={() => onDisable(record)}>{dictionary.roleDisable}</AdminActionButton>
               </div>
             </section>
@@ -640,7 +647,7 @@ function AuthorizationModal({
   dictionary,
   readOnly,
   readOnlyReason,
-  returnFocusRef,
+  afterClose,
   onModeChange,
   onAuthorizationChange,
   onCancel,
@@ -655,33 +662,36 @@ function AuthorizationModal({
   dictionary: Dictionary;
   readOnly: boolean;
   readOnlyReason: string;
-  returnFocusRef: React.RefObject<HTMLElement>;
+  afterClose: () => void;
   onModeChange: (mode: "allow" | "deny") => void;
   onAuthorizationChange: (state: AuthorizationState | null) => void;
   onCancel: () => void;
   onSave: () => void;
 }) {
-  if (!authorization) return null;
-  const nodes = permissionTreeNodes(permissionCatalog, dictionary, uniqueSorted([...authorization.allow, ...authorization.deny]));
-  const selected = mode === "allow" ? authorization.allow : authorization.deny;
+  const nodes = authorization ? permissionTreeNodes(permissionCatalog, dictionary, uniqueSorted([...authorization.allow, ...authorization.deny])) : [];
+  const selected = authorization ? mode === "allow" ? authorization.allow : authorization.deny : [];
   const updateSelected = (next: string[]) => {
+    if (!authorization) return;
     if (mode === "allow") onAuthorizationChange({ ...authorization, allow: next, deny: authorization.deny.filter((code) => !next.includes(code)) });
     else onAuthorizationChange({ ...authorization, deny: next, allow: authorization.allow.filter((code) => !next.includes(code)) });
   };
   return (
     <AdminModal
+      afterClose={afterClose}
       className="role-authorization-modal"
       confirmLoading={!readOnly && acting}
       destroyOnHidden
+      focusTriggerAfterClose={false}
       footer={readOnly ? <Button onClick={onCancel}>{dictionary.close}</Button> : undefined}
       okText={dictionary.reviewAndApply}
-      open
-      title={`${dictionary.assignPermissions}: ${authorization.role.name}`}
+      open={Boolean(authorization)}
+      title={`${dictionary.assignPermissions}: ${authorization?.role.name ?? ""}`}
       width={1080}
       onCancel={onCancel}
       onOk={onSave}
     >
-      {readOnly ? <AdminFeedback type="warning" message={dictionary.rolePermissionReadonlyTitle} description={readOnlyReason} /> : null}
+      {authorization && readOnly ? <AdminFeedback type="warning" message={dictionary.rolePermissionReadonlyTitle} description={readOnlyReason} /> : null}
+      {authorization ? (
       <div className="role-authorization-layout">
         <div className="role-authorization-toolbar">
           <Segmented
@@ -698,7 +708,6 @@ function AuthorizationModal({
           nodes={nodes}
           readOnly={readOnly}
           readOnlyMessage={readOnlyReason}
-          returnFocusRef={returnFocusRef}
           showReadOnlyMessage={readOnly}
           value={selected}
           onChange={updateSelected}
@@ -735,6 +744,7 @@ function AuthorizationModal({
           ) : null}
         </div>
       </div>
+      ) : null}
     </AdminModal>
   );
 }
@@ -745,7 +755,7 @@ function MenuVisibilityModal({
   acting,
   canAssignMenus,
   dictionary,
-  returnFocusRef,
+  afterClose,
   onAssignmentChange,
   onClose,
   onSave,
@@ -755,47 +765,49 @@ function MenuVisibilityModal({
   acting: boolean;
   canAssignMenus: boolean;
   dictionary: Dictionary;
-  returnFocusRef: React.RefObject<HTMLElement>;
+  afterClose: () => void;
   onAssignmentChange: (assignment: MenuAssignmentState | null) => void;
   onClose: () => void;
   onSave: () => void;
 }) {
-  if (!menuAssignment) return null;
-  const legacyVisible = legacyVisibleMenus(menuAssignment.role, menus);
-  const historicalCodes = uniqueSorted([...menuAssignment.menuCodes, ...legacyVisible]);
+  const legacyVisible = menuAssignment ? legacyVisibleMenus(menuAssignment.role, menus) : [];
+  const historicalCodes = menuAssignment ? uniqueSorted([...menuAssignment.menuCodes, ...legacyVisible]) : [];
   const nodes = menuTreeNodes(menus, historicalCodes, dictionary);
   const migrationReadOnly = !roleMenuMigrationWriteEnabled;
-  const canEditMenus = roleMenuMigrationWriteEnabled && canAssignMenus && menuAssignment.role.status === "enabled";
-  const readOnlyReason = roleMenuReadOnlyReason(canAssignMenus, menuAssignment.role, dictionary);
-  const menuActionLabel = canEditMenus ? dictionary.assignMenus : dictionary.viewMenus;
-  const value = migrationReadOnly ? legacyVisible : menuAssignment.menuCodes;
+  const menuAccess = resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, menuAssignment?.role.status ?? "");
+  const readOnlyReason = roleMenuReadOnlyReason(menuAccess.readOnlyReason, dictionary);
+  const menuActionLabel = menuAccess.editable ? dictionary.assignMenus : dictionary.viewMenus;
+  const value = migrationReadOnly ? legacyVisible : menuAssignment?.menuCodes ?? [];
   return (
     <AdminModal
+      afterClose={afterClose}
       className="role-menu-visibility-modal"
       cancelText={dictionary.close}
-      confirmLoading={canEditMenus && acting}
+      confirmLoading={menuAccess.showSave && acting}
       destroyOnHidden
-      footer={!canEditMenus ? <Button onClick={onClose}>{dictionary.close}</Button> : undefined}
+      focusTriggerAfterClose={false}
+      footer={!menuAccess.showSave ? <Button onClick={onClose}>{dictionary.close}</Button> : undefined}
       okText={dictionary.reviewAndApply}
-      open
-      title={`${menuActionLabel}: ${menuAssignment.role.name}`}
+      open={Boolean(menuAssignment)}
+      title={`${menuActionLabel}: ${menuAssignment?.role.name ?? ""}`}
       width={980}
       onCancel={onClose}
       onOk={onSave}
     >
-      {!canEditMenus ? <AdminFeedback type="warning" message={roleMenuReadOnlyTitle(canAssignMenus, menuAssignment.role, dictionary)} description={readOnlyReason} /> : <Typography.Text type="secondary">{dictionary.changeImpactTitle}</Typography.Text>}
+      {menuAssignment && menuAccess.readOnly ? <AdminFeedback type="warning" message={roleMenuReadOnlyTitle(menuAccess.readOnlyReason, dictionary)} description={readOnlyReason} /> : menuAssignment ? <Typography.Text type="secondary">{dictionary.changeImpactTitle}</Typography.Text> : null}
+      {menuAssignment ? (
       <PlatformTreeTransfer
         ariaLabel={menuActionLabel}
         labels={transferLabels(dictionary)}
         nodes={nodes}
-        readOnly={!canEditMenus}
+        readOnly={menuAccess.readOnly}
         readOnlyMessage={readOnlyReason}
-        returnFocusRef={returnFocusRef}
         revision={menuAssignment.revision}
         showReadOnlyMessage={false}
         value={value}
         onChange={(menuCodes) => onAssignmentChange({ ...menuAssignment, menuCodes: pageMenuCodes(nodes, menuCodes) })}
       />
+      ) : null}
     </AdminModal>
   );
 }
@@ -1002,17 +1014,15 @@ function rolePermissionReadOnlyReason(mode: RolePermissionWriteMode, canUpdateRo
   return "";
 }
 
-function roleMenuReadOnlyReason(canAssignMenus: boolean, role: AdminResourceRecord, dictionary: Dictionary) {
-  if (role.status !== "enabled") return dictionary.roleMenuReadonlyDisabledDescription;
-  if (!canAssignMenus) return dictionary.roleMenuReadonlyAccessDescription;
-  if (!roleMenuMigrationWriteEnabled) return dictionary.roleMenuLegacyReadonlyDescription;
+function roleMenuReadOnlyReason(reason: RoleMenuReadOnlyReason, dictionary: Dictionary) {
+  if (reason === "disabled") return dictionary.roleMenuReadonlyDisabledDescription;
+  if (reason === "access") return dictionary.roleMenuReadonlyAccessDescription;
+  if (reason === "legacy") return dictionary.roleMenuLegacyReadonlyDescription;
   return "";
 }
 
-function roleMenuReadOnlyTitle(canAssignMenus: boolean, role: AdminResourceRecord, dictionary: Dictionary) {
-  return role.status === "enabled" && canAssignMenus && !roleMenuMigrationWriteEnabled
-    ? dictionary.roleMenuLegacyReadonlyTitle
-    : dictionary.roleMenuReadonlyTitle;
+function roleMenuReadOnlyTitle(reason: RoleMenuReadOnlyReason, dictionary: Dictionary) {
+  return reason === "legacy" ? dictionary.roleMenuLegacyReadonlyTitle : dictionary.roleMenuReadonlyTitle;
 }
 
 function roleStatusLabel(status: string, dictionary: Dictionary) {

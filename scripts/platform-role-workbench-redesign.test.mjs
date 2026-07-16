@@ -1,15 +1,89 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
+import { pathToFileURL } from "node:url";
 
 const root = path.resolve(import.meta.dirname, "..");
+const behaviorURL = pathToFileURL(path.join(root, "admin/src/platform/resources/roleWorkbenchBehavior.ts")).href;
 
 function source(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
 }
 
+function runBehaviorProbe(body) {
+  const result = spawnSync(process.execPath, ["--experimental-strip-types", "--input-type=module"], {
+    cwd: root,
+    encoding: "utf8",
+    input: `
+      import assert from "node:assert/strict";
+      import { resolveRoleMenuAccess, restoreRoleModalFocus } from ${JSON.stringify(behaviorURL)};
+
+      ${body}
+    `,
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+}
+
 describe("role workbench redesign contracts", () => {
+  it("restores modal focus to a connected opening trigger", () => {
+    runBehaviorProbe(`
+      const calls = [];
+      const trigger = { isConnected: true, focus: (options) => calls.push(["trigger", options]) };
+      const detail = { isConnected: true, focus: (options) => calls.push(["detail", options]) };
+
+      assert.equal(restoreRoleModalFocus(trigger, detail), "trigger");
+      assert.deepEqual(calls, [["trigger", { preventScroll: true }]]);
+    `);
+  });
+
+  it("falls back to the detail target when the opening trigger disconnects", () => {
+    runBehaviorProbe(`
+      const calls = [];
+      const trigger = { isConnected: false, focus: (options) => calls.push(["trigger", options]) };
+      const detail = { isConnected: true, focus: (options) => calls.push(["detail", options]) };
+
+      assert.equal(restoreRoleModalFocus(trigger, detail), "detail");
+      assert.deepEqual(calls, [["detail", { preventScroll: true }]]);
+    `);
+  });
+
+  it("allows menu editing only after cutover with permission and an enabled role", () => {
+    runBehaviorProbe(`
+      assert.deepEqual(resolveRoleMenuAccess(true, true, "enabled"), {
+        editable: true,
+        readOnly: false,
+        readOnlyReason: null,
+        showSave: true,
+      });
+    `);
+  });
+
+  it("returns state-specific menu read-only reasons without a save affordance", () => {
+    runBehaviorProbe(`
+      assert.deepEqual(resolveRoleMenuAccess(false, true, "enabled"), {
+        editable: false,
+        readOnly: true,
+        readOnlyReason: "legacy",
+        showSave: false,
+      });
+      assert.deepEqual(resolveRoleMenuAccess(true, false, "enabled"), {
+        editable: false,
+        readOnly: true,
+        readOnlyReason: "access",
+        showSave: false,
+      });
+      assert.deepEqual(resolveRoleMenuAccess(true, true, "disabled"), {
+        editable: false,
+        readOnly: true,
+        readOnlyReason: "disabled",
+        showSave: false,
+      });
+      assert.equal(resolveRoleMenuAccess(false, false, "disabled").readOnlyReason, "disabled");
+    `);
+  });
+
   it("projects explicit selected and hierarchy semantics into tree data", () => {
     const workbench = source("admin/src/platform/ui/AdminTreeWorkbench.tsx");
 
@@ -37,13 +111,21 @@ describe("role workbench redesign contracts", () => {
   it("makes menu assignment editable only for enabled authorized roles after cutover", () => {
     const role = source("admin/src/platform/resources/RoleGovernanceConsole.tsx");
 
-    assert.match(role, /roleMenuMigrationWriteEnabled && canAssignMenus && record\.status === "enabled"/);
-    assert.match(role, /roleMenuMigrationWriteEnabled && canAssignMenus && menuAssignment\.role\.status === "enabled"/);
-    assert.match(role, /canEditMenus \? dictionary\.assignMenus : dictionary\.viewMenus/);
-    assert.match(role, /if \(role\.status !== "enabled"\) return dictionary\.roleMenuReadonlyDisabledDescription/);
-    assert.match(role, /if \(!canAssignMenus\) return dictionary\.roleMenuReadonlyAccessDescription/);
-    assert.match(role, /if \(!roleMenuMigrationWriteEnabled\) return dictionary\.roleMenuLegacyReadonlyDescription/);
-    assert.match(role, /menuAssignment\.role\.status !== "enabled"\) return/);
+    assert.match(role, /resolveRoleMenuAccess\(roleMenuMigrationWriteEnabled, canAssignMenus, record\.status\)/);
+    assert.match(role, /resolveRoleMenuAccess\(roleMenuMigrationWriteEnabled, canAssignMenus, menuAssignment\.role\.status\)/);
+    assert.match(role, /menuAccess\.editable \? dictionary\.assignMenus : dictionary\.viewMenus/);
+  });
+
+  it("wires one explicit focus restoration path into every role modal", () => {
+    const role = source("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+
+    assert.equal((role.match(/focusTriggerAfterClose=\{false\}/g) ?? []).length, 4);
+    assert.equal((role.match(/afterClose=\{\(\) => restoreRoleModalFocus/g) ?? []).length, 4);
+    assert.match(role, /restoreRoleModalFocus\(metadataTriggerRef\.current, detailFocusRef\.current\)/);
+    assert.match(role, /restoreRoleModalFocus\(moveTriggerRef\.current, detailFocusRef\.current\)/);
+    assert.match(role, /restoreRoleModalFocus\(authorizationTriggerRef\.current, detailFocusRef\.current\)/);
+    assert.match(role, /restoreRoleModalFocus\(menuTriggerRef\.current, detailFocusRef\.current\)/);
+    assert.doesNotMatch(role, /returnFocusRef=/);
   });
 
   it("uses the platform modal boundary and removes dead Tree Transfer state", () => {

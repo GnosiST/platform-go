@@ -851,9 +851,9 @@ describe("validate-admin-ui-contracts", () => {
     const organizationRBAC = adminSource("admin/src/platform/api/organizationRBAC.ts");
 
     assert.match(roleGovernance, /const canAssignMenus = canReadMenus && canUpdateRole;/);
-    assert.match(roleGovernance, /const canEditMenus = roleMenuMigrationWriteEnabled && canAssignMenus && menuAssignment\.role\.status === "enabled";/);
-    assert.match(roleGovernance, /readOnly=\{!canEditMenus\}/);
-    assert.match(roleGovernance, /if \(!menuAssignment \|\| !roleMenuMigrationWriteEnabled \|\| !canAssignMenus \|\| menuAssignment\.role\.status !== "enabled"\) return;/);
+    assert.match(roleGovernance, /resolveRoleMenuAccess\(roleMenuMigrationWriteEnabled, canAssignMenus, menuAssignment\?\.role\.status \?\? ""\)/);
+    assert.match(roleGovernance, /readOnly=\{menuAccess\.readOnly\}/);
+    assert.match(roleGovernance, /!resolveRoleMenuAccess\(roleMenuMigrationWriteEnabled, canAssignMenus, menuAssignment\.role\.status\)\.editable/);
     assert.match(organizationRBAC, /export const roleMenuMigrationWriteEnabled = false;/);
   });
 
@@ -872,7 +872,7 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.match(roleGovernance, /const targetRequest = roleMenuMigrationWriteEnabled \? getRoleMenus\(role\.code\) : Promise\.resolve\(null\);/);
     assert.match(roleGovernance, /menuCodes: targetAssignment \? \[\.\.\.targetAssignment\.menuCodes\] : \[\]/);
-    assert.match(roleGovernance, /const value = migrationReadOnly \? legacyVisible : menuAssignment\.menuCodes;/);
+    assert.match(roleGovernance, /const value = migrationReadOnly \? legacyVisible : menuAssignment\?\.menuCodes \?\? \[\];/);
   });
 
   it("selects permission catalogs by permission write mode while menu catalogs keep their own gate", () => {
@@ -1037,13 +1037,13 @@ describe("validate-admin-ui-contracts", () => {
     const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
     const treeTransfer = adminSource("admin/src/platform/ui/PlatformTreeTransfer.tsx");
 
-    assert.match(roleGovernance, /\{!canEditMenus \? <AdminFeedback type="warning" message=\{roleMenuReadOnlyTitle/);
+    assert.match(roleGovernance, /menuAccess\.readOnly \? <AdminFeedback type="warning" message=\{roleMenuReadOnlyTitle/);
     assert.match(roleGovernance, /description=\{readOnlyReason\}/);
     assert.match(roleGovernance, /showReadOnlyMessage=\{false\}/);
     assert.match(treeTransfer, /showReadOnlyMessage && readOnlyMessage/);
-    assert.match(roleGovernance, /if \(role\.status !== "enabled"\) return dictionary\.roleMenuReadonlyDisabledDescription;/);
-    assert.match(roleGovernance, /if \(!canAssignMenus\) return dictionary\.roleMenuReadonlyAccessDescription;/);
-    assert.match(roleGovernance, /if \(!roleMenuMigrationWriteEnabled\) return dictionary\.roleMenuLegacyReadonlyDescription;/);
+    assert.match(roleGovernance, /if \(reason === "disabled"\) return dictionary\.roleMenuReadonlyDisabledDescription;/);
+    assert.match(roleGovernance, /if \(reason === "access"\) return dictionary\.roleMenuReadonlyAccessDescription;/);
+    assert.match(roleGovernance, /if \(reason === "legacy"\) return dictionary\.roleMenuLegacyReadonlyDescription;/);
   });
 
   it("rejects tenant-scoped role-group creation without tenant read access", () => {
@@ -1143,29 +1143,54 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /stable programmatic detail focus target/);
   });
 
-  it("rejects role menu editing that ignores disabled-role state", () => {
+  it("rejects role menu entry points that bypass the shared access resolver", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
       tempRoot,
       "admin/src/platform/resources/RoleGovernanceConsole.tsx",
-      'roleMenuMigrationWriteEnabled && canAssignMenus && record.status === "enabled"',
-      "roleMenuMigrationWriteEnabled && canAssignMenus",
+      "resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, record.status)",
+      "resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, \"enabled\")",
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /editability must include migration, permission and enabled-role state/);
+    assert.match(result.stderr, /entry points must use the shared access resolver/);
   });
 
   it("rejects a generic assign label for read-only role menu inspection", () => {
     const tempRoot = tempAdminRoot();
-    replaceInTemp(tempRoot, "admin/src/platform/resources/RoleGovernanceConsole.tsx", "canEditMenus ? dictionary.assignMenus : dictionary.viewMenus", "dictionary.assignMenus");
+    replaceInTemp(tempRoot, "admin/src/platform/resources/RoleGovernanceConsole.tsx", "menuAccess.editable ? dictionary.assignMenus : dictionary.viewMenus", "dictionary.assignMenus");
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /localized View Menus label/);
+  });
+
+  it("rejects role modal focus restoration without the detail fallback", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      "afterClose={() => restoreRoleModalFocus(moveTriggerRef.current, detailFocusRef.current)}",
+      "afterClose={() => restoreRoleModalFocus(moveTriggerRef.current, null)}",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /restore focus to its connected trigger or the detail fallback/);
+  });
+
+  it("rejects Ant automatic trigger focus in explicitly restored role modals", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/platform/resources/RoleGovernanceConsole.tsx", "focusTriggerAfterClose={false}", "focusTriggerAfterClose");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /disable Ant automatic trigger focus/);
   });
 
   it("rejects raw role status, role-group scope and role data-scope summaries", () => {
