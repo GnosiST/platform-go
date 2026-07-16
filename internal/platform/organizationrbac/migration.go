@@ -122,6 +122,14 @@ func (r *GORMRepository) RunMigration(ctx context.Context, mode MigrationMode, m
 			report.Status = "blocked"
 			return report, ErrRolePoolViolation
 		}
+		comparison, compareErr := r.CompareAllActivePrincipals(ctx, manifest, PrincipalComparisonCandidate)
+		if compareErr != nil || len(comparison.Differences) != 0 {
+			report.Status = "blocked"
+			if compareErr != nil {
+				return report, compareErr
+			}
+			return report, ErrRolePoolViolation
+		}
 		report.Status = "verified"
 		return report, nil
 	case MigrationApply:
@@ -424,6 +432,14 @@ func (r *GORMRepository) persistMigrationConflicts(ctx context.Context, runID st
 func (r *GORMRepository) applyMigration(ctx context.Context, manifest MigrationManifest, manifestHash string, evidence MigrationEvidence) (CutoverReport, error) {
 	var cutover CutoverReport
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		txRepository := &GORMRepository{db: tx}
+		candidate, err := txRepository.CompareAllActivePrincipals(ctx, manifest, PrincipalComparisonCandidate)
+		if err != nil {
+			return err
+		}
+		if len(candidate.Differences) != 0 {
+			return ErrRolePoolViolation
+		}
 		run := gormOrganizationRBACMigrationRun{
 			RunID: evidence.RunID, ManifestHash: manifestHash, Status: "applying", ActorID: evidence.ActorID,
 			Reason: evidence.Reason, ApprovalRef: evidence.ApprovalRef, BackupURI: evidence.BackupURI,
@@ -443,7 +459,7 @@ func (r *GORMRepository) applyMigration(ctx context.Context, manifest MigrationM
 				return &ValidationError{Field: "migrationEvidence.runId", Reason: "already belongs to a different immutable migration execution"}
 			}
 			var err error
-			cutover, err = (&GORMRepository{db: tx}).ValidateCutover(ctx)
+			cutover, err = txRepository.ValidateCutover(ctx)
 			return err
 		}
 		var groups []gormRoleGroup
@@ -579,8 +595,26 @@ func (r *GORMRepository) applyMigration(ctx context.Context, manifest MigrationM
 		if err := applyPlatformMigrationRemediations(tx, platformUsers, manifest.RolePoolConflictRemediations); err != nil {
 			return err
 		}
-		var err error
-		cutover, err = (&GORMRepository{db: tx}).ValidateCutover(ctx)
+		state, err := loadPrincipalComparisonState(tx, manifest, PrincipalComparisonCandidate)
+		if err != nil {
+			return err
+		}
+		for _, roleCode := range sortedComparisonRoleCodes(state) {
+			if _, err := replaceRoleMenusTx(tx, ReplaceRoleMenusRequest{
+				RoleCode: roleCode, MenuCodes: candidatePageLeavesForRoles(state, []string{roleCode}),
+				ExpectedRevision: state.RoleMenuRevisionByRole[roleCode], ActorID: evidence.ActorID, ChangedAt: evidence.AppliedAt,
+			}, false); err != nil {
+				return err
+			}
+		}
+		persisted, err := txRepository.CompareAllActivePrincipals(ctx, manifest, PrincipalComparisonPersisted)
+		if err != nil {
+			return err
+		}
+		if len(persisted.Differences) != 0 {
+			return ErrRolePoolViolation
+		}
+		cutover, err = txRepository.ValidateCutover(ctx)
 		if err != nil {
 			return err
 		}

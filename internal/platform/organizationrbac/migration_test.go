@@ -3,6 +3,7 @@ package organizationrbac
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -60,15 +61,14 @@ func TestOrganizationRBACMigrationInventoryPersistsUnresolvedRolePoolConflicts(t
 		RunID: "remediated-role-pool-apply-1", ActorID: "migration-admin", Reason: "approved role cleanup", ApprovalRef: "change-remediation-1",
 		BackupURI: "s3://backups/remediated-role-pool-apply-1", BackupSHA256: strings.Repeat("c", 64), CheckpointRef: "restore-rehearsal-remediation-1", AppliedAt: now,
 	}
-	if report, err := repository.RunMigration(context.Background(), MigrationApply, manifest, evidence); err != nil || report.Status != "applied" {
-		t.Fatalf("RunMigration(remediated apply) report = %+v, error = %v", report, err)
+	if report, err := repository.RunMigration(context.Background(), MigrationApply, manifest, evidence); !errors.Is(err, ErrRolePoolViolation) || report.Status != "" {
+		t.Fatalf("RunMigration(non-equivalent remediation) report = %+v, error = %v", report, err)
 	}
-	evidence.AppliedAt = now.Add(time.Minute)
-	if report, err := repository.RunMigration(context.Background(), MigrationApply, manifest, evidence); err != nil || report.Status != "applied" {
-		t.Fatalf("RunMigration(replayed remediated apply) report = %+v, error = %v", report, err)
+	if err := db.Model(&gormUserRole{}).Where("user_id = ? AND role_code = ?", "user-alice", "auditor").Count(&count).Error; err != nil || count != 1 {
+		t.Fatalf("assignment count after blocked remediation = %d, error = %v", count, err)
 	}
-	if err := db.Model(&gormUserRole{}).Where("user_id = ? AND role_code = ?", "user-alice", "auditor").Count(&count).Error; err != nil || count != 0 {
-		t.Fatalf("remediated assignment count = %d, error = %v", count, err)
+	if err := db.Model(&gormOrganizationRBACMigrationRun{}).Where("run_id = ?", evidence.RunID).Count(&count).Error; err != nil || count != 0 {
+		t.Fatalf("migration run count after blocked remediation = %d, error = %v", count, err)
 	}
 }
 
@@ -137,7 +137,87 @@ func TestOrganizationRBACMigrationRequiresExplicitMappingsAndAppliesCutover(t *t
 	}
 }
 
-func TestOrganizationRBACMigrationRemediatesPlatformPrincipalToPlatformRole(t *testing.T) {
+func TestOrganizationRBACMigrationPersistsPageLeavesWithOneGlobalRevisionBump(t *testing.T) {
+	db, repository := prepareOrganizationRBACTestRepository(t)
+	seedOrganizationRBAC(t, db)
+	if err := db.Create(&gormUser{ID: "user-alice", Code: "alice", TenantCode: "legacy", Status: StatusEnabled, ValuesJSON: `{}`}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&gormUserRole{UserID: "user-alice", RoleCode: "operator"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&gormPermission{ID: "permission-user-read", Code: "admin:user:read", Status: StatusEnabled, ResourceType: PermissionResourceTypeAPI}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&gormRolePermission{RoleCode: "operator", Permission: "admin:user:read"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&gormMenu{ID: "menu-users", Code: "users", Status: StatusEnabled, NodeType: string(MenuNodeTypePage), LegacyPermission: "admin:user:read"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	evidence := MigrationEvidence{
+		RunID: "page-leaf-backfill-1", ActorID: "migration-admin", Reason: "persist reviewed page leaves", ApprovalRef: "change-page-leaves",
+		BackupURI: "s3://backups/page-leaf-backfill-1", BackupSHA256: strings.Repeat("9", 64), CheckpointRef: "restore-page-leaf-backfill-1",
+		AppliedAt: time.Date(2026, 7, 15, 13, 15, 0, 0, time.UTC),
+	}
+	if report, err := repository.RunMigration(context.Background(), MigrationApply, testOrganizationRBACMigrationManifest(), evidence); err != nil || report.Status != "applied" {
+		t.Fatalf("RunMigration(page-leaf apply) report = %+v, error = %v", report, err)
+	}
+	menus, err := repository.LoadRoleMenus(context.Background(), "operator")
+	if err != nil || !reflect.DeepEqual(menus.MenuCodes, []string{"users"}) || menus.Revision != 1 {
+		t.Fatalf("persisted role menus = %+v, error = %v", menus, err)
+	}
+	if revision, err := repository.CurrentGlobalRevision(context.Background()); err != nil || revision != 1 {
+		t.Fatalf("global revision = %d, error = %v", revision, err)
+	}
+}
+
+func TestOrganizationRBACMigrationRollsBackWhenPersistedPrincipalComparisonDiffers(t *testing.T) {
+	db, repository := prepareOrganizationRBACTestRepository(t)
+	seedOrganizationRBAC(t, db)
+	if err := db.Create(&gormUser{ID: "user-alice", Code: "alice", TenantCode: "legacy", Status: StatusEnabled, ValuesJSON: `{}`}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&gormUserRole{UserID: "user-alice", RoleCode: "operator"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&gormPermission{ID: "permission-user-read", Code: "admin:user:read", Status: StatusEnabled, ResourceType: PermissionResourceTypeAPI}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&gormRolePermission{RoleCode: "operator", Permission: "admin:user:read"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&gormMenu{ID: "menu-users", Code: "users", Status: StatusEnabled, NodeType: string(MenuNodeTypePage), LegacyPermission: "admin:user:read"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`CREATE TRIGGER discard_migrated_role_menu AFTER INSERT ON platform_admin_role_menus BEGIN DELETE FROM platform_admin_role_menus WHERE role_code = NEW.role_code AND menu_code = NEW.menu_code; END`).Error; err != nil {
+		t.Fatal(err)
+	}
+	evidence := MigrationEvidence{
+		RunID: "persisted-mismatch-1", ActorID: "migration-admin", Reason: "verify persisted comparison rollback", ApprovalRef: "change-persisted-mismatch",
+		BackupURI: "s3://backups/persisted-mismatch-1", BackupSHA256: strings.Repeat("8", 64), CheckpointRef: "restore-persisted-mismatch-1",
+		AppliedAt: time.Date(2026, 7, 15, 13, 20, 0, 0, time.UTC),
+	}
+	if _, err := repository.RunMigration(context.Background(), MigrationApply, testOrganizationRBACMigrationManifest(), evidence); !errors.Is(err, ErrRolePoolViolation) {
+		t.Fatalf("RunMigration(persisted mismatch) error = %v, want ErrRolePoolViolation", err)
+	}
+	var user gormUser
+	if err := db.Where("code = ?", "alice").Take(&user).Error; err != nil {
+		t.Fatal(err)
+	}
+	if user.ScopeType != "" || user.TenantCode != "legacy" || user.OrgUnitCode != "" {
+		t.Fatalf("user after rolled back persisted mismatch = %+v", user)
+	}
+	var count int64
+	if err := db.Model(&gormOrganizationRBACMigrationRun{}).Where("run_id = ?", evidence.RunID).Count(&count).Error; err != nil || count != 0 {
+		t.Fatalf("migration run count after rollback = %d, error = %v", count, err)
+	}
+	if revision, err := repository.CurrentGlobalRevision(context.Background()); err != nil || revision != 0 {
+		t.Fatalf("global revision after rollback = %d, error = %v", revision, err)
+	}
+}
+
+func TestOrganizationRBACMigrationBlocksNonEquivalentPlatformPrincipalRemediation(t *testing.T) {
 	db, repository := prepareOrganizationRBACTestRepository(t)
 	seedOrganizationRBAC(t, db)
 	if err := db.Create(&gormUser{ID: "user-root", Code: "root", TenantCode: "legacy-client", Status: StatusEnabled, ValuesJSON: `{}`}).Error; err != nil {
@@ -161,22 +241,22 @@ func TestOrganizationRBACMigrationRemediatesPlatformPrincipalToPlatformRole(t *t
 		BackupURI: "s3://backups/platform-principal-apply-1", BackupSHA256: strings.Repeat("d", 64), CheckpointRef: "restore-rehearsal-platform-1",
 		AppliedAt: time.Date(2026, 7, 15, 13, 30, 0, 0, time.UTC),
 	}
-	if report, err := repository.RunMigration(context.Background(), MigrationApply, manifest, evidence); err != nil || report.Status != "applied" {
-		t.Fatalf("RunMigration(platform apply) report = %+v, error = %v", report, err)
+	if report, err := repository.RunMigration(context.Background(), MigrationApply, manifest, evidence); !errors.Is(err, ErrRolePoolViolation) || report.Status != "" {
+		t.Fatalf("RunMigration(non-equivalent platform apply) report = %+v, error = %v", report, err)
 	}
 	var user gormUser
 	if err := db.Where("code = ?", "root").Take(&user).Error; err != nil {
 		t.Fatal(err)
 	}
-	if user.ScopeType != string(ScopePlatform) || user.TenantCode != "" || user.OrgUnitCode != "" {
-		t.Fatalf("migrated platform user = %+v", user)
+	if user.ScopeType != "" || user.TenantCode != "legacy-client" || user.OrgUnitCode != "" {
+		t.Fatalf("platform user mutated by blocked migration = %+v", user)
 	}
 	var assignments []gormUserRole
 	if err := db.Where("user_id = ?", user.ID).Order("role_code").Find(&assignments).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(assignments) != 1 || assignments[0].RoleCode != "super-admin" {
-		t.Fatalf("platform assignments = %+v", assignments)
+	if len(assignments) != 1 || assignments[0].RoleCode != "operator" {
+		t.Fatalf("platform assignments after blocked migration = %+v", assignments)
 	}
 }
 

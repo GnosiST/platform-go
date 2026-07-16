@@ -68,8 +68,6 @@ func legacyRoleMenuCandidate(db *gorm.DB, roleCode string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	policy := rbac.NewPolicySetWithDeny(allow, rbac.ParsePermissionList(values["denyPermissions"]))
-	wildcard := policy.Allows("*")
 	deletedMenus, err := deletedRecordIDs(db, "menus")
 	if err != nil {
 		return nil, err
@@ -88,6 +86,20 @@ func legacyRoleMenuCandidate(db *gorm.DB, roleCode string) ([]string, error) {
 			enabledPermissions[permission.Code] = struct{}{}
 		}
 	}
+	enabledAllow := make([]string, 0, len(allow))
+	for _, permission := range allow {
+		if _, enabled := enabledPermissions[permission]; enabled {
+			enabledAllow = append(enabledAllow, permission)
+		}
+	}
+	enabledDeny := make([]string, 0)
+	for _, permission := range rbac.ParsePermissionList(values["denyPermissions"]) {
+		if _, enabled := enabledPermissions[permission]; enabled {
+			enabledDeny = append(enabledDeny, permission)
+		}
+	}
+	policy := rbac.NewPolicySetWithDeny(enabledAllow, enabledDeny)
+	wildcard := policy.Allows("*")
 	var menus []gormMenu
 	if err := db.Where("status = ? AND node_type = ?", StatusEnabled, MenuNodeTypePage).Order("code").Find(&menus).Error; err != nil {
 		return nil, repositoryError(err)
@@ -99,8 +111,10 @@ func legacyRoleMenuCandidate(db *gorm.DB, roleCode string) ([]string, error) {
 		}
 		permission := strings.TrimSpace(menu.LegacyPermission)
 		if wildcard {
-			if permission == "" || policy.Allows(permission) {
-				result = append(result, menu.Code)
+			if permission != "" {
+				if _, enabled := enabledPermissions[permission]; enabled && policy.Allows(permission) {
+					result = append(result, menu.Code)
+				}
 			}
 			continue
 		}

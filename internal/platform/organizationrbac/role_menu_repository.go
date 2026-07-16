@@ -37,7 +37,20 @@ func (r *GORMRepository) PreviewRoleMenus(ctx context.Context, roleCode string, 
 }
 
 func (r *GORMRepository) ReplaceRoleMenus(ctx context.Context, request ReplaceRoleMenusRequest) (RoleMenuSet, error) {
-	if !r.ready(ctx) || !validCode(request.RoleCode) || !validCode(request.ActorID) || request.ChangedAt.IsZero() {
+	if !r.ready(ctx) {
+		return RoleMenuSet{}, ErrInvalid
+	}
+	var committed RoleMenuSet
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var err error
+		committed, err = replaceRoleMenusTx(tx, request, true)
+		return err
+	})
+	return committed, repositoryError(err)
+}
+
+func replaceRoleMenusTx(tx *gorm.DB, request ReplaceRoleMenusRequest, bumpGlobal bool) (RoleMenuSet, error) {
+	if tx == nil || !validCode(request.RoleCode) || !validCode(request.ActorID) || request.ChangedAt.IsZero() {
 		return RoleMenuSet{}, ErrInvalid
 	}
 	codes, err := canonicalRoleMenuCodes(request.MenuCodes)
@@ -45,70 +58,63 @@ func (r *GORMRepository) ReplaceRoleMenus(ctx context.Context, request ReplaceRo
 		return RoleMenuSet{}, err
 	}
 	request.ChangedAt = request.ChangedAt.UTC()
-	var committed RoleMenuSet
-	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if _, err := validateRoleMenuTarget(tx, request.RoleCode, codes); err != nil {
-			return err
-		}
-		current, err := loadRoleMenus(tx, request.RoleCode)
-		if err != nil {
-			return err
-		}
-		if current.Revision != request.ExpectedRevision {
-			return &RevisionConflictError{Expected: request.ExpectedRevision, Actual: current.Revision}
-		}
-		if reflect.DeepEqual(current.MenuCodes, codes) {
-			committed = current
-			return nil
-		}
-		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&gormRoleMenuRevision{RoleCode: request.RoleCode, Revision: 0, UpdatedAt: request.ChangedAt}).Error; err != nil {
-			return repositoryError(err)
-		}
-		next := current.Revision + 1
-		result := tx.Model(&gormRoleMenuRevision{}).Where("role_code = ? AND revision = ?", request.RoleCode, current.Revision).
-			Updates(map[string]any{"revision": next, "updated_at": request.ChangedAt})
-		if result.Error != nil {
-			return repositoryError(result.Error)
-		}
-		if result.RowsAffected != 1 {
-			actual, loadErr := loadRoleMenuRevision(tx, request.RoleCode)
-			if loadErr != nil {
-				return loadErr
-			}
-			return &RevisionConflictError{Expected: current.Revision, Actual: actual}
-		}
-		currentSet := stringSet(current.MenuCodes)
-		targetSet := stringSet(codes)
-		for _, code := range current.MenuCodes {
-			if _, keep := targetSet[code]; keep {
-				continue
-			}
-			if err := tx.Where("role_code = ? AND menu_code = ?", request.RoleCode, code).Delete(&gormRoleMenu{}).Error; err != nil {
-				return repositoryError(err)
-			}
-		}
-		for _, code := range codes {
-			if _, exists := currentSet[code]; exists {
-				if err := tx.Model(&gormRoleMenu{}).Where("role_code = ? AND menu_code = ?", request.RoleCode, code).
-					Updates(map[string]any{"revision": next, "actor_id": request.ActorID, "updated_at": request.ChangedAt}).Error; err != nil {
-					return repositoryError(err)
-				}
-				continue
-			}
-			if err := tx.Create(&gormRoleMenu{RoleCode: request.RoleCode, MenuCode: code, Revision: next, ActorID: request.ActorID, CreatedAt: request.ChangedAt, UpdatedAt: request.ChangedAt}).Error; err != nil {
-				return repositoryError(err)
-			}
-		}
-		if _, err := bumpGlobalRevision(tx); err != nil {
-			return err
-		}
-		committed = RoleMenuSet{RoleCode: request.RoleCode, MenuCodes: codes, Revision: next}
-		return nil
-	})
+	if _, err := validateRoleMenuTarget(tx, request.RoleCode, codes); err != nil {
+		return RoleMenuSet{}, err
+	}
+	current, err := loadRoleMenus(tx, request.RoleCode)
 	if err != nil {
+		return RoleMenuSet{}, err
+	}
+	if current.Revision != request.ExpectedRevision {
+		return RoleMenuSet{}, &RevisionConflictError{Expected: request.ExpectedRevision, Actual: current.Revision}
+	}
+	if reflect.DeepEqual(current.MenuCodes, codes) {
+		return current, nil
+	}
+	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&gormRoleMenuRevision{RoleCode: request.RoleCode, Revision: 0, UpdatedAt: request.ChangedAt}).Error; err != nil {
 		return RoleMenuSet{}, repositoryError(err)
 	}
-	return committed, nil
+	next := current.Revision + 1
+	result := tx.Model(&gormRoleMenuRevision{}).Where("role_code = ? AND revision = ?", request.RoleCode, current.Revision).
+		Updates(map[string]any{"revision": next, "updated_at": request.ChangedAt})
+	if result.Error != nil {
+		return RoleMenuSet{}, repositoryError(result.Error)
+	}
+	if result.RowsAffected != 1 {
+		actual, loadErr := loadRoleMenuRevision(tx, request.RoleCode)
+		if loadErr != nil {
+			return RoleMenuSet{}, loadErr
+		}
+		return RoleMenuSet{}, &RevisionConflictError{Expected: current.Revision, Actual: actual}
+	}
+	currentSet := stringSet(current.MenuCodes)
+	targetSet := stringSet(codes)
+	for _, code := range current.MenuCodes {
+		if _, keep := targetSet[code]; keep {
+			continue
+		}
+		if err := tx.Where("role_code = ? AND menu_code = ?", request.RoleCode, code).Delete(&gormRoleMenu{}).Error; err != nil {
+			return RoleMenuSet{}, repositoryError(err)
+		}
+	}
+	for _, code := range codes {
+		if _, exists := currentSet[code]; exists {
+			if err := tx.Model(&gormRoleMenu{}).Where("role_code = ? AND menu_code = ?", request.RoleCode, code).
+				Updates(map[string]any{"revision": next, "actor_id": request.ActorID, "updated_at": request.ChangedAt}).Error; err != nil {
+				return RoleMenuSet{}, repositoryError(err)
+			}
+			continue
+		}
+		if err := tx.Create(&gormRoleMenu{RoleCode: request.RoleCode, MenuCode: code, Revision: next, ActorID: request.ActorID, CreatedAt: request.ChangedAt, UpdatedAt: request.ChangedAt}).Error; err != nil {
+			return RoleMenuSet{}, repositoryError(err)
+		}
+	}
+	if bumpGlobal {
+		if _, err := bumpGlobalRevision(tx); err != nil {
+			return RoleMenuSet{}, err
+		}
+	}
+	return RoleMenuSet{RoleCode: request.RoleCode, MenuCodes: codes, Revision: next}, nil
 }
 
 func loadRoleMenus(db *gorm.DB, roleCode string) (RoleMenuSet, error) {
