@@ -17,7 +17,10 @@ const root = path.resolve(argValue("--root", repoRoot));
 const strict = hasFlag("--strict");
 const strictPaths = strict || hasFlag("--strict-paths");
 const expectedModule = argValue("--expect-module", "");
-const referenceManifestPath = argValue("--reference-manifest", "resources/reference-snapshot/manifest.json");
+const referenceManifestPath = argValue(
+  "--reference-manifest",
+  "resources/reference-snapshot/manifest.json",
+);
 
 const ignoredDirectories = new Set([
   ".git",
@@ -69,7 +72,7 @@ function relative(file) {
 
 function walk(directory, output = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    if (ignoredDirectories.has(entry.name)) continue;
+    if (entry.isDirectory() && ignoredDirectories.has(entry.name)) continue;
     const file = path.join(directory, entry.name);
     if (entry.isDirectory()) walk(file, output);
     else if (entry.isFile()) output.push(file);

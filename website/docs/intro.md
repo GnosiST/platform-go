@@ -17,3 +17,9 @@ go run ./cmd/platform-api
 ```
 
 API 默认监听 `http://127.0.0.1:9200`。生产部署前请阅读认证和部署文档。
+
+## 继续阅读
+
+- [能力与扩展](./capabilities)
+- [运维与安全](./operations)
+- [完整开发指南](https://github.com/GnosiST/platform-go/blob/main/docs/platform-capability-development.md)
