@@ -74,6 +74,9 @@ const config: Config = {
       title: 'platform-go',
       items: [
         {to: '/docs/intro', label: '文档', position: 'left'},
+        {to: '/docs/capabilities', label: '能力', position: 'left'},
+        {to: '/docs/operations', label: '运维', position: 'left'},
+        {label: 'v0.1.0', href: 'https://github.com/GnosiST/platform-go/releases/tag/v0.1.0', position: 'right'},
         {href: 'https://github.com/GnosiST/platform-go', label: 'GitHub', position: 'right'},
       ],
     },
