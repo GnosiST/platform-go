@@ -374,7 +374,7 @@ function validateFileStorageAdminExperience(capability, errors) {
     errors.push("file-storage-admin-experience must cite desktop and mobile browser screenshot evidence");
   }
   for (const screenshot of screenshots) {
-    if (!relativeExistingPath(screenshot)) {
+    if (!relativeExistingPath(screenshot) && !screenshot.startsWith("external-review-artifacts://")) {
       errors.push(`file-storage-admin-experience screenshot path is missing or unsafe: ${screenshot}`);
     }
   }

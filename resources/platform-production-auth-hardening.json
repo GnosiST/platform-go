@@ -52,7 +52,7 @@
     },
     "productionSessionPolicy": {
       "status": "specified",
-      "path": "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md",
+      "path": "docs/platform-auth.md",
       "requiredDecisions": [
         "current-runtime-sliding-renewal-boundary",
         "refresh-token-family-data-model",
@@ -75,7 +75,7 @@
         "separate-refresh-token-storage-approved",
         "rotation-replay-audit-approved"
       ],
-      "specification": "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md",
+      "specification": "docs/platform-auth.md",
       "implementedRuntimeEvidence": [
         "internal/platform/refreshtoken/store.go",
         "internal/platform/refreshtoken/gorm_repository.go",

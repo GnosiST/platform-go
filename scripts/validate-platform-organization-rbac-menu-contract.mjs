@@ -414,7 +414,7 @@ function validateTaskGovernance(contract, graph, matrix, errors) {
     requireIncludes(capability.evidence?.sourcePaths, [
       "resources/platform-organization-rbac-menu-contract.json",
       "docs/platform-organization-rbac-menu-contract.md",
-      "docs/superpowers/specs/2026-07-15-organization-rbac-menu-contract-and-migration-design.md",
+      "docs/platform-roadmap.md",
     ], `engineering capability ${taskId} sourcePaths`, errors);
     requireIncludes(capability.evidence?.validators, ["scripts/validate-platform-organization-rbac-menu-contract.mjs"], `engineering capability ${taskId} validators`, errors);
     requireIncludes(capability.evidence?.tests, ["scripts/platform-organization-rbac-menu-contract.test.mjs"], `engineering capability ${taskId} tests`, errors);
@@ -432,7 +432,7 @@ function validateTaskGovernance(contract, graph, matrix, errors) {
 
 function validateDocs(errors) {
   const durable = readText("docs/platform-organization-rbac-menu-contract.md");
-  const design = readText("docs/superpowers/specs/2026-07-15-organization-rbac-menu-contract-and-migration-design.md");
+  const design = readText("docs/platform-organization-rbac-menu-contract.md");
   for (const phrase of [
     "server derives and redundantly persists `tenantCode`",
     "`role_menu` persists page leaves only",

@@ -9,7 +9,7 @@ This assessment records the current implementation truth for sensitive-data disp
 
 It does not mark every assessed capability as implemented. Governance now records `67 total / 52 implemented / 15 controlled unfinished`; `mask-strategy-runtime`, `sensitive-data-reveal-step-up`, `data-lifecycle-retention`, `platform-service-contract-standard`, `persisted-query-command-object-runtime`, the disabled-by-default integration ports, the organization/RBAC/menu contract gate, the organization role-pool backend/migration runtime, `organization-user-admin-experience`, `role-tree-and-authorization-entry` and `menu-tree-and-button-permission-configuration` are implemented and closed. Full organization E2E and unified error-code governance remain v0.1.0 blockers. The nine datasource/routing/sharding/federation/XA/certification/outbox/search nodes are post-release optional `deferred` work, not implemented or abandoned.
 
-The [remaining-task topology adjustment](superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md) remains the activated source of truth for the program boundaries and dependencies. The service contract, persisted Query/Command runtime, disabled integration ports, organization contract, organization/user Admin experience and role tree/authorization entry are closed; the remaining 15 nodes retain their approved order and independent completion gates.
+The [remaining-task topology adjustment](docs/platform-roadmap.md) remains the activated source of truth for the program boundaries and dependencies. The service contract, persisted Query/Command runtime, disabled integration ports, organization contract, organization/user Admin experience and role tree/authorization entry are closed; the remaining 15 nodes retain their approved order and independent completion gates.
 
 ## Current-State Summary
 
@@ -115,7 +115,7 @@ Only one MQ adapter should be implemented for the first real workload. RabbitMQ 
 
 The remaining work is feasible within the Gin/GORM/capability-manifest architecture, but it crosses shared contracts, identity, persistence, authorization, operations and Admin UI. Each node must be independently testable and must not claim driver or feature support before the applicable certification lane passes.
 
-The unique approved decomposition and all dependency, lock and completion-gate decisions live in the [remaining-task topology adjustment](superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md). The governing sequence is:
+The unique approved decomposition and all dependency, lock and completion-gate decisions live in the [remaining-task topology adjustment](docs/platform-roadmap.md). The governing sequence is:
 
 ```text
 [implemented: persisted-query-command-object-runtime + integration-ports-disabled-default]

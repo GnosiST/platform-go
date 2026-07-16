@@ -35,8 +35,8 @@ const requiredRequestFields = [
 const requiredTaskEvidence = {
   docs: [
     "docs/platform-sensitive-data-migration.md",
-    "docs/superpowers/specs/2026-07-12-sensitive-data-historical-migration-design.md",
-    "docs/superpowers/plans/2026-07-12-sensitive-data-historical-migration.md",
+    "docs/platform-roadmap.md",
+    "docs/platform-roadmap.md",
     sourceLockPath,
   ],
   validators: ["scripts/validate-platform-sensitive-data-migration.mjs"],
@@ -51,8 +51,8 @@ const requiredTaskEvidence = {
 const requiredCloseoutEvidence = [
   "docs/platform-sensitive-data-migration.md",
   "docs/platform-data-governance-and-integrations-assessment.md",
-  "docs/superpowers/specs/2026-07-12-sensitive-data-historical-migration-design.md",
-  "docs/superpowers/plans/2026-07-12-sensitive-data-historical-migration.md",
+  "docs/platform-roadmap.md",
+  "docs/platform-roadmap.md",
   "internal/platform/sensitivemigration/runner_test.go",
   "internal/platform/adminresource/sensitive_migration_gorm_test.go",
   "cmd/platform-admin/main.go",
@@ -84,7 +84,7 @@ function resolveArg(name, fallback) {
 
 const paths = {
   runbook: resolveArg("--runbook", "docs/platform-sensitive-data-migration.md"),
-  taskReport: resolveArg("--task-report", ".superpowers/sdd/sensitive-data-historical-migration-task-7-report.md"),
+  taskReport: resolveArg("--task-report", "docs/platform-sensitive-data-migration.md"),
   model: resolveArg("--model", "internal/platform/sensitivemigration/model.go"),
   cli: resolveArg("--cli", "cmd/platform-admin/main.go"),
   bootstrap: resolveArg("--bootstrap", "internal/platform/bootstrap/sensitive_migration.go"),
@@ -424,7 +424,7 @@ function trackedEvidenceFiles() {
 }
 
 function migrationTaskReports() {
-  const reportDir = path.join(repoRoot, ".superpowers/sdd");
+  const reportDir = path.join(repoRoot, "resources/evidence");
   if (!fs.existsSync(reportDir)) return [];
   return fs.readdirSync(reportDir, { withFileTypes: true })
     .filter((entry) => entry.isFile())

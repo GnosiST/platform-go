@@ -726,7 +726,7 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-06-platform-go-governance-boundary-design.md",
+          "docs/platform-roadmap.md",
           "docs/platform-foundation-task-map.md"
         ],
         "validators": [
@@ -833,11 +833,11 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-10-platform-production-persistence-correctness-design.md",
+          "docs/platform-roadmap.md",
           "docs/platform-cache.md",
           "docs/platform-roadmap.md",
           "docs/platform-foundation-task-map.md",
-          ".superpowers/sdd/task-4-report.md"
+          "docs/platform-roadmap.md"
         ],
         "validators": [
           "scripts/validate-platform-cache-invalidation.mjs",
@@ -1015,7 +1015,7 @@
         "docs": [
           "docs/platform-foundation-task-map.md",
           "docs/admin-resource-schema.md",
-          "docs/superpowers/specs/2026-07-06-platform-go-codegen-source-writing-readiness-design.md"
+          "docs/platform-roadmap.md"
         ],
         "validators": [
           "scripts/generate-admin-codegen-preview.mjs",
@@ -1049,7 +1049,7 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-06-platform-go-codegen-source-writing-readiness-design.md"
+          "docs/platform-roadmap.md"
         ],
         "validators": [
           "scripts/validate-platform-codegen-source-writing-readiness.mjs",
@@ -1154,7 +1154,7 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-06-platform-go-governance-boundary-design.md",
+          "docs/platform-roadmap.md",
           "docs/platform-foundation-task-map.md"
         ],
         "validators": [
@@ -1269,7 +1269,7 @@
       "evidence": {
         "docs": [
           "docs/admin-ui-foundation.md",
-          "design-qa.md"
+          "docs/platform-deployment.md"
         ],
         "validators": [
           "scripts/validate-admin-i18n.mjs",
@@ -1359,7 +1359,7 @@
           "docs/platform-roadmap.md",
           "docs/platform-foundation-task-map.md",
           "docs/platform-capability-development.md",
-          "docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md"
+          "docs/platform-roadmap.md"
         ],
         "validators": [
           "scripts/validate-platform-production-auth-hardening.mjs",
@@ -1416,7 +1416,7 @@
           "docs/admin-resource-schema.md",
           "docs/admin-ui-foundation.md",
           "docs/platform-foundation-task-map.md",
-          "docs/superpowers/specs/2026-07-08-form-runtime-slots-side-preview-design.md"
+          "docs/platform-roadmap.md"
         ],
         "validators": [
           "scripts/validate-platform-form-schema-layout-slots.mjs",
@@ -1475,7 +1475,7 @@
           "docs/admin-ui-foundation.md",
           "docs/platform-roadmap.md",
           "docs/platform-foundation-task-map.md",
-          "docs/superpowers/specs/2026-07-07-refine-custom-panels-and-actions-design.md"
+          "docs/platform-roadmap.md"
         ],
         "validators": [
           "scripts/validate-admin-resources.mjs",
@@ -1597,7 +1597,7 @@
           "docs/platform-capability-development.md",
           "docs/platform-roadmap.md",
           "docs/platform-foundation-task-map.md",
-          "docs/superpowers/specs/2026-07-07-policy-review-custom-ui-design.md"
+          "docs/platform-roadmap.md"
         ],
         "validators": [
           "scripts/validate-admin-i18n.mjs",
@@ -1648,7 +1648,7 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-06-platform-go-codegen-source-writing-readiness-design.md",
+          "docs/platform-roadmap.md",
           "docs/admin-resource-schema.md",
           "docs/platform-foundation-task-map.md"
         ],
@@ -1854,14 +1854,14 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-11-admin-ui-system-quality-hardening-design.md",
-          "docs/superpowers/plans/2026-07-11-admin-ui-system-quality-hardening.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/admin-ui-foundation.md",
           "docs/platform-ui-optimization-assessment.md",
           "docs/platform-foundation-task-map.md",
           "docs/platform-roadmap.md",
-          "design-qa.md",
-          ".superpowers/sdd/task-4-report.md"
+          "docs/platform-deployment.md",
+          "docs/platform-roadmap.md"
         ],
         "validators": [
           "scripts/validate-admin-i18n.mjs",
@@ -1924,13 +1924,13 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-11-production-admin-oidc-auth-design.md",
-          "docs/superpowers/plans/2026-07-11-production-admin-oidc-auth.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/platform-auth.md",
           "docs/admin-ui-foundation.md",
           "docs/platform-foundation-task-map.md",
           "docs/platform-roadmap.md",
-          "design-qa.md"
+          "docs/platform-deployment.md"
         ],
         "validators": [
           "scripts/validate-platform-production-auth-hardening.mjs",
@@ -2005,9 +2005,9 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
-          "docs/superpowers/specs/2026-07-12-runtime-security-hardening-design.md",
-          "docs/superpowers/plans/2026-07-12-runtime-security-containment.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/platform-auth.md",
           "docs/admin-resource-schema.md",
           "docs/platform-deployment.md",
@@ -2056,10 +2056,10 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
-          "docs/superpowers/specs/2026-07-12-admin-watermark-export-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
-          "docs/superpowers/plans/2026-07-12-admin-watermark-export-governance.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/platform-roadmap.md",
           "docs/platform-foundation-task-map.md",
           "docs/platform-ui-optimization-assessment.md"
@@ -2112,10 +2112,10 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
-          "docs/superpowers/specs/2026-07-12-sensitive-data-encryption-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
-          "docs/superpowers/plans/2026-07-12-sensitive-data-protection-runtime.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/admin-resource-schema.md",
           "docs/platform-capability-development.md",
           "docs/platform-deployment.md"
@@ -2177,11 +2177,11 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
-          "docs/superpowers/specs/2026-07-12-sensitive-data-encryption-design.md",
-          "docs/superpowers/specs/2026-07-12-sensitive-data-historical-migration-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
-          "docs/superpowers/plans/2026-07-12-sensitive-data-historical-migration.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/platform-sensitive-data-migration.md",
           "resources/platform-sensitive-data-migration-source-lock.json",
           "docs/admin-resource-schema.md",
@@ -2239,8 +2239,8 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-13-mask-strategy-runtime-design.md",
-          "docs/superpowers/plans/2026-07-13-mask-strategy-runtime.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-ui-optimization-assessment.md",
           "docs/platform-roadmap.md",
@@ -2320,8 +2320,8 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-13-sensitive-data-reveal-step-up-design.md",
-          "docs/superpowers/plans/2026-07-13-sensitive-data-reveal-step-up.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md",
           "docs/platform-foundation-task-map.md",
@@ -2330,7 +2330,7 @@
           "docs/admin-resource-schema.md",
           "docs/admin-ui-foundation.md",
           "docs/platform-ui-optimization-assessment.md",
-          "design-qa.md"
+          "docs/platform-deployment.md"
         ],
         "sourcePaths": [
           "internal/platform/capability/manifest.go",
@@ -2427,8 +2427,8 @@
       "evidence": {
         "docs": [
           "docs/platform-data-lifecycle-retention.md",
-          "docs/superpowers/specs/2026-07-14-data-lifecycle-retention-design.md",
-          "docs/superpowers/plans/2026-07-14-data-lifecycle-retention.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
@@ -2479,7 +2479,7 @@
         "docs": [
           "docs/platform-service-contract-standard.md",
           "docs/platform-capability-development.md",
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-roadmap.md"
         ],
         "validators": [
@@ -2524,7 +2524,7 @@
         "docs": [
           "docs/platform-service-objects.md",
           "docs/platform-capability-development.md",
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md"
         ],
         "validators": [
@@ -2572,7 +2572,7 @@
         "docs": [
           "docs/platform-integration-ports.md",
           "docs/platform-deployment.md",
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md"
         ],
         "validators": [
@@ -2622,8 +2622,8 @@
       "evidence": {
         "docs": [
           "docs/platform-organization-rbac-menu-contract.md",
-          "docs/superpowers/specs/2026-07-15-organization-rbac-menu-contract-and-migration-design.md",
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/admin-resource-schema.md",
           "docs/admin-rbac-menu.md"
         ],
@@ -2673,7 +2673,7 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-foundation-task-map.md",
           "docs/platform-organization-rbac-menu-contract.md",
           "docs/platform-service-objects.md"
@@ -2722,9 +2722,9 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
-          "docs/superpowers/specs/2026-07-15-organization-user-admin-experience-design.md",
-          "docs/superpowers/plans/2026-07-15-organization-user-admin-experience.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/platform-organization-rbac-menu-contract.md",
           "docs/platform-ui-optimization-assessment.md",
           "docs/admin-resource-schema.md"
@@ -2786,9 +2786,9 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
-          "docs/superpowers/specs/2026-07-15-role-tree-and-authorization-entry-design.md",
-          "docs/superpowers/plans/2026-07-15-role-tree-and-authorization-entry.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
           "docs/platform-organization-rbac-menu-contract.md",
           "docs/platform-ui-optimization-assessment.md",
           "docs/admin-rbac-menu.md",
@@ -2885,7 +2885,7 @@
           "docs/platform-organization-rbac-menu-contract.md",
           "docs/admin-rbac-menu.md",
           "docs/platform-ui-optimization-assessment.md",
-          "docs/superpowers/plans/2026-07-15-menu-tree-and-button-permission-configuration.md"
+          "docs/platform-roadmap.md"
         ],
         "validators": [
           "scripts/validate-platform-organization-rbac-menu-contract.mjs",
@@ -2947,7 +2947,7 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-ui-optimization-assessment.md"
         ],
         "validators": [
@@ -3005,7 +3005,7 @@
         "docs": [
           "docs/platform-error-code-governance.md",
           "docs/platform-service-contract-standard.md",
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md"
+          "docs/platform-roadmap.md"
         ],
         "validators": [
           "scripts/validate-platform-error-code-registry.mjs",
@@ -3047,7 +3047,7 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md"
         ]
       }
@@ -3083,7 +3083,7 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md"
         ]
       }
@@ -3116,7 +3116,7 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md"
         ]
       }
@@ -3151,7 +3151,7 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md"
         ]
       }
@@ -3186,7 +3186,7 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md"
         ]
       }
@@ -3221,7 +3221,7 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md"
         ]
       }
@@ -3255,7 +3255,7 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md"
         ]
       }
@@ -3292,7 +3292,7 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md"
         ]
       }
@@ -3328,7 +3328,7 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md"
         ]
       }
@@ -3362,9 +3362,9 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
-          "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md"
         ],
         "validators": ["scripts/validate-open-source-portability.mjs", "scripts/validate-open-source-portability.test.mjs"],
         "tests": ["examples/external-capability/README.md"],
@@ -3398,9 +3398,9 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
-          "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md"
         ],
         "validators": ["scripts/platform-foundation-docs-drift.test.mjs"],
         "tests": ["website/docs/intro.md", "website/i18n/en/docusaurus-plugin-content-docs/current/intro.md"],
@@ -3442,9 +3442,9 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
-          "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md"
         ],
         "validators": ["website/package.json"],
         "tests": ["website/docusaurus.config.ts", "website/src/pages/index.tsx"],
@@ -3480,9 +3480,9 @@
       ],
       "evidence": {
         "docs": [
-          "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
-          "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
-          "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md",
+          "docs/platform-roadmap.md"
         ],
         "validators": ["scripts/validate-open-source-portability.mjs"],
         "tests": [".github/workflows/ci.yml", ".github/workflows/pages.yml"],

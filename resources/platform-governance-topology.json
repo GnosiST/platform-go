@@ -226,7 +226,7 @@
     "personnelMustIncludeResources": ["personnel-profiles", "positions", "position-assignments", "tenants", "org-units", "area-codes", "users"]
   },
   "documents": [
-    "docs/superpowers/specs/2026-07-06-platform-go-governance-boundary-design.md",
+    "docs/platform-roadmap.md",
     "docs/admin-resource-schema.md",
     "docs/platform-capability-development.md",
     "docs/admin-rbac-menu.md"

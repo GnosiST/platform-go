@@ -10,6 +10,5 @@ automation or security policy require maintainer review and appropriate tests.
 The maintainers may defer, reject or request a narrower change when it would
 couple the foundation to a particular business domain.
 
-Releases follow Semantic Versioning and the process documented in
-`docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md` until a
-public release handbook is published.
+Releases follow Semantic Versioning and the public guidance under [`docs/`](docs/)
+and the repository's release metadata.

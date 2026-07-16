@@ -462,7 +462,7 @@
       "docs/platform-organization-rbac-menu-contract.md",
       "docs/admin-rbac-menu.md",
       "docs/admin-resource-schema.md",
-      "docs/superpowers/specs/2026-07-15-organization-rbac-menu-contract-and-migration-design.md"
+      "docs/platform-roadmap.md"
     ],
     "validators": ["scripts/validate-platform-organization-rbac-menu-contract.mjs"],
     "tests": [

@@ -206,9 +206,9 @@
       "docs/platform-sensitive-data-migration.md",
       "docs/platform-ui-optimization-assessment.md",
       "docs/admin-ui-foundation.md",
-      "docs/superpowers/specs/2026-07-13-sensitive-data-reveal-step-up-design.md",
-      "docs/superpowers/plans/2026-07-13-sensitive-data-reveal-step-up.md",
-      "design-qa.md"
+      "docs/platform-roadmap.md",
+      "docs/platform-roadmap.md",
+      "docs/platform-deployment.md"
     ]
   }
 }

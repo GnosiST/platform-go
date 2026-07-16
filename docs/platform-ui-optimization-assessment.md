@@ -15,7 +15,7 @@ Candidate A has completed that activation path as `admin-ui-system-quality-harde
 
 `runtime-security-containment` and `admin-watermark-export-governance` remain `implemented`; this non-visual service-object node does not replace their security or browser-evidence closeouts.
 
-The original 37-node foundation baseline remains closed. Seventeen continuation nodes, including the non-visual `platform-service-contract-standard`, `persisted-query-command-object-runtime`, `integration-ports-disabled-default` and `organization-role-pool-backend-and-migration`, plus the visual nodes `organization-rbac-menu-contract-and-migration-design`, `organization-user-admin-experience`, `role-tree-and-authorization-entry`, `menu-tree-and-button-permission-configuration` and the organization E2E gate, are `implemented`, so current governance is `67 total / 54 implemented / 13 controlled unfinished` with `completionStatus=not-complete-controlled`.
+The original 37-node foundation baseline remains closed. Seventeen continuation nodes, including the non-visual `platform-service-contract-standard`, `persisted-query-command-object-runtime`, `integration-ports-disabled-default` and `organization-role-pool-backend-and-migration`, plus the visual nodes `organization-rbac-menu-contract-and-migration-design`, `organization-user-admin-experience`, `role-tree-and-authorization-entry`, `menu-tree-and-button-permission-configuration` and the organization E2E gate, are `implemented`, so current governance is `67 total / 58 implemented / 9 controlled unfinished` with `completionStatus=not-complete-controlled`.
 
 The activated topology originally introduced four operational Admin UI nodes. `organization-user-admin-experience`, `role-tree-and-authorization-entry`, `menu-tree-and-button-permission-configuration` and the organization E2E gate are now implemented with Product Design, platform wrappers, `ui-ux-pro-max`, accessibility and responsive browser evidence. The menu workbench supports click expansion, page selection/editing, typed parameters, page-button metadata, focus return and overflow-safe frozen viewports; the ArrowRight screen-reader-input defect is fixed through Ant Tree active-key synchronization with executable UI contract coverage. Target menu serving and role-menu migration writes remain intentionally gated by the existing migration policy. `public-docs-site` remains the only public marketing/art-direction node and additionally requires `design-taste-frontend`.
 
@@ -58,7 +58,7 @@ Status: implemented on 2026-07-11.
 
 Requested aid: `ui-ux-pro-max`
 
-Priority: P1 after the production persistence correctness work described in `docs/superpowers/specs/2026-07-10-platform-production-persistence-correctness-design.md`, before the next large admin capability or downstream business UI is added.
+Priority: P1 after the production persistence correctness work described in `docs/platform-roadmap.md`, before the next large admin capability or downstream business UI is added.
 
 Completed activation gate:
 
@@ -114,7 +114,7 @@ Implemented result:
 - light and dark themes preserve readable settings hierarchy without turning the operational drawer into a promotional surface;
 - Policy Review JSON export alone accepts explicit watermark intent and returns structured provenance; canonical OpenAPI, original file bytes and other export formats are unchanged.
 
-Accepted evidence is stored under `.superpowers/product-design-audit/watermark/`: settings controls, sixteen-mark desktop layout, full-viewport dashboard/navigation/dropdown/modal coverage, responsive `2x8` mobile layout, dark theme and Policy Review export success. Runtime inspection confirmed exact `1/4/9/16` DOM counts, full viewport bounds, overlay stacking, pointer pass-through, no truncated narrow sixteen-mark text, a clean current-run console, and export metadata whose `exportedAt` matches the export timestamp while audit policy records only `watermarkApplied=true`.
+Accepted evidence is stored under `docs/platform-roadmap.md`: settings controls, sixteen-mark desktop layout, full-viewport dashboard/navigation/dropdown/modal coverage, responsive `2x8` mobile layout, dark theme and Policy Review export success. Runtime inspection confirmed exact `1/4/9/16` DOM counts, full viewport bounds, overlay stacking, pointer pass-through, no truncated narrow sixteen-mark text, a clean current-run console, and export metadata whose `exportedAt` matches the export timestamp while audit policy records only `watermarkApplied=true`.
 
 ## Sensitive Data Reveal Step-Up Closeout
 
@@ -128,7 +128,7 @@ Implemented result:
 - the modal progressively handles purpose, `anyOf`/`allOf` factor selection/progress, SMS OTP, OIDC reauthentication and the expiring plaintext state;
 - modal headings receive focus, controls meet the 44px target contract, mobile actions stack without horizontal overflow, and plaintext clears on close, page hide or expiry;
 - verification failure returns a sanitized message and `422` without clearing the main Admin session;
-- browser evidence under `.superpowers/product-design-audit/sensitive-reveal/` covers factor selection, SMS verification, revealed value and the exact `390x844` mobile result.
+- browser evidence under `docs/platform-roadmap.md` covers factor selection, SMS verification, revealed value and the exact `390x844` mobile result.
 
 ## Role Tree And Authorization Entry Closeout
 
@@ -166,6 +166,6 @@ Completion gate:
 
 1. Production persistence correctness and Candidate A are implemented.
 2. Keep Candidate B deferred until there is a real brand/public-surface brief. If only the admin console changes, use the existing quiet operational design language and the implemented Candidate A contracts.
-3. Any future visual candidate requires an explicit task-graph node, design gates, resource locks and fresh screenshot evidence. Candidate A and production Admin OIDC remain closed in the original 37-node baseline; `admin-watermark-export-governance`, `sensitive-data-reveal-step-up`, `organization-rbac-menu-contract-and-migration-design`, the organization backend/migration node, `organization-user-admin-experience`, `role-tree-and-authorization-entry`, `menu-tree-and-button-permission-configuration` and organization E2E are implemented. `public-docs-site` remains controlled pending work in the active `67 total / 54 implemented / 13 controlled unfinished` completion program.
+3. Any future visual candidate requires an explicit task-graph node, design gates, resource locks and fresh screenshot evidence. Candidate A and production Admin OIDC remain closed in the original 37-node baseline; `admin-watermark-export-governance`, `sensitive-data-reveal-step-up`, `organization-rbac-menu-contract-and-migration-design`, the organization backend/migration node, `organization-user-admin-experience`, `role-tree-and-authorization-entry`, `menu-tree-and-button-permission-configuration` and organization E2E are implemented. `public-docs-site` remains controlled pending work in the active `67 total / 58 implemented / 9 controlled unfinished` completion program.
 
 Evidence remains scoped: screenshots, DOM measurements and keyboard checks support this implementation but do not certify WCAG conformance. Screen-reader announcements, high zoom/reflow and platform-specific assistive technology require separate evidence.

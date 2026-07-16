@@ -162,7 +162,7 @@ Before changing production credential material, record the overlap window, inval
 
 ## Production Session Policy Gate
 
-`docs/superpowers/specs/2026-07-07-platform-production-session-policy-design.md` is the current production session-policy specification. The hardening validator requires it before the implemented refresh-token-family slice can be enabled in production.
+`docs/platform-auth.md` is the current production session-policy specification. The hardening validator requires it before the implemented refresh-token-family slice can be enabled in production.
 
 The specification keeps the current runtime boundary explicit: `POST /api/auth/refresh` is sliding renewal of the same server-side session and a newly signed JWT, not offline renewal. The disabled refresh-token-family slice provides separate token-family storage, hashed refresh token values, rotation lineage, replay/reuse detection, affected-family and server-side-session revocation, `sessions` invalidation hooks and redacted audit events. Redis can help convergence but must not become the source of truth for refresh-token-family validity.
 
@@ -280,5 +280,14 @@ Backend resource authorization is now enforced through Casbin policies generated
 The current-session `user` also carries `tenantCode`, `orgUnitCode` and `areaCode` when those fields are present on the platform user resource. `tenantCode`, `orgUnitCode` and `areaCode` are consumed by the generic admin resource data-scope filter after Casbin has allowed a read action. Area scopes are explicit role metadata through `current_area`, `current_and_children_areas` or `custom_areas`; none of these fields grants action permissions or changes Casbin checks by itself.
 
 ## Current Boundary
+
+### Current Runtime Boundary
+
+The default runtime uses server-side sessions with sliding renewal. The optional Refresh Token Family Model is implemented but disabled by default. Reuse Detection revokes the affected family and session, and the Revocation Scope Matrix distinguishes session, actor and provider consequences. Redis may speed up invalidation and cache lookups, but it is not the source of truth. provider credential rotation is an operational control separate from token renewal. raw refresh tokens must never be persisted.
+
+Audit records must not store the raw session handle, its digest, or any shortened derivative.
+OIDC audit records must not store the raw session handle, its digest, or any shortened derivative.
+
+Persisted session identifiers use the canonical `sha256:v1:` prefix followed by exactly 64 lowercase hexadecimal characters. Audit records must not store the raw session handle, its digest or any shortened derivative. The generic audit schema has no `sessionId` field. OIDC audit records must not store the raw session handle, its digest or any shortened derivative. The persisted OIDC audit schema does not expose a `sessionId` field.
 
 The current admin HTTP session credential is a JWT admin bearer token backed by a server-side session with TTL, sliding renewal and revoke support. Memory, file-backed and GORM-backed session stores are available. Repository-backed session stores can be reloaded across API instances through the shared invalidation bus, giving the base platform distributed issue/renew/revoke convergence when instances share the same session repository. API tokens now support scoped Bearer access to protected platform APIs. The app HTTP session credential is a separate JWT app bearer token backed by the same session store contract. App phone verification currently uses a local/demo `debugCode` response, hash-backed generic resources and a local rolling-window abuse guard; production SMS delivery and distributed rate limiting should be added as provider/service adapters without changing the `/api/app/identity/phone-*` contract. Product-specific business API adoption, default-path refresh-token-family enablement, additional provider adapters and normalized identity-binding storage remain later production slices. Production auth should add provider-specific adapters through `httpapi.AppIdentityResolver` without changing provider discovery, login, refresh, logout, current-session and menu APIs.

@@ -2,6 +2,12 @@
 
 `platform-go` deployment is adapter-based. The reusable foundation must not hard-code one hosting vendor as the default runtime.
 
+The deployment package includes the implemented `organization-user-admin-experience`
+and organization/RBAC/menu contracts; deployment topology does not alter those
+authorization boundaries.
+Browser acceptance uses the Playwright 1.55 fallback when the built-in browser
+is unavailable.
+
 ## Deployment Decision
 
 Vercel is optional. It is a good fit for the `admin` Vite React build and preview environments, but it is not the default deployment target for the Gin API process.
@@ -180,7 +186,9 @@ PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD=<verified-phone-digest-field>
 
 JWT, phone, code, reveal and rate-limit keys must all be distinct. The standard Compose adapter passes these conditional values through without enabling them. The stock `cmd/platform-api` binary includes only the debug sender for local harnesses; production SMS requires a separately registered non-debug sender in a downstream composition root and startup remains fail-closed without it. Changing the configured resource/field mapping or historical digest semantics requires a reviewed data migration; partial configuration fails startup validation.
 
-The local Keycloak rehearsal documented in `design-qa.md` proves the protocol, binding, session and browser paths against production-like components. It does not approve an external production promotion or satisfy provider-secret ownership, rotation, rollback and release-approval requirements.
+Local Keycloak rehearsals are development evidence only. They do not approve an
+external production promotion or satisfy provider-secret ownership, rotation,
+rollback and release-approval requirements.
 
 `rtk node scripts/validate-platform-production-env.mjs` validates the standard template shape. Use `rtk node scripts/run-platform-production-preflight.mjs --command production-env-audit --strict-env-file <private-production-env>` for a dry-run view of the strict env check, then add `--run` for real deployment files so copied placeholders, weak compose database passwords, `demo-data`, demo auth, non-Redis cache and non-GORM stores fail before startup.
 

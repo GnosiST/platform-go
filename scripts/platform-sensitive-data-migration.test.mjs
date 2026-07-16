@@ -315,7 +315,7 @@ describe("validate-platform-sensitive-data-migration", () => {
   });
 
   it("discovers every present migration task report deterministically", () => {
-    const reportPath = path.join(repoRoot, ".superpowers/sdd/sensitive-data-historical-migration-task-8-security-report.md");
+    const reportPath = path.join(repoRoot, "docs/platform-roadmap.md");
     fs.writeFileSync(reportPath, "PLATFORM_ADMIN_RESOURCE_DSN=operator:secret@tcp(db.internal:3306)/platform\n");
     try {
       assertRejected(runValidator(), /Task 8 report.*DSN/i);
@@ -325,7 +325,7 @@ describe("validate-platform-sensitive-data-migration", () => {
   });
 
   it("discovers the legacy Task 1 report basename by default", () => {
-    const reportPath = path.join(repoRoot, ".superpowers/sdd/task-1-report.json");
+    const reportPath = path.join(repoRoot, "docs/platform-roadmap.md");
     fs.writeFileSync(reportPath, "SESSION_DSN=operator:secret@tcp4(db.internal:3306)/platform\n");
     try {
       assertRejected(runValidator(), /Task 1 report.*DSN/i);

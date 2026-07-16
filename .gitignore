@@ -28,3 +28,5 @@ design-qa.local.md
 
 # temporary binaries
 /tmp/
+.superpowers/
+design-qa.md
