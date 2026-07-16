@@ -4450,42 +4450,85 @@ func TestAdminResourceSoftDeleteRestoreAndNoOnlinePurgeRoute(t *testing.T) {
 func TestAuthorizationLifecycleRequiresGovernedDomainCommand(t *testing.T) {
 	softPolicy := capability.AdminResourceDeletionPolicy{Mode: capability.AdminDeletionSoftDelete, PolicyVersion: 1, RetentionDays: 30}
 	appendOnly := capability.AdminResourceDeletionPolicy{Mode: capability.AdminDeletionAppendOnly, PolicyVersion: 1}
-	manifests := []capability.Manifest{{ID: "authorization-lifecycle-test", Admin: capability.AdminSurface{Resources: []capability.AdminResource{
-		{
-			Resource: "menus", Title: capability.Text("菜单", "Menus"), Description: capability.Text("菜单。", "Menus."),
-			PermissionPrefix: "admin:menu", Deletion: &softPolicy, Menu: capability.AdminMenu{Route: "/menus", Group: "test", Icon: "menu", Order: 1},
-		},
-		{
-			Resource: "audit-logs", Title: capability.Text("审计日志", "Audit Logs"), Description: capability.Text("审计日志。", "Audit logs."),
-			PermissionPrefix: "admin:audit-log", Deletion: &appendOnly, Menu: capability.AdminMenu{Route: "/audit-logs", Group: "test", Icon: "audit", Order: 2},
-		},
-	}}}}
-	resources := adminresource.NewStoreFromCapabilities(manifests)
-	record, err := resources.Create("menus", adminresource.WriteInput{
-		Code: "settings", Name: "Settings", Status: "enabled",
-		Values: map[string]string{
-			"route": "/settings", "permission": "admin:settings:read", "group": "system", "icon": "settings", "order": "1",
-			"titleZh": "设置", "titleEn": "Settings",
-		},
+	resourcesUnderGovernance := []string{"org-units", "role-groups", "roles", "users", "menus", "permissions"}
+	adminResources := make([]capability.AdminResource, 0, len(resourcesUnderGovernance)+1)
+	for index, resource := range resourcesUnderGovernance {
+		adminResources = append(adminResources, capability.AdminResource{
+			Resource: resource, Title: capability.Text(resource, resource), Description: capability.Text(resource, resource),
+			PermissionPrefix: "admin:" + resource, Deletion: &softPolicy,
+			Menu: capability.AdminMenu{Route: "/" + resource, Group: "test", Icon: "shield", Order: index + 1},
+		})
+	}
+	adminResources = append(adminResources, capability.AdminResource{
+		Resource: "audit-logs", Title: capability.Text("审计日志", "Audit Logs"), Description: capability.Text("审计日志。", "Audit logs."),
+		PermissionPrefix: "admin:audit-log", Deletion: &appendOnly, Menu: capability.AdminMenu{Route: "/audit-logs", Group: "test", Icon: "audit", Order: 2},
 	})
-	if err != nil {
-		t.Fatal(err)
+	manifests := []capability.Manifest{{ID: "authorization-lifecycle-test", Admin: capability.AdminSurface{Resources: adminResources}}}
+	resources := adminresource.NewStoreFromCapabilities(manifests)
+	inputs := map[string]adminresource.WriteInput{
+		"org-units":   {Code: "org-units-guard", Name: "org-units guard", Status: "enabled", Values: map[string]string{"type": "team", "tenantCode": "acme"}},
+		"role-groups": {Code: "role-groups-guard", Name: "role-groups guard", Status: "enabled", Values: map[string]string{"scopeType": "tenant", "tenantCode": "acme"}},
+		"roles":       {Code: "roles-guard", Name: "roles guard", Status: "enabled", Values: map[string]string{"groupCode": "role-groups-guard", "dataScope": "current_org", "permissions": "admin:test:read"}},
+		"users":       {Code: "users-guard", Name: "users guard", Status: "enabled", Values: map[string]string{"scopeType": "tenant", "tenantCode": "acme", "orgUnitCode": "org-units-guard", "roles": "roles-guard"}},
+		"menus": {Code: "menus-guard", Name: "menus guard", Status: "enabled", Values: map[string]string{
+			"nodeType": "page", "route": "/guard", "componentKey": "guard", "permission": "admin:test:read",
+			"group": "security", "icon": "shield", "titleZh": "Guard", "titleEn": "Guard",
+		}},
+		"permissions": {Code: "admin:test:read", Name: "permissions guard", Status: "enabled", Values: map[string]string{
+			"resourceType": "api", "capability": "test", "resource": "guard", "action": "read", "prefix": "admin:test",
+		}},
+	}
+	recordIDs := make(map[string]string, len(resourcesUnderGovernance))
+	for _, resource := range resourcesUnderGovernance {
+		record, err := resources.CreateInternal(resource, inputs[resource])
+		if err != nil {
+			t.Fatalf("Create(%s) error = %v", resource, err)
+		}
+		recordIDs[resource] = record.ID
 	}
 	server := newTestServer(ServerOptions{Capabilities: manifests, Resources: resources})
 
-	for _, request := range []*http.Request{
-		httptest.NewRequest(http.MethodDelete, "/api/admin/resources/menus/"+record.ID, nil),
-		httptest.NewRequest(http.MethodPost, "/api/admin/resources/menus/"+record.ID+"/restore", nil),
-	} {
-		request.Header.Set("X-Platform-User", "admin")
-		response := httptest.NewRecorder()
-		server.Router().ServeHTTP(response, request)
-		if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), `"code":"ADMIN_RESOURCE_DOMAIN_OWNED_MUTATION"`) {
-			t.Fatalf("%s authorization lifecycle status = %d body = %s, want governed-domain 409", request.Method, response.Code, response.Body.String())
+	for _, resource := range resourcesUnderGovernance {
+		for _, request := range []*http.Request{
+			httptest.NewRequest(http.MethodDelete, "/api/admin/resources/"+resource+"/"+recordIDs[resource], nil),
+			httptest.NewRequest(http.MethodPost, "/api/admin/resources/"+resource+"/"+recordIDs[resource]+"/restore", nil),
+		} {
+			request.Header.Set("X-Platform-User", "admin")
+			response := httptest.NewRecorder()
+			server.Router().ServeHTTP(response, request)
+			if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), `"code":"ADMIN_RESOURCE_DOMAIN_OWNED_MUTATION"`) {
+				t.Fatalf("%s %s lifecycle status = %d body = %s, want governed-domain 409", request.Method, resource, response.Code, response.Body.String())
+			}
+		}
+		if items, _ := resources.List(resource); !hasAdminResourceRecordID(items, recordIDs[resource]) {
+			t.Fatalf("%s lifecycle mutation changed records: %+v", resource, items)
 		}
 	}
-	if items, _ := resources.List("menus"); !hasAdminResourceRecordID(items, record.ID) {
-		t.Fatalf("authorization lifecycle mutation changed records: %+v", items)
+}
+
+func TestAdminAuthorizationRoutesExposeNoBulkOrImportMutation(t *testing.T) {
+	server := newTestServer(ServerOptions{})
+	expected := map[string]bool{
+		http.MethodPost + " /api/admin/resources/:resource":             false,
+		http.MethodPut + " /api/admin/resources/:resource/:id":          false,
+		http.MethodDelete + " /api/admin/resources/:resource/:id":       false,
+		http.MethodPost + " /api/admin/resources/:resource/:id/restore": false,
+		http.MethodPost + " /api/admin/service-objects/command":         false,
+	}
+	for _, route := range server.Router().Routes() {
+		key := route.Method + " " + route.Path
+		if _, tracked := expected[key]; tracked {
+			expected[key] = true
+		}
+		lowerPath := strings.ToLower(route.Path)
+		if strings.Contains(lowerPath, "/bulk") || strings.Contains(lowerPath, "/import") {
+			t.Fatalf("unexpected bulk/import mutation route registered: %s", key)
+		}
+	}
+	for route, found := range expected {
+		if !found {
+			t.Fatalf("expected authorization write entry is not registered: %s", route)
+		}
 	}
 }
 

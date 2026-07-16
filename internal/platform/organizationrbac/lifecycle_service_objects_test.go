@@ -54,11 +54,31 @@ func TestResourceLifecyclePrepareImpactApplyIsOwnerScopedAndAudited(t *testing.T
 	if _, err := executor.ExecuteQuery(context.Background(), impactPlan); !errors.Is(err, serviceobject.ErrObjectUnavailable) {
 		t.Fatalf("cross-owner impact error = %v", err)
 	}
+	applyArguments := serviceobject.ValidatedArguments{
+		"previewId": previewID, "expectedRevision": prepare.Values["expectedRevision"], "impactHash": prepare.Values["impactHash"],
+	}
+	if _, err := executor.ExecuteDomainCommand(context.Background(), serviceobject.DomainCommandPlan{
+		Definition: domainDefinitionByID(t, ResourceLifecycleApplyCommandID),
+		Execution:  kernel.ExecutionContext{Context: context.Background(), Actor: kernel.Actor{Username: "other-admin", Kind: kernel.ActorKindUser}},
+		Arguments:  applyArguments,
+	}); !errors.Is(err, serviceobject.ErrObjectUnavailable) {
+		t.Fatalf("cross-owner apply error = %v, want ErrObjectUnavailable", err)
+	}
+	tamperedArguments := serviceobject.ValidatedArguments{
+		"previewId": previewID, "expectedRevision": prepare.Values["expectedRevision"], "impactHash": "mismatched-impact-hash",
+	}
+	if _, err := executor.ExecuteDomainCommand(context.Background(), serviceobject.DomainCommandPlan{
+		Definition: domainDefinitionByID(t, ResourceLifecycleApplyCommandID), Execution: execution, Arguments: tamperedArguments,
+	}); !errors.Is(err, serviceobject.ErrConflict) {
+		t.Fatalf("mismatched-hash apply error = %v, want ErrConflict", err)
+	}
+	var unchanged gormUser
+	if err := db.Where("code = ?", "alice").Take(&unchanged).Error; err != nil || unchanged.Status != StatusEnabled {
+		t.Fatalf("rejected apply changed user = %+v error=%v", unchanged, err)
+	}
 	apply, err := executor.ExecuteDomainCommand(context.Background(), serviceobject.DomainCommandPlan{
 		Definition: domainDefinitionByID(t, ResourceLifecycleApplyCommandID), Execution: execution,
-		Arguments: serviceobject.ValidatedArguments{
-			"previewId": previewID, "expectedRevision": prepare.Values["expectedRevision"], "impactHash": prepare.Values["impactHash"],
-		},
+		Arguments: applyArguments,
 	})
 	if err != nil || apply.Values["revision"] != int64(2) {
 		t.Fatalf("apply = %+v, error = %v", apply, err)
@@ -105,5 +125,49 @@ func TestResourceLifecycleApplyRejectsExpiredPreview(t *testing.T) {
 	var group gormRoleGroup
 	if err := db.Where("code = ?", "acme-ops").Take(&group).Error; err != nil || group.Status != StatusEnabled {
 		t.Fatalf("expired preview changed group = %+v error=%v", group, err)
+	}
+}
+
+func TestResourceLifecycleApplyRejectsStaleRevisionWithoutMutation(t *testing.T) {
+	db, repository := prepareOrganizationRBACTestRepository(t)
+	seedOrganizationRBAC(t, db)
+	if err := db.Create(&gormPermission{
+		ID: "permission-user-read", Code: "admin:user:read", Name: "Read users", Status: StatusEnabled,
+		ResourceType: PermissionResourceTypeAPI, Resource: "users", Action: "read", ValuesJSON: "{}",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 7, 15, 20, 30, 0, 0, time.UTC)
+	executor, err := NewServiceObjectExecutor(repository, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	execution := kernel.ExecutionContext{Context: context.Background(), Actor: kernel.Actor{Username: "admin", Kind: kernel.ActorKindUser}}
+	prepare, err := executor.ExecuteDomainCommand(context.Background(), serviceobject.DomainCommandPlan{
+		Definition: domainDefinitionByID(t, ResourceLifecyclePrepareCommandID), Execution: execution,
+		Arguments: serviceobject.ValidatedArguments{
+			"resource": "permissions", "resourceCode": "admin:user:read", "operation": LifecycleOperationDelete,
+			"retentionDays": int64(30), "policyVersion": int64(1),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.ReplaceOrgUnitRoleGroups(context.Background(), ReplaceOrgUnitRoleGroupsRequest{
+		OrgUnitCode: "acme-hq", RoleGroupCodes: []string{"acme-ops"}, ExpectedRevision: 0, ActorID: "admin", ChangedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := executor.ExecuteDomainCommand(context.Background(), serviceobject.DomainCommandPlan{
+		Definition: domainDefinitionByID(t, ResourceLifecycleApplyCommandID), Execution: execution,
+		Arguments: serviceobject.ValidatedArguments{
+			"previewId": prepare.Values["previewId"], "expectedRevision": prepare.Values["expectedRevision"], "impactHash": prepare.Values["impactHash"],
+		},
+	}); !errors.Is(err, serviceobject.ErrConflict) {
+		t.Fatalf("stale apply error = %v, want ErrConflict", err)
+	}
+	var permission gormPermission
+	if err := db.Where("code = ?", "admin:user:read").Take(&permission).Error; err != nil || permission.Status != StatusEnabled {
+		t.Fatalf("stale apply changed permission = %+v error=%v", permission, err)
 	}
 }

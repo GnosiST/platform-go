@@ -81,7 +81,7 @@ func TestGORMAdminResourceApplierRejectsDeletionModeDrift(t *testing.T) {
 }
 
 func TestGORMAdminResourceApplierRejectsAuthorizationLifecycleWithoutCheckpoint(t *testing.T) {
-	for _, resource := range []string{"org-units", "role-groups", "roles", "users"} {
+	for _, resource := range []string{"org-units", "role-groups", "roles", "users", "menus", "permissions"} {
 		t.Run(resource, func(t *testing.T) {
 			db := openLifecycleTestDB(t)
 			adminRepository, lifecycleRepository, manifests := prepareAdminLifecycleApplyTest(t, db)
