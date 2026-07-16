@@ -7,6 +7,8 @@ and releases follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-16
+
 ### Added
 
 - Initial public foundation with capability manifests, resource contracts, JWT sessions, Casbin RBAC, GORM persistence and the Refine Admin shell.
@@ -16,7 +18,7 @@ and releases follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Reconciled the foundation task graph to 67 total, 57 implemented and ten controlled unfinished nodes.
+- Reconciled the foundation task graph and kept nine post-release data-plane nodes explicitly deferred.
 - Kept local agent and design process files available to maintainers while excluding them from tracked release trees and source archives.
 - Updated GitHub Actions to the current Node 24-based major versions.
 - Established the single-datasource, single-native-transaction support boundary for the `0.1.x` line.

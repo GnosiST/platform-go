@@ -378,8 +378,10 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.equal(graph.tasks.find((item) => item.id === "unified-error-code-governance")?.status, "implemented");
     assert.ok(postReleaseOptionalNodes.every((id) => graph.tasks.find((item) => item.id === id)?.status === "deferred"));
     assert.equal(publicationTask?.status, "pending");
+    assert.match(publicationTask?.statusReason?.zh ?? "", /已明确授权/);
+    assert.match(publicationTask?.statusReason?.en ?? "", /explicitly authorized/i);
     assert.deepEqual(publicationTask?.evidence?.artifacts, []);
-    assert.equal(readJSON("resources/evidence/github-release-publication-20260716.json").status, "withdrawn");
+    assert.equal(readJSON("resources/evidence/github-release-publication-20260716.json").status, "pending");
     assert.deepEqual(graph.tasks.find((item) => item.id === "open-source-portability")?.dependsOn, [
       "admin-watermark-export-governance",
       "organization-rbac-menu-e2e-qa",

@@ -347,7 +347,7 @@ Sensitive-data reveal closeout:
 
 ## Post-Foundation UI Optimization State
 
-The original foundation baseline and completed continuation nodes remain closed. The active graph is `67 total / 57 implemented / 10 controlled unfinished`; external production promotion remains `not-approved`, the v0.1.0 Release/Tag remains pending explicit authorization, and runtime mutation, refresh-token-family default runtime, source writing, uncertified databases, federation mutation, default XA and messaging/search adapters remain disabled.
+The original foundation baseline and completed continuation nodes remain closed. The active graph is `67 total / 57 implemented / 10 controlled unfinished`; external production promotion remains `not-approved`, v0.1.0 publication is authorized and awaits the Release/Tag evidence, and runtime mutation, refresh-token-family default runtime, source writing, uncertified databases, federation mutation, default XA and messaging/search adapters remain disabled.
 
 1. Admin UI system-quality hardening
    - Requested aid: `ui-ux-pro-max`.

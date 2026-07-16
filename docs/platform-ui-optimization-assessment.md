@@ -11,7 +11,7 @@ This assessment records how two design aids are routed without disrupting the pl
 - `ui-ux-pro-max` for implementation-level admin UI quality, accessibility, responsive behavior and shared-component hardening;
 - `design-taste-frontend` for the visual direction of login, brand-entry, landing, portfolio, marketing or deliberate redesign surfaces.
 
-Candidate A has completed that activation path as `admin-ui-system-quality-hardening`. Candidate B's broader brand-entry redesign remains deferred until a real public or brand brief is approved. The bounded `admin-watermark-export-governance`, `sensitive-data-reveal-step-up` and `public-docs-site` visual nodes have completed implementation and fresh browser acceptance; formal v0.1.0 publication remains a separate pending governance gate.
+Candidate A has completed that activation path as `admin-ui-system-quality-hardening`. Candidate B's broader brand-entry redesign remains deferred until a real public or brand brief is approved. The bounded `admin-watermark-export-governance`, `sensitive-data-reveal-step-up` and `public-docs-site` visual nodes have completed implementation and fresh browser acceptance; formal v0.1.0 publication is authorized and remains pending until external evidence is captured.
 
 `runtime-security-containment` and `admin-watermark-export-governance` remain `implemented`; this non-visual service-object node does not replace their security or browser-evidence closeouts.
 

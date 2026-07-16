@@ -3462,8 +3462,8 @@
       "scope": "governance",
       "status": "pending",
       "statusReason": {
-        "zh": "公开仓库、main 默认分支、CI 和 Pages 已就绪；目标版本保持 v0.1.0，正式 Release/Tag 等待用户明确授权。",
-        "en": "The public repository, main default branch, CI and Pages are ready; the target remains v0.1.0 and the formal Release/Tag awaits explicit user authorization."
+        "zh": "v0.1.0 已明确授权发布；公开仓库、main 默认分支、CI 和 Pages 已就绪，等待创建正式 Release/Tag 并回填发布证据。",
+        "en": "v0.1.0 publication is explicitly authorized; the public repository, main default branch, CI and Pages are ready, pending the formal Release/Tag and publication evidence."
       },
       "completionGate": {
         "zh": "创建公开仓库并以 main 作为唯一长期分支，验证净化提交、CI、Pages、v0.1.0 和仓库展示。",

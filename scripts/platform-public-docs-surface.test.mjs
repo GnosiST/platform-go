@@ -40,9 +40,13 @@ describe("public documentation surface", () => {
       }
       assert.match(source, /`github-release-publication`[^.\n]*`pending`/);
     }
+
+    assert.match(read("README.md"), /v0\.1\.0 已明确授权发布/);
+    assert.match(read("README.en.md"), /v0\.1\.0 publication is explicitly authorized/i);
+    assert.match(read("docs/platform-roadmap.md"), /v0\.1\.0 publication is explicitly authorized/i);
   });
 
-  it("keeps v0.1.0 explicitly unreleased until publication is authorized", () => {
+  it("publishes v0.1.0 without advancing the version", () => {
     const adminPackage = JSON.parse(read("admin/package.json"));
     const websitePackage = JSON.parse(read("website/package.json"));
     const home = read("website/src/pages/index.tsx");
@@ -51,10 +55,10 @@ describe("public documentation surface", () => {
 
     assert.equal(adminPackage.version, "0.1.0");
     assert.equal(websitePackage.version, "0.1.0");
-    assert.match(home, /v0\.1\.0 (?:待发布|unreleased)/);
-    assert.doesNotMatch(home, /v0\.1\.\d+ (?:已发布|released)/);
-    assert.doesNotMatch(config, /releases\/tag\/v0\.1\.[0-9]+/);
-    assert.match(changelog, /## \[Unreleased\]/);
+    assert.match(home, /v0\.1\.0 (?:已发布|released)/);
+    assert.doesNotMatch(home, /v0\.1\.[1-9]\d*/);
+    assert.match(config, /label: 'v0\.1\.0', href: 'https:\/\/github\.com\/GnosiST\/platform-go\/releases\/tag\/v0\.1\.0'/);
+    assert.match(changelog, /## \[Unreleased\][\s\S]*## \[0\.1\.0\] - 2026-07-16/);
     assert.doesNotMatch(changelog, /## \[0\.1\.1\]/);
   });
 

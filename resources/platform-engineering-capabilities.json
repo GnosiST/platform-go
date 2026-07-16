@@ -3637,7 +3637,7 @@
         "en": "Public Documentation And Release"
       },
       "status": "partial",
-      "purpose": "Deliver public community documentation, a bilingual Docusaurus site, GitHub Pages and CI while keeping the sanitized v0.1.0 repository release pending explicit authorization.",
+      "purpose": "Deliver public community documentation, a bilingual Docusaurus site, GitHub Pages and CI while recording the explicitly authorized v0.1.0 release through verified external publication evidence.",
       "dependsOn": [
         "open-source-portability"
       ],

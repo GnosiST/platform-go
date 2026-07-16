@@ -77,7 +77,7 @@ const config: Config = {
         {to: '/docs/capabilities', label: '能力 / Capabilities', position: 'left'},
         {to: '/docs/operations', label: '运维 / Operations', position: 'left'},
         {type: 'localeDropdown', position: 'right'},
-        {label: 'v0.1.0 · Unreleased', href: 'https://github.com/GnosiST/platform-go/blob/main/CHANGELOG.md', position: 'right'},
+        {label: 'v0.1.0', href: 'https://github.com/GnosiST/platform-go/releases/tag/v0.1.0', position: 'right'},
         {href: 'https://github.com/GnosiST/platform-go', label: 'GitHub', position: 'right'},
       ],
     },

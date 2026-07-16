@@ -35,7 +35,7 @@ export default function Home(): JSX.Element {
                 <a className="button button--secondary button--lg" href="https://github.com/GnosiST/platform-go">{text('在 GitHub 查看', 'View on GitHub')} <span aria-hidden="true">↗</span></a>
               </div>
               <div className="platform-hero__meta" aria-label={text('项目状态', 'Project status')}>
-                <span><i className="platform-status-dot" aria-hidden="true" />{text('v0.1.0 待发布', 'v0.1.0 unreleased')}</span><span>Apache-2.0</span><span>Go + Gin + GORM</span>
+                <span><i className="platform-status-dot" aria-hidden="true" />{text('v0.1.0 已发布', 'v0.1.0 released')}</span><span>Apache-2.0</span><span>Go + Gin + GORM</span>
               </div>
             </div>
             <div className="platform-hero__visual" aria-label={text('请求从身份进入数据运行时的架构路径', 'Architecture path from identity to data runtime')}>
