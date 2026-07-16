@@ -447,6 +447,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
 
       <AdminFormModal
         afterClose={() => restoreRoleModalFocus(metadataTriggerRef.current, detailFocusRef.current)}
+        cancelText={dictionary.cancel}
         confirmLoading={acting === "metadata"}
         focusTriggerAfterClose={false}
         okText={dictionary.save}
@@ -483,6 +484,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
 
       <AdminModal
         afterClose={() => restoreRoleModalFocus(moveTriggerRef.current, detailFocusRef.current)}
+        cancelText={dictionary.cancel}
         confirmLoading={acting === "move"}
         focusTriggerAfterClose={false}
         okText={dictionary.reviewAndApply}
@@ -678,6 +680,7 @@ function AuthorizationModal({
   return (
     <AdminModal
       afterClose={afterClose}
+      cancelText={dictionary.cancel}
       className="role-authorization-modal"
       confirmLoading={!readOnly && acting}
       destroyOnHidden
@@ -782,7 +785,7 @@ function MenuVisibilityModal({
     <AdminModal
       afterClose={afterClose}
       className="role-menu-visibility-modal"
-      cancelText={dictionary.close}
+      cancelText={dictionary.cancel}
       confirmLoading={menuAccess.showSave && acting}
       destroyOnHidden
       focusTriggerAfterClose={false}

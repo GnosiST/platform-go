@@ -128,6 +128,23 @@ describe("role workbench redesign contracts", () => {
     assert.doesNotMatch(role, /returnFocusRef=/);
   });
 
+  it("localizes role modal cancellation while preserving close-only menu inspection", () => {
+    const role = source("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+
+    assert.equal((role.match(/cancelText=\{dictionary\.cancel\}/g) ?? []).length, 4);
+    assert.match(role, /footer=\{!menuAccess\.showSave \? <Button onClick=\{onClose\}>\{dictionary\.close\}<\/Button> : undefined\}/);
+  });
+
+  it("keeps large role modals inside the dynamic viewport with a scrolling body", () => {
+    const styles = source("admin/src/styles.css");
+
+    assert.match(styles, /\.role-authorization-modal,[\s\S]*?\.role-menu-visibility-modal \{[\s\S]*?top: 16px;[\s\S]*?padding-bottom: 0;/);
+    assert.match(styles, /\.role-authorization-modal \.ant-modal-content,[\s\S]*?\.role-menu-visibility-modal \.ant-modal-content \{[\s\S]*?display: flex;[\s\S]*?max-height: calc\(100dvh - 32px\);[\s\S]*?flex-direction: column;[\s\S]*?overflow: hidden;/);
+    assert.match(styles, /\.role-authorization-modal :is\(\.ant-modal-header, \.ant-modal-footer\),[\s\S]*?\.role-menu-visibility-modal :is\(\.ant-modal-header, \.ant-modal-footer\) \{[\s\S]*?flex: 0 0 auto;/);
+    assert.match(styles, /\.role-authorization-modal \.ant-modal-body,[\s\S]*?\.role-menu-visibility-modal \.ant-modal-body \{[\s\S]*?min-height: 0;[\s\S]*?overflow: auto;/);
+    assert.doesNotMatch(styles, /\.role-authorization-modal \.ant-modal-body,[\s\S]*?max-height: calc\(100dvh - 190px\)/);
+  });
+
   it("uses the platform modal boundary and removes dead Tree Transfer state", () => {
     const primitives = source("admin/src/platform/ui/AdminPrimitives.tsx");
     const role = source("admin/src/platform/resources/RoleGovernanceConsole.tsx");

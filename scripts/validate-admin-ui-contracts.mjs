@@ -512,6 +512,18 @@ for (const triggerRef of ["metadataTriggerRef", "moveTriggerRef", "authorization
 requireCountExactly(files.roleGovernance, "focusTriggerAfterClose={false}", 4, "Role modals must disable Ant automatic trigger focus when using explicit restoration.");
 requireNotIncludes(roleAuthorizationModal, "returnFocusRef=", "Role authorization must not delegate focus restoration to Tree Transfer.");
 requireNotIncludes(roleMenuModal, "returnFocusRef=", "Role menu visibility must not delegate focus restoration to Tree Transfer.");
+requireCountExactly(files.roleGovernance, "cancelText={dictionary.cancel}", 4, "Role governance modals with cancel actions must use the localized cancel label.");
+requireIncludes(roleMenuModal, "footer={!menuAccess.showSave ? <Button onClick={onClose}>{dictionary.close}</Button> : undefined}", "Read-only role menu inspection must retain a localized close-only footer.");
+requireRegex(
+  files.styles,
+  /\.role-authorization-modal,\s*\.role-menu-visibility-modal\s*\{[\s\S]*?top:\s*16px;[\s\S]*?padding-bottom:\s*0;[\s\S]*?\}[\s\S]*?\.role-authorization-modal \.ant-modal-content,\s*\.role-menu-visibility-modal \.ant-modal-content\s*\{[\s\S]*?display:\s*flex;[\s\S]*?max-height:\s*calc\(100dvh - 32px\);[\s\S]*?flex-direction:\s*column;[\s\S]*?overflow:\s*hidden;[\s\S]*?\}/,
+  "Large role governance modals must fit inside the dynamic viewport with bounded flex content.",
+);
+requireRegex(
+  files.styles,
+  /\.role-authorization-modal :is\(\.ant-modal-header, \.ant-modal-footer\),\s*\.role-menu-visibility-modal :is\(\.ant-modal-header, \.ant-modal-footer\)\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?\}[\s\S]*?\.role-authorization-modal \.ant-modal-body,\s*\.role-menu-visibility-modal \.ant-modal-body\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?overflow:\s*auto;[\s\S]*?\}/,
+  "Large role governance modal headers and footers must stay visible while the body scrolls.",
+);
 requireIncludes(files.roleGovernance, "<Typography.Title level={4}>", "Role detail must use the compact platform title hierarchy.");
 requireIncludes(files.roleGovernance, "column={{ xs: 1, md: 2 }}", "Role summaries must reflow from two columns to one.");
 requireIncludes(files.roleGovernance, "roleStatusLabel(record.status, dictionary)", "Role status summaries must be localized.");

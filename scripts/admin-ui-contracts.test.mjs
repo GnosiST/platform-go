@@ -1193,6 +1193,26 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /disable Ant automatic trigger focus/);
   });
 
+  it("rejects untranslated role modal cancel actions", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/platform/resources/RoleGovernanceConsole.tsx", "cancelText={dictionary.cancel}", "cancelText=\"Cancel\"");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must use the localized cancel label/);
+  });
+
+  it("rejects large role modals without a dynamic viewport height bound", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/styles.css", "max-height: calc(100dvh - 32px);", "max-height: none;");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must fit inside the dynamic viewport/);
+  });
+
   it("rejects raw role status, role-group scope and role data-scope summaries", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(tempRoot, "admin/src/platform/resources/RoleGovernanceConsole.tsx", "roleStatusLabel(record.status, dictionary)", "record.status");

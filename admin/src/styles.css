@@ -366,9 +366,28 @@
   min-width: 0;
 }
 
+.role-authorization-modal,
+.role-menu-visibility-modal {
+  top: 16px;
+  padding-bottom: 0;
+}
+
+.role-authorization-modal .ant-modal-content,
+.role-menu-visibility-modal .ant-modal-content {
+  display: flex;
+  max-height: calc(100dvh - 32px);
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.role-authorization-modal :is(.ant-modal-header, .ant-modal-footer),
+.role-menu-visibility-modal :is(.ant-modal-header, .ant-modal-footer) {
+  flex: 0 0 auto;
+}
+
 .role-authorization-modal .ant-modal-body,
 .role-menu-visibility-modal .ant-modal-body {
-  max-height: calc(100dvh - 190px);
+  min-height: 0;
   overflow: auto;
 }
 
