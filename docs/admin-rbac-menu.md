@@ -1,13 +1,13 @@
 # Admin RBAC And Dynamic Menu
 
 Date: 2026-07-04
-Last updated: 2026-07-15
+Last updated: 2026-07-17
 
 ## Purpose
 
 The admin foundation now has a runtime RBAC slice for platform menus and generic admin resources. Menu records are generated from enabled capability manifests, then filtered by the current principal.
 
-The default legacy mode below remains the migration-source experience. The target backend contract in `docs/platform-organization-rbac-menu-contract.md` is implemented behind `PLATFORM_ORGANIZATION_RBAC_MODE=target`: role groups are non-nested and scoped, organizations bind tenant role groups, tenant users derive tenant from one primary organization, and API/page-button permission resources are separated. The organization/user Admin UI, strict role-group-to-role workbench and dedicated menu tree/detail workbench are implemented. Page-only `role_menu` persistence, menu/page-button schema, service objects and revision-aware target resolution exist behind closed serving and write gates. Role menu assignment remains read-only while the migration write gate is closed; full Tree Transfer scale, all-principal dual-read equivalence, cutover/rollback and organization E2E remain pending.
+The default legacy mode below remains the migration-source experience. The target backend contract in `docs/platform-organization-rbac-menu-contract.md` is implemented behind `PLATFORM_ORGANIZATION_RBAC_MODE=target`: role groups are non-nested and scoped, organizations bind tenant role groups, tenant users derive tenant from one primary organization, and API/page-button permission resources are separated. The organization/user Admin UI, strict role-group-to-role workbench and dedicated menu tree/detail workbench are implemented. Page-only `role_menu` persistence, menu/page-button schema, service objects and revision-aware target resolution exist behind production-default serving and write gates. The organization E2E gate has verified full Tree Transfer scale, all-principal dual-read equivalence and cutover/rollback behavior. Production still serves legacy menus and keeps role-menu writes disabled until an explicit rollout approval changes those defaults.
 
 This slice turns resource permission codes into executable behavior:
 

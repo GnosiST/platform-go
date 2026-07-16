@@ -134,7 +134,7 @@ Implemented result:
 
 Status: implemented on 2026-07-15.
 
-The role and role-group routes now share one strict two-level workbench. Role movement and disablement use reviewed impact/remediation commands; permission assignment atomically updates allow, deny and data-scope policy. The shared Tree Transfer preserves keyboard focus, reduced motion, virtual tree rendering and at least 44px interactive targets across the frozen six-viewport set. Resource loading follows independent least-privilege checks for roles and role groups. Menu assignment remains intentionally read-only while the write gate is closed. The subsequent menu node implemented directory/page authoring, `role_menu` persistence seams and its focused browser evidence; full migration E2E remains owned by `organization-rbac-menu-e2e-qa`.
+The role and role-group routes now share one strict two-level workbench. Role movement and disablement use reviewed impact/remediation commands; permission assignment atomically updates allow, deny and data-scope policy. The shared Tree Transfer preserves keyboard focus, reduced motion, virtual tree rendering and at least 44px interactive targets across the frozen six-viewport set. Resource loading follows independent least-privilege checks for roles and role groups. Menu assignment remains intentionally read-only while the write gate is closed. The subsequent menu node implemented directory/page authoring and `role_menu` persistence seams, and `organization-rbac-menu-e2e-qa` completed scale, accessibility, dual-read and cutover/rollback verification. Production serving and writes remain default-closed by rollout policy.
 
 ## Candidate B: Brand Entry And Public-Surface Visual Redesign
 

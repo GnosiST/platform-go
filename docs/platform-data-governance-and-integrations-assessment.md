@@ -126,7 +126,7 @@ The unique approved decomposition and all dependency, lock and completion-gate d
   -> open-source-docs-and-release
 ```
 
-The Query/Command runtime, disabled integration ports, organization/user Admin slice, focused role-workbench slice and menu workbench completed their approved work. The remaining organization E2E lane may run in parallel with the datasource backend lane when their contract and file locks do not overlap.
+The Query/Command runtime, disabled integration ports, organization/user Admin slice, focused role-workbench slice, menu workbench and organization E2E lane completed their approved work. Production menu serving and role-menu writes remain default-closed by rollout policy; the deferred datasource lanes remain independent post-release work.
 
 Stable and future stage gates:
 

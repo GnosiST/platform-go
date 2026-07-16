@@ -20,6 +20,7 @@ const files = {
   client: readSource("admin/src/platform/api/client.ts"),
   dataProvider: readSource("admin/src/platform/refine/dataProvider.ts"),
   dashboard: readSource("admin/src/platform/dashboard/DashboardHome.tsx"),
+  designProvider: readSource("admin/src/platform/ui/AdminDesignProvider.tsx"),
   organizationRBAC: readSource("admin/src/platform/api/organizationRBAC.ts"),
   sessionExpiry: readSource("admin/src/platform/api/sessionExpiry.ts"),
   i18n: readSource("admin/src/platform/i18n.ts"),
@@ -65,6 +66,8 @@ requireIncludes(files.app, "readStoredUIConfig", "App must keep persisted admin 
 requireIncludes(files.app, "writeStorageValue(adminPreferenceStorageKeys.ui", "App must persist admin UI configuration changes.");
 requireIncludes(files.app, "defaultAdminUIConfig", "App must fall back to the shared default admin UI config.");
 requireIncludes(files.app, "disableTelemetry: true", "The reusable Admin foundation must disable Refine third-party telemetry by default.");
+requireIncludes(files.designProvider, "document.body.dataset.theme = themeName;", "Admin theme tokens must propagate to body-portaled overlays.");
+requireIncludes(files.designProvider, "delete document.body.dataset.theme;", "Admin theme propagation must clean up its body theme marker.");
 requireIncludes(files.app, "PolicyReviewConsole", "App must mount the policy-review custom governance console when the resource is enabled.");
 requireIncludes(files.app, 'resource.route !== "/policy-reviews"', "Generic resource routing must not also mount policy-reviews when the custom console is active.");
 requireIncludes(files.app, "projectRoleManagementNavigation", "App must use the approved role-management navigation projection.");

@@ -1,7 +1,7 @@
 import { ConfigProvider, theme as antdTheme, type ThemeConfig } from "antd";
 import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
-import { useMemo, type ReactNode } from "react";
+import { useLayoutEffect, useMemo, type ReactNode } from "react";
 import type { Language } from "../i18n";
 import { themeTokens, type ThemeName } from "../theme";
 
@@ -18,6 +18,21 @@ const adminFontFamily =
 export function AdminDesignProvider({ language, themeName, customPrimary, children }: AdminDesignProviderProps) {
   const tokens = themeTokens[themeName];
   const colorPrimary = customPrimary?.trim() || tokens.primary;
+
+  useLayoutEffect(() => {
+    const previousTheme = document.body.dataset.theme;
+    document.body.dataset.theme = themeName;
+
+    return () => {
+      if (document.body.dataset.theme !== themeName) return;
+      if (previousTheme) {
+        document.body.dataset.theme = previousTheme;
+        return;
+      }
+      delete document.body.dataset.theme;
+    };
+  }, [themeName]);
+
   const theme = useMemo<ThemeConfig>(
     () => ({
       algorithm: themeName === "black" ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,

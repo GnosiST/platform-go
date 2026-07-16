@@ -153,7 +153,7 @@ describe("role permission write mode integration", () => {
 
   it("lets disabled roles open for inspection while guarding every save", () => {
     const detail = roleGovernance.slice(roleGovernance.indexOf("function RoleGovernanceDetail"), roleGovernance.indexOf("function AuthorizationModal"));
-    assert.match(detail, /canReadAuthorizationInputs \? <Button ref=\{authorizationTriggerRef\} icon=\{<SafetyCertificateOutlined/);
+    assert.match(detail, /canReadAuthorizationInputs \? <AdminActionButton ref=\{authorizationTriggerRef\} icon=\{<SafetyCertificateOutlined/);
     assert.doesNotMatch(detail, /authorizationTriggerRef\} disabled=\{!canUpdateRole \|\| record\.status !== "enabled"\}/);
     assert.match(roleGovernance, /authorization\.role\.status !== "enabled"/);
   });

@@ -7,6 +7,15 @@ and releases follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Unified role and role-group administration under one strict two-level role-management workbench while retaining compatibility routes.
+- Reworked role details and menu/permission entry points with platform tree and Tree Transfer primitives across desktop, mobile and dark mode.
+
+### Fixed
+
+- Kept role authorization modal actions inside short desktop and mobile viewports, propagated active theme tokens into portaled authorization surfaces, localized cancellation controls, and restored focus to the opening command after close.
+
 ## [0.1.0] - 2026-07-16
 
 ### Added

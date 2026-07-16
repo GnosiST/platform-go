@@ -1,6 +1,6 @@
 # Organization, RBAC And Menu Contract
 
-> Status: backend constraints, migration runtime, organization/user Admin UI, the role tree/authorization entry and the menu tree/detail workbench are implemented; full browser E2E, serving cutover and role-menu migration writes remain closed.
+> Status: backend constraints, migration runtime, organization/user Admin UI, the role tree/authorization entry, the menu tree/detail workbench and browser E2E are implemented; production serving cutover and role-menu writes remain default-closed pending explicit rollout approval.
 
 This document is the implementation contract for organization role pools, tenant derivation, role ownership, menu visibility, permission boundaries and migration. The machine-readable source is `resources/platform-organization-rbac-menu-contract.json`.
 
@@ -22,7 +22,7 @@ Stable role, role-group, organization and menu codes remain globally unique duri
 
 ## Relational Target
 
-The backend migration node introduces native, transactionally managed relations instead of placing the new authorization state only in `ValuesJSON` or the current full-snapshot delete-and-rebuild path. `PLATFORM_ORGANIZATION_RBAC_MODE=target` activates this boundary and is required in production. Page-only role-menu persistence, per-role revisions, menu/page-button definition service objects, deterministic migration comparison and revision-aware target navigation resolution are implemented. `PLATFORM_ADMIN_MENU_SERVING_MODE=legacy` and `PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=false` remain the only accepted production settings until full migration/cutover E2E closes.
+The backend migration node introduces native, transactionally managed relations instead of placing the new authorization state only in `ValuesJSON` or the current full-snapshot delete-and-rebuild path. `PLATFORM_ORGANIZATION_RBAC_MODE=target` activates this boundary and is required in production. Page-only role-menu persistence, per-role revisions, menu/page-button definition service objects, deterministic migration comparison and revision-aware target navigation resolution are implemented. Migration/cutover E2E has passed, but `PLATFORM_ADMIN_MENU_SERVING_MODE=legacy` and `PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=false` remain the accepted production defaults until an explicit rollout approval changes them.
 
 | Logical model | Physical target | Required behavior |
 | --- | --- | --- |
@@ -180,7 +180,7 @@ The organization/user, focused role and menu nodes cover their bounded form, rol
 
 `organization-role-pool-backend-and-migration` owns the target GORM relations, server-derived tenant and role-pool validation, conflict-aware prepare/impact/apply service objects, authorization lifecycle checks, migration inventory/apply/verify/rollback workflow, target-mode bootstrap and generated Admin service-object contracts. `organization-user-admin-experience` closes organization role-group management, derived tenant display, organization-scoped role selection, explicit invalid-role handling and responsive browser acceptance. `role-tree-and-authorization-entry` closes the strict two-level role workbench, role/group metadata maintenance, reviewed role move/disable remediation, atomic allow/deny/data-scope authorization, and the read-only menu assignment boundary. `menu-tree-and-button-permission-configuration` closes normalized directory/page definitions, native page-button metadata, target-resolution seams and the dedicated Admin menu workbench while preserving closed serving/write gates.
 
-The remaining organization-lane work is owned only by `organization-rbac-menu-e2e-qa`: complete Tree Transfer 10,000-node acceptance, all-principal dual-read equivalence, cutover, rollback and end-to-end authorization proof.
+`organization-rbac-menu-e2e-qa` completed Tree Transfer 10,000-node acceptance, all-principal dual-read equivalence, cutover, rollback and end-to-end authorization proof. That evidence certifies the transition mechanics; it does not itself authorize changing the production-default serving or write gates.
 
 Datasource routing, federation, XA, Outbox/MQ, search projection and workload identity remain outside this lane.
 Runtime implementation is intentionally deferred behind the published

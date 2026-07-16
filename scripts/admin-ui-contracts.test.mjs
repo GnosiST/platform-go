@@ -139,6 +139,21 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stdout, /Admin UI contract validation passed/);
   });
 
+  it("rejects a theme provider that leaves body-portaled overlays outside platform tokens", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/ui/AdminDesignProvider.tsx",
+      "document.body.dataset.theme = themeName;",
+      "void themeName;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Admin theme tokens must propagate to body-portaled overlays/);
+  });
+
   it("rejects passing the complete role resource list to visible shell navigation", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(tempRoot, "admin/src/App.tsx", "resources={navigationResources}", "resources={resources}");
