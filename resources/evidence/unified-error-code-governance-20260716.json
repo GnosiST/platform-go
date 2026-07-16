@@ -17,9 +17,9 @@
     "openTelemetryExport": "not-implemented"
   },
   "verification": {
-    "goTests": "871 passed in 7 packages",
+    "goTests": "1024 passed in 6 packages",
     "registryNodeTests": "19 passed",
-    "focusedSourceCoverage": "1 passed",
+    "focusedSourceCoverage": "22 passed",
     "validators": [
       "scripts/validate-platform-error-code-registry.mjs",
       "scripts/validate-platform-service-contract-standard.mjs",
