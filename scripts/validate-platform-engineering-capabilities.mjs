@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { isExternalReviewArtifactURI } from "./external-review-artifacts.mjs";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 
@@ -374,7 +376,7 @@ function validateFileStorageAdminExperience(capability, errors) {
     errors.push("file-storage-admin-experience must cite desktop and mobile browser screenshot evidence");
   }
   for (const screenshot of screenshots) {
-    if (!relativeExistingPath(screenshot) && !screenshot.startsWith("external-review-artifacts://")) {
+    if (!relativeExistingPath(screenshot) && !isExternalReviewArtifactURI(screenshot)) {
       errors.push(`file-storage-admin-experience screenshot path is missing or unsafe: ${screenshot}`);
     }
   }

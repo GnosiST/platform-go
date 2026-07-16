@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isExternalReviewArtifactURI } from "./external-review-artifacts.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -242,7 +243,7 @@ function validateBrowserEvidence(contract, errors) {
   const viewports = new Set();
   for (const item of evidence) {
     const relativePath = item.path ?? "";
-    if (!relativeExistingPath(relativePath)) {
+    if (!relativeExistingPath(relativePath) && !isExternalReviewArtifactURI(relativePath)) {
       errors.push(`browserEvidence path is missing or unsafe: ${relativePath}`);
     }
     if (!item.viewport) {

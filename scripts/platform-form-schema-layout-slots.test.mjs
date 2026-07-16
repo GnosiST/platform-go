@@ -150,6 +150,17 @@ describe("validate-platform-form-schema-layout-slots", () => {
     assert.match(result.stderr, /browserEvidence must include 390x844/);
   });
 
+  it("accepts portable external browser evidence URIs", () => {
+    const contract = readJSON("resources/platform-form-schema-layout-slots.json");
+    contract.browserEvidence[0].path = "external-review-artifacts://platform-go/form-schema-layout/2026-07-07/desktop.png";
+    contract.browserEvidence[1].path = "external-review-artifacts://platform-go/form-schema-layout/2026-07-07/mobile.png";
+    const contractPath = tempJSON("platform-form-schema-layout-slots.json", contract);
+
+    const result = runValidator(["--contract", contractPath]);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
+
   it("rejects contracts without the shared platform form component and controlled source-level slots", () => {
     const contract = readJSON("resources/platform-form-schema-layout-slots.json");
     contract.supportedToday.frontendFunctions = contract.supportedToday.frontendFunctions.filter((item) => item !== "PlatformResourceForm");

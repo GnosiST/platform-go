@@ -130,9 +130,13 @@ describe("validate-open-source-portability", () => {
   it("rejects local-only artifacts tracked in the candidate Git tree", () => {
     const forbidden = [
       "AGENTS.md",
+      ".codegraph/index.db",
+      ".codex/session.json",
+      ".platform/admin-ui-evidence.png",
       ".superpowers/sdd/report.md",
       "docs/superpowers/specs/design.md",
       "design-qa.md",
+      "tmp/product-design/evidence.png",
       "website/.docusaurus/cache.json",
     ];
     const root = trackedFixture(Object.fromEntries(forbidden.map((file) => [file, "local only\n"])));
@@ -147,14 +151,18 @@ describe("validate-open-source-portability", () => {
 
   it("allows matching local-only artifacts when Git does not track them", () => {
     const root = trackedFixture({
-      ".gitignore": ["AGENTS.md", ".superpowers/", "docs/superpowers/", "design-qa.md", "website/.docusaurus/", ""].join("\n"),
+      ".gitignore": ["AGENTS.md", ".codegraph/", ".codex/", ".platform/", ".superpowers/", "docs/superpowers/", "design-qa.md", "tmp/", "website/.docusaurus/", ""].join("\n"),
       "README.md": "# Clean tracked tree\n",
     });
     for (const file of [
       "AGENTS.md",
+      ".codegraph/index.db",
+      ".codex/session.json",
+      ".platform/admin-ui-evidence.png",
       ".superpowers/sdd/report.md",
       "docs/superpowers/specs/design.md",
       "design-qa.md",
+      "tmp/product-design/evidence.png",
       "website/.docusaurus/cache.json",
     ]) {
       const target = path.join(root, file);

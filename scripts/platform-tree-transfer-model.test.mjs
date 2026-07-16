@@ -8,8 +8,8 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const modelURL = pathToFileURL(path.join(root, "admin/src/platform/ui/treeTransferModel.ts")).href;
 
 function runModel(testBody) {
-  const body = `import { buildTreeTransferIndex, deriveTreeTransferSelection, leafValues, filteredNodeKeys } from ${JSON.stringify(modelURL)};\n${testBody}`;
-  const result = spawnSync(process.execPath, ["--experimental-strip-types", "--input-type=module", "--eval", body], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+  const body = `import assert from "node:assert/strict";\nimport { buildTreeTransferIndex, deriveTreeTransferSelection, leafValues, filteredNodeKeys } from ${JSON.stringify(modelURL)};\n${testBody}`;
+  const result = spawnSync(process.execPath, ["--experimental-strip-types", "--input-type=module"], { input: body, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
   assert.equal(result.status, 0, result.error?.message || result.stderr || result.stdout || `signal=${result.signal}`);
 }
 

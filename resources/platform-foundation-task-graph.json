@@ -1097,11 +1097,11 @@
           "scripts/admin-ui-contracts.test.mjs"
         ],
         "screenshots": [
-          "tmp/product-design/visual-product-design-qa-20260706/02-menus-list-desktop-1440x1024.png",
-          "tmp/product-design/visual-product-design-qa-20260706/07-column-menu-black-1440x1024.png",
-          "tmp/product-design/visual-product-design-qa-20260706/08-filter-menu-black-1440x1024.png",
-          "tmp/product-design/visual-product-design-qa-20260706/11-menus-mobile-390x844-after-fix.png",
-          "tmp/product-design/visual-product-design-qa-20260707/01-sidebar-collapsed-flat-nav-1440x1024.png"
+          "external-review-artifacts://platform-go/visual-product-design-qa/2026-07-06/02-menus-list-desktop-1440x1024.png",
+          "external-review-artifacts://platform-go/visual-product-design-qa/2026-07-06/07-column-menu-black-1440x1024.png",
+          "external-review-artifacts://platform-go/visual-product-design-qa/2026-07-06/08-filter-menu-black-1440x1024.png",
+          "external-review-artifacts://platform-go/visual-product-design-qa/2026-07-06/11-menus-mobile-390x844-after-fix.png",
+          "external-review-artifacts://platform-go/visual-product-design-qa/2026-07-07/01-sidebar-collapsed-flat-nav-1440x1024.png"
         ]
       }
     },
@@ -1279,14 +1279,14 @@
           "admin/package.json"
         ],
         "screenshots": [
-          "tmp/product-design/visual-product-design-qa-20260706/04-user-menu-desktop-1440x1024.png",
-          "tmp/product-design/visual-product-design-qa-20260706/05-settings-black-layout-tab-1440x1024.png",
-          "tmp/product-design/visual-product-design-qa-20260706/06-sidebar-collapsed-black-1440x1024.png",
-          "tmp/product-design/visual-product-design-qa-20260706/07-column-menu-black-1440x1024.png",
-          "tmp/product-design/visual-product-design-qa-20260706/08-filter-menu-black-1440x1024.png",
-          "tmp/product-design/visual-product-design-qa-20260706/09-work-tab-context-menu-black-1440x1024.png",
-          "tmp/product-design/visual-product-design-qa-20260706/11-menus-mobile-390x844-after-fix.png",
-          "tmp/product-design/visual-product-design-qa-20260706/12-dashboard-desktop-1440x1024-after-fix.png"
+          "external-review-artifacts://platform-go/visual-product-design-qa/2026-07-06/04-user-menu-desktop-1440x1024.png",
+          "external-review-artifacts://platform-go/visual-product-design-qa/2026-07-06/05-settings-black-layout-tab-1440x1024.png",
+          "external-review-artifacts://platform-go/visual-product-design-qa/2026-07-06/06-sidebar-collapsed-black-1440x1024.png",
+          "external-review-artifacts://platform-go/visual-product-design-qa/2026-07-06/07-column-menu-black-1440x1024.png",
+          "external-review-artifacts://platform-go/visual-product-design-qa/2026-07-06/08-filter-menu-black-1440x1024.png",
+          "external-review-artifacts://platform-go/visual-product-design-qa/2026-07-06/09-work-tab-context-menu-black-1440x1024.png",
+          "external-review-artifacts://platform-go/visual-product-design-qa/2026-07-06/11-menus-mobile-390x844-after-fix.png",
+          "external-review-artifacts://platform-go/visual-product-design-qa/2026-07-06/12-dashboard-desktop-1440x1024-after-fix.png"
         ]
       }
     },
@@ -1430,10 +1430,10 @@
           "admin/package.json"
         ],
         "screenshots": [
-          "tmp/product-design/form-schema-layout-20260707/02-menus-edit-desktop-scroll-1440x1024.png",
-          "tmp/product-design/form-schema-layout-20260707/03-menus-edit-mobile-single-column-390x844.png",
-          "tmp/product-design/form-runtime-slots-side-preview-20260708/01-menus-side-preview-desktop-1440x1024.png",
-          "tmp/product-design/form-runtime-slots-side-preview-20260708/02-menus-side-preview-mobile-390x844.png"
+          "external-review-artifacts://platform-go/form-schema-layout/2026-07-07/02-menus-edit-desktop-scroll-1440x1024.png",
+          "external-review-artifacts://platform-go/form-schema-layout/2026-07-07/03-menus-edit-mobile-single-column-390x844.png",
+          "external-review-artifacts://platform-go/form-runtime-slots-side-preview/2026-07-08/01-menus-side-preview-desktop-1440x1024.png",
+          "external-review-artifacts://platform-go/form-runtime-slots-side-preview/2026-07-08/02-menus-side-preview-mobile-390x844.png"
         ]
       }
     },
@@ -1489,12 +1489,12 @@
           "scripts/validate-admin-resources.test.mjs"
         ],
         "screenshots": [
-          "tmp/product-design/refine-custom-panels-and-actions-20260707/01-menus-list-custom-actions-desktop-1440x1024.png",
-          "tmp/product-design/refine-custom-panels-and-actions-20260707/02-row-custom-action-dropdown-desktop-1440x1024.png",
-          "tmp/product-design/refine-custom-panels-and-actions-20260707/03-detail-drawer-tabs-desktop-1440x1024.png",
-          "tmp/product-design/refine-custom-panels-and-actions-20260707/04-detail-drawer-audit-panel-desktop-1440x1024.png",
-          "tmp/product-design/refine-custom-panels-and-actions-20260707/05-selection-batch-command-bar-desktop-1440x1024.png",
-          "tmp/product-design/refine-custom-panels-and-actions-20260707/06-menus-mobile-custom-actions-390x844.png"
+          "external-review-artifacts://platform-go/refine-custom-panels-and-actions/2026-07-07/01-menus-list-custom-actions-desktop-1440x1024.png",
+          "external-review-artifacts://platform-go/refine-custom-panels-and-actions/2026-07-07/02-row-custom-action-dropdown-desktop-1440x1024.png",
+          "external-review-artifacts://platform-go/refine-custom-panels-and-actions/2026-07-07/03-detail-drawer-tabs-desktop-1440x1024.png",
+          "external-review-artifacts://platform-go/refine-custom-panels-and-actions/2026-07-07/04-detail-drawer-audit-panel-desktop-1440x1024.png",
+          "external-review-artifacts://platform-go/refine-custom-panels-and-actions/2026-07-07/05-selection-batch-command-bar-desktop-1440x1024.png",
+          "external-review-artifacts://platform-go/refine-custom-panels-and-actions/2026-07-07/06-menus-mobile-custom-actions-390x844.png"
         ]
       }
     },
@@ -1552,10 +1552,10 @@
           "rtk npm --prefix admin run build"
         ],
         "screenshots": [
-          "tmp/product-design/file-storage-experience-20260707/01-files-preview-drawer-desktop-1440x1024.png",
-          "tmp/product-design/file-storage-experience-20260707/02-files-audit-drawer-desktop-1440x1024.png",
-          "tmp/product-design/file-storage-experience-20260707/03-files-mobile-card-pagination-390x844.png",
-          "tmp/product-design/file-storage-experience-20260707/04-files-mobile-preview-drawer-390x844.png"
+          "external-review-artifacts://platform-go/file-storage/2026-07-07/01-files-preview-drawer-desktop-1440x1024.png",
+          "external-review-artifacts://platform-go/file-storage/2026-07-07/02-files-audit-drawer-desktop-1440x1024.png",
+          "external-review-artifacts://platform-go/file-storage/2026-07-07/03-files-mobile-card-pagination-390x844.png",
+          "external-review-artifacts://platform-go/file-storage/2026-07-07/04-files-mobile-preview-drawer-390x844.png"
         ]
       }
     },
@@ -1614,10 +1614,10 @@
           "rtk go test ./internal/platform/adminresource ./internal/platform/httpapi"
         ],
         "screenshots": [
-          "tmp/product-design/policy-review-custom-ui-20260707/01-policy-review-queue-desktop-1440x1024.png",
-          "tmp/product-design/policy-review-custom-ui-20260707/02-policy-review-reject-modal-desktop-1440x1024.png",
-          "tmp/product-design/policy-review-custom-ui-20260707/03-policy-review-mobile-390x844.png",
-          "tmp/product-design/policy-review-custom-ui-20260707/04-policy-review-audit-trail-desktop-1440x1024.png"
+          "external-review-artifacts://platform-go/policy-review-custom-ui/2026-07-07/01-policy-review-queue-desktop-1440x1024.png",
+          "external-review-artifacts://platform-go/policy-review-custom-ui/2026-07-07/02-policy-review-reject-modal-desktop-1440x1024.png",
+          "external-review-artifacts://platform-go/policy-review-custom-ui/2026-07-07/03-policy-review-mobile-390x844.png",
+          "external-review-artifacts://platform-go/policy-review-custom-ui/2026-07-07/04-policy-review-audit-trail-desktop-1440x1024.png"
         ]
       }
     },
@@ -1878,16 +1878,16 @@
           "admin/package.json"
         ],
         "screenshots": [
-          "tmp/product-design/p1-admin-ui-hardening-20260711/01-login-1280x720.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/02-dashboard-375x812.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/03-menus-390x844.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/04-menus-768x1024.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/05-menus-1024x768.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/06-menus-1280x720.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/07-menus-1440x1024.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/08-create-modal-1280x720.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/09-settings-drawer-390x844.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/10-stale-session-390x844.png"
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/01-login-1280x720.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/02-dashboard-375x812.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/03-menus-390x844.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/04-menus-768x1024.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/05-menus-1024x768.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/06-menus-1280x720.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/07-menus-1440x1024.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/08-create-modal-1280x720.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/09-settings-drawer-390x844.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/10-stale-session-390x844.png"
         ]
       }
     },

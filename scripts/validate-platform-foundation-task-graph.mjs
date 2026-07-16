@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isExternalReviewArtifactURI } from "./external-review-artifacts.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -13,7 +14,7 @@ const allowedLockModes = new Set(["exclusive", "shared"]);
 const requiredVisualDesignGate = ["superpowers:brainstorming", "product-design"];
 const optionalVisualDesignGates = new Set(["design-taste-frontend"]);
 const allowedVisualDesignGates = new Set([...requiredVisualDesignGate, ...optionalVisualDesignGates]);
-const evidencePathKeys = ["docs", "validators", "tests", "screenshots"];
+const repositoryEvidencePathKeys = ["docs", "validators", "tests"];
 const requiredAdminUIContractTests = ["scripts/admin-ui-contracts.test.mjs"];
 const requiredWatermarkEvidenceManifest = "resources/evidence/admin-watermark-export-governance-20260713.json";
 const requiredSensitiveRevealEvidenceManifest = "resources/evidence/sensitive-data-reveal-step-up-20260713.json";
@@ -644,13 +645,19 @@ function validateTask(task, context, errors) {
   }
   if (task.status === "implemented" || task.status === "preview") {
     const evidence = task.evidence ?? {};
-    const evidencePaths = evidencePathKeys.flatMap((key) => values(evidence[key]));
-    if (evidencePaths.length === 0) {
+    const repositoryEvidencePaths = repositoryEvidencePathKeys.flatMap((key) => values(evidence[key]));
+    const screenshotEvidencePaths = values(evidence.screenshots);
+    if (repositoryEvidencePaths.length + screenshotEvidencePaths.length === 0) {
       errors.push(`${prefix} must declare evidence paths`);
     }
-    for (const relativePath of evidencePaths) {
+    for (const relativePath of repositoryEvidencePaths) {
       if (!relativeExistingPath(relativePath)) {
         errors.push(`${prefix} evidence path is missing or unsafe: ${relativePath}`);
+      }
+    }
+    for (const screenshotPath of screenshotEvidencePaths) {
+      if (!relativeExistingPath(screenshotPath) && !isExternalReviewArtifactURI(screenshotPath)) {
+        errors.push(`${prefix} evidence path is missing or unsafe: ${screenshotPath}`);
       }
     }
   }

@@ -186,6 +186,18 @@ describe("validate-platform-goal-completion-audit", () => {
     assert.match(result.stderr, /requirement source-writing-codegen-promotion-gate\.requiredBeforeRuntimeMutation must include external absolute artifact URI evidence/);
   });
 
+  it("rejects unsafe external screenshot evidence URIs", () => {
+    const audit = readJSON("resources/platform-goal-completion-audit.json");
+    const requirement = audit.requirements.find((item) => item.id === "admin-ui-system-quality-hardening");
+    requirement.evidence.screenshots = ["external-review-artifacts://other-project/admin-ui/2026-07-11/evidence.png"];
+    const auditPath = tempJSON("platform-goal-completion-audit.json", audit);
+
+    const result = runValidator(["--audit", auditPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /requirement admin-ui-system-quality-hardening screenshot evidence path is missing or unsafe/);
+  });
+
   it("rejects completion audits whose promotion evidence gate omits the submitted package validator", () => {
     const audit = readJSON("resources/platform-goal-completion-audit.json");
     const requirement = audit.requirements.find((item) => item.id === "promotion-evidence-template-gate");

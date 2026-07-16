@@ -32,6 +32,12 @@ function tempText(name, value) {
   return filePath;
 }
 
+function repoTempDir(prefix) {
+  const tempRoot = path.join(repoRoot, "tmp");
+  fs.mkdirSync(tempRoot, { recursive: true });
+  return fs.mkdtempSync(path.join(tempRoot, prefix));
+}
+
 describe("validate-platform-deployment-topology", () => {
   it("accepts the current deployment topology contract", () => {
     const result = runValidator();
@@ -516,7 +522,7 @@ describe("validate-platform-deployment-topology", () => {
   });
 
   it("rejects Vercel admin adapter templates that include API runtime wiring", () => {
-    const tempDir = fs.mkdtempSync(path.join(repoRoot, "tmp", "deployment-topology-vercel-test-"));
+    const tempDir = repoTempDir("deployment-topology-vercel-test-");
     try {
       const templatePath = path.join(tempDir, "admin.vercel.json");
       fs.writeFileSync(
@@ -568,7 +574,7 @@ describe("validate-platform-deployment-topology", () => {
   });
 
   it("rejects production env templates that enable demo data", () => {
-    const tempDir = fs.mkdtempSync(path.join(repoRoot, "tmp", "deployment-topology-test-"));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "deployment-topology-test-"));
     try {
       const envPath = path.join(tempDir, "production.example.env");
       fs.writeFileSync(
@@ -582,13 +588,11 @@ describe("validate-platform-deployment-topology", () => {
         ].join("\n"),
       );
       const contract = readJSON("resources/platform-deployment-topology.json");
-      contract.deploymentPackage.envTemplate = path.relative(repoRoot, envPath);
       const contractPath = tempJSON("platform-deployment-topology.json", contract);
 
-      const result = runValidator(["--contract", contractPath]);
+      const result = runValidator(["--contract", contractPath, "--env-template", envPath]);
 
       assert.notEqual(result.status, 0, result.stdout);
-      assert.match(result.stderr, /deploymentPackage\.envTemplate must stay deploy\/env\/production\.example\.env/);
       assert.match(result.stderr, /deploymentPackage\.envTemplate PLATFORM_CAPABILITIES must not include demo-data/);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });

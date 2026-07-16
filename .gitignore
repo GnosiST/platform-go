@@ -19,8 +19,7 @@ website/.docusaurus/
 
 # Local AI planning and review outputs. Public contracts and user-facing docs
 # belong in docs/ and resources/; execution transcripts stay out of the repo.
-docs/superpowers/plans/
-docs/superpowers/reviews/
+docs/superpowers/
 design-qa.local.md
 
 # OS/editor
@@ -28,5 +27,4 @@ design-qa.local.md
 
 # temporary binaries
 /tmp/
-.superpowers/
 design-qa.md

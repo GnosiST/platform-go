@@ -71,8 +71,12 @@ const ignoredPathScanFiles = new Set([
 const forbiddenTrackedPaths = [
   (file) => file === "AGENTS.md",
   (file) => file === "design-qa.md",
+  (file) => file.startsWith(".codegraph/"),
+  (file) => file.startsWith(".codex/"),
+  (file) => file.startsWith(".platform/"),
   (file) => file.startsWith(".superpowers/"),
   (file) => file.startsWith("docs/superpowers/"),
+  (file) => file.startsWith("tmp/"),
   (file) => file.startsWith("website/.docusaurus/"),
 ];
 

@@ -259,6 +259,17 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /task visual-product-design-qa evidence path is missing or unsafe: tmp\/product-design\/missing-screenshot\.png/);
   });
 
+  it("accepts portable external screenshot evidence URIs", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const visualTask = graph.tasks.find((task) => task.id === "visual-product-design-qa");
+    visualTask.evidence.screenshots[0] = "external-review-artifacts://platform-go/visual-product-design-qa/2026-07-06/evidence.png";
+    const graphPath = tempJSON("platform-foundation-task-graph.json", graph);
+
+    const result = runValidator(["--graph", graphPath]);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
+
   it("rejects visual tasks that skip the product design gate", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const visualTask = graph.tasks.find((task) => task.id === "admin-ui-shell-and-list-components");

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isExternalReviewArtifactURI } from "./external-review-artifacts.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -216,6 +217,11 @@ function validateRequirements(audit, taskExecution, engineering, errors) {
     ]) {
       if (!relativeExistingPath(relativePath)) {
         errors.push(`${prefix} evidence path is missing or unsafe: ${relativePath}`);
+      }
+    }
+    for (const screenshotPath of values(evidence.screenshots)) {
+      if (!relativeExistingPath(screenshotPath) && !isExternalReviewArtifactURI(screenshotPath)) {
+        errors.push(`${prefix} screenshot evidence path is missing or unsafe: ${screenshotPath}`);
       }
     }
   }

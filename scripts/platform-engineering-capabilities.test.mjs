@@ -388,6 +388,23 @@ describe("validate-platform-engineering-capabilities", () => {
     assert.match(result.stdout, /Validated \d+ platform engineering capabilities/);
   });
 
+  it("rejects unsafe external screenshot evidence URIs", () => {
+    for (const screenshotPath of [
+      "external-review-artifacts://other-project/file-storage/2026-07-07/evidence.png",
+      "external-review-artifacts://platform-go/file-storage/2026-07-07/evidence.png?token=secret",
+    ]) {
+      const matrix = readJSON("resources/platform-engineering-capabilities.json");
+      const capability = matrix.capabilities.find((item) => item.id === "file-storage-admin-experience");
+      capability.evidence.screenshots[0] = screenshotPath;
+      const matrixPath = tempJSON("platform-engineering-capabilities.json", matrix);
+
+      const result = runValidator(["--matrix", matrixPath]);
+
+      assert.notEqual(result.status, 0, screenshotPath);
+      assert.match(result.stderr, /file-storage-admin-experience screenshot path is missing or unsafe/);
+    }
+  });
+
   it("rejects missing evidence paths", () => {
     const matrix = readJSON("resources/platform-engineering-capabilities.json");
     matrix.capabilities[0].evidence.sourcePaths.push("missing/not-real.ts");

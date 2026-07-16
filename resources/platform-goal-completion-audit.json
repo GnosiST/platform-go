@@ -155,17 +155,19 @@
           "docs/platform-roadmap.md",
           "docs/admin-ui-foundation.md",
           "docs/platform-ui-optimization-assessment.md",
-          "docs/platform-deployment.md",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/01-login-1280x720.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/02-dashboard-375x812.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/03-menus-390x844.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/04-menus-768x1024.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/05-menus-1024x768.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/06-menus-1280x720.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/07-menus-1440x1024.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/08-create-modal-1280x720.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/09-settings-drawer-390x844.png",
-          "tmp/product-design/p1-admin-ui-hardening-20260711/10-stale-session-390x844.png"
+          "docs/platform-deployment.md"
+        ],
+        "screenshots": [
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/01-login-1280x720.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/02-dashboard-375x812.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/03-menus-390x844.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/04-menus-768x1024.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/05-menus-1024x768.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/06-menus-1280x720.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/07-menus-1440x1024.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/08-create-modal-1280x720.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/09-settings-drawer-390x844.png",
+          "external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/10-stale-session-390x844.png"
         ],
         "validators": [
           "scripts/validate-admin-i18n.mjs",

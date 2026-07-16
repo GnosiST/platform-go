@@ -105,7 +105,7 @@
   ],
   "browserEvidence": [
     {
-      "path": "tmp/product-design/form-schema-layout-20260707/02-menus-edit-desktop-scroll-1440x1024.png",
+      "path": "external-review-artifacts://platform-go/form-schema-layout/2026-07-07/02-menus-edit-desktop-scroll-1440x1024.png",
       "viewport": "1440x1024",
       "assertions": [
         "two-column-density modal width stays at 760px on desktop",
@@ -114,7 +114,7 @@
       ]
     },
     {
-      "path": "tmp/product-design/form-schema-layout-20260707/03-menus-edit-mobile-single-column-390x844.png",
+      "path": "external-review-artifacts://platform-go/form-schema-layout/2026-07-07/03-menus-edit-mobile-single-column-390x844.png",
       "viewport": "390x844",
       "assertions": [
         "two-column-density collapses to one column on narrow screens",
@@ -123,7 +123,7 @@
       ]
     },
     {
-      "path": "tmp/product-design/form-runtime-slots-side-preview-20260708/01-menus-side-preview-desktop-1440x1024.png",
+      "path": "external-review-artifacts://platform-go/form-runtime-slots-side-preview/2026-07-08/01-menus-side-preview-desktop-1440x1024.png",
       "viewport": "1440x1024",
       "assertions": [
         "side-detail-preview edit modal renders a 300px preview rail beside the editable form",
@@ -132,7 +132,7 @@
       ]
     },
     {
-      "path": "tmp/product-design/form-runtime-slots-side-preview-20260708/02-menus-side-preview-mobile-390x844.png",
+      "path": "external-review-artifacts://platform-go/form-runtime-slots-side-preview/2026-07-08/02-menus-side-preview-mobile-390x844.png",
       "viewport": "390x844",
       "assertions": [
         "side-detail-preview preview rail collapses below the editable form on narrow screens",

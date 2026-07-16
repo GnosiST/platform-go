@@ -23,11 +23,11 @@ The activated topology originally introduced four operational Admin UI nodes. `o
 
 The 2026-07-10 audit inspected the local admin at `1280x720` and `390x844` with fresh browser captures:
 
-- `tmp/product-design/ui-optimization-audit-20260710/01-login-current.png`
-- `tmp/product-design/ui-optimization-audit-20260710/02-dashboard-desktop-current.png`
-- `tmp/product-design/ui-optimization-audit-20260710/04-menus-desktop-current.png`
-- `tmp/product-design/ui-optimization-audit-20260710/06-menus-mobile-top-current.png`
-- `tmp/product-design/ui-optimization-audit-20260710/07-dashboard-mobile-current.png`
+- `external-review-artifacts://platform-go/ui-optimization-audit/2026-07-10/01-login-current.png`
+- `external-review-artifacts://platform-go/ui-optimization-audit/2026-07-10/02-dashboard-desktop-current.png`
+- `external-review-artifacts://platform-go/ui-optimization-audit/2026-07-10/04-menus-desktop-current.png`
+- `external-review-artifacts://platform-go/ui-optimization-audit/2026-07-10/06-menus-mobile-top-current.png`
+- `external-review-artifacts://platform-go/ui-optimization-audit/2026-07-10/07-dashboard-mobile-current.png`
 
 Observed strengths:
 
@@ -97,7 +97,7 @@ Implemented result:
 - stored-token 401 responses clear the stale token once, emit the shared session-expired event and present localized sign-in recovery;
 - operating-system reduced-motion preference produces effectively immediate computed animation/transition styles for platform and portaled Ant Design motion without hiding focus, validation, loading or status feedback.
 
-Fresh implementation evidence is under `tmp/product-design/p1-admin-ui-hardening-20260711/` and covers login, dashboard, menu list, create modal, settings drawer and localized stale-session recovery across the required 375, 390, 768, 1024, 1280 and 1440 widths. `09-settings-drawer-390x844.png` records the accepted narrow Drawer state. `10-stale-session-390x844.png` records “会话已过期，请重新登录。” without raw `unauthorized` copy.
+Fresh implementation evidence is referenced through `external-review-artifacts://platform-go/admin-ui-system-quality-hardening/2026-07-11/`, while the original captures remain outside the public repository. It covers login, dashboard, menu list, create modal, settings drawer and localized stale-session recovery across the required 375, 390, 768, 1024, 1280 and 1440 widths. `09-settings-drawer-390x844.png` records the accepted narrow Drawer state. `10-stale-session-390x844.png` records “会话已过期，请重新登录。” without raw `unauthorized` copy.
 
 ## Watermark And Export Governance Closeout
 

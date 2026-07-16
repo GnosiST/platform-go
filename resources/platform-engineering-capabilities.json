@@ -1948,7 +1948,7 @@
           },
           {
             "path": "scripts/validate-platform-foundation-task-graph.mjs",
-            "contains": "\"screenshots\""
+            "contains": "isExternalReviewArtifactURI"
           },
           {
             "path": "scripts/validate-platform-foundation-task-graph.mjs",

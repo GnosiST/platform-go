@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isExternalReviewArtifactURI } from "./external-review-artifacts.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -27,10 +28,6 @@ function relativeExistingPath(relativePath) {
   const absolutePath = path.resolve(repoRoot, relativePath);
   const relative = path.relative(repoRoot, absolutePath);
   return relative !== "" && !relative.startsWith("..") && fs.existsSync(absolutePath);
-}
-
-function externalReviewArtifactPath(value) {
-  return /^external-review-artifacts:\/\/platform-go\/(?:[A-Za-z0-9][A-Za-z0-9._-]*\/)+[A-Za-z0-9][A-Za-z0-9._-]*\.(?:png|jpe?g|webp)$/.test(value);
 }
 
 function requireIncludes(items, required, label, errors) {
@@ -257,7 +254,7 @@ function validateBrowserEvidence(evidence, errors) {
     errors,
   );
   for (const screenshot of screenshots) {
-    if (!screenshot.path || (!relativeExistingPath(screenshot.path) && !externalReviewArtifactPath(screenshot.path))) {
+    if (!screenshot.path || (!relativeExistingPath(screenshot.path) && !isExternalReviewArtifactURI(screenshot.path))) {
       errors.push(`designGate.browserEvidence screenshot path is missing or unsafe: ${screenshot.path}`);
     }
     if (!screenshot.viewport) {
