@@ -17,7 +17,6 @@ const completionProgramTaskIDs = [
   "database-certification-matrix",
   "transactional-outbox-and-one-mq-adapter",
   "asynchronous-search-projection",
-  "github-release-publication",
 ];
 
 function runValidator(args = []) {

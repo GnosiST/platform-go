@@ -377,11 +377,16 @@ describe("validate-platform-foundation-task-graph", () => {
     });
     assert.equal(graph.tasks.find((item) => item.id === "unified-error-code-governance")?.status, "implemented");
     assert.ok(postReleaseOptionalNodes.every((id) => graph.tasks.find((item) => item.id === id)?.status === "deferred"));
-    assert.equal(publicationTask?.status, "pending");
-    assert.match(publicationTask?.statusReason?.zh ?? "", /已明确授权/);
-    assert.match(publicationTask?.statusReason?.en ?? "", /explicitly authorized/i);
-    assert.deepEqual(publicationTask?.evidence?.artifacts, []);
-    assert.equal(readJSON("resources/evidence/github-release-publication-20260716.json").status, "pending");
+    assert.equal(publicationTask?.status, "implemented");
+    assert.match(publicationTask?.statusReason?.zh ?? "", /已发布并验证/);
+    assert.match(publicationTask?.statusReason?.en ?? "", /published and verified/i);
+    assert.deepEqual(publicationTask?.evidence?.artifacts, ["resources/evidence/github-release-publication-20260716.json"]);
+    const publicationEvidence = readJSON("resources/evidence/github-release-publication-20260716.json");
+    assert.equal(publicationEvidence.status, "verified");
+    assert.equal(publicationEvidence.release, "https://github.com/GnosiST/platform-go/releases/tag/v0.1.0");
+    for (const field of ["tagCommit", "releaseCommit", "ciHeadSha", "pagesHeadSha"]) {
+      assert.equal(publicationEvidence[field], "5821d10ced3ba438e814201ef0ca32cda096c941");
+    }
     assert.deepEqual(graph.tasks.find((item) => item.id === "open-source-portability")?.dependsOn, [
       "admin-watermark-export-governance",
       "organization-rbac-menu-e2e-qa",
@@ -504,7 +509,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /menu-tree-and-button-permission-configuration implementationBoundary must preserve implemented scope, closed gates and owner task/);
   });
 
-  it("preserves the closed 37-node baseline, implements seventeen completion nodes, and tracks 13 controlled unfinished nodes", () => {
+  it("preserves the closed 37-node baseline, implements 21 completion nodes, and tracks nine controlled unfinished nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
@@ -538,7 +543,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
     assert.equal(graph.tasks.length, 67);
-    assert.equal(implemented.length, 57);
+    assert.equal(implemented.length, 58);
     assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "admin-watermark-export-governance")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-protection-runtime")?.status, "implemented");

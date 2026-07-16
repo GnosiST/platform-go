@@ -3636,8 +3636,8 @@
         "zh": "公开文档与发布",
         "en": "Public Documentation And Release"
       },
-      "status": "partial",
-      "purpose": "Deliver public community documentation, a bilingual Docusaurus site, GitHub Pages and CI while recording the explicitly authorized v0.1.0 release through verified external publication evidence.",
+      "status": "implemented",
+      "purpose": "Deliver public community documentation, a bilingual Docusaurus site, GitHub Pages and CI with a formally published v0.1.0 Release and verified external publication evidence.",
       "dependsOn": [
         "open-source-portability"
       ],
@@ -3652,9 +3652,16 @@
           "public-docs-site",
           "github-release-publication"
         ],
-        "validators": ["scripts/validate-open-source-portability.mjs"],
-        "tests": ["scripts/validate-open-source-portability.test.mjs"],
-        "artifacts": ["resources/evidence/public-docs-site-20260716.json"]
+        "validators": ["scripts/validate-open-source-portability.mjs", "scripts/validate-platform-foundation-task-graph.mjs"],
+        "tests": [
+          "scripts/validate-open-source-portability.test.mjs",
+          "scripts/platform-foundation-task-graph.test.mjs",
+          "scripts/platform-public-docs-surface.test.mjs"
+        ],
+        "artifacts": [
+          "resources/evidence/public-docs-site-20260716.json",
+          "resources/evidence/github-release-publication-20260716.json"
+        ]
       }
     }
   ]

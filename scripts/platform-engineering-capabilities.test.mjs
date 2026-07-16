@@ -161,6 +161,7 @@ describe("validate-platform-engineering-capabilities", () => {
     "organization-rbac-menu-e2e-qa",
     "unified-error-code-governance",
     "open-source-portability",
+    "public-documentation-and-release",
     ]);
     for (const capability of capabilities.filter((item) => implementedCapabilityIDs.has(item.id))) {
       assert.equal(capability.status, "implemented");
@@ -207,6 +208,8 @@ describe("validate-platform-engineering-capabilities", () => {
       "public-docs-site",
       "github-release-publication",
     ]);
+    assert.ok(publication.evidence.artifacts.includes("resources/evidence/github-release-publication-20260716.json"));
+    assert.ok(publication.evidence.tests.includes("scripts/platform-public-docs-surface.test.mjs"));
 
     const reveal = capabilities.find((item) => item.id === "sensitive-data-reveal-step-up");
     assert.ok(reveal.evidence.sourcePaths.includes("internal/platform/httpapi/sensitive_reveal.go"));

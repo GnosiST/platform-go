@@ -3460,10 +3460,10 @@
       },
       "phase": "production-governance",
       "scope": "governance",
-      "status": "pending",
+      "status": "implemented",
       "statusReason": {
-        "zh": "v0.1.0 已明确授权发布；公开仓库、main 默认分支、CI 和 Pages 已就绪，等待创建正式 Release/Tag 并回填发布证据。",
-        "en": "v0.1.0 publication is explicitly authorized; the public repository, main default branch, CI and Pages are ready, pending the formal Release/Tag and publication evidence."
+        "zh": "v0.1.0 已发布并验证；正式 Tag、GitHub Release、候选提交 CI 和 Pages 证据均已回填。",
+        "en": "v0.1.0 is published and verified; the formal Tag, GitHub Release, candidate CI and Pages evidence are recorded."
       },
       "completionGate": {
         "zh": "创建公开仓库并以 main 作为唯一长期分支，验证净化提交、CI、Pages、v0.1.0 和仓库展示。",
@@ -3484,10 +3484,15 @@
           "docs/platform-roadmap.md",
           "docs/platform-roadmap.md"
         ],
-        "validators": ["scripts/validate-open-source-portability.mjs"],
-        "tests": [".github/workflows/ci.yml", ".github/workflows/pages.yml"],
+        "validators": ["scripts/validate-open-source-portability.mjs", "scripts/validate-platform-foundation-task-graph.mjs"],
+        "tests": [
+          ".github/workflows/ci.yml",
+          ".github/workflows/pages.yml",
+          "scripts/platform-foundation-task-graph.test.mjs",
+          "scripts/platform-public-docs-surface.test.mjs"
+        ],
         "screenshots": [],
-        "artifacts": []
+        "artifacts": ["resources/evidence/github-release-publication-20260716.json"]
       }
     }
   ],

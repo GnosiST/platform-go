@@ -81,7 +81,8 @@
     "role-tree-and-authorization-entry",
     "menu-tree-and-button-permission-configuration",
     "organization-rbac-menu-e2e-qa",
-    "unified-error-code-governance"
+    "unified-error-code-governance",
+    "github-release-publication"
   ],
   "requiredFutureTaskNodes": [
     "multi-datasource-contract-and-runtime",
@@ -92,8 +93,7 @@
     "xa-optional-adapter",
     "database-certification-matrix",
     "transactional-outbox-and-one-mq-adapter",
-    "asynchronous-search-projection",
-    "github-release-publication"
+    "asynchronous-search-projection"
   ],
   "nonDroppableGoalNodes": [
     "stack-alignment-and-architecture",

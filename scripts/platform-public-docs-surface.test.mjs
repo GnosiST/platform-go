@@ -17,6 +17,7 @@ const implementedPublicNodeIDs = [
   "open-source-portability",
   "public-docs-community",
   "public-docs-site",
+  "github-release-publication",
 ];
 
 describe("public documentation surface", () => {
@@ -38,12 +39,11 @@ describe("public documentation surface", () => {
       for (const nodeID of implementedPublicNodeIDs) {
         assert.match(source, new RegExp("`" + nodeID + "`[^.\\n]*`implemented`"));
       }
-      assert.match(source, /`github-release-publication`[^.\n]*`pending`/);
     }
 
-    assert.match(read("README.md"), /v0\.1\.0 已明确授权发布/);
-    assert.match(read("README.en.md"), /v0\.1\.0 publication is explicitly authorized/i);
-    assert.match(read("docs/platform-roadmap.md"), /v0\.1\.0 publication is explicitly authorized/i);
+    assert.match(read("README.md"), /v0\.1\.0 已正式发布/);
+    assert.match(read("README.en.md"), /v0\.1\.0 is formally published/i);
+    assert.match(read("docs/platform-roadmap.md"), /v0\.1\.0 is published and verified/i);
   });
 
   it("publishes v0.1.0 without advancing the version", () => {

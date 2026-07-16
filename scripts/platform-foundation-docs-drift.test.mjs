@@ -56,9 +56,14 @@ describe("platform foundation documentation drift", () => {
     const readme = read("README.md");
     const topology = read("docs/platform-roadmap.md");
     const release = graph.releaseBlockingNodes.map((id) => `\`${id}\``).join(", ");
+    const activeRelease = graph.releaseBlockingNodes.filter(
+      (id) => graph.tasks.find((task) => task.id === id)?.status !== "implemented",
+    );
     const optional = graph.postReleaseOptionalNodes.map((id) => `\`${id}\``).join(", ");
 
     assert.ok(topology.includes(`v0.1.0 release blockers: ${release}.`));
+    assert.deepEqual(activeRelease, []);
+    assert.ok(topology.includes("Active v0.1.0 release blockers: none."));
     assert.ok(topology.includes(`Post-release optional deferred nodes: ${optional}.`));
     assert.match(topology, /Current Remaining Node Order/);
     assert.doesNotMatch(topology, /Open-source publication remains serial after search closeout/);

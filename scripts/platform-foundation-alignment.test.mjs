@@ -28,6 +28,7 @@ const completedProgramTaskIDs = [
   "open-source-portability",
   "public-docs-community",
   "public-docs-site",
+  "github-release-publication",
 ];
 
 const remainingCompletionProgramTaskIDs = [
@@ -40,7 +41,6 @@ const remainingCompletionProgramTaskIDs = [
   "database-certification-matrix",
   "transactional-outbox-and-one-mq-adapter",
   "asynchronous-search-projection",
-  "github-release-publication",
 ];
 
 function runValidator(args = []) {
@@ -62,7 +62,7 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
-  it("tracks completed program nodes as required work and ten unfinished nodes as future work", () => {
+  it("tracks completed program nodes as required work and nine unfinished nodes as future work", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
     const engineering = readJSON("resources/platform-engineering-capabilities.json");
 
