@@ -58,6 +58,13 @@ body { background: var(--platform-paper); color: var(--platform-ink); }
 
 .platform-section { padding: 116px 0; }
 .platform-section--overview { background: #fff; }
+.platform-section--demo { background: #eef3f9; }
+.platform-demo { display: grid; grid-template-columns: .72fr 1.28fr; gap: 70px; align-items: center; }
+.platform-demo__intro h2 { max-width: 520px; margin: 0; font-size: clamp(2.2rem, 4vw, 4rem); letter-spacing: -.055em; line-height: 1.05; }
+.platform-demo__intro > p:last-child { max-width: 480px; margin: 28px 0 0; color: var(--platform-muted); line-height: 1.8; }
+.platform-demo__frame { margin: 0; padding: 14px; border: 1px solid #c6d3e1; border-radius: 12px; background: var(--platform-dark); box-shadow: 18px 18px 0 rgba(29, 99, 216, .1); }
+.platform-demo__frame video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 6px; background: #0d1728; }
+.platform-demo__frame figcaption { padding: 12px 4px 2px; color: #aebacc; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .72rem; }
 .platform-section__heading--row { display: flex; justify-content: space-between; align-items: end; gap: 44px; }
 .platform-section__heading--row h2, .platform-boundary h2, .platform-closing h2 { max-width: 650px; margin: 0; font-size: clamp(2.2rem, 4vw, 4rem); letter-spacing: -.055em; line-height: 1.05; }
 .platform-section__heading--row > p { max-width: 390px; margin: 0 0 3px; color: var(--platform-muted); line-height: 1.7; }
@@ -108,6 +115,7 @@ footer { border-top: 1px solid #27384f; }
   .platform-capability:last-child { border-bottom: 0; }
   .platform-capability h3 { margin-top: 44px; }
   .platform-boundary { grid-template-columns: 1fr; gap: 52px; }
+  .platform-demo { grid-template-columns: 1fr; gap: 40px; }
 }
 
 @media (max-width: 640px) {
@@ -125,6 +133,7 @@ footer { border-top: 1px solid #27384f; }
   .platform-flow__connector { margin-left: 28px; }
   .platform-hero__visual-foot { align-items: flex-start; flex-direction: column; gap: 8px; }
   .platform-section { padding: 76px 0; }
+  .platform-demo__frame { padding: 8px; }
   .platform-section__heading--row h2, .platform-boundary h2, .platform-closing h2 { font-size: 2.5rem; }
   .platform-boundary__list > div { grid-template-columns: 38px 1fr; gap: 12px; }
   .platform-boundary__list p { grid-column: 2; }

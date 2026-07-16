@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 import Layout from '@theme/Layout';
 
 const capabilityCards = [
@@ -18,6 +19,8 @@ export default function Home(): JSX.Element {
     '面向 Go 服务的业务中立底座，提供能力合同、身份授权、数据边界和生产治理。',
     'A business-neutral Go foundation for capability contracts, identity, data boundaries and production governance.',
   );
+  const demoVideo = useBaseUrl('video/platform-go-demo.mp4');
+  const demoPoster = useBaseUrl('video/platform-go-demo.png');
   return (
     <Layout title={pageTitle} description={pageDescription}>
       <main className="platform-home">
@@ -42,6 +45,23 @@ export default function Home(): JSX.Element {
               </div>
               <div className="platform-hero__visual-foot"><span>request_id</span><code>ctx → contract → scope → store</code></div>
             </div>
+          </div>
+        </section>
+
+        <section className="platform-section platform-section--demo">
+          <div className="container platform-demo">
+            <div className="platform-demo__intro">
+              <p className="platform-kicker">{text('一分钟看懂平台路径', 'ONE-MINUTE PLATFORM TOUR')}</p>
+              <h2>{text('从身份到数据，边界如何工作。', 'See the boundary from identity to data.')}</h2>
+              <p>{text('这段演示用一个请求路径串起平台的核心合同：可信身份、能力声明、租户与权限策略，最后才进入数据运行时。', 'This short tour follows one request through the core contracts: trusted identity, capability declarations, tenant and policy scope, and finally the data runtime.')}</p>
+            </div>
+            <figure className="platform-demo__frame">
+              <video controls preload="metadata" poster={demoPoster} aria-label={text('platform-go 运行路径演示视频', 'platform-go runtime path demo')}>
+                <source src={demoVideo} type="video/mp4" />
+                {text('你的浏览器不支持视频播放，请打开视频文件查看。', 'Your browser does not support video playback. Open the video file directly.')}
+              </video>
+              <figcaption>{text('Remotion 生成 · 1920×1080 · 12 秒', 'Rendered with Remotion · 1920×1080 · 12 seconds')}</figcaption>
+            </figure>
           </div>
         </section>
 

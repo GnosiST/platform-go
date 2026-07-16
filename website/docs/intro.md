@@ -20,6 +20,17 @@ go run ./cmd/platform-api
 
 API 默认监听 `http://127.0.0.1:9200`。生产部署前请阅读认证和部署文档。
 
+## 你将获得什么
+
+- 一套能力 manifest 和资源 schema；
+- JWT 会话、RBAC、组织、角色组和菜单治理；
+- Admin 通用资源控制台、审计和数据生命周期；
+- OpenAPI、代码生成预览、生产 preflight 和发布证据。
+
+## 阅读路线
+
+新用户建议按“[架构总览](./architecture) → [开发指南](./development) → [能力与扩展](./capabilities) → [API 与合同](./api)”阅读；部署和安全人员可直接查看“[安全边界](./security) → [部署指南](./deployment)”。
+
 ## 继续阅读
 
 - [能力与扩展](./capabilities)

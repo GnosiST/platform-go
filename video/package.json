@@ -1,0 +1,20 @@
+{
+  "name": "platform-go-demo-video",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "render": "remotion render src/index.ts PlatformGoDemo ../website/static/video/platform-go-demo.mp4",
+    "still": "remotion still src/index.ts PlatformGoDemo --frame=90 ../website/static/video/platform-go-demo.png"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.250",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remotion": "^4.0.250"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.2"
+  }
+}
