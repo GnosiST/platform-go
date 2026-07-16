@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/storage"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 
 	"gorm.io/gorm"
 )

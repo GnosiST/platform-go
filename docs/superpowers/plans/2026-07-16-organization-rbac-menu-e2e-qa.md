@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Work only in `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/.worktrees/platform-completion`.
+- Work only in `./.worktrees/platform-completion`.
 - Prefix every shell command with `rtk`.
 - Use CodeGraph before changing `rbac.Principal`, HTTP serving, GORM persistence, service-object definitions, generated clients or shared UI primitives.
 - Preserve globally unique organization, role-group, role, menu and permission codes; do not introduce tenant-local duplicate codes.

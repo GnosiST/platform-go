@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"platform-go/internal/platform/masking"
+	"github.com/GnosiST/platform-go/internal/platform/masking"
 )
 
 var adminRelationRecordFields = []string{"id", "code", "name", "status", "description", "updatedAt"}

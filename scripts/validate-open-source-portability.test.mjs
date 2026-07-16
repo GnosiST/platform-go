@@ -36,6 +36,11 @@ describe("validate-open-source-portability", () => {
       "SUPPORT.md": "# Support\n",
       "GOVERNANCE.md": "# Governance\n",
       "CHANGELOG.md": "# Changelog\n",
+      "resources/reference-snapshot/manifest.json": JSON.stringify({
+        root: "resources/reference-snapshot/zshenmez",
+        files: ["docs/reference.md"],
+      }),
+      "resources/reference-snapshot/zshenmez/docs/reference.md": "reference\n",
     };
     const root = fixture(files);
     try {
@@ -78,6 +83,27 @@ describe("validate-open-source-portability", () => {
       const result = run(root, ["--strict"]);
       assert.notEqual(result.status, 0);
       assert.match(result.stderr, /required release file is missing: LICENSE/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("requires a tracked reference snapshot manifest in strict mode", () => {
+    const root = fixture({
+      "go.mod": "module github.com/GnosiST/platform-go\n",
+      LICENSE: "Apache License\n",
+      NOTICE: "GnosiST\n",
+      "CONTRIBUTING.md": "# Contributing\n",
+      "SECURITY.md": "# Security\n",
+      "CODE_OF_CONDUCT.md": "# Code of Conduct\n",
+      "SUPPORT.md": "# Support\n",
+      "GOVERNANCE.md": "# Governance\n",
+      "CHANGELOG.md": "# Changelog\n",
+    });
+    try {
+      const result = run(root, ["--strict"]);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /reference snapshot manifest is missing/);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

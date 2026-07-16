@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/kernel"
-	"platform-go/internal/platform/serviceobject"
+	"github.com/GnosiST/platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/serviceobject"
 
 	"gorm.io/gorm"
 )

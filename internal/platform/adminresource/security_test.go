@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/core"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/core"
 )
 
 func TestStoreCreateAndUpdateRejectUndeclaredValuesBeforeSave(t *testing.T) {

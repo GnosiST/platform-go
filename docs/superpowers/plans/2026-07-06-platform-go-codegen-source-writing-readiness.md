@@ -565,8 +565,8 @@ Run:
 
 ```bash
 rtk wc -l AGENTS.md README.md docs/*.md docs/superpowers/plans/*.md docs/superpowers/specs/*.md
-rtk wc -c /Users/irainbow/.codex/memories/MEMORY.md
-rtk du -sh docs /Users/irainbow/.codex/memories 2>/dev/null
+rtk wc -c <private-user-path>
+rtk du -sh docs <private-user-path> 2>/dev/null
 ```
 
 Expected: record any pre-existing size risk in the final handoff.

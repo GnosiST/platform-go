@@ -17,6 +17,7 @@ const root = path.resolve(argValue("--root", repoRoot));
 const strict = hasFlag("--strict");
 const strictPaths = strict || hasFlag("--strict-paths");
 const expectedModule = argValue("--expect-module", "");
+const referenceManifestPath = argValue("--reference-manifest", "resources/reference-snapshot/manifest.json");
 
 const ignoredDirectories = new Set([
   ".git",
@@ -68,7 +69,7 @@ function relative(file) {
 
 function walk(directory, output = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    if (entry.isDirectory() && ignoredDirectories.has(entry.name)) continue;
+    if (ignoredDirectories.has(entry.name)) continue;
     const file = path.join(directory, entry.name);
     if (entry.isDirectory()) walk(file, output);
     else if (entry.isFile()) output.push(file);
@@ -80,6 +81,39 @@ function readText(file) {
   const buffer = fs.readFileSync(file);
   if (buffer.includes(0)) return null;
   return buffer.toString("utf8");
+}
+
+function validateReferenceSnapshot(errors) {
+  const manifestFile = path.resolve(root, referenceManifestPath);
+  if (!fs.existsSync(manifestFile)) {
+    errors.push(`reference snapshot manifest is missing: ${referenceManifestPath}`);
+    return;
+  }
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
+  } catch {
+    errors.push(`reference snapshot manifest is invalid JSON: ${referenceManifestPath}`);
+    return;
+  }
+  if (manifest.root !== "resources/reference-snapshot/zshenmez") {
+    errors.push("reference snapshot manifest root must stay inside resources/reference-snapshot");
+  }
+  if (!Array.isArray(manifest.files) || manifest.files.length === 0) {
+    errors.push("reference snapshot manifest must list tracked files");
+    return;
+  }
+  for (const relativePath of manifest.files) {
+    if (typeof relativePath !== "string" || path.isAbsolute(relativePath) || relativePath.includes("..")) {
+      errors.push(`reference snapshot path must be relative and contained: ${relativePath}`);
+      continue;
+    }
+    const target = path.resolve(root, manifest.root, relativePath);
+    const relative = path.relative(root, target);
+    if (relative.startsWith("..") || !fs.existsSync(target) || !fs.statSync(target).isFile()) {
+      errors.push(`reference snapshot file is missing: ${path.join(manifest.root, relativePath)}`);
+    }
+  }
 }
 
 function validate() {
@@ -106,6 +140,8 @@ function validate() {
       }
     }
   }
+
+  if (strict) validateReferenceSnapshot(errors);
 
   for (const file of walk(root)) {
     const text = readText(file);

@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"platform-go/internal/platform/adminresource"
-	"platform-go/internal/platform/core"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/core"
 )
 
 func TestServerRegistersInjectedAdminRoutesBehindPermissionPolicy(t *testing.T) {

@@ -1,6 +1,6 @@
 package httpapi
 
-import "platform-go/internal/platform/errorcode"
+import "github.com/GnosiST/platform-go/internal/platform/errorcode"
 
 type Response[T any] struct {
 	Data  T          `json:"data,omitempty"`

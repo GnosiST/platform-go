@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/httpapi"
+	"github.com/GnosiST/platform-go/internal/platform/httpapi"
 )
 
 func TestMenuPromotionValidationTransitionTable(t *testing.T) {

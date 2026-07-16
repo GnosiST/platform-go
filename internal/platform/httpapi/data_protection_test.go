@@ -3,8 +3,8 @@ package httpapi
 import (
 	"testing"
 
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/dataprotection"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
 )
 
 func TestNewFailsClosedWhenEncryptedCapabilitiesHaveNoProtectedStore(t *testing.T) {

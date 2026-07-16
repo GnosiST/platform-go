@@ -16,7 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/kernel"
 )
 
 var (

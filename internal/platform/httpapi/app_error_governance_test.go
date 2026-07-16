@@ -15,11 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/adminresource"
-	"platform-go/internal/platform/authjwt"
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/errorcode"
-	"platform-go/internal/platform/session"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/authjwt"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/errorcode"
+	"github.com/GnosiST/platform-go/internal/platform/session"
 )
 
 func TestAppRegistryOwnedFunctionsDoNotUseLegacyErrorWriters(t *testing.T) {

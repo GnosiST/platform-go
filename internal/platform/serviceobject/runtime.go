@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/kernel"
 )
 
 type Runtime struct {

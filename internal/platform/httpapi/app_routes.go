@@ -8,10 +8,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"platform-go/internal/platform/approute"
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/errorcode"
-	"platform-go/internal/platform/session"
+	"github.com/GnosiST/platform-go/internal/platform/approute"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/errorcode"
+	"github.com/GnosiST/platform-go/internal/platform/session"
 )
 
 type AppRouteRegistration = approute.Registration

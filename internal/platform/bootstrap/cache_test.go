@@ -3,8 +3,8 @@ package bootstrap
 import (
 	"testing"
 
-	"platform-go/internal/platform/cache"
-	"platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/cache"
+	"github.com/GnosiST/platform-go/internal/platform/config"
 )
 
 func TestCacheFromConfigUsesNoopByDefault(t *testing.T) {

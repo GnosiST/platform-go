@@ -3,7 +3,7 @@ package approute
 import (
 	"github.com/gin-gonic/gin"
 
-	"platform-go/internal/platform/session"
+	"github.com/GnosiST/platform-go/internal/platform/session"
 )
 
 const SessionContextKey = "platform.appSession"

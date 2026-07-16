@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
 )
 
 func TestRunnerIsDisabledByDefault(t *testing.T) {

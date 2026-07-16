@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"platform-go/internal/platform/serviceobject"
+	"github.com/GnosiST/platform-go/internal/platform/serviceobject"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"

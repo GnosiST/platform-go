@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/session"
-	"platform-go/internal/platform/storage"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/session"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
 
 func SessionsFromConfig(cfg config.Config) (*session.Store, error) {

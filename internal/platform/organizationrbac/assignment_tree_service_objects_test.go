@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"platform-go/internal/platform/kernel"
-	"platform-go/internal/platform/serviceobject"
+	"github.com/GnosiST/platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/serviceobject"
 )
 
 func TestAssignmentTreeQueryDefinitionsAreStableAndClosed(t *testing.T) {

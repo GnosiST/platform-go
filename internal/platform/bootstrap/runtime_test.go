@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/config"
 )
 
 func TestRuntimeFromConfigUsesZeroValueRuntimeWithoutHistoryFile(t *testing.T) {

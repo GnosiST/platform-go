@@ -17,7 +17,7 @@
     ]
   },
   "referenceProjectPolicy": {
-    "referenceProject": "/Users/irainbow/Documents/DevelopmentSpace/myProject/zshenmez",
+    "referenceProject": "resources/reference-snapshot/zshenmez",
     "mode": "reference-only",
     "defaultPlatformBusinessMigration": "forbidden",
     "businessCapabilityOwnership": "external-business-capability",

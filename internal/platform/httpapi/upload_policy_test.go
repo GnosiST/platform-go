@@ -11,7 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"platform-go/internal/platform/errorcode"
+	"github.com/GnosiST/platform-go/internal/platform/errorcode"
 )
 
 func TestUploadErrorCodesAreCompleteRegisteredAndSeparateUploadOpenFromObjectOpen(t *testing.T) {

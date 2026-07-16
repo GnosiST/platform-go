@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/integration"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/integration"
 )
 
 func TestIntegrationsFromConfigDefaultsToExplicitDisabledPorts(t *testing.T) {

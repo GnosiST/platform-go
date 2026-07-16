@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"platform-go/internal/platform/dataprotection"
+	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
 )
 
 type Classification string

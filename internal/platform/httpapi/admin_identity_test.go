@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/adminresource"
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/core"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/core"
 )
 
 func TestAdminIdentityBindingProvisionResolveAndPersistHashesOnly(t *testing.T) {

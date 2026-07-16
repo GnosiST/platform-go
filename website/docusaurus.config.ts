@@ -17,17 +17,25 @@ const config: Config = {
       'classic',
       {
         docs: {routeBasePath: 'docs', sidebarPath: './sidebars.ts'},
+        sitemap: {changefreq: 'weekly', priority: 0.7},
         blog: false,
         theme: {customCss: './src/css/custom.css'},
       } satisfies Preset.Options,
     ],
   ],
   themeConfig: {
+    image: 'img/favicon.svg',
     navbar: {
       title: 'platform-go',
       items: [{to: '/docs/intro', label: '文档', position: 'left'}, {href: 'https://github.com/GnosiST/platform-go', label: 'GitHub', position: 'right'}],
     },
-    metadata: [{name: 'description', content: 'Business-neutral Go operations platform foundation'}],
+    metadata: [
+      {name: 'description', content: 'Business-neutral Go operations platform foundation for capabilities, identity, authorization and production operations.'},
+      {property: 'og:type', content: 'website'},
+      {property: 'og:title', content: 'platform-go | Go operations foundation'},
+      {property: 'og:description', content: 'Contracts, secure defaults and production gates for reusable Go services.'},
+      {name: 'twitter:card', content: 'summary'},
+    ],
   } satisfies Preset.ThemeConfig,
 };
 

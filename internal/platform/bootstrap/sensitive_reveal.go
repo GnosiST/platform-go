@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/sensitivereveal"
-	"platform-go/internal/platform/storage"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/sensitivereveal"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
 
 func SensitiveRevealRuntimeFromConfig(cfg config.Config, manifests []capability.Manifest, phoneRuntime PhoneVerificationRuntime) (*sensitivereveal.Runtime, error) {

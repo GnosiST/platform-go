@@ -12,7 +12,7 @@ import (
 	"sync"
 	"testing"
 
-	"platform-go/internal/platform/core"
+	"github.com/GnosiST/platform-go/internal/platform/core"
 )
 
 func TestSQLAdminResourceRepositoryPersistsSnapshots(t *testing.T) {

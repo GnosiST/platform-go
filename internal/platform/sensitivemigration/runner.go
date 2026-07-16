@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"platform-go/internal/platform/dataprotection"
+	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
 )
 
 type Runner struct {

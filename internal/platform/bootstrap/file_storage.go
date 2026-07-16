@@ -1,8 +1,8 @@
 package bootstrap
 
 import (
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/storage"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
 
 func FileStorageFromConfig(cfg config.Config) (storage.ObjectStore, error) {

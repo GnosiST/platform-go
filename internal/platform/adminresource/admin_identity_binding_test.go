@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/core"
-	"platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/core"
+	"github.com/GnosiST/platform-go/internal/platform/kernel"
 )
 
 func TestProvisionAdminIdentityBindingReturnsStableRecordIdentity(t *testing.T) {

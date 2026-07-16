@@ -14,7 +14,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/kernel"
 )
 
 type GORMAdminResourceRepository struct {

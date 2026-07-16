@@ -130,7 +130,7 @@ function validateApprovedStack(audit, alignment, goal, engineering, errors) {
 
 function validateReferencePolicy(audit, readme, agents, errors) {
   const policy = audit.referenceProjectPolicy ?? {};
-  if (policy.referenceProject !== "/Users/irainbow/Documents/DevelopmentSpace/myProject/zshenmez") {
+  if (policy.referenceProject !== "resources/reference-snapshot/zshenmez") {
     errors.push("referenceProjectPolicy.referenceProject must stay the zshenmez reference path");
   }
   if (policy.mode !== "reference-only") {

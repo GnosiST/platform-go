@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"platform-go/internal/platform/core"
+	"github.com/GnosiST/platform-go/internal/platform/core"
 
 	"gorm.io/gorm"
 )

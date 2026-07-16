@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"platform-go/internal/platform/adminresource"
-	"platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
 )
 
 var ErrAdminStepUpPhoneUnavailable = errors.New("admin step-up phone is unavailable")

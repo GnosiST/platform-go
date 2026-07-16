@@ -13,15 +13,15 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/apps"
-	"platform-go/internal/platform/adminresource"
-	"platform-go/internal/platform/bootstrap"
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/datalifecycle"
-	"platform-go/internal/platform/dataprotection"
-	"platform-go/internal/platform/organizationrbac"
-	"platform-go/internal/platform/sensitivemigration"
+	"github.com/GnosiST/platform-go/internal/apps"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/bootstrap"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/datalifecycle"
+	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
+	"github.com/GnosiST/platform-go/internal/platform/organizationrbac"
+	"github.com/GnosiST/platform-go/internal/platform/sensitivemigration"
 )
 
 const (

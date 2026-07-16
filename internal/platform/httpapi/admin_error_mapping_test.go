@@ -10,8 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"platform-go/internal/platform/adminresource"
-	"platform-go/internal/platform/errorcode"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/errorcode"
 )
 
 func TestAdminResourceErrorCodeMatrix(t *testing.T) {

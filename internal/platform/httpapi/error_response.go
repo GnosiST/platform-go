@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"platform-go/internal/platform/errorcode"
-	"platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/errorcode"
+	"github.com/GnosiST/platform-go/internal/platform/kernel"
 )
 
 func writePlatformError(ctx *gin.Context, code errorcode.Code) {

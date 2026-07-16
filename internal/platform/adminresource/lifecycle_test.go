@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/kernel"
-	"platform-go/internal/platform/rbac"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/rbac"
 )
 
 func TestRequiresGovernedLifecycleCommandCoversAuthorizationEntities(t *testing.T) {

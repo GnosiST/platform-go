@@ -23,19 +23,19 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"platform-go/internal/platform/adminresource"
-	"platform-go/internal/platform/authjwt"
-	"platform-go/internal/platform/cache"
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/dataprotection"
-	"platform-go/internal/platform/errorcode"
-	"platform-go/internal/platform/kernel"
-	"platform-go/internal/platform/ratelimit"
-	"platform-go/internal/platform/rbac"
-	"platform-go/internal/platform/sensitivereveal"
-	"platform-go/internal/platform/serviceobject"
-	"platform-go/internal/platform/session"
-	"platform-go/internal/platform/storage"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/authjwt"
+	"github.com/GnosiST/platform-go/internal/platform/cache"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
+	"github.com/GnosiST/platform-go/internal/platform/errorcode"
+	"github.com/GnosiST/platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/ratelimit"
+	"github.com/GnosiST/platform-go/internal/platform/rbac"
+	"github.com/GnosiST/platform-go/internal/platform/sensitivereveal"
+	"github.com/GnosiST/platform-go/internal/platform/serviceobject"
+	"github.com/GnosiST/platform-go/internal/platform/session"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
 
 type ServerOptions struct {

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/kernel"
 )
 
 func TestRegistryValidatesAndClonesAdditionalPermissions(t *testing.T) {

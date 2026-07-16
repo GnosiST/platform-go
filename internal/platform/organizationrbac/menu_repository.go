@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"platform-go/internal/platform/adminresource"
-	"platform-go/internal/platform/serviceobject"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/serviceobject"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"

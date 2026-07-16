@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"platform-go/internal/platform/adminresource"
-	"platform-go/internal/platform/rbac"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/rbac"
 
 	"gorm.io/gorm"
 )

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"platform-go/internal/platform/dataprotection"
+	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
 )
 
 type Config struct {

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://platform-go.local/schemas/reference-snapshot-manifest.json",
+  "project": "zshenmez",
+  "root": "resources/reference-snapshot/zshenmez",
+  "files": [
+    "admin/scripts/check-api-boundary.mjs",
+    "admin/src/apiBoundary.ts",
+    "admin/src/querySecurity.ts",
+    "api/cmd/demo-data-reset/main.go",
+    "api/internal/database/entities.go",
+    "api/internal/httpapi/handlers.go",
+    "api/internal/httpapi/query_security_test.go",
+    "api/internal/httpapi/server.go",
+    "api/internal/httpapi/wechat.go",
+    "api/internal/model/model.go",
+    "docs/api-contract.md",
+    "docs/auth-rbac-multitenancy.md",
+    "docs/data-model.md",
+    "docs/mvp1-handoff-2026-06-19.md",
+    "docs/platform-architecture.md",
+    "miniprogram-native-v2/scripts/check-boundary.mjs",
+    "miniprogram-native-v2/src/api/appRequest.ts",
+    "miniprogram-native-v2/src/api/appUpload.ts",
+    "miniprogram-native-v2/tests/apiPorts.test.ts",
+    "resources/admin-resources.json"
+  ]
+}

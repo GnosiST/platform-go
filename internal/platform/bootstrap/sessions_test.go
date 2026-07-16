@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/config"
 )
 
 func TestSessionsFromConfigUsesMemoryStoreByDefault(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"platform-go/internal/platform/datalifecycle"
+	"github.com/GnosiST/platform-go/internal/platform/datalifecycle"
 )
 
 const retentionSchedulerOwnerID = "retention-scheduler"

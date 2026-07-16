@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"platform-go/internal/platform/dataprotection"
+	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
 )
 
 const (

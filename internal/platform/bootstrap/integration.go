@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"strings"
 
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/integration"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/integration"
 )
 
 type IntegrationAdapters struct {

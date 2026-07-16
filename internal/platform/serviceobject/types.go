@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/kernel"
 )
 
 type ValueType string

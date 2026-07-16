@@ -73,7 +73,7 @@ The governance-topology gate now records direct user-tenant editing, nested role
 
 ## Reference Project Coverage Audit
 
-This audit uses `/Users/irainbow/Documents/DevelopmentSpace/myProject/zshenmez` as the reference management backend. The point is coverage, not copying: reusable system capabilities stay in platform foundation, while business workflows stay in optional application capabilities.
+This audit uses `<private-user-path>` as the reference management backend. The point is coverage, not copying: reusable system capabilities stay in platform foundation, while business workflows stay in optional application capabilities.
 
 | Reference capability in `zshenmez` | Platform placement | Current `platform-go` coverage | Boundary decision |
 | --- | --- | --- | --- |

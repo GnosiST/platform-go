@@ -11,14 +11,14 @@ import (
 	"syscall"
 	"time"
 
-	"platform-go/internal/apps"
-	"platform-go/internal/platform/authprovider"
-	"platform-go/internal/platform/bootstrap"
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/httpapi"
-	"platform-go/internal/platform/rbac"
-	"platform-go/internal/platform/serviceobject"
+	"github.com/GnosiST/platform-go/internal/apps"
+	"github.com/GnosiST/platform-go/internal/platform/authprovider"
+	"github.com/GnosiST/platform-go/internal/platform/bootstrap"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/httpapi"
+	"github.com/GnosiST/platform-go/internal/platform/rbac"
+	"github.com/GnosiST/platform-go/internal/platform/serviceobject"
 )
 
 func main() {

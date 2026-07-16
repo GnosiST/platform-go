@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"platform-go/internal/platform/dataprotection"
-	"platform-go/internal/platform/sensitivemigration"
+	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
+	"github.com/GnosiST/platform-go/internal/platform/sensitivemigration"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"

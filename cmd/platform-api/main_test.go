@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"testing"
 
-	"platform-go/internal/apps"
-	"platform-go/internal/platform/bootstrap"
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/httpapi"
+	"github.com/GnosiST/platform-go/internal/apps"
+	"github.com/GnosiST/platform-go/internal/platform/bootstrap"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/httpapi"
 )
 
 func TestStartRetentionRuntimeDisabledHasZeroSideEffects(t *testing.T) {

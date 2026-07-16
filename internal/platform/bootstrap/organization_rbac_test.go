@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/adminresource"
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/core"
-	"platform-go/internal/platform/organizationrbac"
-	"platform-go/internal/platform/rbac"
-	"platform-go/internal/platform/storage"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/core"
+	"github.com/GnosiST/platform-go/internal/platform/organizationrbac"
+	"github.com/GnosiST/platform-go/internal/platform/rbac"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
 
 func TestPrepareAndOpenOrganizationRBAC(t *testing.T) {

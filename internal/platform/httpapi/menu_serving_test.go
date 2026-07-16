@@ -9,10 +9,10 @@ import (
 	"reflect"
 	"testing"
 
-	"platform-go/internal/platform/adminresource"
-	"platform-go/internal/platform/cache"
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/rbac"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/cache"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/rbac"
 )
 
 func TestAdminMenusTargetUsesRevisionAwareCache(t *testing.T) {

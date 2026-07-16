@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
 )
 
 func TestHMACPhoneProtectorSeparatesPhoneAndCodeDomains(t *testing.T) {

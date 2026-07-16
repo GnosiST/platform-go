@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"platform-go/internal/platform/rbac"
+	"github.com/GnosiST/platform-go/internal/platform/rbac"
 )
 
 var ErrAdminPrincipalInvalid = errors.New("invalid admin principal")

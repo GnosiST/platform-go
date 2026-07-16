@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"platform-go/internal/platform/serviceobject"
+	"github.com/GnosiST/platform-go/internal/platform/serviceobject"
 
 	"gorm.io/gorm"
 )

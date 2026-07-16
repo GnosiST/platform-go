@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/dataprotection"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
 )
 
 var ErrRevisionConflict = errors.New("admin resource revision conflict")

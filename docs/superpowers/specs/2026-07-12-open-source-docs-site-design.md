@@ -28,7 +28,7 @@ The initial public copyright holder is `GnosiST`. Changing to a personal or orga
 
 Public documentation uses native `go`, `npm`, `node` and `docker compose` commands. The repository's agent-only `rtk` command requirement stays in `AGENTS.md` and internal automation instructions, not in end-user quick starts.
 
-Fresh-clone validators must not require `/Users/irainbow/...`, private Codex assets or a sibling `zshenmez` checkout. Replace live default reference discovery with a tracked, sanitized reference snapshot. Maintainers may opt into live reference validation through an explicit flag or environment variable. CI uses only tracked repository content.
+Fresh-clone validators must not require `<private-user-path>`, private Codex assets or a sibling `zshenmez` checkout. Replace live default reference discovery with a tracked, sanitized reference snapshot. Maintainers may opt into live reference validation through an explicit flag or environment variable. CI uses only tracked repository content.
 
 Before publication, migrate the Go module from `platform-go` to `github.com/GnosiST/platform-go` and update every internal import, generated artifact, validator and public example in the same reviewed change. The Admin package remains a private workspace package and is not published to npm.
 

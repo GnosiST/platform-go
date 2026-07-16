@@ -3,7 +3,7 @@ package apps
 import (
 	"testing"
 
-	"platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
 )
 
 func TestDefaultAppRoutesAreBusinessNeutral(t *testing.T) {

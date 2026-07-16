@@ -1,7 +1,35 @@
 :root {
-  --ifm-color-primary: #155eef;
-  --ifm-color-primary-dark: #0f4fd1;
+  --ifm-color-primary: #0d63f3;
+  --ifm-color-primary-dark: #084dbd;
   --ifm-font-family-base: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --platform-ink: #101828;
+  --platform-muted: #667085;
+  --platform-line: #d0d5dd;
 }
 
-footer { display: none; }
+.navbar { border-bottom: 1px solid var(--platform-line); box-shadow: none; }
+.platform-home { color: var(--platform-ink); }
+.platform-hero { background: #f7f9fc; border-bottom: 1px solid var(--platform-line); }
+.platform-hero__grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr); gap: 5rem; align-items: center; min-height: 640px; padding: 6rem 1.5rem; }
+.platform-kicker { margin: 0 0 1rem; color: var(--ifm-color-primary); font-size: .75rem; font-weight: 700; letter-spacing: .12em; }
+.platform-hero h1 { max-width: 11ch; margin: 0; font-size: clamp(3rem, 7vw, 5.8rem); letter-spacing: -.06em; line-height: .95; }
+.platform-hero__lede { max-width: 34rem; margin: 2rem 0; color: var(--platform-muted); font-size: 1.2rem; line-height: 1.6; }
+.platform-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+.platform-architecture { border: 1px solid #98a2b3; background: #fff; padding: 2rem; box-shadow: 16px 16px 0 #dbe7ff; }
+.platform-architecture__label { color: var(--platform-muted); font-size: .7rem; font-weight: 700; letter-spacing: .14em; }
+.platform-architecture__line { display: flex; align-items: center; justify-content: space-between; gap: .8rem; margin-top: 1.5rem; padding: 1rem; border: 1px solid var(--platform-line); font-weight: 650; }
+.platform-architecture__line b { color: var(--ifm-color-primary); }
+.platform-architecture__line--accent { border-color: var(--ifm-color-primary); background: #eff6ff; }
+.platform-architecture__arrow { margin: .3rem 0; color: var(--ifm-color-primary); text-align: center; }
+.platform-section { padding: 6rem 1.5rem; }
+.platform-section__heading h2, .platform-section__split h2 { max-width: 15ch; margin: 0; font-size: clamp(2rem, 4vw, 3.6rem); letter-spacing: -.04em; line-height: 1; }
+.platform-pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 3rem; }
+.platform-pillars article { border-top: 2px solid var(--platform-ink); padding-top: 1.25rem; }
+.platform-pillars span { color: var(--ifm-color-primary); font-weight: 700; }
+.platform-pillars h3 { margin: 1.3rem 0 .6rem; }
+.platform-pillars p, .platform-section__split > p { color: var(--platform-muted); line-height: 1.7; }
+.platform-section--dark { background: var(--platform-ink); color: #fff; }
+.platform-section--dark .platform-kicker { color: #84adff; }
+.platform-section__split { display: grid; grid-template-columns: 1fr 1fr; gap: 5rem; align-items: end; }
+.platform-section__split > p { color: #d0d5dd; font-size: 1.2rem; }
+@media (max-width: 800px) { .platform-hero__grid, .platform-section__split { grid-template-columns: 1fr; gap: 2.5rem; } .platform-hero__grid { min-height: auto; padding: 4rem 1.25rem; } .platform-pillars { grid-template-columns: 1fr; } .platform-section { padding: 4rem 1.25rem; } }

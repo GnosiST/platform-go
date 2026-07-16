@@ -3,8 +3,8 @@ package adminresource
 import (
 	"strings"
 
-	"platform-go/internal/platform/authz"
-	"platform-go/internal/platform/rbac"
+	"github.com/GnosiST/platform-go/internal/platform/authz"
+	"github.com/GnosiST/platform-go/internal/platform/rbac"
 )
 
 const platformTenant = "platform"

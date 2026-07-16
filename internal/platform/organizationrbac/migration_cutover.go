@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"platform-go/internal/platform/httpapi"
-	"platform-go/internal/platform/rbac"
+	"github.com/GnosiST/platform-go/internal/platform/httpapi"
+	"github.com/GnosiST/platform-go/internal/platform/rbac"
 
 	"gorm.io/gorm"
 )

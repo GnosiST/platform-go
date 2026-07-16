@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/storage"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
 
 func TestGORMRepositoryPersistsRefreshTokenFamilyLineage(t *testing.T) {

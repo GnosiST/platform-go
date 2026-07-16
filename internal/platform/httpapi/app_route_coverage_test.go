@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
 )
 
 func TestAppRouteHandlerCoverageReportsMissingDeclaredHandlers(t *testing.T) {

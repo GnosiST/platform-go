@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"platform-go/internal/platform/httpapi"
+	"github.com/GnosiST/platform-go/internal/platform/httpapi"
 )
 
 const defaultCode2SessionEndpoint = "https://api.weixin.qq.com/sns/jscode2session"

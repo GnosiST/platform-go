@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/dataprotection"
-	"platform-go/internal/platform/sensitivemigration"
-	"platform-go/internal/platform/storage"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
+	"github.com/GnosiST/platform-go/internal/platform/sensitivemigration"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
 
 func TestSensitiveDataMigrationRejectsNonGORMAndIncompleteStorage(t *testing.T) {

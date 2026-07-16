@@ -4,7 +4,7 @@
   "purpose": "Machine-checkable discovery record for reusable, optional and business-only capabilities observed in the zshenmez reference project before promoting anything into the platform foundation.",
   "reference": {
     "project": "zshenmez",
-    "root": "/Users/irainbow/Documents/DevelopmentSpace/myProject/zshenmez",
+    "root": "resources/reference-snapshot/zshenmez",
     "policy": "Reference capabilities must be classified from source evidence before platform promotion. Default platform promotion is allowed only for business-neutral foundation capabilities already mapped by platform-reference-coverage."
   },
   "sourceSets": [

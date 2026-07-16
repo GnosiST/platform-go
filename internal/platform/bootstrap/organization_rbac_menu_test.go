@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"platform-go/internal/platform/adminresource"
-	"platform-go/internal/platform/organizationrbac"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/organizationrbac"
 )
 
 func TestAdminMenuItemsFromOrganizationNodesPreservesNavigationMetadata(t *testing.T) {

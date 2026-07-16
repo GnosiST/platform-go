@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"platform-go/internal/platform/adminresource"
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/dataprotection"
-	"platform-go/internal/platform/storage"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
 
 func TestPrepareDataLifecycleCreatesOnlyLifecycleTables(t *testing.T) {

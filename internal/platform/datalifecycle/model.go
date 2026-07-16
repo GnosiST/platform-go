@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
 )
 
 type Mode string

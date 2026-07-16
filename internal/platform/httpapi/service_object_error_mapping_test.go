@@ -10,8 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"platform-go/internal/platform/errorcode"
-	"platform-go/internal/platform/serviceobject"
+	"github.com/GnosiST/platform-go/internal/platform/errorcode"
+	"github.com/GnosiST/platform-go/internal/platform/serviceobject"
 )
 
 func TestServiceObjectErrorCodeMatrix(t *testing.T) {

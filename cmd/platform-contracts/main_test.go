@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/errorcode"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/errorcode"
 )
 
 func TestRunErrorCodesWritesRegistryDerivedContract(t *testing.T) {

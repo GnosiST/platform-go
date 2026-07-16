@@ -13,8 +13,8 @@ import (
 	coreoidc "github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/httpapi"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/httpapi"
 )
 
 type Config struct {

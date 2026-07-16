@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/httpapi"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/httpapi"
 )
 
 func TestAppIdentityResolverFromConfigReturnsWechatResolverWhenConfigured(t *testing.T) {

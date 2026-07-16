@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/core"
-	"platform-go/internal/platform/kernel"
-	"platform-go/internal/platform/rbac"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/core"
+	"github.com/GnosiST/platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/rbac"
 )
 
 func TestStoreRegistersAdminResourcesFromEnabledCapabilities(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strings"
 
-	"platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
 )
 
 const (

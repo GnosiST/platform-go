@@ -6,7 +6,7 @@ Date: 2026-07-07
 
 Use the selected combined direction: keep the generic resource list as the primary work surface, open details and extension content in a right drawer, add a compact selection command bar for batch work, and expose custom resource actions plus plugin panels through resource schema metadata.
 
-The visual target is anchored by the generated resource-list drawer direction at `/Users/irainbow/.codex/generated_images/019f2ad3-1ed2-7810-849b-1fa073078dcf/ig_078f9851005a1fc5016a4c660ed5588191acdb7faaf7e52994.png`, with batch/filter behavior borrowed from the dark command-bar option and approval/file/audit tabs borrowed from the warm plugin-panel option.
+The visual target is anchored by the generated resource-list drawer direction at `<private-user-path>`, with batch/filter behavior borrowed from the dark command-bar option and approval/file/audit tabs borrowed from the warm plugin-panel option.
 
 ## Goals
 

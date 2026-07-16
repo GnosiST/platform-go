@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
-	"platform-go/internal/platform/storage"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
 
 func TestGORMRepositoryDoesNotPersistRawSessionToken(t *testing.T) {

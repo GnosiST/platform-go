@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"platform-go/internal/platform/adminroute"
+	"github.com/GnosiST/platform-go/internal/platform/adminroute"
 )
 
 type AdminRouteRegistration = adminroute.Registration

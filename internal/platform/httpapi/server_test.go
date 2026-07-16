@@ -20,17 +20,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"platform-go/internal/apps"
-	"platform-go/internal/platform/adminresource"
-	"platform-go/internal/platform/authjwt"
-	"platform-go/internal/platform/cache"
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/core"
-	"platform-go/internal/platform/errorcode"
-	"platform-go/internal/platform/kernel"
-	"platform-go/internal/platform/ratelimit"
-	"platform-go/internal/platform/session"
-	"platform-go/internal/platform/storage"
+	"github.com/GnosiST/platform-go/internal/apps"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/authjwt"
+	"github.com/GnosiST/platform-go/internal/platform/cache"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/core"
+	"github.com/GnosiST/platform-go/internal/platform/errorcode"
+	"github.com/GnosiST/platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/ratelimit"
+	"github.com/GnosiST/platform-go/internal/platform/session"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
 
 type adminResourceListTestPayload struct {

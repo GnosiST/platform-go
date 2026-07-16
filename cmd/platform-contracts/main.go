@@ -13,12 +13,12 @@ import (
 	"sort"
 	"strings"
 
-	"platform-go/internal/apps"
-	"platform-go/internal/platform/bootstrap"
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/errorcode"
-	"platform-go/internal/platform/httpapi"
+	"github.com/GnosiST/platform-go/internal/apps"
+	"github.com/GnosiST/platform-go/internal/platform/bootstrap"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/errorcode"
+	"github.com/GnosiST/platform-go/internal/platform/httpapi"
 )
 
 const (

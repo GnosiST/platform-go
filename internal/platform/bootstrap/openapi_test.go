@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/config"
 )
 
 func TestOpenAPIDocumentFromConfigLoadsJSONDocument(t *testing.T) {

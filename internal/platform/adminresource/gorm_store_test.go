@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"gorm.io/gorm"
-	"platform-go/internal/platform/core"
-	"platform-go/internal/platform/storage"
+	"github.com/GnosiST/platform-go/internal/platform/core"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
 
 type preTask6GORMAdminAuditLog struct {

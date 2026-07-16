@@ -3,10 +3,10 @@ package authprovider
 import (
 	"strings"
 
-	authoidc "platform-go/internal/platform/authprovider/oidc"
-	authwechat "platform-go/internal/platform/authprovider/wechat"
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/httpapi"
+	authoidc "github.com/GnosiST/platform-go/internal/platform/authprovider/oidc"
+	authwechat "github.com/GnosiST/platform-go/internal/platform/authprovider/wechat"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/httpapi"
 )
 
 func AppIdentityResolverFromConfig(cfg config.Config) (httpapi.AppIdentityResolver, error) {

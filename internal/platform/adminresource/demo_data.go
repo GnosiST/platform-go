@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
 )
 
 type DemoDataApplyResult struct {

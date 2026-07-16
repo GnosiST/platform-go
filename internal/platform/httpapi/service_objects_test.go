@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/kernel"
-	"platform-go/internal/platform/ratelimit"
-	"platform-go/internal/platform/serviceobject"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/ratelimit"
+	"github.com/GnosiST/platform-go/internal/platform/serviceobject"
 )
 
 func TestAdminServiceObjectTransportReturnsUnavailableWhenRuntimeIsNotComposed(t *testing.T) {

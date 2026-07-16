@@ -6,14 +6,14 @@ import (
 	"errors"
 	"strings"
 
-	"platform-go/internal/platform/adminresource"
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/httpapi"
-	"platform-go/internal/platform/kernel"
-	"platform-go/internal/platform/organizationrbac"
-	"platform-go/internal/platform/rbac"
-	"platform-go/internal/platform/serviceobject"
-	"platform-go/internal/platform/storage"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/httpapi"
+	"github.com/GnosiST/platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/organizationrbac"
+	"github.com/GnosiST/platform-go/internal/platform/rbac"
+	"github.com/GnosiST/platform-go/internal/platform/serviceobject"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 
 	"gorm.io/gorm"
 )

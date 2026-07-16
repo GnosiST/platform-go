@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/dataprotection"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
 )
 
 type Plan struct {

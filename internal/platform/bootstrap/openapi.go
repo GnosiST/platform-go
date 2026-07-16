@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/config"
 )
 
 func OpenAPIDocumentFromConfig(cfg config.Config) ([]byte, error) {

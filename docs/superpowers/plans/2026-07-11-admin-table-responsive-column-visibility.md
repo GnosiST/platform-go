@@ -321,7 +321,7 @@ Expected: all commands pass and default foundation still includes `org-units` wh
 - [ ] **Step 2: Run UI/UX Pro Max pre-delivery query**
 
 ```bash
-rtk python3 /Users/irainbow/.codex/skills/ui-ux-pro-max/scripts/search.py "responsive data table column settings accessibility loading" --domain ux
+rtk python3 <private-user-path> "responsive data table column settings accessibility loading" --domain ux
 ```
 
 Use the result only as a checklist; preserve the existing Ant Design system and platform wrappers.

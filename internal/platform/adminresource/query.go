@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/rbac"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/rbac"
 )
 
 const (

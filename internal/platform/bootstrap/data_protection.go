@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"platform-go/internal/platform/config"
-	"platform-go/internal/platform/dataprotection"
+	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
 )
 
 func DataProtectionRuntimeFromConfig(cfg config.Config) (dataprotection.Runtime, error) {

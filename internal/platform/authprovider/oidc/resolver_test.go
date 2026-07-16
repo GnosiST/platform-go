@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"platform-go/internal/platform/capability"
-	"platform-go/internal/platform/httpapi"
+	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/httpapi"
 )
 
 func TestResolverStartsAndResolvesAdminIdentity(t *testing.T) {

@@ -1,4 +1,4 @@
-module platform-go
+module github.com/GnosiST/platform-go
 
 go 1.26
 

@@ -4,15 +4,15 @@ Date: 2026-07-04
 
 ## Source Visual Truth Path
 
-- `/var/folders/22/yqxb34ks75jdwy4c2_n1mwwm0000gn/T/codex-clipboard-ead03ade-ae5c-4b33-b8ad-257c44e525b0.png`
-- `/var/folders/22/yqxb34ks75jdwy4c2_n1mwwm0000gn/T/codex-clipboard-8d140a6b-250b-4601-b041-f20d7ba6c946.png`
+- `<temporary-path>`
+- `<temporary-path>`
 
 ## Implementation Screenshot Path
 
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/admin-api-resources-desktop-1440x1024.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/admin-settings-menu-desktop-1440x1024.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/admin-api-resources-mobile-390x844.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/admin-ui-comparison.png`
+- `./tmp/product-design/admin-api-resources-desktop-1440x1024.png`
+- `./tmp/product-design/admin-settings-menu-desktop-1440x1024.png`
+- `./tmp/product-design/admin-api-resources-mobile-390x844.png`
+- `./tmp/product-design/admin-ui-comparison.png`
 
 ## Viewport
 
@@ -31,7 +31,7 @@ Date: 2026-07-04
 
 ## Full-View Comparison Evidence
 
-Comparison image: `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/admin-ui-comparison.png`
+Comparison image: `./tmp/product-design/admin-ui-comparison.png`
 
 The comparison checks the two provided issue screenshots against:
 
@@ -184,10 +184,10 @@ final result: passed
 
 Additional screenshots:
 
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/.superpowers/brainstorm/28542-1783178508/content/admin-list-column-dropdown-20260705.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/.superpowers/brainstorm/28542-1783178508/content/admin-advanced-filter-20260705.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/.superpowers/brainstorm/28542-1783178508/content/admin-settings-drawer-20260705.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/.superpowers/brainstorm/28542-1783178508/content/admin-sidebar-collapsed-20260705.png`
+- `./.superpowers/brainstorm/28542-1783178508/content/admin-list-column-dropdown-20260705.png`
+- `./.superpowers/brainstorm/28542-1783178508/content/admin-advanced-filter-20260705.png`
+- `./.superpowers/brainstorm/28542-1783178508/content/admin-settings-drawer-20260705.png`
+- `./.superpowers/brainstorm/28542-1783178508/content/admin-sidebar-collapsed-20260705.png`
 
 Checked states:
 
@@ -203,23 +203,23 @@ Checked states:
 
 Source visual truth path:
 
-- `/var/folders/22/yqxb34ks75jdwy4c2_n1mwwm0000gn/T/codex-clipboard-49c95835-1877-44a3-910a-23aef216edce.png`
-- `/var/folders/22/yqxb34ks75jdwy4c2_n1mwwm0000gn/T/codex-clipboard-2cb5b51d-69a9-48e6-93bb-6d86cc460d09.png`
-- `/var/folders/22/yqxb34ks75jdwy4c2_n1mwwm0000gn/T/codex-clipboard-46454074-9e7f-46bb-ac1b-202777c4d6d9.png`
-- `/var/folders/22/yqxb34ks75jdwy4c2_n1mwwm0000gn/T/codex-clipboard-e3e8b4b3-13a2-408f-9d0a-f11b5241f204.png`
+- `<temporary-path>`
+- `<temporary-path>`
+- `<temporary-path>`
+- `<temporary-path>`
 - `docs/admin-ui-foundation.md`
 
 Implementation screenshot path:
 
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/visual-product-design-qa-20260706/03-menus-list-desktop-1440x1024.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/visual-product-design-qa-20260706/04-user-menu-desktop-1440x1024.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/visual-product-design-qa-20260706/05-settings-black-layout-tab-1440x1024.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/visual-product-design-qa-20260706/06-sidebar-collapsed-black-1440x1024.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/visual-product-design-qa-20260706/07-column-menu-black-1440x1024.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/visual-product-design-qa-20260706/08-filter-menu-black-1440x1024.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/visual-product-design-qa-20260706/09-work-tab-context-menu-black-1440x1024.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/visual-product-design-qa-20260706/11-menus-mobile-390x844-after-fix.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/visual-product-design-qa-20260706/12-dashboard-desktop-1440x1024-after-fix.png`
+- `./tmp/product-design/visual-product-design-qa-20260706/03-menus-list-desktop-1440x1024.png`
+- `./tmp/product-design/visual-product-design-qa-20260706/04-user-menu-desktop-1440x1024.png`
+- `./tmp/product-design/visual-product-design-qa-20260706/05-settings-black-layout-tab-1440x1024.png`
+- `./tmp/product-design/visual-product-design-qa-20260706/06-sidebar-collapsed-black-1440x1024.png`
+- `./tmp/product-design/visual-product-design-qa-20260706/07-column-menu-black-1440x1024.png`
+- `./tmp/product-design/visual-product-design-qa-20260706/08-filter-menu-black-1440x1024.png`
+- `./tmp/product-design/visual-product-design-qa-20260706/09-work-tab-context-menu-black-1440x1024.png`
+- `./tmp/product-design/visual-product-design-qa-20260706/11-menus-mobile-390x844-after-fix.png`
+- `./tmp/product-design/visual-product-design-qa-20260706/12-dashboard-desktop-1440x1024-after-fix.png`
 
 Viewport:
 
@@ -267,11 +267,11 @@ Status: follow-up tasks identified; no visual implementation started.
 
 Fresh evidence:
 
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/ui-optimization-audit-20260710/01-login-current.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/ui-optimization-audit-20260710/02-dashboard-desktop-current.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/ui-optimization-audit-20260710/04-menus-desktop-current.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/ui-optimization-audit-20260710/06-menus-mobile-top-current.png`
-- `/Users/irainbow/Documents/DevelopmentSpace/myProject/platform-go/tmp/product-design/ui-optimization-audit-20260710/07-dashboard-mobile-current.png`
+- `./tmp/product-design/ui-optimization-audit-20260710/01-login-current.png`
+- `./tmp/product-design/ui-optimization-audit-20260710/02-dashboard-desktop-current.png`
+- `./tmp/product-design/ui-optimization-audit-20260710/04-menus-desktop-current.png`
+- `./tmp/product-design/ui-optimization-audit-20260710/06-menus-mobile-top-current.png`
+- `./tmp/product-design/ui-optimization-audit-20260710/07-dashboard-mobile-current.png`
 
 Viewport and geometry evidence:
 
