@@ -90,7 +90,7 @@ func (s *Server) appPhoneCreateVerification(ctx *gin.Context) {
 	now := s.now().UTC()
 	expiresAt := now.Add(appPhoneVerificationTTL)
 	maskedPhone := maskAppPhone(phone)
-	verificationCode, err := newAppPhoneDebugCode()
+	verificationCode, err := s.appPhoneCodeGenerator()
 	if err != nil {
 		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneCodeGenerationFailed, err)
 		return

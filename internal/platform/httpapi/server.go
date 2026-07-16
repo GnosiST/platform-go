@@ -77,6 +77,7 @@ type ServerOptions struct {
 	AdminMenuResolver        AdminMenuResolver
 	AdminMenuComparisonSink  AdminMenuComparisonSink
 	tokenService             authTokenService
+	appPhoneCodeGenerator    func() (string, error)
 }
 
 type authTokenService interface {
@@ -136,6 +137,7 @@ type Server struct {
 	appIdentityBindings      AppIdentityBindingStore
 	phoneProtector           PhoneProtector
 	phoneVerificationSender  PhoneVerificationSender
+	appPhoneCodeGenerator    func() (string, error)
 	adminStepUpPhoneResolver AdminStepUpPhoneResolver
 	sensitiveReveal          *sensitivereveal.Runtime
 	serviceObjects           *serviceobject.Runtime
@@ -227,6 +229,10 @@ func New(options ServerOptions) *Server {
 	if now == nil {
 		now = time.Now
 	}
+	appPhoneCodeGenerator := options.appPhoneCodeGenerator
+	if appPhoneCodeGenerator == nil {
+		appPhoneCodeGenerator = newAppPhoneDebugCode
+	}
 	fileCleanupSink := options.FileCleanupSink
 	if fileCleanupSink == nil {
 		fileCleanupSink = resourceFileCleanupSink{resources: resources}
@@ -266,6 +272,7 @@ func New(options ServerOptions) *Server {
 		appIdentityBindings:      appIdentityBindings,
 		phoneProtector:           options.PhoneProtector,
 		phoneVerificationSender:  options.PhoneVerificationSender,
+		appPhoneCodeGenerator:    appPhoneCodeGenerator,
 		adminStepUpPhoneResolver: options.AdminStepUpPhoneResolver,
 		sensitiveReveal:          options.SensitiveReveal,
 		debugCodeEnabled:         options.DebugCodeEnabled,
