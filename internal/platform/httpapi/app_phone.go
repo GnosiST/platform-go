@@ -220,7 +220,7 @@ func (s *Server) appPhoneCreateBinding(ctx *gin.Context) {
 		return
 	}
 	actorID := appUserID(username)
-	if err := s.recordAudit("app.phone.bind", actorID, actorID, "success", "phone-bound"); err != nil {
+	if err := s.recordAudit(ctx, "app.phone.bind", actorID, actorID, "success", "phone-bound"); err != nil {
 		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppPhoneAuditFailed, err)
 		return
 	}

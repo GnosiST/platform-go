@@ -312,9 +312,9 @@ Audit candidates: -
 
 ### Schema
 
-- Field count: 11
-- Search: `action`, `actor`, `eventId`, `outcome`, `provider`, `reasonCode`, `resource`
-- Filter: `action`, `actor`, `createdAt`, `eventId`, `outcome`, `provider`, `reasonCode`, `resource`, `targetId`
+- Field count: 13
+- Search: `action`, `actor`, `eventId`, `outcome`, `provider`, `reasonCode`, `requestId`, `resource`, `traceId`
+- Filter: `action`, `actor`, `createdAt`, `eventId`, `outcome`, `provider`, `reasonCode`, `requestId`, `resource`, `targetId`, `traceId`
 - Sort: `action`, `actor`, `createdAt`, `outcome`, `provider`, `reasonCode`, `resource`
 - Table: `actor`, `action`, `resource`, `provider`, `outcome`, `reasonCode`, `createdAt`
 - Form: -

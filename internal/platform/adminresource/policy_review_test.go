@@ -1,10 +1,12 @@
 package adminresource
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"platform-go/internal/platform/core"
+	"platform-go/internal/platform/kernel"
 )
 
 func TestApprovePolicyReviewAppliesRolePermissionChangeAndRecordsAudit(t *testing.T) {
@@ -178,6 +180,65 @@ func TestExportPolicyReviewsAddsWatermarkProvenanceAndBooleanAuditValue(t *testi
 	for _, key := range []string{"watermark", "product", "exportedBy", "exportedAt"} {
 		if value := audit.Values[key]; value != "" {
 			t.Fatalf("export audit %s = %q, want no free-form watermark metadata", key, value)
+		}
+	}
+}
+
+func TestPolicyReviewAuditsUseExactRequestCorrelation(t *testing.T) {
+	want := kernel.Correlation{
+		RequestID: "req_0123456789abcdef0123456789abcdef",
+		TraceID:   "4bf92f3577b34da6a3ce929d0e0e4736",
+	}
+	ctx := kernel.WithCorrelation(context.Background(), want)
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	requestReview, err := store.Create("policy-reviews", WriteInput{
+		Code: "PR-CORRELATION-REQUEST", Name: "Request correlation", Status: "enabled",
+		Values: map[string]string{"policyType": "role_permission", "requestedAction": "update", "reviewStatus": "draft", "roleCode": "operator", "permissionCodes": "admin:user:read"},
+	})
+	if err != nil {
+		t.Fatalf("Create(request review) error = %v", err)
+	}
+	approveReview, err := store.Create("policy-reviews", WriteInput{
+		Code: "PR-CORRELATION-APPROVE", Name: "Approve correlation", Status: "enabled",
+		Values: map[string]string{"policyType": "role_permission", "requestedAction": "update", "reviewStatus": "pending", "roleCode": "operator", "permissionCodes": "admin:user:read"},
+	})
+	if err != nil {
+		t.Fatalf("Create(approve review) error = %v", err)
+	}
+
+	requested, err := store.RequestPolicyReviewContext(ctx, requestReview.ID, "ops", "user-ops")
+	if err != nil {
+		t.Fatalf("RequestPolicyReviewContext() error = %v", err)
+	}
+	rejected, err := store.RejectPolicyReviewContext(ctx, requestReview.ID, "admin", "user-admin", "too broad")
+	if err != nil {
+		t.Fatalf("RejectPolicyReviewContext() error = %v", err)
+	}
+	approved, err := store.ApprovePolicyReviewContext(ctx, approveReview.ID, "admin", "user-admin")
+	if err != nil {
+		t.Fatalf("ApprovePolicyReviewContext() error = %v", err)
+	}
+	exported, err := store.ExportPolicyReviewsContext(ctx, "auditor", "user-auditor", false)
+	if err != nil {
+		t.Fatalf("ExportPolicyReviewsContext() error = %v", err)
+	}
+	persistedAudits, err := store.List("audit-logs")
+	if err != nil {
+		t.Fatalf("List(audit-logs) error = %v", err)
+	}
+	exportedAudit := recordByAction(exported.Audits, "policy-review.export")
+	if exportedAudit == nil || exportedAudit.Values["requestId"] != "" || exportedAudit.Values["traceId"] != "" {
+		t.Fatalf("export projection audit = %+v, want correlation omitted", exportedAudit)
+	}
+
+	for action, audit := range map[string]*Record{
+		"policy-review.request": &requested.Audit,
+		"policy-review.reject":  &rejected.Audit,
+		"policy-review.approve": &approved.Audit,
+		"policy-review.export":  recordByAction(persistedAudits, "policy-review.export"),
+	} {
+		if audit == nil || audit.Values["requestId"] != want.RequestID || audit.Values["traceId"] != want.TraceID {
+			t.Fatalf("%s audit = %+v, want exact request correlation %+v", action, audit, want)
 		}
 	}
 }

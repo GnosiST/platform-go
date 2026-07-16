@@ -1210,12 +1210,12 @@ func TestStoreAuditLogsSchemaExposesStructuredReadOnlyFields(t *testing.T) {
 			t.Fatalf("audit-logs.%s = %+v, want searchable sortable table field", key, field)
 		}
 	}
-	for key, pattern := range map[string]string{
-		"requestId": `^req_[0-9a-f]{32}$`,
-		"traceId":   `^[0-9a-f]{32}$`,
+	for key, validation := range map[string]FieldValidation{
+		"requestId": {MinLength: 36, MaxLength: 36, Pattern: `^req_[0-9a-f]{32}$`},
+		"traceId":   {MinLength: 32, MaxLength: 32, Pattern: `^[0-9a-f]{32}$`},
 	} {
 		field := fieldByKey(schema.Fields, key)
-		if field == nil || !field.Searchable || !field.Filterable || field.Sensitivity != capability.FieldSensitivityInternal || field.StorageMode != capability.FieldStoragePlain || field.ResponseMode != capability.FieldProjectionFull || field.ExportMode != capability.FieldProjectionOmitted || field.Validation == nil || field.Validation.Pattern != pattern {
+		if field == nil || !field.Searchable || !field.Filterable || field.Sensitivity != capability.FieldSensitivityInternal || field.StorageMode != capability.FieldStoragePlain || field.ResponseMode != capability.FieldProjectionFull || field.ExportMode != capability.FieldProjectionOmitted || field.Validation == nil || *field.Validation != validation {
 			t.Fatalf("audit-logs.%s = %+v, want canonical internal correlation field", key, field)
 		}
 	}

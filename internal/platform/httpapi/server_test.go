@@ -1648,6 +1648,61 @@ func TestAuthAndFileContentAuditsUseStructuredRedactedFields(t *testing.T) {
 	}
 }
 
+func TestRequestOwnedGenericAuditProducersUseExactContextCorrelation(t *testing.T) {
+	want := kernel.Correlation{
+		RequestID: "req_0123456789abcdef0123456789abcdef",
+		TraceID:   "4bf92f3577b34da6a3ce929d0e0e4736",
+	}
+	server := newTestServer(ServerOptions{Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "menu", "audit", "api-resource", "parameter", "admin-shell", "system-admin"})})
+	request := httptest.NewRequest(http.MethodPost, "/audit-correlation-test", nil)
+	request = request.WithContext(kernel.WithCorrelation(request.Context(), want))
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = request
+
+	for _, action := range []string{"auth.login", "auth.refresh", "auth.logout", "app.auth.login", "app.auth.logout", "app.phone.bind"} {
+		if err := server.recordAudit(ctx, action, "user-admin", "user-admin", "success", "authenticated"); err != nil {
+			t.Fatalf("recordAudit(%s) error = %v", action, err)
+		}
+	}
+	if err := server.recordFileAuditForActor(ctx, "file.content", "user-admin", adminresource.Record{ID: "files-1"}); err != nil {
+		t.Fatalf("recordFileAuditForActor() error = %v", err)
+	}
+	tokenRecord, _, err := server.issueAdminAPIToken(request.Context(), "user-admin", adminresource.WriteInput{
+		Code: "correlated-token", Name: "Correlated token", Status: "active", Values: map[string]string{"scope": "admin:user:read"},
+	})
+	if err != nil {
+		t.Fatalf("issueAdminAPIToken() error = %v", err)
+	}
+	if _, err := server.updateAdminAPIToken(request.Context(), "user-admin", tokenRecord.ID, adminresource.WriteInput{
+		Name: "Updated correlated token", Status: "active", Values: map[string]string{"scope": "admin:user:read"},
+	}); err != nil {
+		t.Fatalf("updateAdminAPIToken() error = %v", err)
+	}
+	if err := server.revokeAdminAPIToken(request.Context(), "user-admin", tokenRecord.ID); err != nil {
+		t.Fatalf("revokeAdminAPIToken() error = %v", err)
+	}
+
+	audits, err := server.resources.List("audit-logs")
+	if err != nil {
+		t.Fatalf("List(audit-logs) error = %v", err)
+	}
+	for _, action := range []string{
+		"auth.login", "auth.refresh", "auth.logout", "app.auth.login", "app.auth.logout", "app.phone.bind",
+		"file.content", "api_token.create", "api_token.update", "api_token.revoke",
+	} {
+		var audit *adminresource.Record
+		for index := range audits {
+			if audits[index].Values["action"] == action {
+				audit = &audits[index]
+				break
+			}
+		}
+		if audit == nil || audit.Values["requestId"] != want.RequestID || audit.Values["traceId"] != want.TraceID {
+			t.Fatalf("%s audit = %+v, want exact request correlation %+v", action, audit, want)
+		}
+	}
+}
+
 func TestRuntimeInternalErrorsUseRegistryCategoryAndCorrelationID(t *testing.T) {
 	const marker = "request-email@example.test/private/object"
 	fileStore := &recordingObjectStore{saveErr: errors.New("raw-storage-secret")}
@@ -6216,6 +6271,26 @@ func TestAppFileUploadAndContentUseAppSession(t *testing.T) {
 	}
 	if contentRecorder.Body.String() != "hello app file" {
 		t.Fatalf("app file content = %q", contentRecorder.Body.String())
+	}
+	audits, err := server.resources.List("audit-logs")
+	if err != nil {
+		t.Fatalf("List(audit-logs) error = %v", err)
+	}
+	for action, recorder := range map[string]*httptest.ResponseRecorder{"file.upload": uploadRecorder, "file.content": contentRecorder} {
+		traceParts := strings.Split(recorder.Header().Get("traceparent"), "-")
+		if len(traceParts) != 4 {
+			t.Fatalf("%s traceparent = %q, want canonical header", action, recorder.Header().Get("traceparent"))
+		}
+		var audit *adminresource.Record
+		for index := range audits {
+			if audits[index].Values["action"] == action && audits[index].Values["targetId"] == record.ID {
+				audit = &audits[index]
+				break
+			}
+		}
+		if audit == nil || audit.Values["requestId"] != recorder.Header().Get("X-Request-ID") || audit.Values["traceId"] != traceParts[1] {
+			t.Fatalf("%s audit = %+v, want exact response correlation", action, audit)
+		}
 	}
 
 	otherLogin := appLoginForTest(t, server, "other")

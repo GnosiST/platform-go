@@ -2612,8 +2612,10 @@
                   "outcome",
                   "provider",
                   "reasonCode",
+                  "requestId",
                   "resource",
-                  "targetId"
+                  "targetId",
+                  "traceId"
                 ],
                 "x-platform-search-fields": [
                   "action",
@@ -2622,7 +2624,9 @@
                   "outcome",
                   "provider",
                   "reasonCode",
-                  "resource"
+                  "requestId",
+                  "resource",
+                  "traceId"
                 ],
                 "x-platform-filter-fields": [
                   "action",
@@ -2632,8 +2636,10 @@
                   "outcome",
                   "provider",
                   "reasonCode",
+                  "requestId",
                   "resource",
-                  "targetId"
+                  "targetId",
+                  "traceId"
                 ],
                 "x-platform-sort-fields": [
                   "action",
@@ -15304,6 +15310,24 @@
             "x-platform-export-mode": "full",
             "type": "string"
           },
+          "legacyTraceId": {
+            "description": "en: Legacy Trace ID; zh: 旧链路 ID",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "旧链路 ID",
+              "en": "Legacy Trace ID"
+            },
+            "x-platform-searchable": false,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "internal",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "omitted",
+            "x-platform-export-mode": "omitted",
+            "type": "string"
+          },
           "outcome": {
             "description": "en: Outcome; zh: 结果",
             "x-platform-field-type": "text",
@@ -15357,6 +15381,27 @@
             "x-platform-response-mode": "full",
             "x-platform-export-mode": "full",
             "type": "string"
+          },
+          "requestId": {
+            "description": "en: Request ID; zh: 请求 ID",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "请求 ID",
+              "en": "Request ID"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": true,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "internal",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "omitted",
+            "type": "string",
+            "minLength": 36,
+            "maxLength": 36,
+            "pattern": "^req_[0-9a-f]{32}$"
           },
           "resource": {
             "description": "en: Resource; zh: 资源",
@@ -15420,15 +15465,18 @@
               "zh": "链路 ID",
               "en": "Trace ID"
             },
-            "x-platform-searchable": false,
-            "x-platform-filterable": false,
+            "x-platform-searchable": true,
+            "x-platform-filterable": true,
             "x-platform-sortable": false,
             "x-platform-localizable": false,
             "x-platform-sensitivity": "internal",
             "x-platform-storage-mode": "plain",
-            "x-platform-response-mode": "omitted",
+            "x-platform-response-mode": "full",
             "x-platform-export-mode": "omitted",
-            "type": "string"
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 32,
+            "pattern": "^[0-9a-f]{32}$"
           }
         },
         "x-platform-resource": "auditLogs",

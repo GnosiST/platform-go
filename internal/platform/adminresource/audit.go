@@ -54,6 +54,14 @@ type MutationResult struct {
 	Audit  Record
 }
 
+func auditEventWithContext(ctx context.Context, event AuditEvent) AuditEvent {
+	if correlation, ok := kernel.CorrelationFromContext(ctx); ok {
+		event.RequestID = correlation.RequestID
+		event.TraceID = correlation.TraceID
+	}
+	return event
+}
+
 func (s *Store) RecordAudit(event AuditEvent) (Record, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

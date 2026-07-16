@@ -158,6 +158,15 @@ function fieldSchema(field) {
   if (field.type === "color") {
     schema.pattern = "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$";
   }
+  if (Number.isInteger(field.validation?.minLength)) {
+    schema.minLength = field.validation.minLength;
+  }
+  if (Number.isInteger(field.validation?.maxLength)) {
+    schema.maxLength = field.validation.maxLength;
+  }
+  if (typeof field.validation?.pattern === "string" && field.validation.pattern) {
+    schema.pattern = field.validation.pattern;
+  }
   if ((field.type === "select" || field.type === "text") && Array.isArray(field.options)) {
     schema.enum = field.options.map((option) => (typeof option === "string" ? option : option.value)).filter(Boolean);
   }

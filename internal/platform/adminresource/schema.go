@@ -824,9 +824,9 @@ func auditLogResourceSchema() Schema {
 	legacyTargetCode := secureFieldDefinition(auditLogField("targetCode", text("目标编码", "Target Code"), "text", false, false, 180), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted)
 	legacyTraceID := secureFieldDefinition(auditLogField("legacyTraceId", text("旧链路 ID", "Legacy Trace ID"), "text", false, false, 180), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted)
 	requestID := secureFieldDefinition(auditLogField("requestId", text("请求 ID", "Request ID"), "text", true, false, 300), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionFull, capability.FieldProjectionOmitted)
-	requestID.Validation = &FieldValidation{Pattern: `^req_[0-9a-f]{32}$`}
+	requestID.Validation = &FieldValidation{MinLength: 36, MaxLength: 36, Pattern: `^req_[0-9a-f]{32}$`}
 	traceID := secureFieldDefinition(auditLogField("traceId", text("链路 ID", "Trace ID"), "text", true, false, 280), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionFull, capability.FieldProjectionOmitted)
-	traceID.Validation = &FieldValidation{Pattern: `^[0-9a-f]{32}$`}
+	traceID.Validation = &FieldValidation{MinLength: 32, MaxLength: 32, Pattern: `^[0-9a-f]{32}$`}
 	fields := withStandardRecordFields([]FieldDefinition{
 		auditLogField("actor", text("操作人", "Actor"), "text", true, true, 140),
 		auditLogField("action", text("动作", "Action"), "text", true, true, 180),

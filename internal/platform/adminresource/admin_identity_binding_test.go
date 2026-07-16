@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"platform-go/internal/platform/core"
+	"platform-go/internal/platform/kernel"
 )
 
 func TestProvisionAdminIdentityBindingReturnsStableRecordIdentity(t *testing.T) {
@@ -60,7 +61,11 @@ func TestEnsureAdminIdentityBindingAuditIsIdempotentAcrossStoreWrappers(t *testi
 		Outcome:         AdminIdentityBindingAuditOutcomeBound,
 		Now:             now,
 	}
-	if _, err := firstStore.EnsureAdminIdentityBindingAudit(context.Background(), input); err != nil {
+	want := kernel.Correlation{
+		RequestID: "req_0123456789abcdef0123456789abcdef",
+		TraceID:   "4bf92f3577b34da6a3ce929d0e0e4736",
+	}
+	if _, err := firstStore.EnsureAdminIdentityBindingAudit(kernel.WithCorrelation(context.Background(), want), input); err != nil {
 		t.Fatalf("EnsureAdminIdentityBindingAudit(first) error = %v", err)
 	}
 
@@ -84,6 +89,9 @@ func TestEnsureAdminIdentityBindingAuditIsIdempotentAcrossStoreWrappers(t *testi
 	assertIdentityAuditRedacted(t, matching[0], input)
 	if matching[0].Values["actor"] != "user-admin" {
 		t.Fatalf("bound audit actor = %q, want stable user ID", matching[0].Values["actor"])
+	}
+	if matching[0].Values["requestId"] != want.RequestID || matching[0].Values["traceId"] != want.TraceID {
+		t.Fatalf("bound audit correlation = %+v, want exact request correlation %+v", matching[0].Values, want)
 	}
 }
 

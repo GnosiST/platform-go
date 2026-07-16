@@ -325,6 +325,38 @@ describe("admin resource contract generators", () => {
     );
   });
 
+  it("projects canonical audit correlation validation and export policy deterministically", () => {
+    const contract = runAdminResourceContract();
+    const first = runAdminOpenAPIForContract(contract);
+    const second = runAdminOpenAPIForContract(contract);
+	delete first["x-source"];
+	delete second["x-source"];
+    assert.deepEqual(first, second);
+
+    const audit = contract.resources.find((resource) => resource.name === "auditLogs");
+    assert.ok(audit, "expected auditLogs resource");
+    const fields = new Map(audit.schema.fields.map((field) => [field.key, field]));
+    assert.equal(fields.get("legacyTraceId")?.responseMode, "omitted");
+    assert.equal(fields.get("legacyTraceId")?.exportMode, "omitted");
+    for (const [key, length, pattern] of [
+      ["requestId", 36, "^req_[0-9a-f]{32}$"],
+      ["traceId", 32, "^[0-9a-f]{32}$"],
+    ]) {
+      const field = fields.get(key);
+      assert.equal(field?.readOnly, true);
+      assert.equal(field?.sensitivity, "internal");
+      assert.equal(field?.responseMode, "full");
+      assert.equal(field?.exportMode, "omitted");
+      assert.equal(field?.search, true);
+      assert.equal(field?.filter, true);
+      assert.deepEqual(field?.validation, { minLength: length, maxLength: length, pattern });
+      const schema = first.components.schemas.AuditLogsRecord.properties[key];
+      assert.equal(schema.minLength, length);
+      assert.equal(schema.maxLength, length);
+      assert.equal(schema.pattern, pattern);
+    }
+  });
+
   it("rejects unknown and cross-plane explicit Admin OpenAPI error codes", () => {
     const contract = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, "..", "resources", "generated", "admin-resource-contract.json"), "utf8"));
     const openapi = runAdminOpenAPIForContract(contract);

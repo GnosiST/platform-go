@@ -2659,10 +2659,10 @@
             "readOnly": true
           },
           {
-            "key": "traceId",
+            "key": "legacyTraceId",
             "label": {
-              "zh": "链路 ID",
-              "en": "Trace ID"
+              "zh": "旧链路 ID",
+              "en": "Legacy Trace ID"
             },
             "type": "text",
             "readOnly": true,
@@ -2670,6 +2670,48 @@
             "storageMode": "plain",
             "responseMode": "omitted",
             "exportMode": "omitted"
+          },
+          {
+            "key": "requestId",
+            "label": {
+              "zh": "请求 ID",
+              "en": "Request ID"
+            },
+            "type": "text",
+            "search": true,
+            "filter": true,
+            "detail": true,
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "omitted",
+            "validation": {
+              "minLength": 36,
+              "maxLength": 36,
+              "pattern": "^req_[0-9a-f]{32}$"
+            }
+          },
+          {
+            "key": "traceId",
+            "label": {
+              "zh": "链路 ID",
+              "en": "Trace ID"
+            },
+            "type": "text",
+            "search": true,
+            "filter": true,
+            "detail": true,
+            "readOnly": true,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "omitted",
+            "validation": {
+              "minLength": 32,
+              "maxLength": 32,
+              "pattern": "^[0-9a-f]{32}$"
+            }
           }
         ],
         "search": [
@@ -2679,7 +2721,9 @@
           "provider",
           "outcome",
           "eventId",
-          "reasonCode"
+          "reasonCode",
+          "requestId",
+          "traceId"
         ],
         "table": [
           "actor",

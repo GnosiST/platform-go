@@ -235,11 +235,11 @@ func (s *Store) EnsureAdminIdentityBindingAudit(ctx context.Context, input Admin
 		if !auditResourceAvailable {
 			return Record{}, ErrUnknownResource
 		}
-		event := AuditEvent{
+		event := auditEventWithContext(ctx, AuditEvent{
 			Actor: actorID, Action: "admin_identity.bind", Resource: adminIdentitiesResource,
 			TargetID: input.BindingRecordID, Result: input.Outcome,
 			EventID: adminIdentityAuditEventID(input.BindingRecordID, input.Outcome), ReasonCode: "identity-binding-" + input.Outcome,
-		}
+		})
 		if existing, ok, err := matchingAdminIdentityAudit(audits, event); err != nil {
 			return Record{}, err
 		} else if ok {

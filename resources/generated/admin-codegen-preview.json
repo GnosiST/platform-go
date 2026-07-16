@@ -1699,7 +1699,7 @@
         "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
       },
       "schema": {
-        "fieldCount": 11,
+        "fieldCount": 13,
         "search": [
           "action",
           "actor",
@@ -1707,7 +1707,9 @@
           "outcome",
           "provider",
           "reasonCode",
-          "resource"
+          "requestId",
+          "resource",
+          "traceId"
         ],
         "filter": [
           "action",
@@ -1717,8 +1719,10 @@
           "outcome",
           "provider",
           "reasonCode",
+          "requestId",
           "resource",
-          "targetId"
+          "targetId",
+          "traceId"
         ],
         "sort": [
           "action",

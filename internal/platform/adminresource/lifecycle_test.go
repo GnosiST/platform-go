@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"platform-go/internal/platform/capability"
+	"platform-go/internal/platform/kernel"
 	"platform-go/internal/platform/rbac"
 )
 
@@ -44,6 +45,9 @@ func TestSoftDeleteHidesRecordsUntilRestore(t *testing.T) {
 	}
 	if result.Record.DeletionPolicyVersion != 3 || result.Record.PurgeAfter != now.Add(7*24*time.Hour).Format(time.RFC3339) {
 		t.Fatalf("deleted retention = %+v", result.Record)
+	}
+	if !kernel.ValidCorrelation(kernel.Correlation{RequestID: result.Audit.Values["requestId"], TraceID: result.Audit.Values["traceId"]}) {
+		t.Fatalf("background lifecycle audit correlation = %+v, want generated opaque pair", result.Audit.Values)
 	}
 	if items, _ := store.List("lifecycle-records"); len(items) != 0 {
 		t.Fatalf("List() returned soft-deleted records: %+v", items)

@@ -861,7 +861,7 @@ func (s *Server) issueAdminLogin(ctx *gin.Context, principal rbac.Principal, pro
 		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthTokenSignFailed, err)
 		return
 	}
-	if err := s.recordAudit("auth.login", principal.User.ID, principal.User.ID, "success", "authenticated"); err != nil {
+	if err := s.recordAudit(ctx, "auth.login", principal.User.ID, principal.User.ID, "success", "authenticated"); err != nil {
 		if cleanupErr := s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token); cleanupErr != nil {
 			writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthSessionCleanupFailed, cleanupErr)
 			return
@@ -904,7 +904,7 @@ func (s *Server) authRefresh(ctx *gin.Context) {
 		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
-	if err := s.recordAudit("auth.refresh", principal.User.ID, principal.User.ID, "allowed", "renewal-approved"); err != nil {
+	if err := s.recordAudit(ctx, "auth.refresh", principal.User.ID, principal.User.ID, "allowed", "renewal-approved"); err != nil {
 		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthAuditFailed, err)
 		return
 	}
@@ -953,7 +953,7 @@ func (s *Server) authLogout(ctx *gin.Context) {
 		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
 		return
 	}
-	if err := s.recordAudit("auth.logout", principal.User.ID, principal.User.ID, "allowed", "revocation-approved"); err != nil {
+	if err := s.recordAudit(ctx, "auth.logout", principal.User.ID, principal.User.ID, "allowed", "revocation-approved"); err != nil {
 		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthAuditFailed, err)
 		return
 	}
@@ -1009,7 +1009,7 @@ func (s *Server) appAuthLogin(ctx *gin.Context) {
 		return
 	}
 	actorID := appUserID(username)
-	if err := s.recordAudit("app.auth.login", actorID, actorID, "success", "authenticated"); err != nil {
+	if err := s.recordAudit(ctx, "app.auth.login", actorID, actorID, "success", "authenticated"); err != nil {
 		if cleanupErr := s.cleanupIssuedAdminSession(ctx.Request.Context(), issued.Token); cleanupErr != nil {
 			writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppAuthSessionCleanupFailed, cleanupErr)
 			return
@@ -1106,7 +1106,7 @@ func (s *Server) appAuthLogout(ctx *gin.Context) {
 		return
 	}
 	actorID := appUserID(appSession.Username)
-	if err := s.recordAudit("app.auth.logout", actorID, actorID, "allowed", "revocation-approved"); err != nil {
+	if err := s.recordAudit(ctx, "app.auth.logout", actorID, actorID, "allowed", "revocation-approved"); err != nil {
 		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppAuthAuditFailed, err)
 		return
 	}
@@ -1317,7 +1317,7 @@ func (s *Server) adminPolicyReviewApprove(ctx *gin.Context) {
 		writePlatformError(ctx, errorcode.CodeAdminForbidden)
 		return
 	}
-	result, err := s.resources.ApprovePolicyReview(ctx.Param("id"), userCode, s.auditActorID(ctx))
+	result, err := s.resources.ApprovePolicyReviewContext(ctx.Request.Context(), ctx.Param("id"), userCode, s.auditActorID(ctx))
 	if err != nil {
 		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
@@ -1358,7 +1358,7 @@ func (s *Server) adminPolicyReviewRequest(ctx *gin.Context) {
 		writePlatformError(ctx, errorcode.CodeAdminForbidden)
 		return
 	}
-	result, err := s.resources.RequestPolicyReview(ctx.Param("id"), userCode, s.auditActorID(ctx))
+	result, err := s.resources.RequestPolicyReviewContext(ctx.Request.Context(), ctx.Param("id"), userCode, s.auditActorID(ctx))
 	if err != nil {
 		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
@@ -1398,7 +1398,7 @@ func (s *Server) adminPolicyReviewReject(ctx *gin.Context) {
 		writePlatformError(ctx, errorcode.CodeAdminForbidden)
 		return
 	}
-	result, err := s.resources.RejectPolicyReview(ctx.Param("id"), userCode, s.auditActorID(ctx), input.Reason)
+	result, err := s.resources.RejectPolicyReviewContext(ctx.Request.Context(), ctx.Param("id"), userCode, s.auditActorID(ctx), input.Reason)
 	if err != nil {
 		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
@@ -1446,7 +1446,7 @@ func (s *Server) adminPolicyReviewExport(ctx *gin.Context) {
 		}
 		watermarkApplied = values[0] == "true"
 	}
-	result, err := s.resources.ExportPolicyReviews(userCode, s.auditActorID(ctx), watermarkApplied)
+	result, err := s.resources.ExportPolicyReviewsContext(ctx.Request.Context(), userCode, s.auditActorID(ctx), watermarkApplied)
 	if err != nil {
 		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
@@ -1695,7 +1695,7 @@ func (s *Server) appFileUpload(ctx *gin.Context) {
 			"ownerId":       appUserID(username),
 			"createdAt":     s.now().UTC().Format(time.RFC3339),
 		},
-	}, adminresource.AuditEvent{Actor: appUserID(username), Action: "file.upload", Resource: "files", Result: "success", ReasonCode: "uploaded"})
+	}, requestAuditEvent(ctx.Request.Context(), adminresource.AuditEvent{Actor: appUserID(username), Action: "file.upload", Resource: "files", Result: "success", ReasonCode: "uploaded"}))
 	if err != nil {
 		if rollbackErr := s.fileStorage.Delete(ctx.Request.Context(), metadata.Key); rollbackErr != nil {
 			s.recordFileCleanup(ctx, metadata.Key)
@@ -1756,7 +1756,7 @@ func (s *Server) appFileContent(ctx *gin.Context) {
 		return
 	}
 	defer body.Close()
-	if err := s.recordFileAuditForActor("file.content", appUserID(username), record); err != nil {
+	if err := s.recordFileAuditForActor(ctx, "file.content", appUserID(username), record); err != nil {
 		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAppFileMetadataFailed, err)
 		return
 	}
@@ -1850,9 +1850,9 @@ func (s *Server) issueAdminAPIToken(ctx context.Context, actor string, input adm
 		input.Code = prefix
 	}
 	input.Values = values
-	mutation, err := s.resources.CreateInternalWithAudit(apiTokensResource, input, adminresource.AuditEvent{
+	mutation, err := s.resources.CreateInternalWithAudit(apiTokensResource, input, requestAuditEvent(ctx, adminresource.AuditEvent{
 		Actor: actor, Action: "api_token.create", Resource: apiTokensResource, Result: "success", ReasonCode: "issued",
-	})
+	}))
 	if err != nil {
 		return adminresource.Record{}, "", err
 	}
@@ -1872,7 +1872,7 @@ func (s *Server) revokeAdminAPIToken(ctx context.Context, actor string, id strin
 		Status:      "revoked",
 		Description: record.Description,
 		Values:      values,
-	}, adminresource.AuditEvent{Actor: actor, Action: "api_token.revoke", Resource: apiTokensResource, Result: "success", ReasonCode: "revoked"})
+	}, requestAuditEvent(ctx, adminresource.AuditEvent{Actor: actor, Action: "api_token.revoke", Resource: apiTokensResource, Result: "success", ReasonCode: "revoked"}))
 	if err != nil {
 		return err
 	}
@@ -1924,9 +1924,9 @@ func (s *Server) updateAdminAPIToken(ctx context.Context, actor string, id strin
 	}
 	input.Status = status
 	input.Values = values
-	mutation, err := s.resources.UpdateInternalWithAudit(apiTokensResource, id, input, adminresource.AuditEvent{
+	mutation, err := s.resources.UpdateInternalWithAudit(apiTokensResource, id, input, requestAuditEvent(ctx, adminresource.AuditEvent{
 		Actor: actor, Action: "api_token.update", Resource: apiTokensResource, Result: "success", ReasonCode: "updated",
-	})
+	}))
 	if err != nil {
 		return adminresource.Record{}, err
 	}
@@ -2245,19 +2245,19 @@ func (s *Server) authProviderAvailable(provider capability.AuthProvider) bool {
 	return !(s.disableDemoAuthProvider && provider.Kind == "demo")
 }
 
-func (s *Server) recordAudit(action string, actorID string, targetID string, outcome string, reasonCode string) error {
-	_, err := s.resources.RecordAudit(adminresource.AuditEvent{
+func (s *Server) recordAudit(ctx *gin.Context, action string, actorID string, targetID string, outcome string, reasonCode string) error {
+	_, err := s.resources.RecordAudit(requestAuditEvent(ctx.Request.Context(), adminresource.AuditEvent{
 		Actor: actorID, Action: action, Resource: "auth", TargetID: targetID,
 		Result: outcome, ReasonCode: reasonCode,
-	})
+	}))
 	return err
 }
 
 func (s *Server) recordFileAudit(ctx *gin.Context, action string, record adminresource.Record) error {
-	return s.recordFileAuditForActor(action, s.auditActorID(ctx), record)
+	return s.recordFileAuditForActor(ctx, action, s.auditActorID(ctx), record)
 }
 
-func (s *Server) recordFileAuditForActor(action string, actor string, record adminresource.Record) error {
+func (s *Server) recordFileAuditForActor(ctx *gin.Context, action string, actor string, record adminresource.Record) error {
 	if action == "" {
 		return nil
 	}
@@ -2265,11 +2265,19 @@ func (s *Server) recordFileAuditForActor(action string, actor string, record adm
 	if actor == "" {
 		actor = systemActorID
 	}
-	_, err := s.resources.RecordAudit(adminresource.AuditEvent{
+	_, err := s.resources.RecordAudit(requestAuditEvent(ctx.Request.Context(), adminresource.AuditEvent{
 		Actor: actor, Action: action, Resource: "files", TargetID: record.ID,
 		Result: "success", ReasonCode: "content-authorized",
-	})
+	}))
 	return err
+}
+
+func requestAuditEvent(ctx context.Context, event adminresource.AuditEvent) adminresource.AuditEvent {
+	if correlation, ok := kernel.CorrelationFromContext(ctx); ok {
+		event.RequestID = correlation.RequestID
+		event.TraceID = correlation.TraceID
+	}
+	return event
 }
 
 func (s *Server) currentPrincipal(ctx *gin.Context) (rbac.Principal, bool) {

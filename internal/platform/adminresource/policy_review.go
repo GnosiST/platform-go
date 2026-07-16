@@ -1,6 +1,7 @@
 package adminresource
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
@@ -32,7 +33,11 @@ type PolicyReviewExportWatermark struct {
 }
 
 func (s *Store) RequestPolicyReview(reviewID string, requesterCode string, auditActorID string) (PolicyReviewActionResult, error) {
-	return s.transitionPolicyReview(reviewID, policyReviewTransition{
+	return s.RequestPolicyReviewContext(context.Background(), reviewID, requesterCode, auditActorID)
+}
+
+func (s *Store) RequestPolicyReviewContext(ctx context.Context, reviewID string, requesterCode string, auditActorID string) (PolicyReviewActionResult, error) {
+	return s.transitionPolicyReview(ctx, reviewID, policyReviewTransition{
 		actorCode:    requesterCode,
 		auditActorID: auditActorID,
 		fromStatus:   "draft",
@@ -48,6 +53,10 @@ func (s *Store) RequestPolicyReview(reviewID string, requesterCode string, audit
 }
 
 func (s *Store) ApprovePolicyReview(reviewID string, reviewerCode string, auditActorID string) (PolicyReviewResult, error) {
+	return s.ApprovePolicyReviewContext(context.Background(), reviewID, reviewerCode, auditActorID)
+}
+
+func (s *Store) ApprovePolicyReviewContext(ctx context.Context, reviewID string, reviewerCode string, auditActorID string) (PolicyReviewResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	previous, err := s.prepareMutationLocked()
@@ -112,10 +121,10 @@ func (s *Store) ApprovePolicyReview(reviewID string, reviewerCode string, auditA
 	reviews[reviewIndex] = updatedReview
 	s.resources["policy-reviews"] = reviews
 
-	audit, err := s.auditRecordLocked(AuditEvent{
+	audit, err := s.auditRecordLocked(auditEventWithContext(ctx, AuditEvent{
 		Actor: strings.TrimSpace(auditActorID), Action: "policy-review.approve", Resource: "roles",
 		TargetID: role.ID, Result: "success", ReasonCode: "approved",
-	}, s.nextID+1)
+	}), s.nextID+1)
 	if err != nil {
 		s.restoreSnapshotLocked(previous)
 		return PolicyReviewResult{}, err
@@ -133,11 +142,15 @@ func (s *Store) ApprovePolicyReview(reviewID string, reviewerCode string, auditA
 }
 
 func (s *Store) RejectPolicyReview(reviewID string, reviewerCode string, auditActorID string, reason string) (PolicyReviewActionResult, error) {
+	return s.RejectPolicyReviewContext(context.Background(), reviewID, reviewerCode, auditActorID, reason)
+}
+
+func (s *Store) RejectPolicyReviewContext(ctx context.Context, reviewID string, reviewerCode string, auditActorID string, reason string) (PolicyReviewActionResult, error) {
 	reason = strings.TrimSpace(reason)
 	if reason == "" {
 		return PolicyReviewActionResult{}, ValidationError{Field: "reason"}
 	}
-	return s.transitionPolicyReview(reviewID, policyReviewTransition{
+	return s.transitionPolicyReview(ctx, reviewID, policyReviewTransition{
 		actorCode:    reviewerCode,
 		auditActorID: auditActorID,
 		fromStatus:   "pending",
@@ -154,6 +167,10 @@ func (s *Store) RejectPolicyReview(reviewID string, reviewerCode string, auditAc
 }
 
 func (s *Store) ExportPolicyReviews(actorCode string, auditActorID string, watermarkApplied bool) (PolicyReviewExport, error) {
+	return s.ExportPolicyReviewsContext(context.Background(), actorCode, auditActorID, watermarkApplied)
+}
+
+func (s *Store) ExportPolicyReviewsContext(ctx context.Context, actorCode string, auditActorID string, watermarkApplied bool) (PolicyReviewExport, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	previous, err := s.prepareMutationLocked()
@@ -187,10 +204,10 @@ func (s *Store) ExportPolicyReviews(actorCode string, auditActorID string, water
 		projectedAudits = append(projectedAudits, projected)
 	}
 	now := s.now().UTC().Format("2006-01-02T15:04:05Z07:00")
-	audit, err := s.auditRecordLocked(AuditEvent{
+	audit, err := s.auditRecordLocked(auditEventWithContext(ctx, AuditEvent{
 		Actor: strings.TrimSpace(auditActorID), Action: "policy-review.export", Resource: "policy-reviews",
 		TargetID: "policy-reviews", Result: "success", ReasonCode: fmt.Sprintf("watermarkApplied=%t", watermarkApplied),
-	}, s.nextID+1)
+	}), s.nextID+1)
 	if err != nil {
 		return PolicyReviewExport{}, err
 	}
@@ -230,7 +247,7 @@ type policyReviewTransition struct {
 	apply        func(review *Record, actorCode string, now string)
 }
 
-func (s *Store) transitionPolicyReview(reviewID string, transition policyReviewTransition) (PolicyReviewActionResult, error) {
+func (s *Store) transitionPolicyReview(ctx context.Context, reviewID string, transition policyReviewTransition) (PolicyReviewActionResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	previous, err := s.prepareMutationLocked()
@@ -268,10 +285,10 @@ func (s *Store) transitionPolicyReview(reviewID string, transition policyReviewT
 	reviews[reviewIndex] = updatedReview
 	s.resources["policy-reviews"] = reviews
 
-	audit, err := s.auditRecordLocked(AuditEvent{
+	audit, err := s.auditRecordLocked(auditEventWithContext(ctx, AuditEvent{
 		Actor: strings.TrimSpace(transition.auditActorID), Action: transition.auditAction, Resource: "policy-reviews",
 		TargetID: review.ID, Result: "success", ReasonCode: transition.auditSuffix,
-	}, s.nextID+1)
+	}), s.nextID+1)
 	if err != nil {
 		s.restoreSnapshotLocked(previous)
 		return PolicyReviewActionResult{}, err
