@@ -194,7 +194,7 @@
       "classification": "extension",
       "extensionArea": "personnel-and-positions",
       "expectedCapability": "personnel",
-      "sourceSets": ["architecture-docs"],
+      "sourceSets": ["backend-models", "architecture-docs"],
       "evidenceSignals": ["role_profiles", "org_units"],
       "decision": "map-to-optional-personnel-profile"
     },

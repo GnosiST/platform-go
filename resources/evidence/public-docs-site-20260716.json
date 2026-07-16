@@ -1,0 +1,23 @@
+{
+  "$schema": "https://platform-go.local/schemas/public-docs-site-evidence.json",
+  "taskId": "public-docs-site",
+  "capturedAt": "2026-07-16",
+  "status": "verified",
+  "site": "website",
+  "defaultLocale": "zh-Hans",
+  "locales": ["zh-Hans", "en"],
+  "build": "npm --prefix website run build",
+  "seo": ["description", "og:type", "og:title", "og:description", "twitter:card", "sitemap"],
+  "responsiveReview": ["mobile", "desktop"],
+  "designGates": ["superpowers:brainstorming", "product-design", "design-taste-frontend"],
+  "pageAgent": {
+    "defaultEnabled": false,
+    "bundledByDefault": false
+  },
+  "evidence": [
+    "website/src/pages/index.tsx",
+    "website/src/css/custom.css",
+    "website/docusaurus.config.ts",
+    "website/i18n/en/docusaurus-plugin-content-docs/current/intro.md"
+  ]
+}

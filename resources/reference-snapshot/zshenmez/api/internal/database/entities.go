@@ -1,2 +1,2 @@
 package database
-// Sanitized schema signals: StorageSettings UserOrgMembership UserAddress RoleApplication Task TransferApplication SupportTicket FileAsset LoginLog ErrorLog active_sessions file_assets user_org_memberships role_groups.
+// Sanitized schema signals: StorageSettings UserOrgMembership UserAddress RoleApplication Task TransferApplication SupportTicket FileAsset LoginLog ErrorLog active_sessions file_assets user_org_memberships role_groups role_profiles versions.

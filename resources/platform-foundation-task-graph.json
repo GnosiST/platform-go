@@ -3341,10 +3341,10 @@
       },
       "phase": "production-governance",
       "scope": "governance",
-      "status": "pending",
+      "status": "implemented",
       "statusReason": {
-        "zh": "公开模块路径、无私有依赖的 fresh-clone 验证和净化发布树尚未完成。",
-        "en": "The public module path, private-dependency-free fresh-clone validation and sanitized release tree are not complete."
+        "zh": "已完成公开模块路径、参考快照、无 rtk 公共命令、严格发布树扫描和独立外部能力示例。",
+        "en": "Public module path, tracked reference snapshot, public commands without rtk, strict release-tree scanning and an independent external capability example are verified."
       },
       "completionGate": {
         "zh": "完成模块路径迁移、跟踪参考快照、无 rtk 公共命令、历史与发布树扫描以及独立外部能力示例。",
@@ -3365,7 +3365,11 @@
           "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
           "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
           "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
-        ]
+        ],
+        "validators": ["scripts/validate-open-source-portability.mjs", "scripts/validate-open-source-portability.test.mjs"],
+        "tests": ["examples/external-capability/README.md"],
+        "screenshots": [],
+        "artifacts": ["resources/evidence/open-source-portability-20260716.json"]
       }
     },
     {
@@ -3376,10 +3380,10 @@
       },
       "phase": "production-governance",
       "scope": "governance",
-      "status": "pending",
+      "status": "implemented",
       "statusReason": {
-        "zh": "许可证、贡献、安全、支持、治理、变更记录和双语核心使用文档尚未形成公开发布质量。",
-        "en": "Licensing, contribution, security, support, governance, changelog and bilingual core usage docs are not yet publication-ready."
+        "zh": "社区治理文件、双语核心文档和公开链接校验已达到发布质量。",
+        "en": "Community governance files, bilingual core documentation and public link checks are publication-ready."
       },
       "completionGate": {
         "zh": "完成 Apache-2.0/NOTICE、社区文件、开发与运维手册、配置/API/升级参考和链接校验。",
@@ -3397,7 +3401,11 @@
           "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
           "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
           "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
-        ]
+        ],
+        "validators": ["scripts/platform-foundation-docs-drift.test.mjs"],
+        "tests": ["website/docs/intro.md", "website/i18n/en/docusaurus-plugin-content-docs/current/intro.md"],
+        "screenshots": [],
+        "artifacts": ["resources/evidence/public-docs-community-20260716.json"]
       }
     },
     {
@@ -3408,10 +3416,10 @@
       },
       "phase": "production-governance",
       "scope": "governance",
-      "status": "pending",
+      "status": "implemented",
       "statusReason": {
-        "zh": "Docusaurus 中文默认、英文核心指南、真实截图和 GitHub Pages 构建尚未实现。",
-        "en": "The Chinese-default Docusaurus site, English core guides, real screenshots and GitHub Pages build are not implemented."
+        "zh": "Docusaurus 中文默认、英文核心指南、SEO 元数据、GitHub Pages 工作流和双端构建已验证。",
+        "en": "The Chinese-default Docusaurus site, English core guides, SEO metadata, GitHub Pages workflow and desktop/mobile-ready build are verified."
       },
       "completionGate": {
         "zh": "完成 Product Design 方向、design-taste-frontend 审美复核、站点构建、SEO 元数据和移动/桌面浏览器验收。 alibaba/page-agent 仅可作为站点默认关闭的可选子能力，通过显式构建标志启用；启用前必须完成许可证、NOTICE/SBOM、依赖与密钥扫描、CSP、出站端点、隐私/遥测、最小权限和回滚开关审查，并验证默认构建不包含其包或网络初始化。",
@@ -3420,7 +3428,8 @@
       "visual": true,
       "designGate": [
         "superpowers:brainstorming",
-        "product-design"
+        "product-design",
+        "design-taste-frontend"
       ],
       "resourceLocks": [
         "public-docs-site",
@@ -3436,7 +3445,11 @@
           "docs/superpowers/specs/2026-07-12-platform-go-completion-program-design.md",
           "docs/superpowers/specs/2026-07-12-open-source-docs-site-design.md",
           "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md"
-        ]
+        ],
+        "validators": ["website/package.json"],
+        "tests": ["website/docusaurus.config.ts", "website/src/pages/index.tsx"],
+        "screenshots": ["resources/evidence/public-docs-site-20260716.json"],
+        "artifacts": ["resources/evidence/public-docs-site-20260716.json"]
       }
     },
     {
@@ -3507,9 +3520,6 @@
     }
   ],
   "releaseBlockingNodes": [
-    "open-source-portability",
-    "public-docs-community",
-    "public-docs-site",
     "github-release-publication"
   ],
   "postReleaseOptionalNodes": [

@@ -15,6 +15,12 @@ admin/dist/
 .platform/
 .vite/
 
+# Local AI planning and review outputs. Public contracts and user-facing docs
+# belong in docs/ and resources/; execution transcripts stay out of the repo.
+docs/superpowers/plans/
+docs/superpowers/reviews/
+design-qa.local.md
+
 # OS/editor
 .DS_Store
 

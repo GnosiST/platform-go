@@ -81,9 +81,6 @@ const completionProgramTaskIDs = [
 ];
 
 const releaseBlockingNodes = [
-  "open-source-portability",
-  "public-docs-community",
-  "public-docs-site",
   "github-release-publication",
 ];
 

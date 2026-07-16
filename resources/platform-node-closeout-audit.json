@@ -44,9 +44,6 @@
     "database-certification-matrix",
     "transactional-outbox-and-one-mq-adapter",
     "asynchronous-search-projection",
-    "open-source-portability",
-    "public-docs-community",
-    "public-docs-site",
     "github-release-publication"
   ],
   "nodeCloseouts": [
@@ -1618,6 +1615,57 @@
         "resource-lock-review",
         "objective-conflict-review"
       ]
+    },
+    {
+      "taskId": "open-source-portability",
+      "status": "closed",
+      "neatFreak": false,
+      "cleanupMode": "focused",
+      "cleanupEvidence": [
+        "resources/evidence/open-source-portability-20260716.json",
+        "pkg/platform/capability/contracts.go",
+        "examples/external-capability/README.md",
+        "resources/reference-snapshot/manifest.json",
+        "scripts/validate-open-source-portability.mjs",
+        "scripts/validate-open-source-portability.test.mjs",
+        ".github/workflows/ci.yml"
+      ],
+      "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"]
+    },
+    {
+      "taskId": "public-docs-community",
+      "status": "closed",
+      "neatFreak": false,
+      "cleanupMode": "focused",
+      "cleanupEvidence": [
+        "resources/evidence/public-docs-community-20260716.json",
+        "LICENSE",
+        "NOTICE",
+        "CONTRIBUTING.md",
+        "SECURITY.md",
+        "SUPPORT.md",
+        "GOVERNANCE.md",
+        "CODE_OF_CONDUCT.md",
+        "CHANGELOG.md",
+        "website/docs/intro.md",
+        "website/i18n/en/docusaurus-plugin-content-docs/current/intro.md"
+      ],
+      "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"]
+    },
+    {
+      "taskId": "public-docs-site",
+      "status": "closed",
+      "neatFreak": false,
+      "cleanupMode": "focused",
+      "cleanupEvidence": [
+        "resources/evidence/public-docs-site-20260716.json",
+        "website/src/pages/index.tsx",
+        "website/src/css/custom.css",
+        "website/docusaurus.config.ts",
+        ".github/workflows/pages.yml"
+      ],
+      "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"],
+      "visualEvidence": ["superpowers:brainstorming", "product-design", "design-taste-frontend"]
     }
   ]
 }

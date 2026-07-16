@@ -3609,7 +3609,7 @@
         "zh": "开源可移植性",
         "en": "Open Source Portability"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Make fresh clones portable without private paths, sibling repositories or agent-only tooling and produce a sanitized public release tree.",
       "dependsOn": [
         "runtime-security-containment",
@@ -3624,9 +3624,10 @@
           "docs/superpowers/plans/2026-07-12-platform-completion-task-graph.md",
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md"
         ],
-        "taskIds": [
-          "open-source-portability"
-        ]
+        "taskIds": ["open-source-portability"],
+        "validators": ["scripts/validate-open-source-portability.mjs", "scripts/validate-open-source-portability.test.mjs"],
+        "tests": ["examples/external-capability/README.md"],
+        "artifacts": ["resources/evidence/open-source-portability-20260716.json"]
       }
     },
     {

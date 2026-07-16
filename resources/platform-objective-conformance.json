@@ -46,9 +46,6 @@
       "database-certification-matrix",
       "transactional-outbox-and-one-mq-adapter",
       "asynchronous-search-projection",
-      "open-source-portability",
-      "public-docs-community",
-      "public-docs-site",
       "github-release-publication"
     ]
   },
@@ -108,9 +105,6 @@
       "database-certification-matrix",
       "transactional-outbox-and-one-mq-adapter",
       "asynchronous-search-projection",
-      "open-source-portability",
-      "public-docs-community",
-      "public-docs-site",
       "github-release-publication"
     ]
   },

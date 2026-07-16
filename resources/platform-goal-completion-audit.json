@@ -17,9 +17,6 @@
       "database-certification-matrix",
       "transactional-outbox-and-one-mq-adapter",
       "asynchronous-search-projection",
-      "open-source-portability",
-      "public-docs-community",
-      "public-docs-site",
       "github-release-publication"
     ]
   },
@@ -29,8 +26,8 @@
   },
   "taskSummary": {
     "expectedTotal": 67,
-    "expectedImplemented": 54,
-    "expectedControlledUnfinished": 13
+    "expectedImplemented": 57,
+    "expectedControlledUnfinished": 10
   },
   "requirements": [
     {

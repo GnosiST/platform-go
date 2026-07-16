@@ -8,21 +8,21 @@
       "role": "migration-runner",
       "scope": "file",
       "symbol": "",
-      "fingerprint": "sha256:6fba707c1eae3638a67257631f51aa9b9121a69a855069ab4ef85e25c836e930"
+      "fingerprint": "sha256:5f933adc23f1919a77d5eacf0074414d2165c0cb9fe887afa479e772f281ae96"
     },
     {
       "path": "internal/platform/adminresource/sensitive_migration_gorm.go",
       "role": "migration-gorm-store",
       "scope": "file",
       "symbol": "",
-      "fingerprint": "sha256:33255f6b56a218537c1cbcb6191e865e28e90c747d81e791dda15a5b73203267"
+      "fingerprint": "sha256:7ae98420acd797bfd4c2590b95e3f4aaef21f491a5f7e9002d96e734464c7331"
     },
     {
       "path": "internal/platform/bootstrap/sensitive_migration.go",
       "role": "migration-bootstrap",
       "scope": "file",
       "symbol": "",
-      "fingerprint": "sha256:aee1ca873d99b9052267e5f0fde0c24ef0a6d114c1836516ea0db0bed8c8d3b6"
+      "fingerprint": "sha256:3e2ac049d992f958a99a47fe49e322c4d4dd13a3bc22bcee8b8de98c3559767c"
     },
     {
       "path": "internal/platform/adminresource/security.go",

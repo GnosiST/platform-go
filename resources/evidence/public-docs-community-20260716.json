@@ -1,0 +1,28 @@
+{
+  "$schema": "https://platform-go.local/schemas/public-docs-community-evidence.json",
+  "taskId": "public-docs-community",
+  "capturedAt": "2026-07-16",
+  "status": "verified",
+  "communityFiles": [
+    "LICENSE",
+    "NOTICE",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "SUPPORT.md",
+    "GOVERNANCE.md",
+    "CODE_OF_CONDUCT.md",
+    "CHANGELOG.md"
+  ],
+  "coreGuides": [
+    "website/docs/intro.md",
+    "website/docs/capabilities.md",
+    "website/docs/operations.md",
+    "website/i18n/en/docusaurus-plugin-content-docs/current/intro.md",
+    "website/i18n/en/docusaurus-plugin-content-docs/current/capabilities.md",
+    "website/i18n/en/docusaurus-plugin-content-docs/current/operations.md"
+  ],
+  "linkAndBuildChecks": {
+    "websiteBuild": true,
+    "strictBrokenLinks": true
+  }
+}

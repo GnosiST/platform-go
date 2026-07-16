@@ -72,6 +72,9 @@
     "platform-service-contract-standard",
     "persisted-query-command-object-runtime",
     "integration-ports-disabled-default",
+    "open-source-portability",
+    "public-docs-community",
+    "public-docs-site",
     "organization-rbac-menu-contract-and-migration-design",
     "organization-role-pool-backend-and-migration",
     "organization-user-admin-experience",
@@ -88,9 +91,6 @@
     "database-certification-matrix",
     "transactional-outbox-and-one-mq-adapter",
     "asynchronous-search-projection",
-    "open-source-portability",
-    "public-docs-community",
-    "public-docs-site",
     "github-release-publication"
   ],
   "nonDroppableGoalNodes": [
