@@ -7,7 +7,7 @@
 [![Go](https://img.shields.io/badge/Go-1.22%2B-00ADD8.svg)](go.mod)
 [![在线文档](https://img.shields.io/badge/文档-GitHub%20Pages-0b7285.svg)](https://gnosist.github.io/platform-go/)
 
-**中文首选** · [English README](README.en.md) · [在线文档（中文）](https://gnosist.github.io/platform-go/) · [在线文档（English）](https://gnosist.github.io/platform-go/en/)
+[简体中文](README.md) · [English](README.en.md) · [文档站 / Documentation](https://gnosist.github.io/platform-go/)
 
 ## 项目定位
 

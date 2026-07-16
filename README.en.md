@@ -7,7 +7,7 @@
 [![Go](https://img.shields.io/badge/Go-1.22%2B-00ADD8.svg)](go.mod)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-0b7285.svg)](https://gnosist.github.io/platform-go/en/)
 
-[Chinese README](README.md) · [English docs](https://gnosist.github.io/platform-go/en/) · [Chinese docs](https://gnosist.github.io/platform-go/)
+[English](README.en.md) · [简体中文](README.md) · [Documentation / 文档站](https://gnosist.github.io/platform-go/en/)
 
 ## Positioning
 
