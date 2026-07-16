@@ -3,7 +3,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: 'platform-go',
-  tagline: 'A business-neutral Go operations platform foundation',
+  tagline: '面向 Go 服务的业务中立运营平台底座 / A business-neutral Go operations foundation',
   favicon: 'img/favicon.svg',
   url: 'https://gnosist.github.io',
   baseUrl: '/platform-go/',
@@ -73,9 +73,10 @@ const config: Config = {
     navbar: {
       title: 'platform-go',
       items: [
-        {to: '/docs/intro', label: '文档', position: 'left'},
-        {to: '/docs/capabilities', label: '能力', position: 'left'},
-        {to: '/docs/operations', label: '运维', position: 'left'},
+        {to: '/docs/intro', label: '文档 / Docs', position: 'left'},
+        {to: '/docs/capabilities', label: '能力 / Capabilities', position: 'left'},
+        {to: '/docs/operations', label: '运维 / Operations', position: 'left'},
+        {type: 'localeDropdown', position: 'right'},
         {label: 'v0.1.0', href: 'https://github.com/GnosiST/platform-go/releases/tag/v0.1.0', position: 'right'},
         {href: 'https://github.com/GnosiST/platform-go', label: 'GitHub', position: 'right'},
       ],
@@ -83,15 +84,15 @@ const config: Config = {
     metadata: [
       {
         name: 'description',
-        content: 'Business-neutral Go platform foundation for capability manifests, authentication, RBAC, resource contracts and operations.',
+        content: '面向 Go 服务的业务中立运营平台底座，提供能力清单、认证、RBAC、资源合同与生产治理。 Business-neutral Go foundation for reusable operations services.',
       },
       {name: 'keywords', content: 'Go, Gin, GORM, Casbin, Refine, platform foundation, RBAC, capability manifests'},
     ],
     footer: {
       style: 'dark',
       links: [
-        {title: '项目', items: [{label: 'GitHub', href: 'https://github.com/GnosiST/platform-go'}]},
-        {title: '文档', items: [{label: '快速开始', to: '/docs/intro'}, {label: '能力与扩展', to: '/docs/capabilities'}]},
+        {title: '项目 / Project', items: [{label: 'GitHub', href: 'https://github.com/GnosiST/platform-go'}, {label: '发行版本 / Releases', href: 'https://github.com/GnosiST/platform-go/releases'}]},
+        {title: '文档 / Docs', items: [{label: '快速开始 / Quick start', to: '/docs/intro'}, {label: '能力与扩展 / Capabilities', to: '/docs/capabilities'}, {label: '运维与安全 / Operations', to: '/docs/operations'}]},
       ],
       copyright: `Copyright © ${new Date().getFullYear()} GnosiST. Built with Docusaurus.`,
     },

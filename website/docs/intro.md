@@ -7,6 +7,8 @@ title: 介绍
 
 `platform-go` 是面向 Go 服务的业务中立运营平台底座，提供能力清单、认证、RBAC、菜单、资源合同、审计、文件存储和部署治理。
 
+> English: `platform-go` is a business-neutral Go foundation for reusable operations services. See the language switcher in the top navigation for the complete English version.
+
 ## 五分钟开始
 
 ```bash
