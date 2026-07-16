@@ -26,6 +26,7 @@ import (
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/core"
 	"platform-go/internal/platform/errorcode"
+	"platform-go/internal/platform/kernel"
 	"platform-go/internal/platform/ratelimit"
 	"platform-go/internal/platform/session"
 	"platform-go/internal/platform/storage"
@@ -1637,8 +1638,8 @@ func TestAuthAndFileContentAuditsUseStructuredRedactedFields(t *testing.T) {
 					t.Fatalf("%s audit missing %s: %+v", action, key, audit)
 				}
 			}
-			if audit.Values["targetCode"] != "" || audit.Values["traceId"] != "" {
-				t.Fatalf("%s audit retained legacy fields: %+v", action, audit)
+			if audit.Values["targetCode"] != "" || audit.Values["legacyTraceId"] != "" || !kernel.ValidCorrelation(kernel.Correlation{RequestID: audit.Values["requestId"], TraceID: audit.Values["traceId"]}) {
+				t.Fatalf("%s audit correlation or legacy fields are invalid: %+v", action, audit)
 			}
 		}
 		if !found {
@@ -1647,7 +1648,7 @@ func TestAuthAndFileContentAuditsUseStructuredRedactedFields(t *testing.T) {
 	}
 }
 
-func TestRuntimeInternalErrorsUseSafeCauseClassAndCorrelationID(t *testing.T) {
+func TestRuntimeInternalErrorsUseRegistryCategoryAndCorrelationID(t *testing.T) {
 	const marker = "request-email@example.test/private/object"
 	fileStore := &recordingObjectStore{saveErr: errors.New("raw-storage-secret")}
 	internalErrors := &recordingInternalErrorSink{}
@@ -1665,8 +1666,8 @@ func TestRuntimeInternalErrorsUseSafeCauseClassAndCorrelationID(t *testing.T) {
 		t.Fatalf("internal error events = %d, want 1", len(internalErrors.events))
 	}
 	event := internalErrors.events[0]
-	if event.Code != "ADMIN_FILE_SAVE_FAILED" || event.CauseClass != "storage" || strings.TrimSpace(event.EventID) == "" {
-		t.Fatalf("internal error event = %+v, want code/storage/correlation", event)
+	if event.Code != errorcode.CodeAdminFileSaveFailed || event.Category != errorcode.CategoryInternal || strings.TrimSpace(event.EventID) == "" {
+		t.Fatalf("internal error event = %+v, want typed code/registry category/correlation", event)
 	}
 	serialized := fmt.Sprintf("%+v", event)
 	for _, forbidden := range []string{marker, "raw-storage-secret", "private.txt"} {
@@ -1682,14 +1683,18 @@ func TestRuntimeInternalErrorsAttachStructuredSafeGinMetadata(t *testing.T) {
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/internal-test", nil)
 	ctx.Request.Header.Set("X-Request-ID", "private-request@example.test/path")
 
-	server.recordInternalError(ctx, "PROVIDER_UNAVAILABLE", errors.New("raw-provider-secret"))
+	cause := errors.New("raw-provider-secret")
+	server.recordInternalError(ctx, errorcode.CodeInternal, cause)
 
 	if len(ctx.Errors) != 1 {
 		t.Fatalf("gin errors = %+v, want one", ctx.Errors)
 	}
 	event, ok := ctx.Errors[0].Meta.(InternalErrorEvent)
-	if !ok || event.Code != "PROVIDER_UNAVAILABLE" || event.CauseClass != "provider" || strings.TrimSpace(event.EventID) == "" {
+	if !ok || event.Code != errorcode.CodeInternal || event.Category != errorcode.CategoryInternal || strings.TrimSpace(event.EventID) == "" {
 		t.Fatalf("gin error metadata = %+v, want structured safe diagnostic", ctx.Errors[0].Meta)
+	}
+	if !errors.Is(ctx.Errors[0].Err, cause) || errors.Is(event.Err, cause) {
+		t.Fatalf("raw cause placement is unsafe: gin=%v event=%v", ctx.Errors[0].Err, event.Err)
 	}
 	serialized := fmt.Sprintf("%+v", event)
 	for _, forbidden := range []string{"private-request@example.test/path", "raw-provider-secret"} {
@@ -1730,24 +1735,6 @@ func TestMutationAuditHashesSensitiveRequestID(t *testing.T) {
 		return
 	}
 	t.Fatalf("missing admin_resource.create audit for audit-request-id: %+v", audits)
-}
-
-func TestInternalErrorCauseClassUsesStableSpecificPriority(t *testing.T) {
-	tests := map[string]string{
-		"PROVIDER_UNAVAILABLE":         "provider",
-		"AUTH_PROVIDER_UNAVAILABLE":    "auth",
-		"FILE_PROVIDER_UNAVAILABLE":    "storage",
-		"REPOSITORY_UNAVAILABLE":       "repository",
-		"UPSTREAM_TIMEOUT_UNAVAILABLE": "timeout",
-		"SERVICE_UNAVAILABLE":          "unavailable",
-	}
-	for code, want := range tests {
-		for attempt := 0; attempt < 100; attempt++ {
-			if got := internalErrorCauseClass(code); got != want {
-				t.Fatalf("internalErrorCauseClass(%q) = %q, want %q", code, got, want)
-			}
-		}
-	}
 }
 
 func TestAuthLogoutRevokesSessionToken(t *testing.T) {
@@ -4228,7 +4215,7 @@ func TestLegacySecretMarkersDoNotAppearInListQueryExportOrAudit(t *testing.T) {
 		Values: map[string]string{
 			"actor": "admin", "action": "policy-review.request", "resource": "policy-reviews",
 			"targetId": "policy-review-legacy", "targetCode": marker, "provider": "policy-review",
-			"traceId": marker, "createdAt": time.Now().UTC().Format(time.RFC3339),
+			"legacyTraceId": marker, "createdAt": time.Now().UTC().Format(time.RFC3339),
 		},
 	}); err != nil {
 		t.Fatalf("seed legacy audit: %v", err)
@@ -7042,7 +7029,7 @@ func assertInternalErrorRecorded(t *testing.T, events []InternalErrorEvent, code
 	if len(events) != 1 {
 		t.Fatalf("internal error events = %d, want 1", len(events))
 	}
-	if events[0].Code != code || events[0].Err == nil || events[0].Err.Error() != code || strings.Contains(events[0].Err.Error(), marker) {
+	if events[0].Code != errorcode.Code(code) || events[0].Err == nil || events[0].Err.Error() != code || strings.Contains(events[0].Err.Error(), marker) {
 		t.Fatalf("internal error event = %+v, want stable code %q without raw marker", events[0], code)
 	}
 }

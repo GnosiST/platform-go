@@ -607,7 +607,7 @@ func assertRegisteredCauseEvent(t *testing.T, sink *recordingInternalErrorSink, 
 		t.Fatalf("events = %+v, want exactly one", sink.events)
 	}
 	event := sink.events[0]
-	if event.Code != string(code) || event.RequestID != body.RequestID || event.TraceID != body.TraceID || event.Owner == "" {
+	if event.Code != code || event.RequestID != body.RequestID || event.TraceID != body.TraceID || event.Owner == "" {
 		t.Fatalf("event = %+v body = %+v, want matching registered correlation", event, body)
 	}
 }

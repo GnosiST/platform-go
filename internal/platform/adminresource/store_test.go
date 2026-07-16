@@ -3,6 +3,7 @@ package adminresource
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -12,6 +13,7 @@ import (
 
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/core"
+	"platform-go/internal/platform/kernel"
 	"platform-go/internal/platform/rbac"
 )
 
@@ -1188,7 +1190,7 @@ func TestStoreAuditLogsSchemaExposesStructuredReadOnlyFields(t *testing.T) {
 	if schema.DefaultSortKey != "createdAt" {
 		t.Fatalf("audit-logs default sort = %q, want createdAt", schema.DefaultSortKey)
 	}
-	for _, key := range []string{"actor", "action", "resource", "targetId", "targetCode", "provider", "outcome", "eventId", "reasonCode", "createdAt", "traceId"} {
+	for _, key := range []string{"actor", "action", "resource", "targetId", "targetCode", "provider", "outcome", "eventId", "reasonCode", "createdAt", "legacyTraceId", "requestId", "traceId"} {
 		field := fieldByKey(schema.Fields, key)
 		if field == nil {
 			t.Fatalf("audit-logs schema missing %s field: %+v", key, schema.Fields)
@@ -1197,7 +1199,7 @@ func TestStoreAuditLogsSchemaExposesStructuredReadOnlyFields(t *testing.T) {
 			t.Fatalf("audit-logs.%s = %+v, want read-only values detail field outside forms", key, *field)
 		}
 	}
-	for _, key := range []string{"actor", "action", "resource", "provider", "outcome", "eventId", "reasonCode"} {
+	for _, key := range []string{"actor", "action", "resource", "provider", "outcome", "eventId", "reasonCode", "requestId", "traceId"} {
 		if !slices.Contains(schema.SearchFields, key) {
 			t.Fatalf("audit-logs search fields = %+v, want %s", schema.SearchFields, key)
 		}
@@ -1207,6 +1209,96 @@ func TestStoreAuditLogsSchemaExposesStructuredReadOnlyFields(t *testing.T) {
 		if field == nil || !field.InTable || !field.Searchable || !field.Sortable {
 			t.Fatalf("audit-logs.%s = %+v, want searchable sortable table field", key, field)
 		}
+	}
+	for key, pattern := range map[string]string{
+		"requestId": `^req_[0-9a-f]{32}$`,
+		"traceId":   `^[0-9a-f]{32}$`,
+	} {
+		field := fieldByKey(schema.Fields, key)
+		if field == nil || !field.Searchable || !field.Filterable || field.Sensitivity != capability.FieldSensitivityInternal || field.StorageMode != capability.FieldStoragePlain || field.ResponseMode != capability.FieldProjectionFull || field.ExportMode != capability.FieldProjectionOmitted || field.Validation == nil || field.Validation.Pattern != pattern {
+			t.Fatalf("audit-logs.%s = %+v, want canonical internal correlation field", key, field)
+		}
+	}
+	legacy := fieldByKey(schema.Fields, "legacyTraceId")
+	if legacy == nil || legacy.ResponseMode != capability.FieldProjectionOmitted || legacy.ExportMode != capability.FieldProjectionOmitted || legacy.Searchable || legacy.Filterable {
+		t.Fatalf("audit-logs.legacyTraceId = %+v, want hidden legacy field", legacy)
+	}
+}
+
+func TestRecordAuditPersistsCanonicalCorrelationAndOmitsItFromExport(t *testing.T) {
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	want := kernel.Correlation{
+		RequestID: "req_0123456789abcdef0123456789abcdef",
+		TraceID:   "4bf92f3577b34da6a3ce929d0e0e4736",
+	}
+	record, err := store.RecordAudit(AuditEvent{
+		Actor: "admin", Action: "settings.update", Resource: "settings", TargetID: "setting-1",
+		EventID: "domain-event-1", RequestID: want.RequestID, TraceID: want.TraceID,
+	})
+	if err != nil {
+		t.Fatalf("RecordAudit() error = %v", err)
+	}
+	if record.Values["requestId"] != want.RequestID || record.Values["traceId"] != want.TraceID || record.Values["eventId"] != "domain-event-1" {
+		t.Fatalf("audit values = %+v, want distinct event and correlation identifiers", record.Values)
+	}
+	response, err := store.ProjectRecord("audit-logs", record, ProjectionResponse)
+	if err != nil {
+		t.Fatalf("ProjectRecord(response) error = %v", err)
+	}
+	if response.Values["requestId"] != want.RequestID || response.Values["traceId"] != want.TraceID {
+		t.Fatalf("response correlation = %+v, want canonical pair", response.Values)
+	}
+	exported, err := store.ProjectRecord("audit-logs", record, ProjectionExport)
+	if err != nil {
+		t.Fatalf("ProjectRecord(export) error = %v", err)
+	}
+	if exported.Values["requestId"] != "" || exported.Values["traceId"] != "" {
+		t.Fatalf("export leaked correlation: %+v", exported.Values)
+	}
+}
+
+func TestRecordAuditWithoutContextGeneratesCanonicalCorrelation(t *testing.T) {
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	record, err := store.RecordAudit(AuditEvent{
+		Actor: "system", Action: "retention.run", Resource: "files", TargetID: "file-1",
+	})
+	if err != nil {
+		t.Fatalf("RecordAudit() error = %v", err)
+	}
+	if !kernel.ValidCorrelation(kernel.Correlation{RequestID: record.Values["requestId"], TraceID: record.Values["traceId"]}) {
+		t.Fatalf("background audit correlation = %+v, want generated opaque pair", record.Values)
+	}
+}
+
+func TestRepositoryBackedStoreNormalizesLegacyTraceWithoutCanonicalizingIt(t *testing.T) {
+	const legacy = "legacy-secret-email@example.test"
+	repository := &recordingRepository{snapshot: ResourceSnapshot{Resources: map[string][]Record{
+		"audit-logs": {{
+			ID: "audit-legacy", Code: "audit-legacy", Name: "Legacy", Status: "recorded", UpdatedAt: "2026-07-15T00:00:00Z",
+			Values: map[string]string{
+				"actor": "admin", "action": "legacy.action", "resource": "roles", "targetId": "role-1",
+				"outcome": "success", "eventId": "legacy-event", "reasonCode": "completed", "createdAt": "2026-07-15T00:00:00Z", "traceId": legacy,
+			},
+		}},
+	}}}
+	store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	if err != nil {
+		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+	}
+	records, err := store.InternalRecordsContext(context.Background(), "audit-logs")
+	if err != nil || len(records) != 1 {
+		t.Fatalf("InternalRecordsContext() = %+v, %v", records, err)
+	}
+	values := records[0].Values
+	if values["legacyTraceId"] != legacy || values["requestId"] != "" || values["traceId"] != "" {
+		t.Fatalf("normalized legacy audit values = %+v", values)
+	}
+	if repository.saveCount != 1 {
+		t.Fatalf("repository saveCount = %d, want one normalization rewrite", repository.saveCount)
+	}
+	projected, err := store.ProjectRecord("audit-logs", records[0], ProjectionResponse)
+	if err != nil || strings.Contains(fmt.Sprint(projected), legacy) {
+		t.Fatalf("ProjectRecord(response) leaked legacy trace: record=%+v err=%v", projected, err)
 	}
 }
 

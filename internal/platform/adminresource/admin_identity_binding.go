@@ -312,7 +312,7 @@ func matchingAdminIdentityAudit(records []Record, event AuditEvent) (Record, boo
 	}
 	for key := range matched.Values {
 		switch key {
-		case "actor", "action", "resource", "targetId", "outcome", "eventId", "reasonCode", "createdAt":
+		case "actor", "action", "resource", "targetId", "outcome", "eventId", "reasonCode", "createdAt", "requestId", "traceId":
 		default:
 			return Record{}, false, ErrInvalidRecord
 		}

@@ -90,8 +90,7 @@ type Authorizer interface {
 }
 
 type InternalErrorEvent struct {
-	Code           string
-	CauseClass     string
+	Code           errorcode.Code
 	EventID        string
 	Err            error
 	Owner          string
@@ -2662,49 +2661,11 @@ func fileRecordContentType(record adminresource.Record) string {
 	return contentType
 }
 
-func (s *Server) recordInternalError(ctx *gin.Context, code string, err error) {
+func (s *Server) recordInternalError(ctx *gin.Context, code errorcode.Code, err error) {
 	if err == nil {
 		return
 	}
-	publicErr := errors.New(code)
-	correlation := correlationFromGinContext(ctx)
-	event := InternalErrorEvent{
-		Code:       code,
-		CauseClass: internalErrorCauseClass(code),
-		EventID:    internalErrorEventID(ctx),
-		Err:        publicErr,
-		RequestID:  correlation.RequestID,
-		TraceID:    correlation.TraceID,
-	}
-	if definition, ok := errorcode.Lookup(errorcode.Code(code)); ok {
-		event.Owner = definition.Owner
-		event.Category = definition.Category
-		event.RetryPolicy = definition.RetryPolicy
-		event.RedactionClass = definition.RedactionClass
-	}
-	_ = ctx.Error(publicErr).SetMeta(event)
-	if s.internalErrorSink != nil {
-		s.internalErrorSink.Record(ctx.Request.Context(), event)
-	}
-}
-
-func internalErrorCauseClass(code string) string {
-	upper := strings.ToUpper(strings.TrimSpace(code))
-	switch {
-	case strings.Contains(upper, "TIMEOUT"):
-		return "timeout"
-	case strings.Contains(upper, "AUTH"):
-		return "auth"
-	case strings.Contains(upper, "FILE"), strings.Contains(upper, "STORAGE"):
-		return "storage"
-	case strings.Contains(upper, "PROVIDER"):
-		return "provider"
-	case strings.Contains(upper, "REPOSITORY"):
-		return "repository"
-	case strings.Contains(upper, "UNAVAILABLE"):
-		return "unavailable"
-	}
-	return "unknown"
+	recordPlatformError(ctx, s.internalErrorSink, registeredErrorDefinition(code), err)
 }
 
 func internalErrorEventID(ctx *gin.Context) string {
@@ -2722,6 +2683,7 @@ func internalErrorEventID(ctx *gin.Context) string {
 }
 
 func (s *Server) mutationAuditEvent(ctx *gin.Context, action string, resource string, reasonCode string) adminresource.AuditEvent {
+	correlation := correlationFromGinContext(ctx)
 	return adminresource.AuditEvent{
 		Actor:      s.auditActorID(ctx),
 		Action:     action,
@@ -2729,6 +2691,8 @@ func (s *Server) mutationAuditEvent(ctx *gin.Context, action string, resource st
 		Result:     "success",
 		EventID:    internalErrorEventID(ctx),
 		ReasonCode: reasonCode,
+		RequestID:  correlation.RequestID,
+		TraceID:    correlation.TraceID,
 	}
 }
 
@@ -2740,7 +2704,7 @@ func (s *Server) recordFileCleanup(ctx *gin.Context, objectKey string) {
 		CreatedAt:        s.now().UTC(),
 	}
 	if err := s.fileCleanupSink.Record(ctx.Request.Context(), record); err != nil {
-		s.recordInternalError(ctx, "FILE_CLEANUP_RECORD_FAILED", err)
+		s.recordInternalError(ctx, errorcode.CodeInternal, err)
 	}
 }
 

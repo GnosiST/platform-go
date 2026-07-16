@@ -9,6 +9,7 @@ import (
 
 	"platform-go/internal/platform/capability"
 	"platform-go/internal/platform/dataprotection"
+	"platform-go/internal/platform/kernel"
 	"platform-go/internal/platform/masking"
 )
 
@@ -364,6 +365,11 @@ func (s *Store) scrubSnapshot(snapshot ResourceSnapshot) (ResourceSnapshot, bool
 		}
 		cleanRecords := make([]Record, 0, len(records))
 		for _, record := range records {
+			if resource == "audit-logs" {
+				var normalized bool
+				record, normalized = normalizeAuditCorrelationRecord(record)
+				changed = changed || normalized
+			}
 			cleanRecord := cloneRecord(record)
 			cleanRecord.Values = map[string]string{}
 			for key, value := range record.Values {
@@ -385,6 +391,34 @@ func (s *Store) scrubSnapshot(snapshot ResourceSnapshot) (ResourceSnapshot, bool
 		return ResourceSnapshot{}, false, err
 	}
 	return clean, changed, nil
+}
+
+func normalizeAuditCorrelationRecord(record Record) (Record, bool) {
+	normalized := cloneRecord(record)
+	requestID := strings.TrimSpace(normalized.Values["requestId"])
+	traceID := strings.TrimSpace(normalized.Values["traceId"])
+	if kernel.ValidCorrelation(kernel.Correlation{RequestID: requestID, TraceID: traceID}) {
+		changed := normalized.Values["requestId"] != requestID || normalized.Values["traceId"] != traceID
+		normalized.Values["requestId"] = requestID
+		normalized.Values["traceId"] = traceID
+		return normalized, changed
+	}
+
+	legacyTraceID := strings.TrimSpace(normalized.Values["legacyTraceId"])
+	if traceID != "" && legacyTraceID == "" {
+		legacyTraceID = traceID
+	}
+	_, hadRequestID := normalized.Values["requestId"]
+	_, hadTraceID := normalized.Values["traceId"]
+	delete(normalized.Values, "requestId")
+	delete(normalized.Values, "traceId")
+	if legacyTraceID != "" {
+		normalized.Values["legacyTraceId"] = legacyTraceID
+	}
+	if len(normalized.Values) == 0 {
+		normalized.Values = nil
+	}
+	return normalized, hadRequestID || hadTraceID || normalized.Values["legacyTraceId"] != record.Values["legacyTraceId"]
 }
 
 func (s *Store) ProjectRecord(resource string, record Record, purpose ProjectionPurpose) (Record, error) {

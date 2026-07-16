@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"platform-go/internal/platform/capability"
+	"platform-go/internal/platform/kernel"
 )
 
 const (
@@ -44,6 +45,8 @@ type AuditEvent struct {
 	Result     string
 	EventID    string
 	ReasonCode string
+	RequestID  string
+	TraceID    string
 }
 
 type MutationResult struct {
@@ -617,10 +620,18 @@ func (s *Store) auditRecordLocked(event AuditEvent, nextID int) (Record, error) 
 	if strings.TrimSpace(event.EventID) == "" {
 		event.EventID = fmt.Sprintf("event-%d", nextID)
 	}
+	correlation := kernel.Correlation{
+		RequestID: strings.TrimSpace(event.RequestID),
+		TraceID:   strings.TrimSpace(event.TraceID),
+	}
+	if !kernel.ValidCorrelation(correlation) {
+		correlation = kernel.GenerateCorrelation()
+	}
 	values := map[string]string{
 		"actor": event.Actor, "action": event.Action, "resource": event.Resource,
 		"targetId": event.TargetID, "outcome": strings.TrimSpace(event.Result),
 		"eventId": strings.TrimSpace(event.EventID), "reasonCode": strings.TrimSpace(event.ReasonCode),
+		"requestId": correlation.RequestID, "traceId": correlation.TraceID,
 		"createdAt": s.now().UTC().Format(time.RFC3339),
 	}
 	record, err := s.recordFromInputWithOrigin("audit-logs", "", WriteInput{

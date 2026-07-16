@@ -14,18 +14,17 @@ func writePlatformError(ctx *gin.Context, code errorcode.Code) {
 	writeRegisteredError(ctx, definition)
 }
 
-func writePlatformErrorWithCause(ctx *gin.Context, sink InternalErrorSink, code errorcode.Code, _ error) {
+func writePlatformErrorWithCause(ctx *gin.Context, sink InternalErrorSink, code errorcode.Code, cause error) {
 	definition := registeredErrorDefinition(code)
-	recordPlatformError(ctx, sink, definition)
+	recordPlatformError(ctx, sink, definition, cause)
 	writeRegisteredError(ctx, definition)
 }
 
-func recordPlatformError(ctx *gin.Context, sink InternalErrorSink, definition errorcode.Definition) {
+func recordPlatformError(ctx *gin.Context, sink InternalErrorSink, definition errorcode.Definition, cause error) {
 	correlation := correlationFromGinContext(ctx)
 	publicErr := errorcode.New(definition.Code)
 	event := InternalErrorEvent{
-		Code:           string(definition.Code),
-		CauseClass:     internalErrorCauseClass(string(definition.Code)),
+		Code:           definition.Code,
 		EventID:        internalErrorEventID(ctx),
 		Err:            publicErr,
 		Owner:          definition.Owner,
@@ -35,7 +34,11 @@ func recordPlatformError(ctx *gin.Context, sink InternalErrorSink, definition er
 		RequestID:      correlation.RequestID,
 		TraceID:        correlation.TraceID,
 	}
-	_ = ctx.Error(publicErr).SetMeta(event)
+	diagnosticErr := publicErr
+	if cause != nil {
+		diagnosticErr = errorcode.Wrap(definition.Code, cause)
+	}
+	_ = ctx.Error(diagnosticErr).SetMeta(event)
 	if sink != nil {
 		recordContext := context.Background()
 		if ctx.Request != nil {
@@ -50,7 +53,7 @@ func recoveryMiddleware(sink InternalErrorSink) gin.HandlerFunc {
 		defer func() {
 			if recover() != nil {
 				definition := registeredErrorDefinition(errorcode.CodeInternal)
-				recordPlatformError(ctx, sink, definition)
+				recordPlatformError(ctx, sink, definition, nil)
 				ctx.Abort()
 				if !ctx.Writer.Written() {
 					writeRegisteredError(ctx, definition)

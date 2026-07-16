@@ -122,7 +122,7 @@ func TestSensitiveRevealStateRefreshFailureUsesRegistryNoStoreAndRecordsOnce(t *
 	if recorder.Code != http.StatusServiceUnavailable || !strings.Contains(recorder.Body.String(), `"code":"ADMIN_SENSITIVE_REVEAL_STATE_REFRESH_FAILED"`) {
 		t.Fatalf("status/body = %d/%s, want registered 503", recorder.Code, recorder.Body.String())
 	}
-	if recorder.Header().Get("Cache-Control") != "no-store" || len(sink.events) != 1 || sink.events[0].Code != string(errorcode.CodeAdminSensitiveRevealStateRefreshFailed) {
+	if recorder.Header().Get("Cache-Control") != "no-store" || len(sink.events) != 1 || sink.events[0].Code != errorcode.CodeAdminSensitiveRevealStateRefreshFailed {
 		t.Fatalf("headers/events = %q/%+v, want no-store and one safe event", recorder.Header().Get("Cache-Control"), sink.events)
 	}
 	if strings.Contains(recorder.Body.String(), "physical_table") || strings.Contains(recorder.Body.String(), "password") {

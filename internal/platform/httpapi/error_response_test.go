@@ -100,7 +100,7 @@ func TestPlatformErrorWriterWithCauseRecordsOnlySafeRegistryMetadata(t *testing.
 		t.Fatalf("events = %+v, want one", sink.events)
 	}
 	event := sink.events[0]
-	if event.Code != string(errorcode.CodeInternal) || event.Owner != "platform.kernel" || event.Category != errorcode.CategoryInternal || event.RequestID == "" || event.TraceID == "" {
+	if event.Code != errorcode.CodeInternal || event.Owner != "platform.kernel" || event.Category != errorcode.CategoryInternal || event.RequestID == "" || event.TraceID == "" {
 		t.Fatalf("event = %+v, want registry metadata and correlation", event)
 	}
 	clientDigest := sha256.Sum256([]byte("platform-go:request-correlation:v1\x00" + clientRequestID))
@@ -139,7 +139,7 @@ func TestRecoveryDoesNotAppendEnvelopeAfterResponseIsCommitted(t *testing.T) {
 		t.Fatalf("events = %+v, want exactly one", sink.events)
 	}
 	event := sink.events[0]
-	if event.Code != string(errorcode.CodeInternal) || event.RequestID == "" || event.TraceID == "" {
+	if event.Code != errorcode.CodeInternal || event.RequestID == "" || event.TraceID == "" {
 		t.Fatalf("event = %+v, want safe INTERNAL_ERROR correlation", event)
 	}
 	serialized := fmt.Sprintf("%+v", event)
@@ -147,6 +147,25 @@ func TestRecoveryDoesNotAppendEnvelopeAfterResponseIsCommitted(t *testing.T) {
 		if strings.Contains(serialized, forbidden) || strings.Contains(recorder.Body.String(), forbidden) {
 			t.Fatalf("partial-write recovery leaked %q: event=%s body=%q", forbidden, serialized, recorder.Body.String())
 		}
+	}
+}
+
+func TestPlatformErrorWriterWithCauseKeepsRawCauseOnlyOnGinDiagnostic(t *testing.T) {
+	cause := errors.New("password=private-marker physical_table=users")
+	sink := &errorResponseSink{}
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
+
+	writePlatformErrorWithCause(ctx, sink, errorcode.CodeInternal, cause)
+
+	if len(ctx.Errors) != 1 || !errors.Is(ctx.Errors[0].Err, cause) {
+		t.Fatalf("gin errors = %+v, want wrapped private cause", ctx.Errors)
+	}
+	if len(sink.events) != 1 || errors.Is(sink.events[0].Err, cause) {
+		t.Fatalf("sink events = %+v, raw cause must remain private to Gin diagnostic", sink.events)
+	}
+	if strings.Contains(fmt.Sprintf("%+v", sink.events[0]), "private-marker") {
+		t.Fatalf("sink event leaked raw cause: %+v", sink.events[0])
 	}
 }
 

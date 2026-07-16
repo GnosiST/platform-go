@@ -12,6 +12,24 @@ import (
 	"platform-go/internal/platform/storage"
 )
 
+type preTask6GORMAdminAuditLog struct {
+	ID          string `gorm:"column:id;primaryKey"`
+	Code        string `gorm:"column:code;uniqueIndex;not null"`
+	Name        string `gorm:"column:name;not null"`
+	Status      string `gorm:"column:status;not null"`
+	Description string `gorm:"column:description;not null"`
+	UpdatedAt   string `gorm:"column:updated_at;not null"`
+	Actor       string `gorm:"column:actor;index;not null"`
+	Action      string `gorm:"column:action;index;not null"`
+	Resource    string `gorm:"column:resource;index;not null"`
+	CreatedAt   string `gorm:"column:created_at;index;not null"`
+	ValuesJSON  string `gorm:"column:values_json;not null"`
+}
+
+func (preTask6GORMAdminAuditLog) TableName() string {
+	return adminAuditLogsTable
+}
+
 func TestOpenGORMAdminResourceRepositoryDoesNotCreateSchema(t *testing.T) {
 	db, err := storage.OpenGORM(storage.Config{Driver: "sqlite", DSN: filepath.Join(t.TempDir(), "admin-open.db")})
 	if err != nil {
@@ -351,7 +369,7 @@ func TestGORMAdminResourceRepositoryNormalizesOperationsResources(t *testing.T) 
 		NextID: 1099,
 		Resources: map[string][]Record{
 			"audit-logs": {
-				{ID: "audit-1", Code: "audit-1", Name: "Role update", Status: "recorded", Description: "Role was updated", UpdatedAt: "2026-07-05T00:00:00Z", Values: map[string]string{"actor": "admin", "action": "role.update", "resource": "roles", "createdAt": "2026-07-05T00:00:00Z", "traceId": "trace-audit"}},
+				{ID: "audit-1", Code: "audit-1", Name: "Role update", Status: "recorded", Description: "Role was updated", UpdatedAt: "2026-07-05T00:00:00Z", Values: map[string]string{"actor": "admin", "action": "role.update", "resource": "roles", "createdAt": "2026-07-05T00:00:00Z", "requestId": "req_0123456789abcdef0123456789abcdef", "traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "legacyTraceId": "trace-audit"}},
 			},
 			"login-logs": {
 				{ID: "login-1", Code: "login-1", Name: "Admin login", Status: "recorded", Description: "Admin logged in", UpdatedAt: "2026-07-05T00:01:00Z", Values: map[string]string{"username": "admin", "provider": "demo", "ip": "127.0.0.1", "createdAt": "2026-07-05T00:01:00Z"}},
@@ -390,6 +408,78 @@ func TestGORMAdminResourceRepositoryNormalizesOperationsResources(t *testing.T) 
 	}
 	if !reflect.DeepEqual(loaded.Resources, snapshot.Resources) {
 		t.Fatalf("Resources = %#v, want %#v", loaded.Resources, snapshot.Resources)
+	}
+}
+
+func TestGORMAdminAuditMigrationPreservesHistoricalRowWithoutCanonicalBackfill(t *testing.T) {
+	db := openAdminResourceGORMDB(t)
+	if err := db.AutoMigrate(&preTask6GORMAdminAuditLog{}); err != nil {
+		t.Fatalf("AutoMigrate(pre-Task6 audit log) error = %v", err)
+	}
+	const legacyTrace = "legacy-secret-email@example.test"
+	historical := preTask6GORMAdminAuditLog{
+		ID: "audit-historical", Code: "audit-historical", Name: "Historical", Status: "recorded", Description: "pre-Task6 row",
+		UpdatedAt: "2026-07-15T00:00:00Z", Actor: "admin", Action: "legacy.action", Resource: "roles", CreatedAt: "2026-07-15T00:00:00Z",
+		ValuesJSON: `{"targetId":"role-1","outcome":"success","eventId":"legacy-event","reasonCode":"completed","traceId":"` + legacyTrace + `"}`,
+	}
+	if err := db.Create(&historical).Error; err != nil {
+		t.Fatalf("Create(historical audit) error = %v", err)
+	}
+
+	repository, err := NewGORMAdminResourceRepository(context.Background(), db)
+	if err != nil {
+		t.Fatalf("NewGORMAdminResourceRepository() error = %v", err)
+	}
+	for _, column := range []string{"request_id", "trace_id"} {
+		if !db.Migrator().HasColumn(&gormAdminAuditLog{}, column) {
+			t.Fatalf("audit migration missing %s", column)
+		}
+	}
+	var migrated gormAdminAuditLog
+	if err := db.First(&migrated, "id = ?", historical.ID).Error; err != nil {
+		t.Fatalf("load migrated audit row error = %v", err)
+	}
+	if migrated.ID != historical.ID || migrated.Code != historical.Code || migrated.ValuesJSON != historical.ValuesJSON || migrated.RequestID != nil || migrated.TraceID != nil {
+		t.Fatalf("migrated audit row changed history or backfilled correlation: %+v", migrated)
+	}
+
+	loaded, err := repository.Load(context.Background())
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	audits := loaded.Resources["audit-logs"]
+	if len(audits) != 1 {
+		t.Fatalf("loaded audits = %+v, want historical row", audits)
+	}
+	if values := audits[0].Values; values["legacyTraceId"] != legacyTrace || values["requestId"] != "" || values["traceId"] != "" {
+		t.Fatalf("loaded historical correlation = %+v, want hidden legacy only", values)
+	}
+}
+
+func TestGORMAdminAuditCorrelationRoundTripPreservesCanonicalAndLegacyValues(t *testing.T) {
+	repository, err := NewGORMAdminResourceRepository(context.Background(), openAdminResourceGORMDB(t))
+	if err != nil {
+		t.Fatalf("NewGORMAdminResourceRepository() error = %v", err)
+	}
+	snapshot := ResourceSnapshot{NextID: 1001, Resources: map[string][]Record{
+		"audit-logs": {{
+			ID: "audit-canonical", Code: "audit-canonical", Name: "Canonical", Status: "recorded", Description: "Task6 row", UpdatedAt: "2026-07-16T00:00:00Z",
+			Values: map[string]string{
+				"actor": "admin", "action": "settings.update", "resource": "settings", "targetId": "setting-1", "outcome": "success",
+				"eventId": "domain-event", "reasonCode": "completed", "createdAt": "2026-07-16T00:00:00Z",
+				"requestId": "req_0123456789abcdef0123456789abcdef", "traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "legacyTraceId": "historical-marker",
+			},
+		}},
+	}}
+	if _, err := repository.Save(context.Background(), snapshot); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	loaded, err := repository.Load(context.Background())
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if !reflect.DeepEqual(loaded.Resources["audit-logs"], snapshot.Resources["audit-logs"]) {
+		t.Fatalf("audit round trip = %#v, want %#v", loaded.Resources["audit-logs"], snapshot.Resources["audit-logs"])
 	}
 }
 

@@ -13,6 +13,8 @@ import (
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"platform-go/internal/platform/kernel"
 )
 
 type GORMAdminResourceRepository struct {
@@ -350,17 +352,19 @@ type gormAdminAreaCode struct {
 }
 
 type gormAdminAuditLog struct {
-	ID          string `gorm:"column:id;primaryKey"`
-	Code        string `gorm:"column:code;uniqueIndex;not null"`
-	Name        string `gorm:"column:name;not null"`
-	Status      string `gorm:"column:status;not null"`
-	Description string `gorm:"column:description;not null"`
-	UpdatedAt   string `gorm:"column:updated_at;not null"`
-	Actor       string `gorm:"column:actor;index;not null"`
-	Action      string `gorm:"column:action;index;not null"`
-	Resource    string `gorm:"column:resource;index;not null"`
-	CreatedAt   string `gorm:"column:created_at;index;not null"`
-	ValuesJSON  string `gorm:"column:values_json;not null"`
+	ID          string  `gorm:"column:id;primaryKey"`
+	Code        string  `gorm:"column:code;uniqueIndex;not null"`
+	Name        string  `gorm:"column:name;not null"`
+	Status      string  `gorm:"column:status;not null"`
+	Description string  `gorm:"column:description;not null"`
+	UpdatedAt   string  `gorm:"column:updated_at;not null"`
+	Actor       string  `gorm:"column:actor;index;not null"`
+	Action      string  `gorm:"column:action;index;not null"`
+	Resource    string  `gorm:"column:resource;index;not null"`
+	CreatedAt   string  `gorm:"column:created_at;index;not null"`
+	RequestID   *string `gorm:"column:request_id;index"`
+	TraceID     *string `gorm:"column:trace_id;index"`
+	ValuesJSON  string  `gorm:"column:values_json;not null"`
 }
 
 type gormAdminLoginLog struct {
@@ -1379,11 +1383,23 @@ func (r *GORMAdminResourceRepository) loadAuditLogs(ctx context.Context) ([]Reco
 		if err != nil {
 			return nil, err
 		}
+		jsonTraceID := strings.TrimSpace(values["traceId"])
+		if row.RequestID != nil {
+			values["requestId"] = strings.TrimSpace(*row.RequestID)
+		}
+		if row.TraceID != nil {
+			canonicalTraceID := strings.TrimSpace(*row.TraceID)
+			if jsonTraceID != "" && jsonTraceID != canonicalTraceID && strings.TrimSpace(values["legacyTraceId"]) == "" {
+				values["legacyTraceId"] = jsonTraceID
+			}
+			values["traceId"] = canonicalTraceID
+		}
 		values["actor"] = row.Actor
 		values["action"] = row.Action
 		values["resource"] = row.Resource
 		values["createdAt"] = row.CreatedAt
-		records = append(records, recordFromNormalized(row.ID, row.Code, row.Name, row.Status, row.Description, row.UpdatedAt, values))
+		record, _ := normalizeAuditCorrelationRecord(recordFromNormalized(row.ID, row.Code, row.Name, row.Status, row.Description, row.UpdatedAt, values))
+		records = append(records, record)
 	}
 	return records, nil
 }
@@ -1757,9 +1773,17 @@ func saveAreaCodes(tx *gorm.DB, records []Record) error {
 func saveAuditLogs(tx *gorm.DB, records []Record) error {
 	rows := make([]gormAdminAuditLog, 0, len(records))
 	for _, record := range records {
+		record, _ = normalizeAuditCorrelationRecord(record)
 		valuesJSON, err := marshalRecordValues(record)
 		if err != nil {
 			return err
+		}
+		var requestID *string
+		var traceID *string
+		correlation := kernel.Correlation{RequestID: record.Values["requestId"], TraceID: record.Values["traceId"]}
+		if kernel.ValidCorrelation(correlation) {
+			requestID = &correlation.RequestID
+			traceID = &correlation.TraceID
 		}
 		rows = append(rows, gormAdminAuditLog{
 			ID:          record.ID,
@@ -1772,6 +1796,8 @@ func saveAuditLogs(tx *gorm.DB, records []Record) error {
 			Action:      record.Values["action"],
 			Resource:    record.Values["resource"],
 			CreatedAt:   record.Values["createdAt"],
+			RequestID:   requestID,
+			TraceID:     traceID,
 			ValuesJSON:  valuesJSON,
 		})
 	}
