@@ -464,12 +464,26 @@ func comparisonPolicyPatterns(state principalComparisonState, roleCodes []string
 	for _, roleCode := range roleCodes {
 		allow = append(allow, state.AllowByRoleCode[roleCode]...)
 		for _, permission := range rbac.ParsePermissionList(state.RoleValuesByCode[roleCode]["denyPermissions"]) {
-			if _, enabled := state.EnabledPolicyCodes[permission]; enabled {
+			if policyPatternMatchesEnabledPermission(permission, state.EnabledPermissions) {
 				deny = append(deny, permission)
 			}
 		}
 	}
 	return canonicalComparisonStrings(allow), canonicalComparisonStrings(deny)
+}
+
+func policyPatternMatchesEnabledPermission(pattern string, enabledPermissions []string) bool {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return false
+	}
+	policy := rbac.NewPolicySet([]string{pattern})
+	for _, permission := range enabledPermissions {
+		if policy.Allows(permission) {
+			return true
+		}
+	}
+	return false
 }
 
 func visiblePermissionBackedPages(state principalComparisonState, policy rbac.PolicySet) []string {

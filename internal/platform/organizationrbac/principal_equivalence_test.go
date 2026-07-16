@@ -76,6 +76,28 @@ func TestCompareAllActivePrincipals(t *testing.T) {
 		}
 	})
 
+	t.Run("wildcard deny expands against enabled permissions and excludes permissionless pages", func(t *testing.T) {
+		db, repository, manifest := seedPrincipalComparison(t)
+		createPrincipalRole(t, db, "deny-reports", `{"denyPermissions":"admin:report:*","dataScope":"all"}`, "*")
+		createPrincipalUser(t, db, "alice", StatusEnabled, "deny-reports")
+		manifest.TenantUserOrganizationMap["alice"] = "acme-hq"
+
+		state, err := loadPrincipalComparisonState(db, manifest, PrincipalComparisonCandidate)
+		if err != nil {
+			t.Fatal(err)
+		}
+		legacy, err := legacyPrincipalSnapshot(state, state.Users[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(legacy.MenuCodes, []string{"users"}) {
+			t.Fatalf("legacy wildcard-deny menus = %v, want users only", legacy.MenuCodes)
+		}
+		if report, err := repository.CompareAllActivePrincipals(context.Background(), manifest, PrincipalComparisonCandidate); err != nil || len(report.Differences) != 0 {
+			t.Fatalf("wildcard-deny comparison report = %+v, error = %v", report, err)
+		}
+	})
+
 	t.Run("missing tenant organization without allowlist is blocking and never platform", func(t *testing.T) {
 		_, repository, manifest := seedPrincipalComparison(t)
 		db := repository.db

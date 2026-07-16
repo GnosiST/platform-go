@@ -137,6 +137,36 @@ func TestOrganizationRBACMigrationRequiresExplicitMappingsAndAppliesCutover(t *t
 	}
 }
 
+func TestOrganizationRBACMigrationReplaysAfterSourceRoleAssignmentWasRemoved(t *testing.T) {
+	db, repository := prepareOrganizationRBACTestRepository(t)
+	seedOrganizationRBAC(t, db)
+	if err := db.Create(&gormUser{ID: "user-alice", Code: "alice", TenantCode: "legacy-client", Status: StatusEnabled, ValuesJSON: `{}`}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&gormUserRole{UserID: "user-alice", RoleCode: "operator"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	manifest := testOrganizationRBACMigrationManifest()
+	evidence := MigrationEvidence{
+		RunID: "org-rbac-replay-after-remediation-1", ActorID: "migration-admin", Reason: "approved role remediation", ApprovalRef: "change-replay-remediation-1",
+		BackupURI: "s3://backups/org-rbac-replay-after-remediation-1", BackupSHA256: strings.Repeat("7", 64), CheckpointRef: "restore-rehearsal-replay-remediation-1",
+		AppliedAt: time.Date(2026, 7, 15, 13, 5, 0, 0, time.UTC),
+	}
+	if report, err := repository.RunMigration(context.Background(), MigrationApply, manifest, evidence); err != nil || report.Status != "applied" {
+		t.Fatalf("RunMigration(initial apply) report = %+v, error = %v", report, err)
+	}
+	if err := db.Where("user_id = ? AND role_code = ?", "user-alice", "operator").Delete(&gormUserRole{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	replayed, err := repository.RunMigration(context.Background(), MigrationApply, manifest, evidence)
+	if err != nil || replayed.Status != "applied" {
+		t.Fatalf("RunMigration(replay after source-role removal) report = %+v, error = %v", replayed, err)
+	}
+	if revision, err := repository.CurrentGlobalRevision(context.Background()); err != nil || revision != 1 {
+		t.Fatalf("global revision after replay = %d, error = %v", revision, err)
+	}
+}
+
 func TestOrganizationRBACMigrationPersistsPageLeavesWithOneGlobalRevisionBump(t *testing.T) {
 	db, repository := prepareOrganizationRBACTestRepository(t)
 	seedOrganizationRBAC(t, db)
