@@ -51,7 +51,7 @@
 
 .admin-tree-workbench {
   display: grid;
-  grid-template-columns: minmax(280px, 0.75fr) minmax(0, 1.75fr);
+  grid-template-columns: clamp(264px, 28vw, 320px) minmax(0, 1fr);
   align-items: start;
   gap: 12px;
   min-width: 0;
@@ -64,16 +64,38 @@
   min-width: 0;
 }
 
+.role-governance-detail-focus-target,
+.role-governance-detail {
+  min-width: 0;
+  min-height: 360px;
+}
+
 .admin-tree-workbench-tree {
   min-height: 360px;
   padding: 8px;
+  overflow-x: hidden;
 }
 
 .admin-tree-workbench-tree .ant-tree-node-content-wrapper,
 .platform-tree-transfer-pane .ant-tree-node-content-wrapper {
+  flex: 1;
   min-width: 0;
   min-height: 44px;
+  overflow: hidden;
   padding-block: 8px;
+}
+
+.admin-tree-workbench-tree .ant-tree-treenode,
+.platform-tree-transfer-pane .ant-tree-treenode {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-tree-workbench-tree .ant-tree-title,
+.platform-tree-transfer-pane .ant-tree-title {
+  display: block;
+  width: 100%;
+  min-width: 0;
 }
 
 .admin-tree-workbench-tree .ant-tree-switcher {
@@ -84,7 +106,8 @@
   justify-content: center;
 }
 
-.menu-governance-detail-focus-target:focus-visible {
+.menu-governance-detail-focus-target:focus-visible,
+.role-governance-detail-focus-target:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
@@ -93,25 +116,85 @@
 .platform-tree-transfer-node {
   display: flex;
   align-items: center;
+  width: 100%;
   min-width: 0;
   gap: 8px;
 }
 
 .admin-tree-workbench-node-label,
 .platform-tree-transfer-node > span:first-child {
+  display: block;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-tree-workbench-node-count {
+  flex: 0 0 3ch;
   margin-inline-start: auto;
   font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.platform-tree-transfer-node > .ant-typography {
+  min-width: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .role-governance-detail-body {
   display: grid;
   gap: 16px;
+  min-width: 0;
   padding: 16px;
+}
+
+.role-governance-detail-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.role-governance-detail-heading > div {
+  min-width: 0;
+}
+
+.role-governance-detail-heading .ant-typography {
+  max-width: 100%;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.role-governance-access-control,
+.role-governance-lifecycle {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.role-governance-access-control .ant-typography,
+.role-governance-lifecycle .ant-typography {
+  margin: 0;
+}
+
+.role-governance-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.role-governance-lifecycle-actions .ant-btn-dangerous {
+  margin-inline-start: auto;
 }
 
 .menu-governance-detail-body {
@@ -256,8 +339,6 @@
   min-height: 44px;
 }
 
-.role-governance-detail-heading,
-.role-governance-command-bar,
 .role-authorization-toolbar,
 .platform-tree-transfer-toolbar {
   display: flex;
@@ -267,11 +348,7 @@
   flex-wrap: wrap;
 }
 
-.role-governance-detail-heading .ant-typography {
-  margin: 0;
-}
-
-.role-governance-command-bar .ant-btn,
+.role-governance-section-actions .ant-btn,
 .admin-tree-workbench-navigation .admin-list-actions .ant-btn,
 .role-governance-detail .admin-list-actions .ant-btn,
 .menu-governance-detail .admin-list-actions .ant-btn,
@@ -342,7 +419,8 @@
   min-width: 0;
   min-height: 360px;
   padding: 6px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -370,6 +448,13 @@
   overflow: auto;
 }
 
+@media (min-width: 1024px) {
+  .admin-tree-workbench-detail {
+    position: sticky;
+    top: var(--space-page);
+  }
+}
+
 @media (max-width: 1023px) {
   .admin-tree-workbench {
     grid-template-columns: minmax(250px, 0.9fr) minmax(0, 1.1fr);
@@ -379,7 +464,7 @@
     min-height: 44px;
   }
 
-  .role-governance-command-bar .ant-btn {
+  .role-governance-section-actions .ant-btn {
     flex: 1 1 160px;
   }
 }
@@ -416,14 +501,51 @@
     align-items: flex-start;
   }
 
-  .role-governance-command-bar .ant-btn,
-  .platform-tree-transfer-toolbar .ant-btn {
+  .role-governance-section-actions .ant-btn {
     width: 100%;
   }
 
+  .role-governance-lifecycle-actions .ant-btn-dangerous {
+    margin-inline-start: 0;
+  }
+
+  .platform-tree-transfer-toolbar {
+    position: sticky;
+    z-index: 2;
+    top: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-block: 4px 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-elevated);
+  }
+
   .platform-tree-transfer-toolbar .ant-input-affix-wrapper {
+    grid-column: 1 / -1;
+    width: 100%;
     flex-basis: 100%;
     max-width: none;
+  }
+
+  .platform-tree-transfer-toolbar .ant-space {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .platform-tree-transfer-toolbar .ant-space-item,
+  .platform-tree-transfer-toolbar .ant-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .platform-tree-transfer-toolbar .ant-btn {
+    height: 44px;
+    padding-inline: 8px;
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: normal;
   }
 
   .role-data-scope-panel {

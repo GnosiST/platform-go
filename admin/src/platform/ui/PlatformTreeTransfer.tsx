@@ -55,7 +55,6 @@ export function PlatformTreeTransfer({
   const selectableLeafKeySet = useMemo(() => new Set(selectableLeafKeys), [selectableLeafKeys]);
   const selectedEligibleLeafKeySet = useMemo(() => new Set(normalizedValue.filter((key) => mutableLeafKeySet.has(key))), [mutableLeafKeySet, normalizedValue]);
   const filteredKeys = useMemo(() => filteredNodeKeys(index, search), [index, search]);
-  const visibleCheckedKeys = useMemo(() => value.filter((key) => filteredKeys.has(key)), [filteredKeys, value]);
   const availableTreeSelection = useMemo(() => deriveTreeTransferSelection(index, normalizedValue, filteredKeys, selectableLeafKeySet), [filteredKeys, index, normalizedValue, selectableLeafKeySet]);
   const selectedTreeSelection = useMemo(() => deriveTreeTransferSelection(index, normalizedValue, filteredKeys, selectedEligibleLeafKeySet), [filteredKeys, index, normalizedValue, selectedEligibleLeafKeySet]);
   const availableTree = useMemo(() => transferTreeData(index, filteredKeys, valueSet, labels, false), [filteredKeys, index, labels, valueSet]);
@@ -232,7 +231,7 @@ function transferTreeData(
       key: node.key,
       title: (
         <span className="platform-tree-transfer-node">
-          <span>{node.label}</span>
+          <span title={node.label}>{node.label}</span>
           {node.code ? <Typography.Text code>{node.code}</Typography.Text> : null}
           {unavailableReason ? <Tooltip title={labels.disabledReason(unavailableReason)}><Typography.Text type="danger">{unavailableReason}</Typography.Text></Tooltip> : null}
         </span>

@@ -20,7 +20,9 @@ type AdminFeedbackProps = AlertProps & {
   compact?: boolean;
 };
 
-type AdminFormModalProps = ModalProps & {
+type AdminModalProps = ModalProps;
+
+type AdminFormModalProps = AdminModalProps & {
   children: ReactNode;
 };
 
@@ -77,8 +79,12 @@ export function AdminFeedback({ className, compact = true, ...alertProps }: Admi
   return <Alert className={cx("admin-feedback", compact && "compact", className)} showIcon {...alertProps} />;
 }
 
+export function AdminModal({ className, ...modalProps }: AdminModalProps) {
+  return <Modal className={cx("admin-modal", className)} {...modalProps} />;
+}
+
 export function AdminFormModal({ className, width = 560, destroyOnHidden = true, forceRender = true, ...modalProps }: AdminFormModalProps) {
-  return <Modal className={cx("admin-form-modal", className)} width={width} destroyOnHidden={destroyOnHidden} forceRender={forceRender} {...modalProps} />;
+  return <AdminModal className={cx("admin-form-modal", className)} width={width} destroyOnHidden={destroyOnHidden} forceRender={forceRender} {...modalProps} />;
 }
 
 export function PlatformOverflowText({ value, tooltip = value, className, strong, code }: PlatformOverflowTextProps) {

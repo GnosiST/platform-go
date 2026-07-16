@@ -55,6 +55,7 @@ const failures = [];
 const roleAuthorizationOpen = sourceRange(files.roleGovernance, "const openAuthorization", "const saveAuthorization");
 const roleAuthorizationSave = sourceRange(files.roleGovernance, "const saveAuthorization", "const openMenus");
 const roleAuthorizationModal = sourceRange(files.roleGovernance, "function AuthorizationModal", "function MenuVisibilityModal");
+const roleMenuModal = sourceRange(files.roleGovernance, "function MenuVisibilityModal", "async function assignmentPermissionRecords");
 const legacyRolePermissionInput = sourceRange(files.rolePermissionWorkflow, "function legacyRolePermissionInput", "function uniqueSorted");
 const mobileStyles = extractCssBlock(files.styles, "@media (max-width: 767px)");
 const tabletWorkbenchStyles = extractCssBlock(files.styles, "@media (max-width: 1023px)");
@@ -399,14 +400,19 @@ for (const key of [
 }
 requireIncludes(files.roleGovernance, "AdminTreeWorkbench", "Role governance must use the platform tree workbench wrapper.");
 requireIncludes(files.roleGovernance, "PlatformTreeTransfer", "Role permission and menu entry points must use the platform Tree Transfer wrapper.");
+requireIncludes(files.primitives, "export function AdminModal", "Shared platform dialogs must expose the AdminModal wrapper.");
+requireIncludes(files.primitives, '<Modal className={cx("admin-modal", className)}', "AdminModal must remain the single Ant Modal boundary for shared platform dialogs.");
+requireIncludes(files.primitives, "return <AdminModal", "AdminFormModal must build on the shared AdminModal wrapper.");
+requireIncludes(files.roleGovernance, "AdminModal", "Role governance dialogs must use the shared AdminModal wrapper.");
+requireNotIncludes(files.roleGovernance, "<Modal", "Role governance must not bypass the shared AdminModal wrapper.");
 requireIncludes(files.roleGovernance, 'const canReadGroups = hasPermission(permissions, "admin:role-group:read", deniedPermissions);', "Role governance must derive role-group read access from the active permission set.");
 requireIncludes(files.roleGovernance, 'const canReadRoles = hasPermission(permissions, "admin:role:read", deniedPermissions);', "Role governance must derive role read access from the active permission set.");
 requireIncludes(files.roleGovernance, 'const canReadTenants = hasPermission(permissions, "admin:tenant:read", deniedPermissions);', "Role-group creation must derive tenant read access from the active permission set.");
 requireIncludes(files.roleGovernance, 'const canCreateGroup = hasPermission(permissions, "admin:role-group:create", deniedPermissions) && canReadTenants;', "Tenant-scoped role-group creation must require tenant read access.");
 requireIncludes(files.roleGovernance, 'const canReadAuthorizationInputs = hasPermission(permissions, "admin:permission:read", deniedPermissions) && hasPermission(permissions, "admin:org-unit:read", deniedPermissions) && hasPermission(permissions, "admin:area-code:read", deniedPermissions);', "Role permission assignment must require every resource read permission used by its editor.");
 requireIncludes(files.roleGovernance, 'const canReadMenus = hasPermission(permissions, "admin:menu:read", deniedPermissions);', "Read-only role menu assignment must require menu read access.");
-requireIncludes(files.roleGovernance, '{canReadMenus ? <Button ref={menuTriggerRef}', "Role menu assignment must be hidden when menu records cannot be read.");
-requireIncludes(files.roleGovernance, '{canReadAuthorizationInputs ? <Button ref={authorizationTriggerRef}', "Role permission assignment must be hidden when its supporting records cannot be read.");
+requireIncludes(files.roleGovernance, '{canReadMenus ? <AdminActionButton ref={menuTriggerRef}', "Role menu assignment must be hidden when menu records cannot be read.");
+requireIncludes(files.roleGovernance, '{canReadAuthorizationInputs ? <AdminActionButton ref={authorizationTriggerRef}', "Role permission assignment must be hidden when its supporting records cannot be read.");
 requireRegex(
   files.roleGovernance,
   /canReadGroups\s*\?\s*loadAllRecords\("role-groups"\)\s*:\s*Promise\.resolve\(\[\]\)[\s\S]*?canReadRoles\s*\?\s*loadAllRecords\("roles", query \? \[query\] : undefined\)\s*:\s*Promise\.resolve\(\[\]\)/,
@@ -459,7 +465,7 @@ for (const field of ["permissions", "denyPermissions", "dataScope", "dataScopeOr
 }
 requireIncludes(legacyRolePermissionInput, 'uniqueSorted(authorization.allow).join(",")', "Legacy allowed permissions must use the existing delimited storage format.");
 requireIncludes(legacyRolePermissionInput, 'uniqueSorted(authorization.deny).join(",")', "Legacy denied permissions must use the existing delimited storage format.");
-requireIncludes(files.roleGovernance, '{canReadAuthorizationInputs ? <Button ref={authorizationTriggerRef} icon={<SafetyCertificateOutlined', "Readable role permission workflows must stay available for inspection even when editing is disabled.");
+requireIncludes(files.roleGovernance, '{canReadAuthorizationInputs ? <AdminActionButton ref={authorizationTriggerRef} icon={<SafetyCertificateOutlined', "Readable role permission workflows must stay available for inspection even when editing is disabled.");
 requireIncludes(roleAuthorizationModal, "footer={readOnly ? <Button onClick={onCancel}>{dictionary.close}</Button> : undefined}", "Read-only role permission inspection must expose a close-only footer.");
 requireIncludes(roleAuthorizationModal, 'readOnly={readOnly}', "Read-only role permission inspection must disable Tree Transfer and data-scope controls.");
 requireCountAtLeast(roleAuthorizationModal, "disabled={readOnly}", 3, "Read-only role permission inspection must disable every data-scope control.");
@@ -469,7 +475,15 @@ for (const key of ["rolePermissionReadonlyTitle", "rolePermissionReadonlySchemaD
 }
 requireIncludes(files.roleGovernance, "sameRoleGroupBoundary(group, moveSourceGroup)", "Role move options must stay inside the current scope and tenant boundary.");
 requireCountAtLeast(files.roleGovernance, 'disabled={!canUpdateRole || record.status !== "enabled"}', 2, "Disabled roles must not expose move or permission mutation actions.");
-requireIncludes(files.roleGovernance, "readOnlyMessage={dictionary.roleMenuLegacyReadonlyDescription}", "The pre-migration menu assignment entry must state that it is read-only.");
+requireIncludes(files.roleGovernance, 'const canEditMenus = roleMenuMigrationWriteEnabled && canAssignMenus && record.status === "enabled";', "Role menu entry editability must include migration, permission and enabled-role state.");
+requireIncludes(files.roleGovernance, 'const canEditMenus = roleMenuMigrationWriteEnabled && canAssignMenus && menuAssignment.role.status === "enabled";', "Role menu modal editability must include migration, permission and enabled-role state.");
+requireIncludes(files.roleGovernance, 'if (!menuAssignment || !roleMenuMigrationWriteEnabled || !canAssignMenus || menuAssignment.role.status !== "enabled") return;', "Role menu saves must reject disabled roles as well as closed migration and missing permission.");
+requireIncludes(files.roleGovernance, "canEditMenus ? dictionary.assignMenus : dictionary.viewMenus", "Read-only role menu entry points must use the localized View Menus label.");
+requireIncludes(roleMenuModal, "readOnly={!canEditMenus}", "Role menu Tree Transfer must be read-only whenever menu editing is ineligible.");
+requireIncludes(roleMenuModal, "readOnlyMessage={readOnlyReason}", "Role menu inspection must expose the state-specific localized read-only reason.");
+for (const key of ["roleMenuLegacyReadonlyDescription", "roleMenuReadonlyAccessDescription", "roleMenuReadonlyDisabledDescription"]) {
+  requireIncludes(files.roleGovernance, `dictionary.${key}`, `Role menu inspection must use ${key} when that read-only state applies.`);
+}
 requireIncludes(
   files.roleGovernance,
   "permissionTreeNodes(permissionCatalog, dictionary, uniqueSorted([...authorization.allow, ...authorization.deny]))",
@@ -478,7 +492,7 @@ requireIncludes(
 requireIncludes(files.roleGovernance, "dictionary.rolePermissionHistoricalDisabled", "Disabled historical permissions must remain removable but unavailable for assignment.");
 requireIncludes(files.roleGovernance, "availableDisabledReason: dictionary.rolePermissionHistoricalMissing", "Missing historical permissions must remain removable but unavailable for assignment.");
 requireIncludes(files.treeTransfer, "const preserved = value.filter((key) => !mutableVisibleSet.has(key));", "Filtered Tree Transfer changes must preserve selections outside the current result.");
-requireIncludes(files.treeTransfer, "const visibleCheckedKeys = useMemo(() => value.filter((key) => filteredKeys.has(key))", "Filtered Tree Transfer rendering must not pass hidden selections to Ant Tree.");
+requireNotIncludes(files.treeTransfer, "visibleCheckedKeys", "Tree Transfer must not retain the unused visibleCheckedKeys projection.");
 requireIncludes(files.treeTransfer, "const preservedDisabled = value.filter((key) => !mutableLeafKeySet.has(key));", "Tree Transfer bulk operations must preserve disabled selections.");
 requireIncludes(files.treeTransfer, "returnFocusRef?.current?.focus({ preventScroll: true });", "Closing Tree Transfer workflows must restore focus without scrolling.");
 requireIncludes(files.treeTransfer, "virtual={virtual}", "Tree Transfer must virtualize large trees through the platform component.");
@@ -487,7 +501,27 @@ requireIncludes(files.treeTransfer, "node.kind === \"leaf\" && !node.disabledRea
 requireIncludes(files.treeTransfer, "const unavailable = Boolean(node.disabledReason || !selectedOnly && node.availableDisabledReason);", "Tree Transfer historical selections must be disabled only in the available pane.");
 requireIncludes(files.treeTransfer, "disabled: unavailable", "Tree Transfer must expose pane-specific unavailable semantics to Ant Tree.");
 requireIncludes(files.treeWorkbench, 'aria-label={ariaLabel}', "The role tree workbench must expose an accessible tree label.");
+requireIncludes(files.treeWorkbench, "workbenchTreeData(nodes, selectedKey)", "Tree workbench data must project the active selection into node semantics.");
+requireIncludes(files.treeWorkbench, '"aria-selected": node.key === selectedKey', "Tree workbench nodes must expose explicit aria-selected state.");
+requireIncludes(files.treeWorkbench, '"aria-level": depth', "Tree workbench nodes must expose their explicit hierarchy depth.");
+requireIncludes(files.treeWorkbench, "children.map((child) => build(child, depth + 1))", "Tree workbench descendants must increment their aria-level.");
+requireIncludes(files.roleGovernance, 'className="role-governance-detail-focus-target" tabIndex={-1}', "Role governance must expose a stable programmatic detail focus target.");
+requireIncludes(files.roleGovernance, "<Typography.Title level={4}>", "Role detail must use the compact platform title hierarchy.");
+requireIncludes(files.roleGovernance, "column={{ xs: 1, md: 2 }}", "Role summaries must reflow from two columns to one.");
+requireIncludes(files.roleGovernance, "roleStatusLabel(record.status, dictionary)", "Role status summaries must be localized.");
+requireIncludes(files.roleGovernance, "roleGroupScopeLabel(valueOf(record, \"scopeType\"), dictionary)", "Role-group scope summaries must be localized.");
+requireIncludes(files.roleGovernance, "roleDataScopeLabel(valueOf(record, \"dataScope\"), dictionary)", "Role data-scope summaries must be localized.");
+requireIncludes(files.roleGovernance, 'className="role-governance-access-control"', "Role access controls must live in their own unframed section.");
+requireIncludes(files.roleGovernance, 'className="role-governance-lifecycle"', "Role lifecycle actions must remain separate from authorization.");
+requireNotIncludes(files.roleGovernance, "role-governance-command-bar", "Role actions must not collapse back into one command row.");
 requireIncludes(files.styles, ".admin-tree-workbench {", "Role governance must define a stable tree/detail layout.");
+requireRegex(files.styles, /\.admin-tree-workbench\s*\{[\s\S]*?grid-template-columns:\s*clamp\(264px,\s*28vw,\s*320px\)\s+minmax\(0,\s*1fr\);/, "Desktop tree workbench navigation must stay bounded between 264px and 320px.");
+requireRegex(files.styles, /\.role-governance-detail-focus-target,[\s\S]*?\.role-governance-detail\s*\{[\s\S]*?min-height:\s*360px;/, "Role detail and empty states must keep a stable minimum height.");
+requireRegex(files.styles, /\.admin-tree-workbench-node-label,[\s\S]*?text-overflow:\s*ellipsis;[\s\S]*?white-space:\s*nowrap;/, "Tree node labels must ellipsize instead of causing horizontal overflow.");
+requireRegex(files.styles, /@media \(min-width:\s*1024px\)[\s\S]*?\.admin-tree-workbench-detail\s*\{[\s\S]*?position:\s*sticky;/, "Tree workbench detail may stick only on desktop.");
+requireRegex(files.styles, /@media screen and \(max-width:\s*767px\)[\s\S]*?\.platform-tree-transfer-toolbar\s*\{[\s\S]*?position:\s*sticky;[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/, "Mobile Tree Transfer toolbar must stay visible as a stable two-column control area.");
+requireRegex(files.styles, /@media screen and \(max-width:\s*767px\)[\s\S]*?\.platform-tree-transfer-toolbar \.ant-input-affix-wrapper\s*\{[\s\S]*?grid-column:\s*1 \/ -1;[\s\S]*?width:\s*100%;/, "Mobile Tree Transfer search must span the full toolbar width.");
+requireRegex(files.styles, /@media screen and \(max-width:\s*767px\)[\s\S]*?\.platform-tree-transfer-toolbar \.ant-space\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/, "Mobile Tree Transfer bulk actions must stay in a two-column row.");
 requireIncludes(files.styles, ".platform-tree-transfer-pane {", "Tree Transfer must define stable pane dimensions.");
 requireRegex(files.styles, /\.platform-tree-transfer-mobile-tabs \.ant-tabs-tab \{[\s\S]*?min-height:\s*44px;/, "Tree Transfer mobile tabs must expose 44px targets.");
 requireRegex(files.styles, /\.admin-tree-workbench-navigation \.admin-list-actions \.ant-btn,[\s\S]*?min-height:\s*44px;/, "Role tree creation actions must expose 44px targets.");
@@ -502,6 +536,12 @@ for (const key of [
   "roleTreeAriaLabel",
   "assignPermissions",
   "assignMenus",
+  "viewMenus",
+  "roleAccessControl",
+  "roleLifecycle",
+  "roleMenuReadonlyTitle",
+  "roleMenuReadonlyAccessDescription",
+  "roleMenuReadonlyDisabledDescription",
   "roleMenuLegacyReadonlyDescription",
   "rolePermissionHistoricalDisabled",
   "rolePermissionHistoricalMissing",

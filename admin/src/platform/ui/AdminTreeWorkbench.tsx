@@ -50,7 +50,7 @@ export function AdminTreeWorkbench({
   onLoadChildren,
 }: AdminTreeWorkbenchProps) {
   const nodeByKey = useMemo(() => new Map(nodes.map((node) => [node.key, node])), [nodes]);
-  const treeData = useMemo(() => workbenchTreeData(nodes), [nodes]);
+  const treeData = useMemo(() => workbenchTreeData(nodes, selectedKey), [nodes, selectedKey]);
   const expandedKeys = useMemo(() => treeData.map((node) => String(node.key)), [treeData]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const virtual = nodes.length >= 50;
@@ -121,20 +121,26 @@ function firstTreeKey(treeData: TreeDataNode[]) {
   return treeData[0] ? String(treeData[0].key) : null;
 }
 
-function workbenchTreeData(nodes: AdminTreeWorkbenchNode[]): TreeDataNode[] {
+type WorkbenchTreeDataNode = TreeDataNode & {
+  "aria-level": number;
+  "aria-selected": boolean;
+  children?: WorkbenchTreeDataNode[];
+};
+
+function workbenchTreeData(nodes: AdminTreeWorkbenchNode[], selectedKey?: string): WorkbenchTreeDataNode[] {
   const childrenByParent = new Map<string, AdminTreeWorkbenchNode[]>();
   for (const node of nodes) {
     const parentKey = node.parentKey ?? "";
     childrenByParent.set(parentKey, [...(childrenByParent.get(parentKey) ?? []), node]);
   }
 
-  const build = (node: AdminTreeWorkbenchNode): TreeDataNode => {
+  const build = (node: AdminTreeWorkbenchNode, depth: number): WorkbenchTreeDataNode => {
     const children = childrenByParent.get(node.key) ?? [];
     return {
       key: node.key,
       title: (
         <span className="admin-tree-workbench-node">
-          <span className="admin-tree-workbench-node-label">{node.label}</span>
+          <span className="admin-tree-workbench-node-label" title={typeof node.label === "string" ? node.label : node.searchText}>{node.label}</span>
           {node.kind === "group" && typeof node.childCount === "number" ? (
             <Typography.Text className="admin-tree-workbench-node-count" type="secondary">{node.childCount}</Typography.Text>
           ) : null}
@@ -144,9 +150,11 @@ function workbenchTreeData(nodes: AdminTreeWorkbenchNode[]): TreeDataNode[] {
       disabled: Boolean(node.disabledReason),
       isLeaf: node.isLeaf ?? node.kind === "item",
       selectable: node.selectable ?? true,
-      children: children.length > 0 ? children.map(build) : undefined,
+      "aria-selected": node.key === selectedKey,
+      "aria-level": depth,
+      children: children.length > 0 ? children.map((child) => build(child, depth + 1)) : undefined,
     };
   };
 
-  return (childrenByParent.get("") ?? []).map(build);
+  return (childrenByParent.get("") ?? []).map((node) => build(node, 1));
 }

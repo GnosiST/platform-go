@@ -787,8 +787,8 @@ describe("validate-admin-ui-contracts", () => {
     replaceInTemp(
       tempRoot,
       "admin/src/platform/resources/RoleGovernanceConsole.tsx",
-      '{canReadMenus ? <Button ref={menuTriggerRef}',
-      '{true ? <Button ref={menuTriggerRef}',
+      '{canReadMenus ? <AdminActionButton ref={menuTriggerRef}',
+      '{true ? <AdminActionButton ref={menuTriggerRef}',
     );
 
     const result = runValidator(["--root", tempRoot]);
@@ -851,8 +851,9 @@ describe("validate-admin-ui-contracts", () => {
     const organizationRBAC = adminSource("admin/src/platform/api/organizationRBAC.ts");
 
     assert.match(roleGovernance, /const canAssignMenus = canReadMenus && canUpdateRole;/);
-    assert.match(roleGovernance, /readOnly=\{!roleMenuMigrationWriteEnabled \|\| !canAssignMenus\}/);
-    assert.match(roleGovernance, /if \(!menuAssignment \|\| !roleMenuMigrationWriteEnabled \|\| !canAssignMenus\) return;/);
+    assert.match(roleGovernance, /const canEditMenus = roleMenuMigrationWriteEnabled && canAssignMenus && menuAssignment\.role\.status === "enabled";/);
+    assert.match(roleGovernance, /readOnly=\{!canEditMenus\}/);
+    assert.match(roleGovernance, /if \(!menuAssignment \|\| !roleMenuMigrationWriteEnabled \|\| !canAssignMenus \|\| menuAssignment\.role\.status !== "enabled"\) return;/);
     assert.match(organizationRBAC, /export const roleMenuMigrationWriteEnabled = false;/);
   });
 
@@ -1032,14 +1033,17 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(treeTransfer, /index\.leafDescendantsByBranch\.get\(key\)/);
   });
 
-  it("only renders legacy read-only messaging while role-menu assignment is read-only", () => {
+  it("renders one state-specific role-menu read-only explanation", () => {
     const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
     const treeTransfer = adminSource("admin/src/platform/ui/PlatformTreeTransfer.tsx");
 
-    assert.match(roleGovernance, /\{migrationReadOnly \? <AdminFeedback type="warning"/);
-    assert.match(roleGovernance, /showReadOnlyMessage=\{migrationReadOnly\}/);
+    assert.match(roleGovernance, /\{!canEditMenus \? <AdminFeedback type="warning" message=\{roleMenuReadOnlyTitle/);
+    assert.match(roleGovernance, /description=\{readOnlyReason\}/);
+    assert.match(roleGovernance, /showReadOnlyMessage=\{false\}/);
     assert.match(treeTransfer, /showReadOnlyMessage && readOnlyMessage/);
-    assert.doesNotMatch(roleGovernance, /^\s*<AdminFeedback type="warning" message=\{dictionary\.roleMenuLegacyReadonlyTitle\}/m);
+    assert.match(roleGovernance, /if \(role\.status !== "enabled"\) return dictionary\.roleMenuReadonlyDisabledDescription;/);
+    assert.match(roleGovernance, /if \(!canAssignMenus\) return dictionary\.roleMenuReadonlyAccessDescription;/);
+    assert.match(roleGovernance, /if \(!roleMenuMigrationWriteEnabled\) return dictionary\.roleMenuLegacyReadonlyDescription;/);
   });
 
   it("rejects tenant-scoped role-group creation without tenant read access", () => {
@@ -1102,19 +1106,123 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /must preserve selections outside the current result/);
   });
 
-  it("rejects filtered Tree Transfer rendering that passes hidden selections to Ant Tree", () => {
+  it("rejects restoring the unused filtered Tree Transfer checked-key projection", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
       tempRoot,
       "admin/src/platform/ui/PlatformTreeTransfer.tsx",
-      "const visibleCheckedKeys = useMemo(() => value.filter((key) => filteredKeys.has(key)), [filteredKeys, value]);",
-      "const visibleCheckedKeys = value;",
+      "const filteredKeys = useMemo(() => filteredNodeKeys(index, search), [index, search]);",
+      "const filteredKeys = useMemo(() => filteredNodeKeys(index, search), [index, search]);\n  const visibleCheckedKeys = value.filter((key) => filteredKeys.has(key));",
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /must not pass hidden selections to Ant Tree/);
+    assert.match(result.stderr, /must not retain the unused visibleCheckedKeys projection/);
+  });
+
+  it("rejects tree workbench data without explicit selected and level semantics", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/platform/ui/AdminTreeWorkbench.tsx", '"aria-selected": node.key === selectedKey,', '"aria-selected": false,');
+    replaceInTemp(tempRoot, "admin/src/platform/ui/AdminTreeWorkbench.tsx", '"aria-level": depth,', '"aria-level": 1,');
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /explicit aria-selected state/);
+    assert.match(result.stderr, /explicit hierarchy depth/);
+  });
+
+  it("rejects role governance without a stable detail focus target", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/platform/resources/RoleGovernanceConsole.tsx", 'className="role-governance-detail-focus-target" tabIndex={-1}', 'className="role-governance-detail-focus-target"');
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /stable programmatic detail focus target/);
+  });
+
+  it("rejects role menu editing that ignores disabled-role state", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      'roleMenuMigrationWriteEnabled && canAssignMenus && record.status === "enabled"',
+      "roleMenuMigrationWriteEnabled && canAssignMenus",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /editability must include migration, permission and enabled-role state/);
+  });
+
+  it("rejects a generic assign label for read-only role menu inspection", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/platform/resources/RoleGovernanceConsole.tsx", "canEditMenus ? dictionary.assignMenus : dictionary.viewMenus", "dictionary.assignMenus");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /localized View Menus label/);
+  });
+
+  it("rejects raw role status, role-group scope and role data-scope summaries", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/platform/resources/RoleGovernanceConsole.tsx", "roleStatusLabel(record.status, dictionary)", "record.status");
+    replaceInTemp(tempRoot, "admin/src/platform/resources/RoleGovernanceConsole.tsx", 'roleGroupScopeLabel(valueOf(record, "scopeType"), dictionary)', 'valueOf(record, "scopeType")');
+    replaceInTemp(tempRoot, "admin/src/platform/resources/RoleGovernanceConsole.tsx", 'roleDataScopeLabel(valueOf(record, "dataScope"), dictionary)', 'valueOf(record, "dataScope")');
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /status summaries must be localized/);
+    assert.match(result.stderr, /scope summaries must be localized/);
+  });
+
+  it("rejects unbounded role workbench tracks and collapsing role detail", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/styles.css", "grid-template-columns: clamp(264px, 28vw, 320px) minmax(0, 1fr);", "grid-template-columns: 1fr 1fr;");
+    replaceInTemp(tempRoot, "admin/src/styles.css", "min-height: 360px;", "min-height: 0;");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /navigation must stay bounded/);
+    assert.match(result.stderr, /stable minimum height/);
+  });
+
+  it("rejects tree labels that can expand the workbench horizontally", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/styles.css", "text-overflow: ellipsis;", "text-overflow: clip;");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must ellipsize/);
+  });
+
+  it("rejects a mobile Tree Transfer toolbar without sticky two-column actions", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/styles.css", "position: sticky;", "position: static;");
+    replaceInTemp(tempRoot, "admin/src/styles.css", "grid-template-columns: repeat(2, minmax(0, 1fr));", "grid-template-columns: minmax(0, 1fr);");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Mobile Tree Transfer toolbar must stay visible/);
+    assert.match(result.stderr, /bulk actions must stay in a two-column row/);
+  });
+
+  it("rejects role dialogs that bypass the shared AdminModal wrapper", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/platform/resources/RoleGovernanceConsole.tsx", "<AdminModal", "<Modal");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must not bypass the shared AdminModal wrapper/);
   });
 
   it("rejects role move options that cross scope or tenant boundaries", () => {

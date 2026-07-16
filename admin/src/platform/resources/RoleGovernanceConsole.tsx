@@ -7,7 +7,7 @@ import {
   StopOutlined,
   SwapOutlined,
 } from "@ant-design/icons";
-import { App, Button, Descriptions, Form, Input, InputNumber, Modal, Segmented, Select, Space, Tag, Typography } from "antd";
+import { App, Button, Descriptions, Form, Input, InputNumber, Segmented, Select, Space, Tag, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   createAdminResource,
@@ -45,6 +45,7 @@ import {
   AdminFeedback,
   AdminFormModal,
   AdminListPanel,
+  AdminModal,
   AdminPage,
   AdminTreeWorkbench,
   PlatformTreeSelect,
@@ -116,6 +117,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const [metadataForm] = Form.useForm<MetadataValues>();
   const authorizationTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const detailFocusRef = useRef<HTMLDivElement | null>(null);
   const authorizationRequest = useRef(0);
   const governanceRequest = useRef(0);
   const menuRequest = useRef(0);
@@ -318,7 +320,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   };
 
   const saveMenus = async () => {
-    if (!menuAssignment || !roleMenuMigrationWriteEnabled || !canAssignMenus) return;
+    if (!menuAssignment || !roleMenuMigrationWriteEnabled || !canAssignMenus || menuAssignment.role.status !== "enabled") return;
     const requestID = menuRequest.current;
     const menuCodes = pageMenuCodes(menuTreeNodes(menus, menuAssignment.menuCodes, dictionary), menuAssignment.menuCodes);
     setActing("menus");
@@ -383,6 +385,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
       canCreateRole={canCreateRole}
       canReadAuthorizationInputs={canReadAuthorizationInputs}
       canReadMenus={canReadMenus}
+      canAssignMenus={canAssignMenus}
       canUpdateGroup={canUpdateGroup}
       canUpdateRole={canUpdateRole}
       dictionary={dictionary}
@@ -422,7 +425,11 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
           </Space>
         )}
         ariaLabel={dictionary.roleTreeAriaLabel}
-        detail={details}
+        detail={(
+          <div ref={detailFocusRef} className="role-governance-detail-focus-target" tabIndex={-1} aria-label={dictionary.roleGovernanceDetail}>
+            {details}
+          </div>
+        )}
         emptyText={dictionary.emptyData}
         loading={loading}
         nodes={nodes}
@@ -469,7 +476,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
         </Form>
       </AdminFormModal>
 
-      <Modal
+      <AdminModal
         confirmLoading={acting === "move"}
         okText={dictionary.reviewAndApply}
         open={Boolean(moveRole)}
@@ -488,7 +495,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
           value={moveTargetGroup || undefined}
           onChange={setMoveTargetGroup}
         />
-      </Modal>
+      </AdminModal>
 
       <AuthorizationModal
         acting={acting === "authorization"}
@@ -530,6 +537,7 @@ function RoleGovernanceDetail({
   canCreateRole,
   canReadAuthorizationInputs,
   canReadMenus,
+  canAssignMenus,
   canUpdateGroup,
   canUpdateRole,
   authorizationTriggerRef,
@@ -548,6 +556,7 @@ function RoleGovernanceDetail({
   canCreateRole: boolean;
   canReadAuthorizationInputs: boolean;
   canReadMenus: boolean;
+  canAssignMenus: boolean;
   canUpdateGroup: boolean;
   canUpdateRole: boolean;
   authorizationTriggerRef: React.RefObject<HTMLButtonElement>;
@@ -560,6 +569,9 @@ function RoleGovernanceDetail({
   onAssignMenus: (role: AdminResourceRecord) => void;
 }) {
   const group = type === "role" ? groupByCode.get(valueOf(record, "groupCode")) : undefined;
+  const canEditMenus = roleMenuMigrationWriteEnabled && canAssignMenus && record.status === "enabled";
+  const menuActionLabel = canEditMenus ? dictionary.assignMenus : dictionary.viewMenus;
+  const groupScope = valueOf(record, "scopeType");
   return (
     <AdminListPanel
       className="role-governance-detail"
@@ -573,33 +585,43 @@ function RoleGovernanceDetail({
     >
       <div className="role-governance-detail-body">
         <div className="role-governance-detail-heading">
-          <div><Typography.Title level={3}>{record.name}</Typography.Title><Typography.Text code>{record.code}</Typography.Text></div>
-          <Tag color={record.status === "enabled" ? "success" : "default"}>{record.status}</Tag>
+          <div><Typography.Title level={4}>{record.name}</Typography.Title><Typography.Text code>{record.code}</Typography.Text></div>
+          <Tag color={record.status === "enabled" ? "success" : "default"}>{roleStatusLabel(record.status, dictionary)}</Tag>
         </div>
-        <Descriptions column={1} size="small">
+        <Descriptions column={{ xs: 1, md: 2 }} size="small">
           {type === "group" ? (
             <>
-              <Descriptions.Item label={dictionary.roleGroupScope}>{valueOf(record, "scopeType") || "-"}</Descriptions.Item>
-              <Descriptions.Item label={dictionary.tenantContext}>{valueOf(record, "tenantCode") || dictionary.roleGroupScopePlatform}</Descriptions.Item>
+              <Descriptions.Item label={dictionary.roleGroupScope}>{roleGroupScopeLabel(valueOf(record, "scopeType"), dictionary)}</Descriptions.Item>
+              <Descriptions.Item label={dictionary.tenantContext}>{groupScope === "platform" ? "-" : valueOf(record, "tenantCode") || "-"}</Descriptions.Item>
               <Descriptions.Item label={dictionary.roleGroupSortOrder}>{valueOf(record, "sortOrder") || "0"}</Descriptions.Item>
             </>
           ) : (
             <>
               <Descriptions.Item label={dictionary.roleGroupMetadata}>{group ? `${group.name} (${group.code})` : valueOf(record, "groupCode") || "-"}</Descriptions.Item>
-              <Descriptions.Item label={dictionary.roleDataScope}>{valueOf(record, "dataScope") || "-"}</Descriptions.Item>
+              <Descriptions.Item label={dictionary.roleDataScope}>{roleDataScopeLabel(valueOf(record, "dataScope"), dictionary)}</Descriptions.Item>
               <Descriptions.Item label={dictionary.rolePermissionAllow}>{csv(valueOf(record, "permissions")).length}</Descriptions.Item>
               <Descriptions.Item label={dictionary.rolePermissionDeny}>{csv(valueOf(record, "denyPermissions")).length}</Descriptions.Item>
             </>
           )}
-          <Descriptions.Item label={dictionary.description}>{record.description || "-"}</Descriptions.Item>
+          <Descriptions.Item label={dictionary.description} span={{ xs: 1, md: 2 }}>{record.description || "-"}</Descriptions.Item>
         </Descriptions>
         {type === "role" ? (
-          <div className="role-governance-command-bar">
-            <Button disabled={!canUpdateRole || record.status !== "enabled"} icon={<SwapOutlined />} onClick={() => onMove(record)}>{dictionary.roleMove}</Button>
-            <Button danger disabled={!canUpdateRole || record.status !== "enabled"} icon={<StopOutlined />} onClick={() => onDisable(record)}>{dictionary.roleDisable}</Button>
-            {canReadMenus ? <Button ref={menuTriggerRef} icon={<AppstoreOutlined />} onClick={() => onAssignMenus(record)}>{dictionary.assignMenus}</Button> : null}
-            {canReadAuthorizationInputs ? <Button ref={authorizationTriggerRef} icon={<SafetyCertificateOutlined />} type="primary" onClick={() => onAssignPermissions(record)}>{dictionary.assignPermissions}</Button> : null}
-          </div>
+          <>
+            <section className="role-governance-access-control" aria-labelledby="role-governance-access-control-title">
+              <Typography.Title id="role-governance-access-control-title" level={5}>{dictionary.roleAccessControl}</Typography.Title>
+              <div className="role-governance-section-actions">
+                {canReadMenus ? <AdminActionButton ref={menuTriggerRef} icon={<AppstoreOutlined />} label={menuActionLabel} onClick={() => onAssignMenus(record)}>{menuActionLabel}</AdminActionButton> : null}
+                {canReadAuthorizationInputs ? <AdminActionButton ref={authorizationTriggerRef} icon={<SafetyCertificateOutlined />} label={dictionary.assignPermissions} type="primary" onClick={() => onAssignPermissions(record)}>{dictionary.assignPermissions}</AdminActionButton> : null}
+              </div>
+            </section>
+            <section className="role-governance-lifecycle" aria-labelledby="role-governance-lifecycle-title">
+              <Typography.Title id="role-governance-lifecycle-title" level={5}>{dictionary.roleLifecycle}</Typography.Title>
+              <div className="role-governance-section-actions role-governance-lifecycle-actions">
+                <AdminActionButton disabled={!canUpdateRole || record.status !== "enabled"} icon={<SwapOutlined />} label={dictionary.roleMove} onClick={() => onMove(record)}>{dictionary.roleMove}</AdminActionButton>
+                <AdminActionButton danger disabled={!canUpdateRole || record.status !== "enabled"} icon={<StopOutlined />} label={dictionary.roleDisable} onClick={() => onDisable(record)}>{dictionary.roleDisable}</AdminActionButton>
+              </div>
+            </section>
+          </>
         ) : (
           <Typography.Text type="secondary">{dictionary.roleGroupNoGrant}</Typography.Text>
         )}
@@ -647,7 +669,7 @@ function AuthorizationModal({
     else onAuthorizationChange({ ...authorization, deny: next, allow: authorization.allow.filter((code) => !next.includes(code)) });
   };
   return (
-    <Modal
+    <AdminModal
       className="role-authorization-modal"
       confirmLoading={!readOnly && acting}
       destroyOnHidden
@@ -713,7 +735,7 @@ function AuthorizationModal({
           ) : null}
         </div>
       </div>
-    </Modal>
+    </AdminModal>
   );
 }
 
@@ -743,36 +765,38 @@ function MenuVisibilityModal({
   const historicalCodes = uniqueSorted([...menuAssignment.menuCodes, ...legacyVisible]);
   const nodes = menuTreeNodes(menus, historicalCodes, dictionary);
   const migrationReadOnly = !roleMenuMigrationWriteEnabled;
-  const readOnly = migrationReadOnly || !canAssignMenus;
+  const canEditMenus = roleMenuMigrationWriteEnabled && canAssignMenus && menuAssignment.role.status === "enabled";
+  const readOnlyReason = roleMenuReadOnlyReason(canAssignMenus, menuAssignment.role, dictionary);
+  const menuActionLabel = canEditMenus ? dictionary.assignMenus : dictionary.viewMenus;
   const value = migrationReadOnly ? legacyVisible : menuAssignment.menuCodes;
   return (
-    <Modal
+    <AdminModal
       className="role-menu-visibility-modal"
       cancelText={dictionary.close}
-      confirmLoading={acting}
+      confirmLoading={canEditMenus && acting}
       destroyOnHidden
-      footer={readOnly ? <Button onClick={onClose}>{dictionary.close}</Button> : undefined}
+      footer={!canEditMenus ? <Button onClick={onClose}>{dictionary.close}</Button> : undefined}
       okText={dictionary.reviewAndApply}
       open
-      title={`${dictionary.assignMenus}: ${menuAssignment.role.name}`}
+      title={`${menuActionLabel}: ${menuAssignment.role.name}`}
       width={980}
       onCancel={onClose}
       onOk={onSave}
     >
-      {migrationReadOnly ? <AdminFeedback type="warning" message={dictionary.roleMenuLegacyReadonlyTitle} description={dictionary.roleMenuLegacyReadonlyDescription} /> : <Typography.Text type="secondary">{dictionary.changeImpactTitle}</Typography.Text>}
+      {!canEditMenus ? <AdminFeedback type="warning" message={roleMenuReadOnlyTitle(canAssignMenus, menuAssignment.role, dictionary)} description={readOnlyReason} /> : <Typography.Text type="secondary">{dictionary.changeImpactTitle}</Typography.Text>}
       <PlatformTreeTransfer
-        ariaLabel={dictionary.assignMenus}
+        ariaLabel={menuActionLabel}
         labels={transferLabels(dictionary)}
         nodes={nodes}
-        readOnly={!roleMenuMigrationWriteEnabled || !canAssignMenus}
-        readOnlyMessage={dictionary.roleMenuLegacyReadonlyDescription}
+        readOnly={!canEditMenus}
+        readOnlyMessage={readOnlyReason}
         returnFocusRef={returnFocusRef}
         revision={menuAssignment.revision}
-        showReadOnlyMessage={migrationReadOnly}
+        showReadOnlyMessage={false}
         value={value}
         onChange={(menuCodes) => onAssignmentChange({ ...menuAssignment, menuCodes: pageMenuCodes(nodes, menuCodes) })}
       />
-    </Modal>
+    </AdminModal>
   );
 }
 
@@ -976,6 +1000,35 @@ function rolePermissionReadOnlyReason(mode: RolePermissionWriteMode, canUpdateRo
   if (!canUpdateRole) return dictionary.rolePermissionReadonlyAccessDescription;
   if (mode === "readonly") return dictionary.rolePermissionReadonlySchemaDescription;
   return "";
+}
+
+function roleMenuReadOnlyReason(canAssignMenus: boolean, role: AdminResourceRecord, dictionary: Dictionary) {
+  if (role.status !== "enabled") return dictionary.roleMenuReadonlyDisabledDescription;
+  if (!canAssignMenus) return dictionary.roleMenuReadonlyAccessDescription;
+  if (!roleMenuMigrationWriteEnabled) return dictionary.roleMenuLegacyReadonlyDescription;
+  return "";
+}
+
+function roleMenuReadOnlyTitle(canAssignMenus: boolean, role: AdminResourceRecord, dictionary: Dictionary) {
+  return role.status === "enabled" && canAssignMenus && !roleMenuMigrationWriteEnabled
+    ? dictionary.roleMenuLegacyReadonlyTitle
+    : dictionary.roleMenuReadonlyTitle;
+}
+
+function roleStatusLabel(status: string, dictionary: Dictionary) {
+  if (status === "enabled") return dictionary.enabled;
+  if (status === "disabled") return dictionary.disabled;
+  return status || "-";
+}
+
+function roleGroupScopeLabel(scope: string, dictionary: Dictionary) {
+  if (scope === "platform") return dictionary.roleGroupScopePlatform;
+  if (scope === "tenant") return dictionary.roleGroupScopeTenant;
+  return scope || "-";
+}
+
+function roleDataScopeLabel(scope: string, dictionary: Dictionary) {
+  return (dataScopeOptions(dictionary).find((option) => option.value === scope)?.label ?? scope) || "-";
 }
 
 function selectedRecord(key: string, groups: AdminResourceRecord[], roles: AdminResourceRecord[]) {
