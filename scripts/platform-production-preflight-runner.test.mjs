@@ -80,7 +80,7 @@ describe("platform production preflight runner", () => {
       preflightCommands: [
         {
           id: "write-marker",
-          command: `rtk node ${scriptPath}`,
+          command: `node ${scriptPath}`,
           purpose: "Writes a marker so tests can prove --run is required.",
         },
       ],
