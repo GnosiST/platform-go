@@ -366,6 +366,11 @@ describe("admin resource contract generators", () => {
     const acceptedNestedRef = runAdminAPIBoundaryValidator(validNested);
     assert.equal(acceptedNestedRef.status, 0, acceptedNestedRef.stderr);
 
+    const descriptionOnly = runAdminOpenAPIForContract(contract);
+    descriptionOnly.components.responses.BadRequest = { description: "Bad request without a JSON body" };
+    const acceptedDescriptionOnly = runAdminAPIBoundaryValidator(descriptionOnly);
+    assert.equal(acceptedDescriptionOnly.status, 0, acceptedDescriptionOnly.stderr);
+
     const success = runAdminOpenAPIForContract(contract);
     success.paths["/api/admin/service-objects/query"].post.responses["200"].content["application/json"].schema = {
       type: "object",
@@ -373,6 +378,36 @@ describe("admin resource contract generators", () => {
     };
     const accepted = runAdminAPIBoundaryValidator(success);
     assert.equal(accepted.status, 0, accepted.stderr);
+  });
+
+  it("rejects schema and arbitrary objects masquerading as Admin response components", () => {
+    const contract = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, "..", "resources", "generated", "admin-resource-contract.json"), "utf8"));
+    for (const [label, replacement] of [
+      ["schema object", (openapi) => structuredClone(openapi.components.schemas.ErrorResponse)],
+      ["arbitrary object", () => ({ description: "Looks like a response", arbitrary: true })],
+    ]) {
+      const openapi = runAdminOpenAPIForContract(contract);
+      openapi.components.responses.BadRequest = replacement(openapi);
+      const result = runAdminAPIBoundaryValidator(openapi);
+      assert.notEqual(result.status, 0, label);
+      assert.match(result.stderr, /components\.responses\.BadRequest must resolve to a valid OpenAPI Response Object/, label);
+    }
+  });
+
+  it("rejects missing and cyclic Admin response component references", () => {
+    const contract = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, "..", "resources", "generated", "admin-resource-contract.json"), "utf8"));
+    const missing = runAdminOpenAPIForContract(contract);
+    missing.components.responses.BadRequest = { $ref: "#/components/responses/MissingBadRequest" };
+    const missingResult = runAdminAPIBoundaryValidator(missing);
+    assert.notEqual(missingResult.status, 0);
+    assert.match(missingResult.stderr, /components\.responses\.MissingBadRequest is missing/);
+
+    const cyclic = runAdminOpenAPIForContract(contract);
+    cyclic.components.responses.BadRequest = { $ref: "#/components/responses/BadRequestLoop" };
+    cyclic.components.responses.BadRequestLoop = { $ref: "#/components/responses/BadRequest" };
+    const cyclicResult = runAdminAPIBoundaryValidator(cyclic);
+    assert.notEqual(cyclicResult.status, 0);
+    assert.match(cyclicResult.stderr, /components\.responses\.BadRequest contains a circular component response reference/);
   });
 
   it("generates deterministic standalone Go and TypeScript error SDKs", () => {

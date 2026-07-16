@@ -212,6 +212,14 @@ describe("platform service contract standard", () => {
     assert.notEqual(rejectedMissingSchema.status, 0);
     assert.match(rejectedMissingSchema.stderr, /POST \/api\/app\/files response 400 application\/json schema must reference ErrorResponse/);
 
+    const wrongSchemaRef = readJSON("resources/generated/openapi.external.json");
+    wrongSchemaRef.paths["/api/app/files"].post.responses["400"].content["application/json"].schema = {
+      $ref: "#/components/schemas/ErrorBody",
+    };
+    const rejectedWrongSchemaRef = runValidator(["--external-openapi", tempJSON("openapi.external.json", wrongSchemaRef)]);
+    assert.notEqual(rejectedWrongSchemaRef.status, 0);
+    assert.match(rejectedWrongSchemaRef.stderr, /POST \/api\/app\/files response 400 application\/json schema must reference ErrorResponse/);
+
     const success = readJSON("resources/generated/openapi.external.json");
     success.paths["/api/app/files"].post.responses["201"].content["application/json"].schema = {
       type: "object",

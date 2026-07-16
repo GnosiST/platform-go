@@ -111,11 +111,22 @@ function sameJSON(left, right) {
 
 const openAPIHTTPMethods = new Set(["get", "post", "put", "patch", "delete", "head", "options", "trace"]);
 const errorResponseSchema = { $ref: "#/components/schemas/ErrorResponse" };
+const responseObjectFields = new Set(["description", "headers", "content", "links"]);
 
 function componentResponseName(reference) {
   const prefix = "#/components/responses/";
   if (typeof reference !== "string" || !reference.startsWith(prefix)) return "";
   return reference.slice(prefix.length).replaceAll("~1", "/").replaceAll("~0", "~");
+}
+
+function isObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isOpenAPIResponseObject(response) {
+  if (!isObject(response) || typeof response.description !== "string" || !response.description.trim()) return false;
+  if (Object.keys(response).some((key) => !responseObjectFields.has(key) && !key.startsWith("x-"))) return false;
+  return ["headers", "content", "links"].every((key) => !Object.hasOwn(response, key) || isObject(response[key]));
 }
 
 function validateJSONErrorResponse(response, location, errors) {
@@ -124,6 +135,14 @@ function validateJSONErrorResponse(response, location, errors) {
   if (!sameJSON(schema, errorResponseSchema)) {
     errors.push(`${location} application/json schema must reference ErrorResponse`);
   }
+}
+
+function validateConcreteErrorResponse(response, location, errors) {
+  if (!isOpenAPIResponseObject(response)) {
+    errors.push(`${location} must resolve to a valid OpenAPI Response Object`);
+    return;
+  }
+  validateJSONErrorResponse(response, location, errors);
 }
 
 function validateComponentErrorResponse(openapi, name, label, errors, visiting, validated) {
@@ -147,7 +166,7 @@ function validateComponentErrorResponse(openapi, name, label, errors, visiting, 
       validateComponentErrorResponse(openapi, referencedName, label, errors, visiting, validated);
     }
   } else {
-    validateJSONErrorResponse(response, location, errors);
+    validateConcreteErrorResponse(response, location, errors);
   }
   visiting.delete(name);
   validated.add(name);
@@ -174,7 +193,7 @@ function validateOpenAPIErrorResponses(openapi, label, errors) {
           referencedComponents.add(name);
           continue;
         }
-        validateJSONErrorResponse(response, location, errors);
+        validateConcreteErrorResponse(response, location, errors);
       }
     }
   }
