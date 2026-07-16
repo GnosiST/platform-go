@@ -30,6 +30,7 @@ const files = {
   organizationUserExperience: readSource("admin/src/platform/resources/organizationUserExperience.tsx"),
   roleGovernance: readSource("admin/src/platform/resources/RoleGovernanceConsole.tsx"),
   rolePermissionWriteMode: readSource("admin/src/platform/resources/rolePermissionWriteMode.ts"),
+  rolePermissionWorkflow: readSource("admin/src/platform/resources/rolePermissionWorkflow.ts"),
   roleManagementNavigation: readSource("admin/src/platform/resources/roleManagementNavigation.ts"),
   menuGovernance: readSourceOptional("admin/src/platform/resources/MenuGovernanceConsole.tsx"),
   menuGovernanceValidation: readSourceOptional("admin/src/platform/resources/menuGovernanceValidation.ts"),
@@ -54,7 +55,7 @@ const failures = [];
 const roleAuthorizationOpen = sourceRange(files.roleGovernance, "const openAuthorization", "const saveAuthorization");
 const roleAuthorizationSave = sourceRange(files.roleGovernance, "const saveAuthorization", "const openMenus");
 const roleAuthorizationModal = sourceRange(files.roleGovernance, "function AuthorizationModal", "function MenuVisibilityModal");
-const legacyRolePermissionInput = sourceRange(files.roleGovernance, "function legacyRolePermissionInput", "function rolePermissionReadOnlyReason");
+const legacyRolePermissionInput = sourceRange(files.rolePermissionWorkflow, "function legacyRolePermissionInput", "function uniqueSorted");
 const mobileStyles = extractCssBlock(files.styles, "@media (max-width: 767px)");
 const tabletWorkbenchStyles = extractCssBlock(files.styles, "@media (max-width: 1023px)");
 const tabletLoginStyles = extractCssBlock(files.styles, "@media (max-width: 1024px)");
@@ -414,10 +415,10 @@ requireRegex(
 requireIncludes(files.roleGovernance, "const governanceRequest = useRef(0);", "Role governance must track the latest tree request.");
 requireIncludes(files.roleGovernance, "if (governanceRequest.current !== requestID) return;", "Role governance must discard stale role and role-group search responses.");
 requireRegex(files.roleGovernance, /loadGovernance[\s\S]*?if \(governanceRequest\.current !== requestID\) return;\s*setLoading\(true\);/, "A stale debounced role-governance request must not re-enter the loading state.");
-requireIncludes(files.roleGovernance, "allowPermissionCodes: authorization.allow", "Role policy prepare must include allowed permissions.");
-requireIncludes(files.roleGovernance, "denyPermissionCodes: authorization.deny", "Role policy prepare must include denied permissions.");
-requireIncludes(files.roleGovernance, "dataScope: authorization.dataScope", "Role policy prepare must include data scope.");
-requireIncludes(files.roleGovernance, "await replaceRolePermissions(preview)", "Role policy changes must apply through the reviewed domain command.");
+requireIncludes(files.rolePermissionWorkflow, "allowPermissionCodes: authorization.allow", "Role policy prepare must include allowed permissions.");
+requireIncludes(files.rolePermissionWorkflow, "denyPermissionCodes: authorization.deny", "Role policy prepare must include denied permissions.");
+requireIncludes(files.rolePermissionWorkflow, "dataScope: authorization.dataScope", "Role policy prepare must include data scope.");
+requireIncludes(files.rolePermissionWorkflow, "await clients.replace(preview)", "Role policy changes must apply through the reviewed domain command.");
 for (const key of ["permissions", "denyPermissions", "dataScope", "dataScopeOrgCodes", "dataScopeAreaCodes"]) {
   requireIncludes(files.rolePermissionWriteMode, `"${key}"`, `Role permission write-mode resolver must inspect ${key}.`);
 }
@@ -431,9 +432,10 @@ requireIncludes(files.roleGovernance, "if (permissionSchemaRequest.current !== r
 requireIncludes(files.roleGovernance, "return () => { permissionSchemaRequest.current += 1; };", "Role permission schema loading must invalidate pending work on unmount.");
 requireRegex(
   roleAuthorizationOpen,
-  /const writeMode = permissionWriteMode;[\s\S]*?writeMode === "target-domain"\s*\? assignmentPermissionRecords\(role\.code\)\s*:\s*loadAllRecords\("permissions"\)[\s\S]*?setAuthorization\(\{\s*role,\s*writeMode,/,
+  /const writeMode = permissionWriteMode;[\s\S]*?loadRolePermissionCatalog\(writeMode, role\.code, \{[\s\S]*?target: assignmentPermissionRecords,[\s\S]*?generic: \(\) => loadAllRecords\("permissions"\),[\s\S]*?\}\)[\s\S]*?setAuthorization\(\{\s*role,\s*writeMode,/,
   "Permission catalogs must use the role schema write mode instead of the menu migration gate.",
 );
+requireIncludes(files.rolePermissionWorkflow, 'return writeMode === "target-domain" ? sources.target(roleCode) : sources.generic();', "Permission catalogs must select their source from the snapshotted role permission mode.");
 requireNotIncludes(roleAuthorizationOpen, "roleMenuMigrationWriteEnabled", "Permission catalogs must use the role schema write mode instead of the menu migration gate.");
 requireIncludes(
   roleAuthorizationSave,
@@ -442,14 +444,12 @@ requireIncludes(
 );
 requireRegex(
   roleAuthorizationSave,
-  /if \(authorization\.writeMode === "legacy-generic"\) \{[\s\S]*?await updateAdminResource\("roles", authorization\.role\.id, legacyRolePermissionInput\(authorization\)\);[\s\S]*?\} else \{[\s\S]*?await prepareRolePermissionChange\(authorization\.role\.code,[\s\S]*?await replaceRolePermissions\(preview\);[\s\S]*?\}/,
-  "Role permission writes must keep legacy generic and target domain-command paths mutually exclusive.",
+  /executeRolePermissionWrite\(authorization, canUpdateRole, \{[\s\S]*?updateAdminResource,[\s\S]*?prepare: prepareRolePermissionChange,[\s\S]*?impact: getRolePermissionChangeImpact,[\s\S]*?replace: replaceRolePermissions,[\s\S]*?\}\)/,
+  "Role permission saves must use the executable workflow with the production clients.",
 );
-requireNotRegex(
-  roleAuthorizationSave,
-  /await replaceRolePermissions\(preview\);[\s\S]*?await updateAdminResource\("roles", authorization\.role\.id/,
-  "Role policy apply must not be followed by a second generic role mutation.",
-);
+requireIncludes(files.rolePermissionWorkflow, 'if (!canUpdateRole || authorization.role.status !== "enabled" || authorization.writeMode === "readonly") return "blocked"', "Role permission workflow must reject readonly, unauthorized and disabled-role writes.");
+requireRegex(files.rolePermissionWorkflow, /if \(authorization\.writeMode === "legacy-generic"\) \{[\s\S]*?await clients\.updateAdminResource\("roles", authorization\.role\.id, legacyRolePermissionInput\(authorization\)\);[\s\S]*?return "applied" as const;[\s\S]*?\}[\s\S]*?const preview = await clients\.prepare[\s\S]*?await clients\.replace\(preview\);/, "Role permission writes must keep legacy generic and target domain-command paths mutually exclusive.");
+requireNotRegex(files.rolePermissionWorkflow, /await clients\.replace\(preview\);[\s\S]*?clients\.updateAdminResource/, "Role policy apply must not be followed by a second generic role mutation.");
 for (const field of ["code", "name", "status", "description"]) {
   requireIncludes(legacyRolePermissionInput, `${field}: authorization.role.${field}`, `Legacy role permission writes must preserve the public ${field} field.`);
 }

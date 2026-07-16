@@ -876,10 +876,12 @@ describe("validate-admin-ui-contracts", () => {
 
   it("selects permission catalogs by permission write mode while menu catalogs keep their own gate", () => {
     const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+    const permissionWorkflow = adminSource("admin/src/platform/resources/rolePermissionWorkflow.ts");
     const openAuthorization = roleGovernance.slice(roleGovernance.indexOf("const openAuthorization"), roleGovernance.indexOf("const saveAuthorization"));
 
     assert.match(openAuthorization, /const writeMode = permissionWriteMode;/);
-    assert.match(openAuthorization, /writeMode === "target-domain" \? assignmentPermissionRecords\(role\.code\) : loadAllRecords\("permissions"\)/);
+    assert.match(openAuthorization, /loadRolePermissionCatalog\(writeMode, role\.code/);
+    assert.match(permissionWorkflow, /writeMode === "target-domain" \? sources\.target\(roleCode\) : sources\.generic\(\)/);
     assert.doesNotMatch(openAuthorization, /roleMenuMigrationWriteEnabled/);
     assert.match(roleGovernance, /menus\.length > 0 \? Promise\.resolve\(menus\) : roleMenuMigrationWriteEnabled \? assignmentMenuRecords\(role\.code\) : loadAllRecords\("menus"\)/);
     assert.match(roleGovernance, /const targetRequest = roleMenuMigrationWriteEnabled \? getRoleMenus\(role\.code\) : Promise\.resolve\(null\);/);
@@ -1239,9 +1241,9 @@ describe("validate-admin-ui-contracts", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
       tempRoot,
-      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
-      "await replaceRolePermissions(preview);",
-      'await replaceRolePermissions(preview);\n      await updateAdminResource("roles", authorization.role.id, {} as never);',
+      "admin/src/platform/resources/rolePermissionWorkflow.ts",
+      "await clients.replace(preview);",
+      'await clients.replace(preview);\n  await clients.updateAdminResource("roles", authorization.role.id, {});',
     );
 
     const result = runValidator(["--root", tempRoot]);
@@ -1254,15 +1256,15 @@ describe("validate-admin-ui-contracts", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
       tempRoot,
-      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
-      'writeMode === "target-domain" ? assignmentPermissionRecords(role.code) : loadAllRecords("permissions")',
-      'roleMenuMigrationWriteEnabled ? assignmentPermissionRecords(role.code) : loadAllRecords("permissions")',
+      "admin/src/platform/resources/rolePermissionWorkflow.ts",
+      'writeMode === "target-domain" ? sources.target(roleCode) : sources.generic()',
+      'roleMenuMigrationWriteEnabled ? sources.target(roleCode) : sources.generic()',
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /Permission catalogs must use the role schema write mode instead of the menu migration gate/);
+    assert.match(result.stderr, /Permission catalogs must select their source from the snapshotted role permission mode/);
   });
 
   it("rejects permission saves without readonly, update-permission and disabled-role guards", () => {
@@ -1284,7 +1286,7 @@ describe("validate-admin-ui-contracts", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
       tempRoot,
-      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      "admin/src/platform/resources/rolePermissionWorkflow.ts",
       "...authorization.role.values,",
       "",
     );

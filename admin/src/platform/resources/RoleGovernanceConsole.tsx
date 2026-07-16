@@ -56,6 +56,7 @@ import {
 import { pageMenuCodes, projectMenuTreeNodes } from "./menuTreeProjection";
 import type { AdminResourceDefinition } from "./registry";
 import { resolveRolePermissionWriteMode, type RolePermissionWriteMode } from "./rolePermissionWriteMode";
+import { executeRolePermissionWrite, loadRolePermissionCatalog, type RolePermissionAuthorization } from "./rolePermissionWorkflow";
 
 type RoleGovernanceConsoleProps = {
   resource: AdminResourceDefinition;
@@ -71,15 +72,7 @@ type EditorState = {
   groupCode?: string;
 };
 
-type AuthorizationState = {
-  role: AdminResourceRecord;
-  writeMode: RolePermissionWriteMode;
-  allow: string[];
-  deny: string[];
-  dataScope: string;
-  dataScopeOrgCodes: string[];
-  dataScopeAreaCodes: string[];
-};
+type AuthorizationState = RolePermissionAuthorization;
 
 type MenuAssignmentState = {
   role: AdminResourceRecord;
@@ -242,7 +235,10 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
     const writeMode = permissionWriteMode;
     try {
       const [nextPermissions, nextOrgUnits, nextAreaCodes] = await Promise.all([
-        writeMode === "target-domain" ? assignmentPermissionRecords(role.code) : loadAllRecords("permissions"),
+        loadRolePermissionCatalog(writeMode, role.code, {
+          target: assignmentPermissionRecords,
+          generic: () => loadAllRecords("permissions"),
+        }),
         orgUnits.length ? orgUnits : loadAllRecords("org-units"),
         areaCodes.length ? areaCodes : loadAllRecords("area-codes"),
       ]);
@@ -274,20 +270,14 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
     }
     setActing("authorization");
     try {
-      if (authorization.writeMode === "legacy-generic") {
-        await updateAdminResource("roles", authorization.role.id, legacyRolePermissionInput(authorization));
-      } else {
-        const preview = await prepareRolePermissionChange(authorization.role.code, {
-          allowPermissionCodes: authorization.allow,
-          denyPermissionCodes: authorization.deny,
-          dataScope: authorization.dataScope,
-          dataScopeOrgCodes: authorization.dataScope === "custom_orgs" ? authorization.dataScopeOrgCodes : [],
-          dataScopeAreaCodes: authorization.dataScope === "custom_areas" ? authorization.dataScopeAreaCodes : [],
-        });
-        const impact = await getRolePermissionChangeImpact(preview.previewId);
-        if (!impact || !await confirmImpact(modal.confirm, dictionary, impact.affectedUsers, impact.conflictCount)) return;
-        await replaceRolePermissions(preview);
-      }
+      const result = await executeRolePermissionWrite(authorization, canUpdateRole, {
+        updateAdminResource,
+        prepare: prepareRolePermissionChange,
+        impact: getRolePermissionChangeImpact,
+        confirm: (impact) => confirmImpact(modal.confirm, dictionary, impact.affectedUsers, impact.conflictCount),
+        replace: replaceRolePermissions,
+      });
+      if (result !== "applied") return;
       setAuthorization(null);
       setNotice(dictionary.roleAuthorizationSaved);
       await loadGovernance(search);
@@ -978,23 +968,6 @@ function metadataInput(editor: EditorState, values: MetadataValues): AdminResour
     status: editor.record?.status ?? "enabled",
     description: values.description,
     values: { ...existing, groupCode: values.groupCode ?? editor.groupCode ?? "" },
-  };
-}
-
-function legacyRolePermissionInput(authorization: AuthorizationState): AdminResourceInput {
-  return {
-    code: authorization.role.code,
-    name: authorization.role.name,
-    status: authorization.role.status,
-    description: authorization.role.description,
-    values: {
-      ...authorization.role.values,
-      permissions: uniqueSorted(authorization.allow).join(","),
-      denyPermissions: uniqueSorted(authorization.deny).join(","),
-      dataScope: authorization.dataScope,
-      dataScopeOrgCodes: (authorization.dataScope === "custom_orgs" ? uniqueSorted(authorization.dataScopeOrgCodes) : []).join(","),
-      dataScopeAreaCodes: (authorization.dataScope === "custom_areas" ? uniqueSorted(authorization.dataScopeAreaCodes) : []).join(","),
-    },
   };
 }
 
