@@ -29,6 +29,7 @@ const files = {
   resourceExperience: readSource("admin/src/platform/resources/resourceExperience.ts"),
   organizationUserExperience: readSource("admin/src/platform/resources/organizationUserExperience.tsx"),
   roleGovernance: readSource("admin/src/platform/resources/RoleGovernanceConsole.tsx"),
+  rolePermissionWriteMode: readSource("admin/src/platform/resources/rolePermissionWriteMode.ts"),
   roleManagementNavigation: readSource("admin/src/platform/resources/roleManagementNavigation.ts"),
   menuGovernance: readSourceOptional("admin/src/platform/resources/MenuGovernanceConsole.tsx"),
   menuGovernanceValidation: readSourceOptional("admin/src/platform/resources/menuGovernanceValidation.ts"),
@@ -50,6 +51,10 @@ const files = {
 };
 
 const failures = [];
+const roleAuthorizationOpen = sourceRange(files.roleGovernance, "const openAuthorization", "const saveAuthorization");
+const roleAuthorizationSave = sourceRange(files.roleGovernance, "const saveAuthorization", "const openMenus");
+const roleAuthorizationModal = sourceRange(files.roleGovernance, "function AuthorizationModal", "function MenuVisibilityModal");
+const legacyRolePermissionInput = sourceRange(files.roleGovernance, "function legacyRolePermissionInput", "function rolePermissionReadOnlyReason");
 const mobileStyles = extractCssBlock(files.styles, "@media (max-width: 767px)");
 const tabletWorkbenchStyles = extractCssBlock(files.styles, "@media (max-width: 1023px)");
 const tabletLoginStyles = extractCssBlock(files.styles, "@media (max-width: 1024px)");
@@ -413,7 +418,55 @@ requireIncludes(files.roleGovernance, "allowPermissionCodes: authorization.allow
 requireIncludes(files.roleGovernance, "denyPermissionCodes: authorization.deny", "Role policy prepare must include denied permissions.");
 requireIncludes(files.roleGovernance, "dataScope: authorization.dataScope", "Role policy prepare must include data scope.");
 requireIncludes(files.roleGovernance, "await replaceRolePermissions(preview)", "Role policy changes must apply through the reviewed domain command.");
-requireNotIncludes(files.roleGovernance, 'await updateAdminResource("roles", authorization.role.id', "Role policy apply must not be followed by a second generic role mutation.");
+for (const key of ["permissions", "denyPermissions", "dataScope", "dataScopeOrgCodes", "dataScopeAreaCodes"]) {
+  requireIncludes(files.rolePermissionWriteMode, `"${key}"`, `Role permission write-mode resolver must inspect ${key}.`);
+}
+requireIncludes(files.rolePermissionWriteMode, 'field?.inForm !== false && field?.readOnly !== true', "Legacy role permission mode must require every policy field to be form-writable and not read-only.");
+requireIncludes(files.rolePermissionWriteMode, 'field?.inForm === false && field.readOnly === true', "Target role permission mode must require every policy field to be excluded from forms and read-only.");
+requireIncludes(files.rolePermissionWriteMode, 'if (fields.some((field) => !field)) return "readonly";', "Missing role permission policy fields must resolve to readonly.");
+requireIncludes(files.roleGovernance, 'getAdminResourceSchema("roles")', "Role permission mode must load the trusted roles schema.");
+requireIncludes(files.roleGovernance, "setPermissionWriteMode(resolveRolePermissionWriteMode(schema));", "Role permission mode must resolve from the loaded roles schema.");
+requireIncludes(files.roleGovernance, "const permissionSchemaRequest = useRef(0);", "Role permission schema loading must track stale requests.");
+requireIncludes(files.roleGovernance, "if (permissionSchemaRequest.current !== requestID) return;", "Role permission schema loading must discard stale or unmounted results.");
+requireIncludes(files.roleGovernance, "return () => { permissionSchemaRequest.current += 1; };", "Role permission schema loading must invalidate pending work on unmount.");
+requireRegex(
+  roleAuthorizationOpen,
+  /const writeMode = permissionWriteMode;[\s\S]*?writeMode === "target-domain"\s*\? assignmentPermissionRecords\(role\.code\)\s*:\s*loadAllRecords\("permissions"\)[\s\S]*?setAuthorization\(\{\s*role,\s*writeMode,/,
+  "Permission catalogs must use the role schema write mode instead of the menu migration gate.",
+);
+requireNotIncludes(roleAuthorizationOpen, "roleMenuMigrationWriteEnabled", "Permission catalogs must use the role schema write mode instead of the menu migration gate.");
+requireIncludes(
+  roleAuthorizationSave,
+  'if (!authorization || !canUpdateRole || authorization.role.status !== "enabled" || authorization.writeMode === "readonly") return;',
+  "Role permission saves must reject readonly, unauthorized and disabled-role writes.",
+);
+requireRegex(
+  roleAuthorizationSave,
+  /if \(authorization\.writeMode === "legacy-generic"\) \{[\s\S]*?await updateAdminResource\("roles", authorization\.role\.id, legacyRolePermissionInput\(authorization\)\);[\s\S]*?\} else \{[\s\S]*?await prepareRolePermissionChange\(authorization\.role\.code,[\s\S]*?await replaceRolePermissions\(preview\);[\s\S]*?\}/,
+  "Role permission writes must keep legacy generic and target domain-command paths mutually exclusive.",
+);
+requireNotRegex(
+  roleAuthorizationSave,
+  /await replaceRolePermissions\(preview\);[\s\S]*?await updateAdminResource\("roles", authorization\.role\.id/,
+  "Role policy apply must not be followed by a second generic role mutation.",
+);
+for (const field of ["code", "name", "status", "description"]) {
+  requireIncludes(legacyRolePermissionInput, `${field}: authorization.role.${field}`, `Legacy role permission writes must preserve the public ${field} field.`);
+}
+requireIncludes(legacyRolePermissionInput, "...authorization.role.values,", "Legacy role permission writes must preserve the complete public values snapshot.");
+for (const field of ["permissions", "denyPermissions", "dataScope", "dataScopeOrgCodes", "dataScopeAreaCodes"]) {
+  requireIncludes(legacyRolePermissionInput, `${field}:`, `Legacy role permission writes must submit ${field}.`);
+}
+requireIncludes(legacyRolePermissionInput, 'uniqueSorted(authorization.allow).join(",")', "Legacy allowed permissions must use the existing delimited storage format.");
+requireIncludes(legacyRolePermissionInput, 'uniqueSorted(authorization.deny).join(",")', "Legacy denied permissions must use the existing delimited storage format.");
+requireIncludes(files.roleGovernance, '{canReadAuthorizationInputs ? <Button ref={authorizationTriggerRef} icon={<SafetyCertificateOutlined', "Readable role permission workflows must stay available for inspection even when editing is disabled.");
+requireIncludes(roleAuthorizationModal, "footer={readOnly ? <Button onClick={onCancel}>{dictionary.close}</Button> : undefined}", "Read-only role permission inspection must expose a close-only footer.");
+requireIncludes(roleAuthorizationModal, 'readOnly={readOnly}', "Read-only role permission inspection must disable Tree Transfer and data-scope controls.");
+requireCountAtLeast(roleAuthorizationModal, "disabled={readOnly}", 3, "Read-only role permission inspection must disable every data-scope control.");
+requireIncludes(roleAuthorizationModal, "dictionary.rolePermissionReadonlyTitle", "Read-only role permission inspection must expose a localized reason.");
+for (const key of ["rolePermissionReadonlyTitle", "rolePermissionReadonlySchemaDescription", "rolePermissionReadonlyAccessDescription", "rolePermissionReadonlyDisabledDescription"]) {
+  requireCountExactly(files.i18n, `${key}:`, 2, `Role permission read-only i18n key ${key} must exist in matching Chinese and English dictionaries.`);
+}
 requireIncludes(files.roleGovernance, "sameRoleGroupBoundary(group, moveSourceGroup)", "Role move options must stay inside the current scope and tenant boundary.");
 requireCountAtLeast(files.roleGovernance, 'disabled={!canUpdateRole || record.status !== "enabled"}', 2, "Disabled roles must not expose move or permission mutation actions.");
 requireIncludes(files.roleGovernance, "readOnlyMessage={dictionary.roleMenuLegacyReadonlyDescription}", "The pre-migration menu assignment entry must state that it is read-only.");
@@ -1021,6 +1074,13 @@ function extractCssBlock(source, marker) {
     if (depth === 0) return source.slice(openIndex + 1, index);
   }
   return "";
+}
+
+function sourceRange(source, start, end) {
+  const startIndex = source.indexOf(start);
+  const endIndex = source.indexOf(end, startIndex + start.length);
+  if (startIndex === -1 || endIndex === -1) return "";
+  return source.slice(startIndex, endIndex);
 }
 
 function requireOrder(source, first, second, message) {

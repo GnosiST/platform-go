@@ -11,6 +11,7 @@ import { App, Button, Descriptions, Form, Input, InputNumber, Modal, Segmented, 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   createAdminResource,
+  getAdminResourceSchema,
   queryAdminResource,
   updateAdminResource,
   type AdminResourceInput,
@@ -54,6 +55,7 @@ import {
 } from "../ui";
 import { pageMenuCodes, projectMenuTreeNodes } from "./menuTreeProjection";
 import type { AdminResourceDefinition } from "./registry";
+import { resolveRolePermissionWriteMode, type RolePermissionWriteMode } from "./rolePermissionWriteMode";
 
 type RoleGovernanceConsoleProps = {
   resource: AdminResourceDefinition;
@@ -71,6 +73,7 @@ type EditorState = {
 
 type AuthorizationState = {
   role: AdminResourceRecord;
+  writeMode: RolePermissionWriteMode;
   allow: string[];
   deny: string[];
   dataScope: string;
@@ -115,6 +118,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const [moveTargetGroup, setMoveTargetGroup] = useState("");
   const [authorization, setAuthorization] = useState<AuthorizationState | null>(null);
   const [permissionMode, setPermissionMode] = useState<"allow" | "deny">("allow");
+  const [permissionWriteMode, setPermissionWriteMode] = useState<RolePermissionWriteMode>("readonly");
   const [menuAssignment, setMenuAssignment] = useState<MenuAssignmentState | null>(null);
   const [metadataForm] = Form.useForm<MetadataValues>();
   const authorizationTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -122,6 +126,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const authorizationRequest = useRef(0);
   const governanceRequest = useRef(0);
   const menuRequest = useRef(0);
+  const permissionSchemaRequest = useRef(0);
   const canReadGroups = hasPermission(permissions, "admin:role-group:read", deniedPermissions);
   const canReadRoles = hasPermission(permissions, "admin:role:read", deniedPermissions);
   const canReadTenants = hasPermission(permissions, "admin:tenant:read", deniedPermissions);
@@ -132,6 +137,20 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const canReadAuthorizationInputs = hasPermission(permissions, "admin:permission:read", deniedPermissions) && hasPermission(permissions, "admin:org-unit:read", deniedPermissions) && hasPermission(permissions, "admin:area-code:read", deniedPermissions);
   const canReadMenus = hasPermission(permissions, "admin:menu:read", deniedPermissions);
   const canAssignMenus = canReadMenus && canUpdateRole;
+
+  useEffect(() => {
+    const requestID = ++permissionSchemaRequest.current;
+    void getAdminResourceSchema("roles")
+      .then((schema) => {
+        if (permissionSchemaRequest.current !== requestID) return;
+        setPermissionWriteMode(resolveRolePermissionWriteMode(schema));
+      })
+      .catch(() => {
+        if (permissionSchemaRequest.current !== requestID) return;
+        setPermissionWriteMode("readonly");
+      });
+    return () => { permissionSchemaRequest.current += 1; };
+  }, []);
 
   const loadGovernance = useCallback(async (query = "", requestID = ++governanceRequest.current) => {
     if (governanceRequest.current !== requestID) return;
@@ -220,9 +239,10 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const openAuthorization = async (role: AdminResourceRecord) => {
     if (!canReadAuthorizationInputs) return;
     const requestID = ++authorizationRequest.current;
+    const writeMode = permissionWriteMode;
     try {
       const [nextPermissions, nextOrgUnits, nextAreaCodes] = await Promise.all([
-        permissionCatalog.length ? permissionCatalog : roleMenuMigrationWriteEnabled ? assignmentPermissionRecords(role.code) : loadAllRecords("permissions"),
+        writeMode === "target-domain" ? assignmentPermissionRecords(role.code) : loadAllRecords("permissions"),
         orgUnits.length ? orgUnits : loadAllRecords("org-units"),
         areaCodes.length ? areaCodes : loadAllRecords("area-codes"),
       ]);
@@ -233,6 +253,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
       setPermissionMode("allow");
       setAuthorization({
         role,
+        writeMode,
         allow: csv(valueOf(role, "permissions")),
         deny: csv(valueOf(role, "denyPermissions")),
         dataScope: valueOf(role, "dataScope") || "all",
@@ -245,7 +266,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   };
 
   const saveAuthorization = async () => {
-    if (!authorization) return;
+    if (!authorization || !canUpdateRole || authorization.role.status !== "enabled" || authorization.writeMode === "readonly") return;
     const overlap = authorization.allow.filter((code) => authorization.deny.includes(code));
     if (overlap.length > 0) {
       setError(dictionary.rolePermissionOverlap.replace("{permissions}", overlap.join(", ")));
@@ -253,16 +274,20 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
     }
     setActing("authorization");
     try {
-      const preview = await prepareRolePermissionChange(authorization.role.code, {
-        allowPermissionCodes: authorization.allow,
-        denyPermissionCodes: authorization.deny,
-        dataScope: authorization.dataScope,
-        dataScopeOrgCodes: authorization.dataScope === "custom_orgs" ? authorization.dataScopeOrgCodes : [],
-        dataScopeAreaCodes: authorization.dataScope === "custom_areas" ? authorization.dataScopeAreaCodes : [],
-      });
-      const impact = await getRolePermissionChangeImpact(preview.previewId);
-      if (!impact || !await confirmImpact(modal.confirm, dictionary, impact.affectedUsers, impact.conflictCount)) return;
-      await replaceRolePermissions(preview);
+      if (authorization.writeMode === "legacy-generic") {
+        await updateAdminResource("roles", authorization.role.id, legacyRolePermissionInput(authorization));
+      } else {
+        const preview = await prepareRolePermissionChange(authorization.role.code, {
+          allowPermissionCodes: authorization.allow,
+          denyPermissionCodes: authorization.deny,
+          dataScope: authorization.dataScope,
+          dataScopeOrgCodes: authorization.dataScope === "custom_orgs" ? authorization.dataScopeOrgCodes : [],
+          dataScopeAreaCodes: authorization.dataScope === "custom_areas" ? authorization.dataScopeAreaCodes : [],
+        });
+        const impact = await getRolePermissionChangeImpact(preview.previewId);
+        if (!impact || !await confirmImpact(modal.confirm, dictionary, impact.affectedUsers, impact.conflictCount)) return;
+        await replaceRolePermissions(preview);
+      }
       setAuthorization(null);
       setNotice(dictionary.roleAuthorizationSaved);
       await loadGovernance(search);
@@ -483,6 +508,8 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
         mode={permissionMode}
         orgUnits={orgUnits}
         permissionCatalog={permissionCatalog}
+        readOnly={authorization?.writeMode === "readonly" || !canUpdateRole || authorization?.role.status !== "enabled"}
+        readOnlyReason={authorization ? rolePermissionReadOnlyReason(authorization.writeMode, canUpdateRole, authorization.role, dictionary) : ""}
         returnFocusRef={authorizationTriggerRef}
         onAuthorizationChange={setAuthorization}
         onCancel={() => { authorizationRequest.current += 1; setAuthorization(null); }}
@@ -581,7 +608,7 @@ function RoleGovernanceDetail({
             <Button disabled={!canUpdateRole || record.status !== "enabled"} icon={<SwapOutlined />} onClick={() => onMove(record)}>{dictionary.roleMove}</Button>
             <Button danger disabled={!canUpdateRole || record.status !== "enabled"} icon={<StopOutlined />} onClick={() => onDisable(record)}>{dictionary.roleDisable}</Button>
             {canReadMenus ? <Button ref={menuTriggerRef} icon={<AppstoreOutlined />} onClick={() => onAssignMenus(record)}>{dictionary.assignMenus}</Button> : null}
-            {canReadAuthorizationInputs ? <Button ref={authorizationTriggerRef} disabled={!canUpdateRole || record.status !== "enabled"} icon={<SafetyCertificateOutlined />} type="primary" onClick={() => onAssignPermissions(record)}>{dictionary.assignPermissions}</Button> : null}
+            {canReadAuthorizationInputs ? <Button ref={authorizationTriggerRef} icon={<SafetyCertificateOutlined />} type="primary" onClick={() => onAssignPermissions(record)}>{dictionary.assignPermissions}</Button> : null}
           </div>
         ) : (
           <Typography.Text type="secondary">{dictionary.roleGroupNoGrant}</Typography.Text>
@@ -599,6 +626,8 @@ function AuthorizationModal({
   orgUnits,
   areaCodes,
   dictionary,
+  readOnly,
+  readOnlyReason,
   returnFocusRef,
   onModeChange,
   onAuthorizationChange,
@@ -612,6 +641,8 @@ function AuthorizationModal({
   orgUnits: AdminResourceRecord[];
   areaCodes: AdminResourceRecord[];
   dictionary: Dictionary;
+  readOnly: boolean;
+  readOnlyReason: string;
   returnFocusRef: React.RefObject<HTMLElement>;
   onModeChange: (mode: "allow" | "deny") => void;
   onAuthorizationChange: (state: AuthorizationState | null) => void;
@@ -628,8 +659,9 @@ function AuthorizationModal({
   return (
     <Modal
       className="role-authorization-modal"
-      confirmLoading={acting}
+      confirmLoading={!readOnly && acting}
       destroyOnHidden
+      footer={readOnly ? <Button onClick={onCancel}>{dictionary.close}</Button> : undefined}
       okText={dictionary.reviewAndApply}
       open
       title={`${dictionary.assignPermissions}: ${authorization.role.name}`}
@@ -637,6 +669,7 @@ function AuthorizationModal({
       onCancel={onCancel}
       onOk={onSave}
     >
+      {readOnly ? <AdminFeedback type="warning" message={dictionary.rolePermissionReadonlyTitle} description={readOnlyReason} /> : null}
       <div className="role-authorization-layout">
         <div className="role-authorization-toolbar">
           <Segmented
@@ -651,7 +684,10 @@ function AuthorizationModal({
           ariaLabel={dictionary.assignPermissions}
           labels={transferLabels(dictionary)}
           nodes={nodes}
+          readOnly={readOnly}
+          readOnlyMessage={readOnlyReason}
           returnFocusRef={returnFocusRef}
+          showReadOnlyMessage={readOnly}
           value={selected}
           onChange={updateSelected}
         />
@@ -659,6 +695,7 @@ function AuthorizationModal({
           <Typography.Text strong>{dictionary.roleDataScope}</Typography.Text>
           <Select
             aria-label={dictionary.roleDataScope}
+            disabled={readOnly}
             getPopupContainer={platformPopupContainer}
             options={dataScopeOptions(dictionary)}
             value={authorization.dataScope}
@@ -667,6 +704,7 @@ function AuthorizationModal({
           {authorization.dataScope === "custom_orgs" ? (
             <PlatformTreeSelect
               aria-label={dictionary.roleDataScopeOrgs}
+              disabled={readOnly}
               multiple
               options={orgUnits.map((record) => treeRecordOption(record))}
               value={authorization.dataScopeOrgCodes}
@@ -676,6 +714,7 @@ function AuthorizationModal({
           {authorization.dataScope === "custom_areas" ? (
             <PlatformTreeSelect
               aria-label={dictionary.roleDataScopeAreas}
+              disabled={readOnly}
               multiple
               options={areaCodes.map((record) => treeRecordOption(record, "parentCode", "path"))}
               value={authorization.dataScopeAreaCodes}
@@ -940,6 +979,30 @@ function metadataInput(editor: EditorState, values: MetadataValues): AdminResour
     description: values.description,
     values: { ...existing, groupCode: values.groupCode ?? editor.groupCode ?? "" },
   };
+}
+
+function legacyRolePermissionInput(authorization: AuthorizationState): AdminResourceInput {
+  return {
+    code: authorization.role.code,
+    name: authorization.role.name,
+    status: authorization.role.status,
+    description: authorization.role.description,
+    values: {
+      ...authorization.role.values,
+      permissions: uniqueSorted(authorization.allow).join(","),
+      denyPermissions: uniqueSorted(authorization.deny).join(","),
+      dataScope: authorization.dataScope,
+      dataScopeOrgCodes: (authorization.dataScope === "custom_orgs" ? uniqueSorted(authorization.dataScopeOrgCodes) : []).join(","),
+      dataScopeAreaCodes: (authorization.dataScope === "custom_areas" ? uniqueSorted(authorization.dataScopeAreaCodes) : []).join(","),
+    },
+  };
+}
+
+function rolePermissionReadOnlyReason(mode: RolePermissionWriteMode, canUpdateRole: boolean, role: AdminResourceRecord, dictionary: Dictionary) {
+  if (role.status !== "enabled") return dictionary.rolePermissionReadonlyDisabledDescription;
+  if (!canUpdateRole) return dictionary.rolePermissionReadonlyAccessDescription;
+  if (mode === "readonly") return dictionary.rolePermissionReadonlySchemaDescription;
+  return "";
 }
 
 function selectedRecord(key: string, groups: AdminResourceRecord[], roles: AdminResourceRecord[]) {

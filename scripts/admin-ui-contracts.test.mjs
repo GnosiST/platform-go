@@ -874,10 +874,13 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(roleGovernance, /const value = migrationReadOnly \? legacyVisible : menuAssignment\.menuCodes;/);
   });
 
-  it("keeps closed-gate legacy catalogs independent from target assignment reads", () => {
+  it("selects permission catalogs by permission write mode while menu catalogs keep their own gate", () => {
     const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+    const openAuthorization = roleGovernance.slice(roleGovernance.indexOf("const openAuthorization"), roleGovernance.indexOf("const saveAuthorization"));
 
-    assert.match(roleGovernance, /permissionCatalog\.length \? permissionCatalog : roleMenuMigrationWriteEnabled \? assignmentPermissionRecords\(role\.code\) : loadAllRecords\("permissions"\)/);
+    assert.match(openAuthorization, /const writeMode = permissionWriteMode;/);
+    assert.match(openAuthorization, /writeMode === "target-domain" \? assignmentPermissionRecords\(role\.code\) : loadAllRecords\("permissions"\)/);
+    assert.doesNotMatch(openAuthorization, /roleMenuMigrationWriteEnabled/);
     assert.match(roleGovernance, /menus\.length > 0 \? Promise\.resolve\(menus\) : roleMenuMigrationWriteEnabled \? assignmentMenuRecords\(role\.code\) : loadAllRecords\("menus"\)/);
     assert.match(roleGovernance, /const targetRequest = roleMenuMigrationWriteEnabled \? getRoleMenus\(role\.code\) : Promise\.resolve\(null\);/);
   });
@@ -1245,6 +1248,81 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /must not be followed by a second generic role mutation/);
+  });
+
+  it("rejects permission catalogs that reuse the menu migration gate", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      'writeMode === "target-domain" ? assignmentPermissionRecords(role.code) : loadAllRecords("permissions")',
+      'roleMenuMigrationWriteEnabled ? assignmentPermissionRecords(role.code) : loadAllRecords("permissions")',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Permission catalogs must use the role schema write mode instead of the menu migration gate/);
+  });
+
+  it("rejects permission saves without readonly, update-permission and disabled-role guards", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      'if (!authorization || !canUpdateRole || authorization.role.status !== "enabled" || authorization.writeMode === "readonly") return;',
+      "if (!authorization) return;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Role permission saves must reject readonly, unauthorized and disabled-role writes/);
+  });
+
+  it("rejects legacy role permission writes that drop the existing public values snapshot", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      "...authorization.role.values,",
+      "",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Legacy role permission writes must preserve the complete public values snapshot/);
+  });
+
+  it("rejects read-only permission inspection without a close-only footer", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/RoleGovernanceConsole.tsx",
+      "footer={readOnly ? <Button onClick={onCancel}>{dictionary.close}</Button> : undefined}",
+      "footer={undefined}",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Read-only role permission inspection must expose a close-only footer/);
+  });
+
+  it("rejects a permission write-mode resolver that omits a policy field", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/rolePermissionWriteMode.ts",
+      '"dataScopeAreaCodes"] as const',
+      '"areaCodes"] as const',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Role permission write-mode resolver must inspect dataScopeAreaCodes/);
   });
 
   it("rejects a new user form that implicitly selects organization context", () => {
