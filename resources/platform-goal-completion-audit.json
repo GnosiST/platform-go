@@ -16,7 +16,8 @@
       "xa-optional-adapter",
       "database-certification-matrix",
       "transactional-outbox-and-one-mq-adapter",
-      "asynchronous-search-projection"
+      "asynchronous-search-projection",
+      "github-release-publication"
     ]
   },
   "approvedStack": {
@@ -25,8 +26,8 @@
   },
   "taskSummary": {
     "expectedTotal": 67,
-    "expectedImplemented": 58,
-    "expectedControlledUnfinished": 9
+    "expectedImplemented": 57,
+    "expectedControlledUnfinished": 10
   },
   "requirements": [
     {

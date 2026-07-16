@@ -3460,10 +3460,10 @@
       },
       "phase": "production-governance",
       "scope": "governance",
-      "status": "implemented",
+      "status": "pending",
       "statusReason": {
-        "zh": "已完成公开仓库、main 默认分支、CI、Pages、v0.1.0 Release 和仓库可见性验证。",
-        "en": "The public repository, main default branch, CI, Pages, v0.1.0 release and repository visibility are verified."
+        "zh": "公开仓库、main 默认分支、CI 和 Pages 已就绪；目标版本保持 v0.1.0，正式 Release/Tag 等待用户明确授权。",
+        "en": "The public repository, main default branch, CI and Pages are ready; the target remains v0.1.0 and the formal Release/Tag awaits explicit user authorization."
       },
       "completionGate": {
         "zh": "创建公开仓库并以 main 作为唯一长期分支，验证净化提交、CI、Pages、v0.1.0 和仓库展示。",
@@ -3487,7 +3487,7 @@
         "validators": ["scripts/validate-open-source-portability.mjs"],
         "tests": [".github/workflows/ci.yml", ".github/workflows/pages.yml"],
         "screenshots": [],
-        "artifacts": ["resources/evidence/github-release-publication-20260716.json"]
+        "artifacts": []
       }
     }
   ],

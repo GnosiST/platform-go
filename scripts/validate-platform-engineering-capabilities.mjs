@@ -72,9 +72,8 @@ const requiredImplementedCapabilityIDs = [
   "organization-rbac-menu-e2e-qa",
   "unified-error-code-governance",
   "open-source-portability",
-  "public-documentation-and-release",
 ];
-const requiredPartialCapabilityIDs = [];
+const requiredPartialCapabilityIDs = ["public-documentation-and-release"];
 const requiredDeferredCapabilityIDs = [
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",

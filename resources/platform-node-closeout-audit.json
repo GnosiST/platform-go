@@ -43,7 +43,8 @@
     "xa-optional-adapter",
     "database-certification-matrix",
     "transactional-outbox-and-one-mq-adapter",
-    "asynchronous-search-projection"
+    "asynchronous-search-projection",
+    "github-release-publication"
   ],
   "nodeCloseouts": [
     {
@@ -1664,19 +1665,6 @@
       ],
       "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"],
       "visualEvidence": ["superpowers:brainstorming", "product-design", "design-taste-frontend"]
-    },
-    {
-      "taskId": "github-release-publication",
-      "status": "closed",
-      "neatFreak": false,
-      "cleanupMode": "focused",
-      "cleanupEvidence": [
-        "resources/evidence/github-release-publication-20260716.json",
-        "README.md",
-        ".github/workflows/ci.yml",
-        ".github/workflows/pages.yml"
-      ],
-      "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"]
     }
   ]
 }

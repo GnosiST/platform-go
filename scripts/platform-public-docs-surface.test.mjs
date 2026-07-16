@@ -13,11 +13,10 @@ const graph = JSON.parse(read("resources/platform-foundation-task-graph.json"));
 const implemented = graph.tasks.filter((task) => task.status === "implemented");
 const unfinished = graph.tasks.filter((task) => task.status !== "implemented");
 const summary = `${graph.tasks.length} total / ${implemented.length} implemented / ${unfinished.length} controlled unfinished`;
-const publishedNodeIDs = [
+const implementedPublicNodeIDs = [
   "open-source-portability",
   "public-docs-community",
   "public-docs-site",
-  "github-release-publication",
 ];
 
 describe("public documentation surface", () => {
@@ -36,10 +35,27 @@ describe("public documentation surface", () => {
 
     for (const relativePath of ["README.md", "README.en.md", "docs/platform-roadmap.md"]) {
       const source = read(relativePath);
-      for (const nodeID of publishedNodeIDs) {
+      for (const nodeID of implementedPublicNodeIDs) {
         assert.match(source, new RegExp("`" + nodeID + "`[^.\\n]*`implemented`"));
       }
+      assert.match(source, /`github-release-publication`[^.\n]*`pending`/);
     }
+  });
+
+  it("keeps v0.1.0 explicitly unreleased until publication is authorized", () => {
+    const adminPackage = JSON.parse(read("admin/package.json"));
+    const websitePackage = JSON.parse(read("website/package.json"));
+    const home = read("website/src/pages/index.tsx");
+    const config = read("website/docusaurus.config.ts");
+    const changelog = read("CHANGELOG.md");
+
+    assert.equal(adminPackage.version, "0.1.0");
+    assert.equal(websitePackage.version, "0.1.0");
+    assert.match(home, /v0\.1\.0 (?:待发布|unreleased)/);
+    assert.doesNotMatch(home, /v0\.1\.\d+ (?:已发布|released)/);
+    assert.doesNotMatch(config, /releases\/tag\/v0\.1\.[0-9]+/);
+    assert.match(changelog, /## \[Unreleased\]/);
+    assert.doesNotMatch(changelog, /## \[0\.1\.1\]/);
   });
 
   it("renders the landing page through the shared Docusaurus layout", () => {

@@ -26,7 +26,8 @@
     "xa-optional-adapter",
     "database-certification-matrix",
     "transactional-outbox-and-one-mq-adapter",
-    "asynchronous-search-projection"
+    "asynchronous-search-projection",
+    "github-release-publication"
   ],
   "knownPromotionBlockers": [
     {

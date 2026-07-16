@@ -161,7 +161,6 @@ describe("validate-platform-engineering-capabilities", () => {
     "organization-rbac-menu-e2e-qa",
     "unified-error-code-governance",
     "open-source-portability",
-    "public-documentation-and-release",
     ]);
     for (const capability of capabilities.filter((item) => implementedCapabilityIDs.has(item.id))) {
       assert.equal(capability.status, "implemented");

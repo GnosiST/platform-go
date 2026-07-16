@@ -363,6 +363,7 @@ describe("validate-platform-foundation-task-graph", () => {
   it("enforces the v0.1 release blocker and post-release optional partition", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const menuTask = graph.tasks.find((item) => item.id === "menu-tree-and-button-permission-configuration");
+    const publicationTask = graph.tasks.find((item) => item.id === "github-release-publication");
 
     assert.deepEqual(graph.releaseBlockingNodes, releaseBlockingNodes);
     assert.deepEqual(graph.postReleaseOptionalNodes, postReleaseOptionalNodes);
@@ -376,6 +377,9 @@ describe("validate-platform-foundation-task-graph", () => {
     });
     assert.equal(graph.tasks.find((item) => item.id === "unified-error-code-governance")?.status, "implemented");
     assert.ok(postReleaseOptionalNodes.every((id) => graph.tasks.find((item) => item.id === id)?.status === "deferred"));
+    assert.equal(publicationTask?.status, "pending");
+    assert.deepEqual(publicationTask?.evidence?.artifacts, []);
+    assert.equal(readJSON("resources/evidence/github-release-publication-20260716.json").status, "withdrawn");
     assert.deepEqual(graph.tasks.find((item) => item.id === "open-source-portability")?.dependsOn, [
       "admin-watermark-export-governance",
       "organization-rbac-menu-e2e-qa",
@@ -424,36 +428,52 @@ describe("validate-platform-foundation-task-graph", () => {
   });
 
   it("rejects publication evidence whose release source SHAs are missing or inconsistent", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const publicationTask = graph.tasks.find((item) => item.id === "github-release-publication");
+    publicationTask.status = "implemented";
+    publicationTask.evidence.artifacts = ["resources/evidence/github-release-publication-20260716.json"];
+    const graphPath = tempJSON("implemented-publication-graph.json", graph);
     const evidence = readJSON("resources/evidence/github-release-publication-20260716.json");
     const releaseCommit = "a".repeat(40);
     Object.assign(evidence, {
+      status: "verified",
       tagCommit: releaseCommit,
       releaseCommit,
       ciHeadSha: releaseCommit,
       pagesHeadSha: "b".repeat(40),
     });
 
-    const mismatch = runValidator(["--release-evidence", tempJSON("release-evidence-mismatch.json", evidence)]);
+    const mismatch = runValidator(["--graph", graphPath, "--release-evidence", tempJSON("release-evidence-mismatch.json", evidence)]);
     assert.notEqual(mismatch.status, 0, mismatch.stdout);
     assert.match(mismatch.stderr, /publication evidence source SHAs must all equal releaseCommit/);
 
     delete evidence.tagCommit;
-    const missing = runValidator(["--release-evidence", tempJSON("release-evidence-missing.json", evidence)]);
+    const missing = runValidator(["--graph", graphPath, "--release-evidence", tempJSON("release-evidence-missing.json", evidence)]);
     assert.notEqual(missing.status, 0, missing.stdout);
     assert.match(missing.stderr, /publication evidence tagCommit must be a full lowercase Git commit SHA/);
   });
 
   it("accepts publication evidence submitted after release without requiring its own commit SHA", () => {
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    const publicationTask = graph.tasks.find((item) => item.id === "github-release-publication");
+    publicationTask.status = "implemented";
+    publicationTask.evidence.artifacts = ["resources/evidence/github-release-publication-20260716.json"];
     const evidence = readJSON("resources/evidence/github-release-publication-20260716.json");
     const releaseCommit = "a".repeat(40);
     Object.assign(evidence, {
+      status: "verified",
       tagCommit: releaseCommit,
       releaseCommit,
       ciHeadSha: releaseCommit,
       pagesHeadSha: releaseCommit,
     });
 
-    const result = runValidator(["--release-evidence", tempJSON("post-release-evidence.json", evidence)]);
+    const result = runValidator([
+      "--graph",
+      tempJSON("implemented-publication-graph.json", graph),
+      "--release-evidence",
+      tempJSON("post-release-evidence.json", evidence),
+    ]);
     assert.equal(result.status, 0, result.stderr);
   });
 
@@ -516,7 +536,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
     assert.equal(graph.tasks.length, 67);
-    assert.equal(implemented.length, 58);
+    assert.equal(implemented.length, 57);
     assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "admin-watermark-export-governance")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-protection-runtime")?.status, "implemented");

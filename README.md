@@ -37,9 +37,9 @@
 <details>
 <summary>当前实现状态与支持边界（维护者参考）</summary>
 
-当前治理快照为 **67 total / 58 implemented / 9 controlled unfinished**。`runtime-security-containment` 为 `implemented`；`sensitive-data-protection-runtime` 为 `implemented`；`sensitive-data-historical-migration` 为 `implemented`；`admin-watermark-export-governance` 为 `implemented`；`organization-user-admin-experience` 为 `implemented`。
+当前治理快照为 **67 total / 57 implemented / 10 controlled unfinished**。`runtime-security-containment` 为 `implemented`；`sensitive-data-protection-runtime` 为 `implemented`；`sensitive-data-historical-migration` 为 `implemented`；`admin-watermark-export-governance` 为 `implemented`；`organization-user-admin-experience` 为 `implemented`。
 
-当前 persistent full-scope unfinished inventory 仅包括 9 个 `deferred` 节点：`multi-datasource-contract-and-runtime`、`tenant-placement-and-request-routing`、`datasource-read-write-routing`、`sharding-and-tenant-migration`、`federated-read-query`、`xa-optional-adapter`、`database-certification-matrix`、`transactional-outbox-and-one-mq-adapter` 和 `asynchronous-search-projection`。`open-source-portability`、`public-docs-community`、`public-docs-site` 和 `github-release-publication` 均为 `implemented`；具体版本的标签和源码归档完整性仍按发布流程独立验收。v0.1.1 只承诺 one datasource and one native transaction boundary；SQLite is development/test-only by support policy，Oracle and KingbaseES are unsupported。`alibaba/page-agent` is only a default-off optional `public-docs-site` sub-capability。
+当前 persistent full-scope unfinished inventory 包括 9 个 `deferred` 节点：`multi-datasource-contract-and-runtime`、`tenant-placement-and-request-routing`、`datasource-read-write-routing`、`sharding-and-tenant-migration`、`federated-read-query`、`xa-optional-adapter`、`database-certification-matrix`、`transactional-outbox-and-one-mq-adapter` 和 `asynchronous-search-projection`，以及唯一的 v0.1.0 release blocker：`github-release-publication`（`pending`）。`open-source-portability`、`public-docs-community` 和 `public-docs-site` 均为 `implemented`。目标版本保持 v0.1.0，当前尚未正式发布；其支持边界为 one datasource and one native transaction boundary。SQLite is development/test-only by support policy，Oracle and KingbaseES are unsupported。`alibaba/page-agent` is only a default-off optional `public-docs-site` sub-capability。
 
 策略评审接口：
 
