@@ -54,6 +54,46 @@ function runTypeScriptProbe(relativePath, body) {
   );
 }
 
+function runAdminClientProbe(body) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "admin-api-client-probe-"));
+  const apiDir = path.join(tempDir, "admin", "src", "platform", "api");
+  const errorSDKDir = path.join(tempDir, "resources", "generated", "error-sdk");
+  fs.mkdirSync(apiDir, { recursive: true });
+  const generator = spawnSync(
+    process.execPath,
+    ["scripts/generate-platform-error-code-artifacts.mjs", "--output-dir", errorSDKDir],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.equal(generator.status, 0, generator.stderr);
+  const clientSource = adminSource("admin/src/platform/api/client.ts")
+    .replace('const API_BASE = import.meta.env.VITE_PLATFORM_API_BASE ?? "/api";', 'const API_BASE = "/api";');
+  const sessionExpirySource = adminSource("admin/src/platform/api/sessionExpiry.ts");
+  fs.writeFileSync(path.join(apiDir, "client.ts"), clientSource);
+  fs.writeFileSync(path.join(apiDir, "sessionExpiry.ts"), sessionExpirySource);
+  const buildDir = path.join(tempDir, "build");
+  const tsc = path.join(repoRoot, "admin", "node_modules", ".bin", "tsc");
+  const compile = spawnSync(
+    tsc,
+    [
+      "--target", "ES2022",
+      "--module", "CommonJS",
+      "--moduleResolution", "node",
+      "--outDir", buildDir,
+      path.join(apiDir, "client.ts"),
+      path.join(apiDir, "sessionExpiry.ts"),
+      path.join(errorSDKDir, "typescript", "errorContract.ts"),
+    ],
+    { cwd: tempDir, encoding: "utf8" },
+  );
+  assert.equal(compile.status, 0, compile.stderr || compile.stdout);
+  const moduleURL = pathToFileURL(path.join(buildDir, "admin", "src", "platform", "api", "client.js")).href;
+  return spawnSync(
+    process.execPath,
+    ["--input-type=module", "--eval", body(moduleURL)],
+    { cwd: tempDir, encoding: "utf8" },
+  );
+}
+
 function adminSource(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
 }
@@ -1549,14 +1589,65 @@ describe("validate-admin-ui-contracts", () => {
         statusCode: 401,
         requestToken: "current-token",
         currentToken: "current-token",
-        errorCode: "ADMIN_SESSION_INVALID",
+        errorCode: "AUTH_UNAUTHORIZED",
       }), true);
       assert.equal(shouldExpireAdminSession({
         statusCode: 401,
         requestToken: "stale-token",
         currentToken: "current-token",
-        errorCode: "ADMIN_SESSION_INVALID",
+        errorCode: "AUTH_UNAUTHORIZED",
       }), false);
+    `);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  it("keeps Admin session expiry codes typed by the generated registry", () => {
+    assert.match(
+      adminSource("admin/src/platform/api/sessionExpiry.ts"),
+      /errorCode\?: PlatformErrorCode/,
+    );
+  });
+
+  it("normalizes malformed and unknown Admin errors with header correlation", () => {
+    const result = runAdminClientProbe((moduleURL) => `
+      import assert from "node:assert/strict";
+      import { AdminAPIError, parsePlatformResponse } from ${JSON.stringify(moduleURL)};
+
+      const requestId = "req_0123456789abcdef0123456789abcdef";
+      const traceId = "0123456789abcdef0123456789abcdef";
+      const headers = {
+        "X-Request-ID": requestId,
+        traceparent: "00-" + traceId + "-0123456789abcdef-01",
+      };
+      for (const body of ["not-json", JSON.stringify({ error: { code: "UNKNOWN_ERROR", message: "upstream failure" } })]) {
+        await assert.rejects(
+          parsePlatformResponse(new Response(body, { status: 500, headers }), ""),
+          (error) => error instanceof AdminAPIError
+            && error.code === "INTERNAL_ERROR"
+            && error.requestId === requestId
+            && error.traceId === traceId,
+        );
+      }
+      await assert.rejects(
+        parsePlatformResponse(new Response("not-json", {
+          status: 500,
+          headers: { "X-Request-ID": "caller-owned", traceparent: "invalid" },
+        }), ""),
+        (error) => error instanceof AdminAPIError
+          && error.code === "INTERNAL_ERROR"
+          && error.requestId === ""
+          && error.traceId === "",
+      );
+      await assert.rejects(
+        parsePlatformResponse(new Response(JSON.stringify({
+          error: { code: "ADMIN_FORBIDDEN", message: "permission denied", requestId, traceId },
+        }), { status: 403 }), ""),
+        (error) => error instanceof AdminAPIError
+          && error.code === "ADMIN_FORBIDDEN"
+          && error.requestId === requestId
+          && error.traceId === traceId,
+      );
     `);
 
     assert.equal(result.status, 0, result.stderr);

@@ -1,4 +1,9 @@
 import { shouldExpireAdminSession } from "./sessionExpiry";
+import {
+  isPlatformErrorCode,
+  type PlatformErrorBody,
+  type PlatformErrorCode,
+} from "../../../../resources/generated/error-sdk/typescript/errorContract";
 
 const API_BASE = import.meta.env.VITE_PLATFORM_API_BASE ?? "/api";
 const AUTH_TOKEN_KEY = "platform.auth.token";
@@ -9,7 +14,9 @@ export class AdminAPIError extends Error {
   constructor(
     message: string,
     readonly statusCode: number,
-    readonly code = "",
+    readonly code: PlatformErrorCode,
+    readonly requestId: string,
+    readonly traceId: string,
   ) {
     super(message);
     this.name = "AdminAPIError";
@@ -18,10 +25,7 @@ export class AdminAPIError extends Error {
 
 export type PlatformResponse<T> = {
   data?: T;
-  error?: {
-    code: string;
-    message: string;
-  };
+  error?: PlatformErrorBody;
 };
 
 export type CapabilityItem = {
@@ -484,7 +488,7 @@ type PlatformRequestInit = RequestInit & {
   auth?: "stored-token" | "none";
 };
 
-function handleUnauthorizedResponse(statusCode: number, requestToken: string, errorCode = "") {
+function handleUnauthorizedResponse(statusCode: number, requestToken: string, errorCode: PlatformErrorCode) {
   if (!shouldExpireAdminSession({ statusCode, requestToken, currentToken: getAuthToken(), errorCode })) {
     return;
   }
@@ -492,7 +496,33 @@ function handleUnauthorizedResponse(statusCode: number, requestToken: string, er
   window.dispatchEvent(new Event(ADMIN_SESSION_EXPIRED_EVENT));
 }
 
-async function parsePlatformResponse<T>(response: Response, requestToken: string, mode: PlatformResponseMode = "data"): Promise<T> {
+const requestIdPattern = /^req_[0-9a-f]{32}$/;
+const traceIdPattern = /^[0-9a-f]{32}$/;
+const traceparentPattern = /^00-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$/;
+
+function correlationValue(value: unknown, pattern: RegExp) {
+  return typeof value === "string" && pattern.test(value) ? value : "";
+}
+
+function normalizedErrorBody(payload: unknown, response: Response): PlatformErrorBody {
+  const candidate = payload && typeof payload === "object" && "error" in payload
+    ? (payload as { error?: unknown }).error
+    : undefined;
+  const error = candidate && typeof candidate === "object"
+    ? candidate as Record<string, unknown>
+    : {};
+  const traceparent = response.headers.get("traceparent") ?? "";
+  return {
+    code: isPlatformErrorCode(error.code) ? error.code : "INTERNAL_ERROR",
+    message: typeof error.message === "string" ? error.message : `HTTP ${response.status}`,
+    requestId: correlationValue(error.requestId, requestIdPattern)
+      || correlationValue(response.headers.get("X-Request-ID"), requestIdPattern),
+    traceId: correlationValue(error.traceId, traceIdPattern)
+      || (traceparent.match(traceparentPattern)?.[1] ?? ""),
+  };
+}
+
+export async function parsePlatformResponse<T>(response: Response, requestToken: string, mode: PlatformResponseMode = "data"): Promise<T> {
   if (mode === "blob" && response.ok) {
     return (await response.blob()) as T;
   }
@@ -504,12 +534,11 @@ async function parsePlatformResponse<T>(response: Response, requestToken: string
     payload = undefined;
   }
 
-  const error = payload && typeof payload === "object" && "error" in payload
-    ? (payload as PlatformResponse<unknown>).error
-    : undefined;
-  if (!response.ok || error || payload === undefined) {
-    handleUnauthorizedResponse(response.status, requestToken, error?.code);
-    throw new AdminAPIError(error?.message ?? `HTTP ${response.status}`, response.status, error?.code);
+  const hasError = Boolean(payload && typeof payload === "object" && "error" in payload && (payload as PlatformResponse<unknown>).error);
+  if (!response.ok || hasError || payload === undefined) {
+    const error = normalizedErrorBody(payload, response);
+    handleUnauthorizedResponse(response.status, requestToken, error.code);
+    throw new AdminAPIError(error.message, response.status, error.code, error.requestId, error.traceId);
   }
 
   if (mode === "raw") {

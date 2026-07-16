@@ -457,6 +457,262 @@
           "schema",
           "shard"
         ]
+      },
+      "PlatformErrorCode": {
+        "type": "string",
+        "enum": [
+          "ADMIN_AUTH_STATE_REFRESH_FAILED",
+          "ADMIN_DEMO_DATA_NOT_FOUND",
+          "ADMIN_FILE_MIME_INVALID",
+          "ADMIN_FILE_MIME_MISMATCH",
+          "ADMIN_FILE_MIME_NOT_ALLOWED",
+          "ADMIN_FILE_OBJECT_NOT_FOUND",
+          "ADMIN_FILE_OPEN_FAILED",
+          "ADMIN_FILE_READ_FAILED",
+          "ADMIN_FILE_REQUIRED",
+          "ADMIN_FILE_RESTORE_FAILED",
+          "ADMIN_FILE_RESTORE_UNAVAILABLE",
+          "ADMIN_FILE_ROLLBACK_FAILED",
+          "ADMIN_FILE_SAVE_FAILED",
+          "ADMIN_FILE_TOO_LARGE",
+          "ADMIN_FILE_UPLOAD_OPEN_FAILED",
+          "ADMIN_FORBIDDEN",
+          "ADMIN_MENU_RESOLUTION_FAILED",
+          "ADMIN_POLICY_REVIEW_WATERMARK_INVALID",
+          "ADMIN_RESOURCE_DOMAIN_OWNED_MUTATION",
+          "ADMIN_RESOURCE_ERROR",
+          "ADMIN_RESOURCE_INVALID_RECORD",
+          "ADMIN_RESOURCE_LIFECYCLE_CONFLICT",
+          "ADMIN_RESOURCE_NOT_FOUND",
+          "ADMIN_RESOURCE_RECORD_NOT_FOUND",
+          "ADMIN_RESOURCE_REVISION_CONFLICT",
+          "ADMIN_SENSITIVE_REVEAL_CONFLICT",
+          "ADMIN_SENSITIVE_REVEAL_DELIVERY_FAILED",
+          "ADMIN_SENSITIVE_REVEAL_EXPIRED",
+          "ADMIN_SENSITIVE_REVEAL_FAILED",
+          "ADMIN_SENSITIVE_REVEAL_INVALID",
+          "ADMIN_SENSITIVE_REVEAL_NOT_FOUND",
+          "ADMIN_SENSITIVE_REVEAL_PROVIDER_FAILED",
+          "ADMIN_SENSITIVE_REVEAL_STATE_REFRESH_FAILED",
+          "ADMIN_SENSITIVE_REVEAL_UNAVAILABLE",
+          "ADMIN_SENSITIVE_REVEAL_VERIFICATION_FAILED",
+          "APP_AUTH_AUDIT_FAILED",
+          "APP_AUTH_CODE_REQUIRED",
+          "APP_AUTH_IDENTITY_BINDING_FAILED",
+          "APP_AUTH_IDENTITY_INVALID",
+          "APP_AUTH_INVALID_REQUEST",
+          "APP_AUTH_PROVIDER_NOT_CONFIGURED",
+          "APP_AUTH_PROVIDER_NOT_FOUND",
+          "APP_AUTH_PROVIDER_RESOLVER_NOT_CONFIGURED",
+          "APP_AUTH_PROVIDER_RESOLVE_FAILED",
+          "APP_AUTH_SESSION_CLEANUP_FAILED",
+          "APP_AUTH_SESSION_ISSUE_FAILED",
+          "APP_AUTH_SESSION_REVOKE_FAILED",
+          "APP_AUTH_TOKEN_SIGN_FAILED",
+          "APP_FILE_METADATA_FAILED",
+          "APP_FILE_MIME_INVALID",
+          "APP_FILE_MIME_MISMATCH",
+          "APP_FILE_MIME_NOT_ALLOWED",
+          "APP_FILE_NOT_FOUND",
+          "APP_FILE_OBJECT_NOT_FOUND",
+          "APP_FILE_OPEN_FAILED",
+          "APP_FILE_READ_FAILED",
+          "APP_FILE_REQUIRED",
+          "APP_FILE_ROLLBACK_FAILED",
+          "APP_FILE_SAVE_FAILED",
+          "APP_FILE_STATE_REFRESH_FAILED",
+          "APP_FILE_TOO_LARGE",
+          "APP_FILE_UPLOAD_OPEN_FAILED",
+          "APP_FORBIDDEN",
+          "APP_PHONE_ALREADY_BOUND",
+          "APP_PHONE_AUDIT_FAILED",
+          "APP_PHONE_BINDING_CREATE_FAILED",
+          "APP_PHONE_CODE_GENERATION_FAILED",
+          "APP_PHONE_CODE_REQUIRED",
+          "APP_PHONE_INVALID_PHONE",
+          "APP_PHONE_INVALID_REQUEST",
+          "APP_PHONE_PURPOSE_UNSUPPORTED",
+          "APP_PHONE_VERIFICATION_CREATE_FAILED",
+          "APP_PHONE_VERIFICATION_DELIVERY_FAILED",
+          "APP_PHONE_VERIFICATION_INVALID",
+          "APP_PHONE_VERIFICATION_UNAVAILABLE",
+          "APP_PHONE_VERIFICATION_UPDATE_FAILED",
+          "APP_ROUTE_HANDLER_NOT_CONFIGURED",
+          "AUTH_AUDIT_FAILED",
+          "AUTH_IDENTITY_BINDING_FAILED",
+          "AUTH_IDENTITY_INVALID",
+          "AUTH_IDENTITY_NOT_BOUND",
+          "AUTH_IDENTITY_TRANSACTION_INVALID",
+          "AUTH_IDENTITY_TRANSACTION_REQUIRED",
+          "AUTH_INVALID_CREDENTIALS",
+          "AUTH_INVALID_REQUEST",
+          "AUTH_PROVIDER_NOT_CONFIGURED",
+          "AUTH_PROVIDER_NOT_FOUND",
+          "AUTH_PROVIDER_RESOLVER_NOT_CONFIGURED",
+          "AUTH_PROVIDER_RESOLVE_FAILED",
+          "AUTH_PROVIDER_START_FAILED",
+          "AUTH_PROVIDER_START_INVALID",
+          "AUTH_PROVIDER_UNSUPPORTED",
+          "AUTH_SESSION_CLEANUP_FAILED",
+          "AUTH_SESSION_ISSUE_FAILED",
+          "AUTH_SESSION_RENEW_FAILED",
+          "AUTH_SESSION_REVOKE_FAILED",
+          "AUTH_STATE_REFRESH_FAILED",
+          "AUTH_TOKEN_SIGN_FAILED",
+          "AUTH_UNAUTHORIZED",
+          "CONFLICT",
+          "FILE_UPLOAD_INVALID",
+          "FORBIDDEN",
+          "INTERNAL_ERROR",
+          "INVALID_EXECUTION_CONTEXT",
+          "NOT_FOUND",
+          "OPENAPI_NOT_CONFIGURED",
+          "RATE_LIMITED",
+          "RATE_LIMIT_UNAVAILABLE",
+          "REQUEST_BODY_INVALID",
+          "REQUEST_BODY_TOO_LARGE",
+          "SERVICE_OBJECT_COST_LIMIT",
+          "SERVICE_OBJECT_DOMAIN_VALIDATION",
+          "SERVICE_OBJECT_EXECUTION_FAILED",
+          "SERVICE_OBJECT_IDEMPOTENCY_CONFLICT",
+          "SERVICE_OBJECT_REQUEST_INVALID",
+          "SERVICE_OBJECT_STATE_CONFLICT",
+          "SERVICE_OBJECT_UNAVAILABLE",
+          "VALIDATION_ERROR"
+        ]
+      },
+      "PlatformErrorDefinition": {
+        "type": "object",
+        "required": [
+          "code",
+          "owner",
+          "planes",
+          "audiences",
+          "category",
+          "httpStatus",
+          "retryPolicy",
+          "redactionClass",
+          "publicMessage",
+          "introducedIn",
+          "deprecated"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/PlatformErrorCode"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "planes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "app",
+                "service",
+                "data",
+                "control",
+                "external"
+              ]
+            },
+            "uniqueItems": true
+          },
+          "audiences": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "operator",
+                "internal",
+                "partner",
+                "public"
+              ]
+            },
+            "uniqueItems": true
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "authorization",
+              "validation",
+              "not-found",
+              "conflict",
+              "rate-cost",
+              "dependency",
+              "internal"
+            ]
+          },
+          "httpStatus": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "retryPolicy": {
+            "type": "string",
+            "enum": [
+              "never",
+              "after-delay",
+              "backoff"
+            ]
+          },
+          "redactionClass": {
+            "type": "string",
+            "enum": [
+              "public-safe",
+              "generic-only",
+              "correlation-only"
+            ]
+          },
+          "publicMessage": {
+            "type": "string"
+          },
+          "introducedIn": {
+            "type": "string"
+          },
+          "deprecated": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ErrorBody": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "requestId",
+          "traceId"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/PlatformErrorCode"
+          },
+          "message": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string",
+            "pattern": "^req_[0-9a-f]{32}$"
+          },
+          "traceId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "additionalProperties": false
       }
     }
   },
@@ -464,6 +720,10 @@
   "x-source": "resources/generated/platform-service-contract.json",
   "x-source-hash": "sha256:c18bec1b88558546fd6396360d37d2d8d41c19accce6b5ce862d72d486ba5ef5",
   "x-platform-plane": "service",
+  "x-platform-planes": [
+    "service",
+    "data"
+  ],
   "x-platform-tenant-context": {
     "fields": [
       "tenantId",
@@ -586,5 +846,7 @@
         "en": "Store a tenant file for a trusted service."
       }
     }
-  ]
+  ],
+  "x-platform-error-registry-source": "resources/generated/platform-error-code-contract.json",
+  "x-platform-error-registry-hash": "sha256:f4dbaa69b70312857a17553662ce5986a90c0ba0ef4c5fbbcc77056db10f36a8"
 }

@@ -1,6 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  errorResponse as platformErrorResponse,
+  loadPlatformErrorContract,
+  platformErrorOpenAPISchemas,
+  platformErrorRegistryExtensions,
+} from "./platform-error-contract.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -9,6 +15,7 @@ const generatedDir = path.join(repoRoot, "resources", "generated");
 const generatedPath = path.join(generatedDir, "openapi.app.json");
 
 const contract = JSON.parse(fs.readFileSync(contractPath, "utf8"));
+const errorContract = loadPlatformErrorContract(repoRoot);
 const routes = contract.routes ?? [];
 const usedOperationIds = new Set();
 
@@ -156,25 +163,19 @@ const openapi = {
       },
     },
     responses: {
-      BadRequest: successResponse("Bad request", apiResponse({ nullable: true })),
-      Unauthorized: successResponse("Authentication required", apiResponse({ nullable: true })),
-      Forbidden: successResponse("Permission denied", apiResponse({ nullable: true })),
-      InternalError: successResponse("Internal server error", apiResponse({ nullable: true })),
+      BadRequest: platformErrorResponse("Bad request"),
+      Unauthorized: platformErrorResponse("Authentication required"),
+      Forbidden: platformErrorResponse("Permission denied"),
+      InternalError: platformErrorResponse("Internal server error"),
     },
-    schemas: {
-      ErrorBody: {
-        type: "object",
-        properties: {
-          code: { type: "string" },
-          message: { type: "string" },
-        },
-      },
-    },
+    schemas: platformErrorOpenAPISchemas(errorContract),
   },
   "x-generated-by": "scripts/generate-app-openapi.mjs",
   "x-source": "resources/generated/app-route-contract.json",
   "x-source-mode": contract.sourceMode,
   "x-security-domain": "app",
+  "x-platform-plane": "app",
+  ...platformErrorRegistryExtensions(errorContract),
 };
 
 const output = `${JSON.stringify(openapi, null, 2)}\n`;

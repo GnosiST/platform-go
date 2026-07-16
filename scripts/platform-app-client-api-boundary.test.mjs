@@ -26,6 +26,18 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-app-client-api-boundary", () => {
+  it("publishes the unified App OpenAPI error contract", () => {
+    const openapi = readJSON("resources/generated/openapi.app.json");
+    const registry = readJSON("resources/generated/platform-error-code-contract.json");
+    assert.equal(openapi["x-platform-error-registry-source"], "resources/generated/platform-error-code-contract.json");
+    assert.equal(openapi["x-platform-error-registry-hash"], registry.contractHash);
+    assert.deepEqual(openapi.components.schemas.PlatformErrorCode.enum, registry.definitions.map((definition) => definition.code));
+    assert.deepEqual(openapi.components.schemas.ErrorBody.required, ["code", "message", "requestId", "traceId"]);
+    assert.equal(openapi.components.schemas.ErrorBody.additionalProperties, false);
+    assert.equal(openapi.components.responses.BadRequest.content["application/json"].schema.$ref, "#/components/schemas/ErrorResponse");
+    assert.equal(openapi.components.schemas.ErrorResponse.properties.data, undefined);
+  });
+
   it("accepts the current app client API boundary contract", () => {
     const result = runValidator();
 
@@ -84,5 +96,16 @@ describe("validate-platform-app-client-api-boundary", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /app OpenAPI must declare appBearerAuth security scheme/);
     assert.match(result.stderr, /app OpenAPI path must stay under \/api\/app: \/api\/admin\/resources\/users\/query/);
+  });
+
+  it("rejects unknown and cross-plane explicit App OpenAPI error codes", () => {
+    const openapi = readJSON("resources/generated/openapi.app.json");
+    const operation = Object.values(openapi.paths)[0].post ?? Object.values(openapi.paths)[0].get;
+    operation.responses["400"]["x-platform-error-codes"] = ["UNKNOWN_PLATFORM_ERROR", "ADMIN_FORBIDDEN"];
+    const result = runValidator(["--app-openapi", tempJSON("openapi.app.json", openapi)]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /unknown platform error code UNKNOWN_PLATFORM_ERROR/);
+    assert.match(result.stderr, /platform error code ADMIN_FORBIDDEN does not belong to plane app/);
   });
 });

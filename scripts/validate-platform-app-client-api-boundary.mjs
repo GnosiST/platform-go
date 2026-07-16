@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadPlatformErrorContract, validateOpenAPIErrorContract } from "./platform-error-contract.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -15,6 +16,7 @@ const boundaryPath = path.resolve(repoRoot, argValue("--boundary", "resources/pl
 const appRouteContractPath = path.resolve(repoRoot, argValue("--app-route-contract", "resources/generated/app-route-contract.json"));
 const appOpenAPIPath = path.resolve(repoRoot, argValue("--app-openapi", "resources/generated/openapi.app.json"));
 const appCodegenPreviewPath = path.resolve(repoRoot, argValue("--app-codegen-preview", "resources/generated/app-codegen-preview.json"));
+const errorContractPath = path.resolve(repoRoot, argValue("--error-contract", "resources/generated/platform-error-code-contract.json"));
 
 function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -228,6 +230,10 @@ function validate() {
   validateRequiredPaths(boundary, errors);
   validateAppRouteContract(appRouteContract, errors);
   validateAppOpenAPI(appOpenAPI, errors);
+  errors.push(...validateOpenAPIErrorContract(appOpenAPI, loadPlatformErrorContract(repoRoot, errorContractPath), {
+    label: "app OpenAPI",
+    planes: ["app"],
+  }));
   validateAppCodegenPreview(appCodegenPreview, boundary.clientBoundary?.generatedClientBoundary, errors);
 
   return { boundary, errors };

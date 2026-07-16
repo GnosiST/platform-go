@@ -64,10 +64,16 @@ function compileAdminServiceObjectClient(source) {
   const tsc = path.join(repoRoot, "admin", "node_modules", ".bin", "tsc");
   assert.ok(fs.existsSync(tsc), "admin TypeScript compiler must be installed");
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-admin-service-object-client-"));
-  fs.writeFileSync(path.join(tempDir, "client.ts"), source);
+  const generatedDir = path.join(tempDir, "resources", "generated");
+  const clientPath = path.join(generatedDir, "admin-service-object-client.ts");
+  const errorContractDir = path.join(generatedDir, "error-sdk", "typescript");
+  fs.mkdirSync(errorContractDir, { recursive: true });
+  fs.writeFileSync(clientPath, source);
+  const generatedErrors = generateErrorArtifacts(path.join(generatedDir, "error-sdk"));
+  assert.equal(generatedErrors.status, 0, generatedErrors.stderr);
   fs.writeFileSync(
     path.join(tempDir, "consumer.ts"),
-    `import type { AdminServiceObjectClient, AdminServiceObjectMenuDefinition } from "./client";
+    `import type { AdminServiceObjectClient, AdminServiceObjectMenuDefinition } from "./resources/generated/admin-service-object-client";
 
 declare const client: AdminServiceObjectClient;
 declare const menuDefinition: AdminServiceObjectMenuDefinition;
@@ -164,10 +170,62 @@ client.prepareOrganizationRoleGroupChange({ arguments: { orgUnitCode: "org-1", r
   );
   const result = spawnSync(
     tsc,
-    ["--noEmit", "--strict", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "node", "client.ts", "consumer.ts"],
+    ["--noEmit", "--strict", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "node", clientPath, "consumer.ts"],
     { cwd: tempDir, encoding: "utf8" },
   );
   assert.equal(result.status, 0, `generated Admin service object client did not compile\n${result.stdout}${result.stderr}`);
+}
+
+function errorContract() {
+  return JSON.parse(
+    fs.readFileSync(path.resolve(import.meta.dirname, "..", "resources", "generated", "platform-error-code-contract.json"), "utf8"),
+  );
+}
+
+function assertOpenAPIErrorContract(openapi) {
+  const registry = errorContract();
+  assert.equal(openapi["x-platform-error-registry-source"], "resources/generated/platform-error-code-contract.json");
+  assert.equal(openapi["x-platform-error-registry-hash"], registry.contractHash);
+  assert.deepEqual(openapi.components.schemas.PlatformErrorCode, {
+    type: "string",
+    enum: registry.definitions.map((definition) => definition.code),
+  });
+  assert.deepEqual(openapi.components.schemas.ErrorBody, {
+    type: "object",
+    required: ["code", "message", "requestId", "traceId"],
+    properties: {
+      code: { $ref: "#/components/schemas/PlatformErrorCode" },
+      message: { type: "string" },
+      requestId: { type: "string", pattern: "^req_[0-9a-f]{32}$" },
+      traceId: { type: "string", pattern: "^[0-9a-f]{32}$" },
+    },
+    additionalProperties: false,
+  });
+  assert.deepEqual(openapi.components.schemas.ErrorResponse, {
+    type: "object",
+    required: ["error"],
+    properties: { error: { $ref: "#/components/schemas/ErrorBody" } },
+    additionalProperties: false,
+  });
+}
+
+function generateErrorArtifacts(outputDir) {
+  return spawnSync(
+    process.execPath,
+    ["scripts/generate-platform-error-code-artifacts.mjs", "--output-dir", outputDir],
+    { cwd: path.resolve(import.meta.dirname, ".."), encoding: "utf8" },
+  );
+}
+
+function runAdminAPIBoundaryValidator(openapi) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "platform-admin-openapi-boundary-"));
+  const openapiPath = path.join(tempDir, "openapi.admin.json");
+  fs.writeFileSync(openapiPath, `${JSON.stringify(openapi, null, 2)}\n`);
+  return spawnSync(
+    process.execPath,
+    ["scripts/validate-platform-admin-api-boundary.mjs", "--admin-openapi", openapiPath],
+    { cwd: path.resolve(import.meta.dirname, ".."), encoding: "utf8" },
+  );
 }
 
 function writeSensitiveManifest() {
@@ -253,6 +311,68 @@ function validateAdminResourceContract(contract) {
 }
 
 describe("admin resource contract generators", () => {
+  it("generates the unified Admin OpenAPI error contract", () => {
+    const contract = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, "..", "resources", "generated", "admin-resource-contract.json"), "utf8"));
+    const openapi = runAdminOpenAPIForContract(contract);
+    assertOpenAPIErrorContract(openapi);
+    assert.deepEqual(
+      openapi.paths["/api/admin/service-objects/query"].post.responses["404"]["x-platform-error-codes"],
+      ["SERVICE_OBJECT_UNAVAILABLE"],
+    );
+    assert.equal(
+      openapi.components.responses.BadRequest.content["application/json"].schema.$ref,
+      "#/components/schemas/ErrorResponse",
+    );
+  });
+
+  it("rejects unknown and cross-plane explicit Admin OpenAPI error codes", () => {
+    const contract = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, "..", "resources", "generated", "admin-resource-contract.json"), "utf8"));
+    const openapi = runAdminOpenAPIForContract(contract);
+    openapi.paths["/api/admin/service-objects/query"].post.responses["404"]["x-platform-error-codes"] = [
+      "UNKNOWN_PLATFORM_ERROR",
+      "APP_AUTH_INVALID_REQUEST",
+    ];
+    const result = runAdminAPIBoundaryValidator(openapi);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /unknown platform error code UNKNOWN_PLATFORM_ERROR/);
+    assert.match(result.stderr, /platform error code APP_AUTH_INVALID_REQUEST does not belong to plane admin/);
+  });
+
+  it("generates deterministic standalone Go and TypeScript error SDKs", () => {
+    const repoRoot = path.resolve(import.meta.dirname, "..");
+    const first = fs.mkdtempSync(path.join(os.tmpdir(), "platform-error-sdk-a-"));
+    const second = fs.mkdtempSync(path.join(os.tmpdir(), "platform-error-sdk-b-"));
+    for (const outputDir of [first, second]) {
+      const result = generateErrorArtifacts(outputDir);
+      assert.equal(result.status, 0, result.stderr);
+    }
+    for (const relativePath of ["go/error_contract.go", "typescript/errorContract.ts"]) {
+      assert.equal(fs.readFileSync(path.join(first, relativePath), "utf8"), fs.readFileSync(path.join(second, relativePath), "utf8"));
+    }
+
+    const goDir = path.join(first, "go");
+    fs.writeFileSync(path.join(goDir, "go.mod"), "module platform-error-contract-sdk\n\ngo 1.26\n");
+    fs.writeFileSync(
+      path.join(goDir, "error_contract_test.go"),
+      'package errorcontract\n\nimport "testing"\n\nfunc TestGeneratedRegistry(t *testing.T) { if definition, ok := Lookup(CodeInternalError); !ok || definition.Code != CodeInternalError || len(Definitions()) == 0 { t.Fatal("missing generated error registry") } }\n',
+    );
+    const goResult = spawnSync("go", ["test", "./..."], { cwd: goDir, encoding: "utf8" });
+    assert.equal(goResult.status, 0, goResult.stderr);
+
+    const tsc = path.join(repoRoot, "admin", "node_modules", ".bin", "tsc");
+    const consumerPath = path.join(first, "typescript", "consumer.ts");
+    fs.writeFileSync(
+      consumerPath,
+      'import { isPlatformErrorCode, platformErrorDefinitions, type PlatformErrorBody } from "./errorContract";\nconst body: PlatformErrorBody = { code: "INTERNAL_ERROR", message: "internal server error", requestId: "req_00000000000000000000000000000000", traceId: "00000000000000000000000000000000" };\nif (!isPlatformErrorCode(body.code) || platformErrorDefinitions[body.code].code !== body.code) throw new Error("missing generated definition");\n',
+    );
+    const tsResult = spawnSync(
+      tsc,
+      ["--noEmit", "--strict", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "node", path.join(first, "typescript", "errorContract.ts"), consumerPath],
+      { cwd: repoRoot, encoding: "utf8" },
+    );
+    assert.equal(tsResult.status, 0, tsResult.stderr || tsResult.stdout);
+  });
+
   it("rejects physical routing input name variants", () => {
     for (const name of [
       "datasource",
@@ -469,6 +589,8 @@ describe("admin resource contract generators", () => {
       ],
     );
     assert.match(source, /class AdminServiceObjectClient/);
+    assert.match(source, /import type \{ PlatformErrorBody \} from "\.\/error-sdk\/typescript\/errorContract"/);
+    assert.match(source, /readonly error\?: PlatformErrorBody/);
     assert.match(source, /queryId: "platform\.reference-records\.list"/);
     assert.match(source, /commandId: "platform\.reference-records\.rename"/);
     assert.match(source, /"roleGroupCodes": ReadonlyArray<string>/);

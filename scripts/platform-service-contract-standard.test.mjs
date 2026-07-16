@@ -28,6 +28,24 @@ function runGenerator(contract) {
   return { outputDir, result };
 }
 
+function assertOpenAPIErrorContract(openapi) {
+  const registry = readJSON("resources/generated/platform-error-code-contract.json");
+  assert.equal(openapi["x-platform-error-registry-source"], "resources/generated/platform-error-code-contract.json");
+  assert.equal(openapi["x-platform-error-registry-hash"], registry.contractHash);
+  assert.deepEqual(openapi.components.schemas.PlatformErrorCode.enum, registry.definitions.map((definition) => definition.code));
+  assert.deepEqual(openapi.components.schemas.ErrorBody.required, ["code", "message", "requestId", "traceId"]);
+  assert.equal(openapi.components.schemas.ErrorBody.additionalProperties, false);
+  assert.equal(openapi.components.schemas.ErrorBody.properties.code.$ref, "#/components/schemas/PlatformErrorCode");
+  assert.equal(openapi.components.schemas.ErrorBody.properties.requestId.pattern, "^req_[0-9a-f]{32}$");
+  assert.equal(openapi.components.schemas.ErrorBody.properties.traceId.pattern, "^[0-9a-f]{32}$");
+  assert.deepEqual(openapi.components.schemas.ErrorResponse, {
+    type: "object",
+    required: ["error"],
+    properties: { error: { $ref: "#/components/schemas/ErrorBody" } },
+    additionalProperties: false,
+  });
+}
+
 describe("platform service contract standard", () => {
   it("accepts the generated standard and governance closeout", () => {
     const result = runValidator();
@@ -225,16 +243,31 @@ describe("platform service contract standard", () => {
     for (const relativePath of ["openapi.service.json", "openapi.control.json", "openapi.external.json", "asyncapi.events.json", "service-sdk/go/service_contract_sdk.go", "service-sdk/typescript/serviceContractSDK.ts"]) {
       assert.equal(fs.readFileSync(path.join(first, relativePath), "utf8"), fs.readFileSync(path.join(second, relativePath), "utf8"), relativePath);
     }
+    for (const relativePath of ["openapi.service.json", "openapi.control.json", "openapi.external.json"]) {
+      assertOpenAPIErrorContract(JSON.parse(fs.readFileSync(path.join(first, relativePath), "utf8")));
+    }
+    assert.doesNotMatch(fs.readFileSync(path.join(first, "asyncapi.events.json"), "utf8"), /PlatformErrorCode|ErrorResponse/);
 
     const goDir = path.join(first, "service-sdk", "go");
     fs.writeFileSync(path.join(goDir, "go.mod"), "module platform-service-contract-sdk\n\ngo 1.26\n");
-    fs.writeFileSync(path.join(goDir, "service_contract_sdk_test.go"), "package servicecontractsdk\n\nimport \"testing\"\n\nfunc TestGeneratedContractConstants(t *testing.T) { if OperationUploadFile == \"\" || EventFileStoredV1 == \"\" { t.Fatal(\"missing generated constants\") } }\n");
+    fs.writeFileSync(path.join(goDir, "service_contract_sdk_test.go"), "package servicecontractsdk\n\nimport \"testing\"\n\nfunc TestGeneratedContractConstants(t *testing.T) { if OperationUploadFile == \"\" || EventFileStoredV1 == \"\" { t.Fatal(\"missing generated constants\") }; if definition, ok := LookupError(CodeInternalError); !ok || definition.Code != CodeInternalError { t.Fatal(\"missing generated error definition\") } }\n");
     const goResult = spawnSync("go", ["test", "./..."], { cwd: goDir, encoding: "utf8" });
     assert.equal(goResult.status, 0, goResult.stderr);
 
     const tsc = path.join(repoRoot, "admin", "node_modules", ".bin", "tsc");
     const tsResult = spawnSync(tsc, ["--noEmit", "--target", "ES2022", "--module", "ESNext", path.join(first, "service-sdk", "typescript", "serviceContractSDK.ts")], { cwd: repoRoot, encoding: "utf8" });
     assert.equal(tsResult.status, 0, tsResult.stderr || tsResult.stdout);
+    const typeScriptSDK = fs.readFileSync(path.join(first, "service-sdk", "typescript", "serviceContractSDK.ts"), "utf8");
+    assert.match(typeScriptSDK, /export type PlatformErrorBody/);
+    assert.match(typeScriptSDK, /export const platformErrorDefinitions/);
+  });
+
+  it("rejects unknown explicit OpenAPI error codes", () => {
+    const external = readJSON("resources/generated/openapi.external.json");
+    external.paths["/api/app/files"].post.responses["400"]["x-platform-error-codes"] = ["UNKNOWN_PLATFORM_ERROR"];
+    const result = runValidator(["--external-openapi", tempJSON("openapi.external.json", external)]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /unknown platform error code UNKNOWN_PLATFORM_ERROR/);
   });
 
   it("rejects generated identifier and object-key collisions before writing artifacts", () => {

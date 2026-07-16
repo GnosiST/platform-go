@@ -183,14 +183,11 @@ function generateAdminServiceObjectTypeScript() {
 // Codegen definitions: ${adminServiceObjectDefinitions.source}
 // Runtime references: ${adminServiceObjectDefinitions.runtimeSources.join(", ")}
 
-export type AdminServiceObjectError = {
-  readonly code: string;
-  readonly message: string;
-};
+import type { PlatformErrorBody } from "./error-sdk/typescript/errorContract";
 
 export type AdminServiceObjectResponse<TData> = {
   readonly data?: TData;
-  readonly error?: AdminServiceObjectError;
+  readonly error?: PlatformErrorBody;
 };
 
 export interface AdminServiceObjectTransport {

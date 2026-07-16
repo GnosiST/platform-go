@@ -2,6 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { adminServiceObjectDefinitions } from "./admin-service-object-definitions.mjs";
+import {
+  errorResponse as platformErrorResponse,
+  loadPlatformErrorContract,
+  platformErrorOpenAPISchemas,
+  platformErrorRegistryExtensions,
+} from "./platform-error-contract.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -12,6 +18,7 @@ const generatedDir = path.join(repoRoot, "resources", "generated");
 const generatedPath = path.join(generatedDir, "openapi.admin.json");
 
 const contract = JSON.parse(fs.readFileSync(contractPath, "utf8"));
+const errorContract = loadPlatformErrorContract(repoRoot);
 const resources = contract.resources ?? [];
 const usedOperationIds = new Set();
 
@@ -1304,8 +1311,8 @@ paths["/api/admin/service-objects/query"] = {
       "200": successResponse("Persisted query result", apiResponse({ $ref: "#/components/schemas/AdminServiceObjectQueryData" })),
       ...errorResponses(),
       "404": {
-        ...successResponse("Service-object runtime unavailable or QueryDefinition not found", apiResponse({ nullable: true })),
-        "x-platform-error-codes": ["SERVICE_OBJECT_UNAVAILABLE", "SERVICE_OBJECT_NOT_FOUND"],
+        ...platformErrorResponse("Service-object runtime unavailable or QueryDefinition not found"),
+        "x-platform-error-codes": ["SERVICE_OBJECT_UNAVAILABLE"],
       },
       "422": { $ref: "#/components/responses/UnprocessableEntity" },
     },
@@ -1328,8 +1335,8 @@ paths["/api/admin/service-objects/command"] = {
       "200": successResponse("Command result", apiResponse({ $ref: "#/components/schemas/AdminServiceObjectCommandData" })),
       ...errorResponses(),
       "404": {
-        ...successResponse("Service-object runtime unavailable or CommandDefinition not found", apiResponse({ nullable: true })),
-        "x-platform-error-codes": ["SERVICE_OBJECT_UNAVAILABLE", "SERVICE_OBJECT_NOT_FOUND"],
+        ...platformErrorResponse("Service-object runtime unavailable or CommandDefinition not found"),
+        "x-platform-error-codes": ["SERVICE_OBJECT_UNAVAILABLE"],
       },
       "409": { $ref: "#/components/responses/Conflict" },
     },
@@ -1367,20 +1374,20 @@ const openapi = {
       },
     },
     responses: {
-      BadRequest: successResponse("Bad request", apiResponse({ nullable: true })),
-      Unauthorized: successResponse("Authentication required", apiResponse({ nullable: true })),
-      Forbidden: successResponse("Permission denied", apiResponse({ nullable: true })),
-      NotFound: successResponse("Resource not found", apiResponse({ nullable: true })),
-      Conflict: successResponse("Request conflicts with the current reveal state", apiResponse({ nullable: true })),
-      Gone: successResponse("Reveal challenge, factor or grant expired", apiResponse({ nullable: true })),
-      UnprocessableEntity: successResponse("Sensitive reveal verification failed", apiResponse({ nullable: true })),
-      TooManyRequests: successResponse("Sensitive reveal rate limit exceeded", apiResponse({ nullable: true })),
-      InternalError: successResponse("Internal server error", apiResponse({ nullable: true })),
-      NotImplemented: successResponse("Identity provider resolver not configured", apiResponse({ nullable: true })),
-      BadGateway: successResponse("Identity provider unavailable", apiResponse({ nullable: true })),
-      ServiceUnavailable: successResponse("Sensitive reveal runtime or protected value unavailable", apiResponse({ nullable: true })),
+      BadRequest: platformErrorResponse("Bad request"),
+      Unauthorized: platformErrorResponse("Authentication required"),
+      Forbidden: platformErrorResponse("Permission denied"),
+      NotFound: platformErrorResponse("Resource not found"),
+      Conflict: platformErrorResponse("Request conflicts with the current reveal state"),
+      Gone: platformErrorResponse("Reveal challenge, factor or grant expired"),
+      UnprocessableEntity: platformErrorResponse("Sensitive reveal verification failed"),
+      TooManyRequests: platformErrorResponse("Sensitive reveal rate limit exceeded"),
+      InternalError: platformErrorResponse("Internal server error"),
+      NotImplemented: platformErrorResponse("Identity provider resolver not configured"),
+      BadGateway: platformErrorResponse("Identity provider unavailable"),
+      ServiceUnavailable: platformErrorResponse("Sensitive reveal runtime or protected value unavailable"),
     },
-    schemas: schemas(),
+    schemas: { ...schemas(), ...platformErrorOpenAPISchemas(errorContract) },
   },
   "x-generated-by": "scripts/generate-admin-openapi.mjs",
   "x-source": path.relative(repoRoot, contractPath),
@@ -1390,6 +1397,8 @@ const openapi = {
   "x-source-version": contract.sourceVersion,
   "x-source-updated-at": contract.updatedAt,
   "x-stack": contract.stack,
+  "x-platform-plane": "admin",
+  ...platformErrorRegistryExtensions(errorContract),
 };
 
 const output = `${JSON.stringify(openapi, null, 2)}\n`;

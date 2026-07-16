@@ -2,14 +2,11 @@
 // Codegen definitions: scripts/admin-service-object-definitions.mjs
 // Runtime references: internal/platform/serviceobject/reference.go, internal/platform/organizationrbac/service_objects.go, internal/platform/organizationrbac/lifecycle_service_objects.go, internal/platform/organizationrbac/navigation_service_objects.go
 
-export type AdminServiceObjectError = {
-  readonly code: string;
-  readonly message: string;
-};
+import type { PlatformErrorBody } from "./error-sdk/typescript/errorContract";
 
 export type AdminServiceObjectResponse<TData> = {
   readonly data?: TData;
-  readonly error?: AdminServiceObjectError;
+  readonly error?: PlatformErrorBody;
 };
 
 export interface AdminServiceObjectTransport {

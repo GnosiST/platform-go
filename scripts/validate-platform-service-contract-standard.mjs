@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadPlatformErrorContract, validateOpenAPIErrorContract } from "./platform-error-contract.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -25,6 +26,7 @@ const paths = {
   graph: argValue("--graph", "resources/platform-foundation-task-graph.json"),
   engineering: argValue("--engineering", "resources/platform-engineering-capabilities.json"),
   closeout: argValue("--closeout", "resources/platform-node-closeout-audit.json"),
+  errorContract: argValue("--error-contract", "resources/generated/platform-error-code-contract.json"),
 };
 
 function read(relativePath) {
@@ -184,6 +186,7 @@ const codegen = readJSON(paths.codegen);
 const graph = readJSON(paths.graph);
 const engineering = readJSON(paths.engineering);
 const closeout = readJSON(paths.closeout);
+const errorContract = loadPlatformErrorContract(repoRoot, paths.errorContract);
 
 if (standard.contractVersion !== contract.contractVersion) errors.push("standard and generated contract versions must match");
 for (const [field, expected] of [
@@ -242,6 +245,13 @@ for (const event of values(reference?.events)) {
 
 for (const [label, artifact] of [["service OpenAPI", serviceOpenAPI], ["control OpenAPI", controlOpenAPI], ["external OpenAPI", externalOpenAPI], ["AsyncAPI", asyncapi]]) {
   if (artifactSourceHash(artifact) !== contract.contractHash) errors.push(`${label} source hash must match the canonical service contract`);
+}
+for (const [label, artifact, planes] of [
+  ["service OpenAPI", serviceOpenAPI, ["service", "data"]],
+  ["control OpenAPI", controlOpenAPI, ["control"]],
+  ["external OpenAPI", externalOpenAPI, ["external"]],
+]) {
+  errors.push(...validateOpenAPIErrorContract(artifact, errorContract, { label, planes }));
 }
 if (!externalOpenAPI.paths?.["/api/app/files"]?.post || !externalOpenAPI.paths?.["/api/app/files/{id}/content"]?.get) errors.push("external OpenAPI must preserve bound file-storage routes");
 if (Object.keys(serviceOpenAPI.paths ?? {}).length !== 0 || Object.keys(controlOpenAPI.paths ?? {}).length !== 0) errors.push("contract-only service and control operations must not claim OpenAPI runtime paths");

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadPlatformErrorContract, validateOpenAPIErrorContract } from "./platform-error-contract.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -13,6 +14,7 @@ function argValue(name, fallback) {
 
 const boundaryPath = path.resolve(repoRoot, argValue("--boundary", "resources/platform-admin-api-boundary.json"));
 const openAPIPath = path.resolve(repoRoot, argValue("--admin-openapi", "resources/generated/openapi.admin.json"));
+const errorContractPath = path.resolve(repoRoot, argValue("--error-contract", "resources/generated/platform-error-code-contract.json"));
 const allowedExtensions = new Set([".js", ".jsx", ".mjs", ".ts", ".tsx"]);
 
 function readJSON(filePath) {
@@ -276,6 +278,12 @@ function validate() {
   validateAdminSourceBoundary(boundary, errors);
   validateOpenAPIQueryContract(errors);
   validateAdminOIDCOpenAPIContract(errors);
+  if (fs.existsSync(openAPIPath)) {
+    errors.push(...validateOpenAPIErrorContract(readJSON(openAPIPath), loadPlatformErrorContract(repoRoot, errorContractPath), {
+      label: "admin OpenAPI",
+      planes: ["admin"],
+    }));
+  }
   return { boundary, errors };
 }
 
