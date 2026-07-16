@@ -8,7 +8,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "organization-rbac-menu-e2e-qa",
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",
   "datasource-read-write-routing",
@@ -18,10 +17,6 @@ const completionProgramTaskIDs = [
   "database-certification-matrix",
   "transactional-outbox-and-one-mq-adapter",
   "asynchronous-search-projection",
-  "open-source-portability",
-  "public-docs-community",
-  "public-docs-site",
-  "github-release-publication",
 ];
 
 function runValidator(args = []) {
@@ -57,15 +52,15 @@ describe("validate-platform-goal-completion-audit", () => {
     assert.match(result.stdout, /Validated platform goal completion audit/);
   });
 
-  it("marks the completion program as controlled incomplete at 67/53/14", () => {
+  it("marks the completion program as controlled incomplete at 67/58/9", () => {
     const audit = readJSON("resources/platform-goal-completion-audit.json");
 
     assert.equal(audit.completionStatus, "not-complete-controlled");
     assert.deepEqual(audit.completionPolicy.requiredControlledUnfinishedNodes, completionProgramTaskIDs);
     assert.deepEqual(audit.taskSummary, {
       expectedTotal: 67,
-      expectedImplemented: 53,
-      expectedControlledUnfinished: 14,
+      expectedImplemented: 58,
+      expectedControlledUnfinished: 9,
     });
   });
 
@@ -80,8 +75,8 @@ describe("validate-platform-goal-completion-audit", () => {
     const result = runValidator(["--audit", tempJSON("stale-goal-completion-counts.json", audit)]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /taskSummary\.expectedImplemented must match implemented task count 53/);
-    assert.match(result.stderr, /taskSummary\.expectedControlledUnfinished must match unfinished task count 14/);
+    assert.match(result.stderr, /taskSummary\.expectedImplemented must match implemented task count 58/);
+    assert.match(result.stderr, /taskSummary\.expectedControlledUnfinished must match unfinished task count 9/);
   });
 
   it("rejects marking the completion program complete while nodes remain unfinished", () => {

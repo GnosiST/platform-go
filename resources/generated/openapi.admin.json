@@ -11185,7 +11185,7 @@
             "perOffsetCost": 1,
             "predicateCost": 1,
             "sortCost": 0,
-            "totalCost": 2005,
+            "totalCost": 0,
             "maxOffset": 2000,
             "limit": 2005
           },
@@ -21809,7 +21809,8 @@
     "internal/platform/serviceobject/reference.go",
     "internal/platform/organizationrbac/service_objects.go",
     "internal/platform/organizationrbac/lifecycle_service_objects.go",
-    "internal/platform/organizationrbac/navigation_service_objects.go"
+    "internal/platform/organizationrbac/navigation_service_objects.go",
+    "internal/platform/organizationrbac/assignment_tree_service_objects.go"
   ],
   "x-source-version": "0.1.0",
   "x-source-updated-at": "2026-07-06",

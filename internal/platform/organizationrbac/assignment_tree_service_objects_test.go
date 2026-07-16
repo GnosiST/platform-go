@@ -24,7 +24,7 @@ func TestAssignmentTreeQueryDefinitionsAreStableAndClosed(t *testing.T) {
 	definitions := OrganizationQueryDefinitions()
 	for id, expected := range want {
 		definition := queryDefinitionByID(t, id)
-		if definition.ID != id || definition.Version != ServiceObjectVersion || definition.Permission != expected.permission || definition.Resource != expected.resource || definition.Action != "read" || definition.TenantMode != serviceobject.TenantPlatform || definition.DataScope != "platform" || definition.MaxPageSize != expected.maxPage || !reflect.DeepEqual(definition.Arguments, expected.args) || !reflect.DeepEqual(definition.ResultSchema, expected.result) {
+		if definition.ID != id || definition.Version != ServiceObjectVersion || definition.Permission != expected.permission || definition.Resource != expected.resource || definition.Action != "read" || definition.TenantMode != serviceobject.TenantPlatform || definition.DataScope != "platform" || definition.MaxPageSize != expected.maxPage || definition.Cost.MaxOffset != 2000 || !reflect.DeepEqual(definition.Arguments, expected.args) || !reflect.DeepEqual(definition.ResultSchema, expected.result) {
 			t.Fatalf("definition %s = %+v", id, definition)
 		}
 	}

@@ -8,8 +8,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "organization-rbac-menu-e2e-qa",
-  "unified-error-code-governance",
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",
   "datasource-read-write-routing",
@@ -19,10 +17,6 @@ const completionProgramTaskIDs = [
   "database-certification-matrix",
   "transactional-outbox-and-one-mq-adapter",
   "asynchronous-search-projection",
-  "open-source-portability",
-  "public-docs-community",
-  "public-docs-site",
-  "github-release-publication",
 ];
 
 function runValidator(args = []) {

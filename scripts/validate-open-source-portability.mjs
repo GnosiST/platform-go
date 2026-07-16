@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -17,6 +18,7 @@ const root = path.resolve(argValue("--root", repoRoot));
 const strict = hasFlag("--strict");
 const strictPaths = strict || hasFlag("--strict-paths");
 const expectedModule = argValue("--expect-module", "");
+const gitTree = argValue("--git-tree", "HEAD");
 const referenceManifestPath = argValue(
   "--reference-manifest",
   "resources/reference-snapshot/manifest.json",
@@ -66,6 +68,14 @@ const ignoredPathScanFiles = new Set([
   "scripts/validate-open-source-portability.test.mjs",
 ]);
 
+const forbiddenTrackedPaths = [
+  (file) => file === "AGENTS.md",
+  (file) => file === "design-qa.md",
+  (file) => file.startsWith(".superpowers/"),
+  (file) => file.startsWith("docs/superpowers/"),
+  (file) => file.startsWith("website/.docusaurus/"),
+];
+
 function relative(file) {
   return path.relative(root, file) || ".";
 }
@@ -84,6 +94,20 @@ function readText(file) {
   const buffer = fs.readFileSync(file);
   if (buffer.includes(0)) return null;
   return buffer.toString("utf8");
+}
+
+function candidateTrackedFiles(errors) {
+  const repository = spawnSync("git", ["-C", root, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
+  if (repository.status !== 0) return [];
+
+  const tree = spawnSync("git", ["-C", root, "ls-tree", "-r", "-z", "--name-only", "--full-tree", gitTree], {
+    encoding: "utf8",
+  });
+  if (tree.status !== 0) {
+    errors.push(`candidate Git tree could not be inspected: ${gitTree}`);
+    return [];
+  }
+  return tree.stdout.split("\0").filter(Boolean);
 }
 
 function validateReferenceSnapshot(errors) {
@@ -145,6 +169,12 @@ function validate() {
   }
 
   if (strict) validateReferenceSnapshot(errors);
+
+  for (const file of candidateTrackedFiles(errors)) {
+    if (forbiddenTrackedPaths.some((matches) => matches(file))) {
+      errors.push(`forbidden release path is tracked in ${gitTree}: ${file}`);
+    }
+  }
 
   for (const file of walk(root)) {
     const text = readText(file);

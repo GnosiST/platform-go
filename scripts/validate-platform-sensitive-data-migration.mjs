@@ -103,6 +103,7 @@ const paths = {
   execution: resolveArg("--task-execution", "resources/platform-task-execution-audit.json"),
   engineering: resolveArg("--engineering", "resources/platform-engineering-capabilities.json"),
   sourceLock: resolveArg("--source-lock", sourceLockPath),
+  migrationTaskReportDir: resolveArg("--migration-task-report-dir", "resources/evidence"),
 };
 
 function readText(filePath) {
@@ -424,7 +425,7 @@ function trackedEvidenceFiles() {
 }
 
 function migrationTaskReports() {
-  const reportDir = path.join(repoRoot, "resources/evidence");
+  const reportDir = paths.migrationTaskReportDir;
   if (!fs.existsSync(reportDir)) return [];
   return fs.readdirSync(reportDir, { withFileTypes: true })
     .filter((entry) => entry.isFile())

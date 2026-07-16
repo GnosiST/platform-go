@@ -79,7 +79,10 @@
     "organization-role-pool-backend-and-migration",
     "organization-user-admin-experience",
     "role-tree-and-authorization-entry",
-    "menu-tree-and-button-permission-configuration"
+    "menu-tree-and-button-permission-configuration",
+    "organization-rbac-menu-e2e-qa",
+    "unified-error-code-governance",
+    "github-release-publication"
   ],
   "requiredFutureTaskNodes": [
     "multi-datasource-contract-and-runtime",
@@ -116,6 +119,8 @@
     "organization-user-admin-experience",
     "role-tree-and-authorization-entry",
     "menu-tree-and-button-permission-configuration",
+    "organization-rbac-menu-e2e-qa",
+    "unified-error-code-governance",
     "multi-datasource-contract-and-runtime",
     "tenant-placement-and-request-routing",
     "datasource-read-write-routing",
@@ -127,7 +132,8 @@
     "asynchronous-search-projection",
     "open-source-portability",
     "public-docs-community",
-    "public-docs-site"
+    "public-docs-site",
+    "github-release-publication"
   ],
   "nonDroppableEngineeringCapabilities": [
     "form-schema-layout-slot-gate",
@@ -160,6 +166,8 @@
     "organization-user-admin-experience",
     "role-tree-and-authorization-entry",
     "menu-tree-and-button-permission-configuration",
+    "organization-rbac-menu-e2e-qa",
+    "unified-error-code-governance",
     "multi-datasource-contract-and-runtime",
     "tenant-placement-and-request-routing",
     "datasource-read-write-routing",
@@ -218,6 +226,8 @@
     "organization-user-admin-experience",
     "role-tree-and-authorization-entry",
     "menu-tree-and-button-permission-configuration",
+    "organization-rbac-menu-e2e-qa",
+    "unified-error-code-governance",
     "multi-datasource-contract-and-runtime",
     "tenant-placement-and-request-routing",
     "datasource-read-write-routing",

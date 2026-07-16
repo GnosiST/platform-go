@@ -1,15 +1,15 @@
 # Platform Data Governance And Integrations Assessment
 
 Date: 2026-07-12
-Governance updated: 2026-07-15
+Governance updated: 2026-07-16
 
 ## Purpose
 
 This assessment records the current implementation truth for sensitive-data display and controlled reveal, deletion and retention, multi-datasource portability, and optional messaging/search integrations.
 
-It does not mark every assessed capability as implemented. Governance now records `67 total / 52 implemented / 15 controlled unfinished`; `mask-strategy-runtime`, `sensitive-data-reveal-step-up`, `data-lifecycle-retention`, `platform-service-contract-standard`, `persisted-query-command-object-runtime`, the disabled-by-default integration ports, the organization/RBAC/menu contract gate, the organization role-pool backend/migration runtime, `organization-user-admin-experience`, `role-tree-and-authorization-entry` and `menu-tree-and-button-permission-configuration` are implemented and closed. Full organization E2E and unified error-code governance remain v0.1.0 blockers. The nine datasource/routing/sharding/federation/XA/certification/outbox/search nodes are post-release optional `deferred` work, not implemented or abandoned.
+It does not mark every assessed capability as implemented. Governance now records `67 total / 58 implemented / 9 controlled unfinished`; `mask-strategy-runtime`, `sensitive-data-reveal-step-up`, `data-lifecycle-retention`, `platform-service-contract-standard`, `persisted-query-command-object-runtime`, the disabled-by-default integration ports, the organization/RBAC/menu contract and runtime nodes, organization E2E, unified error-code governance, open-source portability, public documentation/site and publication governance are implemented and closed. The nine datasource/routing/sharding/federation/XA/certification/outbox/search nodes are post-release optional `deferred` work, not implemented or abandoned.
 
-The [remaining-task topology adjustment](docs/platform-roadmap.md) remains the activated source of truth for the program boundaries and dependencies. The service contract, persisted Query/Command runtime, disabled integration ports, organization contract, organization/user Admin experience and role tree/authorization entry are closed; the remaining 15 nodes retain their approved order and independent completion gates.
+The [remaining-task topology adjustment](docs/platform-roadmap.md) remains the activated source of truth for the program boundaries and dependencies. The service contract, persisted Query/Command runtime, disabled integration ports, organization and menu governance, unified error-code governance and public release-governance nodes are closed; the remaining nine `deferred` nodes retain their approved order and independent completion gates.
 
 ## Current-State Summary
 
@@ -141,7 +141,7 @@ Stable and future stage gates:
 9. Add disabled/no-op messaging and search ports early, then transactional Outbox, one MQ adapter and asynchronous search projection after the required transaction and event contracts are stable.
 10. Synchronize the open-source manuals, operator runbook, compatibility matrix and public docs site before GitHub publication. Experimental adapters must remain clearly labeled.
 
-The sensitive-data predecessors, `data-lifecycle-retention`, `platform-service-contract-standard`, `persisted-query-command-object-runtime`, `integration-ports-disabled-default`, `organization-rbac-menu-contract-and-migration-design`, `organization-user-admin-experience`, `role-tree-and-authorization-entry` and `menu-tree-and-button-permission-configuration` are implemented in the completion program. All 15 remaining nodes are activated as controlled unfinished work, but none may silently reuse existing closeouts or be described as runtime capability. In particular, federation remains a controlled read-only query boundary and XA remains an optional default-off adapter until their independent implementation and certification gates pass. The task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation must remain synchronized as each node advances. `design-taste-frontend` applies only to the future public documentation and marketing surfaces; the dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
+The sensitive-data predecessors, `data-lifecycle-retention`, `platform-service-contract-standard`, `persisted-query-command-object-runtime`, `integration-ports-disabled-default`, organization/RBAC/menu governance, unified error-code governance and public documentation/release-governance nodes are implemented in the completion program. All nine remaining nodes are controlled `deferred` work, but none may silently reuse existing closeouts or be described as runtime capability. In particular, federation remains a controlled read-only query boundary and XA remains an optional default-off adapter until their independent implementation and certification gates pass. The task graph, dependency locks, engineering capability inventory, release criteria and open-source documentation must remain synchronized as each node advances. `design-taste-frontend` applies to the implemented public documentation and marketing surfaces; dense Admin workflows remain governed by Product Design, existing Ant Design wrappers and `ui-ux-pro-max` accessibility/responsive checks.
 
 ## Release Recommendation
 

@@ -10,7 +10,7 @@ const config: Config = {
   organizationName: 'GnosiST',
   projectName: 'platform-go',
   onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'throw',
+  markdown: {hooks: {onBrokenMarkdownLinks: 'throw'}},
   i18n: {defaultLocale: 'zh-Hans', locales: ['zh-Hans', 'en']},
   presets: [
     [
@@ -77,7 +77,7 @@ const config: Config = {
         {to: '/docs/capabilities', label: '能力 / Capabilities', position: 'left'},
         {to: '/docs/operations', label: '运维 / Operations', position: 'left'},
         {type: 'localeDropdown', position: 'right'},
-        {label: 'v0.1.0', href: 'https://github.com/GnosiST/platform-go/releases/tag/v0.1.0', position: 'right'},
+        {label: 'v0.1.1', href: 'https://github.com/GnosiST/platform-go/releases/tag/v0.1.1', position: 'right'},
         {href: 'https://github.com/GnosiST/platform-go', label: 'GitHub', position: 'right'},
       ],
     },

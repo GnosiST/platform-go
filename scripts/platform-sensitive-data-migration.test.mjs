@@ -314,24 +314,37 @@ describe("validate-platform-sensitive-data-migration", () => {
     assert.equal(runValidator(["--evidence-file", tempText("safe-dsn.md", safe)]).status, 0);
   });
 
-  it("discovers every present migration task report deterministically", () => {
-    const reportPath = path.join(repoRoot, "docs/platform-roadmap.md");
-    fs.writeFileSync(reportPath, "PLATFORM_ADMIN_RESOURCE_DSN=operator:secret@tcp(db.internal:3306)/platform\n");
-    try {
-      assertRejected(runValidator(), /Task 8 report.*DSN/i);
-    } finally {
-      fs.rmSync(reportPath, { force: true });
-    }
+  it("discovers every present migration task report without changing the tracked roadmap", () => {
+    const roadmapPath = path.join(repoRoot, "docs/platform-roadmap.md");
+    const roadmapBefore = {
+      contents: fs.readFileSync(roadmapPath, "utf8"),
+      mtimeMs: fs.statSync(roadmapPath).mtimeMs,
+    };
+    const reportPath = tempText(
+      "sensitive-data-historical-migration-task-8-security-report.md",
+      "PLATFORM_ADMIN_RESOURCE_DSN=operator:secret@tcp(db.internal:3306)/platform\n",
+    );
+
+    const result = runValidator(["--migration-task-report-dir", path.dirname(reportPath)]);
+    const roadmapAfter = {
+      contents: fs.readFileSync(roadmapPath, "utf8"),
+      mtimeMs: fs.statSync(roadmapPath).mtimeMs,
+    };
+
+    assert.deepEqual(roadmapAfter, roadmapBefore);
+    assertRejected(result, /Task 8 report.*DSN/i);
   });
 
-  it("discovers the legacy Task 1 report basename by default", () => {
-    const reportPath = path.join(repoRoot, "docs/platform-roadmap.md");
-    fs.writeFileSync(reportPath, "SESSION_DSN=operator:secret@tcp4(db.internal:3306)/platform\n");
-    try {
-      assertRejected(runValidator(), /Task 1 report.*DSN/i);
-    } finally {
-      fs.rmSync(reportPath, { force: true });
-    }
+  it("discovers an isolated legacy Task 1 report basename", () => {
+    const reportPath = tempText(
+      "task-1-report.json",
+      "SESSION_DSN=operator:secret@tcp4(db.internal:3306)/platform\n",
+    );
+
+    assertRejected(
+      runValidator(["--migration-task-report-dir", path.dirname(reportPath)]),
+      /Task 1 report.*DSN/i,
+    );
   });
 
   it("rejects extended MySQL native and multiline PostgreSQL keyword credentials", () => {

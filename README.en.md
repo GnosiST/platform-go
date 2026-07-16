@@ -13,6 +13,8 @@
 
 `platform-go` is a reusable, auditable and extensible foundation for Go operations services. It is intentionally business-neutral: domain resources, menus and workflows stay outside platform core and attach through capability manifests, public ports and versioned contracts.
 
+`zshenmez` is external reference evidence for reusable management patterns only. `platform-go` is not a business migration target and does not ship its concrete business resources, routes, stores, state machines, menus, fixtures or write-cutover plans.
+
 It is a good fit for teams that need to:
 
 - build long-running services with Gin and GORM;
@@ -37,7 +39,7 @@ Optional profiles keep personnel, notification, jobs and enterprise governance d
 
 The current governance snapshot is **67 total / 58 implemented / 9 controlled unfinished**. `runtime-security-containment`, `sensitive-data-protection-runtime`, `sensitive-data-historical-migration`, `admin-watermark-export-governance` and `organization-user-admin-experience` are `implemented`.
 
-The persistent full-scope unfinished inventory covers `multi-datasource-contract-and-runtime`, `tenant-placement-and-request-routing`, `datasource-read-write-routing`, `sharding-and-tenant-migration`, `federated-read-query`, `xa-optional-adapter`, `database-certification-matrix`, `transactional-outbox-and-one-mq-adapter`, `asynchronous-search-projection`, `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication`. v0.1.0 supports one datasource and one native transaction boundary. SQLite is development/test-only by support policy; Oracle and KingbaseES are unsupported. `alibaba/page-agent` is only a default-off optional `public-docs-site` sub-capability.
+The persistent full-scope unfinished inventory contains only nine `deferred` nodes: `multi-datasource-contract-and-runtime`, `tenant-placement-and-request-routing`, `datasource-read-write-routing`, `sharding-and-tenant-migration`, `federated-read-query`, `xa-optional-adapter`, `database-certification-matrix`, `transactional-outbox-and-one-mq-adapter` and `asynchronous-search-projection`. `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication` are `implemented`; tag and source-archive integrity for a concrete version remains a separate release check. v0.1.1 supports one datasource and one native transaction boundary. SQLite is development/test-only by support policy; Oracle and KingbaseES are unsupported. `alibaba/page-agent` is only a default-off optional `public-docs-site` sub-capability.
 
 Policy review routes:
 
@@ -69,6 +71,47 @@ go run ./cmd/platform-api
 ```
 
 The API defaults to `http://127.0.0.1:9200`; the Admin development server defaults to `http://127.0.0.1:9202`.
+
+<details>
+<summary>Production baseline and non-mutating preflight</summary>
+
+Production baseline: set `PLATFORM_RUNTIME_ENV=production` and explicitly configure durable stores, Redis, a trusted HTTPS edge, independent secrets and disabled demo authentication. See [Deployment and production baseline](docs/platform-deployment.md) for values, constraints and rotation procedures. This README retains the initialization keys required by the machine contract:
+
+```text
+PLATFORM_RUNTIME_ENV
+PLATFORM_PUBLIC_BASE_URL
+PLATFORM_TRUSTED_PROXIES
+PLATFORM_EDGE_TRUSTED_PROXY
+PLATFORM_HTTP_MAX_BODY_BYTES
+PLATFORM_JWT_SECRET
+PLATFORM_DATA_KEY_PROVIDER
+PLATFORM_ADMIN_RESOURCE_DRIVER
+PLATFORM_ADMIN_RESOURCE_DSN
+PLATFORM_SESSION_DRIVER
+PLATFORM_SESSION_DSN
+PLATFORM_LIFECYCLE_HISTORY_DRIVER
+PLATFORM_LIFECYCLE_HISTORY_DSN
+PLATFORM_CACHE_DRIVER
+PLATFORM_REDIS_ADDR
+PLATFORM_RATE_LIMIT_HMAC_KEY
+PLATFORM_DISABLE_DEMO_AUTH_PROVIDER
+```
+
+The retention runner stays disabled by default. Review `PLATFORM_RETENTION_RUNNER_ENABLED`, `PLATFORM_RETENTION_RUNNER_INTERVAL`, `PLATFORM_RETENTION_RUNNER_BATCH_SIZE` and `PLATFORM_RETENTION_RUNNER_MAX_RETRIES` together before enabling it.
+
+List the non-mutating production checks first, then validate a private environment in strict mode. Run `node scripts/validate-platform-production-env.mjs` directly for the standard template:
+
+```bash
+node scripts/validate-platform-foundation-alignment.mjs
+node scripts/run-platform-production-preflight.mjs --list
+node scripts/run-platform-production-preflight.mjs --command production-env-audit --strict-env-file <private-production-env>
+```
+
+`config-backup-export`, `config-import-restore`, `database-migration` and `token-rotation` are production operation policies that require human review, rollback evidence and audit records. Preflight does not deploy, migrate or mutate production state.
+
+Deployment scheme A is selected as the default: run the Gin API as a long-lived service and serve Admin assets from the same origin where practical. See [deployment documentation](docs/platform-deployment.md) and run `node scripts/validate-platform-deployment-topology.mjs` before changing this topology.
+
+</details>
 
 ## Support boundary
 

@@ -1,7 +1,7 @@
 # Platform Foundation Roadmap
 
 Date: 2026-07-04
-Last updated: 2026-07-15
+Last updated: 2026-07-16
 
 ## Goal
 
@@ -11,9 +11,11 @@ The platform is currently a compiled modular monolith, not a runtime plugin mark
 
 ## Current Baseline
 
-v0.1.0 release blockers: `github-release-publication`.
+Recorded task-graph release lane: v0.1.0 release blockers: `github-release-publication`.
 Post-release optional deferred nodes: `multi-datasource-contract-and-runtime`, `tenant-placement-and-request-routing`, `datasource-read-write-routing`, `sharding-and-tenant-migration`, `federated-read-query`, `xa-optional-adapter`, `database-certification-matrix`, `transactional-outbox-and-one-mq-adapter`, `asynchronous-search-projection`.
 Current Remaining Node Order
+
+`github-release-publication` is `implemented` and is not part of the current remaining-node inventory. A concrete Git tag and its generated source archives still require an independent release-surface check; capability closeout does not move or recreate a published tag.
 
 There is no whole-node parallel batch; each release gate follows the declared
 dependency and evidence order.
@@ -83,11 +85,11 @@ Important correction:
 - The earlier implementation had drifted from the intended `jiedanshi/platform` reference stack.
 - The target stack is Gin + GORM + Casbin + JWT on the backend and Refine + React + Ant Design on the admin frontend.
 - Main stack alignment has been corrected in thin slices; production token-rotation policy is contract-gated, and the reusable foundation now marks `production-auth-provider-hardening` plus the source-writing generator skeleton gate as implemented.
-- The original foundation baseline is closed at 37 implemented nodes. Seventeen continuation nodes, including `platform-service-contract-standard`, `persisted-query-command-object-runtime`, `integration-ports-disabled-default`, unified error-code governance, the organization/RBAC/menu contract gate, the organization role-pool backend/migration runtime, `organization-user-admin-experience`, `role-tree-and-authorization-entry`, `menu-tree-and-button-permission-configuration` and the organization E2E gate, are implemented, so the active completion program is now `67 total / 58 implemented / 9 controlled unfinished` and the current goal remains `not-complete-controlled`.
+- The original foundation baseline is closed at 37 implemented nodes. The completed continuation nodes, including `platform-service-contract-standard`, `persisted-query-command-object-runtime`, `integration-ports-disabled-default`, unified error-code governance, the organization/RBAC/menu contract gate, the organization role-pool backend/migration runtime, `organization-user-admin-experience`, `role-tree-and-authorization-entry`, `menu-tree-and-button-permission-configuration` and the organization E2E gate, are implemented, so the active completion program is now `67 total / 58 implemented / 9 controlled unfinished` and the current goal remains `not-complete-controlled`.
 - `runtime-security-containment`, `sensitive-data-protection-runtime` and `sensitive-data-historical-migration` remain `implemented`; the Query/Command closeout reuses their authorization, protected-storage and maintenance-only boundaries without reopening them.
-- The persistent full-scope unfinished inventory contains the nine post-release optional deferred datasource/runtime nodes in task-graph order, then `open-source-portability`, public docs and publication. Unified error-code governance and organization E2E are closed for v0.1.0; the remaining release path is portability, public docs/site and publication. The [activated remaining-task topology](docs/platform-roadmap.md) remains the authority; release eligibility is separate from persistent full-goal completion.
+- The persistent full-scope unfinished inventory contains only the nine post-release optional deferred datasource/runtime nodes in task-graph order. `open-source-portability`, `public-docs-community`, `public-docs-site` and `github-release-publication` are `implemented` and excluded from the unfinished inventory. Release eligibility for a concrete tag and source archive remains separate from capability-state completion.
 - `mask-strategy-runtime` is closed with manifest-driven versioned strategies, fail-closed encrypted projection, single-projection HTTP boundaries, Admin encrypted-edit safety and contract/OpenAPI/TypeScript propagation. `sensitive-data-reveal-step-up` is closed with manifest policy, dedicated permission, OIDC/SMS factor orchestration, short-lived single-use grants, rate limits, append-only audit and an accessible expiring modal.
-- Historical migration and lifecycle retention keep their maintenance-only boundaries. The service contract standard, persisted Query/Command runtime, unified error-code governance, organization/RBAC/menu design contract, organization/user Admin experience, role tree/authorization entry and menu tree/detail workbench are closed with machine gates; full organization E2E, workload identity, event delivery and datasource routing remain unfinished. The 14 unfinished nodes have no implementation closeout. MySQL/PostgreSQL promotion still requires real integration certification evidence, SQLite remains local development/test rehearsal only, Oracle and KingbaseES remain uncertified, federation is read-only and controlled, XA is optional and default-off, and messaging/search integrations remain disabled by default. Production-auth and source-writing promotion remain intentionally non-mutating and `not-approved`.
+- Historical migration and lifecycle retention keep their maintenance-only boundaries. The service contract standard, persisted Query/Command runtime, unified error-code governance, organization/RBAC/menu design and runtime, organization E2E and public release-governance nodes are closed with machine gates. The nine deferred datasource/routing/sharding/federation/XA/certification/outbox/search nodes have no implementation closeout. MySQL/PostgreSQL promotion still requires real integration certification evidence, SQLite remains local development/test rehearsal only, Oracle and KingbaseES remain uncertified, federation is read-only and controlled, XA is optional and default-off, and messaging/search integrations remain disabled by default. Production-auth and source-writing promotion remain intentionally non-mutating and `not-approved`.
 
 ## Menu And Permission Decision
 
@@ -140,7 +142,7 @@ P0 stack alignment:
 - Done: replace opaque HTTP session tokens with JWT admin bearer tokens while preserving server-side revocation semantics.
 - Done: add admin sliding session renewal through `POST /api/auth/refresh`, reusing the authoritative server-side session and returning a newly signed JWT.
 - Done: close `production-auth-provider-hardening` as an implemented foundation gate backed by `resources/platform-production-auth-hardening.json`, `resources/platform-refresh-token-family-promotion.json`, `resources/generated/production-auth-promotion-review.json`, `scripts/validate-platform-production-auth-hardening.mjs`, `scripts/validate-platform-refresh-token-family-promotion.mjs` and `scripts/generate-production-auth-promotion-review.mjs`; it covers JWT/session credentials, provider adapter controls, provider runtime policy, Provider Promotion Matrix with manifest-provider coverage, token-rotation evidence, structured promotion approval evidence schema, operations-plan schema propagation, a non-mutating not-approved promotion review packet and implemented-disabled refresh-token-family runtime artifacts.
-- Done: add the production session-policy specification and disabled refresh-token-family runtime slice. The spec fixes the boundary between current sliding renewal and optional offline renewal, while the runtime slice provides hashed token-family storage, rotation/reuse detection and audit redaction without binding that behavior to the default refresh endpoint.
+- Done: add the production session-policy specification and disabled refresh-token-family runtime slice. The current sliding-renewal credential is authoritative through the server-side session. It is not a refresh-token-family model. The optional runtime slice provides hashed token-family storage, rotation/reuse detection and audit redaction without binding that behavior to the default refresh endpoint.
 - Done: add `pgo_` API token issue/update/revoke plus scoped Bearer authorization for protected platform APIs.
 - Done: add isolated app auth runtime with `tokenType=app` JWTs, app current-session and app logout.
 - Done: add app identity resolver seam and generic app identity binding persistence for configured app login providers without exposing raw OpenID/UnionID in responses, audit records or generic resource rows.
@@ -196,13 +198,13 @@ Acceptance:
 
 ### Post-Foundation UI Optimization State
 
-Status: P1 implemented; public/brand redesign remains deferred. Full assessment: `docs/platform-ui-optimization-assessment.md`.
+Status: P1 and the public documentation surface are implemented. Full assessment: `docs/platform-ui-optimization-assessment.md`.
 
 - Done, P1: `admin-ui-system-quality-hardening` implements default focus visibility, skip/route focus, explicit localized icon labels, 44px mobile shell/resource controls, a two-tier shell below 1024px, settled modal focus lifecycle, schema-order table prioritization, localized stale-session recovery, computed reduced-motion behavior and browser/contract coverage across 375, 390, 768, 1024, 1280 and 1440 widths with no stable-state page overflow or new application console errors.
 - Done, completion program: `admin-watermark-export-governance` is `implemented`. The normalized settings contract preserves legacy boolean configuration, supports independent screen/export scopes, renders exactly `1/4/9/16` inert full-viewport screen marks over navigation, data surfaces and overlays, reflows narrow sixteen-mark layouts to `2x8`, and adds structured provenance only to Policy Review JSON exports. Product Design, `ui-ux-pro-max`, bilingual contract/build checks, responsive browser evidence, dark-mode coverage and a clean current-run console are recorded in the task graph and node closeout audit.
 - Done, completion program: `sensitive-data-reveal-step-up` is `implemented`. Manifest-declared encrypted fields can require a dedicated permission and `anyOf`/`allOf` policy over OIDC reauthentication and Admin SMS OTP; grants are short-lived and single-use, audit is append-only, failed verification returns `422` without clearing the Admin session, and plaintext is confined to the expiring modal.
-- P2, `design-taste-frontend`: keep brand-entry and public-surface visual redesign deferred until a real landing, portfolio, marketing or approved login-brand brief exists. Apply it to public or brand surfaces only; do not turn repeated CRUD and governance workflows into marketing-style card pages.
-- Governance: the 37-node foundation baseline remains closed, seventeen continuation nodes remain `implemented`, and the graph is `67 total / 58 implemented / 9 controlled unfinished` with status `not-complete-controlled`. Four v0.1.0 release blockers are separated from nine post-release optional deferred nodes without dropping either lane from the persistent objective. Production promotion remains `not-approved`; target menu serving, role-menu migration writes, runtime mutation and refresh-token-family default runtime remain disabled.
+- Done, P2 public surface: `design-taste-frontend` informed the bilingual documentation landing page while Docusaurus owns shared navigation, locale switching, metadata and the footer. This art direction remains limited to public and brand surfaces; repeated CRUD and governance workflows stay on the Admin product UI system.
+- Governance: the 37-node foundation baseline and completed continuation nodes remain closed, and the graph is `67 total / 58 implemented / 9 controlled unfinished` with status `not-complete-controlled`. Open-source portability, public docs/community, the documentation site and publication governance are implemented; the nine post-release optional nodes remain `deferred`. Production promotion remains `not-approved`; target menu serving, role-menu migration writes, runtime mutation and refresh-token-family default runtime remain disabled.
 
 ### Phase 3: Production Auth And Identity
 

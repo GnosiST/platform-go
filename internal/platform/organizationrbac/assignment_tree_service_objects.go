@@ -36,7 +36,7 @@ func assignmentTreeQueryDefinitions() []serviceobject.QueryDefinition {
 }
 
 func assignmentTreeQueryDefinition(id, resource string, args []serviceobject.ArgumentDefinition, maxPage int, menu, hydrate bool) serviceobject.QueryDefinition {
-	return serviceobject.QueryDefinition{ID: id, Version: ServiceObjectVersion, Resource: resource, Permission: "admin:role:read", Action: "read", TenantMode: serviceobject.TenantPlatform, DataScope: "platform", Arguments: args, Cost: serviceobject.CostPolicy{BaseCost: 2, PerRowCost: 1, PerOffsetCost: 1, PredicateCost: 1, Limit: 2005}, Timeout: 3 * time.Second, MaxPageSize: maxPage, ResultSchema: assignmentTreeResultSchema(menu), Build: func(arguments serviceobject.ValidatedArguments) (serviceobject.QueryAST, error) {
+	return serviceobject.QueryDefinition{ID: id, Version: ServiceObjectVersion, Resource: resource, Permission: "admin:role:read", Action: "read", TenantMode: serviceobject.TenantPlatform, DataScope: "platform", Arguments: args, Cost: serviceobject.CostPolicy{BaseCost: 2, PerRowCost: 1, PerOffsetCost: 1, PredicateCost: 1, MaxOffset: 2000, Limit: 2005}, Timeout: 3 * time.Second, MaxPageSize: maxPage, ResultSchema: assignmentTreeResultSchema(menu), Build: func(arguments serviceobject.ValidatedArguments) (serviceobject.QueryAST, error) {
 		predicates := []serviceobject.Predicate{{Field: "roleCode", Operator: serviceobject.PredicateEqual, Value: arguments["roleCode"]}}
 		if !hydrate {
 			if query, ok := arguments["query"].(string); ok && strings.TrimSpace(query) != "" {

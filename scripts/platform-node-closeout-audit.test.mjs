@@ -9,7 +9,6 @@ import { describe, it } from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 const completionProgramTaskIDs = [
-  "organization-rbac-menu-e2e-qa",
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",
   "datasource-read-write-routing",
@@ -19,10 +18,6 @@ const completionProgramTaskIDs = [
   "database-certification-matrix",
   "transactional-outbox-and-one-mq-adapter",
   "asynchronous-search-projection",
-  "open-source-portability",
-  "public-docs-community",
-  "public-docs-site",
-  "github-release-publication",
 ];
 
 const foundationBaselineCloseoutTaskIDs = [
@@ -65,7 +60,7 @@ const foundationBaselineCloseoutTaskIDs = [
   "production-admin-oidc-auth",
 ];
 
-const foundationBaselineCloseoutDigest = "3f40fe426cb54ca5b75221721158f3f37cac400baa7f32ab680ebe447a082c59";
+const foundationBaselineCloseoutDigest = "73620dbab7f30678dc2968df929ccb82fd2f856e77a7de8c2626cadccdb8cb02";
 
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-node-closeout-audit.mjs", ...args], {
@@ -93,7 +88,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.match(result.stdout, /Validated platform node closeout audit/);
   });
 
-  it("preserves 37 baseline closeouts, closes sixteen completion nodes, and tracks 14 unfinished nodes", () => {
+  it("preserves 37 baseline closeouts, closes 21 completion nodes, and tracks nine unfinished nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const audit = readJSON("resources/platform-node-closeout-audit.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
@@ -101,7 +96,7 @@ describe("validate-platform-node-closeout-audit", () => {
     assert.ok(task, "task graph must include production-admin-oidc-auth");
     assert.equal(task.status, "implemented");
     assert.equal(audit.nodeCloseouts.some((item) => item.taskId === task.id), true);
-    assert.equal(audit.nodeCloseouts.length, 53);
+    assert.equal(audit.nodeCloseouts.length, 58);
     assert.deepEqual(audit.nodeCloseouts.slice(0, 37).map((item) => item.taskId), foundationBaselineCloseoutTaskIDs);
     assert.equal(createHash("sha256").update(JSON.stringify(audit.nodeCloseouts.slice(0, 37))).digest("hex"), foundationBaselineCloseoutDigest);
     const runtimeSecurityCloseout = audit.nodeCloseouts[37];

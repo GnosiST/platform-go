@@ -412,6 +412,40 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /release blocker github-release-publication must not depend on post-release optional task multi-datasource-contract-and-runtime/);
   });
 
+  it("rejects publication evidence whose release source SHAs are missing or inconsistent", () => {
+    const evidence = readJSON("resources/evidence/github-release-publication-20260716.json");
+    const releaseCommit = "a".repeat(40);
+    Object.assign(evidence, {
+      tagCommit: releaseCommit,
+      releaseCommit,
+      ciHeadSha: releaseCommit,
+      pagesHeadSha: "b".repeat(40),
+    });
+
+    const mismatch = runValidator(["--release-evidence", tempJSON("release-evidence-mismatch.json", evidence)]);
+    assert.notEqual(mismatch.status, 0, mismatch.stdout);
+    assert.match(mismatch.stderr, /publication evidence source SHAs must all equal releaseCommit/);
+
+    delete evidence.tagCommit;
+    const missing = runValidator(["--release-evidence", tempJSON("release-evidence-missing.json", evidence)]);
+    assert.notEqual(missing.status, 0, missing.stdout);
+    assert.match(missing.stderr, /publication evidence tagCommit must be a full lowercase Git commit SHA/);
+  });
+
+  it("accepts publication evidence submitted after release without requiring its own commit SHA", () => {
+    const evidence = readJSON("resources/evidence/github-release-publication-20260716.json");
+    const releaseCommit = "a".repeat(40);
+    Object.assign(evidence, {
+      tagCommit: releaseCommit,
+      releaseCommit,
+      ciHeadSha: releaseCommit,
+      pagesHeadSha: releaseCommit,
+    });
+
+    const result = runValidator(["--release-evidence", tempJSON("post-release-evidence.json", evidence)]);
+    assert.equal(result.status, 0, result.stderr);
+  });
+
   it("rejects stale unimplemented rationale on the implemented menu node", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const menuTask = graph.tasks.find((item) => item.id === "menu-tree-and-button-permission-configuration");

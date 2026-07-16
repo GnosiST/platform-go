@@ -13,6 +13,8 @@
 
 `platform-go` 是可复用、可审计、可扩展的 Go 平台基础层。它不绑定具体业务领域，也不把业务菜单、业务数据或业务工作流写进平台核心；业务包通过 capability manifest、公开端口和稳定合同接入。
 
+`zshenmez` 只作为可复用管理模式的外部参考证据。`platform-go` is not a business migration target：平台不会交付其具体业务资源、路由、存储、状态机、菜单、夹具或写入切换方案。
+
 适合需要以下基础能力的团队：
 
 - 用 Gin + GORM 构建长期运行的 Go 服务；
@@ -37,7 +39,7 @@
 
 当前治理快照为 **67 total / 58 implemented / 9 controlled unfinished**。`runtime-security-containment` 为 `implemented`；`sensitive-data-protection-runtime` 为 `implemented`；`sensitive-data-historical-migration` 为 `implemented`；`admin-watermark-export-governance` 为 `implemented`；`organization-user-admin-experience` 为 `implemented`。
 
-当前 persistent full-scope unfinished inventory 包括 `multi-datasource-contract-and-runtime`、`tenant-placement-and-request-routing`、`datasource-read-write-routing`、`sharding-and-tenant-migration`、`federated-read-query`、`xa-optional-adapter`、`database-certification-matrix`、`transactional-outbox-and-one-mq-adapter`、`asynchronous-search-projection`、`open-source-portability`、`public-docs-community`、`public-docs-site` 和 `github-release-publication`。v0.1.0 只承诺 one datasource and one native transaction boundary；SQLite is development/test-only by support policy，Oracle and KingbaseES are unsupported。`alibaba/page-agent` is only a default-off optional `public-docs-site` sub-capability。
+当前 persistent full-scope unfinished inventory 仅包括 9 个 `deferred` 节点：`multi-datasource-contract-and-runtime`、`tenant-placement-and-request-routing`、`datasource-read-write-routing`、`sharding-and-tenant-migration`、`federated-read-query`、`xa-optional-adapter`、`database-certification-matrix`、`transactional-outbox-and-one-mq-adapter` 和 `asynchronous-search-projection`。`open-source-portability`、`public-docs-community`、`public-docs-site` 和 `github-release-publication` 均为 `implemented`；具体版本的标签和源码归档完整性仍按发布流程独立验收。v0.1.1 只承诺 one datasource and one native transaction boundary；SQLite is development/test-only by support policy，Oracle and KingbaseES are unsupported。`alibaba/page-agent` is only a default-off optional `public-docs-site` sub-capability。
 
 策略评审接口：
 
@@ -69,6 +71,47 @@ go run ./cmd/platform-api
 ```
 
 API 默认地址为 `http://127.0.0.1:9200`，管理端开发服务器为 `http://127.0.0.1:9202`。
+
+<details>
+<summary>生产基线与非变更式预检</summary>
+
+Production baseline: set `PLATFORM_RUNTIME_ENV=production`，并显式配置持久化存储、Redis、可信 HTTPS 边缘、独立密钥和关闭 demo 认证。完整取值、约束和轮换说明以 [部署与生产基线](docs/platform-deployment.md) 为准；README 只保留机器合同要求的初始化清单：
+
+```text
+PLATFORM_RUNTIME_ENV
+PLATFORM_PUBLIC_BASE_URL
+PLATFORM_TRUSTED_PROXIES
+PLATFORM_EDGE_TRUSTED_PROXY
+PLATFORM_HTTP_MAX_BODY_BYTES
+PLATFORM_JWT_SECRET
+PLATFORM_DATA_KEY_PROVIDER
+PLATFORM_ADMIN_RESOURCE_DRIVER
+PLATFORM_ADMIN_RESOURCE_DSN
+PLATFORM_SESSION_DRIVER
+PLATFORM_SESSION_DSN
+PLATFORM_LIFECYCLE_HISTORY_DRIVER
+PLATFORM_LIFECYCLE_HISTORY_DSN
+PLATFORM_CACHE_DRIVER
+PLATFORM_REDIS_ADDR
+PLATFORM_RATE_LIMIT_HMAC_KEY
+PLATFORM_DISABLE_DEMO_AUTH_PROVIDER
+```
+
+保留策略执行器默认关闭；启用前必须一起评审 `PLATFORM_RETENTION_RUNNER_ENABLED`、`PLATFORM_RETENTION_RUNNER_INTERVAL`、`PLATFORM_RETENTION_RUNNER_BATCH_SIZE` 和 `PLATFORM_RETENTION_RUNNER_MAX_RETRIES`。
+
+先列出非变更式生产预检，再针对私有环境执行严格配置审计。标准模板可直接运行 `node scripts/validate-platform-production-env.mjs` 检查：
+
+```bash
+node scripts/validate-platform-foundation-alignment.mjs
+node scripts/run-platform-production-preflight.mjs --list
+node scripts/run-platform-production-preflight.mjs --command production-env-audit --strict-env-file <private-production-env>
+```
+
+`config-backup-export`、`config-import-restore`、`database-migration` 和 `token-rotation` 是需要人工评审、回滚证据与审计记录的生产操作策略；预检本身不会部署、迁移或写入生产状态。
+
+Deployment scheme A is selected as the default：以长生命周期 Gin 服务承载 API，并优先同源提供 Admin 静态资源；边界详见 [部署文档](docs/platform-deployment.md)，变更拓扑前运行 `node scripts/validate-platform-deployment-topology.mjs`。
+
+</details>
 
 ## 能力边界
 

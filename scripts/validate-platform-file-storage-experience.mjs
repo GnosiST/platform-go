@@ -29,6 +29,10 @@ function relativeExistingPath(relativePath) {
   return relative !== "" && !relative.startsWith("..") && fs.existsSync(absolutePath);
 }
 
+function externalReviewArtifactPath(value) {
+  return /^external-review-artifacts:\/\/platform-go\/(?:[A-Za-z0-9][A-Za-z0-9._-]*\/)+[A-Za-z0-9][A-Za-z0-9._-]*\.(?:png|jpe?g|webp)$/.test(value);
+}
+
 function requireIncludes(items, required, label, errors) {
   const actual = new Set(values(items));
   for (const value of required) {
@@ -253,7 +257,7 @@ function validateBrowserEvidence(evidence, errors) {
     errors,
   );
   for (const screenshot of screenshots) {
-    if (!screenshot.path || !relativeExistingPath(screenshot.path)) {
+    if (!screenshot.path || (!relativeExistingPath(screenshot.path) && !externalReviewArtifactPath(screenshot.path))) {
       errors.push(`designGate.browserEvidence screenshot path is missing or unsafe: ${screenshot.path}`);
     }
     if (!screenshot.viewport) {

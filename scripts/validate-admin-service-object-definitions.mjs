@@ -12,6 +12,7 @@ const sourceArguments = new Map([
   ["internal/platform/organizationrbac/service_objects.go", "--organization-source"],
   ["internal/platform/organizationrbac/lifecycle_service_objects.go", "--lifecycle-source"],
   ["internal/platform/organizationrbac/navigation_service_objects.go", "--navigation-source"],
+  ["internal/platform/organizationrbac/assignment_tree_service_objects.go", "--assignment-tree-source"],
 ]);
 const valueTypes = new Map([
   ["ValueString", "string"],
@@ -108,6 +109,40 @@ function functionContaining(source, marker) {
     functionIndex = source.lastIndexOf("\nfunc ", functionIndex - 1);
   }
   return "";
+}
+
+function assignmentTreeInvocation(source, definition) {
+  const invocation = new RegExp(
+    `assignmentTreeQueryDefinition\\(\\s*${definition.goIDSymbol},\\s*"([^"]+)",\\s*([^,]+),\\s*(\\d+),\\s*(true|false),\\s*(true|false)\\s*\\)`,
+  ).exec(source);
+  if (!invocation) return null;
+  return {
+    resource: invocation[1],
+    arguments: invocation[2].trim(),
+    maxPageSize: Number(invocation[3]),
+    menu: invocation[4] === "true",
+    hydrate: invocation[5] === "true",
+  };
+}
+
+function assignmentTreeArguments(source, expression) {
+  const variable = /^([A-Za-z][A-Za-z0-9_]*)/.exec(expression)?.[1] ?? "";
+  let block = variableComposite(source, variable);
+  if (!block) {
+    const alias = new RegExp(`\\b${variable}\\s*:=\\s*append\\([^\\n]*?,\\s*([A-Za-z][A-Za-z0-9_]*)\\.\\.\\.\\)`).exec(source)?.[1];
+    block = alias ? variableComposite(source, alias) : "";
+  }
+  const fields = parseFields(block, source);
+  const limit = /\[:(\d+)\]/.exec(expression)?.[1];
+  return limit ? fields.slice(0, Number(limit)) : fields;
+}
+
+function assignmentTreeResult(source, menu) {
+  const body = functionBody(source, "assignmentTreeResultSchema");
+  const common = parseFields(variableComposite(body, "result"), source).map(({ name, type }) => ({ name, type }));
+  const suffixes = [...body.matchAll(/return append\(result,\s*serviceobject\.ResultField\{Name:\s*"([^"]+)",\s*Type:\s*serviceobject\.(Value[A-Za-z]+)\}\)/g)];
+  const suffix = suffixes[menu ? 0 : 1];
+  return suffix ? [...common, { name: suffix[1], type: valueTypes.get(suffix[2]) ?? suffix[2] }] : common;
 }
 
 function constants(source) {
@@ -225,7 +260,7 @@ function parseGoDefinition(definition, source, costSource = source, resultSource
   const block = compositeContaining(definitionScope, idMarker);
   if (!block) return null;
   const allowedSortBlock = namedComposite(block, "AllowedSort");
-  return {
+  const parsed = {
     resource: resolvedStringField(block, "Resource", source, identifierField(block, "Resource") === "resource" ? definition.resource : ""),
     permission: resolvedStringField(
       block,
@@ -248,6 +283,15 @@ function parseGoDefinition(definition, source, costSource = source, resultSource
     maxAffectedRows: numberField(block, "MaxAffectedRows"),
     result: parseResultFields(block, resultSource),
   };
+  if (definition.goFactory === "assignmentTreeQueryDefinition") {
+    const invocation = assignmentTreeInvocation(source, definition);
+    if (!invocation) return null;
+    parsed.resource = invocation.resource;
+    parsed.arguments = assignmentTreeArguments(source, invocation.arguments);
+    parsed.maxPageSize = invocation.maxPageSize;
+    parsed.result = assignmentTreeResult(source, invocation.menu);
+  }
+  return parsed;
 }
 
 function comparableJSDefinition(kind, definition) {
@@ -316,7 +360,17 @@ for (const [kind, definitions] of [
         errors.push(`${definition.id}@${definition.version} Go registration must include ${requirement.value}`);
       }
     }
-    if (definition.goFactory && !definition.goRequiredSnippets) {
+    if (definition.goFactory === "assignmentTreeQueryDefinition") {
+      const invocation = assignmentTreeInvocation(source, definition);
+      if (
+        !invocation ||
+        invocation.resource !== definition.resource ||
+        invocation.menu !== (definition.resource === "menus") ||
+        invocation.hydrate !== definition.id.endsWith(".hydrate")
+      ) {
+        errors.push(`${definition.id}@${definition.version} Go factory invocation does not match the JS definition`);
+      }
+    } else if (definition.goFactory && !definition.goRequiredSnippets) {
       const invocation = new RegExp(
         `${definition.goFactory}\\(\\s*${definition.goIDSymbol},\\s*"([^"]+)",\\s*"([^"]+)"(?:,\\s*([A-Za-z][A-Za-z0-9_]*))?`,
       ).exec(source);
@@ -363,7 +417,7 @@ for (const [sourcePath, source] of sources) {
   const runtimeSymbols = new Set(
     [
       ...source.matchAll(/\bID:\s*([A-Za-z][A-Za-z0-9_]*(?:QueryID|CommandID))\b/g),
-      ...source.matchAll(/\b(?:impactQueryDefinition|conflictQueryDefinition|applyDomainDefinition)\(\s*([A-Za-z][A-Za-z0-9_]*(?:QueryID|CommandID))\b/g),
+      ...source.matchAll(/\b(?:impactQueryDefinition|conflictQueryDefinition|applyDomainDefinition|assignmentTreeQueryDefinition)\(\s*([A-Za-z][A-Za-z0-9_]*(?:QueryID|CommandID))\b/g),
     ].map((match) => match[1]),
   );
   if (JSON.stringify([...runtimeSymbols].sort()) !== JSON.stringify([...registeredSymbols].sort())) {

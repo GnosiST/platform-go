@@ -20,6 +20,7 @@ const requiredSensitiveRevealEvidenceManifest = "resources/evidence/sensitive-da
 const requiredOrganizationUserEvidenceManifest = "resources/evidence/organization-user-admin-experience-20260715.json";
 const requiredRoleTreeEvidenceManifest = "resources/evidence/role-tree-and-authorization-entry-20260715.json";
 const requiredMenuEvidenceManifest = "resources/evidence/menu-tree-and-button-permission-configuration-20260715.json";
+const requiredReleaseEvidenceManifest = "resources/evidence/github-release-publication-20260716.json";
 const releaseBlockingNodes = [
   "github-release-publication",
 ];
@@ -159,6 +160,7 @@ function argValue(name, fallback) {
 
 const graphPath = path.resolve(repoRoot, argValue("--graph", "resources/platform-foundation-task-graph.json"));
 const oidcEvidencePath = path.resolve(repoRoot, argValue("--oidc-evidence", "resources/evidence/production-admin-oidc-auth-20260711.json"));
+const releaseEvidencePath = path.resolve(repoRoot, argValue("--release-evidence", requiredReleaseEvidenceManifest));
 
 function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -174,6 +176,10 @@ function hasLocalizedText(value) {
 
 function sameList(left, right) {
   return left.length === right.length && left.every((item, index) => item === right[index]);
+}
+
+function isFullGitCommitSHA(value) {
+  return typeof value === "string" && /^[0-9a-f]{40}$/.test(value);
 }
 
 function relativeExistingPath(relativePath) {
@@ -830,13 +836,31 @@ function validateReleaseLanes(graph, tasks, tasksByID, errors) {
     if (task?.status === "deferred") {
       errors.push(`release blocker ${taskID} must not be deferred`);
     }
-    if (task?.status === "implemented" && !values(task.evidence?.artifacts).includes("resources/evidence/github-release-publication-20260716.json")) {
+    if (task?.status === "implemented" && !values(task.evidence?.artifacts).includes(requiredReleaseEvidenceManifest)) {
       errors.push(`implemented release blocker ${taskID} must declare release evidence`);
     }
     for (const optionalTaskID of postReleaseOptionalNodes) {
       if (hasDependencyPath(tasksByID, taskID, optionalTaskID)) {
         errors.push(`release blocker ${taskID} must not depend on post-release optional task ${optionalTaskID}`);
       }
+    }
+  }
+}
+
+function validateGithubReleasePublicationEvidence(tasksByID, evidence, errors) {
+  if (tasksByID.get("github-release-publication")?.status !== "implemented") return;
+  if (evidence.taskId !== "github-release-publication" || evidence.status !== "verified") {
+    errors.push("publication evidence must identify a verified github-release-publication task");
+  }
+  const commitFields = ["tagCommit", "releaseCommit", "ciHeadSha", "pagesHeadSha"];
+  for (const field of commitFields) {
+    if (!isFullGitCommitSHA(evidence[field])) {
+      errors.push(`publication evidence ${field} must be a full lowercase Git commit SHA`);
+    }
+  }
+  if (commitFields.every((field) => isFullGitCommitSHA(evidence[field]))) {
+    if ([evidence.tagCommit, evidence.ciHeadSha, evidence.pagesHeadSha].some((sha) => sha !== evidence.releaseCommit)) {
+      errors.push("publication evidence source SHAs must all equal releaseCommit");
     }
   }
 }
@@ -919,11 +943,17 @@ function hasDependencyPath(tasksByID, fromTaskID, toTaskID, visited = new Set())
 function validate() {
   const graph = readJSON(graphPath);
   let oidcEvidence = {};
+  let releaseEvidence = {};
   const errors = [];
   try {
     oidcEvidence = readJSON(oidcEvidencePath);
   } catch (error) {
     errors.push(`production-admin-oidc-auth evidence manifest could not be read: ${error.message}`);
+  }
+  try {
+    releaseEvidence = readJSON(releaseEvidencePath);
+  } catch (error) {
+    errors.push(`github-release-publication evidence manifest could not be read: ${error.message}`);
   }
   validateApprovedStack(graph, errors);
 
@@ -959,6 +989,7 @@ function validate() {
   }
   validateCompletionProgram(tasks, errors);
   validateReleaseLanes(graph, tasks, tasksByID, errors);
+  validateGithubReleasePublicationEvidence(tasksByID, releaseEvidence, errors);
   validateProductionAdminOIDCNode(tasks, oidcEvidence, errors);
 
   for (const cycle of detectCycles(tasksByID)) {

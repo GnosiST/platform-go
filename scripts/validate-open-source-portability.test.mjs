@@ -24,6 +24,24 @@ function run(root, args = []) {
   });
 }
 
+function git(root, args) {
+  return spawnSync("git", args, {
+    cwd: root,
+    encoding: "utf8",
+  });
+}
+
+function trackedFixture(files) {
+  const root = fixture(files);
+  assert.equal(git(root, ["init"]).status, 0);
+  assert.equal(git(root, ["config", "user.name", "Portability Fixture"]).status, 0);
+  assert.equal(git(root, ["config", "user.email", "portability-fixture@example.com"]).status, 0);
+  assert.equal(git(root, ["add", "."]).status, 0);
+  const commit = git(root, ["commit", "-m", "fixture"]);
+  assert.equal(commit.status, 0, commit.stderr);
+  return root;
+}
+
 describe("validate-open-source-portability", () => {
   it("accepts a clean release fixture with the expected module", () => {
     const files = {
@@ -104,6 +122,48 @@ describe("validate-open-source-portability", () => {
       const result = run(root, ["--strict"]);
       assert.notEqual(result.status, 0);
       assert.match(result.stderr, /reference snapshot manifest is missing/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects local-only artifacts tracked in the candidate Git tree", () => {
+    const forbidden = [
+      "AGENTS.md",
+      ".superpowers/sdd/report.md",
+      "docs/superpowers/specs/design.md",
+      "design-qa.md",
+      "website/.docusaurus/cache.json",
+    ];
+    const root = trackedFixture(Object.fromEntries(forbidden.map((file) => [file, "local only\n"])));
+    try {
+      const result = run(root);
+      assert.notEqual(result.status, 0, result.stdout);
+      for (const file of forbidden) assert.match(result.stderr, new RegExp(file.replaceAll(".", "\\.")));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("allows matching local-only artifacts when Git does not track them", () => {
+    const root = trackedFixture({
+      ".gitignore": ["AGENTS.md", ".superpowers/", "docs/superpowers/", "design-qa.md", "website/.docusaurus/", ""].join("\n"),
+      "README.md": "# Clean tracked tree\n",
+    });
+    for (const file of [
+      "AGENTS.md",
+      ".superpowers/sdd/report.md",
+      "docs/superpowers/specs/design.md",
+      "design-qa.md",
+      "website/.docusaurus/cache.json",
+    ]) {
+      const target = path.join(root, file);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, "local only\n");
+    }
+    try {
+      const result = run(root);
+      assert.equal(result.status, 0, result.stderr);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

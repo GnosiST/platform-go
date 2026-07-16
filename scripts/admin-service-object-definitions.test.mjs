@@ -85,6 +85,24 @@ describe("validate-admin-service-object-definitions", () => {
     assert.match(result.stderr, /navigation_service_objects\.go service-object IDs are not fully mirrored/);
   });
 
+  it("rejects assignment-tree factory argument drift between Go and JS", () => {
+    const source = fs.readFileSync(
+      path.join(repoRoot, "internal/platform/organizationrbac/assignment_tree_service_objects.go"),
+      "utf8",
+    );
+    const changed = source.replace(
+      'assignmentTreeQueryDefinition(MenuAssignmentTreeSearchQueryID, "menus", menuArgs, 100, true, false)',
+      'assignmentTreeQueryDefinition(MenuAssignmentTreeSearchQueryID, "menus", menuArgs, 101, true, false)',
+    );
+    const result = runValidator([
+      "--assignment-tree-source",
+      temporarySource("assignment_tree_service_objects.go", changed),
+    ]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /platform\.navigation\.menu-assignment-tree\.search@1\.0\.0 Go and JS definition fields differ/);
+  });
+
   it("rejects a Go ID that differs from the generated contract", () => {
     const source = fs.readFileSync(path.join(repoRoot, "internal/platform/organizationrbac/service_objects.go"), "utf8");
     const changed = source.replace(

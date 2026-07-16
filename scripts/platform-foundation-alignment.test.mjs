@@ -23,11 +23,15 @@ const completedProgramTaskIDs = [
   "organization-user-admin-experience",
   "role-tree-and-authorization-entry",
   "menu-tree-and-button-permission-configuration",
+  "organization-rbac-menu-e2e-qa",
+  "unified-error-code-governance",
+  "open-source-portability",
+  "public-docs-community",
+  "public-docs-site",
+  "github-release-publication",
 ];
 
 const remainingCompletionProgramTaskIDs = [
-  "organization-rbac-menu-e2e-qa",
-  "unified-error-code-governance",
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",
   "datasource-read-write-routing",
@@ -37,10 +41,6 @@ const remainingCompletionProgramTaskIDs = [
   "database-certification-matrix",
   "transactional-outbox-and-one-mq-adapter",
   "asynchronous-search-projection",
-  "open-source-portability",
-  "public-docs-community",
-  "public-docs-site",
-  "github-release-publication",
 ];
 
 function runValidator(args = []) {
@@ -62,7 +62,7 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
-  it("migrates fifteen completed program nodes to required work and tracks 15 future nodes", () => {
+  it("tracks 21 completed program nodes as required work and nine deferred nodes as future work", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
     const engineering = readJSON("resources/platform-engineering-capabilities.json");
 

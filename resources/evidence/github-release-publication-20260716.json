@@ -7,8 +7,12 @@
   "visibility": "public",
   "defaultBranch": "main",
   "release": "https://github.com/GnosiST/platform-go/releases/tag/v0.1.0",
+  "tagCommit": "03fcc42dd90fd7ee7b9c1109c55c1ea4d788731b",
+  "releaseCommit": "03fcc42dd90fd7ee7b9c1109c55c1ea4d788731b",
   "ciRun": "https://github.com/GnosiST/platform-go/actions/runs/29478381727",
+  "ciHeadSha": "03fcc42dd90fd7ee7b9c1109c55c1ea4d788731b",
   "pagesRun": "https://github.com/GnosiST/platform-go/actions/runs/29478948642",
+  "pagesHeadSha": "03fcc42dd90fd7ee7b9c1109c55c1ea4d788731b",
   "pagesUrl": "https://gnosist.github.io/platform-go/",
   "branchPolicy": {
     "longLivedProjectBranches": ["main"],

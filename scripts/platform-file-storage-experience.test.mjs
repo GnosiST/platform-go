@@ -107,4 +107,23 @@ describe("validate-platform-file-storage-experience", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /designGate\.browserEvidence screenshot path is missing or unsafe/);
   });
+
+  it("rejects unsafe or unrelated external screenshot URIs", () => {
+    for (const screenshotPath of [
+      "https://example.test/platform-go/file-storage/evidence.png",
+      "external-review-artifacts://other-project/file-storage/2026-07-07/evidence.png",
+      "external-review-artifacts://platform-go/file-storage/../evidence.png",
+      "external-review-artifacts://platform-go/file-storage/2026-07-07/evidence.png?token=secret",
+      "external-review-artifacts://platform-go/file-storage/2026-07-07/evidence.txt",
+    ]) {
+      const contract = readJSON("resources/platform-file-storage-experience.json");
+      contract.designGate.browserEvidence.screenshots[0].path = screenshotPath;
+      const contractPath = tempJSON("platform-file-storage-experience.json", contract);
+
+      const result = runValidator(["--contract", contractPath]);
+
+      assert.notEqual(result.status, 0, screenshotPath);
+      assert.match(result.stderr, /designGate\.browserEvidence screenshot path is missing or unsafe/);
+    }
+  });
 });
