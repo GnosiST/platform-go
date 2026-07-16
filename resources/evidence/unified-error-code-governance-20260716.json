@@ -1,0 +1,57 @@
+{
+  "$schema": "https://platform-go.local/schemas/unified-error-code-governance-evidence.json",
+  "capturedAt": "2026-07-16",
+  "purpose": "Integrity-addressed evidence for the unified error-code registry, source coverage, correlation/redaction runtime and generated public contracts.",
+  "status": "implemented",
+  "scope": {
+    "releaseLane": "v0.1.0",
+    "persistentFullScopeGoal": "not-complete-controlled",
+    "deferredNodesUnaffected": ["multi-datasource-contract-and-runtime", "transactional-outbox-and-one-mq-adapter", "asynchronous-search-projection"]
+  },
+  "runtime": {
+    "registryDefinitions": 118,
+    "sourceCoverage": "passed",
+    "publicCauseRedaction": "passed",
+    "requestTraceAuditCorrelation": "passed",
+    "eventPlanePropagation": "not-implemented",
+    "openTelemetryExport": "not-implemented"
+  },
+  "verification": {
+    "goTests": "871 passed in 7 packages",
+    "registryNodeTests": "19 passed",
+    "focusedSourceCoverage": "1 passed",
+    "validators": [
+      "scripts/validate-platform-error-code-registry.mjs",
+      "scripts/validate-platform-service-contract-standard.mjs",
+      "scripts/validate-platform-foundation-task-graph.mjs",
+      "scripts/validate-platform-engineering-capabilities.mjs",
+      "scripts/validate-platform-task-execution-audit.mjs",
+      "scripts/validate-platform-foundation-alignment.mjs",
+      "scripts/validate-platform-goal-completion-audit.mjs",
+      "scripts/validate-platform-objective-conformance.mjs",
+      "scripts/validate-platform-node-closeout-audit.mjs"
+    ]
+  },
+  "artifacts": [
+    {"path": "internal/platform/errorcode/registry.go", "sha256": "sha256:ff16214916a3ef4f6026bd37ed1b2ce65d225f76947470e912c8d37ba8c73f52"},
+    {"path": "internal/platform/errorcode/builtin.go", "sha256": "sha256:0207c669757da284cb7a7330a3deb29089c89e1594a9cd59db5d5dfa6bb4ead4"},
+    {"path": "internal/platform/errorcode/source_coverage_test.go", "sha256": "sha256:5bafc17d33fdb4cd2642f35c39705f6081cef6282281949872bf7b33ade8c5fe"},
+    {"path": "internal/platform/httpapi/error_response.go", "sha256": "sha256:feb3f52824a1106948dc11381edebadc05fcbd3ff526884e8fb2d929736b7a10"},
+    {"path": "internal/platform/httpapi/error_response_test.go", "sha256": "sha256:d090bd60e6bb94876aaa28a734440c831cb6362fc5d89340384f9d1e57a10ea5"},
+    {"path": "internal/platform/httpapi/admin_common_error_registry_test.go", "sha256": "sha256:9724dcc71e15ea83b6b22ba92b51173ac8aacd233b8caa5ce5dc1a9bd2bc1c84"},
+    {"path": "internal/platform/httpapi/admin_error_mapping_test.go", "sha256": "sha256:bdbb7989f7e400b7fa5145fdc6de711366ef9a5594ae3e0a3474336e44b7151a"},
+    {"path": "internal/platform/httpapi/service_object_error_mapping_test.go", "sha256": "sha256:5d32ab8dec152ce9a708068fe236d15b370422b5e1b3374f99ac78496812faec"},
+    {"path": "internal/platform/httpapi/sensitive_reveal_error_mapping_test.go", "sha256": "sha256:60bdc95d40b11fa3e39a4e367f614193d40f3d50634dfde500a7420b7aa36fad"},
+    {"path": "internal/platform/httpapi/server_test.go", "sha256": "sha256:5a5f24db29af1eff60ec264deea3f81168c8ee68897704ea650478585f06da67"},
+    {"path": "resources/generated/platform-error-code-contract.json", "sha256": "sha256:f166b6dfe026ffba71106be1686dbb293fe0d51197459012632560d172b4fac2"},
+    {"path": "resources/generated/error-sdk/go/error_contract.go", "sha256": "sha256:1b06173037b5f3f0d277e8bf014b8e37dbd9d57f10b3882bb8363d7b756067e3"},
+    {"path": "resources/generated/error-sdk/typescript/errorContract.ts", "sha256": "sha256:6d5345d4a0fd0348f697ce32aa9433e79b7441867bcbac6e0d9821262e80dba0"},
+    {"path": "resources/generated/openapi.admin.json", "sha256": "sha256:541275fbe3c9fcac4e20c44e99dbaa9491a3d89bb90cd1ca5a9dad5fb2c4f906"},
+    {"path": "resources/generated/openapi.app.json", "sha256": "sha256:a869d69615c700d839b4ad1f9e7eead0d628a9c3464621933aab1271185cdaf8"},
+    {"path": "resources/generated/openapi.control.json", "sha256": "sha256:2b028e5b56c2f49b1f03b675a9850bc3f5318bc2a6562df569352a071f8aaa6d"},
+    {"path": "resources/generated/openapi.external.json", "sha256": "sha256:8b04b904cfac487596ba0b3815a93c1dc5a6a4478652f173444f9c4ebcc7ddb8"},
+    {"path": "resources/generated/openapi.service.json", "sha256": "sha256:be1f81f0ed09ab4820384eb63a189167fa6d97b86253695980ad4907931fbd09"},
+    {"path": "scripts/validate-platform-error-code-registry.mjs", "sha256": "sha256:ee21cc93e9cdaa38e94323e1280a1da1575d256c702d20f2fb944e748cbaa92f"},
+    {"path": "scripts/platform-error-code-registry.test.mjs", "sha256": "sha256:ae3f8ea455a7109d78adf5e6ff1280d51fcf5e7b61a014112676bd64b8eedda1"}
+  ]
+}
