@@ -99,7 +99,10 @@ func (r *GORMRepository) RunMigration(ctx context.Context, mode MigrationMode, m
 	if err != nil {
 		return MigrationReport{}, err
 	}
-	if mode == MigrationApply && validMigrationEvidence(evidence) {
+	// Resolve a replay by run ID before inventory or candidate comparison. A valid
+	// run ID is enough to inspect the immutable record; malformed evidence must
+	// fail against an existing applied run without re-entering migration logic.
+	if mode == MigrationApply && validCode(evidence.RunID) {
 		if report, replayed, err := r.replayAppliedMigration(ctx, manifestHash, evidence); replayed || err != nil {
 			return report, err
 		}
