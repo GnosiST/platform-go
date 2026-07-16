@@ -38,7 +38,6 @@
     "requiresTaskGraphBeforeNewNode": true,
     "requiredUnfinishedNodes": [
       "organization-rbac-menu-e2e-qa",
-      "unified-error-code-governance",
       "multi-datasource-contract-and-runtime",
       "tenant-placement-and-request-routing",
       "datasource-read-write-routing",
@@ -102,7 +101,6 @@
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "controlledBlockers": [
       "organization-rbac-menu-e2e-qa",
-      "unified-error-code-governance",
       "multi-datasource-contract-and-runtime",
       "tenant-placement-and-request-routing",
       "datasource-read-write-routing",

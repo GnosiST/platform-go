@@ -2968,10 +2968,10 @@
       },
       "phase": "production-governance",
       "scope": "governance",
-      "status": "pending",
+      "status": "implemented",
       "statusReason": {
-        "zh": "Admin、App、服务、数据、控制面与外部适配器仍使用分散的错误码字面量，尚无统一注册表、生命周期与请求追踪合同。",
-        "en": "Admin, App, service, data, control and external adapter planes still use distributed error-code literals without a canonical registry, lifecycle or request-correlation contract."
+        "zh": "统一错误码注册表、生命周期、响应脱敏、请求追踪和生成合同已实现；事件传播与 OpenTelemetry 仍属于后续能力。",
+        "en": "The unified error-code registry, lifecycle, response redaction, request correlation and generated contracts are implemented; event propagation and OpenTelemetry remain future capabilities."
       },
       "completionGate": {
         "zh": "建立稳定错误码注册表及所有权、受众、HTTP 映射、重试、脱敏、兼容和弃用元数据；所有响应构造器与适配器统一解析；请求/追踪 ID 贯通响应、日志和审计；OpenAPI 与 Go/TypeScript 代码生成公开合同；重复、重分配、未记录和无弃用删除均由验证器阻断，并覆盖授权、校验、未找到、冲突、限流/成本、依赖与内部失败路径。",
@@ -2995,8 +2995,17 @@
       ],
       "evidence": {
         "docs": [
+          "docs/platform-error-code-governance.md",
           "docs/platform-service-contract-standard.md",
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-error-code-registry.mjs",
+          "scripts/validate-platform-service-contract-standard.mjs"
+        ],
+        "tests": [
+          "internal/platform/errorcode/source_coverage_test.go",
+          "scripts/platform-error-code-registry.test.mjs"
         ]
       }
     },
@@ -3491,7 +3500,6 @@
   ],
   "releaseBlockingNodes": [
     "organization-rbac-menu-e2e-qa",
-    "unified-error-code-governance",
     "open-source-portability",
     "public-docs-community",
     "public-docs-site",

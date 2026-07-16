@@ -21,7 +21,6 @@ const requiredRoleTreeEvidenceManifest = "resources/evidence/role-tree-and-autho
 const requiredMenuEvidenceManifest = "resources/evidence/menu-tree-and-button-permission-configuration-20260715.json";
 const releaseBlockingNodes = [
   "organization-rbac-menu-e2e-qa",
-  "unified-error-code-governance",
   "open-source-portability",
   "public-docs-community",
   "public-docs-site",

@@ -3355,7 +3355,7 @@
         "zh": "统一错误码治理",
         "en": "Unified Error Code Governance"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Govern stable public error codes, lifecycle metadata, request correlation, redaction and generated Admin/App/service contracts without exposing internal errors.",
       "dependsOn": [
         "platform-service-contract-standard",
@@ -3366,9 +3366,27 @@
       ],
       "evidence": {
         "sourcePaths": [
+          "internal/platform/errorcode/registry.go",
+          "internal/platform/errorcode/builtin.go",
+          "internal/platform/errorcode/source_coverage_test.go",
           "internal/platform/httpapi/response.go",
+          "docs/platform-error-code-governance.md",
           "docs/platform-service-contract-standard.md",
-          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md"
+          "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
+          "resources/evidence/unified-error-code-governance-20260716.json"
+        ],
+        "generatedFiles": [
+          "resources/generated/platform-error-code-contract.json",
+          "resources/generated/error-sdk/go/error_contract.go",
+          "resources/generated/error-sdk/typescript/errorContract.ts"
+        ],
+        "validators": [
+          "scripts/validate-platform-error-code-registry.mjs",
+          "scripts/validate-platform-service-contract-standard.mjs"
+        ],
+        "tests": [
+          "internal/platform/errorcode/source_coverage_test.go",
+          "scripts/platform-error-code-registry.test.mjs"
         ],
         "taskIds": [
           "unified-error-code-governance"

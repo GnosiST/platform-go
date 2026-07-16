@@ -54,7 +54,7 @@ The contract standard does not implement an OAuth2 authorization server, certifi
 
 ## Trace And Event Envelope
 
-Generated contracts use W3C `traceparent` and `tracestate` fields. Runtime HTTP extraction, OpenTelemetry export and cross-message propagation are not implemented by this node.
+Generated contracts use W3C `traceparent` and `tracestate` fields. The HTTP runtime extracts and validates request/trace correlation and carries opaque IDs through public error responses, internal error events and generic audit records. OpenTelemetry export and cross-message propagation remain separate, unimplemented work owned by the event/observability lanes.
 
 Event envelope version `1.0` requires:
 

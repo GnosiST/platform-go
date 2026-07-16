@@ -9,7 +9,6 @@
     "businessReferenceMode": "reference-only",
     "requiredControlledUnfinishedNodes": [
       "organization-rbac-menu-e2e-qa",
-      "unified-error-code-governance",
       "multi-datasource-contract-and-runtime",
       "tenant-placement-and-request-routing",
       "datasource-read-write-routing",
@@ -31,8 +30,8 @@
   },
   "taskSummary": {
     "expectedTotal": 67,
-    "expectedImplemented": 52,
-    "expectedControlledUnfinished": 15
+    "expectedImplemented": 53,
+    "expectedControlledUnfinished": 14
   },
   "requirements": [
     {

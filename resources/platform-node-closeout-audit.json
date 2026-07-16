@@ -36,7 +36,6 @@
   },
   "pendingNodeEvidence": [
     "organization-rbac-menu-e2e-qa",
-    "unified-error-code-governance",
     "multi-datasource-contract-and-runtime",
     "tenant-placement-and-request-routing",
     "datasource-read-write-routing",
@@ -1542,6 +1541,50 @@
         "product-design",
         "ui-ux-pro-max",
         "browser:control-in-app-browser"
+      ]
+    },
+    {
+      "taskId": "unified-error-code-governance",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupMode": "phase-level",
+      "cleanupEvidence": [
+        "README.md",
+        "docs/platform-error-code-governance.md",
+        "docs/platform-service-contract-standard.md",
+        "docs/platform-foundation-task-map.md",
+        "docs/platform-roadmap.md",
+        "internal/platform/errorcode/registry.go",
+        "internal/platform/errorcode/builtin.go",
+        "internal/platform/errorcode/source_coverage_test.go",
+        "internal/platform/httpapi/error_response.go",
+        "internal/platform/httpapi/error_response_test.go",
+        "resources/generated/platform-error-code-contract.json",
+        "resources/generated/error-sdk/go/error_contract.go",
+        "resources/generated/error-sdk/typescript/errorContract.ts",
+        "resources/generated/openapi.admin.json",
+        "resources/generated/openapi.app.json",
+        "resources/generated/openapi.control.json",
+        "resources/generated/openapi.external.json",
+        "resources/generated/openapi.service.json",
+        "resources/evidence/unified-error-code-governance-20260716.json",
+        "resources/platform-foundation-task-graph.json",
+        "resources/platform-engineering-capabilities.json",
+        "resources/platform-task-execution-audit.json",
+        "resources/platform-foundation-alignment-audit.json",
+        "resources/platform-goal-completion-audit.json",
+        "resources/platform-objective-conformance.json",
+        "resources/platform-node-closeout-audit.json",
+        "scripts/validate-platform-error-code-registry.mjs",
+        "scripts/platform-error-code-registry.test.mjs",
+        "scripts/validate-platform-foundation-task-graph.mjs",
+        "scripts/validate-platform-engineering-capabilities.mjs"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
       ]
     }
   ]
