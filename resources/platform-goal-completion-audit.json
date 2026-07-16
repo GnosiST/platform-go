@@ -8,7 +8,6 @@
     "mustNotSelfCertifyExternalApprovalEvidence": true,
     "businessReferenceMode": "reference-only",
     "requiredControlledUnfinishedNodes": [
-      "organization-rbac-menu-e2e-qa",
       "multi-datasource-contract-and-runtime",
       "tenant-placement-and-request-routing",
       "datasource-read-write-routing",
@@ -30,8 +29,8 @@
   },
   "taskSummary": {
     "expectedTotal": 67,
-    "expectedImplemented": 53,
-    "expectedControlledUnfinished": 14
+    "expectedImplemented": 54,
+    "expectedControlledUnfinished": 13
   },
   "requirements": [
     {

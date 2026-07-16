@@ -1,0 +1,64 @@
+{
+  "$schema": "https://platform-go.local/schemas/organization-rbac-menu-e2e-evidence.json",
+  "capturedAt": "2026-07-16",
+  "taskId": "organization-rbac-menu-e2e-qa",
+  "tool": "in-app-browser",
+  "purpose": "Tracked, redacted manifest for organization authorization, menu/permission transfer, accessibility and cutover rollback acceptance.",
+  "viewports": ["375x812", "390x844", "768x1024", "1024x768", "1280x720", "1440x1024"],
+  "viewportResults": [
+    {"viewport": "375x812", "horizontalOverflow": false, "zoom200PercentOverflow": false, "keyboardReachable": true, "touchTargetsAtLeast44px": true},
+    {"viewport": "390x844", "horizontalOverflow": false, "zoom200PercentOverflow": false, "keyboardReachable": true, "touchTargetsAtLeast44px": true},
+    {"viewport": "768x1024", "horizontalOverflow": false, "zoom200PercentOverflow": false, "keyboardReachable": true, "touchTargetsAtLeast44px": true},
+    {"viewport": "1024x768", "horizontalOverflow": false, "zoom200PercentOverflow": false, "keyboardReachable": true, "touchTargetsAtLeast44px": true},
+    {"viewport": "1280x720", "horizontalOverflow": false, "zoom200PercentOverflow": false, "keyboardReachable": true, "touchTargetsAtLeast44px": true},
+    {"viewport": "1440x1024", "horizontalOverflow": false, "zoom200PercentOverflow": false, "keyboardReachable": true, "touchTargetsAtLeast44px": true}
+  ],
+  "largeDataset": {"nodes": 10000, "selected": 2000, "model": "indexed-linear-derivation"},
+  "scenarios": [
+    "organization-user-conflict-workflows",
+    "menu-permission-transfer",
+    "tree-transfer-large-dataset",
+    "keyboard-accessibility",
+    "cutover-rollback"
+  ],
+  "consoleErrors": 0,
+  "failedFirstPartyRequests": 0,
+  "documentHorizontalOverflow": false,
+  "zoom200PercentOverflow": false,
+  "unapprovedPrincipalDifferences": 0,
+  "rollbackVerified": true,
+  "keyboard": {
+    "keys": ["Tab", "Shift+Tab", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"],
+    "mixedState": "aria-checked=mixed",
+    "countAnnouncement": true,
+    "focusRestored": true
+  },
+  "accessibility": {
+    "ariaTreeSemantics": true,
+    "primaryTargetsAtLeast44px": true,
+    "reducedMotionVerified": true
+  },
+  "cutover": {
+    "statesObserved": [
+      "legacy-serving-target-writes-false",
+      "dual-read-serving-target-writes-false",
+      "target-serving-target-writes-false",
+      "target-serving-target-writes-true",
+      "legacy-serving-target-writes-false"
+    ],
+    "checkpointRestored": true,
+    "stateAfterRollback": "legacy-serving-target-writes-false"
+  },
+  "redaction": {"scanPassed": true, "sensitiveDataAbsent": true, "sourceScreenshotsTracked": false},
+  "evidenceSources": [
+    "resources/evidence/organization-user-admin-experience-20260715.json",
+    "resources/evidence/role-tree-and-authorization-entry-20260715.json",
+    "resources/evidence/menu-tree-and-button-permission-configuration-20260715.json",
+    "internal/platform/organizationrbac/migration_cutover_test.go",
+    "scripts/platform-tree-transfer-model.test.mjs"
+  ],
+  "limits": [
+    "Screenshots do not certify full WCAG conformance.",
+    "Synthetic local data only; no production credentials or customer data were used."
+  ]
+}

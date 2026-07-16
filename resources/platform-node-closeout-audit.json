@@ -35,7 +35,6 @@
     "unfinishedTasksMustNotHaveCloseout": true
   },
   "pendingNodeEvidence": [
-    "organization-rbac-menu-e2e-qa",
     "multi-datasource-contract-and-runtime",
     "tenant-placement-and-request-routing",
     "datasource-read-write-routing",
@@ -1535,6 +1534,39 @@
         "scripts/validate-admin-ui-contracts.mjs",
         "scripts/validate-admin-i18n.mjs",
         ".superpowers/sdd/menu-task-6-report.md"
+      ],
+      "visualEvidence": [
+        "superpowers:brainstorming",
+        "product-design",
+        "ui-ux-pro-max",
+        "browser:control-in-app-browser"
+      ]
+    },
+    {
+      "taskId": "organization-rbac-menu-e2e-qa",
+      "status": "closed",
+      "neatFreak": false,
+      "cleanupMode": "focused",
+      "cleanupEvidence": [
+        "resources/evidence/organization-rbac-menu-e2e-qa-20260716.json",
+        "scripts/validate-platform-organization-rbac-menu-e2e-evidence.mjs",
+        "scripts/platform-organization-rbac-menu-e2e-evidence.test.mjs",
+        "scripts/validate-platform-organization-rbac-menu-contract.mjs",
+        "scripts/platform-organization-rbac-menu-contract.test.mjs",
+        "internal/platform/organizationrbac/migration_cutover_test.go",
+        "scripts/platform-tree-transfer-model.test.mjs",
+        "resources/platform-foundation-task-graph.json",
+        "resources/platform-goal-completion-audit.json",
+        "resources/platform-task-execution-audit.json",
+        "resources/platform-engineering-capabilities.json",
+        "resources/platform-foundation-alignment-audit.json",
+        "resources/platform-objective-conformance.json"
+      ],
+      "dimensions": [
+        "docs",
+        "tests-or-validators",
+        "resource-lock-review",
+        "objective-conflict-review"
       ],
       "visualEvidence": [
         "superpowers:brainstorming",

@@ -20,7 +20,6 @@ const requiredOrganizationUserEvidenceManifest = "resources/evidence/organizatio
 const requiredRoleTreeEvidenceManifest = "resources/evidence/role-tree-and-authorization-entry-20260715.json";
 const requiredMenuEvidenceManifest = "resources/evidence/menu-tree-and-button-permission-configuration-20260715.json";
 const releaseBlockingNodes = [
-  "organization-rbac-menu-e2e-qa",
   "open-source-portability",
   "public-docs-community",
   "public-docs-site",

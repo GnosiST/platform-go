@@ -79,7 +79,6 @@
     "menu-tree-and-button-permission-configuration"
   ],
   "requiredFutureTaskNodes": [
-    "organization-rbac-menu-e2e-qa",
     "multi-datasource-contract-and-runtime",
     "tenant-placement-and-request-routing",
     "datasource-read-write-routing",
@@ -118,7 +117,6 @@
     "organization-user-admin-experience",
     "role-tree-and-authorization-entry",
     "menu-tree-and-button-permission-configuration",
-    "organization-rbac-menu-e2e-qa",
     "multi-datasource-contract-and-runtime",
     "tenant-placement-and-request-routing",
     "datasource-read-write-routing",
@@ -164,7 +162,6 @@
     "organization-user-admin-experience",
     "role-tree-and-authorization-entry",
     "menu-tree-and-button-permission-configuration",
-    "organization-rbac-menu-e2e-qa",
     "multi-datasource-contract-and-runtime",
     "tenant-placement-and-request-routing",
     "datasource-read-write-routing",
@@ -223,7 +220,6 @@
     "organization-user-admin-experience",
     "role-tree-and-authorization-entry",
     "menu-tree-and-button-permission-configuration",
-    "organization-rbac-menu-e2e-qa",
     "multi-datasource-contract-and-runtime",
     "tenant-placement-and-request-routing",
     "datasource-read-write-routing",

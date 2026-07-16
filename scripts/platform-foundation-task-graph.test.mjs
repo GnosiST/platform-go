@@ -81,7 +81,6 @@ const completionProgramTaskIDs = [
 ];
 
 const releaseBlockingNodes = [
-  "organization-rbac-menu-e2e-qa",
   "open-source-portability",
   "public-docs-community",
   "public-docs-site",
@@ -407,13 +406,13 @@ describe("validate-platform-foundation-task-graph", () => {
     blockerDeferred.tasks.find((item) => item.id === releaseBlockingNodes[0]).status = "deferred";
     result = runValidator(["--graph", tempJSON("blocker-deferred.json", blockerDeferred)]);
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /release blocker organization-rbac-menu-e2e-qa must not be deferred/);
+    assert.match(result.stderr, /release blocker open-source-portability must not be deferred/);
 
     const transitive = structuredClone(graph);
-    transitive.tasks.find((item) => item.id === "organization-rbac-menu-e2e-qa").dependsOn.push("multi-datasource-contract-and-runtime");
+    transitive.tasks.find((item) => item.id === "open-source-portability").dependsOn.push("multi-datasource-contract-and-runtime");
     result = runValidator(["--graph", tempJSON("blocker-depends-on-optional.json", transitive)]);
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /release blocker organization-rbac-menu-e2e-qa must not depend on post-release optional task multi-datasource-contract-and-runtime/);
+    assert.match(result.stderr, /release blocker open-source-portability must not depend on post-release optional task multi-datasource-contract-and-runtime/);
   });
 
   it("rejects stale unimplemented rationale on the implemented menu node", () => {
@@ -441,7 +440,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.match(result.stderr, /menu-tree-and-button-permission-configuration implementationBoundary must preserve implemented scope, closed gates and owner task/);
   });
 
-  it("preserves the closed 37-node baseline, implements sixteen completion nodes, and tracks 14 controlled unfinished nodes", () => {
+  it("preserves the closed 37-node baseline, implements seventeen completion nodes, and tracks 13 controlled unfinished nodes", () => {
     const graph = readJSON("resources/platform-foundation-task-graph.json");
     const task = graph.tasks.find((item) => item.id === "production-admin-oidc-auth");
     const implemented = graph.tasks.filter((item) => item.status === "implemented");
@@ -475,7 +474,7 @@ describe("validate-platform-foundation-task-graph", () => {
     assert.deepEqual(graph.tasks.slice(0, foundationBaselineTaskIDs.length).map((item) => item.id), foundationBaselineTaskIDs);
     assert.ok(graph.tasks.slice(0, foundationBaselineTaskIDs.length).every((item) => item.status === "implemented"));
     assert.equal(graph.tasks.length, 67);
-    assert.equal(implemented.length, 53);
+    assert.equal(implemented.length, 54);
     assert.equal(graph.tasks.find((item) => item.id === "runtime-security-containment")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "admin-watermark-export-governance")?.status, "implemented");
     assert.equal(graph.tasks.find((item) => item.id === "sensitive-data-protection-runtime")?.status, "implemented");

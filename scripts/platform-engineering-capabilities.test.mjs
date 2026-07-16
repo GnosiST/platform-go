@@ -155,10 +155,11 @@ describe("validate-platform-engineering-capabilities", () => {
       "integration-ports-disabled-default",
       "organization-rbac-menu-contract-and-migration-design",
       "organization-role-pool-backend-and-migration",
-      "organization-user-admin-experience",
-      "role-tree-and-authorization-entry",
-      "menu-tree-and-button-permission-configuration",
-      "unified-error-code-governance",
+    "organization-user-admin-experience",
+    "role-tree-and-authorization-entry",
+    "menu-tree-and-button-permission-configuration",
+    "organization-rbac-menu-e2e-qa",
+    "unified-error-code-governance",
     ]);
     for (const capability of capabilities.filter((item) => implementedCapabilityIDs.has(item.id))) {
       assert.equal(capability.status, "implemented");
@@ -183,7 +184,7 @@ describe("validate-platform-engineering-capabilities", () => {
     for (const [capabilityID, expectedDependencies] of Object.entries(governedCapabilityDependencies)) {
       const capability = capabilities.find((item) => item.id === capabilityID);
       assert.deepEqual(capability.dependsOn, expectedDependencies);
-      if (!["menu-tree-and-button-permission-configuration", "unified-error-code-governance"].includes(capabilityID)) {
+      if (!["menu-tree-and-button-permission-configuration", "organization-rbac-menu-e2e-qa", "unified-error-code-governance"].includes(capabilityID)) {
         assert.deepEqual(
           capability.evidence.sourcePaths,
           ["open-source-portability", "public-documentation-and-release"].includes(capabilityID)

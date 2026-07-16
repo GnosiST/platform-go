@@ -3331,7 +3331,7 @@
         "zh": "组织权限与菜单全链路验收",
         "en": "Organization RBAC And Menu End-To-End QA"
       },
-      "status": "partial",
+      "status": "implemented",
       "purpose": "Verify organization role-pool enforcement, tenant derivation, role and menu administration, authorization migration and browser-visible accessibility across the complete workflow.",
       "dependsOn": [
         "organization-user-admin-experience",
@@ -3342,11 +3342,19 @@
         "sourcePaths": [
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/platform-roadmap.md",
+          "resources/evidence/organization-rbac-menu-e2e-qa-20260716.json"
         ],
-        "taskIds": [
-          "organization-rbac-menu-e2e-qa"
-        ]
+        "taskIds": ["organization-rbac-menu-e2e-qa"],
+        "validators": [
+          "scripts/validate-platform-organization-rbac-menu-e2e-evidence.mjs",
+          "scripts/validate-platform-organization-rbac-menu-contract.mjs"
+        ],
+        "tests": [
+          "scripts/platform-organization-rbac-menu-e2e-evidence.test.mjs",
+          "scripts/platform-organization-rbac-menu-contract.test.mjs"
+        ],
+        "screenshots": ["resources/evidence/organization-rbac-menu-e2e-qa-20260716.json"]
       }
     },
     {

@@ -67,10 +67,10 @@ const requiredImplementedCapabilityIDs = [
   "organization-user-admin-experience",
   "role-tree-and-authorization-entry",
   "menu-tree-and-button-permission-configuration",
+  "organization-rbac-menu-e2e-qa",
   "unified-error-code-governance",
 ];
 const requiredPartialCapabilityIDs = [
-  "organization-rbac-menu-e2e-qa",
   "open-source-portability",
   "public-documentation-and-release",
 ];

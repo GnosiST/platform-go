@@ -2917,15 +2917,7 @@
       },
       "phase": "production-governance",
       "scope": "governance",
-      "status": "pending",
-      "statusReason": {
-        "zh": "新组织授权模型尚无迁移等价、全部写入口、平台主体例外、冲突路径和浏览器可访问性证据。",
-        "en": "The new organization authorization model lacks migration equivalence, all-write-path, platform-principal exception, conflict-path and browser accessibility evidence."
-      },
-      "completionGate": {
-        "zh": "完成迁移双读等价、后端入口回归、独立审计、Tree Transfer 键盘/ARIA、大数据量和桌面/移动浏览器验收。",
-        "en": "Complete migration dual-read equivalence, backend entry-point regression, separate audit, Tree Transfer keyboard/ARIA, large-data and desktop/mobile browser acceptance."
-      },
+      "status": "implemented",
       "visual": true,
       "designGate": [
         "superpowers:brainstorming",
@@ -2957,6 +2949,22 @@
         "docs": [
           "docs/superpowers/specs/2026-07-14-platform-remaining-task-topology-adjustment.md",
           "docs/platform-ui-optimization-assessment.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-organization-rbac-menu-e2e-evidence.mjs",
+          "scripts/validate-platform-organization-rbac-menu-contract.mjs"
+        ],
+        "tests": [
+          "scripts/platform-organization-rbac-menu-e2e-evidence.test.mjs",
+          "scripts/platform-organization-rbac-menu-contract.test.mjs",
+          "internal/platform/organizationrbac/migration_cutover_test.go",
+          "scripts/platform-tree-transfer-model.test.mjs"
+        ],
+        "screenshots": [
+          "resources/evidence/organization-rbac-menu-e2e-qa-20260716.json",
+          "resources/evidence/organization-user-admin-experience-20260715.json",
+          "resources/evidence/role-tree-and-authorization-entry-20260715.json",
+          "resources/evidence/menu-tree-and-button-permission-configuration-20260715.json"
         ]
       }
     },
@@ -3499,7 +3507,6 @@
     }
   ],
   "releaseBlockingNodes": [
-    "organization-rbac-menu-e2e-qa",
     "open-source-portability",
     "public-docs-community",
     "public-docs-site",

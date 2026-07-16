@@ -18,7 +18,6 @@
     "releaseLanePartitionRequired": true
   },
   "requiredUnfinishedNodes": [
-    "organization-rbac-menu-e2e-qa",
     "multi-datasource-contract-and-runtime",
     "tenant-placement-and-request-routing",
     "datasource-read-write-routing",

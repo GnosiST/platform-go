@@ -1,6 +1,6 @@
 # Platform Remaining Task Topology Adjustment
 
-> **Status:** Activated governance topology with the 2026-07-16 release overlay. The current task graph projection is `67 total / 52 implemented / 15 controlled unfinished` and remains `not-complete-controlled`.
+> **Status:** Activated governance topology with the 2026-07-16 release overlay. The current task graph projection is `67 total / 54 implemented / 13 controlled unfinished` and remains `not-complete-controlled`.
 
 ## Authority
 
@@ -8,13 +8,13 @@ This document is the activated and only authoritative topology for the remaining
 
 ## 2026-07-16 Release Overlay
 
-Task 6 closes `menu-tree-and-button-permission-configuration`, adds `unified-error-code-governance`, and separates current unfinished work into two machine-checkable lanes.
+Task 6 closes `menu-tree-and-button-permission-configuration`, `unified-error-code-governance` and the organization E2E gate, and separates current unfinished work into two machine-checkable lanes.
 
-- v0.1.0 release blockers: `organization-rbac-menu-e2e-qa`, `unified-error-code-governance`, `open-source-portability`, `public-docs-community`, `public-docs-site`, `github-release-publication`.
+- v0.1.0 release blockers: `open-source-portability`, `public-docs-community`, `public-docs-site`, `github-release-publication`.
 - Post-release optional deferred nodes: `multi-datasource-contract-and-runtime`, `tenant-placement-and-request-routing`, `datasource-read-write-routing`, `sharding-and-tenant-migration`, `federated-read-query`, `xa-optional-adapter`, `database-certification-matrix`, `transactional-outbox-and-one-mq-adapter`, `asynchronous-search-projection`.
-- `open-source-portability` now depends on `admin-watermark-export-governance`, `organization-rbac-menu-e2e-qa` and `unified-error-code-governance`; no release blocker may depend directly or transitively on a deferred node.
+- `open-source-portability` now depends on `admin-watermark-export-governance`, the implemented organization E2E and unified error-code closeouts; no release blocker may depend directly or transitively on a deferred node.
 - Deferred nodes remain full-goal blockers. Release eligibility can become ready when the release-blocker lane is empty, but the persistent foundation objective cannot become complete while deferred nodes remain unfinished.
-- `unified-error-code-governance` owns the future canonical registry, ownership/audience/HTTP/retry/redaction/compatibility/deprecation metadata, request/trace correlation, generated public contracts and duplicate/reassignment/deprecation validation. This overlay registers the node but does not implement the registry.
+- `unified-error-code-governance` owns the canonical registry, ownership/audience/HTTP/retry/redaction/compatibility/deprecation metadata, request/trace correlation, generated public contracts and duplicate/reassignment/deprecation validation; its closeout is implemented and remains a required shared service-contract boundary.
 
 - The consolidated SaaS data-plane, persisted Query Object and Platform Service Contract input confirmed on 2026-07-14 is authoritative.
 - Earlier cross-session variants describing only static datasources, separate Query Object drafts, SQL-less drafts or partial service-contract drafts are superseded and must not be accumulated as extra requirements.
@@ -51,16 +51,14 @@ Runtime routing is configuration-driven and deterministic. Datasource, Datasourc
 
 ## Current Remaining Node Order
 
-The only current projection is `67 total / 52 implemented / 15 controlled unfinished`. Release blockers and deferred nodes remain disjoint while preserving task-graph order.
+The only current projection is `67 total / 54 implemented / 13 controlled unfinished`. Release blockers and deferred nodes remain disjoint while preserving task-graph order.
 
 v0.1.0 release path:
 
-1. `organization-rbac-menu-e2e-qa`
-2. `unified-error-code-governance`
-3. `open-source-portability`
-4. `public-docs-community`
-5. `public-docs-site`
-6. `github-release-publication`
+1. `open-source-portability`
+2. `public-docs-community`
+3. `public-docs-site`
+4. `github-release-publication`
 
 Post-release optional deferred path:
 
@@ -297,11 +295,11 @@ Later nodes may not move TenantPlacement, sharding, federation, XA, Query Object
 
 The current governance state:
 
-1. preserves 67 stable task IDs with 52 implemented closeouts and 15 controlled unfinished nodes;
-2. keeps six v0.1.0 release blockers separate from nine post-release optional deferred nodes;
-3. requires both active release blockers to close before portability and publication work begins;
+1. preserves 67 stable task IDs with 54 implemented closeouts and 13 controlled unfinished nodes;
+2. keeps four v0.1.0 release blockers separate from nine post-release optional deferred nodes;
+3. requires the active release blockers to close before publication work begins;
 4. retains the deferred contracts as full-scope goal blockers without scheduling their implementation for v0.1.0;
-5. keeps target menu serving, role-menu migration writes, principal dual-read cutover and rollback closed until `organization-rbac-menu-e2e-qa` completes;
-6. keeps the canonical error registry pending until `unified-error-code-governance` completes.
+5. keeps target menu serving and role-menu migration writes behind their explicit migration policy despite the organization E2E closeout;
+6. keeps the canonical error registry as an implemented shared service-contract boundary.
 
 No node may bypass its dependency, resource-lock or completion gate, and release eligibility must not be interpreted as persistent full-scope completion.

@@ -23,9 +23,7 @@ const implementedDownstreamTaskIds = [
   "role-tree-and-authorization-entry",
   "menu-tree-and-button-permission-configuration",
 ];
-const deferredDownstreamTaskIds = [
-  "organization-rbac-menu-e2e-qa",
-];
+const deferredDownstreamTaskIds = [];
 
 function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -75,7 +73,7 @@ function serviceObjectKeys(items) {
 }
 
 function validateContract(contract, serviceRuntime, menuEvidence, errors) {
-  requireEqual(contract.status, "backend-organization-role-and-menu-implemented-e2e-pending", "status", errors);
+  requireEqual(contract.status, "backend-organization-role-and-menu-implemented-e2e-verified", "status", errors);
   requireEqual(contract.taskId, taskId, "taskId", errors);
   requireIncludes(contract.designEvidence, ["superpowers:brainstorming", "product-design", "ui-ux-pro-max"], "designEvidence", errors);
 
@@ -311,13 +309,13 @@ function validateContract(contract, serviceRuntime, menuEvidence, errors) {
     "legacy-role-menu-dual-read-equivalence-and-rollback",
   ], "browserAcceptance.scenarios", errors);
 
-  requireEqual(contract.runtimeBoundary?.implementationStatus, "backend-organization-role-and-menu-implemented-e2e-pending", "runtimeBoundary.implementationStatus", errors);
+  requireEqual(contract.runtimeBoundary?.implementationStatus, "backend-organization-role-and-menu-implemented-e2e-verified", "runtimeBoundary.implementationStatus", errors);
   requireEqual(contract.runtimeBoundary?.backendAndMigrationStatus, "implemented", "runtimeBoundary.backendAndMigrationStatus", errors);
   requireEqual(contract.runtimeBoundary?.adminUIStatus, "organization-user-role-and-menu-implemented", "runtimeBoundary.adminUIStatus", errors);
   requireEqual(contract.runtimeBoundary?.menuRuntimeStatus, "implemented", "runtimeBoundary.menuRuntimeStatus", errors);
-  requireEqual(contract.runtimeBoundary?.browserQAStatus, "menu-workbench-browser-accepted-full-organization-e2e-pending", "runtimeBoundary.browserQAStatus", errors);
+  requireEqual(contract.runtimeBoundary?.browserQAStatus, "menu-workbench-browser-accepted-full-organization-e2e-verified", "runtimeBoundary.browserQAStatus", errors);
   if (!sameList(values(contract.runtimeBoundary?.deferredTaskIds), deferredDownstreamTaskIds)) {
-    errors.push("runtimeBoundary.deferredTaskIds must retain only organization-rbac-menu-e2e-qa");
+    errors.push("runtimeBoundary.deferredTaskIds must be empty after organization E2E closeout");
   }
   requireIncludes(contract.runtimeBoundary?.notOwned, ["datasource-routing", "federated-query", "xa", "outbox", "mq", "search-projection", "workload-identity"], "runtimeBoundary.notOwned", errors);
 
@@ -363,7 +361,7 @@ function validateContract(contract, serviceRuntime, menuEvidence, errors) {
 
 function validateTopology(contract, topology, errors) {
   const migration = topology.organizationRbacMenuMigration ?? {};
-  requireEqual(migration.status, "backend-organization-role-and-menu-implemented-e2e-pending", "topology organization migration status", errors);
+  requireEqual(migration.status, "backend-organization-role-and-menu-implemented-e2e-verified", "topology organization migration status", errors);
   requireEqual(migration.designStatus, "frozen", "topology organization migration designStatus", errors);
   requireEqual(migration.designContract, "resources/platform-organization-rbac-menu-contract.json", "topology organization migration designContract", errors);
   requireEqual(migration.targetModel?.roleOwnership, contract.targetModel?.roleOwnership, "topology target roleOwnership", errors);
@@ -400,7 +398,7 @@ function validateTaskGovernance(contract, graph, matrix, errors) {
   for (const id of deferredDownstreamTaskIds) {
     const downstream = values(graph.tasks).find((item) => item.id === id);
     if (!downstream || downstream.status === "implemented") {
-      errors.push(`downstream E2E task ${id} must remain unfinished`);
+      errors.push(`downstream task ${id} must remain unfinished`);
     }
   }
 

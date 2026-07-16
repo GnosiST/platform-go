@@ -92,7 +92,7 @@ describe("validate-platform-governance-topology", () => {
 
   it("records the current organization model only as migration source and protects the approved target", () => {
     const topology = readJSON("resources/platform-governance-topology.json");
-    assert.equal(topology.organizationRbacMenuMigration.status, "backend-organization-role-and-menu-implemented-e2e-pending");
+    assert.equal(topology.organizationRbacMenuMigration.status, "backend-organization-role-and-menu-implemented-e2e-verified");
     assert.equal(topology.organizationRbacMenuMigration.designStatus, "frozen");
     assert.equal(topology.organizationRbacMenuMigration.designContract, "resources/platform-organization-rbac-menu-contract.json");
     assert.equal(topology.organizationRbacMenuMigration.sourceModel.roleGroupHierarchy, "nested-parentCode");
