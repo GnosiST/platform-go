@@ -13,6 +13,7 @@ function runProjection(testBody) {
     import {
       projectRoleManagementNavigation,
       resolveRoleManagementActiveRoute,
+      selectRoleManagementNavigationResource,
     } from ${JSON.stringify(projectionURL)};
 
     const title = { zh: "角色管理", en: "Role Management" };
@@ -69,6 +70,23 @@ describe("role management navigation projection", () => {
       assert.deepEqual(projected.map((item) => item.route), ["/overview", "/role-groups", "/settings"]);
       assert.deepEqual(projected[1].title, title);
       assert.equal(projected[1].marker, "marker:roleGroups");
+    `);
+  });
+
+  it("selects roles first and falls back to role groups for role-group-only navigation", () => {
+    runProjection(`
+      const rolesPreferred = selectRoleManagementNavigationResource([
+        resource("/role-groups", "roleGroups"),
+        resource("/roles"),
+      ]);
+      assert.equal(rolesPreferred?.route, "/roles");
+
+      const groupsFallback = selectRoleManagementNavigationResource([
+        resource("/overview"),
+        resource("/role-groups", "roleGroups"),
+      ]);
+      assert.equal(groupsFallback?.route, "/role-groups");
+      assert.equal(selectRoleManagementNavigationResource([resource("/overview")]), undefined);
     `);
   });
 

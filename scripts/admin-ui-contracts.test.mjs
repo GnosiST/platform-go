@@ -169,6 +169,21 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /Dashboard role management must target the projected authorized role resource/);
   });
 
+  it("rejects dashboard role management without the shared deterministic selector", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/dashboard/DashboardHome.tsx",
+      "const roleManagementResource = selectRoleManagementNavigationResource(",
+      "const roleManagementResource = Array.from(",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Dashboard role management must use the shared deterministic resource selector/);
+  });
+
   it("rejects using projected navigation resources for route page registration", () => {
     const tempRoot = tempAdminRoot();
     replaceRegexInTemp(

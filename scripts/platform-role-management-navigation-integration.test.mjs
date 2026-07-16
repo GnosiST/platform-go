@@ -39,8 +39,10 @@ describe("role management navigation integration", () => {
 
   it("uses the projection target and shared label for the dashboard role-management action", () => {
     assert.match(dashboard, /projectRoleManagementNavigation\(resources,/);
+    assert.match(dashboard, /const roleManagementResource = selectRoleManagementNavigationResource\(/);
     assert.match(dashboard, /route: roleManagementResource\.route/);
     assert.match(dashboard, /label: dictionary\.roleManagement/);
+    assert.doesNotMatch(dashboard, /\.find\(\(resource\) => resource\.route === "\/roles"/);
     assert.doesNotMatch(dashboard, /\{ key: "roles", label: dictionary\.roles, route: "\/roles"/);
   });
 

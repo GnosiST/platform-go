@@ -95,11 +95,17 @@ requireRegex(
 requireIncludes(files.app, "resources.some((resource) => resource.route === locationRoute)", "Route validation must retain the complete authorized resource list.");
 requireIncludes(files.app, "sensitiveRevealResourceRoute(resources,", "Sensitive-field resume routing must retain the complete authorized resource list.");
 requireIncludes(files.dashboard, "projectRoleManagementNavigation(resources,", "Dashboard role management must use the approved navigation projection.");
+requireIncludes(files.dashboard, "const roleManagementResource = selectRoleManagementNavigationResource(", "Dashboard role management must use the shared deterministic resource selector.");
 requireIncludes(files.dashboard, "label: dictionary.roleManagement", "Dashboard role management must use the shared visible label.");
 requireIncludes(files.dashboard, "route: roleManagementResource.route", "Dashboard role management must target the projected authorized role resource.");
 requireNotIncludes(files.dashboard, '{ key: "roles", label: dictionary.roles, route: "/roles"', "Dashboard must not restore the duplicate roles-only quick action.");
 requireIncludes(files.roleManagementNavigation, 'const ROLES_ROUTE = "/roles";', "Role-management navigation must preserve the roles route.");
 requireIncludes(files.roleManagementNavigation, 'const ROLE_GROUPS_ROUTE = "/role-groups";', "Role-management navigation must preserve the role-groups route.");
+requireIncludes(files.roleManagementNavigation, "export function selectRoleManagementNavigationResource", "Role-management navigation must expose the shared deterministic resource selector.");
+requireIncludes(files.roleManagementNavigation, 'Omit<T, "title"> & { title: RoleManagementNavigationTitle }', "Role-management projection must expose the replaced title type explicitly.");
+requireIncludes(files.roleManagementNavigation, "): ProjectedRoleManagementNavigationResource<T>[]", "Role-management projection must return its explicit replaced-title type.");
+requireNotIncludes(files.roleManagementNavigation, "Object.assign", "Role-management projection must not hide a narrowed title subtype through Object.assign.");
+requireNotIncludes(files.roleManagementNavigation, "as T", "Role-management projection must not cast the replaced title back to an arbitrary input subtype.");
 requireIncludes(files.resourceRoute, 'resource.route === "/roles" || resource.route === "/role-groups"', "Both legacy role routes must retain the shared route adapter.");
 requireCountExactly(files.i18n, "roleManagement:", 2, "Role management navigation must declare matching Chinese and English dictionary keys.");
 requireIncludes(files.i18n, 'roleManagement: "角色管理"', "Role management navigation must declare the exact Chinese label.");

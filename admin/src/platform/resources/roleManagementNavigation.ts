@@ -11,19 +11,28 @@ export type RoleManagementNavigationResource = {
   readonly title: RoleManagementNavigationTitle;
 };
 
+export type ProjectedRoleManagementNavigationResource<T extends RoleManagementNavigationResource> =
+  Omit<T, "title"> & { title: RoleManagementNavigationTitle };
+
+export function selectRoleManagementNavigationResource<T extends RoleManagementNavigationResource>(
+  resources: readonly T[],
+): T | undefined {
+  return resources.find((resource) => resource.route === ROLES_ROUTE)
+    ?? resources.find((resource) => resource.route === ROLE_GROUPS_ROUTE);
+}
+
 export function projectRoleManagementNavigation<T extends RoleManagementNavigationResource>(
   resources: readonly T[],
   title: RoleManagementNavigationTitle,
-): T[] {
+): ProjectedRoleManagementNavigationResource<T>[] {
   const firstRoleIndex = resources.findIndex((resource) => isRoleManagementRoute(resource.route));
   if (firstRoleIndex === -1) return [...resources];
 
-  const selected = resources.find((resource) => resource.route === ROLES_ROUTE)
-    ?? resources.find((resource) => resource.route === ROLE_GROUPS_ROUTE);
+  const selected = selectRoleManagementNavigationResource(resources);
   if (!selected) return [...resources];
 
-  const projectedSelected = Object.assign({}, selected, { title: { ...title } });
-  const projected: T[] = [];
+  const projectedSelected: ProjectedRoleManagementNavigationResource<T> = { ...selected, title: { ...title } };
+  const projected: ProjectedRoleManagementNavigationResource<T>[] = [];
   resources.forEach((resource, index) => {
     if (index === firstRoleIndex) projected.push(projectedSelected);
     if (!isRoleManagementRoute(resource.route)) projected.push(resource);
@@ -36,9 +45,7 @@ export function resolveRoleManagementActiveRoute(
   projectedResources: readonly RoleManagementNavigationResource[],
 ): string {
   if (!isRoleManagementRoute(route)) return route;
-  return projectedResources.find((resource) => resource.route === ROLES_ROUTE)?.route
-    ?? projectedResources.find((resource) => resource.route === ROLE_GROUPS_ROUTE)?.route
-    ?? route;
+  return selectRoleManagementNavigationResource(projectedResources)?.route ?? route;
 }
 
 function isRoleManagementRoute(route: string): boolean {
