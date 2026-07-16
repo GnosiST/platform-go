@@ -1347,7 +1347,10 @@ paths["/api/admin/service-objects/command"] = {
         ...platformErrorResponse("Service-object runtime unavailable or CommandDefinition not found"),
         "x-platform-error-codes": ["SERVICE_OBJECT_UNAVAILABLE"],
       },
-      "409": { $ref: "#/components/responses/Conflict" },
+      "409": {
+        ...platformErrorResponse("Command conflict, including idempotency-key reuse"),
+        "x-platform-error-codes": ["SERVICE_OBJECT_IDEMPOTENCY_CONFLICT", "SERVICE_OBJECT_STATE_CONFLICT"],
+      },
     },
     "x-platform-command-contract": "server-side-versioned-definition",
     "x-platform-runtime": "conditional",

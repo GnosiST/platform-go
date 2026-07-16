@@ -629,14 +629,15 @@ function validateProviderRuntimePolicy(contract, errors) {
   const wechatResolverTestPath = "internal/platform/authprovider/wechat/resolver_test.go";
   if (relativeExistingPath(serverPath)) {
     const server = fs.readFileSync(path.resolve(repoRoot, serverPath), "utf8");
-    for (const snippet of [
-      "APP_AUTH_PROVIDER_NOT_CONFIGURED",
-      "APP_AUTH_PROVIDER_RESOLVE_FAILED",
-      "APP_AUTH_IDENTITY_INVALID",
-      "ProviderSubject: strings.TrimSpace(identity.ProviderSubject)",
-    ]) {
-      if (!server.includes(snippet)) {
-        errors.push(`${serverPath} must include provider runtime evidence ${snippet}`);
+    const providerRuntimeEvidence = [
+      ["APP_AUTH_PROVIDER_NOT_CONFIGURED", ["APP_AUTH_PROVIDER_NOT_CONFIGURED", "CodeAppAuthProviderNotConfigured"]],
+      ["APP_AUTH_PROVIDER_RESOLVE_FAILED", ["APP_AUTH_PROVIDER_RESOLVE_FAILED", "CodeAppAuthProviderResolveFailed"]],
+      ["APP_AUTH_IDENTITY_INVALID", ["APP_AUTH_IDENTITY_INVALID", "CodeAppAuthIdentityInvalid"]],
+      ["ProviderSubject: strings.TrimSpace(identity.ProviderSubject)", ["ProviderSubject: strings.TrimSpace(identity.ProviderSubject)"]],
+    ];
+    for (const [evidence, alternatives] of providerRuntimeEvidence) {
+      if (!alternatives.some((snippet) => server.includes(snippet))) {
+        errors.push(`${serverPath} must include provider runtime evidence ${evidence}`);
       }
     }
   }
@@ -1007,11 +1008,11 @@ function validateAuditPolicy(contract, errors) {
     if (!recordAuditBody) {
       errors.push(`${serverPath} must expose recordAudit before recordFileAudit`);
     }
-    if (!recordAuditBody.includes("func (s *Server) recordAudit(action string, actorID string, targetID string, outcome string, reasonCode string) error")) {
+    if (!/func \(s \*Server\) recordAudit\(ctx \*gin\.Context, action string, actorID string, targetID string, outcome string, reasonCode string\) error/.test(recordAuditBody)) {
       errors.push(`${serverPath} recordAudit must accept only structured audit identifiers and result fields`);
     }
     for (const snippet of [
-      "s.resources.RecordAudit(adminresource.AuditEvent{",
+      "s.resources.RecordAudit(requestAuditEvent(ctx.Request.Context(), adminresource.AuditEvent{",
       "Actor: actorID",
       "Action: action",
       'Resource: "auth"',
@@ -1035,7 +1036,7 @@ function validateAuditPolicy(contract, errors) {
     const refreshStart = server.indexOf("func (s *Server) authRefresh(");
     const refreshEnd = server.indexOf("func (s *Server) authLogout(", refreshStart);
     const refreshBody = refreshStart >= 0 && refreshEnd > refreshStart ? server.slice(refreshStart, refreshEnd) : "";
-    const refreshAudit = refreshBody.indexOf('s.recordAudit("auth.refresh"');
+    const refreshAudit = refreshBody.search(/s\.recordAudit\(ctx,\s*"auth\.refresh"/);
     const refreshRenewal = refreshBody.indexOf("s.sessions.RenewContext(");
     if (refreshAudit < 0 || refreshRenewal < 0 || refreshAudit > refreshRenewal) {
       errors.push(`${serverPath} authRefresh must persist its allowed-attempt audit before renewing the known session`);

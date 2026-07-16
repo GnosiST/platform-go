@@ -20,6 +20,7 @@ const paths = {
   memoryIdempotency: argValue("--memory-idempotency", "internal/platform/serviceobject/idempotency.go"),
   reference: argValue("--reference", "internal/platform/serviceobject/reference.go"),
   http: argValue("--http", "internal/platform/httpapi/server.go"),
+  errorMapping: argValue("--error-mapping", "internal/platform/httpapi/service_object_error_mapping.go"),
   openapi: argValue("--openapi", "resources/generated/openapi.admin.json"),
   client: argValue("--client", "resources/generated/admin-service-object-client.ts"),
   engineering: argValue("--engineering", "resources/platform-engineering-capabilities.json"),
@@ -60,6 +61,7 @@ const idempotency = read(paths.idempotency);
 const memoryIdempotency = read(paths.memoryIdempotency);
 const reference = read(paths.reference);
 const http = read(paths.http);
+const errorMapping = read(paths.errorMapping);
 const openapi = readJSON(paths.openapi);
 const client = read(paths.client);
 const engineering = readJSON(paths.engineering);
@@ -117,7 +119,8 @@ requireIncludes(executor, ["type GORMResourceBinding struct", "applyTenant", "ap
 requireIncludes(idempotency, ["func NewGORMIdempotencyStore", "clause.OnConflict{DoNothing: true}", "reclaimLease", "idempotencyStatusProcessing", "idempotencyStatusCompleted", "idempotencyDatabaseError"], "service-object persistent idempotency", errors);
 requireIncludes(memoryIdempotency, ["defaultMemoryIdempotencyCapacity", "removeExpiredLocked", "reserveCapacityLocked", "case <-ready:"], "service-object bounded memory idempotency", errors);
 requireIncludes(reference, ["platform.reference-records.list", "platform.reference-records.rename", "ReferenceGORMBinding"], "service-object reference definitions", errors);
-requireIncludes(http, ["/admin/service-objects/query", "/admin/service-objects/command", "adminServiceObjectAuthorizer", "DataScopeForPrincipal", "SERVICE_OBJECT_UNAVAILABLE", "SERVICE_OBJECT_IDEMPOTENCY_CONFLICT"], "service-object Admin transport", errors);
+requireIncludes(http, ["/admin/service-objects/query", "/admin/service-objects/command", "adminServiceObjectAuthorizer", "DataScopeForPrincipal"], "service-object Admin transport", errors);
+requireIncludes(errorMapping, ["CodeServiceObjectUnavailable", "CodeServiceObjectIdempotencyConflict"], "service-object Admin error mapping", errors);
 
 for (const apiPath of [contract.transport?.queryPath, contract.transport?.commandPath]) {
   if (!openapi.paths?.[apiPath]?.post) errors.push(`Admin OpenAPI must include POST ${apiPath}`);

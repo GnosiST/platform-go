@@ -8739,7 +8739,18 @@
             ]
           },
           "409": {
-            "$ref": "#/components/responses/Conflict"
+            "description": "Command conflict, including idempotency-key reuse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-platform-error-codes": [
+              "SERVICE_OBJECT_IDEMPOTENCY_CONFLICT",
+              "SERVICE_OBJECT_STATE_CONFLICT"
+            ]
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
