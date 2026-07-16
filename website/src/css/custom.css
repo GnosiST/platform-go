@@ -1,0 +1,7 @@
+:root {
+  --ifm-color-primary: #155eef;
+  --ifm-color-primary-dark: #0f4fd1;
+  --ifm-font-family-base: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+footer { display: none; }
