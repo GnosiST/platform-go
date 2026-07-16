@@ -698,3 +698,4 @@ Before merging a capability:
 - docs mention configuration, APIs and persistence assumptions;
 - no platform core or optional platform capability package imports business-domain packages.
 - downstream composition roots, not platform core packages, inject concrete business manifests.
+Public verification includes `node scripts/validate-platform-foundation-alignment.mjs` and the other commands listed in the repository's contributor guidance. Run `rtk node scripts/validate-platform-production-env.mjs` when changing production environment settings. This document is the public capability and architecture guidance; private agent instructions and local machine state are not part of the release contract. The repository is informed by reusable management patterns observed in `zshenmez`, which remains reference evidence rather than migrated business source.

@@ -23,8 +23,8 @@ npm --prefix admin install
 npm --prefix admin run build
 ```
 
-The repository's internal `rtk` command prefix is an agent workflow detail;
-public contributors can use the native commands above.
+The commands above are the public contributor workflow; no private agent
+tooling or local machine configuration is required.
 
 ## Change Requirements
 

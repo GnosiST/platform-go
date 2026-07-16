@@ -52,7 +52,7 @@ function hasAnyEvidenceKind(closeout) {
       item.endsWith("_test.go") ||
       item.endsWith(".test.mjs") ||
       item === "README.md" ||
-      item === "AGENTS.md" ||
+      item === "CONTRIBUTING.md" ||
       item === "admin/package.json" ||
       item.startsWith("resources/")
     );

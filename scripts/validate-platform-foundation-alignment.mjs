@@ -820,9 +820,9 @@ function validateDocuments(audit, errors) {
   if (!readme.includes("validate-platform-foundation-alignment.mjs")) {
     errors.push("README.md must document validate-platform-foundation-alignment.mjs");
   }
-  const agents = fs.readFileSync(path.resolve(repoRoot, "AGENTS.md"), "utf8");
-  if (!agents.includes("validate-platform-foundation-alignment.mjs")) {
-    errors.push("AGENTS.md must include validate-platform-foundation-alignment.mjs in verification commands");
+  const guidance = fs.readFileSync(path.resolve(repoRoot, "docs/platform-capability-development.md"), "utf8");
+  if (!guidance.includes("validate-platform-foundation-alignment.mjs")) {
+    errors.push("public capability guidance must include validate-platform-foundation-alignment.mjs in verification commands");
   }
 }
 

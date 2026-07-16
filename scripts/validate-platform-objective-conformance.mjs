@@ -21,13 +21,13 @@ const capabilityContractsPath = path.resolve(repoRoot, argValue("--capability-co
 const productionReadinessPath = path.resolve(repoRoot, argValue("--production-readiness", "resources/platform-production-readiness.json"));
 const deploymentTopologyPath = path.resolve(repoRoot, argValue("--deployment-topology", "resources/platform-deployment-topology.json"));
 const readmePath = path.resolve(repoRoot, argValue("--readme", "README.md"));
-const agentsPath = path.resolve(repoRoot, argValue("--agents", "AGENTS.md"));
+const agentsPath = path.resolve(repoRoot, argValue("--guidance", "docs/platform-capability-development.md"));
 
 const approvedBackendStack = ["Gin", "GORM", "Casbin", "JWT"];
 const approvedFrontendStack = ["Refine", "React", "Ant Design"];
 const visualGateOrder = ["superpowers:brainstorming", "product-design"];
 const requiredFuturePromotionGates = ["production-auth-provider-hardening", "source-writing-codegen-promotion"];
-const requiredDocsRoots = ["README.md", "AGENTS.md", "docs/"];
+const requiredDocsRoots = ["README.md", "CONTRIBUTING.md", "docs/"];
 const requiredEvidencePaths = [
   "resources/platform-objective-conformance.json",
   "resources/platform-foundation-task-graph.json",
@@ -149,7 +149,7 @@ function validateReferencePolicy(audit, readme, agents, errors) {
     errors.push("README.md must state platform-go is not a business migration target");
   }
   if (!agents.includes("informed by reusable management patterns observed in `zshenmez`")) {
-    errors.push("AGENTS.md must keep zshenmez as reusable management pattern reference");
+    errors.push("public capability guidance must keep zshenmez as reusable management pattern reference");
   }
 }
 

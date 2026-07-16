@@ -270,7 +270,7 @@ Deployment scheme A is selected as the default: build and run `cmd/platform-api`
 
 ## Documentation Map
 
-- `AGENTS.md`: repository rules for AI agents and required command prefixes.
+- `CONTRIBUTING.md`: public contribution, development and verification guidance.
 - `docs/platform-stack-alignment-audit.md`: stack correction and parity audit.
 - `docs/platform-foundation-task-map.md`: roadmap, dependency graph and current P0/P1/P2 work.
 - `docs/platform-capability-development.md`: capability, manifest, app route, persistence, file storage and extension rules.

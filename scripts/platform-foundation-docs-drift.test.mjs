@@ -185,7 +185,7 @@ describe("platform foundation documentation drift", () => {
   });
 
   it("keeps the production env validator in the broad verification rules", () => {
-    const source = read("AGENTS.md");
+    const source = read("docs/platform-capability-development.md");
 
     assert.ok(source.includes("rtk node scripts/validate-platform-production-env.mjs"));
     assert.match(source, /Run `rtk node scripts\/validate-platform-production-env\.mjs` when changing production environment/);

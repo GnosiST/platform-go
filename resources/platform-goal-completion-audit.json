@@ -58,7 +58,7 @@
       "evidence": {
         "sourcePaths": [
           "README.md",
-          "AGENTS.md",
+          "docs/platform-capability-development.md",
           "resources/platform-reference-discovery.json",
           "resources/platform-reference-coverage.json",
           "resources/platform-capability-profiles.json"
@@ -444,7 +444,7 @@
       "status": "verified",
       "evidence": {
         "sourcePaths": [
-          "AGENTS.md",
+          "docs/platform-capability-development.md",
           "resources/platform-node-closeout-audit.json",
           "docs/platform-sensitive-data-migration.md",
           "docs/platform-foundation-task-map.md",

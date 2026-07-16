@@ -2277,7 +2277,7 @@
           "resources/platform-deployment-topology.json",
           "resources/platform-task-execution-audit.json",
           "README.md",
-          "AGENTS.md"
+          "docs/platform-capability-development.md"
         ],
         "generatedFiles": [
           "resources/generated/platform-promotion-evidence-templates.json",

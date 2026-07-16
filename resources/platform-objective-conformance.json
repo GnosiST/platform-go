@@ -79,7 +79,8 @@
     "nodeCloseoutAudit": "resources/platform-node-closeout-audit.json",
     "docsRoots": [
       "README.md",
-      "AGENTS.md",
+      "CONTRIBUTING.md",
+      "docs/platform-capability-development.md",
       "docs/"
     ]
   },
@@ -192,7 +193,7 @@
     ],
     "docs": [
       "README.md",
-      "AGENTS.md",
+      "docs/platform-capability-development.md",
       "docs/platform-foundation-task-map.md",
       "docs/platform-roadmap.md",
       "docs/platform-auth.md",

@@ -23,7 +23,7 @@ const codegenReadinessPath = path.resolve(repoRoot, argValue("--codegen-readines
 const codegenReviewPath = path.resolve(repoRoot, argValue("--codegen-review", "resources/generated/admin-scaffold-promotion-review.json"));
 const deploymentTopologyPath = path.resolve(repoRoot, argValue("--deployment-topology", "resources/platform-deployment-topology.json"));
 const readmePath = path.resolve(repoRoot, argValue("--readme", "README.md"));
-const agentsPath = path.resolve(repoRoot, argValue("--agents", "AGENTS.md"));
+const agentsPath = path.resolve(repoRoot, argValue("--guidance", "docs/platform-capability-development.md"));
 
 const requiredRequirementIDs = [
   "approved-stack-route",
@@ -143,7 +143,7 @@ function validateBusinessNeutralBoundary({ audit, profiles, discovery, coverage,
     errors.push("README.md must state platform-go is not a business migration target");
   }
   if (!agents.includes("informed by reusable management patterns observed in `zshenmez`")) {
-    errors.push("AGENTS.md must describe zshenmez as reusable management pattern reference, not migrated business source");
+    errors.push("public capability guidance must describe zshenmez as reusable management pattern reference, not migrated business source");
   }
   requireIncludes(
     discovery.mustStayOutOfDefaultProfile,
