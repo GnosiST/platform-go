@@ -873,7 +873,7 @@ describe("validate-admin-ui-contracts", () => {
       assert.deepEqual(pageMenuCodes(nodes, ["directory-a", "page-a"]), ["page-a"]);
     `);
 
-    assert.match(roleGovernance, /const menuCodes = pageMenuCodes\(menuTreeNodes\(menus, menuAssignment\.menuCodes, dictionary\), menuAssignment\.menuCodes\);/);
+    assert.match(roleGovernance, /const menuCodes = pageMenuCodes\(menuTreeNodes\(menus, menuAssignment\.menuCodes, dictionary, language\), menuAssignment\.menuCodes\);/);
     assert.doesNotMatch(roleGovernance, /menuCodes:\s*legacyVisibleMenus/);
     assert.equal(result.status, 0, result.stderr);
   });
@@ -902,19 +902,19 @@ describe("validate-admin-ui-contracts", () => {
       assert.deepEqual(pageMenuCodes(nodes, ["disabled-page", "missing-page"]), ["disabled-page", "missing-page"]);
     `);
 
-    assert.match(roleGovernance, /menuTreeNodes\(menus, menuAssignment\.menuCodes, dictionary\)/);
+    assert.match(roleGovernance, /menuTreeNodes\(menus, historicalCodes, dictionary, language\)/);
     assert.equal(result.status, 0, result.stderr);
   });
 
-  it("requires role update plus menu read permission while the migration write gate stays closed", () => {
+  it("requires role update plus menu read permission while schema cutover controls menu writes", () => {
     const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
-    const organizationRBAC = adminSource("admin/src/platform/api/organizationRBAC.ts");
+    const roleRuntime = adminSource("admin/src/platform/resources/roleGovernanceRuntime.ts");
 
     assert.match(roleGovernance, /const canAssignMenus = canReadMenus && canUpdateRole;/);
-    assert.match(roleGovernance, /resolveRoleMenuAccess\(roleMenuMigrationWriteEnabled, canAssignMenus, menuAssignment\?\.role\.status \?\? ""\)/);
+    assert.match(roleGovernance, /resolveRoleMenuAccess\(roleMenuTargetEnabled, canAssignMenus, menuAssignment\?\.role\.status \?\? ""\)/);
     assert.match(roleGovernance, /readOnly=\{menuAccess\.readOnly\}/);
-    assert.match(roleGovernance, /!resolveRoleMenuAccess\(roleMenuMigrationWriteEnabled, canAssignMenus, menuAssignment\.role\.status\)\.editable/);
-    assert.match(organizationRBAC, /export const roleMenuMigrationWriteEnabled = false;/);
+    assert.match(roleGovernance, /!resolveRoleMenuAccess\(roleMenuTargetEnabled, canAssignMenus, menuAssignment\.role\.status\)\.editable/);
+    assert.match(roleRuntime, /roleMenuTargetEnabled: targetIdentityRuntime && targetMenuSchema/);
   });
 
   it("requires one generated-client role menu prepare, impact and apply flow without client chunks", () => {
@@ -927,15 +927,15 @@ describe("validate-admin-ui-contracts", () => {
     assert.doesNotMatch(organizationRBAC, /menuCodes\.(?:slice|splice)\(/);
   });
 
-  it("keeps closed-gate legacy menu visibility independent from target assignment reads", () => {
+  it("keeps legacy menu visibility independent from target assignment reads", () => {
     const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
 
-    assert.match(roleGovernance, /const targetRequest = roleMenuMigrationWriteEnabled \? getRoleMenus\(role\.code\) : Promise\.resolve\(null\);/);
+    assert.match(roleGovernance, /const targetRequest = roleMenuTargetEnabled \? getRoleMenus\(role\.code\) : Promise\.resolve\(null\);/);
     assert.match(roleGovernance, /menuCodes: targetAssignment \? \[\.\.\.targetAssignment\.menuCodes\] : \[\]/);
     assert.match(roleGovernance, /const value = migrationReadOnly \? legacyVisible : menuAssignment\?\.menuCodes \?\? \[\];/);
   });
 
-  it("selects permission catalogs by permission write mode while menu catalogs keep their own gate", () => {
+  it("selects permission catalogs by permission write mode while menus use the schema runtime", () => {
     const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
     const permissionWorkflow = adminSource("admin/src/platform/resources/rolePermissionWorkflow.ts");
     const openAuthorization = roleGovernance.slice(roleGovernance.indexOf("const openAuthorization"), roleGovernance.indexOf("const saveAuthorization"));
@@ -944,8 +944,8 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(openAuthorization, /loadRolePermissionCatalog\(writeMode, role\.code/);
     assert.match(permissionWorkflow, /writeMode === "target-domain" \? sources\.target\(roleCode\) : sources\.generic\(\)/);
     assert.doesNotMatch(openAuthorization, /roleMenuMigrationWriteEnabled/);
-    assert.match(roleGovernance, /menus\.length > 0 \? Promise\.resolve\(menus\) : roleMenuMigrationWriteEnabled \? assignmentMenuRecords\(role\.code\) : loadAllRecords\("menus"\)/);
-    assert.match(roleGovernance, /const targetRequest = roleMenuMigrationWriteEnabled \? getRoleMenus\(role\.code\) : Promise\.resolve\(null\);/);
+    assert.match(roleGovernance, /menus\.length > 0 \? Promise\.resolve\(menus\) : roleMenuTargetEnabled \? assignmentMenuRecords\(role\.code\) : loadAllRecords\("menus"\)/);
+    assert.match(roleGovernance, /const targetRequest = roleMenuTargetEnabled \? getRoleMenus\(role\.code\) : Promise\.resolve\(null\);/);
   });
 
   it("requires stale role-menu opens and closes to invalidate older async results", () => {
@@ -1111,8 +1111,8 @@ describe("validate-admin-ui-contracts", () => {
     replaceInTemp(
       tempRoot,
       "admin/src/platform/resources/RoleGovernanceConsole.tsx",
-      'const canCreateGroup = hasPermission(permissions, "admin:role-group:create", deniedPermissions) && canReadTenants;',
-      'const canCreateGroup = hasPermission(permissions, "admin:role-group:create", deniedPermissions);',
+      '&& (groupWriteMode !== "target" || canReadTenants);',
+      ';',
     );
 
     const result = runValidator(["--root", tempRoot]);
@@ -1208,8 +1208,8 @@ describe("validate-admin-ui-contracts", () => {
     replaceInTemp(
       tempRoot,
       "admin/src/platform/resources/RoleGovernanceConsole.tsx",
-      "resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, record.status)",
-      "resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, \"enabled\")",
+      "resolveRoleMenuAccess(roleMenuTargetEnabled, canAssignMenus, record.status)",
+      "resolveRoleMenuAccess(roleMenuTargetEnabled, canAssignMenus, \"enabled\")",
     );
 
     const result = runValidator(["--root", tempRoot]);
@@ -1350,14 +1350,14 @@ describe("validate-admin-ui-contracts", () => {
     replaceInTemp(
       tempRoot,
       "admin/src/platform/resources/RoleGovernanceConsole.tsx",
-      'disabled={!canUpdateRole || record.status !== "enabled"}',
-      "disabled={!canUpdateRole}",
+      'const lifecycleDisabled = !roleLifecycleTargetEnabled || !canUpdateRole || record.status !== "enabled";',
+      "const lifecycleDisabled = !roleLifecycleTargetEnabled || !canUpdateRole;",
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /Disabled roles must not expose move or permission mutation actions/);
+    assert.match(result.stderr, /Disabled roles and non-target runtimes must not expose lifecycle mutations/);
   });
 
   it("rejects role detail actions without 44px touch targets", () => {
@@ -1440,8 +1440,8 @@ describe("validate-admin-ui-contracts", () => {
     replaceInTemp(
       tempRoot,
       "admin/src/platform/resources/RoleGovernanceConsole.tsx",
-      "permissionTreeNodes(permissionCatalog, dictionary, uniqueSorted([...authorization.allow, ...authorization.deny]))",
-      "permissionTreeNodes(permissionCatalog, dictionary)",
+      "permissionTreeNodes(permissionCatalog, dictionary, language, uniqueSorted([...authorization.allow, ...authorization.deny]))",
+      "permissionTreeNodes(permissionCatalog, dictionary, language, [])",
     );
 
     const result = runValidator(["--root", tempRoot]);
@@ -2942,6 +2942,31 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /no-results feedback/);
+  });
+
+  it("rejects a desktop sidebar that grows past the viewport instead of scrolling navigation", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/styles.css", "height: 100dvh;\n  min-height: 0;", "min-height: 100vh;");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /expanded navigation can scroll/);
+  });
+
+  it("rejects removing the legacy operations directory localization", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/shell/AdminShell.tsx",
+      "operations: dictionary.operations,",
+      "operations: \"Operations\",",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /localize the legacy operations navigation directory/);
   });
 
   it("rejects relation option search without the platform debounce interval", () => {

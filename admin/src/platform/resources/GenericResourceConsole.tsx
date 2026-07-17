@@ -59,6 +59,7 @@ import { SensitiveFieldRevealModal } from "./SensitiveFieldRevealModal";
 import { useOrganizationUserExperience } from "./organizationUserExperience";
 import { createRelationOptionSearchScheduler } from "./relationOptionSearch";
 import { ResourceExperienceCancelledError, type ResourceExperienceDetailTab, type ResourceExperienceKey, type ResourceFormValues } from "./resourceExperience";
+import { hydrateTreeRelationAncestors } from "./treeRelationAncestors";
 
 type GenericResourceConsoleProps = {
   resource: AdminResourceDefinition;
@@ -1730,7 +1731,23 @@ async function loadRelationOptions(
       meta: { conditions: [...(relation.filters ?? []), { field: relation.valueField, operator: "=", value }] },
     })),
   );
-  const dynamicOptions = [...result.data, ...selectedResults.flatMap((selectedResult) => selectedResult.data)].map((record) => relationOptionFromRecord(record, relation));
+  const relationRecords = [...result.data, ...selectedResults.flatMap((selectedResult) => selectedResult.data)];
+  const projectedRecords = relation.display === "tree" && relation.parentField
+    ? await hydrateTreeRelationAncestors(
+        relationRecords,
+        (record) => recordValueByField(record, relation.valueField),
+        (record) => recordValueByField(record, relation.parentField as string),
+        async (value) => {
+          const parentResult = await provider.getList<AdminResourceRecord>({
+            resource: relation.resource,
+            pagination: { currentPage: 1, pageSize: 1, mode: "server" },
+            meta: { conditions: [...(relation.filters ?? []), { field: relation.valueField, operator: "=", value }] },
+          });
+          return parentResult.data[0];
+        },
+      )
+    : relationRecords;
+  const dynamicOptions = projectedRecords.map((record) => relationOptionFromRecord(record, relation));
   return {
     fieldKey: field.key,
     options: mergeFieldOptions(dynamicOptions, field.options ?? []),

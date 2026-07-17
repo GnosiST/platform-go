@@ -111,8 +111,8 @@ describe("role workbench redesign contracts", () => {
   it("makes menu assignment editable only for enabled authorized roles after cutover", () => {
     const role = source("admin/src/platform/resources/RoleGovernanceConsole.tsx");
 
-    assert.match(role, /resolveRoleMenuAccess\(roleMenuMigrationWriteEnabled, canAssignMenus, record\.status\)/);
-    assert.match(role, /resolveRoleMenuAccess\(roleMenuMigrationWriteEnabled, canAssignMenus, menuAssignment\.role\.status\)/);
+    assert.match(role, /resolveRoleMenuAccess\(roleMenuTargetEnabled, canAssignMenus, record\.status\)/);
+    assert.match(role, /resolveRoleMenuAccess\(roleMenuTargetEnabled, canAssignMenus, menuAssignment\.role\.status\)/);
     assert.match(role, /menuAccess\.editable \? dictionary\.assignMenus : dictionary\.viewMenus/);
   });
 

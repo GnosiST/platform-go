@@ -764,9 +764,13 @@ select {
 }
 
 .platform-sider {
+  position: sticky;
+  top: 0;
   display: flex;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   flex-direction: column;
+  overflow: hidden;
   border-right: 1px solid var(--border);
   background: var(--sidebar);
   color: var(--sidebar-text);
@@ -879,9 +883,13 @@ select {
 }
 
 .side-nav {
+  min-height: 0;
   flex: 1;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 14px 10px;
+  scrollbar-gutter: stable;
 }
 
 .sider-collapsed .side-nav {
@@ -1039,13 +1047,20 @@ select {
 }
 
 .platform-version {
+  flex: 0 0 auto;
   padding: 16px 18px;
   color: var(--sidebar-muted);
   font-size: 12px;
 }
 
 .platform-secondary-nav {
-  min-height: 100vh;
+  position: sticky;
+  top: 0;
+  display: flex;
+  height: 100dvh;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
   border-right: 1px solid var(--border);
   background: var(--surface);
 }
@@ -1056,6 +1071,7 @@ select {
 
 .secondary-nav-title {
   display: block;
+  flex: 0 0 auto;
   padding: 24px 18px 10px;
   color: var(--muted);
   font-weight: 700;

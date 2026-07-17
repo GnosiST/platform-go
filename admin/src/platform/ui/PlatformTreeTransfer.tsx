@@ -2,6 +2,7 @@ import { DeleteOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons"
 import { Button, Empty, Grid, Input, Space, Tabs, Tooltip, Tree, Typography, type TreeDataNode, type TreeProps } from "antd";
 import { useEffect, useMemo, useState, type RefObject } from "react";
 import { buildTreeTransferIndex, deriveTreeTransferSelection, filteredNodeKeys, leafValues, type TreeTransferIndex, type TreeTransferNode } from "./treeTransferModel";
+import { treeTransferRootKeys } from "./treeTransferProjection";
 
 export type PlatformTreeTransferNode = TreeTransferNode;
 
@@ -242,12 +243,12 @@ function transferTreeData(
       children: children.length > 0 ? children.map(build) : undefined,
     };
   };
-  return (index.childrenByParent.get("") ?? [])
+  return treeTransferRootKeys([...index.byKey.values()])
     .map((key) => index.byKey.get(key))
     .filter((node): node is PlatformTreeTransferNode => node !== undefined)
     .filter((node) => filteredKeys.has(node.key) && !(selectedOnly && node.kind === "leaf" && !selectedKeys.has(node.key)))
     .map(build)
-    .filter((node) => !selectedOnly || Boolean(node.children?.length));
+    .filter((node) => !selectedOnly || Boolean(node.children?.length) || selectedKeys.has(String(node.key)));
 }
 
 function uniqueSorted(values: string[]) {

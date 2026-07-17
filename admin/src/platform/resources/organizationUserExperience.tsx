@@ -1,6 +1,6 @@
 import { Alert, App, Input, Select, Space, Spin, Tag, Typography, type FormInstance } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { AdminResourceField, AdminResourceRecord, AdminResourceSchema } from "../api/client";
+import { getAdminResourceSchema, type AdminResourceField, type AdminResourceRecord, type AdminResourceSchema } from "../api/client";
 import {
   changeUserOrganization,
   getOrganizationRoleGroupChangeConflicts,
@@ -23,6 +23,13 @@ import {
   type ResourceExperienceSubmitContext,
   type ResourceFormValues,
 } from "./resourceExperience";
+import {
+  dispatchOrganizationUserWrite,
+  organizationTreeFieldOption,
+  organizationUserRuntimeCapabilities,
+  resolveOrganizationUserRuntimeMode,
+  type OrganizationUserRuntimeMode,
+} from "./organizationUserRuntime";
 
 type UseOrganizationUserExperienceInput = {
   experienceKey?: ResourceExperienceKey;
@@ -51,6 +58,7 @@ export function useOrganizationUserExperience({
 }: UseOrganizationUserExperienceInput): ResourceExperienceController {
   const { modal } = App.useApp();
   const active = experienceKey === "organization-user" && (resourceKey === "org-units" || resourceKey === "users");
+  const [runtimeMode, setRuntimeMode] = useState<OrganizationUserRuntimeMode | "loading">("loading");
   const [orgUnits, setOrgUnits] = useState<AdminResourceRecord[]>([]);
   const [roleGroups, setRoleGroups] = useState<AdminResourceRecord[]>([]);
   const [rolePool, setRolePool] = useState<ReadonlyArray<OrganizationRolePoolItem>>([]);
@@ -59,9 +67,36 @@ export function useOrganizationUserExperience({
   const [contextError, setContextError] = useState("");
   const [rolePoolError, setRolePoolError] = useState("");
   const rolePoolRequest = useRef(0);
+  const runtimeModeRequest = useRef(0);
+  const runtimeCapabilities = runtimeMode === "loading" ? null : organizationUserRuntimeCapabilities(runtimeMode);
 
   useEffect(() => {
-    if (!active || !modalOpen) {
+    const requestID = ++runtimeModeRequest.current;
+    if (!active) {
+      setRuntimeMode("loading");
+      return;
+    }
+    setRuntimeMode("loading");
+    void getAdminResourceSchema("roles")
+      .then((roleSchema) => {
+        if (runtimeModeRequest.current === requestID) {
+          setRuntimeMode(resolveOrganizationUserRuntimeMode(roleSchema));
+        }
+      })
+      .catch(() => {
+        if (runtimeModeRequest.current === requestID) {
+          setRuntimeMode("readonly");
+        }
+      });
+    return () => { runtimeModeRequest.current += 1; };
+  }, [active]);
+
+  useEffect(() => {
+    if (!active || !runtimeCapabilities?.useServiceObjects || !modalOpen) {
+      setContextLoading(false);
+      setContextError("");
+      setOrgUnits([]);
+      setRoleGroups([]);
       return;
     }
     let cancelled = false;
@@ -89,7 +124,7 @@ export function useOrganizationUserExperience({
     return () => {
       cancelled = true;
     };
-  }, [active, dictionary.rolePoolLoadFailed, loadRecords, modalOpen]);
+  }, [active, dictionary.rolePoolLoadFailed, loadRecords, modalOpen, runtimeCapabilities?.useServiceObjects]);
 
   const scopeType = String(editingRecord?.values?.scopeType || "tenant");
   const selectedOrgUnitCode = String(formValues.orgUnitCode ?? "").trim();
@@ -100,16 +135,16 @@ export function useOrganizationUserExperience({
   const derivedTenantCode = scopeType === "platform" ? "" : String(selectedOrgUnit?.values?.tenantCode ?? "");
 
   useEffect(() => {
-    if (!active || resourceKey !== "users" || !modalOpen || scopeType === "platform") {
+    if (!active || !runtimeCapabilities?.useServiceObjects || resourceKey !== "users" || !modalOpen || scopeType === "platform") {
       return;
     }
     if (form.getFieldValue("tenantCode") !== derivedTenantCode) {
       form.setFieldValue("tenantCode", derivedTenantCode);
     }
-  }, [active, derivedTenantCode, form, modalOpen, resourceKey, scopeType]);
+  }, [active, derivedTenantCode, form, modalOpen, resourceKey, runtimeCapabilities?.useServiceObjects, scopeType]);
 
   useEffect(() => {
-    if (!active || resourceKey !== "users" || !modalOpen || scopeType === "platform" || !selectedOrgUnitCode) {
+    if (!active || !runtimeCapabilities?.useServiceObjects || resourceKey !== "users" || !modalOpen || scopeType === "platform" || !selectedOrgUnitCode) {
       rolePoolRequest.current += 1;
       setRolePool([]);
       setRolePoolLoading(false);
@@ -136,14 +171,16 @@ export function useOrganizationUserExperience({
           setRolePoolLoading(false);
         }
       });
-  }, [active, dictionary.rolePoolLoadFailed, modalOpen, resourceKey, scopeType, selectedOrgUnitCode]);
+  }, [active, dictionary.rolePoolLoadFailed, modalOpen, resourceKey, runtimeCapabilities?.useServiceObjects, scopeType, selectedOrgUnitCode]);
 
   const selectedTenantCode = resourceKey === "org-units"
     ? String(formValues.tenantCode ?? editingRecord?.values?.tenantCode ?? "")
     : derivedTenantCode;
   const selectedRoles = stringList(formValues.roles);
   const rolePoolCodes = useMemo(() => new Set(rolePool.map((item) => item.roleCode)), [rolePool]);
-  const invalidSelectedRoles = selectedRoles.filter((roleCode) => !rolePoolCodes.has(roleCode));
+  const invalidSelectedRoles = runtimeCapabilities?.useServiceObjects
+    ? selectedRoles.filter((roleCode) => !rolePoolCodes.has(roleCode))
+    : [];
   const roleOptions = useMemo(
     () => mergeSelectOptions(
       rolePool.map((item) => ({
@@ -171,8 +208,13 @@ export function useOrganizationUserExperience({
   }, [formValues.roleGroupCodes, roleGroups, selectedTenantCode]);
 
   const formFields = useMemo(() => {
-    if (!active) {
+    if (!active || runtimeMode === "legacy") {
       return schema.fields.filter((field) => field.inForm && !field.readOnly);
+    }
+    if (runtimeMode === "loading" || runtimeMode === "readonly") {
+      return schema.fields
+        .filter((field) => field.inForm && !field.readOnly || resourceKey === "org-units" && field.key === "roleGroupCodes")
+        .map((field) => ({ ...field, readOnly: true, required: false }));
     }
     return schema.fields
       .filter((field) => field.inForm && !field.readOnly || resourceKey === "org-units" && field.key === "roleGroupCodes")
@@ -184,20 +226,32 @@ export function useOrganizationUserExperience({
           return { ...field, type: "text" as const, readOnly: true };
         }
         if (resourceKey === "users" && field.key === "orgUnitCode") {
-          return { ...field, required: scopeType !== "platform", options: orgUnits.filter((record) => record.status === "enabled").map((record) => toFieldOption({ value: record.code, label: `${record.name} (${record.code})` })) };
+          return { ...field, required: scopeType !== "platform", options: orgUnits.filter((record) => record.status === "enabled").map(organizationTreeFieldOption) };
         }
         if (resourceKey === "users" && field.key === "roles") {
           return { ...field, options: roleOptions.map(toFieldOption) };
         }
         return field;
       });
-  }, [active, orgUnits, resourceKey, roleGroupOptions, roleOptions, schema.fields, scopeType]);
+  }, [active, orgUnits, resourceKey, roleGroupOptions, roleOptions, runtimeMode, schema.fields, scopeType]);
 
   const renderField = useCallback((field: AdminResourceField, fallback: ReactNode) => {
     if (!active) {
       return fallback;
     }
     if (editingRecord && field.key === "status") {
+      return <Input readOnly aria-readonly="true" />;
+    }
+    if (runtimeMode === "legacy") {
+      return fallback;
+    }
+    if (runtimeMode === "loading" || runtimeMode === "readonly") {
+      if (resourceKey === "org-units" && field.key === "roleGroupCodes") {
+        return <ReadOnlyListValue value={stringList(formValues.roleGroupCodes)} emptyText={dictionary.emptyData} />;
+      }
+      if (resourceKey === "users" && field.key === "roles") {
+        return <ReadOnlyListValue value={selectedRoles} emptyText={dictionary.emptyData} />;
+      }
       return <Input readOnly aria-readonly="true" />;
     }
     if (resourceKey === "org-units" && editingRecord && field.key === "tenantCode") {
@@ -246,10 +300,19 @@ export function useOrganizationUserExperience({
       );
     }
     return fallback;
-  }, [active, contextLoading, dictionary, editingRecord, invalidSelectedRoles.length, roleGroupOptions, roleOptions, rolePoolLoading, resourceKey, scopeType, selectedOrgUnitCode, selectedTenantCode]);
+  }, [active, contextLoading, dictionary, editingRecord, formValues.roleGroupCodes, invalidSelectedRoles.length, roleGroupOptions, roleOptions, rolePoolLoading, resourceKey, runtimeMode, scopeType, selectedOrgUnitCode, selectedRoles, selectedTenantCode]);
 
   const fieldExtra = useCallback((field: AdminResourceField, fallback: ReactNode) => {
     if (!active) {
+      return fallback;
+    }
+    if (runtimeMode === "loading") {
+      return dictionary.organizationContextLoading;
+    }
+    if (runtimeMode === "readonly") {
+      return dictionary.rolePermissionReadonlySchemaDescription;
+    }
+    if (runtimeMode === "legacy") {
       return fallback;
     }
     if (resourceKey === "org-units" && field.key === "roleGroupCodes") {
@@ -265,16 +328,26 @@ export function useOrganizationUserExperience({
       return dictionary.organizationLifecycleManagedStatus;
     }
     return fallback;
-  }, [active, dictionary, editingRecord, resourceKey, scopeType, selectedOrgUnitCode]);
+  }, [active, dictionary, editingRecord, resourceKey, runtimeMode, scopeType, selectedOrgUnitCode]);
 
   const submit = useCallback(async (context: ResourceExperienceSubmitContext) => {
-    if (resourceKey === "org-units") {
-      return submitOrganization(context, dictionary, form, modal.confirm, contextLoading, contextError);
+    if (runtimeMode === "loading") {
+      throw new Error(dictionary.organizationContextLoading);
     }
-    return submitUser(context, dictionary, form, rolePool, scopeType, modal.confirm, contextLoading, contextError, rolePoolLoading, rolePoolError);
-  }, [contextError, contextLoading, dictionary, form, modal.confirm, resourceKey, rolePool, rolePoolError, rolePoolLoading, scopeType]);
+    return dispatchOrganizationUserWrite(runtimeMode, {
+      generic: () => context.persist(context.input),
+      readonly: async () => { throw new Error(dictionary.rolePermissionReadonlySchemaDescription); },
+      target: () => resourceKey === "org-units"
+        ? submitOrganization(context, dictionary, form, modal.confirm, contextLoading, contextError)
+        : submitUser(context, dictionary, form, rolePool, scopeType, modal.confirm, contextLoading, contextError, rolePoolLoading, rolePoolError),
+    });
+  }, [contextError, contextLoading, dictionary, form, modal.confirm, resourceKey, rolePool, rolePoolError, rolePoolLoading, runtimeMode, scopeType]);
 
-  const statusMessage = contextError || rolePoolError
+  const statusMessage = runtimeMode === "loading"
+    ? dictionary.organizationContextLoading
+    : runtimeMode === "readonly"
+      ? dictionary.rolePermissionReadonlySchemaDescription
+      : contextError || rolePoolError
     || (rolePoolLoading ? dictionary.userRolePoolLoading : resourceKey === "users" && selectedOrgUnitCode ? format(dictionary.userRolePoolLoaded, { count: String(rolePool.length) }) : "");
   const invalidRoleStatus = invalidSelectedRoles.length > 0
     ? format(dictionary.userInvalidRolesUnresolved, { roles: invalidSelectedRoles.join(", ") })
@@ -296,13 +369,13 @@ export function useOrganizationUserExperience({
     formFields,
     allowDelete: !active,
     allowStatusToggle: !active,
-    initialValues: active && resourceKey === "users"
+    initialValues: active && runtimeMode !== "legacy" && resourceKey === "users"
       ? (values, record) => record ? values : { ...values, tenantCode: "", orgUnitCode: undefined, roles: [] }
       : undefined,
     renderField,
     fieldExtra,
     submit: active ? submit : undefined,
-    formSlots: active ? {
+    formSlots: active && runtimeMode !== "legacy" ? {
       header: invalidRoleNotice,
       footer: (
         <div aria-live="polite" id="organization-role-pool-status" className="organization-experience-status">
@@ -310,7 +383,7 @@ export function useOrganizationUserExperience({
         </div>
       ),
     } : undefined,
-    detailTab: active && resourceKey === "org-units"
+    detailTab: active && runtimeCapabilities?.useServiceObjects && resourceKey === "org-units"
       ? (record) => ({
           key: "role-pool",
           label: dictionary.organizationRolePoolProvenance,

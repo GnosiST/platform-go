@@ -30,6 +30,7 @@ const files = {
   resourceExperience: readSource("admin/src/platform/resources/resourceExperience.ts"),
   organizationUserExperience: readSource("admin/src/platform/resources/organizationUserExperience.tsx"),
   roleGovernance: readSource("admin/src/platform/resources/RoleGovernanceConsole.tsx"),
+  roleGovernanceRuntime: readSource("admin/src/platform/resources/roleGovernanceRuntime.ts"),
   rolePermissionWriteMode: readSource("admin/src/platform/resources/rolePermissionWriteMode.ts"),
   rolePermissionWorkflow: readSource("admin/src/platform/resources/rolePermissionWorkflow.ts"),
   roleManagementNavigation: readSource("admin/src/platform/resources/roleManagementNavigation.ts"),
@@ -434,7 +435,11 @@ requireNotIncludes(files.roleGovernance, "<Modal", "Role governance must not byp
 requireIncludes(files.roleGovernance, 'const canReadGroups = hasPermission(permissions, "admin:role-group:read", deniedPermissions);', "Role governance must derive role-group read access from the active permission set.");
 requireIncludes(files.roleGovernance, 'const canReadRoles = hasPermission(permissions, "admin:role:read", deniedPermissions);', "Role governance must derive role read access from the active permission set.");
 requireIncludes(files.roleGovernance, 'const canReadTenants = hasPermission(permissions, "admin:tenant:read", deniedPermissions);', "Role-group creation must derive tenant read access from the active permission set.");
-requireIncludes(files.roleGovernance, 'const canCreateGroup = hasPermission(permissions, "admin:role-group:create", deniedPermissions) && canReadTenants;', "Tenant-scoped role-group creation must require tenant read access.");
+requireRegex(
+  files.roleGovernance,
+  /const canCreateGroup = runtimeSchemaReady[\s\S]*?groupWriteMode !== "readonly"[\s\S]*?hasPermission\(permissions, "admin:role-group:create", deniedPermissions\)[\s\S]*?\(groupWriteMode !== "target" \|\| canReadTenants\);/,
+  "Target tenant-scoped role-group creation must require tenant read access while legacy metadata remains writable.",
+);
 requireIncludes(files.roleGovernance, 'const canReadAuthorizationInputs = hasPermission(permissions, "admin:permission:read", deniedPermissions) && hasPermission(permissions, "admin:org-unit:read", deniedPermissions) && hasPermission(permissions, "admin:area-code:read", deniedPermissions);', "Role permission assignment must require every resource read permission used by its editor.");
 requireIncludes(files.roleGovernance, 'const canReadMenus = hasPermission(permissions, "admin:menu:read", deniedPermissions);', "Read-only role menu assignment must require menu read access.");
 requireIncludes(files.roleGovernance, '{canReadMenus ? <AdminActionButton ref={menuTriggerRef}', "Role menu assignment must be hidden when menu records cannot be read.");
@@ -457,11 +462,15 @@ for (const key of ["permissions", "denyPermissions", "dataScope", "dataScopeOrgC
 requireIncludes(files.rolePermissionWriteMode, 'field?.inForm !== false && field?.readOnly !== true', "Legacy role permission mode must require every policy field to be form-writable and not read-only.");
 requireIncludes(files.rolePermissionWriteMode, 'field?.inForm === false && field.readOnly === true', "Target role permission mode must require every policy field to be excluded from forms and read-only.");
 requireIncludes(files.rolePermissionWriteMode, 'if (fields.some((field) => !field)) return "readonly";', "Missing role permission policy fields must resolve to readonly.");
-requireIncludes(files.roleGovernance, 'getAdminResourceSchema("roles")', "Role permission mode must load the trusted roles schema.");
-requireIncludes(files.roleGovernance, "setPermissionWriteMode(resolveRolePermissionWriteMode(schema));", "Role permission mode must resolve from the loaded roles schema.");
-requireIncludes(files.roleGovernance, "const permissionSchemaRequest = useRef(0);", "Role permission schema loading must track stale requests.");
-requireIncludes(files.roleGovernance, "if (permissionSchemaRequest.current !== requestID) return;", "Role permission schema loading must discard stale or unmounted results.");
-requireIncludes(files.roleGovernance, "return () => { permissionSchemaRequest.current += 1; };", "Role permission schema loading must invalidate pending work on unmount.");
+for (const resource of ["role-groups", "roles", "menus"]) {
+  requireIncludes(files.roleGovernance, `getAdminResourceSchema("${resource}")`, `Role governance runtime must load the trusted ${resource} schema.`);
+}
+requireIncludes(files.roleGovernance, "resolveRoleGovernanceRuntime(roleGroupSchema, roleSchema, menuSchema)", "Role governance modes must resolve from one consistent schema snapshot.");
+requireIncludes(files.roleGovernanceRuntime, "const targetIdentityRuntime = groupWriteMode === \"target\" && permissionWriteMode === \"target-domain\";", "Target role lifecycle must require both role-group and role policy ownership cutover.");
+requireIncludes(files.roleGovernanceRuntime, "roleMenuTargetEnabled: targetIdentityRuntime && targetMenuSchema", "Role-menu writes must require the complete identity and menu schema cutover.");
+requireIncludes(files.roleGovernance, "const runtimeSchemaRequest = useRef(0);", "Role governance schema loading must track stale requests.");
+requireIncludes(files.roleGovernance, "if (runtimeSchemaRequest.current !== requestID) return;", "Role governance schema loading must discard stale or unmounted results.");
+requireIncludes(files.roleGovernance, "return () => { runtimeSchemaRequest.current += 1; };", "Role governance schema loading must invalidate pending work on unmount.");
 requireRegex(
   roleAuthorizationOpen,
   /const writeMode = permissionWriteMode;[\s\S]*?loadRolePermissionCatalog\(writeMode, role\.code, \{[\s\S]*?target: assignmentPermissionRecords,[\s\S]*?generic: \(\) => loadAllRecords\("permissions"\),[\s\S]*?\}\)[\s\S]*?setAuthorization\(\{\s*role,\s*writeMode,/,
@@ -491,7 +500,7 @@ for (const field of ["permissions", "denyPermissions", "dataScope", "dataScopeOr
 }
 requireIncludes(legacyRolePermissionInput, 'uniqueSorted(authorization.allow).join(",")', "Legacy allowed permissions must use the existing delimited storage format.");
 requireIncludes(legacyRolePermissionInput, 'uniqueSorted(authorization.deny).join(",")', "Legacy denied permissions must use the existing delimited storage format.");
-requireIncludes(files.roleGovernance, '{canReadAuthorizationInputs ? <AdminActionButton ref={authorizationTriggerRef} icon={<SafetyCertificateOutlined', "Readable role permission workflows must stay available for inspection even when editing is disabled.");
+requireIncludes(files.roleGovernance, '{canReadAuthorizationInputs ? <AdminActionButton ref={authorizationTriggerRef} disabled={!runtimeSchemaReady} icon={<SafetyCertificateOutlined', "Readable role permission workflows must stay available for inspection after runtime schemas are ready.");
 requireIncludes(roleAuthorizationModal, "footer={readOnly ? <Button onClick={onCancel}>{dictionary.close}</Button> : undefined}", "Read-only role permission inspection must expose a close-only footer.");
 requireIncludes(roleAuthorizationModal, 'readOnly={readOnly}', "Read-only role permission inspection must disable Tree Transfer and data-scope controls.");
 requireCountAtLeast(roleAuthorizationModal, "disabled={readOnly}", 3, "Read-only role permission inspection must disable every data-scope control.");
@@ -500,10 +509,11 @@ for (const key of ["rolePermissionReadonlyTitle", "rolePermissionReadonlySchemaD
   requireCountExactly(files.i18n, `${key}:`, 2, `Role permission read-only i18n key ${key} must exist in matching Chinese and English dictionaries.`);
 }
 requireIncludes(files.roleGovernance, "sameRoleGroupBoundary(group, moveSourceGroup)", "Role move options must stay inside the current scope and tenant boundary.");
-requireCountAtLeast(files.roleGovernance, 'disabled={!canUpdateRole || record.status !== "enabled"}', 2, "Disabled roles must not expose move or permission mutation actions.");
-requireIncludes(files.roleGovernance, "resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, record.status)", "Role menu entry points must use the shared access resolver.");
-requireIncludes(files.roleGovernance, "resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, menuAssignment?.role.status ?? \"\")", "Role menu modals must use the shared access resolver.");
-requireIncludes(files.roleGovernance, "!resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, menuAssignment.role.status).editable", "Role menu saves must use the shared access resolver.");
+requireIncludes(files.roleGovernance, 'const lifecycleDisabled = !roleLifecycleTargetEnabled || !canUpdateRole || record.status !== "enabled";', "Disabled roles and non-target runtimes must not expose lifecycle mutations.");
+requireCountAtLeast(files.roleGovernance, "disabled={lifecycleDisabled}", 2, "Role lifecycle actions must share the fail-closed disabled state.");
+requireIncludes(files.roleGovernance, "resolveRoleMenuAccess(roleMenuTargetEnabled, canAssignMenus, record.status)", "Role menu entry points must use the shared access resolver.");
+requireIncludes(files.roleGovernance, "resolveRoleMenuAccess(roleMenuTargetEnabled, canAssignMenus, menuAssignment?.role.status ?? \"\")", "Role menu modals must use the shared access resolver.");
+requireIncludes(files.roleGovernance, "!resolveRoleMenuAccess(roleMenuTargetEnabled, canAssignMenus, menuAssignment.role.status).editable", "Role menu saves must use the shared access resolver.");
 requireIncludes(files.roleGovernance, "menuAccess.editable ? dictionary.assignMenus : dictionary.viewMenus", "Read-only role menu entry points must use the localized View Menus label.");
 requireIncludes(roleMenuModal, "readOnly={menuAccess.readOnly}", "Role menu Tree Transfer must use the resolved read-only state.");
 requireIncludes(roleMenuModal, "readOnlyMessage={readOnlyReason}", "Role menu inspection must expose the state-specific localized read-only reason.");
@@ -512,7 +522,7 @@ for (const key of ["roleMenuLegacyReadonlyDescription", "roleMenuReadonlyAccessD
 }
 requireIncludes(
   files.roleGovernance,
-  "permissionTreeNodes(permissionCatalog, dictionary, uniqueSorted([...authorization.allow, ...authorization.deny]))",
+  "permissionTreeNodes(permissionCatalog, dictionary, language, uniqueSorted([...authorization.allow, ...authorization.deny]))",
   "Role authorization must project disabled and missing historical permissions into the Tree Transfer catalog.",
 );
 requireIncludes(files.roleGovernance, "dictionary.rolePermissionHistoricalDisabled", "Disabled historical permissions must remain removable but unavailable for assignment.");
@@ -642,6 +652,8 @@ requireIncludes(files.shell, "dictionary.globalSearchNoResults", "Global search 
 requireIncludes(files.shell, "open={Boolean(globalSearchQuery.trim())}", "Global search must keep its result surface open for no-results feedback.");
 requireIncludes(files.shell, "items: globalSearchMenuItems", "Global search must use the result-or-empty menu contract.");
 requireIncludes(files.shell, "buildNavigationTree", "AdminShell must build multi-level navigation from resource parents.");
+requireIncludes(files.shell, "operations: dictionary.operations", "AdminShell must localize the legacy operations navigation directory.");
+requireIncludes(files.i18n, "operations: { zh: dictionaries.zh.operations, en: dictionaries.en.operations }", "Menu governance must localize projected legacy operations directories in both languages.");
 requireIncludes(files.shell, '"business/access"', "AdminShell must label business/access through a full parent path.");
 requireIncludes(files.shell, '"business/dispatch"', "AdminShell must label business/dispatch through a full parent path.");
 requireNotIncludes(files.shell, "access: dictionary.navBusinessAccess", "AdminShell must not reuse plain access for business navigation labels.");
@@ -676,6 +688,21 @@ requireIncludes(
   files.shell,
   "onClick={() => handleMobileWorkTabClose(resource.route)}",
   "Mobile work-tab close controls must use the context-closing handler.",
+);
+requireRegex(
+  files.styles,
+  /\.platform-sider\s*\{[\s\S]*?height:\s*100dvh;[\s\S]*?min-height:\s*0;[\s\S]*?overflow:\s*hidden;/,
+  "Desktop sidebar must stay within the viewport so expanded navigation can scroll.",
+);
+requireRegex(
+  files.styles,
+  /\.side-nav\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?overflow-y:\s*auto;/,
+  "Sidebar navigation must own vertical scrolling inside its fixed-height sidebar.",
+);
+requireRegex(
+  files.styles,
+  /\.platform-secondary-nav\s*\{[\s\S]*?height:\s*100dvh;[\s\S]*?min-height:\s*0;[\s\S]*?overflow:\s*hidden;/,
+  "Split-layout secondary navigation must preserve the same viewport scroll boundary.",
 );
 
 for (const key of [

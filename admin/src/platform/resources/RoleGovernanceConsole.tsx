@@ -14,8 +14,8 @@ import {
   getAdminResourceSchema,
   queryAdminResource,
   updateAdminResource,
-  type AdminResourceInput,
   type AdminResourceRecord,
+  type AdminResourceSchema,
 } from "../api/client";
 import {
   applyRoleStateOrGroupChange,
@@ -33,7 +33,6 @@ import {
   replaceRolePermissions,
   searchMenuAssignmentTree,
   searchPermissionAssignmentTree,
-  roleMenuMigrationWriteEnabled,
   type OrganizationRoleRemediation,
   type RoleChangeConflict,
   type RoleMenuImpact,
@@ -51,12 +50,20 @@ import {
   PlatformTreeSelect,
   PlatformTreeTransfer,
   platformPopupContainer,
-  type AdminTreeWorkbenchNode,
   type PlatformTreeTransferNode,
 } from "../ui";
 import { pageMenuCodes, projectMenuTreeNodes } from "./menuTreeProjection";
 import type { AdminResourceDefinition } from "./registry";
-import { resolveRolePermissionWriteMode, type RolePermissionWriteMode } from "./rolePermissionWriteMode";
+import {
+  buildRoleGovernanceMetadataInput,
+  loadRoleAssignmentSearchPages,
+  localizedGovernanceDescription,
+  localizedGovernanceName,
+  projectRoleGovernanceTree,
+  resolveRoleGovernanceRuntime,
+  type RoleGovernanceRuntime,
+} from "./roleGovernanceRuntime";
+import type { RolePermissionWriteMode } from "./rolePermissionWriteMode";
 import { executeRolePermissionWrite, loadRolePermissionCatalog, type RolePermissionAuthorization } from "./rolePermissionWorkflow";
 import { resolveRoleMenuAccess, restoreRoleModalFocus, type RoleMenuReadOnlyReason } from "./roleWorkbenchBehavior";
 
@@ -93,6 +100,15 @@ type MetadataValues = {
   sortOrder?: number;
 };
 
+type RuntimeSchemaState = "loading" | "ready" | "error";
+
+const readonlyRoleGovernanceRuntime: RoleGovernanceRuntime = {
+  groupWriteMode: "readonly",
+  permissionWriteMode: "readonly",
+  roleLifecycleTargetEnabled: false,
+  roleMenuTargetEnabled: false,
+};
+
 export function RoleGovernanceConsole({ resource, language, dictionary, permissions, deniedPermissions }: RoleGovernanceConsoleProps) {
   const { modal } = App.useApp();
   const [groups, setGroups] = useState<AdminResourceRecord[]>([]);
@@ -113,7 +129,10 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const [moveTargetGroup, setMoveTargetGroup] = useState("");
   const [authorization, setAuthorization] = useState<AuthorizationState | null>(null);
   const [permissionMode, setPermissionMode] = useState<"allow" | "deny">("allow");
-  const [permissionWriteMode, setPermissionWriteMode] = useState<RolePermissionWriteMode>("readonly");
+  const [roleGroupSchema, setRoleGroupSchema] = useState<AdminResourceSchema | null>(null);
+  const [roleSchema, setRoleSchema] = useState<AdminResourceSchema | null>(null);
+  const [menuSchema, setMenuSchema] = useState<AdminResourceSchema | null>(null);
+  const [runtimeSchemaState, setRuntimeSchemaState] = useState<RuntimeSchemaState>("loading");
   const [menuAssignment, setMenuAssignment] = useState<MenuAssignmentState | null>(null);
   const [metadataForm] = Form.useForm<MetadataValues>();
   const metadataTriggerRef = useRef<HTMLElement | null>(null);
@@ -124,30 +143,52 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const authorizationRequest = useRef(0);
   const governanceRequest = useRef(0);
   const menuRequest = useRef(0);
-  const permissionSchemaRequest = useRef(0);
+  const runtimeSchemaRequest = useRef(0);
+  const roleGovernanceRuntime = useMemo(
+    () => roleGroupSchema && roleSchema && menuSchema
+      ? resolveRoleGovernanceRuntime(roleGroupSchema, roleSchema, menuSchema)
+      : readonlyRoleGovernanceRuntime,
+    [menuSchema, roleGroupSchema, roleSchema],
+  );
+  const { groupWriteMode, permissionWriteMode, roleLifecycleTargetEnabled, roleMenuTargetEnabled } = roleGovernanceRuntime;
+  const runtimeSchemaReady = runtimeSchemaState === "ready";
   const canReadGroups = hasPermission(permissions, "admin:role-group:read", deniedPermissions);
   const canReadRoles = hasPermission(permissions, "admin:role:read", deniedPermissions);
   const canReadTenants = hasPermission(permissions, "admin:tenant:read", deniedPermissions);
-  const canCreateGroup = hasPermission(permissions, "admin:role-group:create", deniedPermissions) && canReadTenants;
-  const canUpdateGroup = hasPermission(permissions, "admin:role-group:update", deniedPermissions);
-  const canCreateRole = hasPermission(permissions, "admin:role:create", deniedPermissions);
+  const canCreateGroup = runtimeSchemaReady
+    && groupWriteMode !== "readonly"
+    && hasPermission(permissions, "admin:role-group:create", deniedPermissions)
+    && (groupWriteMode !== "target" || canReadTenants);
+  const canUpdateGroup = runtimeSchemaReady && groupWriteMode !== "readonly" && hasPermission(permissions, "admin:role-group:update", deniedPermissions);
+  const canCreateRole = runtimeSchemaReady && hasPermission(permissions, "admin:role:create", deniedPermissions);
   const canUpdateRole = hasPermission(permissions, "admin:role:update", deniedPermissions);
   const canReadAuthorizationInputs = hasPermission(permissions, "admin:permission:read", deniedPermissions) && hasPermission(permissions, "admin:org-unit:read", deniedPermissions) && hasPermission(permissions, "admin:area-code:read", deniedPermissions);
   const canReadMenus = hasPermission(permissions, "admin:menu:read", deniedPermissions);
   const canAssignMenus = canReadMenus && canUpdateRole;
 
   useEffect(() => {
-    const requestID = ++permissionSchemaRequest.current;
-    void getAdminResourceSchema("roles")
-      .then((schema) => {
-        if (permissionSchemaRequest.current !== requestID) return;
-        setPermissionWriteMode(resolveRolePermissionWriteMode(schema));
+    const requestID = ++runtimeSchemaRequest.current;
+    setRuntimeSchemaState("loading");
+    void Promise.all([
+      getAdminResourceSchema("role-groups"),
+      getAdminResourceSchema("roles"),
+      getAdminResourceSchema("menus"),
+    ])
+      .then(([nextRoleGroupSchema, nextRoleSchema, nextMenuSchema]) => {
+        if (runtimeSchemaRequest.current !== requestID) return;
+        setRoleGroupSchema(nextRoleGroupSchema);
+        setRoleSchema(nextRoleSchema);
+        setMenuSchema(nextMenuSchema);
+        setRuntimeSchemaState("ready");
       })
       .catch(() => {
-        if (permissionSchemaRequest.current !== requestID) return;
-        setPermissionWriteMode("readonly");
+        if (runtimeSchemaRequest.current !== requestID) return;
+        setRoleGroupSchema(null);
+        setRoleSchema(null);
+        setMenuSchema(null);
+        setRuntimeSchemaState("error");
       });
-    return () => { permissionSchemaRequest.current += 1; };
+    return () => { runtimeSchemaRequest.current += 1; };
   }, []);
 
   const loadGovernance = useCallback(async (query = "", requestID = ++governanceRequest.current) => {
@@ -185,21 +226,24 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const selected = useMemo(() => selectedRecord(selectedKey, groups, roles), [groups, roles, selectedKey]);
   const invalidGroups = useMemo(() => groups.filter((group) => valueOf(group, "parentCode")), [groups]);
   const invalidRoles = useMemo(() => roles.filter((role) => !valueOf(role, "groupCode") || canReadGroups && !groupByCode.has(valueOf(role, "groupCode"))), [canReadGroups, groupByCode, roles]);
-  const nodes = useMemo(() => roleTreeNodes(groups, roles, search, !canReadGroups), [canReadGroups, groups, roles, search]);
+  const nodes = useMemo(
+    () => projectRoleGovernanceTree(groups, roles, search, language, dictionary.uncategorized),
+    [dictionary.uncategorized, groups, language, roles, search],
+  );
   const moveSourceGroup = moveRole ? groupByCode.get(valueOf(moveRole, "groupCode")) : undefined;
   const moveTargetOptions = useMemo(
     () => moveSourceGroup
-      ? groups.filter(enabled).filter((group) => group.code !== moveSourceGroup.code && sameRoleGroupBoundary(group, moveSourceGroup)).map(recordOption)
+      ? groups.filter(enabled).filter((group) => group.code !== moveSourceGroup.code && sameRoleGroupBoundary(group, moveSourceGroup)).map((record) => recordOption(record, language))
       : [],
-    [groups, moveSourceGroup],
+    [groups, language, moveSourceGroup],
   );
 
   const openEditor = useCallback(async (state: EditorState) => {
     setEditor(state);
-    if (state.kind === "group" && !state.record && tenants.length === 0) {
+    if (state.kind === "group" && groupWriteMode === "target" && !state.record && tenants.length === 0) {
       try { setTenants(await loadAllRecords("tenants")); } catch (nextError) { setError(errorMessage(nextError, dictionary.loadResourceFailed)); }
     }
-  }, [dictionary.loadResourceFailed, tenants.length]);
+  }, [dictionary.loadResourceFailed, groupWriteMode, tenants.length]);
 
   useEffect(() => {
     if (!editor) return;
@@ -216,10 +260,12 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   }, [editor, metadataForm]);
 
   const saveMetadata = async (values: MetadataValues) => {
-    if (!editor) return;
+    if (!editor || !runtimeSchemaReady) return;
+    const schema = editor.kind === "group" ? roleGroupSchema : roleSchema;
+    if (!schema || editor.kind === "group" && groupWriteMode === "readonly") return;
     setActing("metadata");
     try {
-      const input = metadataInput(editor, values);
+      const input = buildRoleGovernanceMetadataInput(editor, values, schema, groupWriteMode);
       const result = editor.record
         ? await updateAdminResource(editor.kind === "group" ? "role-groups" : "roles", editor.record.id, input)
         : await createAdminResource(editor.kind === "group" ? "role-groups" : "roles", input);
@@ -235,7 +281,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   };
 
   const openAuthorization = async (role: AdminResourceRecord) => {
-    if (!canReadAuthorizationInputs) return;
+    if (!canReadAuthorizationInputs || !runtimeSchemaReady) return;
     const requestID = ++authorizationRequest.current;
     const writeMode = permissionWriteMode;
     try {
@@ -294,12 +340,12 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   };
 
   const openMenus = async (role: AdminResourceRecord) => {
-    if (!canReadMenus) return;
+    if (!canReadMenus || !runtimeSchemaReady) return;
     const requestID = ++menuRequest.current;
     try {
-      const targetRequest = roleMenuMigrationWriteEnabled ? getRoleMenus(role.code) : Promise.resolve(null);
+      const targetRequest = roleMenuTargetEnabled ? getRoleMenus(role.code) : Promise.resolve(null);
       const [nextMenus, targetAssignment] = await Promise.all([
-        menus.length > 0 ? Promise.resolve(menus) : roleMenuMigrationWriteEnabled ? assignmentMenuRecords(role.code) : loadAllRecords("menus"),
+        menus.length > 0 ? Promise.resolve(menus) : roleMenuTargetEnabled ? assignmentMenuRecords(role.code) : loadAllRecords("menus"),
         targetRequest,
       ]);
       if (menuRequest.current !== requestID) return;
@@ -323,9 +369,9 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   };
 
   const saveMenus = async () => {
-    if (!menuAssignment || !resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, menuAssignment.role.status).editable) return;
+    if (!menuAssignment || !resolveRoleMenuAccess(roleMenuTargetEnabled, canAssignMenus, menuAssignment.role.status).editable) return;
     const requestID = menuRequest.current;
-    const menuCodes = pageMenuCodes(menuTreeNodes(menus, menuAssignment.menuCodes, dictionary), menuAssignment.menuCodes);
+    const menuCodes = pageMenuCodes(menuTreeNodes(menus, menuAssignment.menuCodes, dictionary, language), menuAssignment.menuCodes);
     setActing("menus");
     try {
       const preview = await prepareRoleMenuChange(menuAssignment.role.code, menuCodes);
@@ -356,6 +402,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   };
 
   const executeRoleChange = async (role: AdminResourceRecord, operation: "move" | "disable", targetGroupCode?: string) => {
+    if (!roleLifecycleTargetEnabled) return;
     setActing(operation);
     try {
       let preview = await prepareRoleStateOrGroupChange(role.code, operation, targetGroupCode);
@@ -393,7 +440,11 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
       canUpdateRole={canUpdateRole}
       dictionary={dictionary}
       groupByCode={groupByCode}
+      language={language}
       record={selected.record}
+      roleLifecycleTargetEnabled={roleLifecycleTargetEnabled}
+      roleMenuTargetEnabled={roleMenuTargetEnabled}
+      runtimeSchemaReady={runtimeSchemaReady}
       type={selected.type}
       onAssignMenus={openMenus}
       onAssignPermissions={openAuthorization}
@@ -410,6 +461,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
     <AdminPage title={dictionary.roleGovernanceTitle} description={dictionary.roleGovernanceDescription}>
       {error ? <AdminFeedback className="api-alert" type="warning" message={dictionary.roleGovernanceSaveFailed} description={error} closable onClose={() => setError("")} /> : null}
       {notice ? <AdminFeedback className="api-alert" type="success" message={notice} closable onClose={() => setNotice("")} /> : null}
+      {runtimeSchemaState === "error" ? <AdminFeedback className="api-alert" type="warning" message={dictionary.rolePermissionReadonlyTitle} description={dictionary.rolePermissionReadonlySchemaDescription} /> : null}
       {invalidGroups.length > 0 || invalidRoles.length > 0 ? (
         <AdminFeedback
           className="api-alert"
@@ -461,21 +513,25 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
           <Form.Item label={dictionary.recordName} name="name" rules={[{ required: true }]}><Input /></Form.Item>
           {editor?.kind === "group" ? (
             <>
-              <Form.Item label={dictionary.roleGroupScope} name="scopeType" rules={[{ required: true }]}>
-                <Select disabled={Boolean(editor.record)} getPopupContainer={platformPopupContainer} options={[{ value: "platform", label: dictionary.roleGroupScopePlatform }, { value: "tenant", label: dictionary.roleGroupScopeTenant }]} />
-              </Form.Item>
-              <Form.Item noStyle shouldUpdate={(before, after) => before.scopeType !== after.scopeType}>
-                {({ getFieldValue }) => getFieldValue("scopeType") === "tenant" ? (
-                  <Form.Item label={dictionary.tenantContext} name="tenantCode" rules={[{ required: true }]}>
-                    <Select disabled={Boolean(editor.record)} getPopupContainer={platformPopupContainer} optionFilterProp="label" options={tenants.map(recordOption)} showSearch />
+              {groupWriteMode === "target" ? (
+                <>
+                  <Form.Item label={dictionary.roleGroupScope} name="scopeType" rules={[{ required: true }]}>
+                    <Select disabled={Boolean(editor.record)} getPopupContainer={platformPopupContainer} options={[{ value: "platform", label: dictionary.roleGroupScopePlatform }, { value: "tenant", label: dictionary.roleGroupScopeTenant }]} />
                   </Form.Item>
-                ) : null}
-              </Form.Item>
+                  <Form.Item noStyle shouldUpdate={(before, after) => before.scopeType !== after.scopeType}>
+                    {({ getFieldValue }) => getFieldValue("scopeType") === "tenant" ? (
+                      <Form.Item label={dictionary.tenantContext} name="tenantCode" rules={[{ required: true }]}>
+                        <Select disabled={Boolean(editor.record)} getPopupContainer={platformPopupContainer} optionFilterProp="label" options={tenants.map((record) => recordOption(record, language))} showSearch />
+                      </Form.Item>
+                    ) : null}
+                  </Form.Item>
+                </>
+              ) : null}
               <Form.Item label={dictionary.roleGroupSortOrder} name="sortOrder"><InputNumber min={0} /></Form.Item>
             </>
           ) : (
             <Form.Item label={dictionary.roleGroupMetadata} name="groupCode" rules={[{ required: true }]}>
-              <Select disabled={Boolean(editor?.record)} getPopupContainer={platformPopupContainer} optionFilterProp="label" options={groups.filter(enabled).map(recordOption)} showSearch />
+              <Select disabled={Boolean(editor?.record)} getPopupContainer={platformPopupContainer} optionFilterProp="label" options={groups.filter(enabled).map((record) => recordOption(record, language))} showSearch />
             </Form.Item>
           )}
           <Form.Item label={dictionary.description} name="description"><Input.TextArea rows={3} /></Form.Item>
@@ -511,6 +567,7 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
         areaCodes={areaCodes}
         authorization={authorization}
         dictionary={dictionary}
+        language={language}
         mode={permissionMode}
         orgUnits={orgUnits}
         permissionCatalog={permissionCatalog}
@@ -527,8 +584,10 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
         acting={acting === "menus"}
         canAssignMenus={canAssignMenus}
         dictionary={dictionary}
+        language={language}
         menuAssignment={menuAssignment}
         menus={menus}
+        roleMenuTargetEnabled={roleMenuTargetEnabled}
         afterClose={() => restoreRoleModalFocus(menuTriggerRef.current, detailFocusRef.current)}
         onAssignmentChange={setMenuAssignment}
         onClose={closeMenus}
@@ -543,12 +602,16 @@ function RoleGovernanceDetail({
   type,
   groupByCode,
   dictionary,
+  language,
   canCreateRole,
   canReadAuthorizationInputs,
   canReadMenus,
   canAssignMenus,
   canUpdateGroup,
   canUpdateRole,
+  roleLifecycleTargetEnabled,
+  roleMenuTargetEnabled,
+  runtimeSchemaReady,
   authorizationTriggerRef,
   menuTriggerRef,
   onEdit,
@@ -562,12 +625,16 @@ function RoleGovernanceDetail({
   type: "group" | "role";
   groupByCode: Map<string, AdminResourceRecord>;
   dictionary: Dictionary;
+  language: Language;
   canCreateRole: boolean;
   canReadAuthorizationInputs: boolean;
   canReadMenus: boolean;
   canAssignMenus: boolean;
   canUpdateGroup: boolean;
   canUpdateRole: boolean;
+  roleLifecycleTargetEnabled: boolean;
+  roleMenuTargetEnabled: boolean;
+  runtimeSchemaReady: boolean;
   authorizationTriggerRef: React.RefObject<HTMLButtonElement>;
   menuTriggerRef: React.RefObject<HTMLButtonElement>;
   onEdit: (kind: "group" | "role", record: AdminResourceRecord, trigger: HTMLElement) => void;
@@ -578,9 +645,11 @@ function RoleGovernanceDetail({
   onAssignMenus: (role: AdminResourceRecord) => void;
 }) {
   const group = type === "role" ? groupByCode.get(valueOf(record, "groupCode")) : undefined;
-  const menuAccess = resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, record.status);
+  const menuAccess = resolveRoleMenuAccess(roleMenuTargetEnabled, canAssignMenus, record.status);
   const menuActionLabel = menuAccess.editable ? dictionary.assignMenus : dictionary.viewMenus;
   const groupScope = valueOf(record, "scopeType");
+  const lifecycleDisabled = !roleLifecycleTargetEnabled || !canUpdateRole || record.status !== "enabled";
+  const lifecycleDisabledReason = !roleLifecycleTargetEnabled ? dictionary.rolePermissionReadonlySchemaDescription : undefined;
   return (
     <AdminListPanel
       className="role-governance-detail"
@@ -588,13 +657,13 @@ function RoleGovernanceDetail({
       actions={(
         <Space size={6} wrap>
           {type === "group" && canCreateRole ? <AdminActionButton icon={<PlusOutlined />} label={dictionary.roleAdd} onClick={(event) => onCreateRole(record.code, event.currentTarget)}>{dictionary.roleAdd}</AdminActionButton> : null}
-          {(type === "group" ? canUpdateGroup : canUpdateRole) ? <AdminActionButton icon={<EditOutlined />} label={dictionary.editRecord} onClick={(event) => onEdit(type, record, event.currentTarget)}>{dictionary.editRecord}</AdminActionButton> : null}
+          {(type === "group" ? canUpdateGroup : canUpdateRole && runtimeSchemaReady) ? <AdminActionButton icon={<EditOutlined />} label={dictionary.editRecord} onClick={(event) => onEdit(type, record, event.currentTarget)}>{dictionary.editRecord}</AdminActionButton> : null}
         </Space>
       )}
     >
       <div className="role-governance-detail-body">
         <div className="role-governance-detail-heading">
-          <div><Typography.Title level={4}>{record.name}</Typography.Title><Typography.Text code>{record.code}</Typography.Text></div>
+          <div><Typography.Title level={4}>{localizedGovernanceName(record, language)}</Typography.Title><Typography.Text code>{record.code}</Typography.Text></div>
           <Tag color={record.status === "enabled" ? "success" : "default"}>{roleStatusLabel(record.status, dictionary)}</Tag>
         </div>
         <Descriptions column={{ xs: 1, md: 2 }} size="small">
@@ -606,28 +675,28 @@ function RoleGovernanceDetail({
             </>
           ) : (
             <>
-              <Descriptions.Item label={dictionary.roleGroupMetadata}>{group ? `${group.name} (${group.code})` : valueOf(record, "groupCode") || "-"}</Descriptions.Item>
+              <Descriptions.Item label={dictionary.roleGroupMetadata}>{group ? `${localizedGovernanceName(group, language)} (${group.code})` : valueOf(record, "groupCode") || "-"}</Descriptions.Item>
               <Descriptions.Item label={dictionary.roleDataScope}>{roleDataScopeLabel(valueOf(record, "dataScope"), dictionary)}</Descriptions.Item>
               <Descriptions.Item label={dictionary.rolePermissionAllow}>{csv(valueOf(record, "permissions")).length}</Descriptions.Item>
               <Descriptions.Item label={dictionary.rolePermissionDeny}>{csv(valueOf(record, "denyPermissions")).length}</Descriptions.Item>
             </>
           )}
-          <Descriptions.Item label={dictionary.description} span={{ xs: 1, md: 2 }}>{record.description || "-"}</Descriptions.Item>
+          <Descriptions.Item label={dictionary.description} span={{ xs: 1, md: 2 }}>{localizedGovernanceDescription(record, language) || "-"}</Descriptions.Item>
         </Descriptions>
         {type === "role" ? (
           <>
             <section className="role-governance-access-control" aria-labelledby="role-governance-access-control-title">
               <Typography.Title id="role-governance-access-control-title" level={5}>{dictionary.roleAccessControl}</Typography.Title>
               <div className="role-governance-section-actions">
-                {canReadMenus ? <AdminActionButton ref={menuTriggerRef} icon={<AppstoreOutlined />} label={menuActionLabel} onClick={() => onAssignMenus(record)}>{menuActionLabel}</AdminActionButton> : null}
-                {canReadAuthorizationInputs ? <AdminActionButton ref={authorizationTriggerRef} icon={<SafetyCertificateOutlined />} label={dictionary.assignPermissions} type="primary" onClick={() => onAssignPermissions(record)}>{dictionary.assignPermissions}</AdminActionButton> : null}
+                {canReadMenus ? <AdminActionButton ref={menuTriggerRef} disabled={!runtimeSchemaReady} icon={<AppstoreOutlined />} label={menuActionLabel} tooltip={!runtimeSchemaReady ? dictionary.rolePermissionReadonlySchemaDescription : undefined} onClick={() => onAssignMenus(record)}>{menuActionLabel}</AdminActionButton> : null}
+                {canReadAuthorizationInputs ? <AdminActionButton ref={authorizationTriggerRef} disabled={!runtimeSchemaReady} icon={<SafetyCertificateOutlined />} label={dictionary.assignPermissions} tooltip={!runtimeSchemaReady ? dictionary.rolePermissionReadonlySchemaDescription : undefined} type="primary" onClick={() => onAssignPermissions(record)}>{dictionary.assignPermissions}</AdminActionButton> : null}
               </div>
             </section>
             <section className="role-governance-lifecycle" aria-labelledby="role-governance-lifecycle-title">
               <Typography.Title id="role-governance-lifecycle-title" level={5}>{dictionary.roleLifecycle}</Typography.Title>
               <div className="role-governance-section-actions role-governance-lifecycle-actions">
-                <AdminActionButton disabled={!canUpdateRole || record.status !== "enabled"} icon={<SwapOutlined />} label={dictionary.roleMove} onClick={(event) => onMove(record, event.currentTarget)}>{dictionary.roleMove}</AdminActionButton>
-                <AdminActionButton danger disabled={!canUpdateRole || record.status !== "enabled"} icon={<StopOutlined />} label={dictionary.roleDisable} onClick={() => onDisable(record)}>{dictionary.roleDisable}</AdminActionButton>
+                <AdminActionButton disabled={lifecycleDisabled} icon={<SwapOutlined />} label={dictionary.roleMove} tooltip={lifecycleDisabledReason} onClick={(event) => onMove(record, event.currentTarget)}>{dictionary.roleMove}</AdminActionButton>
+                <AdminActionButton danger disabled={lifecycleDisabled} icon={<StopOutlined />} label={dictionary.roleDisable} tooltip={lifecycleDisabledReason} onClick={() => onDisable(record)}>{dictionary.roleDisable}</AdminActionButton>
               </div>
             </section>
           </>
@@ -647,6 +716,7 @@ function AuthorizationModal({
   orgUnits,
   areaCodes,
   dictionary,
+  language,
   readOnly,
   readOnlyReason,
   afterClose,
@@ -662,6 +732,7 @@ function AuthorizationModal({
   orgUnits: AdminResourceRecord[];
   areaCodes: AdminResourceRecord[];
   dictionary: Dictionary;
+  language: Language;
   readOnly: boolean;
   readOnlyReason: string;
   afterClose: () => void;
@@ -670,7 +741,7 @@ function AuthorizationModal({
   onCancel: () => void;
   onSave: () => void;
 }) {
-  const nodes = authorization ? permissionTreeNodes(permissionCatalog, dictionary, uniqueSorted([...authorization.allow, ...authorization.deny])) : [];
+  const nodes = authorization ? permissionTreeNodes(permissionCatalog, dictionary, language, uniqueSorted([...authorization.allow, ...authorization.deny])) : [];
   const selected = authorization ? mode === "allow" ? authorization.allow : authorization.deny : [];
   const updateSelected = (next: string[]) => {
     if (!authorization) return;
@@ -688,7 +759,7 @@ function AuthorizationModal({
       footer={readOnly ? <Button onClick={onCancel}>{dictionary.close}</Button> : undefined}
       okText={dictionary.reviewAndApply}
       open={Boolean(authorization)}
-      title={`${dictionary.assignPermissions}: ${authorization?.role.name ?? ""}`}
+      title={`${dictionary.assignPermissions}: ${authorization ? localizedGovernanceName(authorization.role, language) : ""}`}
       width={1080}
       onCancel={onCancel}
       onOk={onSave}
@@ -730,7 +801,7 @@ function AuthorizationModal({
               aria-label={dictionary.roleDataScopeOrgs}
               disabled={readOnly}
               multiple
-              options={orgUnits.map((record) => treeRecordOption(record))}
+              options={orgUnits.map((record) => treeRecordOption(record, language))}
               value={authorization.dataScopeOrgCodes}
               onChange={(value) => onAuthorizationChange({ ...authorization, dataScopeOrgCodes: stringArray(value) })}
             />
@@ -740,7 +811,7 @@ function AuthorizationModal({
               aria-label={dictionary.roleDataScopeAreas}
               disabled={readOnly}
               multiple
-              options={areaCodes.map((record) => treeRecordOption(record, "parentCode", "path"))}
+              options={areaCodes.map((record) => treeRecordOption(record, language, "parentCode", "path"))}
               value={authorization.dataScopeAreaCodes}
               onChange={(value) => onAuthorizationChange({ ...authorization, dataScopeAreaCodes: stringArray(value) })}
             />
@@ -758,6 +829,8 @@ function MenuVisibilityModal({
   acting,
   canAssignMenus,
   dictionary,
+  language,
+  roleMenuTargetEnabled,
   afterClose,
   onAssignmentChange,
   onClose,
@@ -768,6 +841,8 @@ function MenuVisibilityModal({
   acting: boolean;
   canAssignMenus: boolean;
   dictionary: Dictionary;
+  language: Language;
+  roleMenuTargetEnabled: boolean;
   afterClose: () => void;
   onAssignmentChange: (assignment: MenuAssignmentState | null) => void;
   onClose: () => void;
@@ -775,9 +850,9 @@ function MenuVisibilityModal({
 }) {
   const legacyVisible = menuAssignment ? legacyVisibleMenus(menuAssignment.role, menus) : [];
   const historicalCodes = menuAssignment ? uniqueSorted([...menuAssignment.menuCodes, ...legacyVisible]) : [];
-  const nodes = menuTreeNodes(menus, historicalCodes, dictionary);
-  const migrationReadOnly = !roleMenuMigrationWriteEnabled;
-  const menuAccess = resolveRoleMenuAccess(roleMenuMigrationWriteEnabled, canAssignMenus, menuAssignment?.role.status ?? "");
+  const nodes = menuTreeNodes(menus, historicalCodes, dictionary, language);
+  const migrationReadOnly = !roleMenuTargetEnabled;
+  const menuAccess = resolveRoleMenuAccess(roleMenuTargetEnabled, canAssignMenus, menuAssignment?.role.status ?? "");
   const readOnlyReason = roleMenuReadOnlyReason(menuAccess.readOnlyReason, dictionary);
   const menuActionLabel = menuAccess.editable ? dictionary.assignMenus : dictionary.viewMenus;
   const value = migrationReadOnly ? legacyVisible : menuAssignment?.menuCodes ?? [];
@@ -792,7 +867,7 @@ function MenuVisibilityModal({
       footer={!menuAccess.showSave ? <Button onClick={onClose}>{dictionary.close}</Button> : undefined}
       okText={dictionary.reviewAndApply}
       open={Boolean(menuAssignment)}
-      title={`${menuActionLabel}: ${menuAssignment?.role.name ?? ""}`}
+      title={`${menuActionLabel}: ${menuAssignment ? localizedGovernanceName(menuAssignment.role, language) : ""}`}
       width={980}
       onCancel={onClose}
       onOk={onSave}
@@ -817,7 +892,7 @@ function MenuVisibilityModal({
 
 async function assignmentPermissionRecords(roleCode: string): Promise<AdminResourceRecord[]> {
   const [searchResults, selectedResults] = await Promise.all([
-    searchPermissionAssignmentTree(roleCode, "", 1, 1000),
+    loadRoleAssignmentSearchPages(roleCode, searchPermissionAssignmentTree),
     hydratePermissionAssignmentTree(roleCode),
   ]);
   return mergeAssignmentRecords([...searchResults, ...selectedResults], (item) => ({
@@ -829,7 +904,7 @@ async function assignmentPermissionRecords(roleCode: string): Promise<AdminResou
 
 async function assignmentMenuRecords(roleCode: string): Promise<AdminResourceRecord[]> {
   const [searchResults, selectedResults] = await Promise.all([
-    searchMenuAssignmentTree(roleCode, "", 1, 1000),
+    loadRoleAssignmentSearchPages(roleCode, searchMenuAssignmentTree),
     hydrateMenuAssignmentTree(roleCode),
   ]);
   return mergeAssignmentRecords([...searchResults, ...selectedResults], (item) => ({
@@ -855,31 +930,7 @@ function mergeAssignmentRecords<T extends { code: string; name: string; status: 
   return [...byCode.values()].sort((left, right) => left.code.localeCompare(right.code));
 }
 
-function roleTreeNodes(groups: AdminResourceRecord[], roles: AdminResourceRecord[], search: string, includeReferencedGroups = false): AdminTreeWorkbenchNode[] {
-  const normalized = search.trim().toLocaleLowerCase();
-  const rolesByGroup = new Map<string, AdminResourceRecord[]>();
-  for (const role of roles) {
-    const groupCode = valueOf(role, "groupCode");
-    rolesByGroup.set(groupCode, [...(rolesByGroup.get(groupCode) ?? []), role]);
-  }
-  const visibleGroups = groups.filter((group) => !normalized || `${group.name} ${group.code}`.toLocaleLowerCase().includes(normalized) || (rolesByGroup.get(group.code)?.length ?? 0) > 0);
-  const nodes: AdminTreeWorkbenchNode[] = visibleGroups.flatMap((group) => [
-    { key: nodeKey(group, "group"), kind: "group", label: `${group.name} (${group.code})`, childCount: rolesByGroup.get(group.code)?.length ?? 0 },
-    ...(rolesByGroup.get(group.code) ?? []).map((role) => ({ key: nodeKey(role, "role"), parentKey: nodeKey(group, "group"), kind: "item" as const, label: `${role.name} (${role.code})`, status: role.status, isLeaf: true })),
-  ]);
-  if (!includeReferencedGroups) return nodes;
-  const knownGroupCodes = new Set(groups.map((group) => group.code));
-  for (const groupCode of [...rolesByGroup.keys()].filter(Boolean).filter((code) => !knownGroupCodes.has(code)).sort()) {
-    const referencedRoles = rolesByGroup.get(groupCode) ?? [];
-    nodes.push(
-      { key: `group:${groupCode}`, kind: "group", label: groupCode, childCount: referencedRoles.length, selectable: false },
-      ...referencedRoles.map((role) => ({ key: nodeKey(role, "role"), parentKey: `group:${groupCode}`, kind: "item" as const, label: `${role.name} (${role.code})`, status: role.status, isLeaf: true })),
-    );
-  }
-  return nodes;
-}
-
-function permissionTreeNodes(records: AdminResourceRecord[], dictionary: Dictionary, historicalCodes: string[]): PlatformTreeTransferNode[] {
+function permissionTreeNodes(records: AdminResourceRecord[], dictionary: Dictionary, language: Language, historicalCodes: string[]): PlatformTreeTransferNode[] {
   const nodes: PlatformTreeTransferNode[] = [];
   const branches = new Set<string>();
   const historicalCodeSet = new Set(historicalCodes);
@@ -888,11 +939,11 @@ function permissionTreeNodes(records: AdminResourceRecord[], dictionary: Diction
     const availableDisabledReason = enabled(permission) ? undefined : dictionary.rolePermissionHistoricalDisabled;
     const type = valueOf(permission, "resourceType") || "api";
     const typeKey = `permission-type:${type}`;
-    const group = valueOf(permission, "capability") || valueOf(permission, "resource") || dictionary.uncategorized;
+    const group = valueOf(permission, "capability") || valueOf(permission, "resource") || valueOf(permission, "parentCode") || dictionary.uncategorized;
     const groupKey = `${typeKey}:${group}`;
     if (!branches.has(typeKey)) {
       branches.add(typeKey);
-      nodes.push({ key: typeKey, kind: "branch", label: type === "page-button" ? dictionary.permissionTypePageButton : dictionary.permissionTypeAPI });
+      nodes.push({ key: typeKey, kind: "branch", label: type === "page-button" ? dictionary.permissionTypePageButton : type === "api" ? dictionary.permissionTypeAPI : dictionary.uncategorized });
     }
     if (!branches.has(groupKey)) {
       branches.add(groupKey);
@@ -902,7 +953,7 @@ function permissionTreeNodes(records: AdminResourceRecord[], dictionary: Diction
       key: permission.code,
       parentKey: groupKey,
       kind: "leaf",
-      label: permission.name || permission.code,
+      label: localizedGovernanceName(permission, language),
       code: permission.code,
       status: permission.status,
       availableDisabledReason,
@@ -924,11 +975,11 @@ function permissionTreeNodes(records: AdminResourceRecord[], dictionary: Diction
   return nodes;
 }
 
-function menuTreeNodes(records: AdminResourceRecord[], historicalCodes: string[], dictionary: Dictionary): PlatformTreeTransferNode[] {
+function menuTreeNodes(records: AdminResourceRecord[], historicalCodes: string[], dictionary: Dictionary, language: Language): PlatformTreeTransferNode[] {
   return projectMenuTreeNodes(
     records.map((record) => ({
       code: record.code,
-      name: record.name,
+      name: localizedGovernanceName(record, language),
       status: record.status,
       nodeType: valueOf(record, "nodeType"),
       parentCode: valueOf(record, "parentCode"),
@@ -990,26 +1041,6 @@ async function loadAllRecords(resource: string, keywords?: string[]) {
   }
 }
 
-function metadataInput(editor: EditorState, values: MetadataValues): AdminResourceInput {
-  const existing = editor.record?.values ?? {};
-  if (editor.kind === "group") {
-    return {
-      code: values.code,
-      name: values.name,
-      status: editor.record?.status ?? "enabled",
-      description: values.description,
-      values: { ...existing, parentCode: "", scopeType: values.scopeType ?? "tenant", tenantCode: values.scopeType === "platform" ? "" : values.tenantCode ?? "", sortOrder: String(values.sortOrder ?? 0) },
-    };
-  }
-  return {
-    code: values.code,
-    name: values.name,
-    status: editor.record?.status ?? "enabled",
-    description: values.description,
-    values: { ...existing, groupCode: values.groupCode ?? editor.groupCode ?? "" },
-  };
-}
-
 function rolePermissionReadOnlyReason(mode: RolePermissionWriteMode, canUpdateRole: boolean, role: AdminResourceRecord, dictionary: Dictionary) {
   if (role.status !== "enabled") return dictionary.rolePermissionReadonlyDisabledDescription;
   if (!canUpdateRole) return dictionary.rolePermissionReadonlyAccessDescription;
@@ -1062,8 +1093,8 @@ function enabled(record: AdminResourceRecord) { return record.status === "enable
 function sameRoleGroupBoundary(left: AdminResourceRecord, right: AdminResourceRecord) {
   return valueOf(left, "scopeType") === valueOf(right, "scopeType") && valueOf(left, "tenantCode") === valueOf(right, "tenantCode");
 }
-function recordOption(record: AdminResourceRecord) { return { value: record.code, label: `${record.name} (${record.code})` }; }
-function treeRecordOption(record: AdminResourceRecord, parentKey = "parentCode", pathKey?: string) { return { value: record.code, label: `${record.name} (${record.code})`, parentValue: valueOf(record, parentKey), pathValue: pathKey ? valueOf(record, pathKey) : undefined }; }
+function recordOption(record: AdminResourceRecord, language: Language) { return { value: record.code, label: `${localizedGovernanceName(record, language)} (${record.code})` }; }
+function treeRecordOption(record: AdminResourceRecord, language: Language, parentKey = "parentCode", pathKey?: string) { return { value: record.code, label: `${localizedGovernanceName(record, language)} (${record.code})`, parentValue: valueOf(record, parentKey), pathValue: pathKey ? valueOf(record, pathKey) : undefined }; }
 function stringArray(value: unknown) { return Array.isArray(value) ? value.map(String) : []; }
 function errorMessage(error: unknown, fallback: string) { return error instanceof Error ? error.message : fallback; }
 

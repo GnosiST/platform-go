@@ -110,12 +110,14 @@ describe("role permission write mode integration", () => {
   const roleGovernance = source("admin/src/platform/resources/RoleGovernanceConsole.tsx");
   const rolePermissionWorkflow = source("admin/src/platform/resources/rolePermissionWorkflow.ts");
 
-  it("loads the role schema independently with stale and unmount protection", () => {
+  it("loads all governance schemas independently with stale and unmount protection", () => {
+    assert.match(roleGovernance, /getAdminResourceSchema\("role-groups"\)/);
     assert.match(roleGovernance, /getAdminResourceSchema\("roles"\)/);
-    assert.match(roleGovernance, /resolveRolePermissionWriteMode\(schema\)/);
-    assert.match(roleGovernance, /const permissionSchemaRequest = useRef\(0\);/);
-    assert.match(roleGovernance, /if \(permissionSchemaRequest\.current !== requestID\) return;/);
-    assert.match(roleGovernance, /return \(\) => \{ permissionSchemaRequest\.current \+= 1; \};/);
+    assert.match(roleGovernance, /getAdminResourceSchema\("menus"\)/);
+    assert.match(roleGovernance, /resolveRoleGovernanceRuntime\(roleGroupSchema, roleSchema, menuSchema\)/);
+    assert.match(roleGovernance, /const runtimeSchemaRequest = useRef\(0\);/);
+    assert.match(roleGovernance, /if \(runtimeSchemaRequest\.current !== requestID\) return;/);
+    assert.match(roleGovernance, /return \(\) => \{ runtimeSchemaRequest\.current \+= 1; \};/);
 
     const schemaLoad = roleGovernance.indexOf('getAdminResourceSchema("roles")');
     const treeLoad = roleGovernance.indexOf("const loadGovernance");
@@ -153,7 +155,7 @@ describe("role permission write mode integration", () => {
 
   it("lets disabled roles open for inspection while guarding every save", () => {
     const detail = roleGovernance.slice(roleGovernance.indexOf("function RoleGovernanceDetail"), roleGovernance.indexOf("function AuthorizationModal"));
-    assert.match(detail, /canReadAuthorizationInputs \? <AdminActionButton ref=\{authorizationTriggerRef\} icon=\{<SafetyCertificateOutlined/);
+    assert.match(detail, /canReadAuthorizationInputs \? <AdminActionButton ref=\{authorizationTriggerRef\} disabled=\{!runtimeSchemaReady\} icon=\{<SafetyCertificateOutlined/);
     assert.doesNotMatch(detail, /authorizationTriggerRef\} disabled=\{!canUpdateRole \|\| record\.status !== "enabled"\}/);
     assert.match(roleGovernance, /authorization\.role\.status !== "enabled"/);
   });

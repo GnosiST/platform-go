@@ -1398,6 +1398,7 @@ export function menuDirectoryLabels(): Record<string, MenuDirectoryLabel> {
     governance: { zh: dictionaries.zh.navGovernance, en: dictionaries.en.navGovernance },
     system: { zh: dictionaries.zh.navSystem, en: dictionaries.en.navSystem },
     logs: { zh: dictionaries.zh.navLogs, en: dictionaries.en.navLogs },
+    operations: { zh: dictionaries.zh.operations, en: dictionaries.en.operations },
     storage: { zh: dictionaries.zh.navStorage, en: dictionaries.en.navStorage },
     security: { zh: dictionaries.zh.navSecurity, en: dictionaries.en.navSecurity },
     release: { zh: dictionaries.zh.navRelease, en: dictionaries.en.navRelease },
