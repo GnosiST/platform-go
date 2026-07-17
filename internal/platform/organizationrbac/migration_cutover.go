@@ -306,7 +306,7 @@ func (r *GORMRepository) ValidateMenuPromotion(ctx context.Context, mode string,
 	if mode == string(httpapi.AdminMenuServingModeLegacy) {
 		return MenuPromotionState{}, &ValidationError{Field: "promotion.phase", Reason: "legacy serving is blocked after target promotion"}
 	}
-	if state.FrozenRevision != currentRevision {
+	if state.FrozenRevision != currentRevision && state.Phase != PromotionTargetWrite {
 		return MenuPromotionState{}, &ValidationError{Field: "promotion.frozenRevision", Reason: "global revision changed; a new comparison is required"}
 	}
 	if state.ActivePrincipals != state.Equivalent {

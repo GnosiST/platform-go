@@ -79,6 +79,9 @@ func BootstrapDevelopmentOrganizationRBAC(ctx context.Context, cfg config.Config
 		if err := PrepareOrganizationRBAC(ctx, cfg); err != nil {
 			return DevelopmentOrganizationRBACReport{}, err
 		}
+		if _, err := AdminResourcesFromConfig(cfg, manifests, protection); err != nil {
+			return DevelopmentOrganizationRBACReport{}, err
+		}
 	}
 	seedSnapshot, err := adminRepository.Load(ctx)
 	if err != nil {

@@ -28,6 +28,7 @@ func TestBootstrapDevelopmentOrganizationRBAC(t *testing.T) {
 		t.Fatalf("bootstrap report = %+v", report)
 	}
 	assertDevelopmentOrganizationRBACRuntime(t, cfg)
+	assertDevelopmentOrganizationRBACAPIStartup(t, cfg)
 
 	replayed, err := BootstrapDevelopmentOrganizationRBAC(ctx, cfg, core.DefaultManifests(), nil, now.Add(time.Minute))
 	if err != nil {
@@ -38,6 +39,7 @@ func TestBootstrapDevelopmentOrganizationRBAC(t *testing.T) {
 		t.Fatalf("replayed report = %+v, want idempotent target-write", replayed)
 	}
 	assertDevelopmentOrganizationRBACRuntime(t, cfg)
+	assertDevelopmentOrganizationRBACAPIStartup(t, cfg)
 }
 
 func TestBootstrapDevelopmentOrganizationRBACRejectsUnsafeInputs(t *testing.T) {
@@ -153,4 +155,16 @@ func assertDevelopmentOrganizationRBACRuntime(t *testing.T, cfg config.Config) {
 	if err := runtime.Close(); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func assertDevelopmentOrganizationRBACAPIStartup(t *testing.T, cfg config.Config) {
+	t.Helper()
+	resources, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), nil)
+	if err != nil {
+		t.Fatalf("AdminResourcesFromConfig(target) error = %v", err)
+	}
+	if err := resources.ValidateProtectedData(context.Background()); err != nil {
+		t.Fatalf("ValidateProtectedData() error = %v", err)
+	}
+	assertDevelopmentOrganizationRBACRuntime(t, cfg)
 }

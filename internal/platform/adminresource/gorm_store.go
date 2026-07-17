@@ -1036,9 +1036,6 @@ func (r *GORMAdminResourceRepository) loadUsers(ctx context.Context) ([]Record, 
 		values["tenantCode"] = row.TenantCode
 		values["orgUnitCode"] = row.OrgUnitCode
 		values["roles"] = roleValue
-		if strings.TrimSpace(values["role"]) == "" {
-			values["role"] = roleValue
-		}
 		records = append(records, Record{
 			ID:          row.ID,
 			Code:        row.Code,

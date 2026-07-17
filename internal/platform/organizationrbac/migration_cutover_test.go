@@ -77,6 +77,33 @@ func TestMenuPromotionRevisionDriftRequiresNewComparison(t *testing.T) {
 	}
 }
 
+func TestMenuPromotionTargetWriteAllowsPersistedRoleMenuRevisionDrift(t *testing.T) {
+	_, repository := prepareOrganizationRBACTestRepository(t)
+	seedOrganizationRBAC(t, repository.db)
+	seedNativeMenus(t, repository.db)
+	state := completeTargetReadPromotionState(t, repository, "promotion-target-write-drift")
+	state.Phase = PromotionTargetWrite
+	if err := repository.RecordMenuPromotionState(context.Background(), state); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.ReplaceRoleMenus(context.Background(), ReplaceRoleMenusRequest{
+		RoleCode: "operator", MenuCodes: []string{"users"}, ExpectedRevision: 0,
+		ActorID: "admin", ChangedAt: time.Date(2026, 7, 17, 10, 0, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("ReplaceRoleMenus() error = %v", err)
+	}
+	currentRevision, err := repository.CurrentGlobalRevision(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if currentRevision == state.FrozenRevision {
+		t.Fatalf("global revision did not move after role menu write: %d", currentRevision)
+	}
+	if _, err := repository.ValidateMenuPromotion(context.Background(), string(httpapi.AdminMenuServingModeTarget), true); err != nil {
+		t.Fatalf("target-write validation after persisted role-menu write = %v", err)
+	}
+}
+
 func TestPromoteMenuWrites(t *testing.T) {
 	request := MenuWritePromotionRequest{
 		RunID: "promotion-write-1", ExpectedPhase: PromotionTargetRead,
