@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "scripts": {
     "render": "remotion render src/index.ts PlatformGoDemo ../website/static/video/platform-go-demo.mp4",
-    "still": "remotion still src/index.ts PlatformGoDemo --frame=90 ../website/static/video/platform-go-demo.png"
+    "still": "remotion still src/index.ts PlatformGoDemo --frame=520 ../website/static/video/platform-go-demo.png"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.250",
