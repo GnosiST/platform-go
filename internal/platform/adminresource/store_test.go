@@ -392,6 +392,12 @@ func TestStoreSchemaExposesMenuGovernanceFields(t *testing.T) {
 			t.Fatalf("legacy menus field %q = %+v, want writable compatibility field", key, field)
 		}
 	}
+	for _, key := range []string{"permission", "group", "icon"} {
+		field := fieldByKey(legacySchema.Fields, key)
+		if field == nil || field.Required {
+			t.Fatalf("legacy menus field %q = %+v, want optional directory-compatible field", key, field)
+		}
+	}
 
 	store.EnableOrganizationRBACMenuGovernanceWrites()
 

@@ -7,7 +7,7 @@ import {
   isSafeInternalMenuRoute,
 } from "../admin/src/platform/resources/menuGovernanceValidation.ts";
 import {
-  legacyMenuUpdateInput,
+  legacyMenuWriteInput,
   projectMenuGovernanceRecords,
   resolveMenuGovernanceWriteMode,
 } from "../admin/src/platform/resources/menuGovernanceRuntime.ts";
@@ -89,12 +89,19 @@ describe("menu governance validation behavior", () => {
         updatedAt: "2026-07-17T00:00:00Z",
         values: { parent: "identity/accounts", route: "/users", titleZh: "用户", titleEn: "Users" },
       },
-    ], "legacy");
+    ], "legacy", {
+      identity: { zh: "身份", en: "Identity" },
+      "identity/accounts": { zh: "账号", en: "Accounts" },
+    });
 
     assert.deepEqual(records.map((record) => [record.code, record.values?.parentCode, record.values?.nodeType]), [
       ["identity", "", "directory"],
       ["identity/accounts", "identity", "directory"],
       ["users", undefined, undefined],
+    ]);
+    assert.deepEqual(records.slice(0, 2).map((record) => [record.values?.titleZh, record.values?.titleEn]), [
+      ["身份", "Identity"],
+      ["账号", "Accounts"],
     ]);
   });
 
@@ -166,7 +173,7 @@ describe("menu governance validation behavior", () => {
         { key: "pageButtons", source: "values", sensitivity: "public", readOnly: true },
       ],
     };
-    const input = legacyMenuUpdateInput(record, definition, schema);
+    const input = legacyMenuWriteInput(record, definition, schema);
     assert.equal(input.values.permission, "admin:user:read");
     assert.equal(input.values.group, "foundation");
     assert.equal(input.values.parent, "access");

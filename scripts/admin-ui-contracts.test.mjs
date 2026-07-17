@@ -757,7 +757,7 @@ describe("validate-admin-ui-contracts", () => {
     replaceInTemp(
       tempRoot,
       "admin/src/platform/resources/MenuGovernanceConsole.tsx",
-      "projectMenuGovernanceRecords(rawRecords, nextWriteMode, menuDirectoryLabels(dictionary))",
+      "projectMenuGovernanceRecords(rawRecords, nextWriteMode, menuDirectoryLabels())",
       "rawRecords",
     );
 

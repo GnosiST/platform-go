@@ -1087,14 +1087,14 @@ func menuResourceSchema() Schema {
 		readOnlyValueField("pageButtons", text("页面按钮", "Page Buttons"), "textarea", false, false, true, 280, nil),
 		valueField("parent", text("上级菜单", "Parent Menu"), "text", false, true, true, true, true, 160, nil),
 		valueField("resource", text("资源", "Resource"), "text", false, true, true, true, true, 160, nil),
-		valueField("permission", text("旧权限码", "Legacy Permission"), "text", true, true, true, true, true, 220, nil),
-		valueField("group", text("分组", "Group"), "select", true, true, true, true, true, 140, []FieldOption{
+		valueField("permission", text("旧权限码", "Legacy Permission"), "text", false, true, true, true, true, 220, nil),
+		valueField("group", text("分组", "Group"), "select", false, true, true, true, true, 140, []FieldOption{
 			option("foundation", "基础", "Foundation"),
 			option("governance", "治理", "Governance"),
 			option("operations", "运维", "Operations"),
 			option("security", "安全", "Security"),
 		}),
-		valueField("icon", text("图标", "Icon"), "text", true, false, true, true, true, 140, nil),
+		valueField("icon", text("图标", "Icon"), "text", false, false, true, true, true, 140, nil),
 		valueField("order", text("排序", "Order"), "text", false, false, true, true, true, 90, nil),
 		valueField("titleZh", text("中文标题", "Chinese Title"), "text", true, true, false, true, true, 160, nil),
 		valueField("titleEn", text("英文标题", "English Title"), "text", true, true, false, true, true, 160, nil),

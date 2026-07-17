@@ -21,6 +21,7 @@ import {
 } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  createAdminResource,
   getAdminResourceSchema,
   queryAdminResource,
   updateAdminResource,
@@ -55,7 +56,7 @@ import {
 } from "./menuGovernanceValidation";
 import {
   isSyntheticLegacyDirectory,
-  legacyMenuUpdateInput,
+  legacyMenuWriteInput,
   projectMenuGovernanceRecords,
   resolveMenuGovernanceWriteMode,
   type MenuGovernanceWriteMode,
@@ -109,7 +110,6 @@ type MenuEditorValues = {
   parameters?: MenuParameterValue[];
   cacheEnabled?: boolean;
   hidden?: boolean;
-  activeMenuCode?: string;
   breadcrumbVisible?: boolean;
   buttons?: MenuButtonValue[];
 };
@@ -157,6 +157,8 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
   const directoryMode = editor?.mode === "create-directory" || editor?.mode === "edit-directory";
   const externalPage = Form.useWatch("external", form) ?? false;
   const currentDefinition = selectedDefinition?.node.code === selectedKey ? selectedDefinition : null;
+  const currentRecord = records.find((record) => record.code === selectedKey);
+  const currentIsSyntheticDirectory = currentRecord ? isSyntheticLegacyDirectory(currentRecord) : false;
 
   const loadMenus = useCallback(async (query = "", requestID = ++menuListRequest.current) => {
     if (!canRead || menuListRequest.current !== requestID) return;
@@ -166,7 +168,7 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
     try {
       const [rawRecords, schema] = await Promise.all([loadAllMenus(), getAdminResourceSchema("menus")]);
       const nextWriteMode = resolveMenuGovernanceWriteMode(schema);
-      const nextRecords = projectMenuGovernanceRecords(rawRecords, nextWriteMode, menuDirectoryLabels(dictionary));
+      const nextRecords = projectMenuGovernanceRecords(rawRecords, nextWriteMode, menuDirectoryLabels());
       const visibleRecords = filterMenuRecords(nextRecords, query);
       if (menuListRequest.current !== requestID) return;
       setMenuWriteMode(nextWriteMode);
@@ -221,7 +223,7 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
       setDefinitionLoading(false);
       setSelectedDefinition(legacyMenuDefinition(selectedRecord));
       setSelectedRevision(0);
-      setMenuDefinitionWritable(!isSyntheticLegacyDirectory(selectedRecord));
+      setMenuDefinitionWritable(true);
       setError("");
       return;
     }
@@ -250,7 +252,6 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
   }, [canRead, definitionRefresh, dictionary.menuLoadFailed, menuWriteMode, records, selectedKey]);
 
   const directoryRecords = useMemo(() => records.filter((record) => nodeType(record) === "directory"), [records]);
-  const pageRecords = useMemo(() => records.filter((record) => nodeType(record) === "page"), [records]);
   const nodes = useMemo(() => menuTreeNodes(filterMenuRecords(records, search), language), [language, records, search]);
   const componentOptions = useMemo(
     () => availableResourceRoutes.map((route) => ({ label: route, value: route.replace(/^\/+/, "") })).filter((option) => option.value),
@@ -314,12 +315,19 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
       if (editorSession.current !== sessionID) return;
       if (freshWriteMode !== editor.writeMode) throw new Error(dictionary.menuSaveFailed);
       if (editor.writeMode === "legacy") {
-        const legacyRecord = freshRecords.find((record) => record.id === editor.recordID && record.code === definition.node.code);
-        if (!legacyRecord || isSyntheticLegacyDirectory(legacyRecord) || editor.mode.startsWith("create-") ||
+        const legacyRecords = projectMenuGovernanceRecords(freshRecords, freshWriteMode, menuDirectoryLabels());
+        const legacyRecord = legacyRecords.find((record) => record.code === definition.node.code);
+        if (!legacyRecord || legacyRecord.id !== editor.recordID || editor.mode.startsWith("create-") ||
           legacyRecord.updatedAt !== editor.updatedAt) {
           throw new Error(dictionary.menuSaveFailed);
         }
-        await updateAdminResource("menus", legacyRecord.id, legacyMenuUpdateInput(legacyRecord, definition, freshSchema));
+        const input = legacyMenuWriteInput(legacyRecord, definition, freshSchema);
+        if (isSyntheticLegacyDirectory(legacyRecord)) {
+          if (!canCreate || definition.node.nodeType !== "directory") throw new Error(dictionary.menuSaveFailed);
+          await createAdminResource("menus", input);
+        } else {
+          await updateAdminResource("menus", legacyRecord.id, input);
+        }
       } else if (editor.mode.startsWith("create-")) {
         await createMenuDefinition(definition, selectedRevision);
       } else {
@@ -356,7 +364,7 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
       definition={currentDefinition}
       dictionary={dictionary}
       language={language}
-      canUpdate={canUpdate && menuDefinitionWritable}
+      canUpdate={canUpdate && menuDefinitionWritable && (!currentIsSyntheticDirectory || canCreate)}
       onEdit={(trigger) => openEditor(
         currentDefinition.node.nodeType === "directory" ? "edit-directory" : "edit-page",
         trigger,
@@ -499,17 +507,6 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
                     </Form.Item>
                     <Form.Item name="resourceCode" label={dictionary.menuResourceCode} rules={[registeredKeyRule(componentOptions, dictionary.menuRegisteredKeyRequired, true)]}>
                       <Select allowClear getPopupContainer={platformPopupContainer} options={componentOptions} showSearch optionFilterProp="label" />
-                    </Form.Item>
-                    <Form.Item name="activeMenuCode" label={dictionary.menuActiveCode}>
-                      <Select
-                        allowClear
-                        getPopupContainer={platformPopupContainer}
-                        options={pageRecords
-                          .filter((record) => record.status === "enabled" && record.code !== editor?.definition?.node.code)
-                          .map((record) => ({ label: localizedTitle(record, language), value: record.code }))}
-                        showSearch
-                        optionFilterProp="label"
-                      />
                     </Form.Item>
                   </div>
                 )}
@@ -733,7 +730,7 @@ function buildMenuDefinition(values: MenuEditorValues, directoryMode: boolean, e
       parameters: [],
       cacheEnabled: directoryMode ? false : !external && Boolean(values.cacheEnabled),
       hidden: directoryMode ? false : Boolean(values.hidden),
-      activeMenuCode: directoryMode ? "" : values.activeMenuCode?.trim() ?? "",
+      activeMenuCode: existing?.node.activeMenuCode ?? "",
       breadcrumbVisible: directoryMode ? false : Boolean(values.breadcrumbVisible),
       ...(!directoryMode ? {
         route: external ? "" : normalizeRoute(values.route ?? ""),
@@ -768,7 +765,6 @@ function editorValues(definition: MenuDefinition): MenuEditorValues {
     parameters: node.parameters.map((parameter) => ({ ...parameter })),
     cacheEnabled: node.cacheEnabled,
     hidden: node.hidden,
-    activeMenuCode: node.activeMenuCode,
     breadcrumbVisible: node.breadcrumbVisible,
     buttons: definition.buttons.map((button) => ({ ...button })),
   };
@@ -795,7 +791,6 @@ function defaultEditorValues(mode: MenuEditorMode, selected: MenuDefinition | nu
     parameters: [],
     cacheEnabled: true,
     hidden: false,
-    activeMenuCode: "",
     breadcrumbVisible: true,
     buttons: [],
   };

@@ -4,6 +4,7 @@ import type {
   AdminResourceSchema,
 } from "../api/client";
 import type { MenuDefinition } from "../api/organizationRBAC";
+import type { MenuDirectoryLabel } from "../i18n";
 
 export type MenuGovernanceWriteMode = "legacy" | "target";
 
@@ -16,7 +17,7 @@ export function resolveMenuGovernanceWriteMode(
 export function projectMenuGovernanceRecords(
   records: AdminResourceRecord[],
   mode: MenuGovernanceWriteMode,
-  directoryLabels: Record<string, string> = {},
+  directoryLabels: Record<string, MenuDirectoryLabel> = {},
 ): AdminResourceRecord[] {
   if (mode === "target") return records;
   const existingCodes = new Set(records.map((record) => record.code));
@@ -38,7 +39,7 @@ export function isSyntheticLegacyDirectory(record: AdminResourceRecord) {
   return record.values?.syntheticLegacyDirectory === "true";
 }
 
-export function legacyMenuUpdateInput(
+export function legacyMenuWriteInput(
   record: AdminResourceRecord,
   definition: MenuDefinition,
   schema: Pick<AdminResourceSchema, "fields">,
@@ -82,19 +83,20 @@ export function legacyMenuUpdateInput(
   };
 }
 
-function legacyDirectoryRecord(code: string, directoryLabels: Record<string, string>): AdminResourceRecord {
-  const label = directoryLabels[code] || humanizeDirectoryCode(code);
+function legacyDirectoryRecord(code: string, directoryLabels: Record<string, MenuDirectoryLabel>): AdminResourceRecord {
+  const fallback = humanizeDirectoryCode(code);
+  const label = directoryLabels[code] ?? { zh: fallback, en: fallback };
   return {
     id: `legacy-directory:${code}`,
     code,
-    name: label,
+    name: label.en,
     status: "enabled",
     updatedAt: "",
     values: {
       nodeType: "directory",
       parentCode: parentDirectoryCode(code),
-      titleZh: label,
-      titleEn: label,
+      titleZh: label.zh,
+      titleEn: label.en,
       syntheticLegacyDirectory: "true",
     },
   };

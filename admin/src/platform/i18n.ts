@@ -1385,25 +1385,27 @@ export const dictionaries = {
 
 export type Dictionary = (typeof dictionaries)[Language];
 
-export function menuDirectoryLabels(dictionary: Dictionary): Record<string, string> {
+export type MenuDirectoryLabel = { zh: string; en: string };
+
+export function menuDirectoryLabels(): Record<string, MenuDirectoryLabel> {
   return {
-    runtime: dictionary.navRuntime,
-    identity: dictionary.navIdentity,
-    access: dictionary.navAccess,
-    resources: dictionary.navResources,
-    audit: dictionary.navAudit,
-    configuration: dictionary.navConfiguration,
-    governance: dictionary.navGovernance,
-    system: dictionary.navSystem,
-    logs: dictionary.navLogs,
-    storage: dictionary.navStorage,
-    security: dictionary.navSecurity,
-    release: dictionary.navRelease,
-    business: dictionary.navBusiness,
-    "business/access": dictionary.navBusinessAccess,
-    "business/content": dictionary.navBusinessContent,
-    "business/dispatch": dictionary.navBusinessDispatch,
-    "business/fulfillment": dictionary.navBusinessFulfillment,
-    "business/support": dictionary.navBusinessSupport,
+    runtime: { zh: dictionaries.zh.navRuntime, en: dictionaries.en.navRuntime },
+    identity: { zh: dictionaries.zh.navIdentity, en: dictionaries.en.navIdentity },
+    access: { zh: dictionaries.zh.navAccess, en: dictionaries.en.navAccess },
+    resources: { zh: dictionaries.zh.navResources, en: dictionaries.en.navResources },
+    audit: { zh: dictionaries.zh.navAudit, en: dictionaries.en.navAudit },
+    configuration: { zh: dictionaries.zh.navConfiguration, en: dictionaries.en.navConfiguration },
+    governance: { zh: dictionaries.zh.navGovernance, en: dictionaries.en.navGovernance },
+    system: { zh: dictionaries.zh.navSystem, en: dictionaries.en.navSystem },
+    logs: { zh: dictionaries.zh.navLogs, en: dictionaries.en.navLogs },
+    storage: { zh: dictionaries.zh.navStorage, en: dictionaries.en.navStorage },
+    security: { zh: dictionaries.zh.navSecurity, en: dictionaries.en.navSecurity },
+    release: { zh: dictionaries.zh.navRelease, en: dictionaries.en.navRelease },
+    business: { zh: dictionaries.zh.navBusiness, en: dictionaries.en.navBusiness },
+    "business/access": { zh: dictionaries.zh.navBusinessAccess, en: dictionaries.en.navBusinessAccess },
+    "business/content": { zh: dictionaries.zh.navBusinessContent, en: dictionaries.en.navBusinessContent },
+    "business/dispatch": { zh: dictionaries.zh.navBusinessDispatch, en: dictionaries.en.navBusinessDispatch },
+    "business/fulfillment": { zh: dictionaries.zh.navBusinessFulfillment, en: dictionaries.en.navBusinessFulfillment },
+    "business/support": { zh: dictionaries.zh.navBusinessSupport, en: dictionaries.en.navBusinessSupport },
   };
 }
