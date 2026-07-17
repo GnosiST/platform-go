@@ -110,6 +110,47 @@ func (s *Store) snapshotLocked() ResourceSnapshot {
 	}
 }
 
+func (s *Store) MaterializeCapabilitySeeds(ctx context.Context) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.repository == nil {
+		return false, nil
+	}
+	current, err := s.repository.Load(ctx)
+	if err != nil {
+		return false, err
+	}
+	if !emptyRepositorySnapshot(current) {
+		s.installSnapshotLocked(current)
+		return false, nil
+	}
+	snapshot := s.snapshotLocked()
+	snapshot.Revision = current.Revision
+	snapshot, _, err = s.scrubSnapshot(snapshot)
+	if err != nil {
+		return false, err
+	}
+	committed, err := s.repository.Save(ctx, snapshot)
+	if err != nil {
+		return false, err
+	}
+	snapshot.Revision = committed
+	s.installSnapshotLocked(snapshot)
+	return true, nil
+}
+
+func emptyRepositorySnapshot(snapshot ResourceSnapshot) bool {
+	if snapshot.Revision != 0 || snapshot.NextID != 0 {
+		return false
+	}
+	for _, records := range snapshot.Resources {
+		if len(records) != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *Store) restoreSnapshotLocked(snapshot ResourceSnapshot) {
 	s.revision = snapshot.Revision
 	s.nextID = snapshot.NextID

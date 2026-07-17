@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"testing"
 
-	"gorm.io/gorm"
 	"github.com/GnosiST/platform-go/internal/platform/core"
 	"github.com/GnosiST/platform-go/internal/platform/storage"
+	"gorm.io/gorm"
 )
 
 type preTask6GORMAdminAuditLog struct {
@@ -531,6 +531,103 @@ func TestGORMBackedStorePersistsRolePermissionsForDynamicMenus(t *testing.T) {
 	}
 	if hasMenuRoute(menus, "/tenants") {
 		t.Fatalf("menus after GORM reload = %+v, want /tenants removed", menus)
+	}
+}
+
+func TestStoreMaterializeCapabilitySeedsInitializesEmptyGORMRepository(t *testing.T) {
+	ctx := context.Background()
+	repository, err := NewGORMAdminResourceRepository(ctx, openAdminResourceGORMDB(t))
+	if err != nil {
+		t.Fatalf("NewGORMAdminResourceRepository() error = %v", err)
+	}
+	store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	if err != nil {
+		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+	}
+
+	materialized, err := store.MaterializeCapabilitySeeds(ctx)
+	if err != nil || !materialized {
+		t.Fatalf("MaterializeCapabilitySeeds() = %v, %v; want materialized", materialized, err)
+	}
+	loaded, err := repository.Load(ctx)
+	if err != nil {
+		t.Fatalf("Load(materialized) error = %v", err)
+	}
+	if loaded.Revision != 1 {
+		t.Fatalf("revision after materialization = %d, want 1", loaded.Revision)
+	}
+	for _, expectation := range []struct {
+		resource string
+		code     string
+	}{
+		{resource: "tenants", code: "platform"},
+		{resource: "users", code: "admin"},
+		{resource: "roles", code: "super-admin"},
+		{resource: "role-groups", code: "system-admin"},
+		{resource: "permissions", code: "admin:menu:read"},
+		{resource: "menus", code: "roles"},
+	} {
+		if findRecordByCode(loaded.Resources[expectation.resource], expectation.code) == nil {
+			t.Fatalf("materialized %s missing %q: %+v", expectation.resource, expectation.code, loaded.Resources[expectation.resource])
+		}
+	}
+
+	again, err := store.MaterializeCapabilitySeeds(ctx)
+	if err != nil || again {
+		t.Fatalf("MaterializeCapabilitySeeds(replay) = %v, %v; want false nil", again, err)
+	}
+	replayed, err := repository.Load(ctx)
+	if err != nil {
+		t.Fatalf("Load(replay) error = %v", err)
+	}
+	if replayed.Revision != loaded.Revision || !reflect.DeepEqual(replayed.Resources, loaded.Resources) {
+		t.Fatalf("replayed snapshot = %#v, want unchanged %#v", replayed, loaded)
+	}
+	reloaded, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	if err != nil {
+		t.Fatalf("reload materialized store error = %v", err)
+	}
+	roles, err := reloaded.List("roles")
+	if err != nil || findRecordByCode(roles, "super-admin") == nil {
+		t.Fatalf("reloaded roles = %+v, %v; want super-admin seed", roles, err)
+	}
+}
+
+func TestStoreMaterializeCapabilitySeedsLeavesNonEmptyGORMRepository(t *testing.T) {
+	ctx := context.Background()
+	db := openAdminResourceGORMDB(t)
+	repository, err := NewGORMAdminResourceRepository(ctx, db)
+	if err != nil {
+		t.Fatalf("NewGORMAdminResourceRepository() error = %v", err)
+	}
+	existing := gormAdminResourceRecord{
+		Resource: "settings", ID: "setting-existing", Code: "existing", Name: "Existing", Status: "enabled",
+		Description: "existing row", UpdatedAt: "2026-07-17T00:00:00Z", ValuesJSON: "{}",
+	}
+	if err := db.Create(&existing).Error; err != nil {
+		t.Fatalf("Create(existing) error = %v", err)
+	}
+	store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	if err != nil {
+		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+	}
+
+	materialized, err := store.MaterializeCapabilitySeeds(ctx)
+	if err != nil || materialized {
+		t.Fatalf("MaterializeCapabilitySeeds(non-empty) = %v, %v; want false nil", materialized, err)
+	}
+	loaded, err := repository.Load(ctx)
+	if err != nil {
+		t.Fatalf("Load(non-empty) error = %v", err)
+	}
+	if loaded.Revision != 0 {
+		t.Fatalf("revision after non-empty materialization = %d, want 0", loaded.Revision)
+	}
+	if findRecordByCode(loaded.Resources["settings"], "existing") == nil {
+		t.Fatalf("existing settings row missing after materialization guard: %+v", loaded.Resources["settings"])
+	}
+	if findRecordByCode(loaded.Resources["roles"], "super-admin") != nil {
+		t.Fatalf("role seed was written into non-empty repository: %+v", loaded.Resources["roles"])
 	}
 }
 
