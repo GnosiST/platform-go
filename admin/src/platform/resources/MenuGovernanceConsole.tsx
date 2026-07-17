@@ -21,8 +21,11 @@ import {
 } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  getAdminResourceSchema,
   queryAdminResource,
+  updateAdminResource,
   type AdminResourceRecord,
+  type AdminResourceSchema,
 } from "../api/client";
 import {
   createMenuDefinition,
@@ -32,7 +35,7 @@ import {
   type MenuParameter,
   type PageButton,
 } from "../api/organizationRBAC";
-import type { Dictionary, Language } from "../i18n";
+import { menuDirectoryLabels, type Dictionary, type Language } from "../i18n";
 import { hasPermission } from "../refine";
 import {
   AdminActionButton,
@@ -50,6 +53,13 @@ import {
   isForbiddenMenuParameterStringValue,
   isSafeInternalMenuRoute,
 } from "./menuGovernanceValidation";
+import {
+  isSyntheticLegacyDirectory,
+  legacyMenuUpdateInput,
+  projectMenuGovernanceRecords,
+  resolveMenuGovernanceWriteMode,
+  type MenuGovernanceWriteMode,
+} from "./menuGovernanceRuntime";
 
 type MenuGovernanceConsoleProps = {
   resource: AdminResourceDefinition;
@@ -109,6 +119,9 @@ type MenuEditorState = {
   definition?: MenuDefinition;
   revision: number;
   sessionID: number;
+  writeMode: MenuGovernanceWriteMode;
+  recordID?: string;
+  updatedAt?: string;
 };
 
 const SAFE_PARAMETER_KEY = /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/;
@@ -121,6 +134,8 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
   const [selectedDefinition, setSelectedDefinition] = useState<MenuDefinition | null>(null);
   const [selectedRevision, setSelectedRevision] = useState(0);
   const [definitionRefresh, setDefinitionRefresh] = useState(0);
+  const [menuWriteMode, setMenuWriteMode] = useState<MenuGovernanceWriteMode | "loading">("loading");
+  const [menuSchema, setMenuSchema] = useState<AdminResourceSchema | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [definitionLoading, setDefinitionLoading] = useState(false);
@@ -146,10 +161,16 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
   const loadMenus = useCallback(async (query = "", requestID = ++menuListRequest.current) => {
     if (!canRead || menuListRequest.current !== requestID) return;
     setLoading(true);
+    setMenuWriteMode("loading");
+    setMenuSchema(null);
     try {
-      const nextRecords = await loadAllMenus();
+      const [rawRecords, schema] = await Promise.all([loadAllMenus(), getAdminResourceSchema("menus")]);
+      const nextWriteMode = resolveMenuGovernanceWriteMode(schema);
+      const nextRecords = projectMenuGovernanceRecords(rawRecords, nextWriteMode, menuDirectoryLabels(dictionary));
       const visibleRecords = filterMenuRecords(nextRecords, query);
       if (menuListRequest.current !== requestID) return;
+      setMenuWriteMode(nextWriteMode);
+      setMenuSchema(schema);
       setRecords(nextRecords);
       setError("");
       setSelectedKey((current) => {
@@ -170,6 +191,8 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
       setLoading(false);
       setRecords([]);
       setSelectedKey("");
+      setMenuWriteMode("loading");
+      setMenuSchema(null);
       return;
     }
     const timer = window.setTimeout(() => void loadMenus(search, requestID), 250);
@@ -177,11 +200,12 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
   }, [canRead, loadMenus, search]);
 
   useEffect(() => {
-    if (!selectedKey || !canRead) {
+    if (!selectedKey || !canRead || menuWriteMode === "loading") {
       definitionRequest.current += 1;
       setDefinitionLoading(false);
       setSelectedDefinition(null);
       setSelectedRevision(0);
+      setMenuDefinitionWritable(false);
       return;
     }
     const selectedRecord = records.find((record) => record.code === selectedKey);
@@ -189,14 +213,15 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
       setDefinitionLoading(false);
       setSelectedDefinition(null);
       setSelectedRevision(0);
+      setMenuDefinitionWritable(false);
       return;
     }
-    if (!hasTargetMenuDefinition(selectedRecord)) {
+    if (menuWriteMode === "legacy") {
       definitionRequest.current += 1;
       setDefinitionLoading(false);
       setSelectedDefinition(legacyMenuDefinition(selectedRecord));
       setSelectedRevision(0);
-      setMenuDefinitionWritable(false);
+      setMenuDefinitionWritable(!isSyntheticLegacyDirectory(selectedRecord));
       setError("");
       return;
     }
@@ -204,6 +229,7 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
     if (definitionRequest.current !== requestID) return;
     setSelectedDefinition(null);
     setSelectedRevision(0);
+    setMenuDefinitionWritable(false);
     setDefinitionLoading(true);
     void getMenuDefinition(selectedKey)
       .then((result) => {
@@ -221,7 +247,7 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
       .finally(() => {
         if (definitionRequest.current === requestID) setDefinitionLoading(false);
       });
-  }, [canRead, definitionRefresh, dictionary.menuLoadFailed, records, selectedKey]);
+  }, [canRead, definitionRefresh, dictionary.menuLoadFailed, menuWriteMode, records, selectedKey]);
 
   const directoryRecords = useMemo(() => records.filter((record) => nodeType(record) === "directory"), [records]);
   const pageRecords = useMemo(() => records.filter((record) => nodeType(record) === "page"), [records]);
@@ -242,8 +268,18 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
   );
 
   const openEditor = (mode: MenuEditorMode, trigger: HTMLElement, definition?: MenuDefinition, revision = 0) => {
+    if (menuWriteMode === "loading") return;
+    const record = definition ? records.find((item) => item.code === definition.node.code) : undefined;
     returnFocusRef.current = trigger;
-    setEditor({ mode, definition, revision, sessionID: ++editorSession.current });
+    setEditor({
+      mode,
+      definition,
+      revision,
+      sessionID: ++editorSession.current,
+      writeMode: menuWriteMode,
+      recordID: record?.id,
+      updatedAt: record?.updatedAt,
+    });
     form.setFieldsValue(definition ? editorValues(definition) : defaultEditorValues(mode, currentDefinition));
   };
 
@@ -272,7 +308,19 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
       if (editor.definition && editor.definition.node.parentCode !== definition.node.parentCode &&
         !await confirmMenuParentChange(modal.confirm, dictionary, editor.definition, definition, records)) return;
       if (editorSession.current !== sessionID) return;
-      if (editor.mode.startsWith("create-")) {
+      if (menuWriteMode !== editor.writeMode || !menuSchema) throw new Error(dictionary.menuSaveFailed);
+      const [freshRecords, freshSchema] = await Promise.all([loadAllMenus(), getAdminResourceSchema("menus")]);
+      const freshWriteMode = resolveMenuGovernanceWriteMode(freshSchema);
+      if (editorSession.current !== sessionID) return;
+      if (freshWriteMode !== editor.writeMode) throw new Error(dictionary.menuSaveFailed);
+      if (editor.writeMode === "legacy") {
+        const legacyRecord = freshRecords.find((record) => record.id === editor.recordID && record.code === definition.node.code);
+        if (!legacyRecord || isSyntheticLegacyDirectory(legacyRecord) || editor.mode.startsWith("create-") ||
+          legacyRecord.updatedAt !== editor.updatedAt) {
+          throw new Error(dictionary.menuSaveFailed);
+        }
+        await updateAdminResource("menus", legacyRecord.id, legacyMenuUpdateInput(legacyRecord, definition, freshSchema));
+      } else if (editor.mode.startsWith("create-")) {
         await createMenuDefinition(definition, selectedRevision);
       } else {
         await replaceMenuDefinition(definition, editor.revision);
@@ -327,7 +375,7 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
       {error ? <AdminFeedback className="api-alert" type="warning" message={dictionary.menuSaveFailed} description={error} closable onClose={() => setError("")} /> : null}
       {notice ? <AdminFeedback className="api-alert" type="success" message={notice} closable onClose={() => setNotice("")} /> : null}
       <AdminTreeWorkbench
-        actions={canCreate && menuDefinitionWritable ? (
+        actions={canCreate && menuWriteMode === "target" && (records.length === 0 || menuDefinitionWritable) ? (
           <Space size={6} wrap>
             <AdminActionButton
               disabled={definitionLoading || records.length > 0 && !currentDefinition}
@@ -511,10 +559,11 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
                 </Form.List>
               </fieldset>
 
-              <fieldset className="menu-governance-form-section">
-                <legend>{dictionary.menuPageButtons}</legend>
-                <AdminFeedback type="info" message={dictionary.menuButtonAuthorizationBoundary} description={dictionary.menuButtonAuthorizationDescription} />
-                <Form.List name="buttons">
+              {editor?.writeMode === "target" ? (
+                <fieldset className="menu-governance-form-section">
+                  <legend>{dictionary.menuPageButtons}</legend>
+                  <AdminFeedback type="info" message={dictionary.menuButtonAuthorizationBoundary} description={dictionary.menuButtonAuthorizationDescription} />
+                  <Form.List name="buttons">
                   {(fields, { add, remove }) => (
                     <div className="menu-governance-form-list">
                       {fields.map((field, index) => (
@@ -540,8 +589,9 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
                       >{dictionary.menuAddButton}</AdminActionButton>
                     </div>
                   )}
-                </Form.List>
-              </fieldset>
+                  </Form.List>
+                </fieldset>
+              ) : null}
             </>
           ) : null}
         </Form>
@@ -606,11 +656,6 @@ function MenuDefinitionDetail({ definition, dictionary, language, canUpdate, onE
   );
 }
 
-function hasTargetMenuDefinition(record: AdminResourceRecord) {
-  const type = valueOf(record, "nodeType");
-  return type === "directory" || type === "page";
-}
-
 function legacyMenuDefinition(record: AdminResourceRecord): MenuDefinition {
   const external = booleanValue(record, "isExternal") || booleanValue(record, "external");
   const openMode = external && valueOf(record, "openMode") === "new-tab" ? "new-tab" : external ? "same-tab" : "";
@@ -637,13 +682,13 @@ function legacyMenuDefinition(record: AdminResourceRecord): MenuDefinition {
       external,
       externalUrl: valueOf(record, "externalUrl"),
       openMode,
-      parameters: [],
+      parameters: structuredValues<MenuParameter>(record, "parameters"),
       cacheEnabled: booleanValue(record, "cacheEnabled") || booleanValue(record, "keepAlive"),
       hidden: booleanValue(record, "hidden") || visible === "false",
       activeMenuCode: valueOf(record, "activeMenuCode"),
       breadcrumbVisible: valueOf(record, "breadcrumbVisible") !== "false",
     },
-    buttons: [],
+    buttons: structuredValues<PageButton>(record, "pageButtons"),
   };
 }
 
@@ -850,6 +895,17 @@ function numberValue(record: AdminResourceRecord, key: string) {
 
 function booleanValue(record: AdminResourceRecord, key: string) {
   return valueOf(record, key) === "true";
+}
+
+function structuredValues<T>(record: AdminResourceRecord, key: string): T[] {
+  const raw = valueOf(record, key);
+  if (!raw) return [];
+  try {
+    const values: unknown = JSON.parse(raw);
+    return Array.isArray(values) ? values as T[] : [];
+  } catch {
+    return [];
+  }
 }
 
 function normalizeRoute(value: string) {

@@ -1384,3 +1384,26 @@ export const dictionaries = {
 } as const;
 
 export type Dictionary = (typeof dictionaries)[Language];
+
+export function menuDirectoryLabels(dictionary: Dictionary): Record<string, string> {
+  return {
+    runtime: dictionary.navRuntime,
+    identity: dictionary.navIdentity,
+    access: dictionary.navAccess,
+    resources: dictionary.navResources,
+    audit: dictionary.navAudit,
+    configuration: dictionary.navConfiguration,
+    governance: dictionary.navGovernance,
+    system: dictionary.navSystem,
+    logs: dictionary.navLogs,
+    storage: dictionary.navStorage,
+    security: dictionary.navSecurity,
+    release: dictionary.navRelease,
+    business: dictionary.navBusiness,
+    "business/access": dictionary.navBusinessAccess,
+    "business/content": dictionary.navBusinessContent,
+    "business/dispatch": dictionary.navBusinessDispatch,
+    "business/fulfillment": dictionary.navBusinessFulfillment,
+    "business/support": dictionary.navBusinessSupport,
+  };
+}

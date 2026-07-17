@@ -737,19 +737,34 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /menu-definition replace wrapper must use the generated service-object client/);
   });
 
-  it("rejects menu governance that sends legacy snapshots to target service objects", () => {
+  it("rejects menu governance that drops the runtime legacy branch", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
       tempRoot,
       "admin/src/platform/resources/MenuGovernanceConsole.tsx",
-      "setSelectedDefinition(legacyMenuDefinition(selectedRecord))",
-      "setSelectedDefinition(null)",
+      'if (menuWriteMode === "legacy")',
+      'if (menuWriteMode === "target")',
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /Legacy menu snapshots must render a compatible read-only definition/);
+    assert.match(result.stderr, /must keep legacy updates separate from target service-object writes/);
+  });
+
+  it("rejects menu governance that drops missing legacy directory projection", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/MenuGovernanceConsole.tsx",
+      "projectMenuGovernanceRecords(rawRecords, nextWriteMode, menuDirectoryLabels(dictionary))",
+      "rawRecords",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must project missing directory ancestors/);
   });
 
   it("rejects layout options without an accessible selected state", () => {

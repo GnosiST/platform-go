@@ -34,6 +34,7 @@ const files = {
   rolePermissionWorkflow: readSource("admin/src/platform/resources/rolePermissionWorkflow.ts"),
   roleManagementNavigation: readSource("admin/src/platform/resources/roleManagementNavigation.ts"),
   menuGovernance: readSourceOptional("admin/src/platform/resources/MenuGovernanceConsole.tsx"),
+  menuGovernanceRuntime: readSourceOptional("admin/src/platform/resources/menuGovernanceRuntime.ts"),
   menuGovernanceValidation: readSourceOptional("admin/src/platform/resources/menuGovernanceValidation.ts"),
   resourceRoute: readSource("admin/src/platform/refine/ResourceRoutePage.tsx"),
   sensitiveRevealModal: readSource("admin/src/platform/resources/SensitiveFieldRevealModal.tsx"),
@@ -336,14 +337,25 @@ requireIncludes(files.menuGovernance, 'const canRead = hasPermission(permissions
 requireIncludes(files.menuGovernance, 'const canCreate = hasPermission(permissions, "admin:menu:create", deniedPermissions);', "Menu creation must require admin:menu:create and respect denied permissions.");
 requireIncludes(files.menuGovernance, 'const canUpdate = hasPermission(permissions, "admin:menu:update", deniedPermissions);', "Menu updates must require admin:menu:update and respect denied permissions.");
 requireIncludes(files.menuGovernance, "getMenuDefinition", "Menu governance must load selected button metadata through the atomic menu-definition service object.");
-requireIncludes(files.menuGovernance, "hasTargetMenuDefinition(selectedRecord)", "Menu governance must distinguish target definitions from legacy menu snapshots before calling service objects.");
-requireIncludes(files.menuGovernance, "setSelectedDefinition(legacyMenuDefinition(selectedRecord))", "Legacy menu snapshots must render a compatible read-only definition instead of raising a service-object error.");
-requireIncludes(files.menuGovernance, "canCreate && menuDefinitionWritable", "Legacy menu snapshots must not expose target-only create actions.");
+requireIncludes(files.menuGovernance, "resolveMenuGovernanceWriteMode(schema)", "Menu governance must derive legacy or target writes from the authoritative runtime schema.");
+requireIncludes(files.menuGovernance, "projectMenuGovernanceRecords(rawRecords, nextWriteMode, menuDirectoryLabels(dictionary))", "Legacy menu snapshots must project missing directory ancestors with localized labels before tree rendering.");
+requireIncludes(files.menuGovernance, 'if (menuWriteMode === "legacy")', "Menu governance must keep legacy updates separate from target service-object writes.");
+requireIncludes(files.menuGovernance, "setSelectedDefinition(legacyMenuDefinition(selectedRecord))", "Legacy menu snapshots must render a compatible definition instead of raising a service-object error.");
+requireIncludes(files.menuGovernance, 'canCreate && menuWriteMode === "target" && (records.length === 0 || menuDefinitionWritable)', "Legacy menu snapshots must not expose target-only create actions, while an empty target tree can create its first node.");
 requireIncludes(files.menuGovernance, "canUpdate && menuDefinitionWritable", "Legacy menu snapshots must not expose target-only update actions.");
 requireIncludes(files.menuGovernance, "createMenuDefinition", "Menu governance must create menus through the atomic menu-definition service object.");
 requireIncludes(files.menuGovernance, "replaceMenuDefinition", "Menu governance must replace menus through the atomic menu-definition service object.");
 requireNotIncludes(files.menuGovernance, "createAdminResource", "Menu governance must not compose atomic menu definitions from generic menu CRUD.");
-requireNotIncludes(files.menuGovernance, "updateAdminResource", "Menu governance must not compose atomic menu definitions from generic menu CRUD.");
+requireIncludes(files.menuGovernance, 'updateAdminResource("menus", legacyRecord.id, legacyMenuUpdateInput(legacyRecord, definition, freshSchema))', "Legacy menu metadata updates must use the current schema and existing generic record without touching target definitions.");
+requireIncludes(files.menuGovernance, "isSyntheticLegacyDirectory(legacyRecord)", "Synthetic legacy directory projections must never be persisted as menu records.");
+requireIncludes(files.menuGovernance, "writeMode: menuWriteMode", "Menu editors must snapshot their runtime write mode when opened.");
+requireIncludes(files.menuGovernance, "freshWriteMode !== editor.writeMode", "Menu saves must reject runtime mode changes instead of switching write paths mid-edit.");
+requireIncludes(files.menuGovernance, "legacyRecord.updatedAt !== editor.updatedAt", "Legacy menu saves must reject stale record snapshots.");
+requireIncludes(files.menuGovernance, 'editor?.writeMode === "target"', "Legacy menu editors must not expose target-only page button authoring.");
+requireIncludes(files.menuGovernanceRuntime, 'return schema.fields.find((field) => field.key === "nodeType")?.required ? "target" : "legacy";', "Menu governance runtime mode must be derived from target nodeType requirements.");
+requireIncludes(files.menuGovernanceRuntime, "missingDirectories.add(directoryCode)", "Legacy menu projection must materialize missing directory ancestors.");
+requireIncludes(files.menuGovernanceRuntime, 'field.source === "values" && !field.readOnly && field.sensitivity === "public"', "Legacy menu updates must submit only declared public writable value fields.");
+requireNotIncludes(files.menuGovernanceRuntime, "pageButtons: JSON.stringify", "Legacy menu updates must not submit read-only page button projections.");
 requireIncludes(files.organizationRBAC, "client.getMenuDefinition", "The menu-definition query wrapper must use the generated service-object client.");
 requireIncludes(files.organizationRBAC, "client.createMenuDefinition", "The menu-definition create wrapper must use the generated service-object client.");
 requireIncludes(files.organizationRBAC, "client.replaceMenuDefinition", "The menu-definition replace wrapper must use the generated service-object client.");
@@ -377,7 +389,7 @@ requireIncludes(files.menuGovernance, "if (!canRead || menuListRequest.current !
 requireCountAtLeast(files.menuGovernance, "if (menuListRequest.current !== requestID) return;", 2, "Menu search must discard stale responses before changing loading, error, data, or selection.");
 requireCountAtLeast(files.menuGovernance, "if (definitionRequest.current !== requestID) return;", 2, "Selected menu loading must discard stale responses before changing detail state.");
 requireIncludes(files.menuGovernance, "setDefinitionLoading(false);\n      setSelectedDefinition(null);\n      setSelectedRevision(0);", "Clearing menu selection must also clear loading and revision state.");
-requireIncludes(files.menuGovernance, "setSelectedDefinition(null);\n    setSelectedRevision(0);\n    setDefinitionLoading(true);", "Starting a menu definition load must clear stale detail and revision state.");
+requireIncludes(files.menuGovernance, "setSelectedDefinition(null);\n    setSelectedRevision(0);\n    setMenuDefinitionWritable(false);\n    setDefinitionLoading(true);", "Starting a target menu definition load must clear stale detail, revision, and write state.");
 requireIncludes(files.menuGovernance, "returnFocusRef.current?.focus({ preventScroll: true });", "Closing the menu editor must restore focus without scrolling.");
 requireIncludes(files.menuGovernance, "returnFocusRef.current = detailFocusRef.current;", "Successful menu saves must restore focus to a stable detail target that survives definition refresh.");
 requireIncludes(files.menuGovernance, "await confirmMenuParentChange(modal.confirm, dictionary, editor.definition, definition, records)", "Menu parent changes must require an explicit localized structural confirmation.");
