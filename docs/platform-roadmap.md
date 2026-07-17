@@ -95,7 +95,7 @@ Important correction:
 
 ## Menu And Permission Decision
 
-The legacy serving model remains dynamic and permission-derived. The target runtime now has independent page-only role-menu bindings, revision-aware resolution and the dedicated menu UI, but serving and write cutover gates remain closed until the full organization/menu E2E node finishes.
+The legacy serving model remains dynamic and permission-derived. The target runtime now has independent page-only role-menu bindings, revision-aware resolution, the dedicated menu UI and completed organization/menu E2E evidence, but production serving and write cutover gates remain closed pending explicit rollout approval.
 
 ```text
 user -> roles -> permissions / denyPermissions -> menus/resources/actions

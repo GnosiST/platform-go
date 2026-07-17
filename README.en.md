@@ -72,6 +72,38 @@ go run ./cmd/platform-api
 
 The API defaults to `http://127.0.0.1:9200`; the Admin development server defaults to `http://127.0.0.1:9202`.
 
+### Development Target Role Menus
+
+When validating role-menu saves locally, bootstrap a fresh SQLite development database into target RBAC and menu-write state explicitly. This path accepts only `development + sqlite + target serving + role-menu write enabled`, and only materializes an empty database; production and staging never run it automatically.
+
+```bash
+export PLATFORM_ADMIN_RESOURCE_DSN=<local-sqlite-admin-resource-dsn>
+
+PLATFORM_RUNTIME_ENV=development \
+PLATFORM_ADMIN_RESOURCE_DRIVER=sqlite \
+PLATFORM_ORGANIZATION_RBAC_MODE=target \
+PLATFORM_ADMIN_MENU_SERVING_MODE=target \
+PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=true \
+go run ./cmd/platform-admin organization-rbac-migrate --mode bootstrap-development
+```
+
+Then start the API with the same environment before running the Admin development server:
+
+```bash
+export PLATFORM_ADMIN_RESOURCE_DSN=<local-sqlite-admin-resource-dsn>
+
+PLATFORM_RUNTIME_ENV=development \
+PLATFORM_ADMIN_RESOURCE_DRIVER=sqlite \
+PLATFORM_ORGANIZATION_RBAC_MODE=target \
+PLATFORM_ADMIN_MENU_SERVING_MODE=target \
+PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=true \
+go run ./cmd/platform-api
+
+npm --prefix admin run dev
+```
+
+Production role-menu writes still require a reviewed migration packet, database checkpoint, dual-read comparison and audited `promote` operation; do not use the development bootstrap as a production migration entry point.
+
 <details>
 <summary>Production baseline and non-mutating preflight</summary>
 
