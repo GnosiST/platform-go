@@ -56,6 +56,7 @@ type dataLifecycleOpener func(config.Config, ...capability.Manifest) (dataLifecy
 
 type organizationRBACMigrationSession interface {
 	RunMigration(context.Context, organizationrbac.MigrationMode, organizationrbac.MigrationManifest, organizationrbac.MigrationEvidence) (organizationrbac.MigrationReport, error)
+	PromoteMenuWrites(context.Context, organizationrbac.MenuWritePromotionRequest) (organizationrbac.MenuPromotionState, error)
 	Close() error
 }
 
@@ -95,6 +96,10 @@ type organizationRBACMigrationAdapter struct {
 
 func (a *organizationRBACMigrationAdapter) RunMigration(ctx context.Context, mode organizationrbac.MigrationMode, manifest organizationrbac.MigrationManifest, evidence organizationrbac.MigrationEvidence) (organizationrbac.MigrationReport, error) {
 	return a.runtime.Repository.RunMigration(ctx, mode, manifest, evidence)
+}
+
+func (a *organizationRBACMigrationAdapter) PromoteMenuWrites(ctx context.Context, request organizationrbac.MenuWritePromotionRequest) (organizationrbac.MenuPromotionState, error) {
+	return a.runtime.Repository.PromoteMenuWrites(ctx, request)
 }
 
 func (a *organizationRBACMigrationAdapter) Close() error { return a.runtime.Close() }
@@ -288,9 +293,10 @@ func runSensitiveDataMigration(ctx context.Context, args []string, stdout, stder
 func runOrganizationRBACMigration(ctx context.Context, args []string, stdout io.Writer, loadConfig func() config.Config, prepare organizationRBACPreparer, open organizationRBACMigrationOpener) error {
 	flags := flag.NewFlagSet(organizationRBACMigrationCommand, flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
-	modeValue := flags.String("mode", "", "prepare, inventory, verify, apply, or rollback")
+	modeValue := flags.String("mode", "", "prepare, inventory, verify, apply, rollback, or promote")
 	manifestPath := flags.String("manifest", "", "versioned migration manifest JSON")
 	runID := flags.String("run-id", "", "immutable migration run ID")
+	expectedPhase := flags.String("expected-phase", "", "expected promotion phase")
 	actor := flags.String("actor", "", "operator actor ID")
 	reason := flags.String("reason", "", "approved migration reason")
 	approvalRef := flags.String("approval-ref", "", "approval reference")
@@ -312,6 +318,35 @@ func runOrganizationRBACMigration(ctx context.Context, args []string, stdout io.
 			return errors.New("organization rbac migration prepare failed")
 		}
 		return json.NewEncoder(stdout).Encode(map[string]string{"mode": "prepare", "status": "prepared"})
+	}
+	if *modeValue == "promote" {
+		if strings.TrimSpace(*runID) == "" || *expectedPhase != organizationrbac.PromotionTargetRead ||
+			strings.TrimSpace(*actor) == "" || strings.TrimSpace(*reason) == "" || strings.TrimSpace(*approvalRef) == "" {
+			return errors.New("invalid organization rbac promotion arguments")
+		}
+		session, err := open(ctx, cfg)
+		if err != nil || session == nil {
+			return errors.New("organization rbac migration bootstrap failed")
+		}
+		closed := false
+		defer func() {
+			if !closed {
+				_ = session.Close()
+			}
+		}()
+		if _, err := session.PromoteMenuWrites(ctx, organizationrbac.MenuWritePromotionRequest{
+			RunID: *runID, ExpectedPhase: *expectedPhase, ActorID: *actor, Reason: *reason, ApprovalRef: *approvalRef, ObservedAt: time.Now().UTC(),
+		}); err != nil {
+			return errors.New("organization rbac menu write promotion failed")
+		}
+		if err := json.NewEncoder(stdout).Encode(map[string]string{"status": "promoted"}); err != nil {
+			return errors.New("write organization rbac promotion report")
+		}
+		if err := session.Close(); err != nil {
+			return errors.New("close organization rbac migration storage")
+		}
+		closed = true
+		return nil
 	}
 	mode := organizationrbac.MigrationMode(*modeValue)
 	switch mode {

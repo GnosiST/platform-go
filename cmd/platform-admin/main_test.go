@@ -111,13 +111,79 @@ func TestOrganizationRBACMigrationCLIEndToEndSQLite(t *testing.T) {
 	}
 }
 
-type fakeOrganizationRBACMigrationSession struct{}
+func TestRunOrganizationRBACMigrationPromote(t *testing.T) {
+	baseArgs := []string{
+		organizationRBACMigrationCommand, "--mode", "promote", "--run-id", "promotion-write-1",
+		"--expected-phase", organizationrbac.PromotionTargetRead, "--actor", "migration-admin",
+		"--reason", "approved target writes", "--approval-ref", "change-write-1",
+	}
+	t.Run("forwards the audited promotion request and emits promoted status", func(t *testing.T) {
+		session := &fakeOrganizationRBACMigrationSession{promoted: organizationrbac.MenuPromotionState{
+			RunID: "promotion-write-1", Phase: organizationrbac.PromotionTargetWrite,
+		}}
+		var output bytes.Buffer
+		if err := runOrganizationRBACMigration(context.Background(), baseArgs, &output, func() config.Config { return config.Config{} },
+			func(context.Context, config.Config) error { return nil },
+			func(context.Context, config.Config) (organizationRBACMigrationSession, error) { return session, nil }); err != nil {
+			t.Fatal(err)
+		}
+		if session.promoteCalls != 1 || session.promotionRequest.RunID != "promotion-write-1" ||
+			session.promotionRequest.ExpectedPhase != organizationrbac.PromotionTargetRead || session.promotionRequest.ActorID != "migration-admin" ||
+			session.promotionRequest.Reason != "approved target writes" || session.promotionRequest.ApprovalRef != "change-write-1" ||
+			session.promotionRequest.ObservedAt.IsZero() {
+			t.Fatalf("promotion request = %+v calls=%d", session.promotionRequest, session.promoteCalls)
+		}
+		if !strings.Contains(output.String(), `"status":"promoted"`) || session.closes != 1 {
+			t.Fatalf("output=%q closes=%d", output.String(), session.closes)
+		}
+	})
+
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{name: "missing run ID", args: []string{organizationRBACMigrationCommand, "--mode", "promote", "--expected-phase", organizationrbac.PromotionTargetRead, "--actor", "migration-admin", "--reason", "approved target writes", "--approval-ref", "change-write-1"}},
+		{name: "missing actor", args: []string{organizationRBACMigrationCommand, "--mode", "promote", "--run-id", "promotion-write-1", "--expected-phase", organizationrbac.PromotionTargetRead, "--reason", "approved target writes", "--approval-ref", "change-write-1"}},
+		{name: "missing reason", args: []string{organizationRBACMigrationCommand, "--mode", "promote", "--run-id", "promotion-write-1", "--expected-phase", organizationrbac.PromotionTargetRead, "--actor", "migration-admin", "--approval-ref", "change-write-1"}},
+		{name: "missing approval reference", args: []string{organizationRBACMigrationCommand, "--mode", "promote", "--run-id", "promotion-write-1", "--expected-phase", organizationrbac.PromotionTargetRead, "--actor", "migration-admin", "--reason", "approved target writes"}},
+		{name: "wrong expected phase", args: []string{organizationRBACMigrationCommand, "--mode", "promote", "--run-id", "promotion-write-1", "--expected-phase", organizationrbac.PromotionDualRead, "--actor", "migration-admin", "--reason", "approved target writes", "--approval-ref", "change-write-1"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opened := false
+			err := runOrganizationRBACMigration(context.Background(), tc.args, &bytes.Buffer{}, func() config.Config { return config.Config{} },
+				func(context.Context, config.Config) error { return nil },
+				func(context.Context, config.Config) (organizationRBACMigrationSession, error) {
+					opened = true
+					return &fakeOrganizationRBACMigrationSession{}, nil
+				})
+			if err == nil || opened {
+				t.Fatalf("error=%v opened=%v, want invalid arguments before opening storage", err, opened)
+			}
+		})
+	}
+}
+
+type fakeOrganizationRBACMigrationSession struct {
+	promoted         organizationrbac.MenuPromotionState
+	promotionRequest organizationrbac.MenuWritePromotionRequest
+	promoteCalls     int
+	closes           int
+}
 
 func (*fakeOrganizationRBACMigrationSession) RunMigration(_ context.Context, mode organizationrbac.MigrationMode, _ organizationrbac.MigrationManifest, _ organizationrbac.MigrationEvidence) (organizationrbac.MigrationReport, error) {
 	return organizationrbac.MigrationReport{Mode: mode, Status: "inventoried"}, nil
 }
 
-func (*fakeOrganizationRBACMigrationSession) Close() error { return nil }
+func (s *fakeOrganizationRBACMigrationSession) PromoteMenuWrites(_ context.Context, request organizationrbac.MenuWritePromotionRequest) (organizationrbac.MenuPromotionState, error) {
+	s.promotionRequest = request
+	s.promoteCalls++
+	return s.promoted, nil
+}
+
+func (s *fakeOrganizationRBACMigrationSession) Close() error {
+	s.closes++
+	return nil
+}
 
 func TestRunBindAdminOIDCRequiresSubjectStdin(t *testing.T) {
 	cfg := testConfig(t)
