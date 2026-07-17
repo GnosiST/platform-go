@@ -11,6 +11,7 @@ import (
 	"github.com/GnosiST/platform-go/internal/platform/config"
 	"github.com/GnosiST/platform-go/internal/platform/core"
 	"github.com/GnosiST/platform-go/internal/platform/organizationrbac"
+	"github.com/GnosiST/platform-go/internal/platform/rbac"
 	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
 
@@ -28,6 +29,7 @@ func TestBootstrapDevelopmentOrganizationRBAC(t *testing.T) {
 		t.Fatalf("bootstrap report = %+v", report)
 	}
 	assertDevelopmentOrganizationRBACRuntime(t, cfg)
+	assertDevelopmentOrganizationRBACTargetMenus(t, cfg)
 	assertDevelopmentOrganizationRBACAPIStartup(t, cfg)
 
 	replayed, err := BootstrapDevelopmentOrganizationRBAC(ctx, cfg, core.DefaultManifests(), nil, now.Add(time.Minute))
@@ -39,6 +41,7 @@ func TestBootstrapDevelopmentOrganizationRBAC(t *testing.T) {
 		t.Fatalf("replayed report = %+v, want idempotent target-write", replayed)
 	}
 	assertDevelopmentOrganizationRBACRuntime(t, cfg)
+	assertDevelopmentOrganizationRBACTargetMenus(t, cfg)
 	assertDevelopmentOrganizationRBACAPIStartup(t, cfg)
 }
 
@@ -154,6 +157,52 @@ func assertDevelopmentOrganizationRBACRuntime(t *testing.T, cfg config.Config) {
 	}
 	if err := runtime.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func assertDevelopmentOrganizationRBACTargetMenus(t *testing.T, cfg config.Config) {
+	t.Helper()
+	runtime, err := OpenOrganizationRBAC(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("OpenOrganizationRBAC() error = %v", err)
+	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	principal := rbac.Principal{
+		User:  rbac.User{Username: "admin"},
+		Roles: []string{"super-admin"},
+	}
+	revision, err := runtime.AdminMenus.Revision(context.Background(), principal)
+	if err != nil {
+		t.Fatalf("AdminMenus.Revision(super-admin) error = %v", err)
+	}
+	items, err := runtime.AdminMenus.Resolve(context.Background(), principal, revision)
+	if err != nil {
+		t.Fatalf("AdminMenus.Resolve(super-admin) error = %v", err)
+	}
+	routes := make(map[string]adminresource.MenuItem, len(items))
+	for _, item := range items {
+		if item.Route == "" {
+			t.Fatalf("target shell menu contains non-page item: %+v", item)
+		}
+		routes[item.Route] = item
+	}
+	for _, route := range []string{"/overview", "/users"} {
+		if _, ok := routes[route]; !ok {
+			t.Fatalf("target shell menu routes = %+v, want %s", routes, route)
+		}
+	}
+	for route, permission := range map[string]string{
+		"/dictionary-parameters": "admin:dictionary-parameter:read",
+		"/parameters":            "admin:parameter:read",
+	} {
+		item, ok := routes[route]
+		if !ok || item.Permission != permission {
+			t.Fatalf("target shell menu %s = %+v, want permission %s", route, item, permission)
+		}
 	}
 }
 

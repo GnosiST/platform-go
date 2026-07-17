@@ -74,6 +74,7 @@ describe("role permission write mode resolver", () => {
   it("resolves a fully domain-owned target schema", () => {
     runResolverProbe(`
       assert.equal(resolveRolePermissionWriteMode({ fields: fields({ inForm: false, readOnly: true }) }), "target-domain");
+      assert.equal(resolveRolePermissionWriteMode({ fields: fields({ readOnly: true }) }), "target-domain");
     `);
   });
 

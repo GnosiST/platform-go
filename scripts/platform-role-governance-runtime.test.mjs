@@ -16,7 +16,7 @@ function resolveRolePermissionWriteMode(schema) {
   const fields = keys.map((key) => schema?.fields.find((field) => field.key === key));
   if (fields.some((field) => !field)) return "readonly";
   if (fields.every((field) => field?.inForm !== false && field?.readOnly !== true)) return "legacy-generic";
-  if (fields.every((field) => field?.inForm === false && field.readOnly === true)) return "target-domain";
+  if (fields.every((field) => field?.inForm !== true && field?.readOnly === true)) return "target-domain";
   return "readonly";
 }`,
 ));
@@ -43,7 +43,7 @@ describe("role governance runtime contracts", () => {
   const roleSchema = (target) => ({ fields: [
     field("groupCode"),
     ...["permissions", "denyPermissions", "dataScope", "dataScopeOrgCodes", "dataScopeAreaCodes"]
-      .map((key) => field(key, target ? { readOnly: true, inForm: false } : {})),
+      .map((key) => field(key, target ? { readOnly: true, inForm: undefined } : {})),
   ] });
   const menuSchema = (target) => ({ fields: [field("nodeType", { required: target })] });
 

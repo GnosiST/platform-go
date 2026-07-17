@@ -139,9 +139,10 @@ Current persistence boundary: tenants, org units, users, role groups, roles, use
 Fresh local SQLite development databases can be bootstrapped directly into the target role-menu state for UI verification. The bootstrap is intentionally narrow: it requires `PLATFORM_RUNTIME_ENV=development`, `PLATFORM_ADMIN_RESOURCE_DRIVER=sqlite`, a non-empty `PLATFORM_ADMIN_RESOURCE_DSN`, no file-backed Admin resource repository, `PLATFORM_ORGANIZATION_RBAC_MODE=target`, `PLATFORM_ADMIN_MENU_SERVING_MODE=target`, and `PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=true`.
 
 ```bash
+export PLATFORM_ADMIN_RESOURCE_DSN=<local-sqlite-admin-resource-dsn>
+
 PLATFORM_RUNTIME_ENV=development \
 PLATFORM_ADMIN_RESOURCE_DRIVER=sqlite \
-PLATFORM_ADMIN_RESOURCE_DSN=.platform/development-admin.db \
 PLATFORM_ORGANIZATION_RBAC_MODE=target \
 PLATFORM_ADMIN_MENU_SERVING_MODE=target \
 PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=true \
@@ -155,9 +156,10 @@ This path rejects non-empty databases that are not already fully bootstrapped. I
 Start the API with the same target-mode environment before opening `/roles`:
 
 ```bash
+export PLATFORM_ADMIN_RESOURCE_DSN=<local-sqlite-admin-resource-dsn>
+
 PLATFORM_RUNTIME_ENV=development \
 PLATFORM_ADMIN_RESOURCE_DRIVER=sqlite \
-PLATFORM_ADMIN_RESOURCE_DSN=.platform/development-admin.db \
 PLATFORM_ORGANIZATION_RBAC_MODE=target \
 PLATFORM_ADMIN_MENU_SERVING_MODE=target \
 PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=true \

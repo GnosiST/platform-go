@@ -465,7 +465,7 @@ for (const key of ["permissions", "denyPermissions", "dataScope", "dataScopeOrgC
   requireIncludes(files.rolePermissionWriteMode, `"${key}"`, `Role permission write-mode resolver must inspect ${key}.`);
 }
 requireIncludes(files.rolePermissionWriteMode, 'field?.inForm !== false && field?.readOnly !== true', "Legacy role permission mode must require every policy field to be form-writable and not read-only.");
-requireIncludes(files.rolePermissionWriteMode, 'field?.inForm === false && field.readOnly === true', "Target role permission mode must require every policy field to be excluded from forms and read-only.");
+requireIncludes(files.rolePermissionWriteMode, 'field?.inForm !== true && field?.readOnly === true', "Target role permission mode must treat omitted false inForm values as excluded from forms and require every policy field to be read-only.");
 requireIncludes(files.rolePermissionWriteMode, 'if (fields.some((field) => !field)) return "readonly";', "Missing role permission policy fields must resolve to readonly.");
 for (const resource of ["role-groups", "roles", "menus"]) {
   requireIncludes(files.roleGovernance, `getAdminResourceSchema("${resource}")`, `Role governance runtime must load the trusted ${resource} schema.`);

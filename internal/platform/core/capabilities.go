@@ -26,7 +26,7 @@ func DefaultManifests() []capability.Manifest {
 		{ID: "parameter", Name: "Parameter", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "audit"}, Admin: adminSurface(parameterAdminResource(), brandingAdminResource(), adminResource("settings", "设置", "Settings", "平台配置和品牌设置。", "Platform configuration and branding.", "admin:settings", "/settings", "security", "settings", 310)), Migrations: lifecycleMigrations("parameter"), Seeds: lifecycleSeeds("parameter")},
 		{ID: "file-storage", Name: "File Storage", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity", "parameter", "audit"}, Admin: adminSurface(fileStorageAdminResource()), App: appSurface(appRoute("POST", "/api/app/files", capability.AppRouteAuthSession, "", "上传 App 文件。", "Upload app file."), appRoute("GET", "/api/app/files/:id/content", capability.AppRouteAuthSession, "", "读取 App 文件内容。", "Read app file content.")), Service: fileStorageServiceSurface(), Migrations: lifecycleMigrations("file-storage"), Seeds: lifecycleSeeds("file-storage")},
 		{ID: "admin-shell", Name: "Admin Shell", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "rbac", "menu"}, Admin: adminSurface(adminResource("capabilities", "能力清单", "Capabilities", "查看当前平台启用的能力包。", "View enabled platform capability packages.", "admin:capability", "/capabilities", "foundation", "capabilities", 20), adminResource("overview", "概览", "Overview", "平台底座运行概览。", "Platform foundation overview.", "admin:overview", "/overview", "foundation", "overview", 10)), Migrations: lifecycleMigrations("admin-shell"), Seeds: lifecycleSeeds("admin-shell")},
-		{ID: "demo-data", Name: "Demo Data", Version: "0.1.0", Dependencies: []capability.ID{"admin-shell", "tenant"}, Admin: adminSurface(adminResource("demo-data", "演示数据", "Demo Data", "声明式演示数据集。", "Declarative demo data sets.", "admin:demo-data", "/demo-data", "operations", "dictParams", 205)), Migrations: lifecycleMigrations("demo-data"), Seeds: lifecycleSeeds("demo-data"), DemoData: platformDemoDataSets()},
+		{ID: "demo-data", Name: "Demo Data", Version: "0.1.0", Dependencies: []capability.ID{"admin-shell", "tenant"}, Admin: adminSurface(demoDataAdminResource()), Migrations: lifecycleMigrations("demo-data"), Seeds: lifecycleSeeds("demo-data"), DemoData: platformDemoDataSets()},
 		{ID: "system-admin", Name: "System Admin", Version: "0.1.0", Dependencies: []capability.ID{"admin-shell", "api-resource", "dictionary", "parameter", "audit"}, Admin: adminSurface(monitoringAdminResource(), adminResource("versions", "版本管理", "Versions", "平台版本、发布记录和运行基线。", "Platform versions, release records and runtime baselines.", "admin:version", "/versions", "operations", "cluster", 360), apiTokenAdminResource()), Migrations: lifecycleMigrations("system-admin"), Seeds: lifecycleSeeds("system-admin")},
 	}
 }
@@ -228,6 +228,17 @@ func platformDemoDataSets() []capability.DemoDataSet {
 			},
 		},
 	}
+}
+
+func demoDataAdminResource() capability.AdminResource {
+	resource := adminResource("demo-data", "演示数据", "Demo Data", "声明式演示数据集。", "Declarative demo data sets.", "admin:demo-data", "/demo-data", "operations", "dictParams", 205)
+	resource.Actions = []capability.AdminResourceAction{
+		{
+			Key: "apply", Label: capability.Text("执行", "Apply"), Kind: "resource", Tone: "primary", Icon: "database",
+			Permission: "admin:demo-data:apply", Route: "/api/admin/demo-data/:capabilityId/:datasetId/apply", Method: "POST", AuditAction: "demo-data.apply", Refresh: true,
+		},
+	}
+	return resource
 }
 
 func adminResource(resource string, titleZH string, titleEN string, descriptionZH string, descriptionEN string, permissionPrefix string, route string, group string, icon string, order int) capability.AdminResource {

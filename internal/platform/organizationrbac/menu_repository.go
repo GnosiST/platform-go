@@ -602,7 +602,7 @@ func menuNodeFromGORM(row gormMenu) (MenuNode, error) {
 		}
 	}
 	return MenuNode{Code: row.Code, ParentCode: row.ParentCode, NodeType: MenuNodeType(row.NodeType), TitleZH: row.TitleZH, TitleEN: row.TitleEN,
-		DescriptionZH: row.DescriptionZH, DescriptionEN: row.DescriptionEN, Status: row.Status, Icon: row.Icon, SortOrder: row.SortOrder,
+		DescriptionZH: row.DescriptionZH, DescriptionEN: row.DescriptionEN, Status: row.Status, Icon: row.Icon, Group: row.Group, SortOrder: row.SortOrder,
 		Route: row.Route, ComponentKey: row.ComponentKey, ResourceCode: row.ResourceCode, External: row.External, ExternalURL: row.ExternalURL,
 		OpenMode: MenuOpenMode(row.OpenMode), Parameters: parameters, CacheEnabled: row.CacheEnabled, Hidden: row.Hidden, ActiveMenuCode: row.ActiveMenuCode,
 		BreadcrumbVisible: row.BreadcrumbVisible, LegacyPermission: row.LegacyPermission}, nil
@@ -752,7 +752,7 @@ func menuNodesFromRecords(records []adminresource.Record) ([]MenuNode, []PageBut
 			Code: record.Code, ParentCode: parentCode, NodeType: nodeType,
 			TitleZH: valueWithFallback(record.Values["titleZh"], record.Values["nameZh"]), TitleEN: valueWithFallback(record.Values["titleEn"], record.Values["nameEn"]),
 			DescriptionZH: valueWithFallback(record.Values["descriptionZh"], record.Description), DescriptionEN: valueWithFallback(record.Values["descriptionEn"], record.Description),
-			Status: record.Status, Icon: record.Values["icon"], SortOrder: parseInt(record.Values["sortOrder"], record.Values["order"]),
+			Status: record.Status, Icon: record.Values["icon"], Group: record.Values["group"], SortOrder: parseInt(record.Values["sortOrder"], record.Values["order"]),
 			Route: record.Values["route"], ComponentKey: valueWithFallback(record.Values["componentKey"], record.Values["resource"]), ResourceCode: valueWithFallback(record.Values["resourceCode"], record.Values["resource"]),
 			External: parseRecordBool(record.Values["external"], record.Values["isExternal"]), ExternalURL: record.Values["externalUrl"], OpenMode: MenuOpenMode(record.Values["openMode"]),
 			Parameters: parameters, CacheEnabled: parseRecordBoolDefault(true, record.Values["cacheEnabled"]), Hidden: parseRecordBool(record.Values["hidden"]),

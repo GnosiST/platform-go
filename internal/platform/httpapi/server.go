@@ -1229,13 +1229,81 @@ func (s *Server) adminResourceQuery(ctx *gin.Context) {
 	})
 }
 
+type adminResourceWriteRequest struct {
+	Code        string                     `json:"code"`
+	Name        string                     `json:"name"`
+	Status      string                     `json:"status"`
+	Description string                     `json:"description"`
+	Values      map[string]json.RawMessage `json:"values"`
+}
+
+func bindAdminResourceWriteInput(ctx *gin.Context) (adminresource.WriteInput, error) {
+	var request adminResourceWriteRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		return adminresource.WriteInput{}, err
+	}
+	values, err := normalizeAdminResourceWriteValues(request.Values)
+	if err != nil {
+		return adminresource.WriteInput{}, err
+	}
+	return adminresource.WriteInput{
+		Code:        request.Code,
+		Name:        request.Name,
+		Status:      request.Status,
+		Description: request.Description,
+		Values:      values,
+	}, nil
+}
+
+func normalizeAdminResourceWriteValues(rawValues map[string]json.RawMessage) (map[string]string, error) {
+	if len(rawValues) == 0 {
+		return nil, nil
+	}
+	values := make(map[string]string, len(rawValues))
+	for key, raw := range rawValues {
+		value, err := normalizeAdminResourceWriteValue(raw)
+		if err != nil {
+			return nil, err
+		}
+		values[key] = value
+	}
+	return values, nil
+}
+
+func normalizeAdminResourceWriteValue(raw json.RawMessage) (string, error) {
+	decoder := json.NewDecoder(strings.NewReader(string(raw)))
+	decoder.UseNumber()
+	var value any
+	if err := decoder.Decode(&value); err != nil {
+		return "", err
+	}
+	switch typed := value.(type) {
+	case nil:
+		return "", nil
+	case string:
+		return typed, nil
+	case bool:
+		return strconv.FormatBool(typed), nil
+	case json.Number:
+		return typed.String(), nil
+	case []any, map[string]any:
+		encoded, err := json.Marshal(typed)
+		if err != nil {
+			return "", err
+		}
+		return string(encoded), nil
+	default:
+		return "", adminresource.ErrInvalidRecord
+	}
+}
+
 func (s *Server) adminResourceCreate(ctx *gin.Context) {
 	resource := ctx.Param("resource")
 	if !s.authorizeAdminResource(ctx, resource, "create") {
 		return
 	}
-	var input adminresource.WriteInput
-	if err := ctx.ShouldBindJSON(&input); err != nil {
+	input, err := bindAdminResourceWriteInput(ctx)
+	if err != nil {
 		writeAdminResourceError(ctx, s.internalErrorSink, adminresource.ErrInvalidRecord)
 		return
 	}
@@ -1274,8 +1342,8 @@ func (s *Server) adminResourceUpdate(ctx *gin.Context) {
 	if !s.authorizeAdminResource(ctx, resource, "update") {
 		return
 	}
-	var input adminresource.WriteInput
-	if err := ctx.ShouldBindJSON(&input); err != nil {
+	input, err := bindAdminResourceWriteInput(ctx)
+	if err != nil {
 		writeAdminResourceError(ctx, s.internalErrorSink, adminresource.ErrInvalidRecord)
 		return
 	}

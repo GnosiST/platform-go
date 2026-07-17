@@ -558,6 +558,7 @@ func seedResources() map[string][]Record {
 			seedLocalized("setting-branding", "branding", "品牌设置", "Branding Settings", "enabled", "产品名称、Logo 和主题设置。", "Product name, logo and theme settings.", updatedAt, brandingSeedValues()),
 		},
 	}
+	resources["menus"] = withMenuDirectorySeeds(resources["menus"], updatedAt)
 	permissionCodes := []string{
 		"admin:api-docs:read",
 		"admin:capability:read",
@@ -593,10 +594,136 @@ func seedResourcesFromCapabilities(manifests []capability.Manifest) map[string][
 			}
 		}
 	}
+	resources["menus"] = withMenuDirectorySeeds(resources["menus"], updatedAt)
 	if !registered {
 		return seedResources()
 	}
 	return resources
+}
+
+type menuDirectorySeedLabel struct {
+	ZH string
+	EN string
+}
+
+var menuDirectorySeedLabels = map[string]menuDirectorySeedLabel{
+	"runtime":              {ZH: "运行", EN: "Runtime"},
+	"identity":             {ZH: "身份", EN: "Identity"},
+	"access":               {ZH: "访问控制", EN: "Access Control"},
+	"resources":            {ZH: "资源治理", EN: "Resource Governance"},
+	"audit":                {ZH: "审计", EN: "Audit"},
+	"configuration":        {ZH: "配置", EN: "Configuration"},
+	"governance":           {ZH: "治理", EN: "Governance"},
+	"system":               {ZH: "系统", EN: "System"},
+	"logs":                 {ZH: "日志", EN: "Logs"},
+	"operations":           {ZH: "运维", EN: "Operations"},
+	"storage":              {ZH: "存储", EN: "Storage"},
+	"security":             {ZH: "安全", EN: "Security"},
+	"release":              {ZH: "发布", EN: "Release"},
+	"business":             {ZH: "业务", EN: "Business"},
+	"business/access":      {ZH: "入驻审核", EN: "Access Review"},
+	"business/content":     {ZH: "内容治理", EN: "Content Governance"},
+	"business/dispatch":    {ZH: "调度", EN: "Dispatch"},
+	"business/fulfillment": {ZH: "履约", EN: "Fulfillment"},
+	"business/support":     {ZH: "客诉支持", EN: "Support"},
+}
+
+func withMenuDirectorySeeds(menus []Record, updatedAt string) []Record {
+	if len(menus) == 0 {
+		return menus
+	}
+	existingCodes := make(map[string]struct{}, len(menus))
+	for _, menu := range menus {
+		existingCodes[menu.Code] = struct{}{}
+	}
+	missingCodes := map[string]struct{}{}
+	for _, menu := range menus {
+		for parent := strings.TrimSpace(valueWithFallback(menu.Values["parentCode"], menu.Values["parent"])); parent != ""; parent = parentMenuDirectoryCode(parent) {
+			if _, exists := existingCodes[parent]; exists {
+				continue
+			}
+			missingCodes[parent] = struct{}{}
+		}
+	}
+	if len(missingCodes) == 0 {
+		return menus
+	}
+	codes := make([]string, 0, len(missingCodes))
+	for code := range missingCodes {
+		codes = append(codes, code)
+	}
+	slices.SortFunc(codes, func(left, right string) int {
+		if leftDepth, rightDepth := menuDirectoryDepth(left), menuDirectoryDepth(right); leftDepth != rightDepth {
+			return leftDepth - rightDepth
+		}
+		return strings.Compare(left, right)
+	})
+	result := make([]Record, 0, len(codes)+len(menus))
+	for _, code := range codes {
+		result = append(result, seedMenuDirectory(code, updatedAt))
+	}
+	return append(result, menus...)
+}
+
+func seedMenuDirectory(code string, updatedAt string) Record {
+	label, exists := menuDirectorySeedLabels[code]
+	if !exists {
+		name := humanizeMenuDirectoryCode(code)
+		label = menuDirectorySeedLabel{ZH: name, EN: name}
+	}
+	parentCode := parentMenuDirectoryCode(code)
+	return seed("menu-"+strings.ReplaceAll(code, "/", "-"), code, label.EN, "enabled", "Menu directory.", updatedAt, map[string]string{
+		"nodeType":          "directory",
+		"parent":            parentCode,
+		"parentCode":        parentCode,
+		"titleZh":           label.ZH,
+		"titleEn":           label.EN,
+		"nameZh":            label.ZH,
+		"nameEn":            label.EN,
+		"descriptionZh":     label.ZH + "目录。",
+		"descriptionEn":     label.EN + " directory.",
+		"breadcrumbVisible": "false",
+	})
+}
+
+func parentMenuDirectoryCode(code string) string {
+	segments := strings.Split(code, "/")
+	normalized := make([]string, 0, len(segments))
+	for _, segment := range segments {
+		if trimmed := strings.TrimSpace(segment); trimmed != "" {
+			normalized = append(normalized, trimmed)
+		}
+	}
+	if len(normalized) <= 1 {
+		return ""
+	}
+	return strings.Join(normalized[:len(normalized)-1], "/")
+}
+
+func menuDirectoryDepth(code string) int {
+	depth := 0
+	for _, segment := range strings.Split(code, "/") {
+		if strings.TrimSpace(segment) != "" {
+			depth++
+		}
+	}
+	return depth
+}
+
+func humanizeMenuDirectoryCode(code string) string {
+	segments := strings.Split(code, "/")
+	fallback := code
+	for index := len(segments) - 1; index >= 0; index-- {
+		if trimmed := strings.TrimSpace(segments[index]); trimmed != "" {
+			fallback = trimmed
+			break
+		}
+	}
+	words := strings.Fields(strings.NewReplacer("-", " ", "_", " ").Replace(fallback))
+	for index, word := range words {
+		words[index] = strings.ToUpper(word[:1]) + word[1:]
+	}
+	return strings.Join(words, " ")
 }
 
 func seedPrincipalResources() map[string][]Record {

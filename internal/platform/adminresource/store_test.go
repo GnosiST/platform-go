@@ -668,7 +668,7 @@ func TestStoreBuildsPermissionCatalogFromCapabilityAdminResources(t *testing.T) 
 	if err != nil {
 		t.Fatalf("List(permissions) error = %v", err)
 	}
-	if !hasRecordCode(permissions, "admin:tenant:read") || !hasRecordCode(permissions, "admin:role:update") {
+	if !hasRecordCode(permissions, "admin:tenant:read") || !hasRecordCode(permissions, "admin:role:update") || !hasRecordCode(permissions, "admin:demo-data:apply") {
 		t.Fatalf("permission catalog missing core permissions: %+v", permissions)
 	}
 	permission := recordByCode(permissions, "admin:tenant:read")

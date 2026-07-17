@@ -5484,6 +5484,28 @@ func TestAdminResourceCreateValidatesSchemaRequiredValueFields(t *testing.T) {
 	}
 }
 
+func TestAdminResourceCreateNormalizesTypedJSONValues(t *testing.T) {
+	server := newTestServer(ServerOptions{Capabilities: []capability.Manifest{{ID: "parameter"}}})
+	createBody := bytes.NewBufferString(`{"code":"typed-parameter","name":"Typed Parameter","values":{"value":7,"group":["alpha",2]}}`)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/resources/parameters", createBody)
+	request.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("POST typed resource with typed values status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	var created adminResourceRecordTestPayload
+	if err := json.Unmarshal(recorder.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode typed resource create: %v body = %s", err, recorder.Body.String())
+	}
+	record := created.Data.Record
+	if record.Values["value"] != "7" || record.Values["group"] != `["alpha",2]` {
+		t.Fatalf("created typed values were not normalized: %+v", record.Values)
+	}
+}
+
 func TestAdminAPITokenCreateReturnsSecretOnceAndRevokeKeepsSanitizedRecord(t *testing.T) {
 	server := newTestServer(ServerOptions{Capabilities: capabilitiesFromConfigForTest(t, []string{
 		"tenant", "identity", "session", "rbac", "menu", "api-resource", "dictionary", "parameter", "audit", "admin-shell", "system-admin",

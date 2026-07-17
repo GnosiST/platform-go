@@ -141,7 +141,17 @@ func (r organizationRBACAdminMenuResolver) Resolve(ctx context.Context, principa
 	if resolved.Revision != expected.GlobalRevision {
 		return nil, errors.New("organization rbac menu revision changed during resolution")
 	}
-	return adminMenuItemsFromOrganizationNodes(resolved.Nodes)
+	return adminMenuPageItemsFromOrganizationNodes(resolved.Nodes)
+}
+
+func adminMenuPageItemsFromOrganizationNodes(nodes []organizationrbac.MenuNode) ([]adminresource.MenuItem, error) {
+	pageNodes := make([]organizationrbac.MenuNode, 0, len(nodes))
+	for _, node := range nodes {
+		if node.NodeType == organizationrbac.MenuNodeTypePage {
+			pageNodes = append(pageNodes, node)
+		}
+	}
+	return adminMenuItemsFromOrganizationNodes(pageNodes)
 }
 
 func adminMenuItemsFromOrganizationNodes(nodes []organizationrbac.MenuNode) ([]adminresource.MenuItem, error) {
@@ -162,7 +172,7 @@ func adminMenuItemsFromOrganizationNodes(nodes []organizationrbac.MenuNode) ([]a
 			ActiveMenuCode: node.ActiveMenuCode, BreadcrumbVisible: node.BreadcrumbVisible, Resource: node.ResourceCode,
 			Title:       adminresource.LocalizedText{ZH: node.TitleZH, EN: node.TitleEN},
 			Description: adminresource.LocalizedText{ZH: node.DescriptionZH, EN: node.DescriptionEN},
-			Icon:        node.Icon, Order: node.SortOrder,
+			Permission:  node.LegacyPermission, Group: node.Group, Icon: node.Icon, Order: node.SortOrder,
 		})
 	}
 	return items, nil

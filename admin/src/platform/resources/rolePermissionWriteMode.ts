@@ -14,6 +14,6 @@ export function resolveRolePermissionWriteMode(schema: RolePermissionSchema | un
   const fields = rolePolicyFields.map((key) => schema?.fields.find((field) => field.key === key));
   if (fields.some((field) => !field)) return "readonly";
   if (fields.every((field) => field?.inForm !== false && field?.readOnly !== true)) return "legacy-generic";
-  if (fields.every((field) => field?.inForm === false && field.readOnly === true)) return "target-domain";
+  if (fields.every((field) => field?.inForm !== true && field?.readOnly === true)) return "target-domain";
   return "readonly";
 }

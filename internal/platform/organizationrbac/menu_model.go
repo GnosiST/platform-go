@@ -11,11 +11,11 @@ const (
 type MenuParameterType string
 
 const (
-	MenuParameterTypeString  MenuParameterType = "string"
-	MenuParameterTypeNumber  MenuParameterType = "number"
-	MenuParameterTypeBoolean MenuParameterType = "boolean"
-	MaximumMenuParameters                      = 32
-	MaximumRoleMenuSelections                  = 2000
+	MenuParameterTypeString   MenuParameterType = "string"
+	MenuParameterTypeNumber   MenuParameterType = "number"
+	MenuParameterTypeBoolean  MenuParameterType = "boolean"
+	MaximumMenuParameters                       = 32
+	MaximumRoleMenuSelections                   = 2000
 )
 
 type MenuOpenMode string
@@ -50,6 +50,7 @@ type MenuNode struct {
 	DescriptionEN     string
 	Status            string
 	Icon              string
+	Group             string
 	SortOrder         int
 	Route             string
 	ComponentKey      string
