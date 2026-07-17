@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/GnosiST/platform-go/internal/platform/rbac"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -146,13 +148,14 @@ func (r *GORMRepository) RecordMenuPromotionState(ctx context.Context, state Men
 }
 
 func (r *GORMRepository) PromoteMenuWrites(ctx context.Context, request MenuWritePromotionRequest) (MenuPromotionState, error) {
-	if !r.ready(ctx) || !validMenuWritePromotionRequest(request) {
+	request, valid := normalizedMenuWritePromotionRequest(request)
+	if !r.ready(ctx) || !valid {
 		return MenuPromotionState{}, ErrInvalid
 	}
 	var promoted MenuPromotionState
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var current gormOrganizationRBACPromotion
-		if err := tx.Where("run_id = ?", request.RunID).Take(&current).Error; err != nil {
+		if err := lockedMenuPromotion(tx, request.RunID, &current); err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return &ValidationError{Field: "promotion.runId", Reason: "target-read promotion run was not found"}
 			}
@@ -165,7 +168,7 @@ func (r *GORMRepository) PromoteMenuWrites(ctx context.Context, request MenuWrit
 		if current.Phase != PromotionTargetRead {
 			return &ValidationError{Field: "promotion.phase", Reason: "target-read promotion is required"}
 		}
-		currentRevision, err := loadGlobalRevision(tx)
+		currentRevision, err := lockedGlobalRevision(tx)
 		if err != nil {
 			return err
 		}
@@ -180,10 +183,17 @@ func (r *GORMRepository) PromoteMenuWrites(ctx context.Context, request MenuWrit
 			return err
 		}
 		observedAt := request.ObservedAt.UTC()
-		if err := tx.Model(&gormOrganizationRBACPromotion{}).Where("run_id = ?", current.RunID).Updates(map[string]any{
-			"phase": PromotionTargetWrite, "observed_at": observedAt, "updated_at": observedAt,
-		}).Error; err != nil {
-			return err
+		result := tx.Model(&gormOrganizationRBACPromotion{}).
+			Where("run_id = ? AND phase = ? AND frozen_revision = ? AND active_principals = equivalent", current.RunID, PromotionTargetRead, current.FrozenRevision).
+			Where("(SELECT value FROM "+adminResourceStateTable+" WHERE key = ?) = ?", "revision", strconv.FormatUint(current.FrozenRevision, 10)).
+			Updates(map[string]any{
+				"phase": PromotionTargetWrite, "observed_at": observedAt, "updated_at": observedAt,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return &ValidationError{Field: "promotion", Reason: "promotion state changed during target-write approval"}
 		}
 		if err := tx.Create(&gormOrganizationRBACPromotionEvent{
 			RunID: current.RunID, Sequence: int(count) + 1, FromPhase: PromotionTargetRead, ToPhase: PromotionTargetWrite,
@@ -204,9 +214,41 @@ func (r *GORMRepository) PromoteMenuWrites(ctx context.Context, request MenuWrit
 	return promoted, nil
 }
 
-func validMenuWritePromotionRequest(request MenuWritePromotionRequest) bool {
-	return validCode(request.RunID) && request.ExpectedPhase == PromotionTargetRead && validCode(request.ActorID) &&
-		strings.TrimSpace(request.Reason) != "" && strings.TrimSpace(request.ApprovalRef) != "" && !request.ObservedAt.IsZero()
+func lockedMenuPromotion(tx *gorm.DB, runID string, current *gormOrganizationRBACPromotion) error {
+	query := tx.Where("run_id = ?", runID)
+	if tx.Dialector.Name() != "sqlite" {
+		query = query.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	return query.Take(current).Error
+}
+
+func lockedGlobalRevision(tx *gorm.DB) (uint64, error) {
+	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&gormAdminResourceState{Key: "revision", Value: "0"}).Error; err != nil {
+		return 0, err
+	}
+	query := tx.Where("key = ?", "revision")
+	if tx.Dialector.Name() != "sqlite" {
+		query = query.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	var state gormAdminResourceState
+	if err := query.Take(&state).Error; err != nil {
+		return 0, err
+	}
+	revision, err := strconv.ParseUint(state.Value, 10, 64)
+	if err != nil {
+		return 0, ErrRepositoryFailed
+	}
+	return revision, nil
+}
+
+func normalizedMenuWritePromotionRequest(request MenuWritePromotionRequest) (MenuWritePromotionRequest, bool) {
+	request.ActorID = strings.TrimSpace(request.ActorID)
+	request.Reason = strings.TrimSpace(request.Reason)
+	request.ApprovalRef = strings.TrimSpace(request.ApprovalRef)
+	valid := validCode(request.RunID) && request.ExpectedPhase == PromotionTargetRead && validCode(request.ActorID) &&
+		len(request.ActorID) <= 191 && len(request.Reason) > 0 && len(request.Reason) <= 1024 &&
+		len(request.ApprovalRef) > 0 && len(request.ApprovalRef) <= 1024 && !request.ObservedAt.IsZero()
+	return request, valid
 }
 
 func promotionTransitionAllowed(from, to string) bool {

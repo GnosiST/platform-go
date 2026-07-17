@@ -138,6 +138,19 @@ func TestRunOrganizationRBACMigrationPromote(t *testing.T) {
 		}
 	})
 
+	t.Run("closes only once after a close failure", func(t *testing.T) {
+		session := &fakeOrganizationRBACMigrationSession{
+			promoted: organizationrbac.MenuPromotionState{RunID: "promotion-write-1", Phase: organizationrbac.PromotionTargetWrite},
+			closeErr: errors.New("close failure"),
+		}
+		err := runOrganizationRBACMigration(context.Background(), baseArgs, &bytes.Buffer{}, func() config.Config { return config.Config{} },
+			func(context.Context, config.Config) error { return nil },
+			func(context.Context, config.Config) (organizationRBACMigrationSession, error) { return session, nil })
+		if err == nil || err.Error() != "close organization rbac migration storage" || session.closes != 1 {
+			t.Fatalf("error=%v closes=%d, want normalized close failure and one close", err, session.closes)
+		}
+	})
+
 	for _, tc := range []struct {
 		name string
 		args []string
@@ -168,6 +181,7 @@ type fakeOrganizationRBACMigrationSession struct {
 	promotionRequest organizationrbac.MenuWritePromotionRequest
 	promoteCalls     int
 	closes           int
+	closeErr         error
 }
 
 func (*fakeOrganizationRBACMigrationSession) RunMigration(_ context.Context, mode organizationrbac.MigrationMode, _ organizationrbac.MigrationManifest, _ organizationrbac.MigrationEvidence) (organizationrbac.MigrationReport, error) {
@@ -182,7 +196,7 @@ func (s *fakeOrganizationRBACMigrationSession) PromoteMenuWrites(_ context.Conte
 
 func (s *fakeOrganizationRBACMigrationSession) Close() error {
 	s.closes++
-	return nil
+	return s.closeErr
 }
 
 func TestRunBindAdminOIDCRequiresSubjectStdin(t *testing.T) {

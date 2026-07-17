@@ -342,10 +342,11 @@ func runOrganizationRBACMigration(ctx context.Context, args []string, stdout io.
 		if err := json.NewEncoder(stdout).Encode(map[string]string{"status": "promoted"}); err != nil {
 			return errors.New("write organization rbac promotion report")
 		}
-		if err := session.Close(); err != nil {
+		closeErr := session.Close()
+		closed = true
+		if closeErr != nil {
 			return errors.New("close organization rbac migration storage")
 		}
-		closed = true
 		return nil
 	}
 	mode := organizationrbac.MigrationMode(*modeValue)

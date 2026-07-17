@@ -117,6 +117,67 @@ func TestPromoteMenuWrites(t *testing.T) {
 		assertMenuPromotionEventCount(t, db, request.RunID, 2)
 	})
 
+	t.Run("rejects revision drift between observation and phase transition", func(t *testing.T) {
+		db, repository := prepareOrganizationRBACTestRepository(t)
+		state := completeTargetReadPromotionState(t, repository, request.RunID)
+		if err := repository.RecordMenuPromotionState(context.Background(), state); err != nil {
+			t.Fatal(err)
+		}
+		callbackName := "test:promotion_revision_drift_during_transition"
+		changed := false
+		if err := db.Callback().Update().Before("gorm:update").Register(callbackName, func(tx *gorm.DB) {
+			if changed || tx.Statement == nil || tx.Statement.Schema == nil || tx.Statement.Schema.Table != (gormOrganizationRBACPromotion{}).TableName() {
+				return
+			}
+			result := tx.Session(&gorm.Session{NewDB: true}).Exec("UPDATE "+adminResourceStateTable+" SET value = ? WHERE key = ? AND value = ?", "1", "revision", "0")
+			if result.Error != nil || result.RowsAffected != 1 {
+				t.Errorf("inject revision drift = %d, %v", result.RowsAffected, result.Error)
+				return
+			}
+			changed = true
+		}); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = db.Callback().Update().Remove(callbackName) })
+
+		if _, err := repository.PromoteMenuWrites(context.Background(), request); err == nil {
+			t.Fatal("PromoteMenuWrites() error = nil after revision drift")
+		}
+		if !changed {
+			t.Fatal("test callback did not inject revision drift")
+		}
+		var current gormOrganizationRBACPromotion
+		if err := db.Where("run_id = ?", request.RunID).Take(&current).Error; err != nil {
+			t.Fatal(err)
+		}
+		if current.Phase != PromotionTargetRead {
+			t.Fatalf("phase after revision drift = %q, want %q", current.Phase, PromotionTargetRead)
+		}
+		assertMenuPromotionEventCount(t, db, request.RunID, 1)
+	})
+
+	t.Run("normalizes persisted audit fields", func(t *testing.T) {
+		db, repository := prepareOrganizationRBACTestRepository(t)
+		normalizedRequest := request
+		normalizedRequest.RunID = "promotion-write-normalized"
+		normalizedRequest.ActorID = " migration-admin "
+		normalizedRequest.Reason = " approved target writes "
+		normalizedRequest.ApprovalRef = " change-write-1 "
+		if err := repository.RecordMenuPromotionState(context.Background(), completeTargetReadPromotionState(t, repository, normalizedRequest.RunID)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := repository.PromoteMenuWrites(context.Background(), normalizedRequest); err != nil {
+			t.Fatalf("PromoteMenuWrites() error = %v", err)
+		}
+		var event gormOrganizationRBACPromotionEvent
+		if err := db.Where("run_id = ? AND sequence = ?", normalizedRequest.RunID, 2).Take(&event).Error; err != nil {
+			t.Fatal(err)
+		}
+		if event.ActorID != "migration-admin" || event.Reason != "approved target writes" || event.ApprovalRef != "change-write-1" {
+			t.Fatalf("normalized audit event = %+v", event)
+		}
+	})
+
 	for _, tc := range []struct {
 		name    string
 		state   func(*testing.T, *GORMRepository) MenuPromotionState
@@ -162,12 +223,62 @@ func TestPromoteMenuWrites(t *testing.T) {
 			},
 		},
 		{
-			name: "missing audit fields",
+			name: "missing actor",
 			state: func(t *testing.T, repository *GORMRepository) MenuPromotionState {
 				return completeTargetReadPromotionState(t, repository, request.RunID)
 			},
 			request: func(request MenuWritePromotionRequest) MenuWritePromotionRequest {
 				request.ActorID = ""
+				return request
+			},
+		},
+		{
+			name: "missing reason",
+			state: func(t *testing.T, repository *GORMRepository) MenuPromotionState {
+				return completeTargetReadPromotionState(t, repository, request.RunID)
+			},
+			request: func(request MenuWritePromotionRequest) MenuWritePromotionRequest {
+				request.Reason = ""
+				return request
+			},
+		},
+		{
+			name: "missing approval reference",
+			state: func(t *testing.T, repository *GORMRepository) MenuPromotionState {
+				return completeTargetReadPromotionState(t, repository, request.RunID)
+			},
+			request: func(request MenuWritePromotionRequest) MenuWritePromotionRequest {
+				request.ApprovalRef = ""
+				return request
+			},
+		},
+		{
+			name: "missing observed time",
+			state: func(t *testing.T, repository *GORMRepository) MenuPromotionState {
+				return completeTargetReadPromotionState(t, repository, request.RunID)
+			},
+			request: func(request MenuWritePromotionRequest) MenuWritePromotionRequest {
+				request.ObservedAt = time.Time{}
+				return request
+			},
+		},
+		{
+			name: "reason exceeds storage limit",
+			state: func(t *testing.T, repository *GORMRepository) MenuPromotionState {
+				return completeTargetReadPromotionState(t, repository, request.RunID)
+			},
+			request: func(request MenuWritePromotionRequest) MenuWritePromotionRequest {
+				request.Reason = strings.Repeat("r", 1025)
+				return request
+			},
+		},
+		{
+			name: "approval reference exceeds storage limit",
+			state: func(t *testing.T, repository *GORMRepository) MenuPromotionState {
+				return completeTargetReadPromotionState(t, repository, request.RunID)
+			},
+			request: func(request MenuWritePromotionRequest) MenuWritePromotionRequest {
+				request.ApprovalRef = strings.Repeat("a", 1025)
 				return request
 			},
 		},
