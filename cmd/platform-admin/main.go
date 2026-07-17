@@ -62,6 +62,7 @@ type organizationRBACMigrationSession interface {
 
 type organizationRBACPreparer func(context.Context, config.Config) error
 type organizationRBACMigrationOpener func(context.Context, config.Config) (organizationRBACMigrationSession, error)
+type organizationRBACDevelopmentBootstrapper func(context.Context, config.Config, []capability.Manifest, dataprotection.Runtime, time.Time) (bootstrap.DevelopmentOrganizationRBACReport, error)
 
 func main() {
 	if err := run(context.Background(), os.Args[1:], os.Stdin, os.Stdout, os.Stderr, config.Load); err != nil {
@@ -72,14 +73,14 @@ func main() {
 
 func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, loadConfig func() config.Config) error {
 	if len(args) > 0 && args[0] == organizationRBACMigrationCommand {
-		return runOrganizationRBACMigration(ctx, args, stdout, loadConfig, bootstrap.PrepareOrganizationRBAC,
+		return runOrganizationRBACMigrationWithBootstrap(ctx, args, stdout, loadConfig, bootstrap.PrepareOrganizationRBAC,
 			func(ctx context.Context, cfg config.Config) (organizationRBACMigrationSession, error) {
 				runtime, err := bootstrap.OpenOrganizationRBACMigration(ctx, cfg)
 				if err != nil {
 					return nil, err
 				}
 				return &organizationRBACMigrationAdapter{runtime: runtime}, nil
-			})
+			}, bootstrap.BootstrapDevelopmentOrganizationRBAC)
 	}
 	return runWithPlatformDependencies(ctx, args, stdin, stdout, stderr, loadConfig, bootstrap.AdminResourcesFromConfig,
 		func(cfg config.Config, manifests ...capability.Manifest) (sensitiveMigrationSession, error) {
@@ -291,9 +292,13 @@ func runSensitiveDataMigration(ctx context.Context, args []string, stdout, stder
 }
 
 func runOrganizationRBACMigration(ctx context.Context, args []string, stdout io.Writer, loadConfig func() config.Config, prepare organizationRBACPreparer, open organizationRBACMigrationOpener) error {
+	return runOrganizationRBACMigrationWithBootstrap(ctx, args, stdout, loadConfig, prepare, open, nil)
+}
+
+func runOrganizationRBACMigrationWithBootstrap(ctx context.Context, args []string, stdout io.Writer, loadConfig func() config.Config, prepare organizationRBACPreparer, open organizationRBACMigrationOpener, bootstrapDevelopment organizationRBACDevelopmentBootstrapper) error {
 	flags := flag.NewFlagSet(organizationRBACMigrationCommand, flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
-	modeValue := flags.String("mode", "", "prepare, inventory, verify, apply, rollback, or promote")
+	modeValue := flags.String("mode", "", "prepare, inventory, verify, apply, rollback, promote, or bootstrap-development")
 	manifestPath := flags.String("manifest", "", "versioned migration manifest JSON")
 	runID := flags.String("run-id", "", "immutable migration run ID")
 	expectedPhase := flags.String("expected-phase", "", "expected promotion phase")
@@ -306,10 +311,36 @@ func runOrganizationRBACMigration(ctx context.Context, args []string, stdout io.
 	if err := flags.Parse(args[1:]); err != nil || len(flags.Args()) != 0 {
 		return errors.New("invalid organization-rbac-migrate arguments")
 	}
-	if loadConfig == nil || prepare == nil || open == nil {
+	if loadConfig == nil {
 		return errors.New("organization rbac migration bootstrap is unavailable")
 	}
 	cfg := loadConfig()
+	if *modeValue == "bootstrap-development" {
+		if strings.TrimSpace(*manifestPath) != "" || strings.TrimSpace(*runID) != "" || strings.TrimSpace(*expectedPhase) != "" ||
+			strings.TrimSpace(*actor) != "" || strings.TrimSpace(*reason) != "" || strings.TrimSpace(*approvalRef) != "" ||
+			strings.TrimSpace(*backupURI) != "" || strings.TrimSpace(*backupHash) != "" || strings.TrimSpace(*checkpointRef) != "" {
+			return errors.New("organization rbac development bootstrap does not accept manifest or run identity")
+		}
+		if bootstrapDevelopment == nil {
+			return errors.New("organization rbac development bootstrap is unavailable")
+		}
+		manifests, err := bootstrap.CapabilitiesFromConfig(cfg, apps.DefaultManifests()...)
+		if err != nil {
+			return errors.New("resolve platform capabilities")
+		}
+		protection, err := bootstrap.DataProtectionRuntimeFromConfig(cfg)
+		if err != nil {
+			return errors.New("build data protection runtime")
+		}
+		report, err := bootstrapDevelopment(ctx, cfg, manifests, protection, time.Now().UTC())
+		if err != nil {
+			return errors.New("organization rbac development bootstrap failed")
+		}
+		return json.NewEncoder(stdout).Encode(report)
+	}
+	if prepare == nil || open == nil {
+		return errors.New("organization rbac migration bootstrap is unavailable")
+	}
 	if *modeValue == "prepare" {
 		if strings.TrimSpace(*manifestPath) != "" || strings.TrimSpace(*runID) != "" {
 			return errors.New("organization rbac prepare does not accept manifest or run identity")

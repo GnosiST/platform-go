@@ -111,6 +111,113 @@ func TestOrganizationRBACMigrationCLIEndToEndSQLite(t *testing.T) {
 	}
 }
 
+func TestRunOrganizationRBACMigrationBootstrapDevelopment(t *testing.T) {
+	cfg := config.Config{
+		RuntimeEnvironment:        config.RuntimeEnvironmentDevelopment,
+		Capabilities:              developmentOrganizationRBACCapabilities(),
+		AdminResourceDriver:       "sqlite",
+		AdminResourceDSN:          filepath.Join(t.TempDir(), "secret-development-rbac.db"),
+		OrganizationRBACMode:      config.OrganizationRBACModeTarget,
+		AdminMenuServingMode:      config.AdminMenuServingModeTarget,
+		AdminRoleMenuWriteEnabled: true,
+	}
+	var called bool
+	var output bytes.Buffer
+	err := runOrganizationRBACMigrationWithBootstrap(context.Background(),
+		[]string{organizationRBACMigrationCommand, "--mode", "bootstrap-development"},
+		&output, func() config.Config { return cfg },
+		func(context.Context, config.Config) error {
+			t.Fatal("prepare must not run for development bootstrap")
+			return nil
+		},
+		func(context.Context, config.Config) (organizationRBACMigrationSession, error) {
+			t.Fatal("migration storage must not open through the generic opener")
+			return nil, nil
+		},
+		func(_ context.Context, received config.Config, _ []capability.Manifest, _ dataprotection.Runtime, observedAt time.Time) (bootstrap.DevelopmentOrganizationRBACReport, error) {
+			called = true
+			if received.AdminResourceDSN != cfg.AdminResourceDSN || observedAt.IsZero() {
+				t.Fatalf("bootstrap config=%+v observedAt=%v", received, observedAt)
+			}
+			return bootstrap.DevelopmentOrganizationRBACReport{
+				SeedMaterialized: true,
+				SeedRevision:     1,
+				MigrationRunID:   "development-role-menu-bootstrap",
+				MigrationStatus:  "applied",
+				PromotionPhase:   organizationrbac.PromotionTargetWrite,
+			}, nil
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !called || !strings.Contains(output.String(), `"seedMaterialized":true`) ||
+		!strings.Contains(output.String(), `"promotionPhase":"target-write"`) ||
+		strings.Contains(output.String(), cfg.AdminResourceDSN) {
+		t.Fatalf("called=%v output=%s", called, output.String())
+	}
+}
+
+func TestRunOrganizationRBACMigrationBootstrapDevelopmentRejectsMigrationArguments(t *testing.T) {
+	cfg := config.Config{
+		RuntimeEnvironment:        config.RuntimeEnvironmentDevelopment,
+		Capabilities:              developmentOrganizationRBACCapabilities(),
+		AdminResourceDriver:       "sqlite",
+		AdminResourceDSN:          filepath.Join(t.TempDir(), "secret-development-rbac.db"),
+		OrganizationRBACMode:      config.OrganizationRBACModeTarget,
+		AdminMenuServingMode:      config.AdminMenuServingModeTarget,
+		AdminRoleMenuWriteEnabled: true,
+	}
+	var called bool
+	err := runOrganizationRBACMigrationWithBootstrap(context.Background(),
+		[]string{organizationRBACMigrationCommand, "--mode", "bootstrap-development", "--manifest", filepath.Join(t.TempDir(), "manifest.json"), "--run-id", "unsafe"},
+		&bytes.Buffer{}, func() config.Config { return cfg },
+		func(context.Context, config.Config) error { return nil },
+		func(context.Context, config.Config) (organizationRBACMigrationSession, error) {
+			return &fakeOrganizationRBACMigrationSession{}, nil
+		},
+		func(context.Context, config.Config, []capability.Manifest, dataprotection.Runtime, time.Time) (bootstrap.DevelopmentOrganizationRBACReport, error) {
+			called = true
+			return bootstrap.DevelopmentOrganizationRBACReport{}, nil
+		})
+	if err == nil || called || strings.Contains(err.Error(), cfg.AdminResourceDSN) {
+		t.Fatalf("error=%v called=%v, want rejected before bootstrap without DSN leak", err, called)
+	}
+}
+
+func TestOrganizationRBACMigrationBootstrapDevelopmentCLIEndToEndSQLite(t *testing.T) {
+	cfg := config.Config{
+		RuntimeEnvironment:        config.RuntimeEnvironmentDevelopment,
+		Capabilities:              developmentOrganizationRBACCapabilities(),
+		AdminResourceDriver:       "sqlite",
+		AdminResourceDSN:          filepath.Join(t.TempDir(), "organization-rbac-development-cli.db"),
+		OrganizationRBACMode:      config.OrganizationRBACModeTarget,
+		AdminMenuServingMode:      config.AdminMenuServingModeTarget,
+		AdminRoleMenuWriteEnabled: true,
+	}
+	bootstrapped := execute(t, cfg, []string{organizationRBACMigrationCommand, "--mode", "bootstrap-development"}, "")
+	if bootstrapped.err != nil || !strings.Contains(bootstrapped.stdout, `"seedMaterialized":true`) ||
+		!strings.Contains(bootstrapped.stdout, `"migrationStatus":"applied"`) ||
+		!strings.Contains(bootstrapped.stdout, `"promotionPhase":"target-write"`) ||
+		strings.Contains(bootstrapped.stdout, cfg.AdminResourceDSN) {
+		t.Fatalf("bootstrap result = %+v", bootstrapped)
+	}
+	runtime, err := bootstrap.OpenOrganizationRBAC(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("OpenOrganizationRBAC() error = %v", err)
+	}
+	if _, err := runtime.Repository.ValidateMenuPromotion(context.Background(), config.AdminMenuServingModeTarget, true); err != nil {
+		t.Fatalf("ValidateMenuPromotion(target write) error = %v", err)
+	}
+	if err := runtime.Close(); err != nil {
+		t.Fatal(err)
+	}
+	replayed := execute(t, cfg, []string{organizationRBACMigrationCommand, "--mode", "bootstrap-development"}, "")
+	if replayed.err != nil || !strings.Contains(replayed.stdout, `"seedMaterialized":false`) ||
+		!strings.Contains(replayed.stdout, `"promotionPhase":"target-write"`) {
+		t.Fatalf("replayed bootstrap result = %+v", replayed)
+	}
+}
+
 func TestRunOrganizationRBACMigrationPromote(t *testing.T) {
 	baseArgs := []string{
 		organizationRBACMigrationCommand, "--mode", "promote", "--run-id", "promotion-write-1",
@@ -1017,6 +1124,25 @@ func executeWithResources(t *testing.T, cfg config.Config, args []string, stdin 
 
 func bindArgs(username string) []string {
 	return []string{"bind-admin-oidc", "--provider", "oidc", "--issuer", testIssuer, "--username", username, "--subject-stdin"}
+}
+
+func developmentOrganizationRBACCapabilities() []string {
+	return []string{
+		"tenant",
+		"identity",
+		"session",
+		"rbac",
+		"menu",
+		"api-resource",
+		"audit",
+		"wechat-login",
+		"dictionary",
+		"parameter",
+		"file-storage",
+		"admin-shell",
+		"demo-data",
+		"system-admin",
+	}
 }
 
 func testConfig(t *testing.T) config.Config {

@@ -72,6 +72,36 @@ go run ./cmd/platform-api
 
 API 默认地址为 `http://127.0.0.1:9200`，管理端开发服务器为 `http://127.0.0.1:9202`。
 
+### 开发环境角色菜单目标态
+
+本地需要验证角色菜单保存时，可在一个新的 SQLite 开发库上显式引导目标态 RBAC 与菜单写入。该命令只接受 `development + sqlite + target serving + role-menu write enabled`，且只会物化空库；生产和 staging 不会自动执行。
+
+```bash
+PLATFORM_RUNTIME_ENV=development \
+PLATFORM_ADMIN_RESOURCE_DRIVER=sqlite \
+PLATFORM_ADMIN_RESOURCE_DSN=.platform/development-admin.db \
+PLATFORM_ORGANIZATION_RBAC_MODE=target \
+PLATFORM_ADMIN_MENU_SERVING_MODE=target \
+PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=true \
+go run ./cmd/platform-admin organization-rbac-migrate --mode bootstrap-development
+```
+
+随后用同一组环境变量启动 API，再启动 Admin 开发服务器：
+
+```bash
+PLATFORM_RUNTIME_ENV=development \
+PLATFORM_ADMIN_RESOURCE_DRIVER=sqlite \
+PLATFORM_ADMIN_RESOURCE_DSN=.platform/development-admin.db \
+PLATFORM_ORGANIZATION_RBAC_MODE=target \
+PLATFORM_ADMIN_MENU_SERVING_MODE=target \
+PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=true \
+go run ./cmd/platform-api
+
+npm --prefix admin run dev
+```
+
+生产角色菜单写入仍需走已审阅的 migration packet、数据库 checkpoint、dual-read 比对和 `promote` 运维命令；不要把 development bootstrap 当作生产迁移入口。
+
 <details>
 <summary>生产基线与非变更式预检</summary>
 

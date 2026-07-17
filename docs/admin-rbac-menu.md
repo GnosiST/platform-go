@@ -133,3 +133,35 @@ The base account model intentionally supports one primary org relation through `
 The `permissions` resource is a generated catalog from enabled capability manifests plus registered platform control-plane permissions. The legacy `roles` schema keeps `permissions` and `denyPermissions` fields for compatibility, while target mode uses the dedicated Tree Transfer and reviewed domain command instead of generic resource mutation. API and page-button permissions are grouped separately; disabled or missing historical entries can be removed but not newly assigned.
 
 Current persistence boundary: tenants, org units, users, role groups, roles, user-role bindings, role-permission bindings, permissions, menus, area codes and operations logs are in-memory by default. Set `PLATFORM_ADMIN_RESOURCE_FILE` to use the file-backed admin resource repository for local persistence, or set `PLATFORM_ADMIN_RESOURCE_DRIVER` and `PLATFORM_ADMIN_RESOURCE_DSN` to use the GORM-backed repository. The GORM adapter stores these standard platform resources in normalized tables while mapping them back to the generic resource API contract.
+
+## Development Bootstrap For Target Role Menus
+
+Fresh local SQLite development databases can be bootstrapped directly into the target role-menu state for UI verification. The bootstrap is intentionally narrow: it requires `PLATFORM_RUNTIME_ENV=development`, `PLATFORM_ADMIN_RESOURCE_DRIVER=sqlite`, a non-empty `PLATFORM_ADMIN_RESOURCE_DSN`, no file-backed Admin resource repository, `PLATFORM_ORGANIZATION_RBAC_MODE=target`, `PLATFORM_ADMIN_MENU_SERVING_MODE=target`, and `PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=true`.
+
+```bash
+PLATFORM_RUNTIME_ENV=development \
+PLATFORM_ADMIN_RESOURCE_DRIVER=sqlite \
+PLATFORM_ADMIN_RESOURCE_DSN=.platform/development-admin.db \
+PLATFORM_ORGANIZATION_RBAC_MODE=target \
+PLATFORM_ADMIN_MENU_SERVING_MODE=target \
+PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=true \
+go run ./cmd/platform-admin organization-rbac-migrate --mode bootstrap-development
+```
+
+The command creates the Admin resource schema, materializes current capability seeds, prepares organization RBAC tables, applies the development migration manifest, promotes role-menu writes to `target-write`, and emits a JSON report. Re-running it against the same completed development database is idempotent.
+
+This path rejects non-empty databases that are not already fully bootstrapped. It also rejects production, staging, MySQL, PostgreSQL, file-backed Admin resource storage, legacy menu serving and disabled role-menu writes.
+
+Start the API with the same target-mode environment before opening `/roles`:
+
+```bash
+PLATFORM_RUNTIME_ENV=development \
+PLATFORM_ADMIN_RESOURCE_DRIVER=sqlite \
+PLATFORM_ADMIN_RESOURCE_DSN=.platform/development-admin.db \
+PLATFORM_ORGANIZATION_RBAC_MODE=target \
+PLATFORM_ADMIN_MENU_SERVING_MODE=target \
+PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=true \
+go run ./cmd/platform-api
+```
+
+Production and staging rollout must still use the reviewed migration manifest, backup/checkpoint evidence, principal equivalence proof, bounded dual-read observation, and the audited `promote` command. The development bootstrap is not a production migration shortcut and does not change production defaults.
