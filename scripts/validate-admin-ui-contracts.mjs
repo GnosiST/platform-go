@@ -313,6 +313,8 @@ requireRegex(
 requireIncludes(files.organizationUserExperience, "conflicts.length !== initialImpact.conflictCount", "Organization conflict remediation must reject incomplete conflict pages.");
 requireIncludes(files.organizationUserExperience, "aria-invalid={invalidSelectedRoles.length > 0}", "Out-of-pool user roles must expose their invalid state semantically.");
 requireIncludes(files.organizationUserExperience, '<ul className="organization-role-pool-list"', "Organization role-pool provenance must use list semantics.");
+requireIncludes(files.organizationUserExperience, "organization-role-pool-metrics", "Organization role-pool provenance must expose compact summary metrics.");
+requireIncludes(files.organizationUserExperience, "organizationRolePoolSummary", "Organization role-pool summary must use localized copy.");
 requireIncludes(files.organizationUserExperience, 'role="textbox" aria-readonly="true"', "Read-only role values must expose a valid read-only widget semantic.");
 requireIncludes(files.resourceRoute, 'resource.route === "/roles" || resource.route === "/role-groups"', "Role and role-group routes must share the role governance console.");
 requireIncludes(files.resourceRoute, 'resource.route === "/menus"', "The menus route must use the dedicated menu governance console.");
@@ -432,6 +434,9 @@ requireIncludes(files.primitives, '<Modal className={cx("admin-modal", className
 requireIncludes(files.primitives, "return <AdminModal", "AdminFormModal must build on the shared AdminModal wrapper.");
 requireIncludes(files.roleGovernance, "AdminModal", "Role governance dialogs must use the shared AdminModal wrapper.");
 requireNotIncludes(files.roleGovernance, "<Modal", "Role governance must not bypass the shared AdminModal wrapper.");
+requireIncludes(files.roleGovernance, "role-governance-action-groups", "Role governance actions must be grouped by authorization and lifecycle responsibility.");
+requireIncludes(files.roleGovernance, "roleGovernanceAuthorizationActions", "Role governance authorization actions must have a localized group label.");
+requireIncludes(files.roleGovernance, "roleGovernanceLifecycleActions", "Role governance lifecycle actions must have a localized group label.");
 requireIncludes(files.roleGovernance, 'const canReadGroups = hasPermission(permissions, "admin:role-group:read", deniedPermissions);', "Role governance must derive role-group read access from the active permission set.");
 requireIncludes(files.roleGovernance, 'const canReadRoles = hasPermission(permissions, "admin:role:read", deniedPermissions);', "Role governance must derive role read access from the active permission set.");
 requireIncludes(files.roleGovernance, 'const canReadTenants = hasPermission(permissions, "admin:tenant:read", deniedPermissions);', "Role-group creation must derive tenant read access from the active permission set.");
@@ -561,7 +566,7 @@ requireRegex(
   "Large role governance modal headers and footers must stay visible while the body scrolls.",
 );
 requireIncludes(files.roleGovernance, "<Typography.Title level={4}>", "Role detail must use the compact platform title hierarchy.");
-requireIncludes(files.roleGovernance, "column={{ xs: 1, md: 2 }}", "Role summaries must reflow from two columns to one.");
+requireIncludes(files.roleGovernance, 'className="role-governance-facts"', "Role summaries must use the compact fact-card layout.");
 requireIncludes(files.roleGovernance, "roleStatusLabel(record.status, dictionary)", "Role status summaries must be localized.");
 requireIncludes(files.roleGovernance, "roleGroupScopeLabel(valueOf(record, \"scopeType\"), dictionary)", "Role-group scope summaries must be localized.");
 requireIncludes(files.roleGovernance, "roleDataScopeLabel(valueOf(record, \"dataScope\"), dictionary)", "Role data-scope summaries must be localized.");
@@ -600,6 +605,12 @@ for (const key of [
   "rolePermissionHistoricalDisabled",
   "rolePermissionHistoricalMissing",
   "transferSelectedCount",
+  "roleGovernanceAuthorizationActions",
+  "roleGovernanceLifecycleActions",
+  "organizationRolePoolSummary",
+  "organizationRolePoolDescription",
+  "organizationRolePoolRoleCount",
+  "organizationRolePoolGroupCount",
 ]) {
   requireCountExactly(files.i18n, `${key}:`, 2, `Role governance i18n key ${key} must exist in matching Chinese and English dictionaries.`);
 }
@@ -643,10 +654,16 @@ requireIncludes(files.shell, "SystemSettingsDrawer", "AdminShell must expose acc
 requireIncludes(files.shell, "user-menu-trigger", "AdminShell must keep the avatar/settings trigger in the topbar.");
 requireIncludes(files.shell, "language-toggle-button", "AdminShell must use an icon language toggle, not a language dropdown.");
 requireCountExactly(files.shell, 'className="brand-collapse-button"', 1, "AdminShell must expose one sidebar collapse affordance in the brand area.");
+requireNotIncludes(files.shell, 'className="desktop-sider-toggle"', "AdminShell must not render a second desktop sidebar collapse affordance in the topbar.");
 requireIncludes(files.shell, "platform-work-tabs", "AdminShell must keep browser-like work tabs.");
-requireIncludes(files.shell, "setWorkTabsOverflow", "AdminShell must track work-tab overflow state for directional scrolling.");
-requireIncludes(files.shell, "scrollBy({ left: -240, behavior: \"smooth\" })", "AdminShell must expose a left work-tab overflow control.");
-requireIncludes(files.shell, "scrollBy({ left: 240, behavior: \"smooth\" })", "AdminShell must expose a right work-tab overflow control.");
+requireIncludes(files.shell, 'className="platform-work-tabs-shell"', "AdminShell must keep work-tab overflow controls in a stable shell.");
+requireIncludes(files.shell, "const [workTabsScroll, setWorkTabsScroll]", "AdminShell must track work-tab overflow state for directional scrolling.");
+requireIncludes(files.shell, "ResizeObserver", "AdminShell must update work-tab overflow when the workbar resizes.");
+requireIncludes(files.shell, "MutationObserver", "AdminShell must update work-tab overflow when tabs are added or removed.");
+requireIncludes(files.shell, "onWheel={handleWorkTabsWheel}", "AdminShell must allow wheel scrolling inside overflowing work tabs.");
+requireIncludes(files.shell, 'aria-current={active ? "page" : undefined}', "AdminShell work tabs must expose the active tab state.");
+requireIncludes(files.shell, "disabled={!workTabsScroll.left}", "AdminShell must disable the left work-tab scroll button when it cannot scroll.");
+requireIncludes(files.shell, "disabled={!workTabsScroll.right}", "AdminShell must disable the right work-tab scroll button when it cannot scroll.");
 requireIncludes(files.shell, "workTabMenuItems", "AdminShell work tabs must keep the close/current/left/right context menu.");
 requireIncludes(files.shell, "dictionary.globalSearchNoResults", "Global search must expose a localized no-results state.");
 requireIncludes(files.shell, "open={Boolean(globalSearchQuery.trim())}", "Global search must keep its result surface open for no-results feedback.");
@@ -910,15 +927,17 @@ requireOrder(files.resourceConsole, "initializedFormKeyRef.current = initializat
 requireIncludes(files.resourceConsole, "form.setFieldsValue(activeFormInitialValues)", "Form initialization must apply the active resource experience initial values.");
 requireOrder(files.resourceConsole, 'initializedFormKeyRef.current = "";', "form.setFieldsValue(activeFormInitialValues)", "Closing a form must clear its initialization key before a later modal lifecycle can initialize.");
 requireIncludes(files.resourceConsole, "field.type === \"multiselect\"", "Form hydration must preserve multiselect arrays for relation fields.");
-requireIncludes(files.resourceConsole, "function serializeFieldValue(field: AdminResourceField, raw: unknown)", "Generic resource writes must normalize schema field values through one typed serializer.");
-requireIncludes(files.resourceConsole, 'field.type === "switch"', "Generic resource writes must preserve explicit boolean values in the string storage contract.");
-requireIncludes(files.resourceConsole, 'field.type === "number"', "Generic resource writes must preserve numeric values in the string storage contract.");
-requireIncludes(files.resourceConsole, "JSON.stringify(raw.map((item) => String(item)))", "Generic resource writes must preserve array boundaries in the string storage contract.");
+requireIncludes(files.resourceConsole, "type SchemaValue = string | number | boolean | null | SchemaValue[] | { [key: string]: SchemaValue };", "Generic resource writes must define a JSON-compatible typed schema value boundary.");
+requireIncludes(files.resourceConsole, "function schemaValueFromFormValue(value: unknown): SchemaValue | undefined", "Generic resource writes must normalize form values through the schema value boundary.");
+requireIncludes(files.resourceConsole, "const nestedValues: Record<string, SchemaValue> = {};", "Generic resource writes must preserve typed nested schema values.");
+requireIncludes(files.resourceConsole, "return isSchemaValue(value) ? value : undefined;", "Generic resource writes must reject non-schema values without flattening valid arrays, booleans or numbers.");
 requireIncludes(files.resourceConsole, "function parseListValue(value: string)", "Generic resource hydration must parse JSON arrays while keeping legacy delimiter values compatible.");
-requireIncludes(files.resourceConsole, "if (typeof raw === \"object\")", "Generic resource writes must JSON-encode structured values instead of dropping them.");
-requireIncludes(files.dataProvider, "isValueMap(source.values)", "Refine writes must accept structured values maps from resource forms.");
-requireIncludes(files.dataProvider, "storageValue(value)", "Refine writes must encode non-string values without dropping them.");
-requireIncludes(files.dataProvider, "JSON.stringify(value)", "Refine writes must preserve arrays and objects through the API string-value contract.");
+requireNotIncludes(files.resourceConsole, "function serializeFieldValue", "Generic resource writes must not reintroduce string-only serialization.");
+requireNotIncludes(files.resourceConsole, "JSON.stringify(raw.map((item) => String(item)))", "Generic resource writes must not stringify multiselect arrays.");
+requireIncludes(files.dataProvider, "type SchemaValue = string | number | boolean | null | SchemaValue[] | { [key: string]: SchemaValue };", "Refine writes must preserve JSON-compatible schema values.");
+requireIncludes(files.dataProvider, "isSchemaValueMap(source.values)", "Refine writes must accept typed schema value maps from resource forms.");
+requireIncludes(files.dataProvider, "if (isSchemaValue(value))", "Refine writes must keep valid non-string field values from variables.");
+requireNotIncludes(files.dataProvider, "storageValue(value)", "Refine writes must not stringify typed schema values.");
 requireRegex(
   files.resourceConsole,
   /function formValueFromRecord\(record: AdminResourceRecord, field: AdminResourceField\) \{\s*if \(field\.storageMode === "encrypted"\) \{\s*return undefined;\s*\}/,

@@ -10,6 +10,12 @@ const capabilityCards = [
   {index: '03', zh: '运行治理', en: 'Runtime governance', textZh: 'OpenAPI、代码生成、迁移检查和发布证据，让每次扩展都可验证、可追溯。', textEn: 'OpenAPI, code generation, migration checks and release evidence keep every extension verifiable.', link: '/docs/operations', linkZh: '查看运维手册', linkEn: 'Read operations guide'},
 ];
 
+const proofPoints = [
+  {value: 'v0.1.0', zh: '已发布版本', en: 'released version'},
+  {value: '67', zh: '任务图节点', en: 'task-graph nodes'},
+  {value: 'OpenAPI', zh: '合同生成物', en: 'contract artifacts'},
+];
+
 export default function Home(): JSX.Element {
   const {i18n} = useDocusaurusContext();
   const en = i18n.currentLocale === 'en';
@@ -37,9 +43,15 @@ export default function Home(): JSX.Element {
               <div className="platform-hero__meta" aria-label={text('项目状态', 'Project status')}>
                 <span><i className="platform-status-dot" aria-hidden="true" />{text('v0.1.0 已发布', 'v0.1.0 released')}</span><span>Apache-2.0</span><span>Go + Gin + GORM</span>
               </div>
+              <div className="platform-hero__proof" aria-label={text('平台状态证明', 'Platform proof points')}>
+                {proofPoints.map((item) => <div key={item.value}><strong>{item.value}</strong><span>{text(item.zh, item.en)}</span></div>)}
+              </div>
             </div>
             <div className="platform-hero__visual" aria-label={text('请求从身份进入数据运行时的架构路径', 'Architecture path from identity to data runtime')}>
               <div className="platform-hero__visual-head"><span>{text('请求 / 数据路径', 'REQUEST / DATA PATH')}</span><span className="platform-code-tag">platform-go</span></div>
+              <div className="platform-hero__preview">
+                <img src={demoPoster} alt={text('platform-go 运行路径演示画面', 'platform-go runtime path demo frame')} />
+              </div>
               <div className="platform-flow">
                 {[['01', 'Identity', '可信身份 / Trusted identity'], ['02', 'Capability', '服务合同 / Service contract'], ['03', 'Policy', '租户与权限 / Scope & policy'], ['04', 'Runtime', 'GORM 数据层 / Data runtime']].map(([number, title, caption], index) => <React.Fragment key={number}><div className={`platform-flow__node${index === 2 ? ' platform-flow__node--accent' : ''}`}><b>{number}</b><span>{title}</span><small>{caption}</small></div>{index < 3 && <div className="platform-flow__connector" aria-hidden="true" />}</React.Fragment>)}
               </div>

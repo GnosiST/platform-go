@@ -7,7 +7,7 @@ import {
   StopOutlined,
   SwapOutlined,
 } from "@ant-design/icons";
-import { App, Button, Descriptions, Form, Input, InputNumber, Segmented, Select, Space, Tag, Typography } from "antd";
+import { App, Button, Form, Input, InputNumber, Segmented, Select, Space, Tag, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   createAdminResource,
@@ -663,48 +663,68 @@ function RoleGovernanceDetail({
     >
       <div className="role-governance-detail-body">
         <div className="role-governance-detail-heading">
-          <div><Typography.Title level={4}>{localizedGovernanceName(record, language)}</Typography.Title><Typography.Text code>{record.code}</Typography.Text></div>
+          <div className="role-governance-identity">
+            <Typography.Text className="role-governance-detail-kicker" type="secondary">
+              {type === "group" ? dictionary.roleGroupMetadata : dictionary.roleMetadata}
+            </Typography.Text>
+            <Typography.Title level={4}>{localizedGovernanceName(record, language)}</Typography.Title>
+            <Typography.Text code>{record.code}</Typography.Text>
+          </div>
           <Tag color={record.status === "enabled" ? "success" : "default"}>{roleStatusLabel(record.status, dictionary)}</Tag>
         </div>
-        <Descriptions column={{ xs: 1, md: 2 }} size="small">
+        <dl className="role-governance-facts">
           {type === "group" ? (
             <>
-              <Descriptions.Item label={dictionary.roleGroupScope}>{roleGroupScopeLabel(valueOf(record, "scopeType"), dictionary)}</Descriptions.Item>
-              <Descriptions.Item label={dictionary.tenantContext}>{groupScope === "platform" ? "-" : valueOf(record, "tenantCode") || "-"}</Descriptions.Item>
-              <Descriptions.Item label={dictionary.roleGroupSortOrder}>{valueOf(record, "sortOrder") || "0"}</Descriptions.Item>
+              <RoleGovernanceFact label={dictionary.roleGroupScope} value={roleGroupScopeLabel(valueOf(record, "scopeType"), dictionary)} />
+              <RoleGovernanceFact label={dictionary.tenantContext} value={groupScope === "platform" ? "-" : valueOf(record, "tenantCode") || "-"} />
+              <RoleGovernanceFact label={dictionary.roleGroupSortOrder} value={valueOf(record, "sortOrder") || "0"} />
             </>
           ) : (
             <>
-              <Descriptions.Item label={dictionary.roleGroupMetadata}>{group ? `${localizedGovernanceName(group, language)} (${group.code})` : valueOf(record, "groupCode") || "-"}</Descriptions.Item>
-              <Descriptions.Item label={dictionary.roleDataScope}>{roleDataScopeLabel(valueOf(record, "dataScope"), dictionary)}</Descriptions.Item>
-              <Descriptions.Item label={dictionary.rolePermissionAllow}>{csv(valueOf(record, "permissions")).length}</Descriptions.Item>
-              <Descriptions.Item label={dictionary.rolePermissionDeny}>{csv(valueOf(record, "denyPermissions")).length}</Descriptions.Item>
+              <RoleGovernanceFact label={dictionary.roleGroupMetadata} value={group ? `${localizedGovernanceName(group, language)} (${group.code})` : valueOf(record, "groupCode") || "-"} />
+              <RoleGovernanceFact label={dictionary.roleDataScope} value={roleDataScopeLabel(valueOf(record, "dataScope"), dictionary)} />
+              <RoleGovernanceFact label={dictionary.rolePermissionAllow} value={String(csv(valueOf(record, "permissions")).length)} />
+              <RoleGovernanceFact label={dictionary.rolePermissionDeny} value={String(csv(valueOf(record, "denyPermissions")).length)} />
             </>
           )}
-          <Descriptions.Item label={dictionary.description} span={{ xs: 1, md: 2 }}>{localizedGovernanceDescription(record, language) || "-"}</Descriptions.Item>
-        </Descriptions>
+        </dl>
+        <div className="role-governance-description">
+          <Typography.Text type="secondary">{dictionary.description}</Typography.Text>
+          <Typography.Paragraph>{localizedGovernanceDescription(record, language) || "-"}</Typography.Paragraph>
+        </div>
         {type === "role" ? (
-          <>
+          <div className="role-governance-action-groups">
             <section className="role-governance-access-control" aria-labelledby="role-governance-access-control-title">
-              <Typography.Title id="role-governance-access-control-title" level={5}>{dictionary.roleAccessControl}</Typography.Title>
+              <Typography.Title id="role-governance-access-control-title" level={5}>{dictionary.roleGovernanceAuthorizationActions}</Typography.Title>
               <div className="role-governance-section-actions">
                 {canReadMenus ? <AdminActionButton ref={menuTriggerRef} disabled={!runtimeSchemaReady} icon={<AppstoreOutlined />} label={menuActionLabel} tooltip={!runtimeSchemaReady ? dictionary.rolePermissionReadonlySchemaDescription : undefined} onClick={() => onAssignMenus(record)}>{menuActionLabel}</AdminActionButton> : null}
                 {canReadAuthorizationInputs ? <AdminActionButton ref={authorizationTriggerRef} disabled={!runtimeSchemaReady} icon={<SafetyCertificateOutlined />} label={dictionary.assignPermissions} tooltip={!runtimeSchemaReady ? dictionary.rolePermissionReadonlySchemaDescription : undefined} type="primary" onClick={() => onAssignPermissions(record)}>{dictionary.assignPermissions}</AdminActionButton> : null}
               </div>
             </section>
             <section className="role-governance-lifecycle" aria-labelledby="role-governance-lifecycle-title">
-              <Typography.Title id="role-governance-lifecycle-title" level={5}>{dictionary.roleLifecycle}</Typography.Title>
+              <Typography.Title id="role-governance-lifecycle-title" level={5}>{dictionary.roleGovernanceLifecycleActions}</Typography.Title>
               <div className="role-governance-section-actions role-governance-lifecycle-actions">
                 <AdminActionButton disabled={lifecycleDisabled} icon={<SwapOutlined />} label={dictionary.roleMove} tooltip={lifecycleDisabledReason} onClick={(event) => onMove(record, event.currentTarget)}>{dictionary.roleMove}</AdminActionButton>
                 <AdminActionButton danger disabled={lifecycleDisabled} icon={<StopOutlined />} label={dictionary.roleDisable} tooltip={lifecycleDisabledReason} onClick={() => onDisable(record)}>{dictionary.roleDisable}</AdminActionButton>
               </div>
             </section>
-          </>
+          </div>
         ) : (
-          <Typography.Text type="secondary">{dictionary.roleGroupNoGrant}</Typography.Text>
+          <div className="role-governance-readonly-note">
+            <Typography.Text type="secondary">{dictionary.roleGroupNoGrant}</Typography.Text>
+          </div>
         )}
       </div>
     </AdminListPanel>
+  );
+}
+
+function RoleGovernanceFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="role-governance-fact">
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
   );
 }
 

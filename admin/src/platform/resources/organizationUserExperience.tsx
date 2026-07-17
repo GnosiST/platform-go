@@ -563,17 +563,41 @@ function OrganizationRolePoolPanel({ dictionary, record }: { dictionary: Diction
     return <Alert type="warning" showIcon message={dictionary.rolePoolLoadFailed} description={error} />;
   }
   if (items.length === 0) {
-    return <Typography.Text type="secondary">{dictionary.organizationRolePoolEmpty}</Typography.Text>;
+    return (
+      <section className="organization-role-pool-panel" aria-label={dictionary.organizationRolePoolSummary}>
+        <div className="organization-role-pool-header">
+          <div>
+            <Typography.Text strong>{dictionary.organizationRolePoolSummary}</Typography.Text>
+            <Typography.Text type="secondary">{dictionary.organizationRolePoolDescription}</Typography.Text>
+          </div>
+          <Tag>{dictionary.organizationRolePoolEmpty}</Tag>
+        </div>
+      </section>
+    );
   }
+  const groupCount = new Set(items.map((item) => item.roleGroupCode)).size;
   return (
-    <ul className="organization-role-pool-list" aria-label={dictionary.organizationRolePoolProvenance}>
-      {items.map((item) => (
-        <li className="organization-role-pool-item" key={item.roleCode}>
-          <div><strong>{item.roleName || item.roleCode}</strong><Typography.Text code>{item.roleCode}</Typography.Text></div>
-          <Typography.Text type="secondary">{item.roleGroupName} ({item.roleGroupCode})</Typography.Text>
-        </li>
-      ))}
-    </ul>
+    <section className="organization-role-pool-panel" aria-label={dictionary.organizationRolePoolSummary}>
+      <div className="organization-role-pool-header">
+        <div>
+          <Typography.Text strong>{dictionary.organizationRolePoolSummary}</Typography.Text>
+          <Typography.Text type="secondary">{dictionary.organizationRolePoolDescription}</Typography.Text>
+        </div>
+        <Tag color="blue">{items.length}</Tag>
+      </div>
+      <dl className="organization-role-pool-metrics">
+        <div><dt>{dictionary.organizationRolePoolRoleCount}</dt><dd>{items.length}</dd></div>
+        <div><dt>{dictionary.organizationRolePoolGroupCount}</dt><dd>{groupCount}</dd></div>
+      </dl>
+      <ul className="organization-role-pool-list" aria-label={dictionary.organizationRolePoolProvenance}>
+        {items.map((item) => (
+          <li className="organization-role-pool-item" key={item.roleCode}>
+            <div><strong>{item.roleName || item.roleCode}</strong><Typography.Text code>{item.roleCode}</Typography.Text></div>
+            <Typography.Text type="secondary">{item.roleGroupName} ({item.roleGroupCode})</Typography.Text>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

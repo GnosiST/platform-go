@@ -6,8 +6,6 @@ import {
   BellOutlined,
   BookOutlined,
   BranchesOutlined,
-  CaretLeftOutlined,
-  CaretRightOutlined,
   CloudServerOutlined,
   CloseOutlined,
   ControlOutlined,
@@ -15,12 +13,14 @@ import {
   DownOutlined,
   GlobalOutlined,
   HomeOutlined,
+  LeftOutlined,
   MenuFoldOutlined,
   MenuOutlined,
   MenuUnfoldOutlined,
   MoonOutlined,
   PartitionOutlined,
   PushpinOutlined,
+  RightOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
   SettingOutlined,
@@ -30,7 +30,7 @@ import {
   UserOutlined,
 } from "@ant-design/icons";
 import { Avatar, Button, Drawer, Dropdown, Input, Space, Tag, Tooltip, Typography, type MenuProps } from "antd";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type WheelEvent } from "react";
 import type { AdminCurrentSession, BrandingConfig } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
 import { themeTokens, type AdminLayoutMode, type ThemeName } from "../theme";
@@ -119,7 +119,7 @@ export function AdminShell({
   const [openContext, setOpenContext] = useState<"mobile-work" | "mobile-runtime" | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
   const workTabsRef = useRef<HTMLElement | null>(null);
-  const [workTabsOverflow, setWorkTabsOverflow] = useState({ left: false, right: false });
+  const [workTabsScroll, setWorkTabsScroll] = useState({ left: false, right: false });
   const [openTabRoutes, setOpenTabRoutes] = useState<string[]>(() => uniqueRoutes([HOME_ROUTE, activeRoute]));
   const mainRef = useRef<HTMLElement | null>(null);
   const previousRouteRef = useRef(activeRoute);
@@ -171,17 +171,6 @@ export function AdminShell({
   }, [activeRoute, resourcesByRoute]);
 
   useEffect(() => {
-    const updateWorkTabsOverflow = () => {
-      const element = workTabsRef.current;
-      if (!element) return;
-      setWorkTabsOverflow({ left: element.scrollLeft > 2, right: element.scrollLeft + element.clientWidth < element.scrollWidth - 2 });
-    };
-    updateWorkTabsOverflow();
-    window.addEventListener("resize", updateWorkTabsOverflow);
-    return () => window.removeEventListener("resize", updateWorkTabsOverflow);
-  }, [openTabs.length, uiConfig.showWorkTabs]);
-
-  useEffect(() => {
     if (previousRouteRef.current === activeRoute) {
       return;
     }
@@ -191,6 +180,43 @@ export function AdminShell({
     }
     window.requestAnimationFrame(() => mainRef.current?.focus({ preventScroll: true }));
   }, [activeRoute]);
+
+  useEffect(() => {
+    const nav = workTabsRef.current;
+    if (!nav || !uiConfig.showWorkTabs) {
+      setWorkTabsScroll({ left: false, right: false });
+      return;
+    }
+
+    let frame = 0;
+    const updateScrollState = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const maxScrollLeft = Math.max(0, nav.scrollWidth - nav.clientWidth);
+        setWorkTabsScroll({
+          left: nav.scrollLeft > 1,
+          right: maxScrollLeft - nav.scrollLeft > 1,
+        });
+      });
+    };
+    const resizeObserver = new ResizeObserver(updateScrollState);
+    const mutationObserver = new MutationObserver(updateScrollState);
+    resizeObserver.observe(nav);
+    mutationObserver.observe(nav, { childList: true, subtree: true });
+    nav.addEventListener("scroll", updateScrollState, { passive: true });
+    updateScrollState();
+
+    return () => {
+      cancelAnimationFrame(frame);
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      nav.removeEventListener("scroll", updateScrollState);
+    };
+  }, [openTabs.length, uiConfig.showWorkTabs, language]);
+
+  useEffect(() => {
+    workTabsRef.current?.querySelector<HTMLElement>(".work-tab.active")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeRoute, openTabs.length]);
 
   const openResource = (resource: AdminResourceDefinition) => {
     if (resource.isExternal) {
@@ -260,6 +286,21 @@ export function AdminShell({
     onUIConfigChange({ ...uiConfig, customPrimary: themeTokens[nextTheme].primary });
   };
   const toggleSidebar = () => onUIConfigChange({ ...uiConfig, sidebarCollapsed: !uiConfig.sidebarCollapsed });
+  const scrollWorkTabs = (direction: -1 | 1) => {
+    const nav = workTabsRef.current;
+    if (!nav) {
+      return;
+    }
+    nav.scrollBy({ left: direction * Math.max(nav.clientWidth * 0.75, 160), behavior: "smooth" });
+  };
+  const handleWorkTabsWheel = (event: WheelEvent<HTMLElement>) => {
+    const delta = Math.abs(event.deltaY) > Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+    if (!delta || (!workTabsScroll.left && !workTabsScroll.right)) {
+      return;
+    }
+    event.preventDefault();
+    event.currentTarget.scrollBy({ left: delta, behavior: "auto" });
+  };
 
   const shellClass = [
     "platform-shell",
@@ -403,6 +444,7 @@ export function AdminShell({
               activeRoute={activeRoute}
               language={language}
               dictionary={dictionary}
+              compact={layoutMode === "mixed"}
               onResourceOpen={openResource}
             />
           </section>
@@ -495,59 +537,72 @@ export function AdminShell({
 
         <section className={uiConfig.showWorkTabs ? "platform-workbar" : "platform-workbar without-tabs"}>
           {uiConfig.showWorkTabs ? (
-            <nav ref={workTabsRef} className="platform-work-tabs" aria-label={dictionary.workTabs} onScroll={() => {
-              const element = workTabsRef.current;
-              if (element) setWorkTabsOverflow({ left: element.scrollLeft > 2, right: element.scrollLeft + element.clientWidth < element.scrollWidth - 2 });
-            }}>
-              {openTabs.map((resource) => {
-                const Icon = iconMap[resource.icon as keyof typeof iconMap] ?? BookOutlined;
-                const isPinned = resource.route === HOME_ROUTE;
-                return (
-                  <Dropdown
-                    key={resource.route}
-                    trigger={["contextMenu"]}
-                    menu={{
-                      items: workTabMenuItems(dictionary, resource.route, openTabRoutes),
-                      onClick: ({ key }) => closeWorkTabs(key as "current" | "others" | "all" | "left" | "right", resource.route),
-                    }}
-                  >
-                    <div className={resource.route === activeRoute ? "work-tab active" : "work-tab"}>
-                      <button className="work-tab-label" type="button" onClick={() => openResource(resource)}>
-                        <Icon />
-                        <span>{resource.title[language]}</span>
-                        {isPinned ? (
-                          <Tooltip title={dictionary.pinnedTab}>
-                            <PushpinOutlined className="work-tab-pin" />
+            <div className="platform-work-tabs-shell">
+              {workTabsScroll.left || workTabsScroll.right ? (
+                <Button
+                  aria-label={dictionary.scrollWorkTabsLeft}
+                  className="work-tabs-scroll-button"
+                  disabled={!workTabsScroll.left}
+                  icon={<LeftOutlined />}
+                  onClick={() => scrollWorkTabs(-1)}
+                />
+              ) : null}
+              <nav ref={workTabsRef} className="platform-work-tabs" aria-label={dictionary.workTabs} onWheel={handleWorkTabsWheel}>
+                {openTabs.map((resource) => {
+                  const Icon = iconMap[resource.icon as keyof typeof iconMap] ?? BookOutlined;
+                  const isPinned = resource.route === HOME_ROUTE;
+                  const active = resource.route === activeRoute;
+                  return (
+                    <Dropdown
+                      key={resource.route}
+                      trigger={["contextMenu"]}
+                      menu={{
+                        items: workTabMenuItems(dictionary, resource.route, openTabRoutes),
+                        onClick: ({ key }) => closeWorkTabs(key as "current" | "others" | "all" | "left" | "right", resource.route),
+                      }}
+                    >
+                      <div className={active ? "work-tab active" : "work-tab"}>
+                        <button
+                          aria-current={active ? "page" : undefined}
+                          className="work-tab-label"
+                          type="button"
+                          onClick={() => openResource(resource)}
+                        >
+                          <Icon />
+                          <span>{resource.title[language]}</span>
+                          {isPinned ? (
+                            <Tooltip title={dictionary.pinnedTab}>
+                              <PushpinOutlined className="work-tab-pin" />
+                            </Tooltip>
+                          ) : null}
+                        </button>
+                        {isPinned ? null : (
+                          <Tooltip title={dictionary.closeTab}>
+                            <button
+                              aria-label={`${dictionary.closeTab}: ${resource.title[language]}`}
+                              className="work-tab-close"
+                              type="button"
+                              onClick={() => closeWorkTab(resource.route)}
+                            >
+                              <CloseOutlined />
+                            </button>
                           </Tooltip>
-                        ) : null}
-                      </button>
-                      {isPinned ? null : (
-                        <Tooltip title={dictionary.closeTab}>
-                          <button
-                            aria-label={`${dictionary.closeTab}: ${resource.title[language]}`}
-                            className="work-tab-close"
-                            type="button"
-                            onClick={() => closeWorkTab(resource.route)}
-                          >
-                            <CloseOutlined />
-                          </button>
-                        </Tooltip>
-                      )}
-                    </div>
-                  </Dropdown>
-                );
-              })}
-            </nav>
-          ) : null}
-          {uiConfig.showWorkTabs && workTabsOverflow.left ? (
-            <button className="work-tabs-scroll-button left" aria-label={dictionary.scrollWorkTabsLeft} type="button" onClick={() => workTabsRef.current?.scrollBy({ left: -240, behavior: "smooth" })}>
-              <CaretLeftOutlined />
-            </button>
-          ) : null}
-          {uiConfig.showWorkTabs && workTabsOverflow.right ? (
-            <button className="work-tabs-scroll-button right" aria-label={dictionary.scrollWorkTabsRight} type="button" onClick={() => workTabsRef.current?.scrollBy({ left: 240, behavior: "smooth" })}>
-              <CaretRightOutlined />
-            </button>
+                        )}
+                      </div>
+                    </Dropdown>
+                  );
+                })}
+              </nav>
+              {workTabsScroll.left || workTabsScroll.right ? (
+                <Button
+                  aria-label={dictionary.scrollWorkTabsRight}
+                  className="work-tabs-scroll-button"
+                  disabled={!workTabsScroll.right}
+                  icon={<RightOutlined />}
+                  onClick={() => scrollWorkTabs(1)}
+                />
+              ) : null}
+            </div>
           ) : null}
           <div className="context-controls">
             <div className="context-chip context-readonly" aria-label={dictionary.environmentContext}>
@@ -760,18 +815,34 @@ function TopNavigation({
   activeRoute,
   language,
   dictionary,
+  compact = false,
   onResourceOpen,
 }: {
   groupedResources: Array<{ group: AdminResourceDefinition["group"]; label: string; resources: AdminResourceDefinition[] }>;
   activeRoute: string;
   language: Language;
   dictionary: Dictionary;
+  compact?: boolean;
   onResourceOpen: (resource: AdminResourceDefinition) => void;
 }) {
   return (
     <div className="top-resource-nav">
       {groupedResources.map((group) => {
         const active = group.resources.some((resource) => resource.route === activeRoute);
+        const firstResource = group.resources[0];
+        if (compact) {
+          return (
+            <Button
+              aria-current={active ? "page" : undefined}
+              aria-label={`${group.label}: ${firstResource?.title[language] ?? ""}`}
+              className={active ? "top-resource-nav-item active" : "top-resource-nav-item"}
+              key={group.group}
+              onClick={() => firstResource && onResourceOpen(firstResource)}
+            >
+              <span>{group.label}</span>
+            </Button>
+          );
+        }
         return (
           <Dropdown
             key={group.group}

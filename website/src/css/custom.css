@@ -40,19 +40,26 @@ body { background: var(--platform-paper); color: var(--platform-ink); }
 .platform-actions .button--secondary:hover { background: #fff; border-color: var(--platform-blue); }
 .platform-hero__meta { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 30px; color: #708096; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .72rem; }
 .platform-status-dot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: #27b78d; box-shadow: 0 0 0 4px rgba(39,183,141,.12); }
+.platform-hero__proof { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 610px; margin-top: 28px; border: 1px solid var(--platform-line); background: #fff; box-shadow: 10px 10px 0 rgba(29, 99, 216, .06); }
+.platform-hero__proof > div { display: grid; gap: 5px; min-width: 0; padding: 16px; border-right: 1px solid var(--platform-line); }
+.platform-hero__proof > div:last-child { border-right: 0; }
+.platform-hero__proof strong { color: var(--platform-ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1rem; }
+.platform-hero__proof span { color: var(--platform-muted); font-size: .78rem; line-height: 1.4; }
 
-.platform-hero__visual { position: relative; padding: 24px; border: 1px solid #bccbdc; border-radius: 10px; background: #fff; box-shadow: 18px 18px 0 rgba(29, 99, 216, .08); }
+.platform-hero__visual { position: relative; padding: 18px; border: 1px solid #bccbdc; border-radius: 10px; background: #fff; box-shadow: 18px 18px 0 rgba(29, 99, 216, .08); }
 .platform-hero__visual::before { content: ""; position: absolute; inset: 14px; border: 1px dashed #e0e7f0; border-radius: 5px; pointer-events: none; }
 .platform-hero__visual-head, .platform-hero__visual-foot { position: relative; display: flex; justify-content: space-between; gap: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .68rem; letter-spacing: .08em; }
 .platform-hero__visual-head { color: #64758b; }
 .platform-code-tag { color: var(--platform-blue); }
-.platform-flow { position: relative; display: grid; grid-template-columns: 1fr; gap: 0; margin: 45px 14px; }
-.platform-flow__node { display: grid; grid-template-columns: 42px 1fr auto; align-items: center; gap: 14px; min-height: 68px; padding: 12px 16px; border: 1px solid #d8e1eb; border-radius: 8px; background: #fbfdff; }
+.platform-hero__preview { position: relative; margin: 18px 0 16px; overflow: hidden; border: 1px solid #d8e1eb; border-radius: 8px; background: #f4f7fb; }
+.platform-hero__preview img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; object-position: left top; }
+.platform-flow { position: relative; display: grid; grid-template-columns: 1fr; gap: 0; margin: 20px 8px 24px; }
+.platform-flow__node { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 12px; min-height: 56px; padding: 10px 14px; border: 1px solid #d8e1eb; border-radius: 8px; background: #fbfdff; }
 .platform-flow__node b { color: var(--platform-blue); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .75rem; }
 .platform-flow__node span { font-weight: 750; }
 .platform-flow__node small { color: #728198; font-size: .75rem; }
 .platform-flow__node--accent { border-color: var(--platform-blue); background: #f0f6ff; }
-.platform-flow__connector { width: 1px; height: 22px; margin-left: 37px; background: #b5c7dc; }
+.platform-flow__connector { width: 1px; height: 14px; margin-left: 31px; background: #b5c7dc; }
 .platform-hero__visual-foot { padding-top: 16px; border-top: 1px solid #e5ebf2; color: #7b8aa0; letter-spacing: 0; }
 .platform-hero__visual-foot code { color: var(--platform-blue); font-size: .7rem; }
 
@@ -126,8 +133,11 @@ footer { border-top: 1px solid #27384f; }
   .platform-actions { align-items: stretch; flex-direction: column; }
   .platform-actions .button { justify-content: center; width: 100%; }
   .platform-hero__meta { gap: 10px 14px; line-height: 1.5; }
+  .platform-hero__proof { grid-template-columns: 1fr; }
+  .platform-hero__proof > div { border-right: 0; border-bottom: 1px solid var(--platform-line); }
+  .platform-hero__proof > div:last-child { border-bottom: 0; }
   .platform-hero__visual { padding: 18px; }
-  .platform-flow { margin: 34px 0; }
+  .platform-flow { margin: 22px 0; }
   .platform-flow__node { grid-template-columns: 34px 1fr; gap: 10px; padding: 11px 12px; }
   .platform-flow__node small { grid-column: 2; margin-top: -8px; }
   .platform-flow__connector { margin-left: 28px; }

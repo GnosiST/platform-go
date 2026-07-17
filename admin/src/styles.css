@@ -147,7 +147,7 @@
 
 .role-governance-detail-body {
   display: grid;
-  gap: 16px;
+  gap: 14px;
   min-width: 0;
   padding: 16px;
 }
@@ -167,8 +167,60 @@
 
 .role-governance-detail-heading .ant-typography {
   max-width: 100%;
+}
+
+.role-governance-identity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.role-governance-detail-kicker {
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.role-governance-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.role-governance-fact {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--page);
+}
+
+.role-governance-fact dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.role-governance-fact dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.role-governance-description {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.role-governance-description .ant-typography {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.role-governance-action-groups {
+  display: grid;
+  gap: 8px;
 }
 
 .role-governance-access-control,
@@ -195,6 +247,11 @@
 
 .role-governance-lifecycle-actions .ant-btn-dangerous {
   margin-inline-start: auto;
+}
+
+.role-governance-readonly-note {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
 
 .menu-governance-detail-body {
@@ -520,7 +577,12 @@
     align-items: flex-start;
   }
 
-  .role-governance-section-actions .ant-btn {
+  .role-governance-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .role-governance-section-actions .ant-btn,
+  .platform-tree-transfer-toolbar .ant-btn {
     width: 100%;
   }
 
@@ -573,6 +635,10 @@
 
   .role-data-scope-panel > :not(:first-child):not(:nth-child(2)) {
     grid-column: 1;
+  }
+
+  .organization-role-pool-metrics {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .platform-tree-transfer-pane {
@@ -1315,6 +1381,15 @@ select {
   justify-content: flex-end;
 }
 
+.platform-work-tabs-shell {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+
 .resource-page-header {
   display: flex;
   min-width: 0;
@@ -1356,36 +1431,36 @@ select {
 .platform-work-tabs {
   display: flex;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 auto;
   gap: 6px;
-  overflow: auto;
-  scrollbar-width: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-color: var(--border) transparent;
+  scrollbar-width: thin;
   scroll-behavior: smooth;
-}
-
-.platform-work-tabs::-webkit-scrollbar {
-  display: none;
 }
 
 .work-tabs-scroll-button {
   display: inline-grid;
-  width: 28px;
-  height: 32px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
   flex: 0 0 auto;
   place-items: center;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
   background: var(--surface-elevated);
-  color: var(--muted);
+  color: var(--text);
 }
 
-.work-tabs-scroll-button:hover {
+.work-tabs-scroll-button:hover:not(:disabled) {
   border-color: var(--primary);
   color: var(--primary);
 }
 
 .work-tab {
   display: inline-flex;
+  flex: 0 0 auto;
   min-width: 0;
   max-width: 220px;
   height: 32px;
@@ -1420,6 +1495,14 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.generic-resource-console .platform-data-table-panel .admin-list-title {
+  display: none;
+}
+
+.generic-resource-console .platform-data-table-panel .admin-list-toolbar {
+  min-height: 0;
 }
 
 .work-tab-close {
@@ -2967,6 +3050,58 @@ select {
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+.organization-role-pool-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.organization-role-pool-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.organization-role-pool-header > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.organization-role-pool-header .ant-typography {
+  overflow-wrap: anywhere;
+}
+
+.organization-role-pool-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.organization-role-pool-metrics > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--page);
+}
+
+.organization-role-pool-metrics dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.organization-role-pool-metrics dd {
+  margin: 0;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
 .organization-role-pool-item {

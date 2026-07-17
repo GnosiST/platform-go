@@ -26,6 +26,9 @@ type AdminResourceListMeta = {
   conditions?: unknown;
 };
 
+type SchemaValue = string | number | boolean | null | SchemaValue[] | { [key: string]: SchemaValue };
+type SchemaValueMap = Record<string, SchemaValue>;
+
 export const dataProvider: DataProvider = {
   getList: async <TData extends BaseRecord = BaseRecord>(params: GetListParams) => {
     const meta = params.meta as AdminResourceListMeta | undefined;
@@ -94,27 +97,28 @@ function toRefineRecord(record: AdminResourceRecord, issuedToken?: string): Base
 
 function toAdminResourceInput(variables: unknown): AdminResourceInput {
   const source = isObjectRecord(variables) ? variables : {};
-  const input: AdminResourceInput = {
+  const values: SchemaValueMap = isSchemaValueMap(source.values) ? source.values : {};
+  const input = {
     code: stringValue(source.code),
     name: stringValue(source.name) ?? "",
     status: stringValue(source.status),
     description: stringValue(source.description),
-    values: isValueMap(source.values) ? Object.fromEntries(Object.entries(source.values).map(([key, value]) => [key, storageValue(value)])) : {},
+    values,
   };
 
   for (const [key, value] of Object.entries(source)) {
     if (key === "id" || key === "code" || key === "name" || key === "status" || key === "description" || key === "values") {
       continue;
     }
-    if (value !== undefined) {
-      input.values = { ...(input.values ?? {}), [key]: storageValue(value) };
+    if (isSchemaValue(value)) {
+      input.values = { ...input.values, [key]: value };
     }
   }
 
   if (!input.name) {
     input.name = input.code || "Untitled";
   }
-  return input;
+  return input as unknown as AdminResourceInput;
 }
 
 function filtersToConditions(filters: CrudFilter[]): AdminResourceQueryCondition[] {
@@ -191,19 +195,18 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isValueMap(value: unknown): value is Record<string, unknown> {
-  return isObjectRecord(value);
+function isSchemaValueMap(value: unknown): value is SchemaValueMap {
+  return isObjectRecord(value) && Object.values(value).every(isSchemaValue);
 }
 
-function storageValue(value: unknown): string {
-  if (value === null) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
+function isSchemaValue(value: unknown): value is SchemaValue {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return true;
   }
+  if (Array.isArray(value)) {
+    return value.every(isSchemaValue);
+  }
+  return isObjectRecord(value) && Object.values(value).every(isSchemaValue);
 }
 
 function stringValue(value: unknown) {

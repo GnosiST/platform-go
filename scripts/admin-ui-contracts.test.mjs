@@ -234,34 +234,34 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /Shared role governance page must display Role Management as its English H1/);
   });
 
-  it("rejects resource writes that drop structured field values", () => {
+  it("rejects resource writes that narrow schema values to strings", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
       tempRoot,
       "admin/src/platform/resources/GenericResourceConsole.tsx",
-      'if (typeof raw === "object")',
-      'if (false && typeof raw === "object")',
+      "return isSchemaValue(value) ? value : undefined;",
+      'return typeof value === "string" ? value : undefined;',
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /must JSON-encode structured values/);
+    assert.match(result.stderr, /valid arrays, booleans or numbers/);
   });
 
-  it("rejects resource writes that flatten array boundaries", () => {
+  it("rejects resource writes that stringify array boundaries", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
       tempRoot,
       "admin/src/platform/resources/GenericResourceConsole.tsx",
-      "JSON.stringify(raw.map((item) => String(item)))",
-      'raw.map((item) => String(item)).join(",")',
+      "const value = schemaValueFromFormValue(raw);",
+      'const value = Array.isArray(raw) ? JSON.stringify(raw.map((item) => String(item))) : schemaValueFromFormValue(raw);',
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /must preserve array boundaries/);
+    assert.match(result.stderr, /must not stringify multiselect arrays/);
   });
 
   it("rejects relation option loading without stale-response protection", () => {
@@ -1375,6 +1375,18 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /Role detail actions must expose 44px targets/);
   });
 
+  it("keeps role and organization workbench hierarchy localized and contract-bound", () => {
+    const roleGovernance = adminSource("admin/src/platform/resources/RoleGovernanceConsole.tsx");
+    const organizationExperience = adminSource("admin/src/platform/resources/organizationUserExperience.tsx");
+    const styles = adminSource("admin/src/styles.css");
+
+    assert.match(roleGovernance, /role-governance-action-groups/);
+    assert.match(roleGovernance, /roleGovernanceAuthorizationActions/);
+    assert.match(roleGovernance, /roleGovernanceLifecycleActions/);
+    assert.match(organizationExperience, /organization-role-pool-metrics/);
+    assert.match(styles, /\.organization-role-pool-panel\s*\{/);
+  });
+
   it("rejects Tree Transfer checkboxes without a real 44px pointer target", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
@@ -2139,6 +2151,48 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /Mobile work-tab close controls must use the context-closing handler/);
+  });
+
+  it("keeps one shell collapse control and gives mixed layout distinct navigation roles", () => {
+    const shell = adminSource("admin/src/platform/shell/AdminShell.tsx");
+
+    assert.equal((shell.match(/className="brand-collapse-button"/g) ?? []).length, 1);
+    assert.doesNotMatch(shell, /className="desktop-sider-toggle"/);
+    assert.match(shell, /groupedResources=\{layoutMode === "mixed" && activeGroup \? \[activeGroup\] : groupedResources\}/);
+    assert.match(shell, /compact=\{layoutMode === "mixed"\}/);
+    assert.match(shell, /aria-current=\{active \? "page" : undefined\}/);
+  });
+
+  it("keeps work tabs visible with overflow controls, wheel scrolling, and active-tab reveal", () => {
+    const shell = adminSource("admin/src/platform/shell/AdminShell.tsx");
+    const styles = adminSource("admin/src/styles.css");
+    const dictionary = adminSource("admin/src/platform/i18n.ts");
+
+    assert.match(shell, /className="platform-work-tabs-shell"/);
+    assert.match(shell, /ResizeObserver/);
+    assert.match(shell, /MutationObserver/);
+    assert.match(shell, /onWheel=\{handleWorkTabsWheel\}/);
+    assert.match(shell, /event\.currentTarget\.scrollBy/);
+    assert.match(shell, /scrollIntoView\(\{ block: "nearest", inline: "nearest" \}\)/);
+    assert.match(shell, /className="work-tabs-scroll-button"/);
+    assert.match(shell, /disabled=\{!workTabsScroll\.left\}/);
+    assert.match(shell, /disabled=\{!workTabsScroll\.right\}/);
+    assert.match(styles, /\.platform-work-tabs-shell\s*\{/);
+    assert.match(styles, /\.work-tab\s*\{[\s\S]*?flex:\s*0 0 auto;/);
+    assert.match(styles, /\.platform-work-tabs\s*\{[\s\S]*?overflow-x:\s*auto;/);
+    assert.match(dictionary, /scrollWorkTabsLeft: /);
+    assert.match(dictionary, /scrollWorkTabsRight: /);
+  });
+
+  it("keeps the resource page heading semantic while removing its duplicate list title", () => {
+    const page = adminSource("admin/src/platform/ui/AdminPage.tsx");
+    const resource = adminSource("admin/src/platform/resources/GenericResourceConsole.tsx");
+    const styles = adminSource("admin/src/styles.css");
+
+    assert.match(page, /<ResourcePageHeader className="page-heading"/);
+    assert.match(adminSource("admin/src/platform/ui/ResourcePageHeader.tsx"), /<Typography\.Title level=\{1\}>\{title\}<\/Typography\.Title>/);
+    assert.match(resource, /<AdminPage\s+[\s\S]*title=\{resource\.title\[language\]\}/);
+    assert.match(styles, /\.generic-resource-console \.platform-data-table-panel \.admin-list-title\s*\{[\s\S]*?display:\s*none;/);
   });
 
   it("rejects a client that renames the session-expired event contract", () => {

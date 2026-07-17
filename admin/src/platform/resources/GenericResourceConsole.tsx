@@ -80,6 +80,8 @@ type RelationOptionResult = {
   options: NonNullable<AdminResourceField["options"]>;
 };
 
+type SchemaValue = string | number | boolean | null | SchemaValue[] | { [key: string]: SchemaValue };
+
 const RELATION_OPTION_PAGE_SIZE = 30;
 const RELATION_OPTION_SEARCH_DELAY_MS = 250;
 
@@ -1801,7 +1803,7 @@ function recordValueByField(record: AdminResourceRecord, fieldKey: string) {
   if (fieldKey === "updatedAt") {
     return record.updatedAt;
   }
-  return record.values?.[fieldKey] ?? "";
+  return schemaValueToText(record.values?.[fieldKey]);
 }
 
 function mergeFieldOptions(
@@ -1829,8 +1831,15 @@ function relationValuesFromRecord(record: AdminResourceRecord | null, field: Adm
 }
 
 function relationValuesFromInput(value: unknown) {
-  if (Array.isArray(value)) return value.filter((item) => (typeof item === "string" || typeof item === "number") && String(item).trim() !== "").map(String);
-  return typeof value === "string" ? parseListValue(value) : [];
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => (typeof item === "string" || typeof item === "number") && String(item).trim() !== "")
+      .map(String);
+  }
+  if (typeof value !== "string") {
+    return [];
+  }
+  return parseListValue(value);
 }
 
 function relationSignature(fields: AdminResourceField[]) {
@@ -1866,7 +1875,9 @@ type FieldInputProps = {
 
 function FieldInput({ field, language, ...controlProps }: FieldInputProps) {
   const relationLoading = controlProps.relationLoading === true;
-  const onRelationSearch = typeof controlProps.onRelationSearch === "function" ? controlProps.onRelationSearch as (search: string) => void : undefined;
+  const onRelationSearch = typeof controlProps.onRelationSearch === "function"
+    ? controlProps.onRelationSearch as (search: string) => void
+    : undefined;
   delete controlProps.relationLoading;
   delete controlProps.onRelationSearch;
   const maxLength = field.validation?.maxLength;
@@ -1888,12 +1899,12 @@ function FieldInput({ field, language, ...controlProps }: FieldInputProps) {
     if (isTreeRelationField(field)) {
       return (
         <PlatformTreeSelect
-        {...(controlProps as ComponentProps<typeof PlatformTreeSelect>)}
-        multiple
-        filterTreeNode={onRelationSearch ? false : undefined}
-        loading={relationLoading}
-        onSearch={onRelationSearch}
-        options={treeSelectOptions(field, language)}
+          {...(controlProps as ComponentProps<typeof PlatformTreeSelect>)}
+          multiple
+          filterTreeNode={onRelationSearch ? false : undefined}
+          loading={relationLoading}
+          onSearch={onRelationSearch}
+          options={treeSelectOptions(field, language)}
         />
       );
     }
@@ -1920,12 +1931,12 @@ function FieldInput({ field, language, ...controlProps }: FieldInputProps) {
     if (isTreeRelationField(field)) {
       return (
         <PlatformTreeSelect
-        {...(controlProps as ComponentProps<typeof PlatformTreeSelect>)}
-        allowClear={!field.required}
-        filterTreeNode={onRelationSearch ? false : undefined}
-        loading={relationLoading}
-        onSearch={onRelationSearch}
-        options={treeSelectOptions(field, language)}
+          {...(controlProps as ComponentProps<typeof PlatformTreeSelect>)}
+          allowClear={!field.required}
+          filterTreeNode={onRelationSearch ? false : undefined}
+          loading={relationLoading}
+          onSearch={onRelationSearch}
+          options={treeSelectOptions(field, language)}
         />
       );
     }
@@ -2306,7 +2317,7 @@ function renderFieldValue(
     return <Tag>{value}</Tag>;
   }
   if (field.type === "multiselect") {
-    const values = parseListValue(getRecordFieldValue(record, field));
+    const values = relationValuesFromInput(getRecordFieldValue(record, field));
     if (values.length === 0) {
       return "-";
     }
@@ -2322,14 +2333,14 @@ function renderFieldValue(
     return (
       <Switch
         aria-label={localizedText(field.label, language)}
-        checked={isTruthyValue(getRecordFieldValue(record, field))}
+        checked={isTruthySchemaValue(getRecordFieldValue(record, field))}
         disabled
         size="small"
       />
     );
   }
   if (field.type === "color") {
-    const color = getRecordFieldValue(record, field);
+    const color = schemaValueToText(getRecordFieldValue(record, field));
     return color ? (
       <span className="resource-color-cell">
         <i style={{ background: color }} />
@@ -2349,51 +2360,52 @@ function renderPlainFieldValue(
   dictionary: Dictionary,
 ) {
   const value = getRecordFieldValue(record, field);
-  if (!value) {
+  if (value === undefined || value === null || value === "") {
     return "-";
   }
+  const displayValue = schemaValueToText(value);
   if (field.localizable) {
     return localizedRecordValue(record, field.key, language);
   }
   if (field.key === "status") {
-    return statusLabel(dictionary, value);
+    return statusLabel(dictionary, displayValue);
   }
   if (field.type === "datetime") {
-    return formatDate(value);
+    return formatDate(displayValue);
   }
   if (field.type === "select") {
-    return optionLabel(field, value, language);
+    return optionLabel(field, displayValue, language);
   }
   if (field.type === "multiselect") {
-    return parseListValue(value)
+    return relationValuesFromInput(value)
       .map((item) => optionLabel(field, item, language))
       .join(", ");
   }
   if (field.type === "switch") {
-    return boolLabel(dictionary, value);
+    return boolLabel(dictionary, isTruthySchemaValue(value));
   }
-  return value;
+  return displayValue;
 }
 
 function withOverflowTooltip(value: string) {
   return <PlatformOverflowText value={value} />;
 }
 
-function getRecordFieldValue(record: AdminResourceRecord, field?: AdminResourceField) {
+function getRecordFieldValue(record: AdminResourceRecord, field?: AdminResourceField): SchemaValue {
   if (!field) {
     return "";
   }
   if (field.source === "values") {
-    return record.values?.[field.key] ?? "";
+    return (record.values as Record<string, SchemaValue> | undefined)?.[field.key] ?? "";
   }
   const value = record[field.key as keyof AdminResourceRecord];
-  return typeof value === "string" ? value : "";
+  return isSchemaValue(value) ? value : "";
 }
 
 function localizedRecordValue(record: AdminResourceRecord, key: string, language: Language) {
   const suffix = language === "zh" ? "Zh" : "En";
   const fallbackSuffix = language === "zh" ? "En" : "Zh";
-  return record.values?.[`${key}${suffix}`] || record.values?.[`${key}${fallbackSuffix}`] || record.values?.[key] || recordFieldValue(record, key);
+  return schemaValueToText(record.values?.[`${key}${suffix}`]) || schemaValueToText(record.values?.[`${key}${fallbackSuffix}`]) || schemaValueToText(record.values?.[key]) || recordFieldValue(record, key);
 }
 
 function recordFieldValue(record: AdminResourceRecord, key: string) {
@@ -2413,15 +2425,15 @@ function formValueFromRecord(record: AdminResourceRecord, field: AdminResourceFi
   }
   const value = getRecordFieldValue(record, field);
   if (field.type === "multiselect") {
-    return parseListValue(value);
+    return relationValuesFromInput(value);
   }
   if (field.type === "switch") {
-    return isTruthyValue(value);
+    return isTruthySchemaValue(value);
   }
   if (field.type === "number") {
-    return value === "" ? undefined : Number(value);
+    return value === "" || value === null ? undefined : typeof value === "number" ? value : Number(value);
   }
-  return value;
+  return value as ResourceFormValues[string];
 }
 
 function defaultFormValues(fields: AdminResourceField[]) {
@@ -2446,69 +2458,55 @@ function defaultFieldValue(field: AdminResourceField) {
 
 function inputFromFormValues(values: ResourceFormValues, fields: AdminResourceField[]): AdminResourceInput {
   const input: AdminResourceInput = { name: String(values.name ?? "") };
-  const nestedValues: Record<string, string> = {};
+  const nestedValues: Record<string, SchemaValue> = {};
   for (const field of fields) {
-    const raw = values[field.key];
-    const value = serializeFieldValue(field, raw);
+    const raw = (values as Record<string, unknown>)[field.key];
+    const value = schemaValueFromFormValue(raw);
     if (field.source === "values") {
-      if (value.trim() !== "") {
+      if (value !== undefined && value !== "") {
         nestedValues[field.key] = value;
       }
       continue;
     }
     switch (field.key) {
     case "code":
-      input.code = value;
+      input.code = typeof value === "string" ? value : "";
       break;
     case "name":
-      input.name = value;
+      input.name = typeof value === "string" ? value : "";
       break;
     case "status":
-      input.status = value;
+      input.status = typeof value === "string" ? value : undefined;
       break;
     case "description":
-      input.description = value;
+      input.description = typeof value === "string" ? value : undefined;
       break;
     }
   }
   if (Object.keys(nestedValues).length > 0) {
-    input.values = nestedValues;
+    input.values = nestedValues as unknown as NonNullable<AdminResourceInput["values"]>;
   }
   return input;
 }
 
-function serializeFieldValue(field: AdminResourceField, raw: unknown): string {
-  if (Array.isArray(raw)) {
-    return JSON.stringify(raw.map((item) => String(item)));
-  }
-  if (raw == null) {
-    return "";
-  }
-  if (field.type === "switch") {
-    return raw === true ? "true" : "false";
-  }
-  if (field.type === "number") {
-    return String(raw);
-  }
-  if (typeof raw === "object") {
-    return JSON.stringify(raw);
-  }
-  return String(raw);
+function schemaValueFromFormValue(value: unknown): SchemaValue | undefined {
+  return isSchemaValue(value) ? value : undefined;
 }
 
 function inputFromRecord(record: AdminResourceRecord, fields: AdminResourceField[], overrides: Partial<AdminResourceInput> = {}): AdminResourceInput {
+  const recordValues = record.values as Record<string, unknown> | undefined;
   const safeValues = Object.fromEntries(
     fields
       .filter((field) => field.source === "values" && !field.readOnly && field.sensitivity === "public" && field.storageMode !== "encrypted" && field.responseMode !== "omitted" && field.responseMode !== "privileged")
-      .map((field) => [field.key, record.values?.[field.key] ?? ""])
-      .filter(([, value]) => value !== ""),
+      .map((field) => [field.key, recordValues?.[field.key] ?? ""] as const)
+      .filter(([, value]) => isSchemaValue(value) && value !== ""),
   );
   return {
     code: overrides.code ?? record.code,
     name: overrides.name ?? record.name,
     status: overrides.status ?? record.status,
     description: overrides.description ?? record.description ?? "",
-    values: { ...safeValues, ...(overrides.values ?? {}) },
+    values: { ...safeValues, ...(overrides.values ?? {}) } as unknown as NonNullable<AdminResourceInput["values"]>,
   };
 }
 
@@ -2951,8 +2949,8 @@ function statusLabel(dictionary: Dictionary, status: string) {
   return labels[status] ?? status;
 }
 
-function boolLabel(dictionary: Dictionary, value: string) {
-  return isTruthyValue(value) ? dictionary.yes : dictionary.no;
+function boolLabel(dictionary: Dictionary, value: SchemaValue) {
+  return isTruthySchemaValue(value) ? dictionary.yes : dictionary.no;
 }
 
 function tableRangeLabel(total: number, range: [number, number], dictionary: Dictionary) {
@@ -2983,6 +2981,40 @@ function stripQuotes(value: string) {
 
 function isTruthyValue(value: string) {
   return ["1", "true", "yes", "enabled", "on"].includes(value.toLowerCase());
+}
+
+function isTruthySchemaValue(value: SchemaValue) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  return typeof value === "string" ? isTruthyValue(value) : typeof value === "number" && value !== 0;
+}
+
+function schemaValueToText(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "";
+  }
+}
+
+function isSchemaValue(value: unknown): value is SchemaValue {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.every(isSchemaValue);
+  }
+  return Boolean(value && typeof value === "object" && Object.values(value).every(isSchemaValue));
 }
 
 function filterValueActive(value: PlatformDataTableFilterValue) {
