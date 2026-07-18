@@ -325,6 +325,28 @@ describe("admin resource contract generators", () => {
     );
   });
 
+  it("documents restart-required plugin management status", () => {
+    const contract = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, "..", "resources", "generated", "admin-resource-contract.json"), "utf8"));
+    const openapi = runAdminOpenAPIForContract(contract);
+    const operation = openapi.paths["/api/admin/plugin-management/status"]?.get;
+    assert.ok(operation, "expected GET /api/admin/plugin-management/status");
+    assert.equal(operation.operationId, "getPluginManagementStatus");
+    assert.equal(operation["x-platform-permission"], "admin:capability:read");
+    assert.equal(operation["x-platform-plugin-management"], "restart-required-v1");
+    assert.equal(operation.responses["200"].content["application/json"].schema.properties.data.$ref, "#/components/schemas/PluginManagementStatusData");
+
+    const status = openapi.components.schemas.PluginManagementStatusData;
+    assert.equal(status.properties.operationMode.const, "restart-required-desired-state");
+    assert.equal(status.properties.activation.const, "manual-restart");
+    assert.equal(status.properties.progressTransport.const, "http-polling");
+    assert.equal(status.properties.runtimeHotInstall.const, false);
+    assert.equal(status.properties.runtimeHotUninstall.const, false);
+    assert.equal(status.properties.remoteRepositoryPull.const, false);
+    assert.equal(status.properties.restartRequiredForChanges.const, true);
+    assert.equal(status.properties.lockStatus.$ref, "#/components/schemas/PluginManagementLockStatus");
+    assert.equal(openapi.components.schemas.PluginManagementLockStatus.additionalProperties, false);
+  });
+
   it("projects canonical audit correlation validation and export policy deterministically", () => {
     const contract = runAdminResourceContract();
     const first = runAdminOpenAPIForContract(contract);

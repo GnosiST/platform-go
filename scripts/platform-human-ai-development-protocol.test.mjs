@@ -60,9 +60,12 @@ describe("validate-platform-human-ai-development-protocol", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /minimumAcceptanceCommands must include rtk node scripts\/validate-platform-capability-operation-policy\.mjs/);
+    assert.match(result.stderr, /minimumAcceptanceCommands must include rtk node scripts\/validate-platform-plugin-management-v1\.mjs/);
     assert.match(result.stderr, /minimumAcceptanceCommands must include rtk node scripts\/validate-external-capability-example\.mjs/);
+    assert.match(result.stderr, /requiredValidators must include scripts\/validate-platform-plugin-management-v1\.mjs/);
     assert.match(result.stderr, /requiredValidators must include scripts\/validate-platform-capability-operation-policy\.mjs/);
     assert.match(result.stderr, /requiredValidators must include scripts\/validate-admin-ui-contracts\.mjs/);
+    assert.match(result.stderr, /requiredTests must include scripts\/platform-plugin-management-v1\.test\.mjs/);
     assert.match(result.stderr, /requiredTests must include scripts\/platform-capability-operation-policy\.test\.mjs/);
   });
 

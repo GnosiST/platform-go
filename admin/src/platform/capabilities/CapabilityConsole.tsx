@@ -1,10 +1,10 @@
 import {
   ApiOutlined,
-  CloudUploadOutlined,
   EyeOutlined,
 } from "@ant-design/icons";
-import { Progress, Segmented, Space, Tag, Typography } from "antd";
+import { Modal, Progress, Segmented, Space, Tag, Typography } from "antd";
 import { useEffect, useMemo, useState } from "react";
+import type { PluginManagementStatus } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
 import {
   AdminActionButton,
@@ -26,6 +26,7 @@ type CapabilityConsoleProps = {
   dictionary: Dictionary;
   loading: boolean;
   error: string;
+  pluginManagementStatus: PluginManagementStatus | null;
 };
 
 type CapabilityFilter = "all" | CapabilityKind;
@@ -37,17 +38,38 @@ export function CapabilityConsole({
   dictionary,
   loading,
   error,
+  pluginManagementStatus,
 }: CapabilityConsoleProps) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<CapabilityFilter>("all");
   const [tableFilters, setTableFilters] = useState<Record<string, PlatformDataTableFilterValue>>({});
   const [selectedID, setSelectedID] = useState("");
+  const [detailOpen, setDetailOpen] = useState(false);
   const allCapabilities = capabilities;
+  const catalogCapabilities = useMemo(() => {
+    const seen = new Set(allCapabilities.map((capability) => capability.id));
+    return [
+      ...allCapabilities,
+      ...optionalCapabilities.filter((capability) => {
+        if (seen.has(capability.id)) {
+          return false;
+        }
+        seen.add(capability.id);
+        return true;
+      }),
+    ];
+  }, [allCapabilities, optionalCapabilities]);
+  const status = useMemo(
+    () => normalizePluginManagementStatus(pluginManagementStatus, allCapabilities),
+    [allCapabilities, pluginManagementStatus],
+  );
+  const currentCapabilityIDs = useMemo(() => new Set(status.currentCapabilities), [status.currentCapabilities]);
+  const desiredCapabilityIDs = useMemo(() => new Set(status.desiredCapabilities), [status.desiredCapabilities]);
 
   const filteredCapabilities = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return allCapabilities.filter((capability) => {
-      const matchesFilter = filter === "all" || capability.kind === filter;
+    return catalogCapabilities.filter((capability) => {
+      const matchesFilter = matchesCapabilitySegmentFilter(capability, filter, currentCapabilityIDs);
       const haystack = [
         capability.id,
         capability.name,
@@ -62,28 +84,34 @@ export function CapabilityConsole({
         .toLowerCase();
       return matchesFilter && matchesCapabilityFilters(capability, tableFilters, language) && (!normalizedQuery || haystack.includes(normalizedQuery));
     });
-  }, [allCapabilities, filter, language, query, tableFilters]);
+  }, [catalogCapabilities, currentCapabilityIDs, filter, language, query, tableFilters]);
 
   const selectedCapability = useMemo(() => {
     return (
-      allCapabilities.find((capability) => capability.id === selectedID) ??
+      catalogCapabilities.find((capability) => capability.id === selectedID) ??
       filteredCapabilities[0] ??
-      allCapabilities[0]
+      catalogCapabilities[0]
     );
-  }, [allCapabilities, filteredCapabilities, selectedID]);
+  }, [catalogCapabilities, filteredCapabilities, selectedID]);
 
   useEffect(() => {
-    if (!selectedID && allCapabilities[0]) {
-      setSelectedID(allCapabilities[0].id);
+    if (!selectedID && catalogCapabilities[0]) {
+      setSelectedID(catalogCapabilities[0].id);
     }
-  }, [allCapabilities, selectedID]);
+  }, [catalogCapabilities, selectedID]);
 
-  const enabledCount = allCapabilities.filter((capability) => capability.kind !== "disabled").length;
-  const optionalCount = optionalCapabilities.length;
-  const disabledCount = allCapabilities.filter((capability) => capability.kind === "disabled").length;
-  const domainCount = new Set(allCapabilities.map((capability) => capability.domain.en)).size;
-  const healthyCount = allCapabilities.filter((capability) => capability.health === "healthy").length;
-  const healthPercent = Math.round((healthyCount / Math.max(allCapabilities.length, 1)) * 100);
+  const openCapabilityDetail = (capabilityID: string) => {
+    setSelectedID(capabilityID);
+    setDetailOpen(true);
+  };
+
+  const enabledCount = catalogCapabilities.filter((capability) => currentCapabilityIDs.has(capability.id)).length;
+  const optionalCount = catalogCapabilities.filter((capability) => capability.kind === "optional" && !currentCapabilityIDs.has(capability.id)).length;
+  const disabledCount = catalogCapabilities.filter((capability) => !currentCapabilityIDs.has(capability.id) && !desiredCapabilityIDs.has(capability.id)).length;
+  const domainCount = new Set(catalogCapabilities.map((capability) => capability.domain.en)).size;
+  const healthyCount = catalogCapabilities.filter((capability) => capability.health === "healthy").length;
+  const healthPercent = Math.round((healthyCount / Math.max(catalogCapabilities.length, 1)) * 100);
+  const installedPluginCount = catalogCapabilities.filter((capability) => currentCapabilityIDs.has(capability.id) && capability.kind === "plugin").length;
 
   const filterFields = useMemo<PlatformDataTableFilterField[]>(
     () => [
@@ -112,13 +140,13 @@ export function CapabilityConsole({
         key: "domain",
         label: dictionary.domain,
         type: "select",
-        options: Array.from(new Map(allCapabilities.map((capability) => [capability.domain.en, capability.domain])).values()).map((domain) => ({
+        options: Array.from(new Map(catalogCapabilities.map((capability) => [capability.domain.en, capability.domain])).values()).map((domain) => ({
           value: domain.en,
           label: domain[language],
         })),
       },
     ],
-    [allCapabilities, dictionary, language],
+    [catalogCapabilities, dictionary, language],
   );
 
   const columns: PlatformDataTableColumn<CapabilityView>[] = [
@@ -149,6 +177,13 @@ export function CapabilityConsole({
       render: (_: unknown, record: CapabilityView) => <PlatformOverflowText value={record.domain[language]} />,
     },
     {
+      title: dictionary.description,
+      dataIndex: "description",
+      key: "description",
+      width: 260,
+      render: (_: unknown, record: CapabilityView) => <PlatformOverflowText value={record.description[language]} />,
+    },
+    {
       title: dictionary.type,
       dataIndex: "kind",
       key: "kind",
@@ -157,14 +192,10 @@ export function CapabilityConsole({
     },
     {
       title: dictionary.status,
-      dataIndex: "kind",
+      dataIndex: "id",
       key: "status",
-      width: 110,
-      render: (kind: CapabilityKind) => (
-        <span className={`status-dot status-${kind === "disabled" ? "disabled" : "enabled"}`}>
-          {kind === "disabled" ? dictionary.disabled : dictionary.enabled}
-        </span>
-      ),
+      width: 130,
+      render: (_: unknown, record: CapabilityView) => capabilityRuntimeStatusTag(record, currentCapabilityIDs, desiredCapabilityIDs, dictionary),
     },
     {
       title: dictionary.version,
@@ -185,7 +216,7 @@ export function CapabilityConsole({
             label={dictionary.openDetail}
             size="small"
             type="text"
-            onClick={() => setSelectedID(record.id)}
+            onClick={() => openCapabilityDetail(record.id)}
           />
         </Space>
       ),
@@ -202,12 +233,12 @@ export function CapabilityConsole({
           <AdminMetricStrip
             className="summary-metrics"
             items={[
-              { key: "total", label: dictionary.totalCapabilities, value: allCapabilities.length },
+              { key: "total", label: dictionary.totalCapabilities, value: catalogCapabilities.length },
               { key: "enabled", label: dictionary.enabled, value: enabledCount, tone: "accent" },
               { key: "optional", label: dictionary.optional, value: optionalCount, tone: "warning" },
               { key: "disabled", label: dictionary.disabled, value: disabledCount },
               { key: "domains", label: dictionary.domains, value: domainCount },
-              { key: "installed", label: dictionary.installedPlugins, value: 0 },
+              { key: "installed", label: dictionary.installedPlugins, value: installedPluginCount },
             ]}
           />
           <div className="health-panel">
@@ -225,6 +256,7 @@ export function CapabilityConsole({
       }
     >
       {error ? <AdminFeedback className="api-alert" type="warning" message={dictionary.apiUnavailable} description={error} /> : null}
+      <PluginManagementPanel status={status} dictionary={dictionary} />
 
       <div className="console-grid">
         <div className="capability-workspace-stack">
@@ -286,13 +318,27 @@ export function CapabilityConsole({
                     className={capability.id === selectedCapability?.id ? "mobile-capability-card active" : "mobile-capability-card"}
                     key={capability.id}
                     type="button"
-                    onClick={() => setSelectedID(capability.id)}
+                    onMouseDown={(event) => {
+                      if (event.button === 0) {
+                        openCapabilityDetail(capability.id);
+                      }
+                    }}
+                    onPointerDown={(event) => {
+                      if (event.button === 0) {
+                        openCapabilityDetail(capability.id);
+                      }
+                    }}
+                    onClick={() => openCapabilityDetail(capability.id)}
                   >
                     <span>
                       <strong>{capability.label[language]}</strong>
                       <em>{capability.id}</em>
                     </span>
-                    <Tag className={`kind-tag kind-${capability.kind}`}>{kindLabel(dictionary, capability.kind)}</Tag>
+                    <span className="mobile-capability-meta">
+                      <Tag className={`kind-tag kind-${capability.kind}`}>{kindLabel(dictionary, capability.kind)}</Tag>
+                      {capabilityRuntimeStatusTag(capability, currentCapabilityIDs, desiredCapabilityIDs, dictionary)}
+                    </span>
+                    <EyeOutlined className="mobile-detail-icon" />
                   </button>
                 ))}
               </div>
@@ -307,41 +353,126 @@ export function CapabilityConsole({
                 }),
             }}
             rowKey="id"
-            scrollX={940}
+            scrollX={1180}
             searchPlaceholder={dictionary.searchCapability}
             searchValue={query}
             selectedRowKey={selectedCapability?.id}
             onClearFilters={() => setTableFilters({})}
             onFilterChange={(key, value) => setTableFilters((current) => ({ ...current, [key]: value }))}
-            onRowClick={(record) => setSelectedID(record.id)}
+            onRowClick={(record) => openCapabilityDetail(record.id)}
             onSearchChange={setQuery}
           />
 
-          <section className="optional-section">
-            <div className="section-title-row">
-              <Typography.Title level={3}>{dictionary.optionalCapabilities}</Typography.Title>
-              <Typography.Text>{dictionary.marketplaceHint}</Typography.Text>
-            </div>
-            <div className="optional-grid">
-              {optionalCapabilities.map((capability) => {
-                return (
-                  <article className="optional-card" key={capability.id}>
-                    <CloudUploadOutlined />
-                    <div>
-                      <Typography.Text strong>{capability.label[language]}</Typography.Text>
-                      <Typography.Text className="secondary-text">{capability.version}</Typography.Text>
-                    </div>
-                    <Tag>{dictionary.capabilityActionUnavailable}</Tag>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
         </div>
-
-        <CapabilityInspector capability={selectedCapability} dictionary={dictionary} language={language} />
       </div>
+      <Modal
+        centered
+        className="capability-detail-modal"
+        destroyOnHidden
+        footer={null}
+        open={detailOpen && Boolean(selectedCapability)}
+        title={null}
+        width={560}
+        onCancel={() => setDetailOpen(false)}
+      >
+        <CapabilityInspector capability={selectedCapability} dictionary={dictionary} language={language} />
+      </Modal>
     </AdminPage>
+  );
+}
+
+function PluginManagementPanel({
+  status,
+  dictionary,
+}: {
+  status: PluginManagementStatus;
+  dictionary: Dictionary;
+}) {
+  const restartRequired = status.restartRequiredForChanges;
+  return (
+    <section className={status.pendingRestart ? "plugin-management-panel pending" : "plugin-management-panel"}>
+      <div className="plugin-management-header">
+        <div>
+          <Typography.Text strong>{dictionary.pluginManagementV1Title}</Typography.Text>
+          <Typography.Paragraph>{dictionary.pluginManagementV1Description}</Typography.Paragraph>
+        </div>
+        <Space wrap>
+          <Tag className={status.pendingRestart ? "resource-status status-recorded" : "resource-status status-healthy"}>
+            {status.pendingRestart ? dictionary.restartPending : dictionary.noPendingRestart}
+          </Tag>
+          <Tag>{restartRequired ? dictionary.pluginV1RestartRequired : dictionary.no}</Tag>
+        </Space>
+      </div>
+
+      <dl className="plugin-management-grid">
+        <div>
+          <dt>{dictionary.operationMode}</dt>
+          <dd>{status.operationMode}</dd>
+        </div>
+        <div>
+          <dt>{dictionary.activation}</dt>
+          <dd>{status.activation}</dd>
+        </div>
+        <div>
+          <dt>{dictionary.progressTransport}</dt>
+          <dd>{status.progressTransport}</dd>
+        </div>
+        <div>
+          <dt>{dictionary.runtimeHotInstall}</dt>
+          <dd>{status.runtimeHotInstall ? dictionary.yes : dictionary.no}</dd>
+        </div>
+        <div>
+          <dt>{dictionary.runtimeHotUninstall}</dt>
+          <dd>{status.runtimeHotUninstall ? dictionary.yes : dictionary.no}</dd>
+        </div>
+        <div>
+          <dt>{dictionary.remoteRepositoryPull}</dt>
+          <dd>{status.remoteRepositoryPull ? dictionary.yes : dictionary.no}</dd>
+        </div>
+        <div>
+          <dt>{dictionary.restartRequired}</dt>
+          <dd>{restartRequired ? dictionary.yes : dictionary.no}</dd>
+        </div>
+        <div>
+          <dt>{dictionary.pendingRestart}</dt>
+          <dd>{status.pendingRestart ? dictionary.yes : dictionary.no}</dd>
+        </div>
+        <div>
+          <dt>{dictionary.lockStatus}</dt>
+          <dd>{formatLockStatus(status.lockStatus, dictionary)}</dd>
+        </div>
+        <div>
+          <dt>{dictionary.source}</dt>
+          <dd>{status.source}</dd>
+        </div>
+      </dl>
+
+      <div className="plugin-capability-state">
+        <PluginCapabilityList label={dictionary.currentCapabilities} ids={status.currentCapabilities} emptyText={dictionary.noDependency} />
+        <PluginCapabilityList label={dictionary.desiredCapabilities} ids={status.desiredCapabilities} emptyText={dictionary.noDependency} />
+      </div>
+    </section>
+  );
+}
+
+function PluginCapabilityList({
+  label,
+  ids,
+  emptyText,
+}: {
+  label: string;
+  ids: string[];
+  emptyText: string;
+}) {
+  const visibleIDs = ids.slice(0, 18);
+  return (
+    <div className="plugin-capability-list">
+      <Typography.Text strong>{label}</Typography.Text>
+      <div className="plugin-capability-tags">
+        {visibleIDs.length > 0 ? visibleIDs.map((id) => <Tag key={id}>{id}</Tag>) : <Typography.Text className="secondary-text">{emptyText}</Typography.Text>}
+        {ids.length > visibleIDs.length ? <Tag>{`+${ids.length - visibleIDs.length}`}</Tag> : null}
+      </div>
+    </div>
   );
 }
 
@@ -355,13 +486,13 @@ function CapabilityInspector({
   language: Language;
 }) {
   if (!capability) {
-    return <aside className="capability-inspector empty" />;
+    return <div className="capability-detail-panel empty" />;
   }
 
   const dependencyChain = capability.dependencies.length > 0 ? [...capability.dependencies, capability.id] : [capability.id];
 
   return (
-    <aside className="capability-inspector">
+    <div className="capability-detail-panel">
       <div className="inspector-header">
         <div className="inspector-icon">
           <ApiOutlined />
@@ -423,7 +554,7 @@ function CapabilityInspector({
         </div>
       </section>
 
-    </aside>
+    </div>
   );
 }
 
@@ -459,6 +590,36 @@ function filterValueActive(value: PlatformDataTableFilterValue) {
   return Boolean(value.from || value.to);
 }
 
+function matchesCapabilitySegmentFilter(capability: CapabilityView, filter: CapabilityFilter, currentCapabilityIDs: Set<string>) {
+  switch (filter) {
+  case "all":
+    return true;
+  case "plugin":
+    return capability.kind === "plugin" || capability.kind === "optional";
+  case "optional":
+    return !currentCapabilityIDs.has(capability.id);
+  default:
+    return capability.kind === filter;
+  }
+}
+
+function capabilityRuntimeStatusTag(
+  capability: CapabilityView,
+  currentCapabilityIDs: Set<string>,
+  desiredCapabilityIDs: Set<string>,
+  dictionary: Dictionary,
+) {
+  const enabled = currentCapabilityIDs.has(capability.id);
+  const pending = !enabled && desiredCapabilityIDs.has(capability.id);
+  if (pending) {
+    return <Tag className="resource-status status-recorded">{dictionary.restartPending}</Tag>;
+  }
+  if (enabled) {
+    return <span className="status-dot status-enabled">{dictionary.enabled}</span>;
+  }
+  return <span className="status-dot status-disabled">{dictionary.notEnabled}</span>;
+}
+
 function kindLabel(dictionary: Dictionary, kind: CapabilityKind) {
   const labels = {
     core: dictionary.coreCapability,
@@ -471,4 +632,66 @@ function kindLabel(dictionary: Dictionary, kind: CapabilityKind) {
 
 function formatTemplate(template: string, values: Record<string, string>) {
   return Object.entries(values).reduce((result, [key, value]) => result.replaceAll(`{${key}}`, value), template);
+}
+
+function normalizePluginManagementStatus(status: PluginManagementStatus | null, capabilities: CapabilityView[]): PluginManagementStatus {
+  const currentCapabilities = uniqueCapabilityIDs(status?.currentCapabilities, capabilities.map((capability) => capability.id));
+  const desiredCapabilities = uniqueCapabilityIDs(status?.desiredCapabilities, currentCapabilities);
+  const restartRequired = status ? Boolean(status.restartRequiredForChanges) : true;
+  return {
+    operationMode: status?.operationMode || "restart-required-desired-state",
+    activation: status?.activation || "manual-restart",
+    progressTransport: status?.progressTransport || "http-polling",
+    runtimeHotInstall: Boolean(status?.runtimeHotInstall),
+    runtimeHotUninstall: Boolean(status?.runtimeHotUninstall),
+    remoteRepositoryPull: Boolean(status?.remoteRepositoryPull),
+    restartRequiredForChanges: restartRequired,
+    pendingRestart: Boolean(status?.pendingRestart || !sameCapabilitySet(currentCapabilities, desiredCapabilities)),
+    lockStatus: normalizeLockStatus(status?.lockStatus),
+    source: status?.source || "/api/capabilities",
+    currentCapabilities,
+    desiredCapabilities,
+  };
+}
+
+function normalizeLockStatus(value: unknown): PluginManagementStatus["lockStatus"] {
+  if (!value || typeof value !== "object") {
+    return { configured: false, exists: false, valid: false };
+  }
+  const record = value as Record<string, unknown>;
+  return {
+    configured: Boolean(record.configured),
+    path: typeof record.path === "string" ? record.path : undefined,
+    exists: Boolean(record.exists),
+    valid: Boolean(record.valid),
+    error: typeof record.error === "string" ? record.error : undefined,
+  };
+}
+
+function formatLockStatus(status: PluginManagementStatus["lockStatus"], dictionary: Dictionary) {
+  if (!status.configured) {
+    return dictionary.lockNotConfigured;
+  }
+  if (!status.exists) {
+    return dictionary.lockConfiguredMissing;
+  }
+  if (!status.valid) {
+    return status.error ? `${dictionary.lockConfiguredInvalid}: ${status.error}` : dictionary.lockConfiguredInvalid;
+  }
+  return dictionary.lockConfiguredValid;
+}
+
+function uniqueCapabilityIDs(values: unknown, fallback: string[]) {
+  if (!Array.isArray(values)) {
+    return fallback;
+  }
+  return Array.from(new Set(values.filter((value): value is string => typeof value === "string" && value.trim() !== "").map((value) => value.trim())));
+}
+
+function sameCapabilitySet(left: string[], right: string[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+  const rightSet = new Set(right);
+  return left.every((value) => rightSet.has(value));
 }

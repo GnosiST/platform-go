@@ -19,6 +19,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_EDGE_TRUSTED_PROXY", "")
 	t.Setenv("PLATFORM_HTTP_MAX_BODY_BYTES", "")
 	t.Setenv("PLATFORM_CAPABILITIES", "")
+	t.Setenv("PLATFORM_CAPABILITY_LOCK_FILE", "")
 	t.Setenv("PLATFORM_ADMIN_RESOURCE_FILE", "")
 	t.Setenv("PLATFORM_ADMIN_RESOURCE_DRIVER", "")
 	t.Setenv("PLATFORM_ADMIN_RESOURCE_DSN", "")
@@ -490,6 +491,57 @@ func TestLoadPreservesBlankCapabilityEntriesForValidation(t *testing.T) {
 	want := []string{"tenant", "", "identity", ""}
 	if !reflect.DeepEqual(cfg.Capabilities, want) {
 		t.Fatalf("Capabilities = %#v, want %#v", cfg.Capabilities, want)
+	}
+}
+
+func TestLoadUsesCapabilityLockFileWhenCapabilitiesUnset(t *testing.T) {
+	lockPath := filepath.Join(t.TempDir(), "platform-capabilities.lock.json")
+	if err := os.WriteFile(lockPath, []byte(`{"version":1,"capabilities":["tenant","identity","audit"]}`), 0o600); err != nil {
+		t.Fatalf("write lock file: %v", err)
+	}
+	t.Setenv("PLATFORM_CAPABILITIES", "")
+	t.Setenv("PLATFORM_CAPABILITY_LOCK_FILE", lockPath)
+
+	cfg := Load()
+	want := []string{"tenant", "identity", "audit"}
+	if !reflect.DeepEqual(cfg.Capabilities, want) {
+		t.Fatalf("Capabilities = %#v, want %#v", cfg.Capabilities, want)
+	}
+	if cfg.CapabilityLockFile != lockPath {
+		t.Fatalf("CapabilityLockFile = %q, want %q", cfg.CapabilityLockFile, lockPath)
+	}
+	if source := cfg.CapabilityConfigSource(); source != "lock-file" {
+		t.Fatalf("CapabilityConfigSource() = %q, want lock-file", source)
+	}
+}
+
+func TestValidateRuntimeRejectsCapabilityLockAndExplicitCapabilitiesConflict(t *testing.T) {
+	lockPath := filepath.Join(t.TempDir(), "platform-capabilities.lock.json")
+	if err := os.WriteFile(lockPath, []byte(`{"version":1,"capabilities":["tenant","identity"]}`), 0o600); err != nil {
+		t.Fatalf("write lock file: %v", err)
+	}
+	t.Setenv("PLATFORM_CAPABILITIES", "tenant,identity")
+	t.Setenv("PLATFORM_CAPABILITY_LOCK_FILE", lockPath)
+
+	cfg := Load()
+	err := cfg.ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "PLATFORM_CAPABILITY_LOCK_FILE cannot be combined with PLATFORM_CAPABILITIES") {
+		t.Fatalf("ValidateRuntime() error = %v, want lock conflict", err)
+	}
+}
+
+func TestValidateRuntimeRejectsInvalidCapabilityLockFile(t *testing.T) {
+	lockPath := filepath.Join(t.TempDir(), "platform-capabilities.lock.json")
+	if err := os.WriteFile(lockPath, []byte(`{"version":2,"capabilities":["tenant"]}`), 0o600); err != nil {
+		t.Fatalf("write lock file: %v", err)
+	}
+	t.Setenv("PLATFORM_CAPABILITIES", "")
+	t.Setenv("PLATFORM_CAPABILITY_LOCK_FILE", lockPath)
+
+	cfg := Load()
+	err := cfg.ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "PLATFORM_CAPABILITY_LOCK_FILE is invalid") {
+		t.Fatalf("ValidateRuntime() error = %v, want invalid lock", err)
 	}
 }
 

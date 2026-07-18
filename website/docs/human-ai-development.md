@@ -30,15 +30,18 @@ title: 人机协同开发
 
 ## 扩展生命周期
 
-当前平台支持启动前组合能力，不支持运行时热插拔。启用能力要先注册 manifest，再通过 profile、`PLATFORM_CAPABILITIES` 或下游 composition root 选择；禁用后重新生成合同并重启，已禁用资源不能继续从 Admin/API 暴露。历史数据清理或源码移除不是通用卸载按钮，需要迁移、回滚和负责人证据。
+当前平台支持启动前组合能力，不支持运行时热插拔。启用能力要先注册 manifest，再通过 profile、`PLATFORM_CAPABILITIES`、`PLATFORM_CAPABILITY_LOCK_FILE` 或下游 composition root 选择；禁用后重新生成合同并重启，已禁用资源不能继续从 Admin/API 暴露。历史数据清理或源码移除不是通用卸载按钮，需要迁移、回滚和负责人证据。
+
+插件管理 v1 的合同是 `resources/platform-plugin-management-v1.json`。它把通过 profile、`PLATFORM_CAPABILITIES`、`PLATFORM_CAPABILITY_LOCK_FILE` 或下游 composition root 声明期望能力后“启用/禁用手动重启生效”固定为 restart-required desired-state model，并明确 v1 不集成 WebSocket、不从远端仓库拉插件、不支持运行时热安装/热卸载或破坏性卸载。新业务项目优先放在下游仓库或 composition root，平台只提供通用能力边界。
 
 ## 验证入口
 
 ```bash
-node scripts/validate-platform-human-ai-development-protocol.mjs
-node scripts/validate-platform-capability-operation-policy.mjs
-node scripts/validate-external-capability-example.mjs
-node scripts/validate-admin-resources.mjs
-node scripts/validate-admin-ui-contracts.mjs
-node scripts/validate-platform-codegen-source-writing-readiness.mjs
+rtk node scripts/validate-platform-human-ai-development-protocol.mjs
+rtk node scripts/validate-platform-plugin-management-v1.mjs
+rtk node scripts/validate-platform-capability-operation-policy.mjs
+rtk node scripts/validate-external-capability-example.mjs
+rtk node scripts/validate-admin-resources.mjs
+rtk node scripts/validate-admin-ui-contracts.mjs
+rtk node scripts/validate-platform-codegen-source-writing-readiness.mjs
 ```

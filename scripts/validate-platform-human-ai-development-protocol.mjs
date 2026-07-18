@@ -36,6 +36,7 @@ const requiredCustomizationModes = [
 ];
 const requiredAcceptanceCommands = [
   "rtk node scripts/validate-platform-human-ai-development-protocol.mjs",
+  "rtk node scripts/validate-platform-plugin-management-v1.mjs",
   "rtk node scripts/validate-platform-capability-operation-policy.mjs",
   "rtk node scripts/validate-external-capability-example.mjs",
   "rtk node scripts/validate-admin-resources.mjs",
@@ -171,6 +172,7 @@ function validateProtocol(protocol) {
   requireIncludes(protocol.minimumAcceptanceCommands, requiredAcceptanceCommands, "minimumAcceptanceCommands", errors);
   requireIncludes(protocol.requiredValidators, [
     "scripts/validate-platform-human-ai-development-protocol.mjs",
+    "scripts/validate-platform-plugin-management-v1.mjs",
     "scripts/validate-platform-capability-operation-policy.mjs",
     "scripts/validate-external-capability-example.mjs",
     "scripts/validate-admin-ui-contracts.mjs",
@@ -178,6 +180,7 @@ function validateProtocol(protocol) {
   ], "requiredValidators", errors);
   requireIncludes(protocol.requiredTests, [
     "scripts/platform-human-ai-development-protocol.test.mjs",
+    "scripts/platform-plugin-management-v1.test.mjs",
     "scripts/platform-capability-operation-policy.test.mjs",
   ], "requiredTests", errors);
 

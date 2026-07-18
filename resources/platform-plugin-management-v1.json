@@ -1,0 +1,295 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-plugin-management-v1.json",
+  "capturedAt": "2026-07-18",
+  "contractVersion": "0.1.0",
+  "id": "platform-plugin-management-v1",
+  "purpose": "Machine-checkable v1 contract for plugin-style capability management on the business-neutral platform foundation. v1 uses a restart-required desired-state model instead of runtime hot-plugging.",
+  "businessBoundary": {
+    "platformRole": "Provide generic capability lifecycle contracts, validation gates, profile composition and restart-required activation rules.",
+    "businessRole": "Own concrete domain capabilities, storage, workflow, custom UI panels and product-specific tests in downstream packages or composition roots.",
+    "forbids": [
+      "shipping exhibition, exhibitor, builder or other concrete business resources as platform-default capabilities",
+      "hard-coding business menus, handlers or storage into platform core",
+      "treating a business direction as a reusable foundation module without a separate reusable capability contract"
+    ]
+  },
+  "runtimePolicy": {
+    "operationMode": "restart-required-desired-state",
+    "activation": "manual-restart",
+    "restartRequiredForChanges": true,
+    "manualRestartSupported": true,
+    "runtimeHotInstall": false,
+    "runtimeHotUninstall": false,
+    "remoteRepositoryPull": false,
+    "destructiveUninstall": false,
+    "sourceRemovalSupported": false,
+    "dataPurgeSupported": false,
+    "webSocketRequired": false,
+    "webSocketIntegratedInV1": false,
+    "progressTransport": "http-polling",
+    "updateDetection": "static-version-json-or-api-version-check",
+    "dirtyWorkAutoRefresh": false
+  },
+  "desiredState": {
+    "currentStateSource": "Enabled manifests resolved at process startup and reflected in generated contracts.",
+    "pendingRestartRule": "pendingRestart is true when the desired capability set differs from the running process capability set; it is cleared only after contracts are regenerated and the process restarts with the desired set.",
+    "stateFields": [
+      "operationMode",
+      "activation",
+      "source",
+      "lockStatus",
+      "currentCapabilities",
+      "desiredCapabilities",
+      "pendingRestart",
+      "restartRequiredForChanges"
+    ],
+    "sources": [
+      {
+        "id": "capability-profile",
+        "kind": "repository-contract",
+        "path": "resources/platform-capability-profiles.json",
+        "status": "implemented-contract",
+        "writesRuntimeSource": false,
+        "restartRequired": true
+      },
+      {
+        "id": "PLATFORM_CAPABILITIES",
+        "kind": "environment-variable",
+        "env": "PLATFORM_CAPABILITIES",
+        "status": "implemented-runtime-selection",
+        "writesRuntimeSource": false,
+        "restartRequired": true
+      },
+      {
+        "id": "PLATFORM_CAPABILITY_LOCK_FILE",
+        "kind": "lock-file",
+        "env": "PLATFORM_CAPABILITY_LOCK_FILE",
+        "status": "implemented-runtime-selection",
+        "writesRuntimeSource": false,
+        "restartRequired": true
+      },
+      {
+        "id": "downstream-composition-root",
+        "kind": "downstream-code",
+        "status": "downstream-owned-runtime-selection",
+        "writesRuntimeSource": false,
+        "restartRequired": true
+      }
+    ]
+  },
+  "lifecycleGates": [
+    {
+      "id": "declare-desired-state",
+      "phase": "plan",
+      "required": true,
+      "evidence": [
+        "selected profile, PLATFORM_CAPABILITIES value, PLATFORM_CAPABILITY_LOCK_FILE value or downstream composition-root change",
+        "business-neutral boundary review for reusable platform changes"
+      ],
+      "commands": [
+        "rtk node scripts/validate-platform-plugin-management-v1.mjs"
+      ]
+    },
+    {
+      "id": "contract-preflight",
+      "phase": "preflight",
+      "required": true,
+      "commands": [
+        "rtk node scripts/validate-platform-capability-contracts.mjs",
+        "rtk node scripts/validate-platform-capability-profiles.mjs",
+        "rtk node scripts/validate-platform-capability-operation-policy.mjs",
+        "rtk node scripts/validate-platform-plugin-management-v1.mjs"
+      ]
+    },
+    {
+      "id": "contract-regeneration",
+      "phase": "build",
+      "required": true,
+      "commands": [
+        "rtk go run ./cmd/platform-contracts admin-resources --output resources/generated/admin-capability-resource-contract.json",
+        "rtk go run ./cmd/platform-contracts app-routes --output resources/generated/app-route-contract.json",
+        "rtk go run ./cmd/platform-contracts audit --output resources/generated/platform-capability-audit.json",
+        "rtk node scripts/generate-admin-resource-contract.mjs",
+        "rtk node scripts/generate-admin-openapi.mjs",
+        "rtk node scripts/generate-app-openapi.mjs"
+      ]
+    },
+    {
+      "id": "manual-restart",
+      "phase": "activation",
+      "required": true,
+      "requires": [
+        "stop the old API process",
+        "start the API process with the desired capability source",
+        "do not mutate runtime source or pull plugin code from a remote repository during activation"
+      ]
+    },
+    {
+      "id": "post-restart-verification",
+      "phase": "verify",
+      "required": true,
+      "commands": [
+        "rtk node scripts/validate-admin-resources.mjs",
+        "rtk node scripts/validate-platform-admin-api-boundary.mjs",
+        "rtk node scripts/validate-platform-app-client-api-boundary.mjs",
+        "rtk node scripts/validate-platform-plugin-management-v1.mjs"
+      ],
+      "evidence": [
+        "disabled schemas, menus, providers, routes and demo datasets are absent from exposed contracts",
+        "enabled capability contracts match the desired capability set"
+      ]
+    },
+    {
+      "id": "update-detection",
+      "phase": "client-notice",
+      "required": true,
+      "transport": "http-polling",
+      "requires": [
+        "version.json polling or API version check",
+        "manual reload prompt when a newer deployed version is detected",
+        "no automatic refresh while user work may be dirty"
+      ]
+    },
+    {
+      "id": "destructive-removal-review",
+      "phase": "outside-v1",
+      "required": true,
+      "mode": "review-required-outside-v1",
+      "prohibitedInV1": [
+        "source package deletion",
+        "persisted data purge",
+        "runtime one-click uninstall"
+      ],
+      "requires": [
+        "owner-approved migration plan",
+        "rollback plan",
+        "backup or retention evidence",
+        "post-removal contract validation"
+      ]
+    }
+  ],
+  "acceptedCombinations": [
+    {
+      "id": "minimal-admin",
+      "type": "profile",
+      "profile": "minimal-admin",
+      "operationPolicyCombination": "minimal-admin",
+      "expected": "Foundation-only Admin shell with non-removable capabilities."
+    },
+    {
+      "id": "platform-default",
+      "type": "profile",
+      "profile": "platform-default",
+      "operationPolicyCombination": "platform-default",
+      "expected": "Default development foundation selected when PLATFORM_CAPABILITIES is unset."
+    },
+    {
+      "id": "production-admin-oidc-ready",
+      "type": "profile",
+      "profile": "production-admin-oidc-ready",
+      "operationPolicyCombination": "production-admin-oidc-ready",
+      "expected": "Production-oriented Admin profile with demo data removed and Admin OIDC enabled."
+    },
+    {
+      "id": "all-optional-platform-without-demo",
+      "type": "explicit-capabilities",
+      "operationPolicyCombination": "all-optional-platform-without-demo",
+      "expected": "Reusable optional platform capabilities can be composed while demo data stays disabled."
+    },
+    {
+      "id": "optional-personnel-disabled-after-profile-removal",
+      "type": "disable",
+      "fromProfile": "platform-personnel-ready",
+      "toProfile": "platform-default",
+      "capability": "personnel",
+      "expectedDisableMode": "config-remove-retain-data",
+      "expectedDataAfterDisable": "retained-unreachable"
+    },
+    {
+      "id": "external-business-downstream-owned",
+      "type": "external-business",
+      "capability": "external-business-capability",
+      "expectedInstallMode": "external-business",
+      "expectedDisableMode": "downstream-owned",
+      "expectedUninstallMode": "downstream-owned-reviewed-removal",
+      "expectedDataAfterDisable": "downstream-owned"
+    }
+  ],
+  "requiredValidators": [
+    "scripts/validate-platform-plugin-management-v1.mjs",
+    "scripts/validate-platform-capability-operation-policy.mjs",
+    "scripts/validate-platform-capability-contracts.mjs",
+    "scripts/validate-platform-capability-profiles.mjs",
+    "scripts/validate-external-capability-example.mjs"
+  ],
+  "requiredTests": [
+    "scripts/platform-plugin-management-v1.test.mjs",
+    "scripts/platform-capability-operation-policy.test.mjs",
+    "scripts/platform-capability-contracts.test.mjs",
+    "scripts/platform-capability-profiles.test.mjs"
+  ],
+  "requiredDocs": [
+    "README.md",
+    "README.en.md",
+    "docs/platform-capability-development.md",
+    "docs/platform-human-ai-development-protocol.md",
+    "website/docs/capabilities.md",
+    "website/docs/human-ai-development.md",
+    "website/i18n/en/docusaurus-plugin-content-docs/current/capabilities.md",
+    "website/i18n/en/docusaurus-plugin-content-docs/current/human-ai-development.md"
+  ],
+  "requiredSourceSnippets": [
+    {
+      "path": "README.md",
+      "contains": "插件管理 v1"
+    },
+    {
+      "path": "README.en.md",
+      "contains": "Plugin management v1"
+    },
+    {
+      "path": "docs/platform-capability-development.md",
+      "contains": "platform-plugin-management-v1"
+    },
+    {
+      "path": "docs/platform-human-ai-development-protocol.md",
+      "contains": "platform-plugin-management-v1"
+    },
+    {
+      "path": "internal/platform/config/config.go",
+      "contains": "PLATFORM_CAPABILITY_LOCK_FILE"
+    },
+    {
+      "path": "internal/platform/httpapi/server.go",
+      "contains": "adminPluginManagementStatus"
+    },
+    {
+      "path": "admin/src/platform/capabilities/CapabilityConsole.tsx",
+      "contains": "PluginManagementPanel"
+    },
+    {
+      "path": "admin/src/platform/shell/AdminShell.tsx",
+      "contains": "getFrontendVersion"
+    },
+    {
+      "path": "resources/generated/openapi.admin.json",
+      "contains": "/api/admin/plugin-management/status"
+    },
+    {
+      "path": "website/docs/capabilities.md",
+      "contains": "插件管理 v1"
+    },
+    {
+      "path": "website/docs/human-ai-development.md",
+      "contains": "插件管理 v1"
+    },
+    {
+      "path": "website/i18n/en/docusaurus-plugin-content-docs/current/capabilities.md",
+      "contains": "Plugin management v1"
+    },
+    {
+      "path": "website/i18n/en/docusaurus-plugin-content-docs/current/human-ai-development.md",
+      "contains": "Plugin management v1"
+    }
+  ]
+}

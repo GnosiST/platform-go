@@ -1120,6 +1120,50 @@ function schemas() {
         copyAllowed: { type: "boolean" },
       },
     },
+    PluginManagementLockStatus: {
+      type: "object",
+      required: ["configured", "exists", "valid"],
+      additionalProperties: false,
+      properties: {
+        configured: { type: "boolean" },
+        path: { type: "string" },
+        exists: { type: "boolean" },
+        valid: { type: "boolean" },
+        error: { type: "string" },
+      },
+    },
+    PluginManagementStatusData: {
+      type: "object",
+      required: [
+        "operationMode",
+        "activation",
+        "progressTransport",
+        "runtimeHotInstall",
+        "runtimeHotUninstall",
+        "remoteRepositoryPull",
+        "restartRequiredForChanges",
+        "source",
+        "lockStatus",
+        "currentCapabilities",
+        "desiredCapabilities",
+        "pendingRestart",
+      ],
+      additionalProperties: false,
+      properties: {
+        operationMode: { type: "string", const: "restart-required-desired-state" },
+        activation: { type: "string", const: "manual-restart" },
+        progressTransport: { type: "string", const: "http-polling" },
+        runtimeHotInstall: { type: "boolean", const: false },
+        runtimeHotUninstall: { type: "boolean", const: false },
+        remoteRepositoryPull: { type: "boolean", const: false },
+        restartRequiredForChanges: { type: "boolean", const: true },
+        source: { type: "string", enum: ["default", "environment", "lock-file", "manual"] },
+        lockStatus: { $ref: "#/components/schemas/PluginManagementLockStatus" },
+        currentCapabilities: { type: "array", items: { type: "string" }, uniqueItems: true },
+        desiredCapabilities: { type: "array", items: { type: "string" }, uniqueItems: true },
+        pendingRestart: { type: "boolean" },
+      },
+    },
   };
 
   for (const resource of resources) {
@@ -1306,6 +1350,23 @@ paths["/api/auth/login"] = {
   },
 };
 
+paths["/api/admin/plugin-management/status"] = {
+  get: {
+    tags: ["plugin-management"],
+    operationId: "getPluginManagementStatus",
+    summary: "Read restart-required plugin management status",
+    description:
+      "Reports the running capability set, desired lock-file capability set and whether a manual restart is required. v1 does not support runtime hot install or uninstall.",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      "200": successResponse("Plugin management status", apiResponse({ $ref: "#/components/schemas/PluginManagementStatusData" })),
+      ...errorResponses(),
+    },
+    "x-platform-permission": "admin:capability:read",
+    "x-platform-plugin-management": "restart-required-v1",
+  },
+};
+
 paths["/api/admin/service-objects/query"] = {
   post: {
     tags: ["service-objects"],
@@ -1368,6 +1429,7 @@ const openapi = {
   servers: [{ url: "/" }],
   tags: [
     { name: "auth", description: "Public Admin authentication endpoints." },
+    { name: "plugin-management", description: "Restart-required capability desired-state inspection." },
     { name: "sensitive-reveal", description: "Step-up verification and one-time sensitive field reveal endpoints." },
     { name: "service-objects", description: "Versioned server-side QueryDefinition and CommandDefinition execution." },
     ...resources.map((resource) => ({

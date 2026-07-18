@@ -158,6 +158,8 @@ func main() {
 		DebugCodeEnabled:         phoneVerification.DebugCodeEnabled,
 		JWTSecret:                cfg.JWTSecret,
 		OpenAPIDocument:          openAPIDocument,
+		CapabilityLockFile:       cfg.CapabilityLockFile,
+		CapabilityConfigSource:   cfg.CapabilityConfigSource(),
 		DisableDemoAuthProvider:  cfg.DisableDemoAuthProvider,
 		Security:                 securityOptionsFromConfig(cfg),
 		RateLimiter:              rateLimitRuntime.Limiter,

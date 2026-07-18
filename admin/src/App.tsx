@@ -12,6 +12,7 @@ import {
   getBrandingConfig,
   getAuthToken,
   getCurrentAdminSession,
+  getPluginManagementStatus,
   listAdminMenus,
   listAuthProviders,
   listCapabilities,
@@ -21,6 +22,7 @@ import {
   type AdminCurrentSession,
   type AuthProvider,
   type CapabilityItem,
+  type PluginManagementStatus,
   type AdminSensitiveRevealFactorComplete,
 } from "./platform/api/client";
 import { CapabilityConsole } from "./platform/capabilities/CapabilityConsole";
@@ -72,6 +74,7 @@ function PlatformApp() {
   const [session, setSession] = useState<AdminCurrentSession | null>(null);
   const [authProviders, setAuthProviders] = useState<AuthProvider[]>([]);
   const [branding, setBranding] = useState<BrandingConfig | null>(null);
+  const [pluginManagementStatus, setPluginManagementStatus] = useState<PluginManagementStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
   const [error, setError] = useState("");
@@ -144,6 +147,7 @@ function PlatformApp() {
       setPermissions([]);
       setDeniedPermissions([]);
       setCapabilityItems([]);
+      setPluginManagementStatus(null);
       setResources(coreResources);
       setSessionExpired(true);
       setSensitiveRevealOIDCResume(null);
@@ -173,14 +177,21 @@ function PlatformApp() {
 
   const loadAdminWorkspace = () => {
     setLoading(true);
-    return Promise.all([listCapabilities(), listAdminMenus(), getCurrentAdminSession(), getBrandingConfig()])
-      .then(([items, menus, session, nextBranding]) => {
+    return Promise.all([
+      listCapabilities(),
+      listAdminMenus(),
+      getCurrentAdminSession(),
+      getBrandingConfig(),
+      getPluginManagementStatus().catch(() => null),
+    ])
+      .then(([items, menus, session, nextBranding, nextPluginManagementStatus]) => {
         setCapabilityItems(items);
         setResources(menus.items.map(menuItemToResourceDefinition));
         setPermissions(session.permissions);
         setDeniedPermissions(session.deniedPermissions ?? []);
         setSession(session);
         setBranding(nextBranding);
+        setPluginManagementStatus(nextPluginManagementStatus);
         if (!hasStoredTheme) {
           applyThemeName(normalizeThemeName(nextBranding.defaultTheme));
         }
@@ -194,6 +205,7 @@ function PlatformApp() {
         clearAuthToken();
         setSession(null);
         setDeniedPermissions([]);
+        setPluginManagementStatus(null);
         setError(nextError instanceof Error ? nextError.message : dictionary.capabilityListLoadFailed);
       })
       .finally(() => setLoading(false));
@@ -205,6 +217,7 @@ function PlatformApp() {
       setPermissions([]);
       setDeniedPermissions([]);
       setResources(coreResources);
+      setPluginManagementStatus(null);
       setSensitiveRevealOIDCResume(null);
       setSensitiveRevealOIDCCallbackPending(false);
       clearPendingSensitiveRevealOIDC();
@@ -364,6 +377,7 @@ function PlatformApp() {
           exportWatermark={uiConfig.watermark && uiConfig.watermarkScopes.includes("export")}
           resources={resources}
           session={session}
+          pluginManagementStatus={pluginManagementStatus}
           sensitiveRevealOIDCResume={sensitiveRevealOIDCResume}
           onSensitiveRevealOIDCResumeConsumed={() => setSensitiveRevealOIDCResume(null)}
           onRouteChange={navigateToRoute}
@@ -384,6 +398,7 @@ function PlatformRoutePages({
   permissions,
   deniedPermissions,
   exportWatermark,
+  pluginManagementStatus,
   resources,
   session,
   sensitiveRevealOIDCResume,
@@ -400,6 +415,7 @@ function PlatformRoutePages({
   permissions: string[];
   deniedPermissions: string[];
   exportWatermark: boolean;
+  pluginManagementStatus: PluginManagementStatus | null;
   resources: AdminResourceDefinition[];
   session: AdminCurrentSession;
   sensitiveRevealOIDCResume: SensitiveRevealOIDCResume<AdminSensitiveRevealFactorComplete> | null;
@@ -436,6 +452,7 @@ function PlatformRoutePages({
             dictionary={dictionary}
             loading={loading}
             error={error}
+            pluginManagementStatus={pluginManagementStatus}
           />
         )}
       />

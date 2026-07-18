@@ -34,6 +34,29 @@ export type CapabilityItem = {
   version: string;
 };
 
+export type PluginManagementLockStatus = {
+  configured: boolean;
+  path?: string;
+  exists: boolean;
+  valid: boolean;
+  error?: string;
+};
+
+export type PluginManagementStatus = {
+  operationMode: string;
+  activation: string;
+  progressTransport: string;
+  runtimeHotInstall: boolean;
+  runtimeHotUninstall: boolean;
+  remoteRepositoryPull: boolean;
+  restartRequiredForChanges: boolean;
+  pendingRestart: boolean;
+  lockStatus: PluginManagementLockStatus;
+  source: string;
+  currentCapabilities: string[];
+  desiredCapabilities: string[];
+};
+
 export type BrandingConfig = {
   productName: string;
   shortName: string;
@@ -594,6 +617,18 @@ export function clearAuthToken() {
 
 export function listCapabilities() {
   return request<CapabilityItem[]>("/capabilities");
+}
+
+export function getPluginManagementStatus() {
+  return request<PluginManagementStatus>("/admin/plugin-management/status");
+}
+
+export async function getFrontendVersion() {
+  const response = await fetch(`/version.json?t=${Date.now()}`, { cache: "no-store" });
+  if (!response.ok) {
+    return null;
+  }
+  return response.json() as Promise<unknown>;
 }
 
 export function getBrandingConfig() {

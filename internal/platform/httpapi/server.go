@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -65,6 +66,8 @@ type ServerOptions struct {
 	SessionTTL               time.Duration
 	JWTSecret                string
 	OpenAPIDocument          []byte
+	CapabilityLockFile       string
+	CapabilityConfigSource   string
 	TokenService             *authjwt.Service
 	Now                      func() time.Time
 	Authorizer               Authorizer
@@ -144,6 +147,8 @@ type Server struct {
 	tokens                   authTokenService
 	now                      func() time.Time
 	openAPIDocument          []byte
+	capabilityLockFile       string
+	capabilityConfigSource   string
 	authorizer               Authorizer
 	policyMu                 sync.Mutex
 	policyAuthorizer         Authorizer
@@ -278,6 +283,8 @@ func New(options ServerOptions) *Server {
 		tokens:                   tokens,
 		now:                      now,
 		openAPIDocument:          append([]byte(nil), options.OpenAPIDocument...),
+		capabilityLockFile:       strings.TrimSpace(options.CapabilityLockFile),
+		capabilityConfigSource:   strings.TrimSpace(options.CapabilityConfigSource),
 		authorizer:               options.Authorizer,
 		allowInsecureHeaderAuth:  options.AllowInsecureHeaderAuth,
 		disableDemoAuthProvider:  options.DisableDemoAuthProvider,
@@ -319,6 +326,7 @@ func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 	s.registerManifestAppRoutes(api)
 	api.GET("/admin/session/current", s.adminCurrentSession)
 	api.GET("/admin/menus", s.adminMenus)
+	api.GET("/admin/plugin-management/status", s.adminPluginManagementStatus)
 	api.GET("/admin/demo-data", s.adminDemoDataList)
 	api.POST("/admin/demo-data/:capability/:dataset/apply", s.adminDemoDataApply)
 	api.GET("/admin/policy-reviews/export", s.adminPolicyReviewExport)
@@ -431,6 +439,97 @@ func (s *Server) capabilitiesList(ctx *gin.Context) {
 		items = append(items, item{ID: manifest.ID, Name: manifest.Name, Version: manifest.Version})
 	}
 	ctx.JSON(http.StatusOK, Response[[]item]{Data: items})
+}
+
+type pluginManagementStatusResponse struct {
+	OperationMode             string                   `json:"operationMode"`
+	Activation                string                   `json:"activation"`
+	ProgressTransport         string                   `json:"progressTransport"`
+	RuntimeHotInstall         bool                     `json:"runtimeHotInstall"`
+	RuntimeHotUninstall       bool                     `json:"runtimeHotUninstall"`
+	RemoteRepositoryPull      bool                     `json:"remoteRepositoryPull"`
+	RestartRequiredForChanges bool                     `json:"restartRequiredForChanges"`
+	Source                    string                   `json:"source"`
+	LockStatus                pluginManagementLockInfo `json:"lockStatus"`
+	CurrentCapabilities       []string                 `json:"currentCapabilities"`
+	DesiredCapabilities       []string                 `json:"desiredCapabilities"`
+	PendingRestart            bool                     `json:"pendingRestart"`
+}
+
+type pluginManagementLockInfo struct {
+	Configured bool   `json:"configured"`
+	Path       string `json:"path,omitempty"`
+	Exists     bool   `json:"exists"`
+	Valid      bool   `json:"valid"`
+	Error      string `json:"error,omitempty"`
+}
+
+func (s *Server) adminPluginManagementStatus(ctx *gin.Context) {
+	if !s.authorize(ctx, "admin:capability:read") {
+		return
+	}
+	current := s.currentCapabilityIDs()
+	desired := append([]string(nil), current...)
+	source := strings.TrimSpace(s.capabilityConfigSource)
+	if source == "" {
+		source = "manual"
+	}
+	lock := pluginManagementLockInfo{}
+	if s.capabilityLockFile != "" {
+		lock.Configured = true
+		lock.Path = s.capabilityLockFile
+		if _, err := os.Stat(s.capabilityLockFile); err == nil {
+			lock.Exists = true
+		}
+		lockFile, err := capability.LoadLockFile(s.capabilityLockFile)
+		if err != nil {
+			lock.Valid = false
+			lock.Error = err.Error()
+		} else {
+			lock.Valid = true
+			desired = capability.IDsToStrings(lockFile.Capabilities)
+		}
+	}
+	ctx.JSON(http.StatusOK, Response[pluginManagementStatusResponse]{Data: pluginManagementStatusResponse{
+		OperationMode:             "restart-required-desired-state",
+		Activation:                "manual-restart",
+		ProgressTransport:         "http-polling",
+		RuntimeHotInstall:         false,
+		RuntimeHotUninstall:       false,
+		RemoteRepositoryPull:      false,
+		RestartRequiredForChanges: true,
+		Source:                    source,
+		LockStatus:                lock,
+		CurrentCapabilities:       current,
+		DesiredCapabilities:       desired,
+		PendingRestart:            lock.Valid && !sameStringSet(current, desired),
+	}})
+}
+
+func (s *Server) currentCapabilityIDs() []string {
+	ids := make([]string, 0, len(s.capabilities))
+	for _, manifest := range s.capabilities {
+		ids = append(ids, string(manifest.ID))
+	}
+	return ids
+}
+
+func sameStringSet(left []string, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	counts := map[string]int{}
+	for _, value := range left {
+		counts[strings.TrimSpace(value)]++
+	}
+	for _, value := range right {
+		key := strings.TrimSpace(value)
+		if counts[key] == 0 {
+			return false
+		}
+		counts[key]--
+	}
+	return true
 }
 
 func (s *Server) platformBranding(ctx *gin.Context) {

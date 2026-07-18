@@ -54,6 +54,18 @@ describe("validate-platform-capability-operation-policy", () => {
     assert.match(result.stderr, /capability tenant is foundation-core and must use uninstallMode not-supported-foundation/);
   });
 
+  it("rejects policies that claim runtime plugin management support", () => {
+    const policy = readJSON("resources/platform-capability-operation-policy.json");
+    policy.operationModel.remoteRepositoryPull = true;
+    policy.operationModel.webSocketRequired = true;
+
+    const result = runValidator(["--policy", tempJSON("operation-policy.json", policy)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /operationModel\.remoteRepositoryPull must stay false/);
+    assert.match(result.stderr, /operationModel\.webSocketRequired must stay false/);
+  });
+
   it("rejects optional operation combinations that do not resolve through capability audit", () => {
     const policy = readJSON("resources/platform-capability-operation-policy.json");
     policy.validatedCombinations.push({

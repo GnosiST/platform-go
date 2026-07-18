@@ -18,7 +18,11 @@ This document is the public protocol for starting a highly customized business s
 
 ## Capability Lifecycle Operations
 
-Capability install, disable and uninstall decisions must use `resources/platform-capability-operation-policy.json`. The platform supports startup-time composition, not runtime hot-plugging: enabling a capability means selecting a registered manifest through a profile, `PLATFORM_CAPABILITIES` or a downstream composition root before startup and contract generation. Disabling a default or optional capability means removing it from the enabled set, regenerating contracts and restarting; disabled resources, menus, providers, routes and demo data must not remain exposed. Foundation capabilities are non-removable. Destructive data purge or source-package removal is not a generic platform operation and requires reviewed migration, rollback and owner evidence.
+Capability install, disable and uninstall decisions must use `resources/platform-capability-operation-policy.json`. The platform supports startup-time composition, not runtime hot-plugging: enabling a capability means selecting a registered manifest through a profile, `PLATFORM_CAPABILITIES`, `PLATFORM_CAPABILITY_LOCK_FILE` or a downstream composition root before startup and contract generation. Disabling a default or optional capability means removing it from the enabled set, regenerating contracts and restarting; disabled resources, menus, providers, routes and demo data must not remain exposed. Foundation capabilities are non-removable. Destructive data purge or source-package removal is not a generic platform operation and requires reviewed migration, rollback and owner evidence.
+
+`resources/platform-plugin-management-v1.json` defines the productized plugin management v1 contract. It is a restart-required desired-state model: humans or AI agents declare the desired capability set through a profile, `PLATFORM_CAPABILITIES`, `PLATFORM_CAPABILITY_LOCK_FILE` or a downstream composition root, run the contract/profile/operation-policy gates, regenerate artifacts, then manually restart the API process. v1 does not support runtime hot install/uninstall, remote repository pull, destructive uninstall, source removal, data purge or WebSocket progress. Update detection should be HTTP polling, `version.json` or API version checks with a manual reload prompt.
+
+When starting a new business project, keep business-specific code outside platform core. Use a downstream package, repository or composition root for product resources, workflows, storage, UI panels and tests, and import only `github.com/GnosiST/platform-go/pkg/platform/capability`. A business direction can inform examples, but it must not become a platform-default capability without a reusable contract and profile gate.
 
 ## Collaboration Rules
 
@@ -92,6 +96,7 @@ For a meaningful business customization, start with the narrow checks for the ch
 
 ```bash
 rtk node scripts/validate-platform-human-ai-development-protocol.mjs
+rtk node scripts/validate-platform-plugin-management-v1.mjs
 rtk node scripts/validate-platform-capability-operation-policy.mjs
 rtk node scripts/validate-external-capability-example.mjs
 rtk node scripts/validate-admin-resources.mjs

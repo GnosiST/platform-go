@@ -151,7 +151,11 @@ The default release supports one datasource and one native transaction boundary.
 
 Platform owns shared mechanisms. Business code must not reach into concrete platform storage, HTTP handlers or Admin internals; use the public capability, service, query/command and storage-port contracts.
 
-Capability operations are governed by [resources/platform-capability-operation-policy.json](resources/platform-capability-operation-policy.json): the platform supports startup-time enablement through profiles, `PLATFORM_CAPABILITIES` or a downstream composition root. It does not support runtime hot-plugging or generic destructive uninstall. Disabled capability surfaces must disappear from contracts, and foundation capabilities are non-removable.
+Capability operations are governed by [resources/platform-capability-operation-policy.json](resources/platform-capability-operation-policy.json): the platform supports startup-time enablement through profiles, `PLATFORM_CAPABILITIES`, `PLATFORM_CAPABILITY_LOCK_FILE` or a downstream composition root. It does not support runtime hot-plugging or generic destructive uninstall. Disabled capability surfaces must disappear from contracts, and foundation capabilities are non-removable.
+
+Plugin management v1 is defined in [resources/platform-plugin-management-v1.json](resources/platform-plugin-management-v1.json). It uses a restart-required desired-state model: install or enable means declaring the desired capability set through a profile, `PLATFORM_CAPABILITIES`, `PLATFORM_CAPABILITY_LOCK_FILE` or a downstream composition root, regenerating contracts and manually restarting the service; disable means removing the capability from the desired set and restarting. v1 does not pull code from remote repositories, does not support runtime hot install/uninstall, does not provide destructive uninstall, and does not integrate WebSocket. Status and update notices use HTTP polling, `version.json` or an API version check.
+
+To start a new business project on the foundation, do not place product-specific code in `platform-go` core. Prefer a downstream business repository or downstream composition root: declare the business capability manifest, resources, permissions, routes and lifecycle first, then keep storage, handlers, Admin panels and product tests downstream. Only behavior reusable across business domains should become a platform profile.
 
 Before onboarding a business capability, copy or adapt the minimum example in
 [examples/external-capability](examples/external-capability), then run the

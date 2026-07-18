@@ -20,6 +20,7 @@ import {
   MoonOutlined,
   PartitionOutlined,
   PushpinOutlined,
+  ReloadOutlined,
   RightOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
@@ -29,9 +30,9 @@ import {
   UploadOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Avatar, Button, Drawer, Dropdown, Input, Space, Tag, Tooltip, Typography, type MenuProps } from "antd";
+import { Alert, Avatar, Button, Drawer, Dropdown, Input, Space, Tag, Tooltip, Typography, type MenuProps } from "antd";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type WheelEvent } from "react";
-import type { AdminCurrentSession, BrandingConfig } from "../api/client";
+import { getFrontendVersion, type AdminCurrentSession, type BrandingConfig } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
 import { themeTokens, type AdminLayoutMode, type ThemeName } from "../theme";
 import type { AdminResourceDefinition } from "../resources/registry";
@@ -121,9 +122,11 @@ export function AdminShell({
   const workTabsRef = useRef<HTMLElement | null>(null);
   const [workTabsScroll, setWorkTabsScroll] = useState({ left: false, right: false });
   const [openTabRoutes, setOpenTabRoutes] = useState<string[]>(() => uniqueRoutes([HOME_ROUTE, activeRoute]));
+  const [frontendUpdateAvailable, setFrontendUpdateAvailable] = useState(false);
   const mainRef = useRef<HTMLElement | null>(null);
   const previousRouteRef = useRef(activeRoute);
   const pendingDrawerRouteFocusRef = useRef(false);
+  const frontendVersionSignatureRef = useRef("");
   const activeResource = resources.find((resource) => resource.route === activeRoute) ?? resources[0];
   const resourcesByRoute = useMemo(() => new Map(resources.map((resource) => [resource.route, resource])), [resources]);
   const groupedResources = useMemo(
@@ -217,6 +220,40 @@ export function AdminShell({
   useEffect(() => {
     workTabsRef.current?.querySelector<HTMLElement>(".work-tab.active")?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activeRoute, openTabs.length]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const checkFrontendVersion = async () => {
+      try {
+        const signature = frontendVersionSignature(await getFrontendVersion());
+        if (!signature || cancelled) {
+          return;
+        }
+        if (!frontendVersionSignatureRef.current) {
+          frontendVersionSignatureRef.current = signature;
+          return;
+        }
+        if (frontendVersionSignatureRef.current !== signature) {
+          setFrontendUpdateAvailable(true);
+        }
+      } catch {
+        // Static version polling is best-effort and must not disrupt admin work.
+      }
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void checkFrontendVersion();
+      }
+    };
+    void checkFrontendVersion();
+    const interval = window.setInterval(checkFrontendVersion, 300000);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   const openResource = (resource: AdminResourceDefinition) => {
     if (resource.isExternal) {
@@ -617,6 +654,21 @@ export function AdminShell({
             </div>
           </div>
         </section>
+
+        {frontendUpdateAvailable ? (
+          <Alert
+            action={(
+              <Button icon={<ReloadOutlined />} size="small" type="primary" onClick={() => window.location.reload()}>
+                {dictionary.reloadPage}
+              </Button>
+            )}
+            className="platform-update-alert"
+            description={dictionary.frontendUpdateDescription}
+            message={dictionary.frontendUpdateAvailable}
+            showIcon
+            type="info"
+          />
+        ) : null}
 
         <section className="platform-content">
           {children}
@@ -1045,4 +1097,15 @@ function workTabMenuItems(dictionary: Dictionary, route: string, routes: string[
 
 function uniqueRoutes(routes: string[]) {
   return routes.filter((route, index) => route && routes.indexOf(route) === index);
+}
+
+function frontendVersionSignature(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return "";
+  }
+  const record = value as Record<string, unknown>;
+  return ["version", "buildId", "commit", "builtAt"]
+    .map((key) => (typeof record[key] === "string" ? record[key] : ""))
+    .filter(Boolean)
+    .join(":");
 }

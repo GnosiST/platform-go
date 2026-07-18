@@ -31,12 +31,14 @@ const requiredUninstallModes = new Set([
 ]);
 const requiredDataModes = new Set(["required-foundation", "retained-unreachable", "downstream-owned"]);
 const requiredValidators = [
+  "scripts/validate-platform-plugin-management-v1.mjs",
   "scripts/validate-platform-capability-operation-policy.mjs",
   "scripts/validate-platform-capability-contracts.mjs",
   "scripts/validate-platform-capability-profiles.mjs",
   "scripts/validate-external-capability-example.mjs",
 ];
 const requiredTests = [
+  "scripts/platform-plugin-management-v1.test.mjs",
   "scripts/platform-capability-operation-policy.test.mjs",
   "scripts/platform-capability-contracts.test.mjs",
   "scripts/platform-capability-profiles.test.mjs",
@@ -320,6 +322,21 @@ function validate() {
   }
   if (policy.operationModel?.runtimeHotUninstall !== false) {
     errors.push("operationModel.runtimeHotUninstall must stay false");
+  }
+  if (policy.operationModel?.restartRequiredForChanges !== true) {
+    errors.push("operationModel.restartRequiredForChanges must stay true");
+  }
+  if (policy.operationModel?.remoteRepositoryPull !== false) {
+    errors.push("operationModel.remoteRepositoryPull must stay false");
+  }
+  if (policy.operationModel?.webSocketRequired !== false) {
+    errors.push("operationModel.webSocketRequired must stay false");
+  }
+  if (policy.operationModel?.progressTransport !== "http-polling") {
+    errors.push("operationModel.progressTransport must be http-polling");
+  }
+  if (policy.operationModel?.updateDetection !== "static-version-json-or-api-version-check") {
+    errors.push("operationModel.updateDetection must be static-version-json-or-api-version-check");
   }
   if (policy.operationModel?.destructiveUninstallRequiresReview !== true) {
     errors.push("operationModel.destructiveUninstallRequiresReview must stay true");

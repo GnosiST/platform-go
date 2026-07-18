@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GnosiST/platform-go/internal/platform/capability"
 	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
 )
 
@@ -23,6 +24,7 @@ type Config struct {
 	EdgeTrustedProxy                    string
 	HTTPMaxBodyBytes                    int64
 	Capabilities                        []string
+	CapabilityLockFile                  string
 	AdminResourceFile                   string
 	AdminResourceDriver                 string
 	AdminResourceDSN                    string
@@ -90,6 +92,7 @@ type Config struct {
 	AdminStepUpPhoneVerifiedAtField     string
 	AdminStepUpPhoneVerifiedDigestField string
 	filePolicySource                    filePolicySource
+	capabilitySource                    capabilitySource
 	transportPolicySource               transportPolicySource
 	retentionRunnerSource               retentionRunnerSource
 	integrationSource                   integrationSource
@@ -111,6 +114,13 @@ type filePolicySource struct {
 	maxUploadBytes        envConfigState
 	allowedMIMETypes      envConfigState
 	s3Encryption          envConfigState
+}
+
+type capabilitySource struct {
+	capabilities   envConfigState
+	lockFile       envConfigState
+	loadedFromLock bool
+	lockFileError  string
 }
 
 type transportPolicySource struct {
@@ -188,6 +198,19 @@ func Load() Config {
 	messageBusEnabled, messageBusEnabledState := boolEnvWithState("PLATFORM_MESSAGE_BUS_ENABLED", false)
 	searchEnabled, searchEnabledState := boolEnvWithState("PLATFORM_SEARCH_ENABLED", false)
 	adminRoleMenuWriteEnabled, adminRoleMenuWriteEnabledState := boolEnvWithState("PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED", false)
+	capabilities, capabilitiesState := csvEnvWithState("PLATFORM_CAPABILITIES", defaultCapabilities)
+	capabilityLockFile, capabilityLockFileState := envWithState("PLATFORM_CAPABILITY_LOCK_FILE", "")
+	capabilityLoadedFromLock := false
+	capabilityLockFileError := ""
+	if capabilityLockFileState == envConfigPresent && capabilitiesState != envConfigPresent {
+		lock, err := capability.LoadLockFile(capabilityLockFile)
+		if err != nil {
+			capabilityLockFileError = err.Error()
+		} else {
+			capabilities = capability.IDsToStrings(lock.Capabilities)
+			capabilityLoadedFromLock = true
+		}
+	}
 	return Config{
 		RuntimeEnvironment:                  strings.ToLower(env("PLATFORM_RUNTIME_ENV", RuntimeEnvironmentDevelopment)),
 		HTTPAddr:                            env("PLATFORM_HTTP_ADDR", "127.0.0.1:9200"),
@@ -195,7 +218,8 @@ func Load() Config {
 		TrustedProxies:                      csvEnv("PLATFORM_TRUSTED_PROXIES", nil),
 		EdgeTrustedProxy:                    env("PLATFORM_EDGE_TRUSTED_PROXY", ""),
 		HTTPMaxBodyBytes:                    httpMaxBodyBytes,
-		Capabilities:                        csvEnv("PLATFORM_CAPABILITIES", defaultCapabilities),
+		Capabilities:                        capabilities,
+		CapabilityLockFile:                  capabilityLockFile,
 		AdminResourceFile:                   env("PLATFORM_ADMIN_RESOURCE_FILE", ""),
 		AdminResourceDriver:                 env("PLATFORM_ADMIN_RESOURCE_DRIVER", ""),
 		AdminResourceDSN:                    env("PLATFORM_ADMIN_RESOURCE_DSN", ""),
@@ -268,6 +292,12 @@ func Load() Config {
 			allowedMIMETypes:      fileAllowedMIMETypesState,
 			s3Encryption:          fileS3EncryptionState,
 		},
+		capabilitySource: capabilitySource{
+			capabilities:   capabilitiesState,
+			lockFile:       capabilityLockFileState,
+			loadedFromLock: capabilityLoadedFromLock,
+			lockFileError:  capabilityLockFileError,
+		},
 		transportPolicySource: transportPolicySource{
 			loadedFromEnvironment: true,
 			maxBodyBytes:          httpMaxBodyBytesState,
@@ -299,6 +329,19 @@ func (c Config) AdminStepUpPhoneSourceConfigured() bool {
 		strings.TrimSpace(c.AdminStepUpPhoneVerifiedDigestField) != ""
 }
 
+func (c Config) CapabilityConfigSource() string {
+	if c.capabilitySource.loadedFromLock {
+		return "lock-file"
+	}
+	if c.capabilitySource.capabilities == envConfigPresent {
+		return "environment"
+	}
+	if c.capabilitySource.capabilities == envConfigUnknown {
+		return "manual"
+	}
+	return "default"
+}
+
 func (c Config) ValidateRuntime() error {
 	var errs []error
 	environment := strings.ToLower(strings.TrimSpace(c.RuntimeEnvironment))
@@ -318,6 +361,15 @@ func (c Config) ValidateRuntime() error {
 		errs = append(errs, errors.New("PLATFORM_HTTP_MAX_BODY_BYTES must be between 1 and 104857600 bytes"))
 	}
 	errs = append(errs, validateTrustedProxies(c.TrustedProxies, environment == RuntimeEnvironmentProduction)...)
+	if strings.TrimSpace(c.CapabilityLockFile) != c.CapabilityLockFile {
+		errs = append(errs, errors.New("PLATFORM_CAPABILITY_LOCK_FILE must be trimmed"))
+	}
+	if c.capabilitySource.lockFile == envConfigPresent && c.capabilitySource.capabilities == envConfigPresent {
+		errs = append(errs, errors.New("PLATFORM_CAPABILITY_LOCK_FILE cannot be combined with PLATFORM_CAPABILITIES; use one source of truth"))
+	}
+	if c.capabilitySource.lockFileError != "" {
+		errs = append(errs, fmt.Errorf("PLATFORM_CAPABILITY_LOCK_FILE is invalid: %s", c.capabilitySource.lockFileError))
+	}
 	if strings.TrimSpace(c.JWTSecret) == "" {
 		errs = append(errs, errors.New("jwt secret is required"))
 	}

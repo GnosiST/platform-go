@@ -6,7 +6,7 @@ import Layout from '@theme/Layout';
 
 const capabilityCards = [
   {index: '01', zh: '身份与授权', en: 'Identity & access', textZh: 'JWT 会话、Casbin RBAC、租户范围、组织与菜单边界，从第一天就可审计。', textEn: 'JWT sessions, Casbin RBAC, tenant scopes, organizations and menu boundaries with auditability built in.', link: '/docs/intro', linkZh: '开始阅读', linkEn: 'Get started'},
-  {index: '02', zh: '能力合同', en: 'Capability contracts', textZh: '用 manifest 描述资源、路由、权限、生命周期和启停边界，让业务包按合同接入。', textEn: 'Manifests describe resources, routes, permissions, lifecycle and operation boundaries so business packages attach by contract.', link: '/docs/capabilities', linkZh: '查看能力模型', linkEn: 'Explore capabilities'},
+  {index: '02', zh: '能力合同', en: 'Capability contracts', textZh: '用 manifest 描述资源、路由、权限、生命周期和重启生效的插件边界，让业务包按合同接入。', textEn: 'Manifests describe resources, routes, permissions, lifecycle and restart-required plugin boundaries so business packages attach by contract.', link: '/docs/capabilities', linkZh: '查看能力模型', linkEn: 'Explore capabilities'},
   {index: '03', zh: '运行治理', en: 'Runtime governance', textZh: 'OpenAPI、代码生成、组合检查和发布证据，让每次扩展都可验证、可追溯。', textEn: 'OpenAPI, code generation, composition checks and release evidence keep every extension verifiable.', link: '/docs/operations', linkZh: '查看运维手册', linkEn: 'Read operations guide'},
   {index: '04', zh: '人机协同', en: 'Human + AI workflow', textZh: '接口、UI、视觉、代码生成和数据安全都有共同协议，让人和 AI 按同一套门禁定制业务。', textEn: 'Interfaces, UI, visual standards, codegen and data security share one protocol so humans and AI customize through the same gates.', link: '/docs/human-ai-development', linkZh: '查看协同规范', linkEn: 'Read the protocol'},
 ];

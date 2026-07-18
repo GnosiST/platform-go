@@ -159,7 +159,7 @@ export const optionalCapabilities: CapabilityView[] = [
   makeOptional("wechat-login", { zh: "微信登录", en: "WeChat Login" }, { zh: "小程序登录、OpenID 绑定与访客会话。", en: "Mini-program login, OpenID binding, and guest sessions." }),
   makeOptional("file-storage", { zh: "文件存储", en: "File Storage" }, { zh: "本地与 S3 兼容上传、预览、下载和删除。", en: "Local and S3-compatible upload, preview, download, and delete." }),
   makeOptional("branding", { zh: "品牌配置", en: "Branding" }, { zh: "产品名称、Logo、主题和登录页文案。", en: "Product name, logo, theme, and login copy." }),
-  makeOptional("demo-seed", { zh: "演示数据", en: "Demo Seed" }, { zh: "演示数据包、重置行为和 fixture 槽位。", en: "Demo packs, reset behavior, and fixture slots." }),
+  makeOptional("demo-data", { zh: "演示数据", en: "Demo Data" }, { zh: "演示数据包、重置行为和 fixture 槽位。", en: "Demo packs, reset behavior, and fixture slots." }),
   makeOptional("policy-review", { zh: "策略评审", en: "Policy Review" }, { zh: "角色、权限和数据范围变更的可选审批台账。", en: "Optional approval ledger for role, permission, and data-scope changes." }),
   makeOptional("personnel", { zh: "人员与岗位", en: "Personnel & Positions" }, { zh: "扩展人员档案、岗位和任职关系；默认平台底座已提供组织机构。", en: "Adds personnel profiles, positions, and assignments; organization units are already part of the default platform foundation." }),
   makeOptional("notification", { zh: "通知中心", en: "Notification" }, { zh: "站内通知、模板和投递记录，可供平台能力和业务能力复用。", en: "In-app notifications, templates, and delivery records reusable by platform and business capabilities." }),

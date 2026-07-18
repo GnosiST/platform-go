@@ -30,15 +30,18 @@ See the full [Human + AI Development Protocol](https://github.com/GnosiST/platfo
 
 ## Extension Lifecycle
 
-The platform supports startup-time capability composition, not runtime hot-plugging. Enable a capability by registering its manifest, then selecting it through a profile, `PLATFORM_CAPABILITIES` or a downstream composition root. After disabling it, regenerate contracts and restart; disabled resources must not remain exposed through Admin or API surfaces. Persisted data purge or source removal is not a generic uninstall button and needs migration, rollback and owner evidence.
+The platform supports startup-time capability composition, not runtime hot-plugging. Enable a capability by registering its manifest, then selecting it through a profile, `PLATFORM_CAPABILITIES`, `PLATFORM_CAPABILITY_LOCK_FILE` or a downstream composition root. After disabling it, regenerate contracts and restart; disabled resources must not remain exposed through Admin or API surfaces. Persisted data purge or source removal is not a generic uninstall button and needs migration, rollback and owner evidence.
+
+Plugin management v1 is defined by `resources/platform-plugin-management-v1.json`. It fixes install/disable as a restart-required desired-state model with manual restart after declaring the desired capability set through a profile, `PLATFORM_CAPABILITIES`, `PLATFORM_CAPABILITY_LOCK_FILE` or a downstream composition root and regenerating contracts. v1 does not integrate WebSocket, pull plugins from remote repositories, support runtime hot install/uninstall or provide destructive uninstall. New business projects should live downstream; the platform only provides the generic capability boundary.
 
 ## Validation entrypoint
 
 ```bash
-node scripts/validate-platform-human-ai-development-protocol.mjs
-node scripts/validate-platform-capability-operation-policy.mjs
-node scripts/validate-external-capability-example.mjs
-node scripts/validate-admin-resources.mjs
-node scripts/validate-admin-ui-contracts.mjs
-node scripts/validate-platform-codegen-source-writing-readiness.mjs
+rtk node scripts/validate-platform-human-ai-development-protocol.mjs
+rtk node scripts/validate-platform-plugin-management-v1.mjs
+rtk node scripts/validate-platform-capability-operation-policy.mjs
+rtk node scripts/validate-external-capability-example.mjs
+rtk node scripts/validate-admin-resources.mjs
+rtk node scripts/validate-admin-ui-contracts.mjs
+rtk node scripts/validate-platform-codegen-source-writing-readiness.mjs
 ```

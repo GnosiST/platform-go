@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -527,6 +528,77 @@ func TestCapabilitiesEndpoint(t *testing.T) {
 	body := recorder.Body.String()
 	if !strings.Contains(body, `"id":"tenant"`) || !strings.Contains(body, `"id":"identity"`) {
 		t.Fatalf("GET /api/capabilities body = %s", body)
+	}
+}
+
+func TestAdminPluginManagementStatusReportsRestartPending(t *testing.T) {
+	lockPath := filepath.Join(t.TempDir(), "platform-capabilities.lock.json")
+	if err := os.WriteFile(lockPath, []byte(`{"version":1,"capabilities":["tenant","identity","audit"]}`), 0o600); err != nil {
+		t.Fatalf("write lock file: %v", err)
+	}
+	server := newTestServer(ServerOptions{
+		Capabilities:           []capability.Manifest{{ID: "tenant"}, {ID: "identity"}},
+		CapabilityLockFile:     lockPath,
+		CapabilityConfigSource: "lock-file",
+		Authorizer:             permissionSetAuthorizer{"admin:capability:read": true},
+	})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/admin/plugin-management/status", nil)
+	request.Header.Set("X-Platform-User", "admin")
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET plugin status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	var payload Response[pluginManagementStatusResponse]
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode plugin status: %v", err)
+	}
+	if payload.Data.OperationMode != "restart-required-desired-state" || payload.Data.Activation != "manual-restart" || payload.Data.ProgressTransport != "http-polling" {
+		t.Fatalf("plugin status operation = %+v", payload.Data)
+	}
+	if payload.Data.RuntimeHotInstall || payload.Data.RuntimeHotUninstall || payload.Data.RemoteRepositoryPull || !payload.Data.RestartRequiredForChanges {
+		t.Fatalf("plugin status hot/runtime flags = %+v", payload.Data)
+	}
+	if !payload.Data.LockStatus.Configured || !payload.Data.LockStatus.Exists || !payload.Data.LockStatus.Valid {
+		t.Fatalf("lock status = %+v", payload.Data.LockStatus)
+	}
+	if !payload.Data.PendingRestart {
+		t.Fatalf("pending restart = false, status = %+v", payload.Data)
+	}
+	if !sameStringSet(payload.Data.CurrentCapabilities, []string{"tenant", "identity"}) || !sameStringSet(payload.Data.DesiredCapabilities, []string{"tenant", "identity", "audit"}) {
+		t.Fatalf("capabilities = current %+v desired %+v", payload.Data.CurrentCapabilities, payload.Data.DesiredCapabilities)
+	}
+}
+
+func TestAdminPluginManagementStatusDefaultsToCurrentCapabilitiesWithoutLock(t *testing.T) {
+	server := newTestServer(ServerOptions{
+		Capabilities:           []capability.Manifest{{ID: "tenant"}, {ID: "identity"}},
+		CapabilityConfigSource: "environment",
+		Authorizer:             permissionSetAuthorizer{"admin:capability:read": true},
+	})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/admin/plugin-management/status", nil)
+	request.Header.Set("X-Platform-User", "admin")
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET plugin status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	var payload Response[pluginManagementStatusResponse]
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode plugin status: %v", err)
+	}
+	if payload.Data.LockStatus.Configured || payload.Data.PendingRestart {
+		t.Fatalf("plugin status = %+v, want no configured lock and no pending restart", payload.Data)
+	}
+	if payload.Data.Source != "environment" {
+		t.Fatalf("source = %q, want environment", payload.Data.Source)
+	}
+	if !sameStringSet(payload.Data.CurrentCapabilities, payload.Data.DesiredCapabilities) {
+		t.Fatalf("capabilities = current %+v desired %+v", payload.Data.CurrentCapabilities, payload.Data.DesiredCapabilities)
 	}
 }
 
