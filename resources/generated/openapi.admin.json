@@ -15521,7 +15521,10 @@
             "x-platform-export-mode": "full",
             "type": "string",
             "enum": [
+              "continent",
               "country",
+              "subdivision",
+              "state",
               "province",
               "city",
               "district",
@@ -15697,7 +15700,10 @@
             "x-platform-export-mode": "full",
             "type": "string",
             "enum": [
+              "continent",
               "country",
+              "subdivision",
+              "state",
               "province",
               "city",
               "district",

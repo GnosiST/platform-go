@@ -445,11 +445,11 @@ describe("validate-admin-resources relation contracts", () => {
     assert.match(result.stderr, /area-codes must declare path hierarchy field/);
   });
 
-  it("rejects area-code resources that drop street or custom levels", () => {
+  it("rejects area-code resources that drop global, street or custom levels", () => {
     const manifestPath = writeBrokenManifest((manifest) => {
       const areaCodes = manifest.resources.find((resource) => resource.code === "area-codes");
       const level = areaCodes.schema.fields.find((field) => field.key === "level");
-      level.options = level.options.filter((option) => option !== "street" && option !== "custom");
+      level.options = level.options.filter((option) => option !== "continent" && option !== "subdivision" && option !== "state" && option !== "street" && option !== "custom");
     });
 
     const result = runValidator(["--manifest", manifestPath]);

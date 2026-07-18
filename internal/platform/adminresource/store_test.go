@@ -1411,8 +1411,8 @@ func TestCoreSchemaExposesOrganizationAndAreaRelations(t *testing.T) {
 		t.Fatalf("area-codes.parentCode relation path field = %+v, want path", parentField.Relation)
 	}
 	levelField := fieldByKey(areaSchema.Fields, "level")
-	if levelField == nil || !hasFieldOption(levelField.Options, "country") || !hasFieldOption(levelField.Options, "province") || !hasFieldOption(levelField.Options, "street") || !hasFieldOption(levelField.Options, "custom") {
-		t.Fatalf("area-codes.level options = %+v, want country/province/street/custom", levelField)
+	if levelField == nil || !hasFieldOption(levelField.Options, "continent") || !hasFieldOption(levelField.Options, "country") || !hasFieldOption(levelField.Options, "subdivision") || !hasFieldOption(levelField.Options, "state") || !hasFieldOption(levelField.Options, "province") || !hasFieldOption(levelField.Options, "street") || !hasFieldOption(levelField.Options, "custom") {
+		t.Fatalf("area-codes.level options = %+v, want global country/subdivision/state/province/street/custom levels", levelField)
 	}
 }
 

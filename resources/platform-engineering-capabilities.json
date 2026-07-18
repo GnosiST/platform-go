@@ -298,7 +298,7 @@
           },
           {
             "path": "scripts/validate-admin-resources.mjs",
-            "contains": "\"country\", \"province\", \"city\", \"district\", \"street\", \"custom\""
+            "contains": "\"continent\", \"country\", \"subdivision\", \"state\", \"province\", \"city\", \"district\", \"street\", \"custom\""
           },
           {
             "path": "scripts/validate-platform-governance-topology.mjs",

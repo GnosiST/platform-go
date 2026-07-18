@@ -2114,7 +2114,10 @@
           "table": true,
           "form": true,
           "options": [
+            "continent",
             "country",
+            "subdivision",
+            "state",
             "province",
             "city",
             "district",
@@ -7151,7 +7154,10 @@
             "table": true,
             "form": true,
             "options": [
+              "continent",
               "country",
+              "subdivision",
+              "state",
               "province",
               "city",
               "district",

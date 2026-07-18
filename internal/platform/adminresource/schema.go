@@ -1560,7 +1560,10 @@ func orgUnitTypeOptions() []FieldOption {
 
 func areaLevelOptions() []FieldOption {
 	return []FieldOption{
+		option("continent", "洲/大区", "Continent / Region"),
 		option("country", "国家", "Country"),
+		option("subdivision", "一级行政区", "Subdivision"),
+		option("state", "州/邦", "State"),
 		option("province", "省/直辖市", "Province"),
 		option("city", "城市", "City"),
 		option("district", "区县", "District"),

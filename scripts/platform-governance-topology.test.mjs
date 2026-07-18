@@ -315,7 +315,7 @@ describe("validate-platform-governance-topology", () => {
     assert.match(result.stderr, /areaCodePolicy\.attachmentRequiredByDefault must stay false/);
     assert.match(result.stderr, /areaCodePolicy\.defaultConsumers must include org-units/);
     assert.match(result.stderr, /areaCodePolicy\.optionalConsumers must include personnel-profiles/);
-    assert.match(result.stderr, /areaCodePolicy\.levels must include country, province, city, district, street, custom/);
+    assert.match(result.stderr, /areaCodePolicy\.levels must include continent, country, subdivision, state, province, city, district, street, custom/);
   });
 
   it("rejects area-code policies that remove attachment fields or promote detailed addresses into the default foundation", () => {

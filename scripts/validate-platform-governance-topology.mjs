@@ -20,7 +20,7 @@ const profilesPath = path.resolve(repoRoot, argValue("--profiles", "resources/pl
 const matrixPath = path.resolve(repoRoot, argValue("--matrix", "resources/platform-engineering-capabilities.json"));
 const personnelAdminContractPath = argValue("--personnel-admin-contract", "");
 const requiredOrgUnitTypeOptions = ["group", "company", "branch", "organization", "department", "team", "store", "custom"];
-const requiredAreaCodeLevelOptions = ["country", "province", "city", "district", "street", "custom"];
+const requiredAreaCodeLevelOptions = ["continent", "country", "subdivision", "state", "province", "city", "district", "street", "custom"];
 const requiredOrganizationMigrationTaskIDs = [
   "organization-rbac-menu-contract-and-migration-design",
   "organization-role-pool-backend-and-migration",

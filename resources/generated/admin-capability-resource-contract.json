@@ -916,10 +916,31 @@
           "width": 130,
           "options": [
             {
+              "value": "continent",
+              "label": {
+                "zh": "洲/大区",
+                "en": "Continent / Region"
+              }
+            },
+            {
               "value": "country",
               "label": {
                 "zh": "国家",
                 "en": "Country"
+              }
+            },
+            {
+              "value": "subdivision",
+              "label": {
+                "zh": "一级行政区",
+                "en": "Subdivision"
+              }
+            },
+            {
+              "value": "state",
+              "label": {
+                "zh": "州/邦",
+                "en": "State"
               }
             },
             {

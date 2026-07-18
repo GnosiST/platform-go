@@ -661,7 +661,7 @@ function validatePlatformGovernanceContract(resourcesByCode) {
       errors.push("area-codes must declare parentCode tree relation to area-codes");
     }
     const levelField = fieldByKey(areaCodes, "level");
-    if (!levelField || levelField.type !== "select" || !hasOptions(levelField, ["country", "province", "city", "district", "street", "custom"])) {
+    if (!levelField || levelField.type !== "select" || !hasOptions(levelField, ["continent", "country", "subdivision", "state", "province", "city", "district", "street", "custom"])) {
       errors.push("area-codes must declare level select options");
     }
     const pathField = fieldByKey(areaCodes, "path");

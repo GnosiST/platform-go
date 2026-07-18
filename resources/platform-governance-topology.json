@@ -26,7 +26,7 @@
     },
     "areaCodes": {
       "decision": "supported-as-shared-master-data",
-      "reason": "Area codes are reusable regional master data and optional ownership metadata. Regional authorization must be explicit through role data scopes, not inferred from address-code references.",
+      "reason": "Area codes are reusable global regional master data and optional ownership metadata. Regional authorization must be explicit through role data scopes, not inferred from address-code references.",
       "resource": "area-codes",
       "defaultResourceRequired": true,
       "attachmentRequiredByDefault": false,
@@ -124,7 +124,7 @@
       "resource": "area-codes",
       "fields": [
         { "key": "parentCode", "relationResource": "area-codes", "display": "tree", "parentField": "parentCode", "pathField": "path" },
-        { "key": "level", "type": "select", "options": ["country", "province", "city", "district", "street", "custom"] },
+        { "key": "level", "type": "select", "options": ["continent", "country", "subdivision", "state", "province", "city", "district", "street", "custom"] },
         { "key": "path", "type": "text" }
       ]
     },
@@ -182,7 +182,7 @@
     },
     "defaultConsumers": ["tenants", "org-units", "users"],
     "optionalConsumers": ["personnel-profiles"],
-    "levels": ["country", "province", "city", "district", "street", "custom"]
+    "levels": ["continent", "country", "subdivision", "state", "province", "city", "district", "street", "custom"]
   },
   "personnelBoundary": {
     "defaultCapability": "excluded",
