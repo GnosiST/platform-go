@@ -227,8 +227,8 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const invalidGroups = useMemo(() => groups.filter((group) => valueOf(group, "parentCode")), [groups]);
   const invalidRoles = useMemo(() => roles.filter((role) => !valueOf(role, "groupCode") || canReadGroups && !groupByCode.has(valueOf(role, "groupCode"))), [canReadGroups, groupByCode, roles]);
   const nodes = useMemo(
-    () => projectRoleGovernanceTree(groups, roles, search, language, dictionary.uncategorized),
-    [dictionary.uncategorized, groups, language, roles, search],
+    () => projectRoleGovernanceTree(groups, roles, search, language, dictionary),
+    [dictionary, groups, language, roles, search],
   );
   const moveSourceGroup = moveRole ? groupByCode.get(valueOf(moveRole, "groupCode")) : undefined;
   const moveTargetOptions = useMemo(

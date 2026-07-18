@@ -1,5 +1,5 @@
 import { SearchOutlined } from "@ant-design/icons";
-import { Empty, Input, Spin, Tree, Typography, type TreeDataNode, type TreeProps } from "antd";
+import { Empty, Input, Spin, Tag, Tree, Typography, type TreeDataNode, type TreeProps } from "antd";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AdminListPanel } from "./AdminPrimitives";
 
@@ -8,8 +8,11 @@ export type AdminTreeWorkbenchNode = {
   parentKey?: string;
   kind: "group" | "item";
   label: ReactNode;
+  subtitle?: ReactNode;
+  meta?: ReactNode;
   searchText?: string;
   status?: string;
+  statusLabel?: ReactNode;
   disabledReason?: string;
   childCount?: number;
   selectable?: boolean;
@@ -136,15 +139,28 @@ function workbenchTreeData(nodes: AdminTreeWorkbenchNode[], selectedKey?: string
 
   const build = (node: AdminTreeWorkbenchNode, depth: number): WorkbenchTreeDataNode => {
     const children = childrenByParent.get(node.key) ?? [];
+    const title = typeof node.label === "string" ? node.label : node.searchText;
     return {
       key: node.key,
       title: (
-        <span className="admin-tree-workbench-node">
-          <span className="admin-tree-workbench-node-label" title={typeof node.label === "string" ? node.label : node.searchText}>{node.label}</span>
-          {node.kind === "group" && typeof node.childCount === "number" ? (
-            <Typography.Text className="admin-tree-workbench-node-count" type="secondary">{node.childCount}</Typography.Text>
-          ) : null}
-          {node.disabledReason ? <Typography.Text type="danger">{node.disabledReason}</Typography.Text> : null}
+        <span className="admin-tree-workbench-node" data-kind={node.kind}>
+          <span className="admin-tree-workbench-node-marker" aria-hidden />
+          <span className="admin-tree-workbench-node-copy">
+            <span className="admin-tree-workbench-node-main">
+              <span className="admin-tree-workbench-node-label" title={title}>{node.label}</span>
+              {node.kind === "group" && typeof node.childCount === "number" ? (
+                <Typography.Text className="admin-tree-workbench-node-count" type="secondary">{node.childCount}</Typography.Text>
+              ) : null}
+            </span>
+            {node.subtitle ? <span className="admin-tree-workbench-node-subtitle">{node.subtitle}</span> : null}
+            {node.meta || node.status || node.disabledReason ? (
+              <span className="admin-tree-workbench-node-meta">
+                {node.status ? <Tag>{node.statusLabel ?? node.status}</Tag> : null}
+                {node.meta}
+                {node.disabledReason ? <Typography.Text type="danger">{node.disabledReason}</Typography.Text> : null}
+              </span>
+            ) : null}
+          </span>
         </span>
       ),
       disabled: Boolean(node.disabledReason),

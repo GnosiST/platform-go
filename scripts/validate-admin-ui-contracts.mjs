@@ -16,6 +16,7 @@ const files = {
   authProvider: readSource("admin/src/platform/refine/authProvider.ts"),
   login: readSource("admin/src/platform/auth/AdminLoginView.tsx"),
   oidcPolicy: readSource("admin/src/platform/auth/oidcPolicy.ts"),
+  capabilityConsole: readSource("admin/src/platform/capabilities/CapabilityConsole.tsx"),
   capabilityMetadata: readSource("admin/src/platform/capabilities/metadata.ts"),
   client: readSource("admin/src/platform/api/client.ts"),
   dataProvider: readSource("admin/src/platform/refine/dataProvider.ts"),
@@ -34,6 +35,7 @@ const files = {
   rolePermissionWriteMode: readSource("admin/src/platform/resources/rolePermissionWriteMode.ts"),
   rolePermissionWorkflow: readSource("admin/src/platform/resources/rolePermissionWorkflow.ts"),
   roleManagementNavigation: readSource("admin/src/platform/resources/roleManagementNavigation.ts"),
+  permissionGovernance: readSource("admin/src/platform/resources/PermissionGovernanceConsole.tsx"),
   menuGovernance: readSourceOptional("admin/src/platform/resources/MenuGovernanceConsole.tsx"),
   menuGovernanceRuntime: readSourceOptional("admin/src/platform/resources/menuGovernanceRuntime.ts"),
   menuGovernanceValidation: readSourceOptional("admin/src/platform/resources/menuGovernanceValidation.ts"),
@@ -119,6 +121,8 @@ requireIncludes(files.roleManagementNavigation, "): ProjectedRoleManagementNavig
 requireNotIncludes(files.roleManagementNavigation, "Object.assign", "Role-management projection must not hide a narrowed title subtype through Object.assign.");
 requireNotIncludes(files.roleManagementNavigation, "as T", "Role-management projection must not cast the replaced title back to an arbitrary input subtype.");
 requireIncludes(files.resourceRoute, 'resource.route === "/roles" || resource.route === "/role-groups"', "Both legacy role routes must retain the shared route adapter.");
+requireIncludes(files.resourceRoute, 'resource.route === "/permissions"', "The permissions route must use the dedicated permission governance console.");
+requireIncludes(files.resourceRoute, "<PermissionGovernanceConsole", "The permissions route must render PermissionGovernanceConsole instead of GenericResourceConsole.");
 requireCountExactly(files.i18n, "roleManagement:", 2, "Role management navigation must declare matching Chinese and English dictionary keys.");
 requireIncludes(files.i18n, 'roleManagement: "角色"', "Role navigation must declare the concise Chinese label.");
 requireIncludes(files.i18n, 'roleManagement: "Roles"', "Role navigation must declare the concise English label.");
@@ -382,6 +386,20 @@ requireIncludes(files.menuGovernance, "button.permissionCode.trim()", "Each page
 requireIncludes(files.menuGovernance, "duplicateButtonKey", "Page buttons must reject duplicate stable button keys.");
 requireIncludes(files.menuGovernance, '<Form.List name="buttons">', "Page buttons must be controlled rows inside the selected page editor.");
 requireIncludes(files.menuGovernance, "dictionary.menuButtonAuthorizationBoundary", "Page-button editing must state that visibility metadata does not authorize APIs.");
+requireIncludes(files.permissionGovernance, "export function PermissionGovernanceConsole", "PermissionGovernanceConsole must expose the dedicated permissions workbench entry point.");
+requireIncludes(files.permissionGovernance, "AdminTreeWorkbench", "Permission governance must reuse the platform tree workbench wrapper.");
+requireIncludes(files.permissionGovernance, 'const canRead = hasPermission(permissions, "admin:permission:read", deniedPermissions);', "Permission governance read access must respect allowed and denied permission catalog access.");
+requireIncludes(files.permissionGovernance, 'queryAdminResource("permissions"', "Permission governance must use the current generic permissions resource query contract.");
+requireIncludes(files.permissionGovernance, "projectPermissionTree(records, search, dictionary, language)", "Permission governance must project permission records into the grouped tree model.");
+requireIncludes(files.permissionGovernance, 'const typeKey = `permission-type:${resourceType}`;', "Permission governance must group by resource type before capability and resource.");
+requireIncludes(files.permissionGovernance, 'const capabilityKey = `${typeKey}:capability:${capability}`;', "Permission governance must group by capability under resource type.");
+requireIncludes(files.permissionGovernance, 'const resourceKey = `${capabilityKey}:resource:${resource}`;', "Permission governance must group by resource under capability.");
+requireIncludes(files.permissionGovernance, "const leftLevel = permissionTreeNodeLevel(left);", "Permission governance tree sorting must use explicit hierarchy levels.");
+requireIncludes(files.permissionGovernance, "typeRank(permissionTreeResourceType(left))", "Permission governance tree sorting must keep resource-type groups stable.");
+requireNotIncludes(files.permissionGovernance, 'String(left.key).split(":").length', "Permission governance tree sorting must not derive hierarchy depth from colon-delimited permission codes.");
+requireIncludes(files.permissionGovernance, "permissionReadOnlySeededTitle", "Permission governance must state that the catalog is contract-generated and read-only.");
+requireNotIncludes(files.permissionGovernance, "createAdminResource", "Permission governance must not expose direct permission catalog creation.");
+requireNotIncludes(files.permissionGovernance, "updateAdminResource", "Permission governance must not expose direct permission catalog edits.");
 requireIncludes(files.menuGovernance, "const menuListRequest = useRef(0);", "Menu governance must track the latest tree search request.");
 requireIncludes(files.menuGovernance, "const definitionRequest = useRef(0);", "Menu governance must track the latest selected-definition request.");
 requireIncludes(files.menuGovernance, "const editorSession = useRef(0);", "Menu saves must ignore stale mutation completions from a closed or replaced editor session.");
@@ -422,7 +440,23 @@ for (const key of [
 ]) {
   requireCountExactly(files.i18n, `${key}:`, 2, `Menu governance i18n key ${key} must exist in matching Chinese and English dictionaries.`);
 }
+for (const key of [
+  "permissionGovernanceTitle",
+  "permissionTreeAriaLabel",
+  "permissionTreeTitle",
+  "permissionReadOnlySeededTitle",
+  "permissionResourceType",
+  "permissionGroupTotal",
+]) {
+  requireCountExactly(files.i18n, `${key}:`, 2, `Permission governance i18n key ${key} must exist in matching Chinese and English dictionaries.`);
+}
 requireIncludes(files.settings, "LayoutModeSelector", "SystemSettingsDrawer must use the illustrated layout-mode selector.");
+requireIncludes(files.settings, "settings-summary-groups", "SystemSettingsDrawer must keep the grouped summary layout.");
+requireIncludes(files.settings, "dictionary.interfacePreferences", "System settings summary must classify interface preferences.");
+requireIncludes(files.settings, "dictionary.runtimeContext", "System settings summary must classify runtime context.");
+requireIncludes(files.settings, "SettingSummaryItem label={dictionary.environmentContext}", "System settings summary must include environment context.");
+requireIncludes(files.settings, "SettingSummaryItem label={dictionary.tenantContext}", "System settings summary must include tenant context.");
+requireNotIncludes(files.settings, "settings-status-grid", "System settings must not restore the old cramped status grid.");
 requireIncludes(files.settings, "aria-pressed={active === mode}", "Layout-mode options must expose their selected state to assistive technology.");
 requireIncludes(files.settings, "layoutDescription(dictionary, mode)", "Layout-mode options must include the approved explanatory copy.");
 requireIncludes(files.settings, "showPreviews={uiConfig.showLayoutLegend}", "The persisted layout-legend preference must control preview visibility without hiding the selector.");
@@ -570,13 +604,21 @@ requireIncludes(files.roleGovernance, 'className="role-governance-facts"', "Role
 requireIncludes(files.roleGovernance, "roleStatusLabel(record.status, dictionary)", "Role status summaries must be localized.");
 requireIncludes(files.roleGovernance, "roleGroupScopeLabel(valueOf(record, \"scopeType\"), dictionary)", "Role-group scope summaries must be localized.");
 requireIncludes(files.roleGovernance, "roleDataScopeLabel(valueOf(record, \"dataScope\"), dictionary)", "Role data-scope summaries must be localized.");
+requireIncludes(files.roleGovernanceRuntime, "label: localizedGovernanceName(group, language)", "Role tree nodes must separate display names from codes.");
+requireIncludes(files.roleGovernanceRuntime, "subtitle: group.code", "Role tree nodes must expose role-group codes as secondary text.");
+requireIncludes(files.roleGovernanceRuntime, "subtitle: role.code", "Role tree nodes must expose role codes as secondary text.");
+requireIncludes(files.menuGovernance, "subtitle: record.code", "Menu tree nodes must expose menu codes as secondary text.");
+requireIncludes(files.menuGovernance, 'meta: nodeType(record) === "directory" ? dictionary.menuDirectory', "Menu tree nodes must expose directory or route metadata.");
 requireIncludes(files.roleGovernance, 'className="role-governance-access-control"', "Role access controls must live in their own unframed section.");
 requireIncludes(files.roleGovernance, 'className="role-governance-lifecycle"', "Role lifecycle actions must remain separate from authorization.");
 requireNotIncludes(files.roleGovernance, "role-governance-command-bar", "Role actions must not collapse back into one command row.");
 requireIncludes(files.styles, ".admin-tree-workbench {", "Role governance must define a stable tree/detail layout.");
-requireRegex(files.styles, /\.admin-tree-workbench\s*\{[\s\S]*?grid-template-columns:\s*clamp\(264px,\s*28vw,\s*320px\)\s+minmax\(0,\s*1fr\);/, "Desktop tree workbench navigation must stay bounded between 264px and 320px.");
-requireRegex(files.styles, /\.role-governance-detail-focus-target,[\s\S]*?\.role-governance-detail\s*\{[\s\S]*?min-height:\s*360px;/, "Role detail and empty states must keep a stable minimum height.");
-requireRegex(files.styles, /\.admin-tree-workbench-node-label,[\s\S]*?text-overflow:\s*ellipsis;[\s\S]*?white-space:\s*nowrap;/, "Tree node labels must ellipsize instead of causing horizontal overflow.");
+requireRegex(files.styles, /\.admin-tree-workbench\s*\{[\s\S]*?grid-template-columns:\s*clamp\(320px,\s*32vw,\s*440px\)\s+minmax\(0,\s*1fr\);/, "Desktop tree workbench navigation must stay wide enough for structured tree nodes.");
+requireCssRule(files.styles, ".admin-tree-workbench-tree", ["max-height: min(640px, calc(100vh - 280px));", "overflow: auto;", "overscroll-behavior: contain;"], "Tree workbench navigation must scroll internally instead of stretching long trees.");
+requireRegex(files.styles, /\.role-governance-detail-focus-target,[\s\S]*?\.role-governance-detail,[\s\S]*?\.permission-governance-detail\s*\{[\s\S]*?min-height:\s*360px;/, "Role and permission detail states must keep a stable minimum height.");
+requireRegex(files.styles, /\.admin-tree-workbench-node-label,[\s\S]*?overflow-wrap:\s*anywhere;[\s\S]*?white-space:\s*normal;/, "Tree node labels must wrap long names instead of truncating core context.");
+requireRegex(files.styles, /\.admin-tree-workbench-node-subtitle\s*\{[\s\S]*?overflow-wrap:\s*anywhere;/, "Tree node subtitles must wrap long codes.");
+requireRegex(files.styles, /\.admin-tree-workbench-node-meta\s*\{[\s\S]*?flex-wrap:\s*wrap;/, "Tree node metadata must wrap instead of clipping status or route context.");
 requireRegex(files.styles, /@media \(min-width:\s*1024px\)[\s\S]*?\.admin-tree-workbench-detail\s*\{[\s\S]*?position:\s*sticky;/, "Tree workbench detail may stick only on desktop.");
 requireRegex(files.styles, /@media screen and \(max-width:\s*767px\)[\s\S]*?\.platform-tree-transfer-toolbar\s*\{[\s\S]*?position:\s*sticky;[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/, "Mobile Tree Transfer toolbar must stay visible as a stable two-column control area.");
 requireRegex(files.styles, /@media screen and \(max-width:\s*767px\)[\s\S]*?\.platform-tree-transfer-toolbar \.ant-input-affix-wrapper\s*\{[\s\S]*?grid-column:\s*1 \/ -1;[\s\S]*?width:\s*100%;/, "Mobile Tree Transfer search must span the full toolbar width.");
@@ -649,10 +691,34 @@ requireIncludes(files.authProvider, "error instanceof AdminAPIError", "Refine au
 requireIncludes(files.capabilityMetadata, 'label: { zh: "身份与组织", en: "Identity & Organization" }', "Core identity capability must make default organization ownership explicit.");
 requireIncludes(files.capabilityMetadata, 'makeOptional("personnel", { zh: "人员与岗位", en: "Personnel & Positions" }', "Optional personnel capability must not be labeled as the organization capability.");
 requireIncludes(files.capabilityMetadata, "默认平台底座已提供组织机构", "Optional personnel copy must state that organization units are part of the default foundation.");
+requireIncludes(files.capabilityConsole, "PlatformDataTable", "Capability console must render capabilities through the shared list/table surface.");
+requireIncludes(files.capabilityConsole, "openCapabilityDetail", "Capability console must keep a single detail-opening path.");
+requireIncludes(files.capabilityConsole, "onRowClick={(record) => openCapabilityDetail(record.id)}", "Capability list rows must open the detail modal.");
+requireIncludes(files.capabilityConsole, "mobileCards={(items) =>", "Capability console must keep mobile cards as direct detail entry points.");
+requireCountAtLeast(files.capabilityConsole, "openCapabilityDetail(capability.id)", 2, "Capability mobile cards must open the detail modal from pointer and click paths.");
+requireIncludes(files.capabilityConsole, 'className="capability-detail-modal"', "Capability detail must render in a modal card.");
+requireIncludes(files.capabilityConsole, "<CapabilityInspector", "Capability detail modal must reuse the capability inspector content.");
+requireNotIncludes(files.capabilityConsole, "<aside className=\"capability-inspector\"", "Capability console must not restore a permanent right-side detail inspector.");
 
 requireIncludes(files.shell, "SystemSettingsDrawer", "AdminShell must expose account/system settings through the shared drawer.");
 requireIncludes(files.shell, "profile-menu-trigger", "AdminShell must keep the personal profile trigger in the topbar.");
 requireIncludes(files.shell, "settings-trigger-button", "AdminShell must keep a separate system settings trigger in the topbar.");
+requireOrder(files.shell, 'className="topbar-icon-button settings-trigger-button"', 'className="profile-menu-trigger"', "AdminShell must keep the profile avatar as the right-most topbar action.");
+requireIncludes(files.shell, 'trigger={["click"]}', "Profile dropdown must be click-triggered.");
+requireNotIncludes(files.shell, 'trigger={["click", "hover"]}', "Profile dropdown must not open on hover.");
+requireNotIncludes(files.shell, "profile-menu-name", "Profile avatar trigger must not render the user name.");
+requireIncludes(files.shell, "handleProfileOutsidePointerDown", "Profile dropdown must close when clicking outside the profile card.");
+requireIncludes(files.shell, 'document.addEventListener("pointerdown", handleProfileOutsidePointerDown, true)', "Profile outside-click handling must run before portal overlays swallow blank-area clicks.");
+requireIncludes(files.shell, "ProfileEditorModal", "AdminShell must expose a full profile editor modal from the profile panel.");
+requireIncludes(files.shell, "dictionary.changePassword", "Profile editor modal must expose a change-password action slot.");
+requireIncludes(files.shell, "dictionary.resetPassword", "Profile editor modal must expose a reset-password action slot.");
+requireCssRule(files.styles, ".profile-editor-modal .ant-modal-body", ["max-height: min(720px, calc(100vh - 260px));", "overflow-y: auto;", "overscroll-behavior: contain;"], "Profile editor modal body must stay scrollable within the viewport.");
+requireIncludes(files.shell, "roles.map((role) => <Tag key={role}>{role}</Tag>)", "Profile summary must display role names instead of a role count.");
+requireIncludes(files.shell, 'bodyClassName="profile-summary-body"', "Profile summary dropdown must scroll its body instead of clipping fields.");
+requireIncludes(files.shell, 'maxHeight="min(640px, calc(100vh - 72px))"', "Profile summary dropdown must reserve enough viewport height.");
+requireCssRule(files.styles, ".platform-dropdown-panel", ["display: flex;", "flex-direction: column;", "overflow: hidden;"], "Platform dropdown panel must keep header/body/footer in a scroll-safe column.");
+requireCssRule(files.styles, ".platform-dropdown-panel-body", ["flex: 1 1 auto;", "min-height: 0;", "overflow: auto;"], "Platform dropdown body must own overflow scrolling.");
+requireCssRule(files.styles, ".profile-summary-body", ["overflow-y: auto;", "overscroll-behavior: contain;"], "Profile summary body must remain scrollable.");
 requireIncludes(files.shell, "language-toggle-button", "AdminShell must use an icon language toggle, not a language dropdown.");
 requireCountExactly(files.shell, 'className="brand-collapse-button"', 1, "AdminShell must expose one sidebar collapse affordance in the brand area.");
 requireNotIncludes(files.shell, 'className="desktop-sider-toggle"', "AdminShell must not render a second desktop sidebar collapse affordance in the topbar.");

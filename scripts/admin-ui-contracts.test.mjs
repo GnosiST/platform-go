@@ -139,6 +139,96 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stdout, /Admin UI contract validation passed/);
   });
 
+  it("rejects restoring hover-open behavior on the profile dropdown", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/shell/AdminShell.tsx",
+      'trigger={["click"]}',
+      'trigger={["click", "hover"]}',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Profile dropdown must not open on hover/);
+  });
+
+  it("rejects rendering the user name inside the avatar trigger", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/shell/AdminShell.tsx",
+      "<Avatar size={28} className=\"admin-avatar\">\n                  {avatarLetter}\n                </Avatar>",
+      "<Avatar size={28} className=\"admin-avatar\">\n                  {avatarLetter}\n                </Avatar>\n                <span className=\"profile-menu-name\">{displayName}</span>",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Profile avatar trigger must not render the user name/);
+  });
+
+  it("rejects showing a role count instead of role names in the profile panel", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/shell/AdminShell.tsx",
+      "roles.map((role) => <Tag key={role}>{role}</Tag>)",
+      "String(roles.length)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Profile summary must display role names instead of a role count/);
+  });
+
+  it("rejects removing outside-click close handling from the profile dropdown", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/shell/AdminShell.tsx",
+      'document.addEventListener("pointerdown", handleProfileOutsidePointerDown, true);',
+      'document.addEventListener("pointerdown", () => undefined, true);',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Profile outside-click handling must run before portal overlays swallow blank-area clicks/);
+  });
+
+  it("rejects clipping the profile dropdown instead of scrolling its body", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/styles.css",
+      ".profile-summary-body {",
+      ".profile-summary-body.missing {",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Profile summary body must remain scrollable/);
+  });
+
+  it("rejects profile editor modals that can grow past the viewport", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/styles.css",
+      ".profile-editor-modal .ant-modal-body {",
+      ".profile-editor-modal .ant-modal-body.missing {",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Profile editor modal body must stay scrollable within the viewport/);
+  });
+
   it("rejects a theme provider that leaves body-portaled overlays outside platform tokens", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
@@ -212,6 +302,81 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /Platform route pages must retain the complete authorized resource list/);
+  });
+
+  it("rejects routing permissions back through the generic resource console", () => {
+    const tempRoot = tempAdminRoot();
+    replaceRegexInTemp(
+      tempRoot,
+      "admin/src/platform/refine/ResourceRoutePage.tsx",
+      /if \(resource\.route === "\/permissions"\) \{[\s\S]*?\n  \}\n\n  if \(resource\.route === "\/sessions"\)/,
+      'if (resource.route === "/sessions")',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /permissions route must use the dedicated permission governance console/);
+  });
+
+  it("rejects permission governance that exposes direct catalog edits", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/PermissionGovernanceConsole.tsx",
+      'import { queryAdminResource, type AdminResourceRecord } from "../api/client";',
+      'import { createAdminResource, queryAdminResource, type AdminResourceRecord } from "../api/client";',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must not expose direct permission catalog creation/);
+  });
+
+  it("rejects permission tree sorting that infers hierarchy from colon-delimited permission codes", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/PermissionGovernanceConsole.tsx",
+      "const leftLevel = permissionTreeNodeLevel(left);\n  const rightLevel = permissionTreeNodeLevel(right);",
+      'const leftLevel = String(left.key).split(":").length;\n  const rightLevel = String(right.key).split(":").length;',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must not derive hierarchy depth from colon-delimited permission codes/);
+  });
+
+  it("rejects system settings that restore the unclassified status grid", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/ui/SystemSettingsDrawer.tsx",
+      "settings-summary-groups",
+      "settings-status-grid",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /old cramped status grid/);
+  });
+
+  it("rejects capability details that no longer open from the list into a modal", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/capabilities/CapabilityConsole.tsx",
+      'className="capability-detail-modal"',
+      'className="capability-detail-drawer"',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Capability detail must render in a modal card/);
   });
 
   it("rejects restoring the verbose Role Management navigation label", () => {
@@ -1288,24 +1453,34 @@ describe("validate-admin-ui-contracts", () => {
 
   it("rejects unbounded role workbench tracks and collapsing role detail", () => {
     const tempRoot = tempAdminRoot();
-    replaceInTemp(tempRoot, "admin/src/styles.css", "grid-template-columns: clamp(264px, 28vw, 320px) minmax(0, 1fr);", "grid-template-columns: 1fr 1fr;");
+    replaceInTemp(tempRoot, "admin/src/styles.css", "grid-template-columns: clamp(320px, 32vw, 440px) minmax(0, 1fr);", "grid-template-columns: 1fr 1fr;");
     replaceInTemp(tempRoot, "admin/src/styles.css", "min-height: 360px;", "min-height: 0;");
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /navigation must stay bounded/);
+    assert.match(result.stderr, /wide enough for structured tree nodes/);
     assert.match(result.stderr, /stable minimum height/);
   });
 
-  it("rejects tree labels that can expand the workbench horizontally", () => {
+  it("rejects tree workbenches that let long trees stretch the whole page", () => {
     const tempRoot = tempAdminRoot();
-    replaceInTemp(tempRoot, "admin/src/styles.css", "text-overflow: ellipsis;", "text-overflow: clip;");
+    replaceInTemp(tempRoot, "admin/src/styles.css", "max-height: min(640px, calc(100vh - 280px));", "max-height: none;");
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /must ellipsize/);
+    assert.match(result.stderr, /must scroll internally instead of stretching long trees/);
+  });
+
+  it("rejects tree labels that truncate structured node context", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/styles.css", "white-space: normal;", "white-space: nowrap;");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must wrap long names/);
   });
 
   it("rejects a mobile Tree Transfer toolbar without sticky two-column actions", () => {

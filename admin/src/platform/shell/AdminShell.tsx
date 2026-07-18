@@ -31,7 +31,7 @@ import {
   UploadOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Alert, Avatar, Button, Drawer, Dropdown, Input, Space, Tag, Tooltip, Typography, type MenuProps } from "antd";
+import { Alert, Avatar, Button, Drawer, Dropdown, Input, Modal, Space, Tag, Tooltip, Typography, type MenuProps } from "antd";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type WheelEvent } from "react";
 import { getFrontendVersion, type AdminCurrentSession, type BrandingConfig } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
@@ -119,6 +119,7 @@ export function AdminShell({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const [openContext, setOpenContext] = useState<"mobile-work" | "mobile-runtime" | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
   const workTabsRef = useRef<HTMLElement | null>(null);
@@ -256,6 +257,35 @@ export function AdminShell({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (!profileOpen) {
+      return;
+    }
+
+    const handleProfileOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      if (target.closest(".profile-menu-trigger") || target.closest(".profile-summary-panel")) {
+        return;
+      }
+      setProfileOpen(false);
+    };
+    const handleProfileEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setProfileOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handleProfileOutsidePointerDown, true);
+    document.addEventListener("keydown", handleProfileEscape);
+    return () => {
+      document.removeEventListener("pointerdown", handleProfileOutsidePointerDown, true);
+      document.removeEventListener("keydown", handleProfileEscape);
+    };
+  }, [profileOpen]);
 
   const openResource = (resource: AdminResourceDefinition) => {
     if (resource.isExternal) {
@@ -466,29 +496,41 @@ export function AdminShell({
                 onClick={() => changeTheme(themeName === "black" ? "tech" : "black")}
               />
             </Tooltip>
+            <Tooltip title={dictionary.userSettings}>
+              <Button
+                aria-label={dictionary.userSettings}
+                className="topbar-icon-button settings-trigger-button"
+                icon={<SettingOutlined />}
+                onClick={() => {
+                  setProfileOpen(false);
+                  setSettingsOpen(true);
+                }}
+              />
+            </Tooltip>
             <PlatformDropdownPlugin
               open={profileOpen}
-              content={<ProfileSummaryPanel avatarLetter={avatarLetter} dictionary={dictionary} displayName={displayName} session={session} />}
+              content={(
+                <ProfileSummaryPanel
+                  avatarLetter={avatarLetter}
+                  dictionary={dictionary}
+                  displayName={displayName}
+                  session={session}
+                  onEditProfile={() => {
+                    setProfileOpen(false);
+                    setProfileEditorOpen(true);
+                  }}
+                />
+              )}
               placement="bottomRight"
-              trigger={["click", "hover"]}
+              trigger={["click"]}
               onOpenChange={setProfileOpen}
             >
               <Button className="profile-menu-trigger" aria-label={dictionary.personalProfile}>
                 <Avatar size={28} className="admin-avatar">
                   {avatarLetter}
                 </Avatar>
-                <span className="profile-menu-name">{displayName}</span>
-                <DownOutlined />
               </Button>
             </PlatformDropdownPlugin>
-            <Tooltip title={dictionary.userSettings}>
-              <Button
-                aria-label={dictionary.userSettings}
-                className="topbar-icon-button settings-trigger-button"
-                icon={<SettingOutlined />}
-                onClick={() => setSettingsOpen(true)}
-              />
-            </Tooltip>
           </Space>
         </header>
 
@@ -723,6 +765,14 @@ export function AdminShell({
         onUIConfigChange={onUIConfigChange}
         onLogout={onLogout}
       />
+      <ProfileEditorModal
+        open={profileEditorOpen}
+        avatarLetter={avatarLetter}
+        dictionary={dictionary}
+        displayName={displayName}
+        session={session}
+        onClose={() => setProfileEditorOpen(false)}
+      />
     </div>
   );
 }
@@ -732,11 +782,13 @@ function ProfileSummaryPanel({
   dictionary,
   displayName,
   session,
+  onEditProfile,
 }: {
   avatarLetter: string;
   dictionary: Dictionary;
   displayName: string;
   session: AdminCurrentSession;
+  onEditProfile: () => void;
 }) {
   const tenantCode = session.user.tenantCode || "platform";
   const tenantDisplay = tenantCode === "platform" ? `${dictionary.platformTenant} (platform)` : tenantCode;
@@ -753,17 +805,15 @@ function ProfileSummaryPanel({
   return (
     <PlatformDropdownPanel
       className="profile-summary-panel"
+      bodyClassName="profile-summary-body"
       title={dictionary.personalProfile}
       description={session.user.username || displayName}
-      width={360}
+      width={420}
+      maxHeight="min(640px, calc(100vh - 72px))"
       footer={(
-        <Tooltip title={dictionary.editProfileUnavailable}>
-          <span className="profile-summary-disabled-action">
-            <Button block disabled icon={<EditOutlined />}>
-              {dictionary.editProfile}
-            </Button>
-          </span>
-        </Tooltip>
+        <Button block icon={<EditOutlined />} onClick={onEditProfile}>
+          {dictionary.editProfile}
+        </Button>
       )}
     >
       <div className="profile-summary-header">
@@ -776,24 +826,15 @@ function ProfileSummaryPanel({
         </div>
       </div>
       <dl className="profile-summary-facts">
-        <div>
-          <dt>{dictionary.tenant}</dt>
-          <dd>{tenantDisplay}</dd>
-        </div>
-        <div>
-          <dt>{dictionary.organization}</dt>
-          <dd>{organizationDisplay}</dd>
-        </div>
-        <div>
+        <ProfileFact label={dictionary.tenant} value={tenantDisplay} />
+        <ProfileFact label={dictionary.organization} value={organizationDisplay} />
+        <div className="profile-summary-fact">
           <dt>{dictionary.roles}</dt>
-          <dd>{roles.length > 0 ? roles.length : dictionary.notConfigured}</dd>
+          <dd className="profile-role-list">
+            {roles.length > 0 ? roles.map((role) => <Tag key={role}>{role}</Tag>) : dictionary.notConfigured}
+          </dd>
         </div>
       </dl>
-      {roles.length > 0 ? (
-        <div className="profile-role-tags" aria-label={dictionary.roles}>
-          {roles.map((role) => <Tag key={role}>{role}</Tag>)}
-        </div>
-      ) : null}
       <div className="profile-field-grid">
         {profileFields.map((field) => (
           <div key={field.label}>
@@ -803,6 +844,132 @@ function ProfileSummaryPanel({
         ))}
       </div>
     </PlatformDropdownPanel>
+  );
+}
+
+function ProfileFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="profile-summary-fact">
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function ProfileEditorModal({
+  open,
+  avatarLetter,
+  dictionary,
+  displayName,
+  session,
+  onClose,
+}: {
+  open: boolean;
+  avatarLetter: string;
+  dictionary: Dictionary;
+  displayName: string;
+  session: AdminCurrentSession;
+  onClose: () => void;
+}) {
+  const tenantCode = session.user.tenantCode || "platform";
+  const tenantDisplay = tenantCode === "platform" ? `${dictionary.platformTenant} (platform)` : tenantCode;
+  const organizationDisplay = session.user.orgUnitCode || dictionary.notConfigured;
+  const roles = session.roles.filter(Boolean);
+  const profileFields = [
+    { label: dictionary.username, value: session.user.username || dictionary.notConfigured },
+    { label: dictionary.nickname, value: session.user.name || dictionary.notConfigured },
+    { label: dictionary.phone, value: dictionary.notConfigured },
+    { label: dictionary.email, value: dictionary.notConfigured },
+    { label: dictionary.address, value: dictionary.notConfigured, multiline: true },
+  ];
+
+  return (
+    <Modal
+      className="profile-editor-modal"
+      title={dictionary.editProfile}
+      open={open}
+      width={760}
+      footer={[
+        <Button key="close" onClick={onClose}>{dictionary.close}</Button>,
+        <Button key="save" disabled type="primary">{dictionary.saveProfile}</Button>,
+      ]}
+      onCancel={onClose}
+    >
+      <div className="profile-editor-content">
+        <Alert
+          showIcon
+          type="info"
+          message={dictionary.profileUpdateUnavailable}
+          description={dictionary.profileUpdateUnavailableDescription}
+        />
+        <section className="profile-editor-section">
+          <header className="profile-editor-section-header">
+            <Avatar size={52} className="admin-avatar">{avatarLetter}</Avatar>
+            <div>
+              <Typography.Text type="secondary">{dictionary.profileBasics}</Typography.Text>
+              <Typography.Text strong>{displayName}</Typography.Text>
+              <Typography.Text type="secondary">{session.user.username || dictionary.notConfigured}</Typography.Text>
+            </div>
+          </header>
+          <div className="profile-editor-grid">
+            {profileFields.map((field) => (
+              <label className={field.multiline ? "profile-editor-field full" : "profile-editor-field"} key={field.label}>
+                <span>{field.label}</span>
+                {field.multiline ? (
+                  <Input.TextArea disabled readOnly autoSize={{ minRows: 2, maxRows: 4 }} value={field.value} />
+                ) : (
+                  <Input disabled readOnly value={field.value} />
+                )}
+              </label>
+            ))}
+          </div>
+        </section>
+        <section className="profile-editor-section">
+          <Typography.Text strong>{dictionary.profileIdentityContext}</Typography.Text>
+          <div className="profile-editor-context">
+            <ProfileContextItem label={dictionary.tenant} value={tenantDisplay} />
+            <ProfileContextItem label={dictionary.organization} value={organizationDisplay} />
+            <div>
+              <Typography.Text type="secondary">{dictionary.roles}</Typography.Text>
+              <div className="profile-editor-role-list">
+                {roles.length > 0 ? roles.map((role) => <Tag key={role}>{role}</Tag>) : <Typography.Text>{dictionary.notConfigured}</Typography.Text>}
+              </div>
+            </div>
+          </div>
+        </section>
+        <section className="profile-editor-section">
+          <Typography.Text strong>{dictionary.accountSecurity}</Typography.Text>
+          <div className="profile-editor-grid">
+            <label className="profile-editor-field">
+              <span>{dictionary.currentPassword}</span>
+              <Input.Password disabled readOnly placeholder={dictionary.passwordActionUnavailable} value="" />
+            </label>
+            <label className="profile-editor-field">
+              <span>{dictionary.newPassword}</span>
+              <Input.Password disabled readOnly placeholder={dictionary.passwordActionUnavailable} value="" />
+            </label>
+            <label className="profile-editor-field">
+              <span>{dictionary.confirmPassword}</span>
+              <Input.Password disabled readOnly placeholder={dictionary.passwordActionUnavailable} value="" />
+            </label>
+          </div>
+          <Space wrap className="profile-editor-security-actions">
+            <Button disabled>{dictionary.changePassword}</Button>
+            <Button disabled>{dictionary.resetPassword}</Button>
+          </Space>
+          <Typography.Text type="secondary">{dictionary.passwordActionUnavailable}</Typography.Text>
+        </section>
+      </div>
+    </Modal>
+  );
+}
+
+function ProfileContextItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <Typography.Text type="secondary">{label}</Typography.Text>
+      <strong>{value}</strong>
+    </div>
   );
 }
 

@@ -139,29 +139,27 @@ export function SystemSettingsDrawer({
         </div>
       </div>
 
-      <div className="settings-status-grid">
-        <div>
-          <Typography.Text>{dictionary.theme}</Typography.Text>
-          <strong>{themeLabel(dictionary, themeName)}</strong>
-        </div>
-        <div>
-          <Typography.Text>{dictionary.layout}</Typography.Text>
-          <strong>{layoutLabel(dictionary, layoutMode)}</strong>
-        </div>
-        <div>
-          <Typography.Text>{dictionary.densitySetting}</Typography.Text>
-          <strong>{uiConfig.density === "compact" ? dictionary.densityCompact : dictionary.densityComfortable}</strong>
-        </div>
-        <div>
-          <Typography.Text>{dictionary.environment}</Typography.Text>
-          <strong>{dictionary.production}</strong>
-          <Tag>{dictionary.readOnlyContext}</Tag>
-        </div>
-        <div>
-          <Typography.Text>{dictionary.tenant}</Typography.Text>
-          <strong>{`${dictionary.platformTenant} (platform)`}</strong>
-          <Tag>{dictionary.readOnlyContext}</Tag>
-        </div>
+      <div className="settings-summary-groups" aria-label={dictionary.currentContext}>
+        <section className="settings-summary-group" aria-label={dictionary.interfacePreferences}>
+          <div className="settings-summary-group-header">
+            <Typography.Text strong>{dictionary.interfacePreferences}</Typography.Text>
+          </div>
+          <div className="settings-summary-items compact">
+            <SettingSummaryItem label={dictionary.theme} value={themeLabel(dictionary, themeName)} />
+            <SettingSummaryItem label={dictionary.layout} value={layoutLabel(dictionary, layoutMode)} />
+            <SettingSummaryItem label={dictionary.densitySetting} value={uiConfig.density === "compact" ? dictionary.densityCompact : dictionary.densityComfortable} />
+          </div>
+        </section>
+        <section className="settings-summary-group" aria-label={dictionary.runtimeContext}>
+          <div className="settings-summary-group-header">
+            <Typography.Text strong>{dictionary.runtimeContext}</Typography.Text>
+            <Tag>{dictionary.readOnlyContext}</Tag>
+          </div>
+          <div className="settings-summary-items">
+            <SettingSummaryItem label={dictionary.environmentContext} value={dictionary.production} hint={dictionary.environmentContextHelp} />
+            <SettingSummaryItem label={dictionary.tenantContext} value={`${dictionary.platformTenant} (platform)`} hint={dictionary.tenantContextHelp} />
+          </div>
+        </section>
       </div>
 
       <Tabs
@@ -406,6 +404,16 @@ function SettingRow({ label, hint, children }: { label: string; hint?: string; c
         {hint ? <Typography.Text type="secondary">{hint}</Typography.Text> : null}
       </div>
       <div>{children}</div>
+    </div>
+  );
+}
+
+function SettingSummaryItem({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="settings-summary-item">
+      <Typography.Text type="secondary">{label}</Typography.Text>
+      <strong>{value}</strong>
+      {hint ? <Typography.Text type="secondary">{hint}</Typography.Text> : null}
     </div>
   );
 }

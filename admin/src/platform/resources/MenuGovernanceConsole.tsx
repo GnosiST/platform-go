@@ -252,7 +252,7 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
   }, [canRead, definitionRefresh, dictionary.menuLoadFailed, menuWriteMode, records, selectedKey]);
 
   const directoryRecords = useMemo(() => records.filter((record) => nodeType(record) === "directory"), [records]);
-  const nodes = useMemo(() => menuTreeNodes(filterMenuRecords(records, search), language), [language, records, search]);
+  const nodes = useMemo(() => menuTreeNodes(filterMenuRecords(records, search), language, dictionary), [dictionary, language, records, search]);
   const componentOptions = useMemo(
     () => availableResourceRoutes.map((route) => ({ label: route, value: route.replace(/^\/+/, "") })).filter((option) => option.value),
     [availableResourceRoutes],
@@ -796,7 +796,7 @@ function defaultEditorValues(mode: MenuEditorMode, selected: MenuDefinition | nu
   };
 }
 
-function menuTreeNodes(records: AdminResourceRecord[], language: Language): AdminTreeWorkbenchNode[] {
+function menuTreeNodes(records: AdminResourceRecord[], language: Language, dictionary: Dictionary): AdminTreeWorkbenchNode[] {
   const visibleCodes = new Set(records.map((record) => record.code));
   const childCounts = new Map<string, number>();
   for (const record of records) {
@@ -810,8 +810,11 @@ function menuTreeNodes(records: AdminResourceRecord[], language: Language): Admi
       parentKey: visibleCodes.has(parentCodeOf(record)) ? parentCodeOf(record) : undefined,
       kind: nodeType(record) === "directory" ? "group" : "item",
       label: localizedTitle(record, language),
+      subtitle: record.code,
+      meta: nodeType(record) === "directory" ? dictionary.menuDirectory : valueOf(record, "route") || valueOf(record, "externalUrl") || dictionary.menuDirectoryNoNavigation,
       searchText: `${record.code} ${record.name}`,
       status: record.status,
+      statusLabel: record.status === "enabled" ? dictionary.enabled : record.status === "disabled" ? dictionary.disabled : record.status,
       childCount: nodeType(record) === "directory" ? childCounts.get(record.code) ?? 0 : undefined,
       isLeaf: nodeType(record) === "page",
     }));

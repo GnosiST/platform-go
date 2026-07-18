@@ -3,7 +3,7 @@ import type {
   AdminResourceRecord,
   AdminResourceSchema,
 } from "../api/client";
-import type { Language } from "../i18n";
+import type { Dictionary, Language } from "../i18n";
 import type { AdminTreeWorkbenchNode } from "../ui";
 import { resolveRolePermissionWriteMode, type RolePermissionWriteMode } from "./rolePermissionWriteMode";
 
@@ -111,7 +111,7 @@ export function projectRoleGovernanceTree(
   roles: AdminResourceRecord[],
   search: string,
   language: Language,
-  uncategorizedLabel: string,
+  dictionary: Dictionary,
 ): AdminTreeWorkbenchNode[] {
   const normalized = search.trim().toLocaleLowerCase();
   const groupsByCode = new Map(groups.map((group) => [group.code, group]));
@@ -149,10 +149,10 @@ export function projectRoleGovernanceTree(
   const ungroupedVisible = visibleGroupCodes.has("");
   const nodes: AdminTreeWorkbenchNode[] = [];
   for (const code of [...placeholderCodes].sort()) {
-    nodes.push({ key: groupNodeKey(code), kind: "group", label: code, childCount: rolesByGroup.get(code)?.length ?? 0, selectable: false });
+    nodes.push({ key: groupNodeKey(code), kind: "group", label: code, subtitle: dictionary.roleGroupMetadata, childCount: rolesByGroup.get(code)?.length ?? 0, selectable: false });
   }
   if (ungroupedVisible) {
-    nodes.push({ key: groupNodeKey(""), kind: "group", label: uncategorizedLabel, childCount: rolesByGroup.get("")?.length ?? 0, selectable: false });
+    nodes.push({ key: groupNodeKey(""), kind: "group", label: dictionary.uncategorized, subtitle: dictionary.roleGroupMetadata, childCount: rolesByGroup.get("")?.length ?? 0, selectable: false });
   }
   for (const group of groups) {
     if (!visibleGroupCodes.has(group.code)) continue;
@@ -162,17 +162,21 @@ export function projectRoleGovernanceTree(
       key: groupNodeKey(group.code),
       parentKey: parentCode && parentCode !== group.code ? groupNodeKey(parentCode) : undefined,
       kind: "group",
-      label: `${localizedGovernanceName(group, language)} (${group.code})`,
+      label: localizedGovernanceName(group, language),
+      subtitle: group.code,
+      meta: roleGroupScopeLabel(group.values?.scopeType?.trim() ?? "", dictionary),
+      status: group.status,
+      statusLabel: statusLabel(group.status, dictionary),
       childCount: groupedRoles.length,
     });
     for (const role of groupedRoles) {
       if (normalized && !matchesRecord(group, normalized, language) && !matchesRecord(role, normalized, language)) continue;
-      nodes.push(roleNode(role, group.code, language));
+      nodes.push(roleNode(role, group.code, language, dictionary));
     }
   }
   for (const code of [...placeholderCodes, ...(ungroupedVisible ? [""] : [])]) {
     for (const role of rolesByGroup.get(code) ?? []) {
-      if (!normalized || matchesRecord(role, normalized, language)) nodes.push(roleNode(role, code, language));
+      if (!normalized || matchesRecord(role, normalized, language)) nodes.push(roleNode(role, code, language, dictionary));
     }
   }
   return nodes;
@@ -192,17 +196,46 @@ function matchesRecord(record: AdminResourceRecord, normalized: string, language
   return `${localizedGovernanceName(record, language)} ${record.name} ${record.code}`.toLocaleLowerCase().includes(normalized);
 }
 
-function roleNode(role: AdminResourceRecord, groupCode: string, language: Language): AdminTreeWorkbenchNode {
+function roleNode(role: AdminResourceRecord, groupCode: string, language: Language, dictionary: Dictionary): AdminTreeWorkbenchNode {
   return {
     key: `role:${role.code}`,
     parentKey: groupNodeKey(groupCode),
     kind: "item",
-    label: `${localizedGovernanceName(role, language)} (${role.code})`,
+    label: localizedGovernanceName(role, language),
+    subtitle: role.code,
+    meta: roleDataScopeLabel(role.values?.dataScope?.trim() ?? "", dictionary),
     status: role.status,
+    statusLabel: statusLabel(role.status, dictionary),
     isLeaf: true,
   };
 }
 
 function groupNodeKey(code: string) {
   return `group:${code || "__uncategorized__"}`;
+}
+
+function statusLabel(status: string, dictionary: Dictionary) {
+  if (status === "enabled") return dictionary.enabled;
+  if (status === "disabled") return dictionary.disabled;
+  return status || "-";
+}
+
+function roleGroupScopeLabel(scope: string, dictionary: Dictionary) {
+  if (scope === "platform") return dictionary.roleGroupScopePlatform;
+  if (scope === "tenant") return dictionary.roleGroupScopeTenant;
+  return scope || "";
+}
+
+function roleDataScopeLabel(scope: string, dictionary: Dictionary) {
+  const options = [
+    ["all", dictionary.dataScopeAll],
+    ["current_org", dictionary.dataScopeCurrentOrg],
+    ["current_and_children", dictionary.dataScopeCurrentAndChildren],
+    ["custom_orgs", dictionary.dataScopeCustomOrgs],
+    ["current_area", dictionary.dataScopeCurrentArea],
+    ["current_and_children_areas", dictionary.dataScopeCurrentAndChildrenAreas],
+    ["custom_areas", dictionary.dataScopeCustomAreas],
+    ["self", dictionary.dataScopeSelf],
+  ];
+  return options.find(([value]) => value === scope)?.[1] ?? scope;
 }

@@ -3,6 +3,7 @@ import { useCan, useResourceParams } from "@refinedev/core";
 import type { Dictionary, Language } from "../i18n";
 import { GenericResourceConsole } from "../resources/GenericResourceConsole";
 import { MenuGovernanceConsole } from "../resources/MenuGovernanceConsole";
+import { PermissionGovernanceConsole } from "../resources/PermissionGovernanceConsole";
 import { RoleGovernanceConsole } from "../resources/RoleGovernanceConsole";
 import { SessionConsole } from "../resources/SessionConsole";
 import type { AdminResourceDefinition } from "../resources/registry";
@@ -58,6 +59,18 @@ export function ResourceRoutePage({ resource, availableResourceRoutes, language,
       <MenuGovernanceConsole
         resource={resource}
         availableResourceRoutes={availableResourceRoutes}
+        language={language}
+        dictionary={dictionary}
+        permissions={permissions}
+        deniedPermissions={deniedPermissions}
+      />
+    );
+  }
+
+  if (resource.route === "/permissions") {
+    return (
+      <PermissionGovernanceConsole
+        resource={resource}
         language={language}
         dictionary={dictionary}
         permissions={permissions}
