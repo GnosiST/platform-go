@@ -7,7 +7,7 @@ import {
   StopOutlined,
   SwapOutlined,
 } from "@ant-design/icons";
-import { App, Button, Form, Input, InputNumber, Segmented, Select, Space, Tag, Typography } from "antd";
+import { App, Button, Descriptions, Form, Input, InputNumber, Segmented, Select, Space, Tag, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   createAdminResource,
@@ -672,7 +672,7 @@ function RoleGovernanceDetail({
           </div>
           <Tag color={record.status === "enabled" ? "success" : "default"}>{roleStatusLabel(record.status, dictionary)}</Tag>
         </div>
-        <dl className="role-governance-facts">
+        <Descriptions className="role-governance-facts" column={{ xs: 1, md: 2 }} size="small">
           {type === "group" ? (
             <>
               <RoleGovernanceFact label={dictionary.roleGroupScope} value={roleGroupScopeLabel(valueOf(record, "scopeType"), dictionary)} />
@@ -687,7 +687,7 @@ function RoleGovernanceDetail({
               <RoleGovernanceFact label={dictionary.rolePermissionDeny} value={String(csv(valueOf(record, "denyPermissions")).length)} />
             </>
           )}
-        </dl>
+        </Descriptions>
         <div className="role-governance-description">
           <Typography.Text type="secondary">{dictionary.description}</Typography.Text>
           <Typography.Paragraph>{localizedGovernanceDescription(record, language) || "-"}</Typography.Paragraph>
@@ -721,10 +721,7 @@ function RoleGovernanceDetail({
 
 function RoleGovernanceFact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="role-governance-fact">
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
+    <Descriptions.Item className="role-governance-fact" label={label}>{value}</Descriptions.Item>
   );
 }
 

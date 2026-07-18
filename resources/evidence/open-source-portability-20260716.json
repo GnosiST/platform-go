@@ -1,7 +1,7 @@
 {
   "$schema": "https://platform-go.local/schemas/open-source-portability-evidence.json",
   "taskId": "open-source-portability",
-  "capturedAt": "2026-07-16",
+  "capturedAt": "2026-07-18",
   "status": "verified",
   "module": "github.com/GnosiST/platform-go",
   "strictValidator": "scripts/validate-open-source-portability.mjs --root . --strict --strict-paths --expect-module github.com/GnosiST/platform-go",
@@ -10,11 +10,19 @@
     "agentOnlyCommandsExcludedFromPublicDocs": true,
     "referenceSnapshotTracked": true,
     "externalCapabilityExample": "examples/external-capability",
-    "goTests": "2058 passed / 41 packages"
+    "externalCapabilityExampleGate": "scripts/validate-external-capability-example.mjs",
+    "goTests": "2102 passed / 42 packages"
   },
   "evidence": [
+    "docs/platform-capability-development.md",
     "pkg/platform/capability/contracts.go",
+    "pkg/platform/capability/contracts_test.go",
+    "examples/external-capability/go.mod",
     "examples/external-capability/README.md",
+    "examples/external-capability/main.go",
+    "examples/external-capability/main_test.go",
+    "scripts/validate-external-capability-example.mjs",
+    "scripts/validate-external-capability-example.test.mjs",
     "resources/reference-snapshot/manifest.json",
     "scripts/validate-open-source-portability.mjs",
     "scripts/validate-open-source-portability.test.mjs"

@@ -32,6 +32,7 @@ jobs:
           cache-dependency-path: admin/package-lock.json
       - run: npm ci --prefix admin
       - run: node scripts/validate-open-source-portability.mjs --strict --expect-module github.com/GnosiST/platform-go
+      - run: node scripts/validate-external-capability-example.mjs
       - run: node --test scripts/*.test.mjs
   admin:
     runs-on: ubuntu-latest

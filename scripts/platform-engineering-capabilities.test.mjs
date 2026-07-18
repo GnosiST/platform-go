@@ -85,6 +85,12 @@ const governedCapabilityDocs = [
 ];
 const openSourceCapabilityDocs = [
   "docs/platform-roadmap.md",
+  "docs/platform-capability-development.md",
+  "pkg/platform/capability/contracts.go",
+  "examples/external-capability/main.go",
+];
+const publicDocumentationCapabilityDocs = [
+  "docs/platform-roadmap.md",
   "docs/platform-roadmap.md",
   "docs/platform-roadmap.md",
 ];
@@ -187,11 +193,15 @@ describe("validate-platform-engineering-capabilities", () => {
       const capability = capabilities.find((item) => item.id === capabilityID);
       assert.deepEqual(capability.dependsOn, expectedDependencies);
       if (!["menu-tree-and-button-permission-configuration", "organization-rbac-menu-e2e-qa", "unified-error-code-governance"].includes(capabilityID)) {
+        const expectedSourcePaths =
+          capabilityID === "open-source-portability"
+            ? openSourceCapabilityDocs
+            : capabilityID === "public-documentation-and-release"
+              ? publicDocumentationCapabilityDocs
+              : governedCapabilityDocs;
         assert.deepEqual(
           capability.evidence.sourcePaths,
-          ["open-source-portability", "public-documentation-and-release"].includes(capabilityID)
-            ? openSourceCapabilityDocs
-            : governedCapabilityDocs,
+          expectedSourcePaths,
         );
       }
     }
@@ -210,6 +220,13 @@ describe("validate-platform-engineering-capabilities", () => {
     ]);
     assert.ok(publication.evidence.artifacts.includes("resources/evidence/github-release-publication-20260716.json"));
     assert.ok(publication.evidence.tests.includes("scripts/platform-public-docs-surface.test.mjs"));
+
+    const portability = capabilities.find((item) => item.id === "open-source-portability");
+    assert.ok(portability.evidence.sourcePaths.includes("docs/platform-capability-development.md"));
+    assert.ok(portability.evidence.sourcePaths.includes("pkg/platform/capability/contracts.go"));
+    assert.ok(portability.evidence.tests.includes("pkg/platform/capability/contracts_test.go"));
+    assert.ok(portability.evidence.tests.includes("examples/external-capability/main_test.go"));
+    assert.ok(portability.evidence.validators.includes("scripts/validate-external-capability-example.mjs"));
 
     const reveal = capabilities.find((item) => item.id === "sensitive-data-reveal-step-up");
     assert.ok(reveal.evidence.sourcePaths.includes("internal/platform/httpapi/sensitive_reveal.go"));

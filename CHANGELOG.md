@@ -7,6 +7,11 @@ and releases follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Added a standalone external capability example and validator gate that prove downstream packages can use only `pkg/platform/capability` public contracts for manifest validation, lifecycle execution and JSON-safe contract previews.
+- Exposed public capability-package lifecycle history and recorded executor helpers so downstream composition roots can run manifest migrations and seeds without importing internal platform packages.
+
 ### Changed
 
 - Unified role and role-group administration under one strict two-level role-management workbench while retaining compatibility routes.

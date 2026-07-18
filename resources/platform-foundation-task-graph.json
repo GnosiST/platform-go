@@ -3363,11 +3363,16 @@
       "evidence": {
         "docs": [
           "docs/platform-roadmap.md",
-          "docs/platform-roadmap.md",
-          "docs/platform-roadmap.md"
+          "docs/platform-capability-development.md",
+          "examples/external-capability/README.md"
         ],
-        "validators": ["scripts/validate-open-source-portability.mjs", "scripts/validate-open-source-portability.test.mjs"],
-        "tests": ["examples/external-capability/README.md"],
+        "validators": [
+          "scripts/validate-open-source-portability.mjs",
+          "scripts/validate-open-source-portability.test.mjs",
+          "scripts/validate-external-capability-example.mjs",
+          "scripts/validate-external-capability-example.test.mjs"
+        ],
+        "tests": ["pkg/platform/capability/contracts_test.go", "examples/external-capability/main_test.go"],
         "screenshots": [],
         "artifacts": ["resources/evidence/open-source-portability-20260716.json"]
       }

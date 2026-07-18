@@ -181,29 +181,19 @@
 }
 
 .role-governance-facts {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
   margin: 0;
 }
 
 .role-governance-fact {
-  display: grid;
-  gap: 4px;
   min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--page);
 }
 
-.role-governance-fact dt {
+.role-governance-facts .ant-descriptions-item-label {
   color: var(--muted);
   font-size: 11px;
 }
 
-.role-governance-fact dd {
-  margin: 0;
+.role-governance-facts .ant-descriptions-item-content {
   overflow-wrap: anywhere;
 }
 
@@ -575,10 +565,6 @@
 
   .role-governance-detail-heading {
     align-items: flex-start;
-  }
-
-  .role-governance-facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .role-governance-section-actions .ant-btn,
