@@ -1,13 +1,23 @@
-import { Descriptions, Spin, Tag, Typography } from "antd";
+import { EditOutlined, PlusOutlined } from "@ant-design/icons";
+import { Descriptions, Form, Input, Select, Space, Spin, Tag, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { queryAdminResource, type AdminResourceRecord } from "../api/client";
+import {
+  createAdminResource,
+  queryAdminResource,
+  updateAdminResource,
+  type AdminResourceInput,
+  type AdminResourceRecord,
+} from "../api/client";
 import type { Dictionary, Language } from "../i18n";
 import { hasPermission } from "../refine";
 import {
+  AdminActionButton,
   AdminFeedback,
+  AdminFormModal,
   AdminListPanel,
   AdminPage,
   AdminTreeWorkbench,
+  platformPopupContainer,
   type AdminTreeWorkbenchNode,
 } from "../ui";
 import type { AdminResourceDefinition } from "./registry";
@@ -38,14 +48,44 @@ type PermissionTreeModel = {
   firstKey: string;
 };
 
+type PermissionEditorValues = {
+  code: string;
+  name: string;
+  nameZh?: string;
+  nameEn?: string;
+  resource: string;
+  action: string;
+  status: "enabled" | "disabled";
+  description?: string;
+  descriptionZh?: string;
+  descriptionEn?: string;
+};
+
+type PermissionEditorState = {
+  record?: AdminResourceRecord;
+  sessionID: number;
+};
+
+const CUSTOM_API_PERMISSION_CAPABILITY = "custom-api";
+const CUSTOM_PERMISSION_CODE = /^admin:[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*(?::[a-z0-9][a-z0-9-]*)*$/;
+const CUSTOM_PERMISSION_SEGMENT = /^[a-z0-9][a-z0-9-]*$/;
+
 export function PermissionGovernanceConsole({ resource, language, dictionary, permissions, deniedPermissions }: PermissionGovernanceConsoleProps) {
   const [records, setRecords] = useState<AdminResourceRecord[]>([]);
   const [selectedKey, setSelectedKey] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [editor, setEditor] = useState<PermissionEditorState | null>(null);
+  const [form] = Form.useForm<PermissionEditorValues>();
   const requestRef = useRef(0);
+  const editorSessionRef = useRef(0);
+  const savingRef = useRef(false);
   const canRead = hasPermission(permissions, "admin:permission:read", deniedPermissions);
+  const canCreate = hasPermission(permissions, "admin:permission:create", deniedPermissions);
+  const canUpdate = hasPermission(permissions, "admin:permission:update", deniedPermissions);
 
   const loadPermissions = useCallback(async (requestID = ++requestRef.current) => {
     if (!canRead || requestRef.current !== requestID) return;
@@ -75,6 +115,12 @@ export function PermissionGovernanceConsole({ resource, language, dictionary, pe
     return () => { requestRef.current += 1; };
   }, [canRead, loadPermissions]);
 
+  useEffect(() => {
+    if (!editor) return;
+    form.resetFields();
+    form.setFieldsValue(permissionEditorValues(editor.record));
+  }, [editor, form]);
+
   const treeModel = useMemo(
     () => projectPermissionTree(records, search, dictionary, language),
     [dictionary, language, records, search],
@@ -92,6 +138,72 @@ export function PermissionGovernanceConsole({ resource, language, dictionary, pe
     return <AdminFeedback type="warning" message={dictionary.noPermission} description={resource.permission} />;
   }
 
+  const openCreate = () => {
+    if (!canCreate) {
+      setError(dictionary.noPermission);
+      return;
+    }
+    setError("");
+    setNotice("");
+    setEditor({ sessionID: ++editorSessionRef.current });
+  };
+
+  const openEdit = (record: AdminResourceRecord) => {
+    if (!isCustomAPIPermission(record)) {
+      setError(dictionary.permissionSystemLockedDescription);
+      return;
+    }
+    if (!canUpdate) {
+      setError(dictionary.noPermission);
+      return;
+    }
+    setError("");
+    setNotice("");
+    setEditor({ record, sessionID: ++editorSessionRef.current });
+  };
+
+  const closeEditor = () => {
+    editorSessionRef.current += 1;
+    savingRef.current = false;
+    setSaving(false);
+    setEditor(null);
+    form.resetFields();
+  };
+
+  const savePermission = async (values: PermissionEditorValues) => {
+    if (!editor || savingRef.current) return;
+    if (editor.record && !isCustomAPIPermission(editor.record)) {
+      setError(dictionary.permissionSystemLockedDescription);
+      return;
+    }
+    if ((editor.record && !canUpdate) || (!editor.record && !canCreate)) {
+      setError(dictionary.noPermission);
+      return;
+    }
+    savingRef.current = true;
+    const sessionID = editor.sessionID;
+    setSaving(true);
+    try {
+      const input = buildPermissionInput(values, dictionary);
+      const result = editor.record
+        ? await updateAdminResource("permissions", editor.record.id, input)
+        : await createAdminResource("permissions", input);
+      if (editorSessionRef.current !== sessionID) return;
+      closeEditor();
+      setNotice(dictionary.permissionSaveSucceeded);
+      setSelectedKey(permissionNodeKey(result.record.code));
+      await loadPermissions();
+    } catch (nextError) {
+      if (editorSessionRef.current !== sessionID) return;
+      setError(nextError instanceof Error ? nextError.message : dictionary.permissionSaveFailed);
+    } finally {
+      if (editorSessionRef.current === sessionID) {
+        savingRef.current = false;
+        setSaving(false);
+      }
+    }
+  };
+
   const selectedRecord = treeModel.permissions.get(selectedKey);
   const selectedSummary = treeModel.summaries.get(selectedKey);
   const detail = loading ? (
@@ -99,7 +211,13 @@ export function PermissionGovernanceConsole({ resource, language, dictionary, pe
       <div className="loading-panel" aria-live="polite"><Spin size="small" /></div>
     </AdminListPanel>
   ) : selectedRecord ? (
-    <PermissionDetail record={selectedRecord} dictionary={dictionary} language={language} />
+    <PermissionDetail
+      record={selectedRecord}
+      dictionary={dictionary}
+      language={language}
+      canUpdate={canUpdate && isCustomAPIPermission(selectedRecord)}
+      onEdit={openEdit}
+    />
   ) : selectedSummary ? (
     <PermissionSummary summary={selectedSummary} dictionary={dictionary} language={language} />
   ) : (
@@ -111,8 +229,14 @@ export function PermissionGovernanceConsole({ resource, language, dictionary, pe
   return (
     <AdminPage title={dictionary.permissionGovernanceTitle} description={dictionary.permissionGovernanceDescription}>
       {error ? <AdminFeedback className="api-alert" type="warning" message={dictionary.loadResourceFailed} description={error} closable onClose={() => setError("")} /> : null}
-      <AdminFeedback className="api-alert permission-readonly-alert" type="info" message={dictionary.permissionReadOnlySeededTitle} description={dictionary.permissionReadOnlySeededDescription} />
+      {notice ? <AdminFeedback className="api-alert" type="success" message={notice} closable onClose={() => setNotice("")} /> : null}
+      <AdminFeedback className="api-alert permission-contract-alert" type="info" message={dictionary.permissionSeededGuardTitle} description={dictionary.permissionSeededGuardDescription} />
       <AdminTreeWorkbench
+        actions={canCreate ? (
+          <AdminActionButton disabled={loading} icon={<PlusOutlined />} label={dictionary.permissionAddCustomAPI} onClick={openCreate}>
+            {dictionary.permissionAddCustomAPI}
+          </AdminActionButton>
+        ) : null}
         ariaLabel={dictionary.permissionTreeAriaLabel}
         detail={detail}
         emptyText={dictionary.emptyData}
@@ -126,14 +250,102 @@ export function PermissionGovernanceConsole({ resource, language, dictionary, pe
         onSearchChange={setSearch}
         onSelect={setSelectedKey}
       />
+      <AdminFormModal
+        className="permission-governance-modal"
+        open={Boolean(editor)}
+        title={editor?.record ? dictionary.permissionEditCustomAPI : dictionary.permissionAddCustomAPI}
+        width={760}
+        okText={dictionary.save}
+        cancelText={dictionary.cancel}
+        confirmLoading={saving}
+        cancelButtonProps={{ disabled: saving }}
+        closable={!saving}
+        keyboard={!saving}
+        maskClosable={!saving}
+        okButtonProps={{ disabled: editor?.record ? !canUpdate : !canCreate }}
+        onCancel={() => { if (!saving) closeEditor(); }}
+        onOk={() => form.submit()}
+      >
+        <Form<PermissionEditorValues> form={form} layout="vertical" onFinish={(values) => void savePermission(values)}>
+          <div className="permission-governance-form-grid">
+            <Form.Item
+              name="code"
+              label={dictionary.permissionCode}
+              rules={[requiredRule(dictionary.requiredField, dictionary.permissionCode), permissionCodeRule(dictionary.permissionCustomCodeInvalid)]}
+            >
+              <Input autoComplete="off" disabled={Boolean(editor?.record)} placeholder="admin:orders:refund" />
+            </Form.Item>
+            <Form.Item
+              name="resource"
+              label={dictionary.permissionResource}
+              rules={[requiredRule(dictionary.requiredField, dictionary.permissionResource), permissionSegmentRule(dictionary.permissionCustomResourceInvalid)]}
+            >
+              <Input autoComplete="off" placeholder="orders" />
+            </Form.Item>
+            <Form.Item
+              name="action"
+              label={dictionary.permissionAction}
+              rules={[
+                requiredRule(dictionary.requiredField, dictionary.permissionAction),
+                permissionSegmentRule(dictionary.permissionCustomActionInvalid),
+                actionMatchesPermissionCodeRule(form, dictionary.permissionCustomCodeActionMismatch),
+              ]}
+            >
+              <Input autoComplete="off" placeholder="refund" />
+            </Form.Item>
+            <Form.Item name="status" label={dictionary.status} rules={[requiredRule(dictionary.requiredField, dictionary.status)]}>
+              <Select getPopupContainer={platformPopupContainer} options={permissionStatusOptions(dictionary)} />
+            </Form.Item>
+            <Form.Item name="name" label={dictionary.recordName} rules={[requiredRule(dictionary.requiredField, dictionary.recordName)]}>
+              <Input autoComplete="off" />
+            </Form.Item>
+            <Form.Item name="nameZh" label={dictionary.recordNameZh}>
+              <Input autoComplete="off" />
+            </Form.Item>
+            <Form.Item name="nameEn" label={dictionary.recordNameEn}>
+              <Input autoComplete="off" />
+            </Form.Item>
+            <Form.Item name="description" label={dictionary.description}>
+              <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
+            </Form.Item>
+            <Form.Item name="descriptionZh" label={dictionary.recordDescriptionZh}>
+              <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
+            </Form.Item>
+            <Form.Item name="descriptionEn" label={dictionary.recordDescriptionEn}>
+              <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
+            </Form.Item>
+          </div>
+        </Form>
+      </AdminFormModal>
     </AdminPage>
   );
 }
 
-function PermissionDetail({ record, dictionary, language }: { record: AdminResourceRecord; dictionary: Dictionary; language: Language }) {
+function PermissionDetail({
+  record,
+  dictionary,
+  language,
+  canUpdate,
+  onEdit,
+}: {
+  record: AdminResourceRecord;
+  dictionary: Dictionary;
+  language: Language;
+  canUpdate: boolean;
+  onEdit: (record: AdminResourceRecord) => void;
+}) {
   const resourceType = valueOf(record, "resourceType") || "api";
+  const customPermission = isCustomAPIPermission(record);
   return (
-    <AdminListPanel className="permission-governance-detail" title={dictionary.permissionDetailTitle}>
+    <AdminListPanel
+      className="permission-governance-detail"
+      title={dictionary.permissionDetailTitle}
+      actions={canUpdate ? (
+        <AdminActionButton icon={<EditOutlined />} label={dictionary.permissionEditCustomAPI} onClick={() => onEdit(record)}>
+          {dictionary.editRecord}
+        </AdminActionButton>
+      ) : null}
+    >
       <div className="permission-governance-detail-body">
         <div className="permission-governance-detail-heading">
           <div>
@@ -141,8 +353,14 @@ function PermissionDetail({ record, dictionary, language }: { record: AdminResou
             <Typography.Title level={4}>{localizedPermissionName(record, language)}</Typography.Title>
             <Typography.Text code>{record.code}</Typography.Text>
           </div>
-          <Tag color={record.status === "enabled" ? "success" : "default"}>{statusLabel(record.status, dictionary)}</Tag>
+          <Space size={6} wrap>
+            <Tag color={customPermission ? "processing" : "default"}>{customPermission ? dictionary.permissionCustomManagedTag : dictionary.permissionSystemManagedTag}</Tag>
+            <Tag color={record.status === "enabled" ? "success" : "default"}>{statusLabel(record.status, dictionary)}</Tag>
+          </Space>
         </div>
+        {!customPermission ? (
+          <AdminFeedback type="info" message={dictionary.permissionSystemLockedTitle} description={dictionary.permissionSystemLockedDescription} />
+        ) : null}
         <Descriptions className="permission-governance-facts" bordered column={{ xs: 1, md: 2 }} size="small">
           <PermissionFact label={dictionary.permissionResourceType} value={permissionTypeLabel(resourceType, dictionary)} />
           <PermissionFact label={dictionary.permissionCapability} value={valueOf(record, "capability") || "-"} />
@@ -230,7 +448,7 @@ function projectPermissionTree(records: AdminResourceRecord[], search: string, d
     const typeKey = `permission-type:${resourceType}`;
     const capabilityKey = `${typeKey}:capability:${capability}`;
     const resourceKey = `${capabilityKey}:resource:${resource}`;
-    const permissionKey = `permission:${record.code}`;
+    const permissionKey = permissionNodeKey(record.code);
     const typeSummary = ensureSummary({
       key: typeKey,
       title: permissionTypeLabel(resourceType, dictionary),
@@ -321,6 +539,98 @@ async function loadAllPermissions() {
   }
 }
 
+function buildPermissionInput(values: PermissionEditorValues, dictionary: Dictionary): AdminResourceInput {
+  const code = values.code.trim();
+  const action = values.action.trim();
+  const parts = permissionPartsFromCode(code);
+  if (parts.action !== action) {
+    throw new Error(dictionary.permissionCustomCodeActionMismatch);
+  }
+  return {
+    code,
+    name: values.name.trim(),
+    status: values.status,
+    description: values.description?.trim() ?? "",
+    values: cleanValues({
+      resourceType: "api",
+      capability: CUSTOM_API_PERMISSION_CAPABILITY,
+      resource: values.resource.trim(),
+      action,
+      prefix: parts.prefix,
+      nameZh: values.nameZh?.trim() ?? "",
+      nameEn: values.nameEn?.trim() ?? "",
+      descriptionZh: values.descriptionZh?.trim() ?? "",
+      descriptionEn: values.descriptionEn?.trim() ?? "",
+    }),
+  };
+}
+
+function permissionEditorValues(record?: AdminResourceRecord): PermissionEditorValues {
+  return {
+    code: record?.code ?? "",
+    name: record?.name ?? "",
+    nameZh: valueOfOptional(record, "nameZh"),
+    nameEn: valueOfOptional(record, "nameEn"),
+    resource: valueOfOptional(record, "resource"),
+    action: valueOfOptional(record, "action"),
+    status: record?.status === "disabled" ? "disabled" : "enabled",
+    description: record?.description ?? "",
+    descriptionZh: valueOfOptional(record, "descriptionZh"),
+    descriptionEn: valueOfOptional(record, "descriptionEn"),
+  };
+}
+
+function isCustomAPIPermission(record: AdminResourceRecord) {
+  return (valueOf(record, "resourceType") || "api") === "api" && valueOf(record, "capability") === CUSTOM_API_PERMISSION_CAPABILITY;
+}
+
+function permissionPartsFromCode(code: string) {
+  const segments = code.split(":");
+  const action = segments.at(-1) ?? "";
+  return { prefix: segments.slice(0, -1).join(":"), action };
+}
+
+function permissionNodeKey(code: string) {
+  return `permission:${code}`;
+}
+
+function cleanValues(values: Record<string, string>) {
+  return Object.fromEntries(Object.entries(values).filter(([, value]) => value.trim() !== ""));
+}
+
+function permissionStatusOptions(dictionary: Dictionary) {
+  return [
+    { label: dictionary.enabled, value: "enabled" },
+    { label: dictionary.disabled, value: "disabled" },
+  ];
+}
+
+function requiredRule(message: string, label: string) {
+  return { required: true, message: message.replace("{label}", label) };
+}
+
+function permissionCodeRule(message: string) {
+  return { validator: async (_: unknown, value?: string) => {
+    if (!value || CUSTOM_PERMISSION_CODE.test(value.trim())) return;
+    throw new Error(message);
+  } };
+}
+
+function permissionSegmentRule(message: string) {
+  return { validator: async (_: unknown, value?: string) => {
+    if (!value || CUSTOM_PERMISSION_SEGMENT.test(value.trim())) return;
+    throw new Error(message);
+  } };
+}
+
+function actionMatchesPermissionCodeRule(form: ReturnType<typeof Form.useForm<PermissionEditorValues>>[0], message: string) {
+  return { validator: async (_: unknown, value?: string) => {
+    const code = String(form.getFieldValue("code") ?? "").trim();
+    if (!code || !value || permissionPartsFromCode(code).action === value.trim()) return;
+    throw new Error(message);
+  } };
+}
+
 function comparePermissionRecords(left: AdminResourceRecord, right: AdminResourceRecord) {
   return typeRank(valueOf(left, "resourceType")) - typeRank(valueOf(right, "resourceType"))
     || valueOf(left, "capability").localeCompare(valueOf(right, "capability"))
@@ -404,4 +714,8 @@ function typeRank(resourceType: string) {
 
 function valueOf(record: AdminResourceRecord, key: string) {
   return record.values?.[key]?.trim() ?? "";
+}
+
+function valueOfOptional(record: AdminResourceRecord | undefined, key: string) {
+  return record ? valueOf(record, key) : "";
 }

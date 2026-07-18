@@ -709,7 +709,7 @@
         "zh": "权限码",
         "en": "Permissions"
       },
-      "codegenMode": "readOnlySeeded",
+      "codegenMode": "guardedCatalog",
       "generationLevel": "templateCandidate",
       "sourceWriting": "disabled",
       "dryRunStatus": "safePreview",

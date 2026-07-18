@@ -1,7 +1,7 @@
 # Platform Auth Provider Contract
 
 Date: 2026-07-04
-Last updated: 2026-07-12
+Last updated: 2026-07-19
 
 ## Purpose
 
@@ -29,6 +29,69 @@ The current platform has no local-password provider or password repository. `cmd
 Do not add password hashes to `Record.Values`. A future local-password capability requires a separately approved authentication and migration design with an Argon2id password-hashing boundary, dedicated storage, upgrade parameters, reset/rotation behavior, breach response and historical-data migration. Passwords are not reversibly encrypted, and changing hashing policy cannot be treated as an ordinary runtime configuration toggle.
 
 The current browser login flows send demo usernames or provider authorization codes, not local passwords. JWTs, provider codes and API tokens are credentials and must cross browser-to-server and provider-to-server boundaries over the production HTTPS contract. TLS protects credentials in transit; application payload encoding is not a substitute for HTTPS. The Admin client currently keeps its bearer token in browser storage, so CSP and same-origin delivery reduce exposure but do not remove the residual localStorage/XSS risk. Moving credentials to cookies requires a separate CSRF and session-client specification.
+
+## Credential Auth v1
+
+`credential-auth` is the planned local credential authentication capability. The first work package is contract-only and is tracked in `resources/platform-credential-auth-v1.json`, with the gate `rtk node scripts/validate-platform-credential-auth-v1.mjs`. It does not change the current demo/OIDC runtime, does not enable provider kind `password` in `cmd/platform-api`, and does not replace the current provider discovery, demo login, Admin OIDC exchange, app login or server-side session issuance flows.
+
+The capability is business-neutral. It may later declare provider modes for `username-password`, `phone-password`, `email-password` and `phone-sms-otp`, but the login UI must stay provider-discovery driven rather than hard-coding those four modes. A successful credential login still delegates JWT signing, session persistence, renewal and revocation to the existing `session` boundary, then RBAC and Casbin calculate authorization after login.
+
+The storage boundary is deliberately separate from generic Admin resources: password credentials must not be stored in generic `Record.Values`. The planned dedicated stores are `auth_identifiers`, `password_credentials`, `credential_challenges` and `sms_otp_challenges`. They store normalized hashes, masked identifiers, Argon2id verifier metadata, digests, expiry, attempt and one-time consumption state, not raw passwords, raw OTP codes, raw challenge answers or raw phone/email values.
+
+Challenge support is scoped to login for v1: `off`, `always`, `after-failure` or `risk-based`, with `captcha` or `slider` as implementation choices. SMS OTP login belongs to `credential-auth` as a secret type, while SMS delivery itself belongs to the `notification` SMS channel so delivery ledgers, provider adapters, templates, rate limits and production provider validation stay reusable outside authentication. Production must reject mock SMS providers.
+
+The future structured API shape is:
+
+```text
+GET /api/auth/providers
+POST /api/auth/challenges
+POST /api/auth/sms-otp/start
+POST /api/auth/login
+```
+
+Password login request:
+
+```json
+{
+  "provider": "phone-password",
+  "identifier": { "type": "phone", "value": "+8613800000000" },
+  "secret": { "type": "password", "value": "plain-password" },
+  "challenge": { "id": "challenge-id", "kind": "slider", "proof": "client-proof" }
+}
+```
+
+SMS login request:
+
+```json
+{
+  "provider": "phone-sms-otp",
+  "identifier": { "type": "phone", "value": "+8613800000000" },
+  "secret": { "type": "sms-otp", "transactionId": "otp-id", "code": "123456" },
+  "challenge": { "id": "challenge-id", "kind": "captcha", "proof": "abcd" }
+}
+```
+
+Suggested configuration keys for the later implementation package:
+
+```text
+PLATFORM_CAPABILITIES=identity,session,rbac,audit,notification,credential-auth
+PLATFORM_CREDENTIAL_AUTH_USERNAME_PASSWORD=true
+PLATFORM_CREDENTIAL_AUTH_PHONE_PASSWORD=true
+PLATFORM_CREDENTIAL_AUTH_EMAIL_PASSWORD=true
+PLATFORM_CREDENTIAL_AUTH_PHONE_SMS_OTP=true
+PLATFORM_CREDENTIAL_AUTH_CHALLENGE_ENABLED=true
+PLATFORM_CREDENTIAL_AUTH_CHALLENGE_MODE=after-failure
+PLATFORM_CREDENTIAL_AUTH_CHALLENGE_KIND=slider
+PLATFORM_CREDENTIAL_AUTH_ARGON2_PARAMS_VERSION=v1
+PLATFORM_CREDENTIAL_AUTH_PASSWORD_MAX_ATTEMPTS=5
+PLATFORM_CREDENTIAL_AUTH_LOCK_SECONDS=900
+PLATFORM_NOTIFICATION_SMS_PROVIDER=aliyun
+PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID=...
+PLATFORM_AUTH_SMS_OTP_TTL_SECONDS=300
+PLATFORM_AUTH_SMS_OTP_MAX_ATTEMPTS=5
+```
+
+The remaining implementation packages are dedicated backend repositories/services, notification SMS adapters, structured auth APIs with compatibility for demo/OIDC, Admin login UI provider rendering, and security governance for OpenAPI, error codes, audit redaction, rate limits and production environment validation.
 
 ## APIs
 

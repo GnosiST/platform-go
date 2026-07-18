@@ -6317,14 +6317,14 @@
       "overview",
       "settings"
     ],
+    "guardedCatalog": [
+      "permissions"
+    ],
     "readOnly": [
       "auditLogs",
       "errorLogs",
       "loginLogs",
       "sessions"
-    ],
-    "readOnlySeeded": [
-      "permissions"
     ],
     "scaffold": [
       "apiResources",
@@ -11324,7 +11324,7 @@
         "localizedFields": []
       },
       "codegen": {
-        "mode": "readOnlySeeded",
+        "mode": "guardedCatalog",
         "model": "Permission",
         "table": "platform_permissions"
       }

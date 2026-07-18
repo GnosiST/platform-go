@@ -319,19 +319,49 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /permissions route must use the dedicated permission governance console/);
   });
 
-  it("rejects permission governance that exposes direct catalog edits", () => {
+  it("rejects permission governance without controlled custom API permission creation", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
       tempRoot,
       "admin/src/platform/resources/PermissionGovernanceConsole.tsx",
-      'import { queryAdminResource, type AdminResourceRecord } from "../api/client";',
-      'import { createAdminResource, queryAdminResource, type AdminResourceRecord } from "../api/client";',
+      'await createAdminResource("permissions", input)',
+      'await queryAdminResource("permissions", { page: 1, pageSize: 1 })',
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /must not expose direct permission catalog creation/);
+    assert.match(result.stderr, /must support controlled custom API permission creation/);
+  });
+
+  it("rejects permission governance that does not guard edits to custom API permissions", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/PermissionGovernanceConsole.tsx",
+      "isCustomAPIPermission",
+      "isPermissionEditable",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must guard edit actions to custom API permission records/);
+  });
+
+  it("rejects permission governance that does not guard the custom permission submit path", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/PermissionGovernanceConsole.tsx",
+      "if ((editor.record && !canUpdate) || (!editor.record && !canCreate)) {\n      setError(dictionary.noPermission);\n      return;\n    }\n    savingRef.current = true;",
+      "savingRef.current = true;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must guard the custom permission submit path/);
   });
 
   it("rejects permission tree sorting that infers hierarchy from colon-delimited permission codes", () => {

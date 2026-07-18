@@ -19,11 +19,15 @@ title: 能力与扩展
 
 ## 装停卸边界
 
-平台不是运行时热插拔市场。安装能力等于在启动前通过 profile、`PLATFORM_CAPABILITIES`、`PLATFORM_CAPABILITY_LOCK_FILE` 或下游 composition root 启用已注册 manifest；禁用能力等于移出启用集合、重新生成合同并重启，资源、菜单、provider、路由和演示数据不能继续暴露。`dictionary`、`tenant`、`identity`、`session`、`rbac`、`menu` 和 `admin-shell` 属于不可卸载基础能力。破坏性卸载或历史数据清理需要单独评审、迁移和回滚证据。
+平台不是运行时热插拔市场。安装能力等于在启动前通过 profile、`PLATFORM_CAPABILITIES`、`PLATFORM_CAPABILITY_LOCK_FILE` 或下游 composition root 声明 desired state；禁用能力等于移出期望集合、重新生成合同并手动重启。运行进程与期望集合不一致时只能标记 `pendingRestart`，不能热应用。重启后 Admin resource、App route、auth provider 和 demo data set 不能继续暴露。`dictionary`、`tenant`、`identity`、`session`、`rbac`、`menu` 和 `admin-shell` 属于不可卸载基础能力。破坏性卸载或历史数据清理需要单独评审、迁移和回滚证据。
 
 ## 插件管理 v1
 
 插件管理 v1 采用 restart-required desired-state model。先通过 profile、`PLATFORM_CAPABILITIES`、`PLATFORM_CAPABILITY_LOCK_FILE` 或下游 composition root 声明期望能力集合，再跑合同校验、重新生成合同并手动重启；前台只通过 HTTP polling、`version.json` 或 API version check 提示新版本，不通过 WebSocket 做热更新。v1 明确不支持 runtime hot install/uninstall、远端仓库拉取、源码删除、数据清理或一键破坏性卸载。
+
+## Credential Auth v1
+
+`credential-auth` 是规划中的本地凭据认证能力，用于用户名/密码、手机号/密码、邮箱/密码和手机号/短信验证码登录。当前只完成合同、文档和验证门禁，不启用 `password` provider，不改变现有 demo/OIDC/App 登录运行时。密码、OTP、验证码答案和挑战证明不能存入 generic `Record.Values`，后续实现必须使用专用 credential store，并把短信发送作为 `notification` 的 SMS channel 扩展。
 
 新业务项目应把具体业务能力放在下游仓库或下游 composition root，只把跨业务复用能力沉淀为平台 profile。
 
@@ -31,6 +35,7 @@ title: 能力与扩展
 
 ```bash
 rtk node scripts/validate-platform-plugin-management-v1.mjs
+rtk node scripts/validate-platform-credential-auth-v1.mjs
 rtk node scripts/validate-platform-capability-contracts.mjs
 rtk node scripts/validate-platform-capability-profiles.mjs
 rtk node scripts/validate-platform-capability-operation-policy.mjs

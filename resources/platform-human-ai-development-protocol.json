@@ -247,10 +247,12 @@
         "scripts/platform-capability-profiles.test.mjs"
       ],
       "requiredPractices": [
-          "capability install means startup-time enablement through profiles, PLATFORM_CAPABILITIES, PLATFORM_CAPABILITY_LOCK_FILE or a downstream composition root",
-        "plugin management v1 uses a restart-required desired-state model with HTTP polling or version checks",
+        "capability install means restart-required desired-state enablement through profiles, PLATFORM_CAPABILITIES, PLATFORM_CAPABILITY_LOCK_FILE or a downstream composition root",
+        "plugin management v1 uses a restart-required desired-state model with manual API restart and HTTP polling or version checks",
+        "pendingRestart means the running process differs from desiredCapabilities and must not be hot-applied",
         "foundation capabilities are non-removable",
-        "disable removes schemas, menus, providers, routes and demo data from the registered surface while retaining data by default",
+        "disable removes Admin resources, App routes, auth providers and demo data sets from the registered contract surface after restart while retaining data by default",
+        "runtime hot install, runtime hot uninstall, one-click remote repository pull and WebSocket progress are unsupported in v1",
         "destructive uninstall or persisted data purge requires reviewed migration, rollback and owner evidence",
         "supported capability combinations run through cmd/platform-contracts audit before being documented as usable"
       ]

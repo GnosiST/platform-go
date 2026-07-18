@@ -6109,7 +6109,7 @@
         "x-platform-resource": "permissions",
         "x-platform-resource-code": "permissions",
         "x-platform-permission": "admin:permission:create",
-        "x-platform-codegen-mode": "readOnlySeeded",
+        "x-platform-codegen-mode": "guardedCatalog",
         "x-platform-audit-action": "permission.create",
         "requestBody": {
           "required": true,
@@ -6185,7 +6185,7 @@
         "x-platform-resource": "permissions",
         "x-platform-resource-code": "permissions",
         "x-platform-permission": "admin:permission:delete",
-        "x-platform-codegen-mode": "readOnlySeeded",
+        "x-platform-codegen-mode": "guardedCatalog",
         "x-platform-audit-action": "permission.delete"
       },
       "put": {
@@ -6262,7 +6262,7 @@
         "x-platform-resource": "permissions",
         "x-platform-resource-code": "permissions",
         "x-platform-permission": "admin:permission:update",
-        "x-platform-codegen-mode": "readOnlySeeded",
+        "x-platform-codegen-mode": "guardedCatalog",
         "x-platform-audit-action": "permission.update",
         "requestBody": {
           "required": true,
@@ -6357,7 +6357,7 @@
         "x-platform-resource": "permissions",
         "x-platform-resource-code": "permissions",
         "x-platform-permission": "admin:permission:read",
-        "x-platform-codegen-mode": "readOnlySeeded",
+        "x-platform-codegen-mode": "guardedCatalog",
         "requestBody": {
           "required": true,
           "content": {
@@ -19666,7 +19666,7 @@
           }
         },
         "x-platform-resource": "permissions",
-        "x-platform-codegen-mode": "readOnlySeeded"
+        "x-platform-codegen-mode": "guardedCatalog"
       },
       "PermissionsInput": {
         "type": "object",

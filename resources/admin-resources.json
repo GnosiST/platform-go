@@ -1606,7 +1606,7 @@
         ]
       },
       "codegen": {
-        "mode": "readOnlySeeded",
+        "mode": "guardedCatalog",
         "model": "Permission",
         "table": "platform_permissions"
       }

@@ -56,14 +56,76 @@ describe("validate-platform-capability-operation-policy", () => {
 
   it("rejects policies that claim runtime plugin management support", () => {
     const policy = readJSON("resources/platform-capability-operation-policy.json");
+    policy.operationModel.activation = "hot-apply";
+    policy.operationModel.manualRestartSupported = false;
     policy.operationModel.remoteRepositoryPull = true;
+    policy.operationModel.oneClickRemoteInstall = true;
     policy.operationModel.webSocketRequired = true;
 
     const result = runValidator(["--policy", tempJSON("operation-policy.json", policy)]);
 
     assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /operationModel\.activation must be manual-restart/);
+    assert.match(result.stderr, /operationModel\.manualRestartSupported must stay true/);
     assert.match(result.stderr, /operationModel\.remoteRepositoryPull must stay false/);
+    assert.match(result.stderr, /operationModel\.oneClickRemoteInstall must stay false/);
     assert.match(result.stderr, /operationModel\.webSocketRequired must stay false/);
+  });
+
+  it("rejects operation policies without desired-state restart semantics", () => {
+    const policy = readJSON("resources/platform-capability-operation-policy.json");
+    policy.desiredState.desiredStateSources = policy.desiredState.desiredStateSources.filter(
+      (source) => source !== "PLATFORM_CAPABILITY_LOCK_FILE",
+    );
+    policy.desiredState.stateFields = policy.desiredState.stateFields.filter((field) => field !== "pendingRestart");
+    policy.desiredState.manualRestartClearsPendingRestart = false;
+    policy.desiredState.runtimeHotApplySupported = true;
+
+    const result = runValidator(["--policy", tempJSON("operation-policy.json", policy)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /desiredState\.desiredStateSources must include PLATFORM_CAPABILITY_LOCK_FILE/);
+    assert.match(result.stderr, /desiredState\.stateFields must include pendingRestart/);
+    assert.match(result.stderr, /desiredState\.manualRestartClearsPendingRestart must stay true/);
+    assert.match(result.stderr, /desiredState\.runtimeHotApplySupported must stay false/);
+  });
+
+  it("rejects operation policies that stop proving disabled contract surfaces disappear", () => {
+    const policy = readJSON("resources/platform-capability-operation-policy.json");
+    policy.contractDisappearanceAfterDisable.appliesToSurfaces = policy.contractDisappearanceAfterDisable.appliesToSurfaces.filter(
+      (surface) => surface !== "authProviders",
+    );
+    policy.contractDisappearanceAfterDisable.validatedBy =
+      policy.contractDisappearanceAfterDisable.validatedBy.filter(
+        (field) => field !== "validatedCombinations.expectedExcludedAuthProviders",
+      );
+
+    const result = runValidator(["--policy", tempJSON("operation-policy.json", policy)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /contractDisappearanceAfterDisable\.appliesToSurfaces must include authProviders/);
+    assert.match(
+      result.stderr,
+      /contractDisappearanceAfterDisable\.validatedBy must include validatedCombinations\.expectedExcludedAuthProviders/,
+    );
+  });
+
+  it("rejects combinations that still expose disabled resources, routes, providers or demo data", () => {
+    const policy = readJSON("resources/platform-capability-operation-policy.json");
+    const minimalAdmin = policy.validatedCombinations.find((combination) => combination.id === "minimal-admin");
+    minimalAdmin.expectedExcludedAdminResources.push("sessions");
+    minimalAdmin.expectedExcludedAppRoutes.push("POST /api/app/auth/login");
+    minimalAdmin.expectedExcludedAuthProviders.push("demo");
+    const defaultProfile = policy.validatedCombinations.find((combination) => combination.id === "platform-default");
+    defaultProfile.expectedExcludedDemoDataSets = ["platform-demo-tenants"];
+
+    const result = runValidator(["--policy", tempJSON("operation-policy.json", policy)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /combination minimal-admin must exclude admin resource sessions/);
+    assert.match(result.stderr, /combination minimal-admin must exclude app route POST \/api\/app\/auth\/login/);
+    assert.match(result.stderr, /combination minimal-admin must exclude auth provider demo/);
+    assert.match(result.stderr, /combination platform-default must exclude demo data set platform-demo-tenants/);
   });
 
   it("rejects optional operation combinations that do not resolve through capability audit", () => {

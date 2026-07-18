@@ -43,6 +43,23 @@ const requiredTests = [
   "scripts/platform-capability-contracts.test.mjs",
   "scripts/platform-capability-profiles.test.mjs",
 ];
+const requiredDesiredSources = new Set([
+  "capability-profile",
+  "PLATFORM_CAPABILITIES",
+  "PLATFORM_CAPABILITY_LOCK_FILE",
+  "downstream-composition-root",
+]);
+const requiredDesiredStateFields = new Set([
+  "operationMode",
+  "activation",
+  "source",
+  "lockStatus",
+  "currentCapabilities",
+  "desiredCapabilities",
+  "pendingRestart",
+  "restartRequiredForChanges",
+]);
+const requiredDisableContractSurfaces = new Set(["adminResources", "appRoutes", "authProviders", "demoDataSets"]);
 
 function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -164,6 +181,7 @@ function validateCombination(combination, profilesByID) {
   const resourceIDs = flattenedAuditSet(audit, "adminResources");
   const routeIDs = flattenedAuditSet(audit, "appRoutes");
   const authProviders = flattenedAuditSet(audit, "authProviders");
+  const demoDataSets = flattenedAuditSet(audit, "demoDataSets");
 
   for (const capability of values(combination.expectedCapabilities)) {
     if (!capabilityIDs.has(capability)) {
@@ -180,14 +198,39 @@ function validateCombination(combination, profilesByID) {
       errors.push(`${prefix} missing expected admin resource ${resource}`);
     }
   }
+  for (const resource of values(combination.expectedExcludedAdminResources)) {
+    if (resourceIDs.has(resource)) {
+      errors.push(`${prefix} must exclude admin resource ${resource}`);
+    }
+  }
   for (const route of values(combination.expectedAppRoutes)) {
     if (!routeIDs.has(route)) {
       errors.push(`${prefix} missing expected app route ${route}`);
     }
   }
+  for (const route of values(combination.expectedExcludedAppRoutes)) {
+    if (routeIDs.has(route)) {
+      errors.push(`${prefix} must exclude app route ${route}`);
+    }
+  }
   for (const provider of values(combination.expectedAuthProviders)) {
     if (!authProviders.has(provider)) {
       errors.push(`${prefix} missing expected auth provider ${provider}`);
+    }
+  }
+  for (const provider of values(combination.expectedExcludedAuthProviders)) {
+    if (authProviders.has(provider)) {
+      errors.push(`${prefix} must exclude auth provider ${provider}`);
+    }
+  }
+  for (const dataset of values(combination.expectedDemoDataSets)) {
+    if (!demoDataSets.has(dataset)) {
+      errors.push(`${prefix} missing expected demo data set ${dataset}`);
+    }
+  }
+  for (const dataset of values(combination.expectedExcludedDemoDataSets)) {
+    if (demoDataSets.has(dataset)) {
+      errors.push(`${prefix} must exclude demo data set ${dataset}`);
     }
   }
   return errors;
@@ -208,6 +251,62 @@ function validateSourceSnippets(policy, errors) {
     if (!readRelativeFile(sourcePath).includes(contains)) {
       errors.push(`${sourcePath} is missing required snippet ${contains}`);
     }
+  }
+}
+
+function validateDesiredStatePolicy(policy, errors) {
+  const desiredState = policy.desiredState ?? {};
+  if (!desiredState.currentStateSource || !desiredState.currentStateSource.includes("process startup")) {
+    errors.push("desiredState.currentStateSource must describe process startup");
+  }
+  requireIncludes(
+    desiredState.desiredStateSources,
+    [...requiredDesiredSources],
+    "desiredState.desiredStateSources",
+    errors,
+  );
+  requireIncludes(
+    desiredState.stateFields,
+    [...requiredDesiredStateFields],
+    "desiredState.stateFields",
+    errors,
+  );
+  if (!desiredState.pendingRestartRule || !desiredState.pendingRestartRule.includes("pendingRestart")) {
+    errors.push("desiredState.pendingRestartRule must describe pendingRestart");
+  }
+  if (desiredState.manualRestartClearsPendingRestart !== true) {
+    errors.push("desiredState.manualRestartClearsPendingRestart must stay true");
+  }
+  if (desiredState.runtimeHotApplySupported !== false) {
+    errors.push("desiredState.runtimeHotApplySupported must stay false");
+  }
+}
+
+function validateContractDisappearancePolicy(policy, errors) {
+  const disablePolicy = policy.contractDisappearanceAfterDisable ?? {};
+  if (!disablePolicy.rule || !disablePolicy.rule.includes("must disappear")) {
+    errors.push("contractDisappearanceAfterDisable.rule must require disabled surfaces to disappear");
+  }
+  requireIncludes(
+    disablePolicy.appliesToSurfaces,
+    [...requiredDisableContractSurfaces],
+    "contractDisappearanceAfterDisable.appliesToSurfaces",
+    errors,
+  );
+  requireIncludes(
+    disablePolicy.validatedBy,
+    [
+      "validatedCombinations.expectedExcludedCapabilities",
+      "validatedCombinations.expectedExcludedAdminResources",
+      "validatedCombinations.expectedExcludedAppRoutes",
+      "validatedCombinations.expectedExcludedAuthProviders",
+      "validatedCombinations.expectedExcludedDemoDataSets",
+    ],
+    "contractDisappearanceAfterDisable.validatedBy",
+    errors,
+  );
+  if (disablePolicy.dataVisibilityAfterDisable !== "retained-unreachable") {
+    errors.push("contractDisappearanceAfterDisable.dataVisibilityAfterDisable must be retained-unreachable");
   }
 }
 
@@ -317,17 +416,38 @@ function validate() {
   if (!policy.purpose || !policy.purpose.includes("install, disable, uninstall")) {
     errors.push("operation policy purpose must describe install, disable and uninstall");
   }
+  if (policy.operationModel?.operationMode !== "restart-required-desired-state") {
+    errors.push("operationModel.operationMode must be restart-required-desired-state");
+  }
+  if (policy.operationModel?.activation !== "manual-restart") {
+    errors.push("operationModel.activation must be manual-restart");
+  }
+  if (policy.operationModel?.manualRestartSupported !== true) {
+    errors.push("operationModel.manualRestartSupported must stay true");
+  }
+  if (policy.operationModel?.desiredStateRequired !== true) {
+    errors.push("operationModel.desiredStateRequired must stay true");
+  }
+  if (policy.operationModel?.pendingRestartRequired !== true) {
+    errors.push("operationModel.pendingRestartRequired must stay true");
+  }
   if (policy.operationModel?.runtimeHotInstall !== false) {
     errors.push("operationModel.runtimeHotInstall must stay false");
   }
   if (policy.operationModel?.runtimeHotUninstall !== false) {
     errors.push("operationModel.runtimeHotUninstall must stay false");
   }
+  if (policy.operationModel?.runtimeSourceMutation !== false) {
+    errors.push("operationModel.runtimeSourceMutation must stay false");
+  }
   if (policy.operationModel?.restartRequiredForChanges !== true) {
     errors.push("operationModel.restartRequiredForChanges must stay true");
   }
   if (policy.operationModel?.remoteRepositoryPull !== false) {
     errors.push("operationModel.remoteRepositoryPull must stay false");
+  }
+  if (policy.operationModel?.oneClickRemoteInstall !== false) {
+    errors.push("operationModel.oneClickRemoteInstall must stay false");
   }
   if (policy.operationModel?.webSocketRequired !== false) {
     errors.push("operationModel.webSocketRequired must stay false");
@@ -338,12 +458,17 @@ function validate() {
   if (policy.operationModel?.updateDetection !== "static-version-json-or-api-version-check") {
     errors.push("operationModel.updateDetection must be static-version-json-or-api-version-check");
   }
+  if (policy.operationModel?.contractDisappearanceAfterDisable !== true) {
+    errors.push("operationModel.contractDisappearanceAfterDisable must stay true");
+  }
   if (policy.operationModel?.destructiveUninstallRequiresReview !== true) {
     errors.push("operationModel.destructiveUninstallRequiresReview must stay true");
   }
   if (policy.operationModel?.dataAfterDisableDefault !== "retained-unreachable") {
     errors.push("operationModel.dataAfterDisableDefault must stay retained-unreachable");
   }
+  validateDesiredStatePolicy(policy, errors);
+  validateContractDisappearancePolicy(policy, errors);
 
   requireAllowedModes(policy, "installMode", requiredInstallModes, errors);
   requireAllowedModes(policy, "disableMode", requiredDisableModes, errors);

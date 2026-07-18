@@ -8,9 +8,9 @@ title: 开发指南
 ## 环境准备
 
 ```bash
-go test ./...
-npm --prefix admin install
-npm --prefix admin run dev
+rtk go test ./...
+rtk npm --prefix admin install
+rtk npm --prefix admin run dev
 ```
 
 API 默认监听 `http://127.0.0.1:9200`，Admin 默认监听 `http://127.0.0.1:9202`。
@@ -30,10 +30,17 @@ API 默认监听 `http://127.0.0.1:9200`，Admin 默认监听 `http://127.0.0.1:
 示例门禁会检查外部包没有导入 `internal/platform/**`，并在示例目录内执行 `go test ./...` 与 `go run .`：
 
 ```bash
-node scripts/validate-external-capability-example.mjs
+rtk node scripts/validate-external-capability-example.mjs
 ```
 
-插件启停采用重启生效模型：修改 profile、`PLATFORM_CAPABILITIES`、`PLATFORM_CAPABILITY_LOCK_FILE` 或下游 composition root 后，重新生成合同并手动重启 API。v1 不支持 WebSocket 热更新、远端仓库拉取或破坏性卸载。
+插件启停采用重启生效模型：修改 profile、`PLATFORM_CAPABILITIES`、`PLATFORM_CAPABILITY_LOCK_FILE` 或下游 composition root 后，重新生成合同并手动重启 API。运行进程与期望集合不一致时只标记 `pendingRestart`，不能热应用。v1 不支持 WebSocket 热更新、远端仓库拉取或破坏性卸载。
+
+如果新增本地登录能力，先按 `credential-auth` 合同推进，不要把密码或验证码塞进 generic `Record.Values`，也不要提前打开 `password` provider：
+
+```bash
+rtk node scripts/validate-platform-credential-auth-v1.mjs
+rtk node --test scripts/platform-credential-auth-v1.test.mjs
+```
 
 ## 常用检查
 
@@ -41,6 +48,7 @@ node scripts/validate-external-capability-example.mjs
 rtk node scripts/validate-external-capability-example.mjs
 rtk node scripts/validate-admin-resources.mjs
 rtk node scripts/validate-platform-plugin-management-v1.mjs
+rtk node scripts/validate-platform-credential-auth-v1.mjs
 rtk node scripts/validate-platform-capability-contracts.mjs
 rtk node scripts/validate-platform-capability-profiles.mjs
 rtk node scripts/validate-platform-capability-operation-policy.mjs

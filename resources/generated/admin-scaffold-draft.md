@@ -959,7 +959,7 @@ Audit candidates: `parameter.create`, `parameter.delete`, `parameter.restore`, `
 
 - Code: `permissions`
 - Group: `system`
-- Codegen mode: `readOnlySeeded`
+- Codegen mode: `guardedCatalog`
 - Generation level: `templateCandidate`
 - Dry-run status: `safePreview`
 - Source writing: `disabled`

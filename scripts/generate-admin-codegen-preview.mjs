@@ -62,7 +62,7 @@ function routeTarget(resource, route) {
 
 function generationLevel(resource) {
   const mode = resource.codegen?.mode ?? "unknown";
-  if (mode === "scaffold" || mode === "readOnly" || mode === "readOnlySeeded") {
+  if (mode === "scaffold" || mode === "readOnly" || mode === "readOnlySeeded" || mode === "guardedCatalog") {
     return "templateCandidate";
   }
   return "manualReview";

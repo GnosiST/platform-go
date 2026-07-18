@@ -6,9 +6,9 @@ title: Development guide
 # Development guide
 
 ```bash
-go test ./...
-npm --prefix admin install
-npm --prefix admin run dev
+rtk go test ./...
+rtk npm --prefix admin install
+rtk npm --prefix admin run dev
 ```
 
 The API defaults to `http://127.0.0.1:9200`; Admin defaults to `http://127.0.0.1:9202`.
@@ -41,3 +41,10 @@ rtk npm --prefix website run build
 ```
 
 Plugin enable/disable is restart-required in v1: change a profile, `PLATFORM_CAPABILITIES`, `PLATFORM_CAPABILITY_LOCK_FILE` or downstream composition root, regenerate contracts and restart the API manually. v1 does not support WebSocket hot updates, remote repository pull or destructive uninstall.
+
+For local credential login work, start from the `credential-auth` contract. Do not store passwords or verification codes in generic `Record.Values`, and do not enable provider kind `password` before the runtime package deliberately changes that boundary:
+
+```bash
+rtk node scripts/validate-platform-credential-auth-v1.mjs
+rtk node --test scripts/platform-credential-auth-v1.test.mjs
+```

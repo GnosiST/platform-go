@@ -397,9 +397,15 @@ requireIncludes(files.permissionGovernance, 'const resourceKey = `${capabilityKe
 requireIncludes(files.permissionGovernance, "const leftLevel = permissionTreeNodeLevel(left);", "Permission governance tree sorting must use explicit hierarchy levels.");
 requireIncludes(files.permissionGovernance, "typeRank(permissionTreeResourceType(left))", "Permission governance tree sorting must keep resource-type groups stable.");
 requireNotIncludes(files.permissionGovernance, 'String(left.key).split(":").length', "Permission governance tree sorting must not derive hierarchy depth from colon-delimited permission codes.");
-requireIncludes(files.permissionGovernance, "permissionReadOnlySeededTitle", "Permission governance must state that the catalog is contract-generated and read-only.");
-requireNotIncludes(files.permissionGovernance, "createAdminResource", "Permission governance must not expose direct permission catalog creation.");
-requireNotIncludes(files.permissionGovernance, "updateAdminResource", "Permission governance must not expose direct permission catalog edits.");
+requireIncludes(files.permissionGovernance, "permissionSeededGuardTitle", "Permission governance must state that system-generated permissions are contract-locked.");
+requireIncludes(files.permissionGovernance, "CUSTOM_API_PERMISSION_CAPABILITY", "Permission governance must isolate hand-maintained entries behind an explicit custom API capability marker.");
+requireIncludes(files.permissionGovernance, 'createAdminResource("permissions"', "Permission governance must support controlled custom API permission creation.");
+requireIncludes(files.permissionGovernance, 'updateAdminResource("permissions"', "Permission governance must support controlled custom API permission updates.");
+requireIncludes(files.permissionGovernance, "isCustomAPIPermission(record)", "Permission governance must guard edit actions to custom API permission records.");
+requireIncludes(files.permissionGovernance, "if (!canCreate) {", "Permission governance must fail closed before opening custom permission creation without create access.");
+requireIncludes(files.permissionGovernance, "if (!canUpdate) {", "Permission governance must fail closed before opening custom permission editing without update access.");
+requireIncludes(files.permissionGovernance, "if ((editor.record && !canUpdate) || (!editor.record && !canCreate)) {", "Permission governance must guard the custom permission submit path against stale unauthorized states.");
+requireIncludes(files.permissionGovernance, "dictionary.permissionSystemLockedDescription", "Permission governance must explain why system-generated permission records cannot be edited directly.");
 requireIncludes(files.menuGovernance, "const menuListRequest = useRef(0);", "Menu governance must track the latest tree search request.");
 requireIncludes(files.menuGovernance, "const definitionRequest = useRef(0);", "Menu governance must track the latest selected-definition request.");
 requireIncludes(files.menuGovernance, "const editorSession = useRef(0);", "Menu saves must ignore stale mutation completions from a closed or replaced editor session.");
@@ -444,7 +450,10 @@ for (const key of [
   "permissionGovernanceTitle",
   "permissionTreeAriaLabel",
   "permissionTreeTitle",
-  "permissionReadOnlySeededTitle",
+  "permissionSeededGuardTitle",
+  "permissionAddCustomAPI",
+  "permissionEditCustomAPI",
+  "permissionSystemLockedDescription",
   "permissionResourceType",
   "permissionGroupTotal",
 ]) {

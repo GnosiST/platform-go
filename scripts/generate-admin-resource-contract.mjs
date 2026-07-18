@@ -295,7 +295,7 @@ function mergeStaticResourceWithCapability(resource, capabilityResource) {
     permissions,
     routes,
     deletion: capabilityResource.deletion,
-    ...(resource.codegen?.mode === "readOnlySeeded" && capabilityFields.length > 0 ? {
+    ...((resource.codegen?.mode === "readOnlySeeded" || resource.codegen?.mode === "guardedCatalog") && capabilityFields.length > 0 ? {
       schema: {
         ...(resource.schema ?? {}),
         ...capabilityManifestResource.schema,

@@ -4,18 +4,65 @@
   "contractVersion": "0.1.0",
   "purpose": "Machine-checkable install, disable, uninstall and composition policy for platform and downstream capabilities. The platform is profile/config composed, not a runtime hot-plug marketplace.",
   "operationModel": {
+    "operationMode": "restart-required-desired-state",
+    "activation": "manual-restart",
+    "manualRestartSupported": true,
     "installSemantics": "Enable a registered manifest through a capability profile, PLATFORM_CAPABILITIES, PLATFORM_CAPABILITY_LOCK_FILE or a downstream composition root before process startup and contract generation.",
     "disableSemantics": "Remove the capability from the enabled profile, PLATFORM_CAPABILITIES or PLATFORM_CAPABILITY_LOCK_FILE, regenerate contracts and restart; disabled schemas, menus, providers, routes and demo datasets must not be registered.",
     "uninstallSemantics": "Runtime destructive uninstall is unsupported. Removing source packages or purging persisted data requires a reviewed migration or downstream-owned removal plan.",
+    "desiredStateRequired": true,
+    "pendingRestartRequired": true,
     "runtimeHotInstall": false,
     "runtimeHotUninstall": false,
+    "runtimeSourceMutation": false,
     "restartRequiredForChanges": true,
     "remoteRepositoryPull": false,
+    "oneClickRemoteInstall": false,
     "webSocketRequired": false,
     "progressTransport": "http-polling",
     "updateDetection": "static-version-json-or-api-version-check",
+    "contractDisappearanceAfterDisable": true,
     "destructiveUninstallRequiresReview": true,
     "dataAfterDisableDefault": "retained-unreachable"
+  },
+  "desiredState": {
+    "currentStateSource": "Enabled manifests resolved at process startup and reflected in generated Admin/App/audit contracts.",
+    "desiredStateSources": [
+      "capability-profile",
+      "PLATFORM_CAPABILITIES",
+      "PLATFORM_CAPABILITY_LOCK_FILE",
+      "downstream-composition-root"
+    ],
+    "stateFields": [
+      "operationMode",
+      "activation",
+      "source",
+      "lockStatus",
+      "currentCapabilities",
+      "desiredCapabilities",
+      "pendingRestart",
+      "restartRequiredForChanges"
+    ],
+    "pendingRestartRule": "pendingRestart is true when desiredCapabilities differ from currentCapabilities; the change becomes effective only after contracts are regenerated and the API process is manually restarted with the desired set.",
+    "manualRestartClearsPendingRestart": true,
+    "runtimeHotApplySupported": false
+  },
+  "contractDisappearanceAfterDisable": {
+    "rule": "After a capability is removed from the desired enabled set and the process restarts, its schemas, menus, providers, routes and demo datasets must disappear from exposed contracts. Persisted data is retained but unreachable unless a reviewed downstream removal or migration plan owns it.",
+    "appliesToSurfaces": [
+      "adminResources",
+      "appRoutes",
+      "authProviders",
+      "demoDataSets"
+    ],
+    "validatedBy": [
+      "validatedCombinations.expectedExcludedCapabilities",
+      "validatedCombinations.expectedExcludedAdminResources",
+      "validatedCombinations.expectedExcludedAppRoutes",
+      "validatedCombinations.expectedExcludedAuthProviders",
+      "validatedCombinations.expectedExcludedDemoDataSets"
+    ],
+    "dataVisibilityAfterDisable": "retained-unreachable"
   },
   "nonRemovableCapabilities": [
     "dictionary",
@@ -227,9 +274,13 @@
       "profile": "minimal-admin",
       "purpose": "Smallest supported Admin foundation.",
       "expectedCapabilities": ["dictionary", "tenant", "identity", "session", "rbac", "menu", "admin-shell"],
-      "expectedExcludedCapabilities": ["admin-oidc", "app-phone", "demo-data", "external-business-capability", "file-storage", "job", "notification", "personnel", "policy-review", "system-admin"],
+      "expectedExcludedCapabilities": ["admin-oidc", "api-resource", "app-phone", "audit", "demo-data", "external-business-capability", "file-storage", "job", "notification", "parameter", "personnel", "policy-review", "system-admin", "wechat-login"],
       "expectedAdminResources": ["area-codes", "capabilities", "menus", "overview", "roles", "sessions", "tenants", "users"],
-      "expectedAppRoutes": ["GET /api/app/session/current", "POST /api/app/auth/login", "POST /api/app/auth/logout"]
+      "expectedExcludedAdminResources": ["admin-identities", "api-docs", "api-resources", "api-tokens", "app-phone-bindings", "app-phone-verifications", "audit-logs", "branding", "demo-data", "error-logs", "files", "job-definitions", "job-run-attempts", "job-runs", "login-logs", "monitoring", "notification-deliveries", "notification-templates", "notifications", "parameters", "personnel-profiles", "policy-reviews", "position-assignments", "positions", "settings", "versions"],
+      "expectedAppRoutes": ["GET /api/app/session/current", "POST /api/app/auth/login", "POST /api/app/auth/logout"],
+      "expectedExcludedAppRoutes": ["GET /api/app/files/:id/content", "POST /api/app/files", "POST /api/app/identity/phone-bindings", "POST /api/app/identity/phone-verifications"],
+      "expectedExcludedAuthProviders": ["oidc", "wechat"],
+      "expectedExcludedDemoDataSets": ["platform-demo-tenants"]
     },
     {
       "id": "platform-default",
@@ -239,7 +290,10 @@
       "expectedExcludedCapabilities": ["admin-oidc", "app-phone", "external-business-capability", "job", "notification", "personnel", "policy-review"],
       "expectedAdminResources": ["api-resources", "area-codes", "capabilities", "demo-data", "files", "overview", "settings", "users"],
       "expectedAppRoutes": ["GET /api/app/files/:id/content", "GET /api/app/session/current", "POST /api/app/auth/login", "POST /api/app/auth/logout", "POST /api/app/files"],
-      "expectedAuthProviders": ["demo", "wechat"]
+      "expectedAuthProviders": ["demo", "wechat"],
+      "expectedExcludedAdminResources": ["admin-identities", "app-phone-bindings", "app-phone-verifications", "job-definitions", "job-run-attempts", "job-runs", "notification-deliveries", "notification-templates", "notifications", "personnel-profiles", "policy-reviews", "position-assignments", "positions"],
+      "expectedExcludedAppRoutes": ["POST /api/app/identity/phone-bindings", "POST /api/app/identity/phone-verifications"],
+      "expectedExcludedAuthProviders": ["oidc"]
     },
     {
       "id": "production-admin-oidc-ready",
@@ -249,7 +303,11 @@
       "expectedExcludedCapabilities": ["app-phone", "demo-data", "external-business-capability", "job", "notification", "personnel", "policy-review", "wechat-login"],
       "expectedAdminResources": ["admin-identities", "api-tokens", "audit-logs", "sessions", "users", "versions"],
       "expectedAppRoutes": ["GET /api/app/files/:id/content", "GET /api/app/session/current", "POST /api/app/auth/login", "POST /api/app/auth/logout", "POST /api/app/files"],
-      "expectedAuthProviders": ["demo", "oidc"]
+      "expectedAuthProviders": ["demo", "oidc"],
+      "expectedExcludedAdminResources": ["app-phone-bindings", "app-phone-verifications", "demo-data", "job-definitions", "job-run-attempts", "job-runs", "notification-deliveries", "notification-templates", "notifications", "personnel-profiles", "policy-reviews", "position-assignments", "positions"],
+      "expectedExcludedAppRoutes": ["POST /api/app/identity/phone-bindings", "POST /api/app/identity/phone-verifications"],
+      "expectedExcludedAuthProviders": ["wechat"],
+      "expectedExcludedDemoDataSets": ["platform-demo-tenants"]
     },
     {
       "id": "all-optional-platform-without-demo",
@@ -259,7 +317,9 @@
       "expectedExcludedCapabilities": ["demo-data", "external-business-capability"],
       "expectedAdminResources": ["admin-identities", "app-phone-bindings", "app-phone-verifications", "job-definitions", "job-run-attempts", "job-runs", "notification-deliveries", "notification-templates", "notifications", "personnel-profiles", "policy-reviews", "position-assignments", "positions"],
       "expectedAppRoutes": ["GET /api/app/files/:id/content", "GET /api/app/session/current", "POST /api/app/auth/login", "POST /api/app/auth/logout", "POST /api/app/files", "POST /api/app/identity/phone-bindings", "POST /api/app/identity/phone-verifications"],
-      "expectedAuthProviders": ["demo", "oidc", "wechat"]
+      "expectedAuthProviders": ["demo", "oidc", "wechat"],
+      "expectedExcludedAdminResources": ["demo-data"],
+      "expectedExcludedDemoDataSets": ["platform-demo-tenants"]
     }
   ],
   "requiredValidators": [
@@ -281,8 +341,24 @@
       "contains": "platform-capability-operation-policy"
     },
     {
+      "path": "docs/platform-capability-development.md",
+      "contains": "restart-required desired-state"
+    },
+    {
       "path": "docs/platform-human-ai-development-protocol.md",
       "contains": "install, disable and uninstall"
+    },
+    {
+      "path": "README.md",
+      "contains": "手动重启服务"
+    },
+    {
+      "path": "README.en.md",
+      "contains": "manually restarting the service"
+    },
+    {
+      "path": "examples/external-capability/README.md",
+      "contains": "restart-required desired-state"
     },
     {
       "path": "resources/platform-human-ai-development-protocol.json",
