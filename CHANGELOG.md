@@ -9,6 +9,7 @@ and releases follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Added a machine-checked Human + AI development protocol covering interface contracts, Admin UI, visual customization, code generation, data security and handoff rules for downstream business customization.
 - Added a standalone external capability example and validator gate that prove downstream packages can use only `pkg/platform/capability` public contracts for manifest validation, lifecycle execution and JSON-safe contract previews.
 - Exposed public capability-package lifecycle history and recorded executor helpers so downstream composition roots can run manifest migrations and seeds without importing internal platform packages.
 

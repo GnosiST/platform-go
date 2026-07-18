@@ -1,0 +1,334 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-human-ai-development-protocol.json",
+  "capturedAt": "2026-07-18",
+  "purpose": "Machine-checkable development protocol for human and AI contributors building highly customized business systems on top of the business-neutral platform foundation.",
+  "audiences": [
+    "human-developers",
+    "ai-agents",
+    "downstream-business-teams",
+    "platform-maintainers"
+  ],
+  "entrypoints": {
+    "agentRules": "AGENTS.md",
+    "publicGuide": "docs/platform-human-ai-development-protocol.md",
+    "capabilityGuide": "docs/platform-capability-development.md",
+    "externalExample": "examples/external-capability/README.md",
+    "websiteGuide": "website/docs/human-ai-development.md"
+  },
+  "principles": [
+    {
+      "id": "contract-first",
+      "label": {
+        "zh": "合同先行",
+        "en": "Contract first"
+      },
+      "requires": [
+        "declare capability manifests, resources, routes, permissions and service contracts before implementation",
+        "regenerate OpenAPI and codegen previews from committed contract sources"
+      ],
+      "forbids": [
+        "page-local API paths that bypass generated contracts",
+        "business menus hard-coded into platform core"
+      ]
+    },
+    {
+      "id": "boundary-first-customization",
+      "label": {
+        "zh": "边界内高定制",
+        "en": "Customize within boundaries"
+      },
+      "requires": [
+        "attach business capabilities from downstream packages or composition roots",
+        "use platform ports and wrappers for storage, HTTP, Admin UI, query/command and uploads"
+      ],
+      "forbids": [
+        "downstream imports from internal/platform/**",
+        "platform core imports of concrete business packages"
+      ]
+    },
+    {
+      "id": "ai-readable-context",
+      "label": {
+        "zh": "上下文可被 AI 读取",
+        "en": "AI-readable context"
+      },
+      "requires": [
+        "keep the public protocol, examples and validation commands discoverable from README and docs",
+        "write decisions as current rules or external docs instead of private chat history"
+      ],
+      "forbids": [
+        "unstated architectural assumptions",
+        "business-specific requirements hidden inside platform rules"
+      ]
+    },
+    {
+      "id": "machine-verified",
+      "label": {
+        "zh": "机器门禁兜底",
+        "en": "Machine verified"
+      },
+      "requires": [
+        "run the narrow validator for the changed plane",
+        "run this protocol validator when changing contributor rules, onboarding, contracts, UI standards, visual standards or code generation"
+      ],
+      "forbids": [
+        "claiming readiness from documentation only",
+        "accepting generated source writes without review evidence"
+      ]
+    },
+    {
+      "id": "human-reviewed-risk",
+      "label": {
+        "zh": "风险由人审批",
+        "en": "Human-reviewed risk"
+      },
+      "requires": [
+        "human review for production mutations, source-writing codegen, destructive data work and new runtime roots",
+        "rollback and verification evidence for promotion decisions"
+      ],
+      "forbids": [
+        "automatic production mutation",
+        "AI-only approval for source overwrites or runtime promotion"
+      ]
+    }
+  ],
+  "customizationModes": [
+    {
+      "id": "external-business-package",
+      "status": "preferred-for-business-systems",
+      "description": "A downstream package or repository imports only pkg/platform/capability and attaches through a composition root.",
+      "starter": "examples/external-capability/README.md",
+      "requiredGate": "rtk node scripts/validate-external-capability-example.mjs"
+    },
+    {
+      "id": "platform-extension-capability",
+      "status": "for-reusable-platform-slices",
+      "description": "A capability under internal/platform may be added only when the behavior is reusable across business domains.",
+      "requiredGate": "rtk node scripts/validate-platform-capability-contracts.mjs"
+    },
+    {
+      "id": "generated-scaffold-preview",
+      "status": "safe-default",
+      "description": "Generators may produce preview and scaffold artifacts for review without mutating runtime source.",
+      "requiredGate": "rtk node scripts/validate-platform-codegen-source-writing-readiness.mjs"
+    }
+  ],
+  "domains": [
+    {
+      "id": "api-interface-contracts",
+      "sourceOfTruth": [
+        "capability.Manifest.Admin.Resources",
+        "capability.Manifest.App.Routes",
+        "capability.Manifest.Service"
+      ],
+      "requiredDocs": [
+        "docs/platform-capability-development.md",
+        "docs/admin-resource-schema.md",
+        "docs/platform-service-contract-standard.md",
+        "docs/platform-auth.md"
+      ],
+      "requiredGeneratedEvidence": [
+        "resources/generated/admin-resource-contract.json",
+        "resources/generated/openapi.admin.json",
+        "resources/generated/app-route-contract.json",
+        "resources/generated/openapi.app.json"
+      ],
+      "requiredValidators": [
+        "scripts/validate-admin-resources.mjs",
+        "scripts/validate-platform-admin-api-boundary.mjs",
+        "scripts/validate-platform-app-client-api-boundary.mjs",
+        "scripts/validate-platform-service-contract-standard.mjs"
+      ],
+      "requiredPractices": [
+        "Admin collection queries use POST /api/admin/resources/:resource/query",
+        "App routes stay under /api/app/** and use app security-domain tokens",
+        "service contracts declare identity, trusted tenant context, operations, reliability and compatibility"
+      ]
+    },
+    {
+      "id": "admin-ui-contracts",
+      "sourceOfTruth": [
+        "resources/admin-resources.json",
+        "capability.Manifest.Admin.Resources",
+        "admin/src/platform/ui",
+        "admin/src/platform/refine"
+      ],
+      "requiredDocs": [
+        "docs/admin-ui-foundation.md",
+        "docs/admin-resource-schema.md",
+        "docs/platform-capability-development.md"
+      ],
+      "requiredValidators": [
+        "scripts/validate-admin-i18n.mjs",
+        "scripts/validate-admin-ui-contracts.mjs"
+      ],
+      "requiredTests": [
+        "scripts/admin-ui-contracts.test.mjs"
+      ],
+      "requiredPractices": [
+        "shared Admin surfaces use platform wrappers over Ant Design",
+        "schema-driven CRUD flows stay on Refine data, auth and access-control providers",
+        "business custom panels attach through manifest actions, panels or controlled runtime slots"
+      ]
+    },
+    {
+      "id": "visual-system",
+      "sourceOfTruth": [
+        "docs/platform-ui-optimization-assessment.md",
+        "docs/platform-branding.md",
+        "admin/src/platform/ui"
+      ],
+      "requiredDocs": [
+        "docs/platform-ui-optimization-assessment.md",
+        "docs/platform-branding.md"
+      ],
+      "requiredValidators": [
+        "scripts/validate-admin-i18n.mjs",
+        "scripts/validate-admin-ui-contracts.mjs"
+      ],
+      "requiredPractices": [
+        "visual customization uses theme, layout, density, branding and registered components instead of page-local style forks",
+        "desktop and mobile changes keep accessibility, focus, i18n and reduced-motion behavior intact",
+        "public documentation surfaces may use distinct art direction while Admin workflows stay product-UI-first"
+      ]
+    },
+    {
+      "id": "code-generation",
+      "sourceOfTruth": [
+        "resources/platform-codegen-source-writing-readiness.json",
+        "resources/generated/admin-codegen-preview.json",
+        "resources/generated/app-codegen-preview.json",
+        "resources/generated/admin-scaffold-plan.json",
+        "resources/generated/admin-scaffold-files.json"
+      ],
+      "requiredDocs": [
+        "docs/admin-resource-schema.md",
+        "docs/platform-capability-development.md"
+      ],
+      "requiredValidators": [
+        "scripts/validate-platform-codegen-source-writing-readiness.mjs",
+        "scripts/validate-platform-admin-api-boundary.mjs",
+        "scripts/validate-platform-app-client-api-boundary.mjs"
+      ],
+      "requiredPractices": [
+        "source-writing generation remains disabled unless a reviewed promotion package is complete",
+        "generated previews are reviewed before any runtime target promotion",
+        "generated client code stays behind the Admin or App API boundary"
+      ]
+    },
+    {
+      "id": "data-security-governance",
+      "sourceOfTruth": [
+        "resources/platform-production-readiness.json",
+        "resources/platform-data-lifecycle-retention.json",
+        "resources/platform-production-auth-hardening.json",
+        "resources/platform-sensitive-data-migration-source-lock.json"
+      ],
+      "requiredDocs": [
+        "docs/platform-auth.md",
+        "docs/platform-deployment.md",
+        "docs/platform-data-lifecycle-retention.md",
+        "docs/platform-sensitive-data-migration.md"
+      ],
+      "requiredValidators": [
+        "scripts/validate-platform-production-env.mjs",
+        "scripts/validate-platform-production-readiness.mjs",
+        "scripts/validate-platform-data-lifecycle-retention.mjs",
+        "scripts/validate-platform-sensitive-data-migration.mjs"
+      ],
+      "requiredPractices": [
+        "tenant, organization and area ownership fields are declared explicitly when a business record needs data isolation",
+        "production mutation requires review evidence and rollback paths",
+        "sensitive data protection and reveal policies stay manifest-driven and fail closed"
+      ]
+    },
+    {
+      "id": "docs-handoff",
+      "sourceOfTruth": [
+        "README.md",
+        "README.en.md",
+        "AGENTS.md",
+        "docs/platform-human-ai-development-protocol.md",
+        "website/docs/human-ai-development.md"
+      ],
+      "requiredDocs": [
+        "README.md",
+        "README.en.md",
+        "AGENTS.md",
+        "docs/platform-human-ai-development-protocol.md",
+        "website/docs/human-ai-development.md",
+        "website/i18n/en/docusaurus-plugin-content-docs/current/human-ai-development.md"
+      ],
+      "requiredValidators": [
+        "scripts/validate-platform-human-ai-development-protocol.mjs",
+        "scripts/validate-external-capability-example.mjs"
+      ],
+      "requiredPractices": [
+        "stable onboarding knowledge lives in docs, not private chat or local memory",
+        "handoffs cite current files, commands and verification output",
+        "business examples stay illustrative and do not become platform-default capabilities"
+      ]
+    }
+  ],
+  "minimumAcceptanceCommands": [
+    "rtk node scripts/validate-platform-human-ai-development-protocol.mjs",
+    "rtk node scripts/validate-external-capability-example.mjs",
+    "rtk node scripts/validate-admin-resources.mjs",
+    "rtk node scripts/validate-platform-admin-api-boundary.mjs",
+    "rtk node scripts/validate-platform-app-client-api-boundary.mjs",
+    "rtk node scripts/validate-admin-i18n.mjs",
+    "rtk node scripts/validate-admin-ui-contracts.mjs",
+    "rtk node scripts/validate-platform-codegen-source-writing-readiness.mjs",
+    "rtk npm --prefix admin run build"
+  ],
+  "requiredSourceSnippets": [
+    {
+      "path": "AGENTS.md",
+      "contains": "Human + AI Development Protocol"
+    },
+    {
+      "path": "README.md",
+      "contains": "人机协同开发协议"
+    },
+    {
+      "path": "README.en.md",
+      "contains": "Human + AI development protocol"
+    },
+    {
+      "path": "docs/platform-human-ai-development-protocol.md",
+      "contains": "contract-first"
+    },
+    {
+      "path": "docs/platform-capability-development.md",
+      "contains": "platform-human-ai-development-protocol"
+    },
+    {
+      "path": "website/docs/human-ai-development.md",
+      "contains": "examples/external-capability"
+    },
+    {
+      "path": "website/i18n/en/docusaurus-plugin-content-docs/current/human-ai-development.md",
+      "contains": "examples/external-capability"
+    },
+    {
+      "path": "website/sidebars.ts",
+      "contains": "human-ai-development"
+    },
+    {
+      "path": "resources/platform-codegen-source-writing-readiness.json",
+      "contains": "\"sourceWriting\": \"disabled\""
+    }
+  ],
+  "requiredValidators": [
+    "scripts/validate-platform-human-ai-development-protocol.mjs",
+    "scripts/validate-external-capability-example.mjs",
+    "scripts/validate-admin-resources.mjs",
+    "scripts/validate-platform-admin-api-boundary.mjs",
+    "scripts/validate-platform-app-client-api-boundary.mjs",
+    "scripts/validate-admin-ui-contracts.mjs",
+    "scripts/validate-platform-codegen-source-writing-readiness.mjs"
+  ],
+  "requiredTests": [
+    "scripts/platform-human-ai-development-protocol.test.mjs"
+  ]
+}

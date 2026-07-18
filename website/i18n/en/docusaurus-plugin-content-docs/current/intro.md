@@ -17,3 +17,7 @@ go run ./cmd/platform-api
 ```
 
 The API listens on `http://127.0.0.1:9200` by default. Read the authentication and deployment guides before production use.
+
+## Reading path
+
+New contributors should read Architecture overview, Development guide, Human + AI development, Capabilities and API contracts in that order. Operators can jump directly to Security and Deployment.

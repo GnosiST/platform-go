@@ -535,6 +535,12 @@ For external business capability integration, keep the implementation outside `p
 
 External capabilities must treat `github.com/GnosiST/platform-go/pkg/platform/capability` as the only supported manifest import. Do not import `internal/platform/**`, `internal/apps/**`, concrete admin stores, HTTP handlers or Admin shell code from a business repository. The public package deliberately re-exports the full manifest contract surface: admin resource protection, deletion, actions, panels and runtime slots; App route declarations; service contract declarations; auth providers; lifecycle migrations/seeds; demo data; registry resolution; and validators. If a required declaration cannot be expressed through that package, add or extend a public contract first instead of reaching into internal code.
 
+Human and AI contributors share the same onboarding and customization contract in `docs/platform-human-ai-development-protocol.md`. Keep `resources/platform-human-ai-development-protocol.json` synchronized when changing contributor rules, external onboarding, interface contracts, Admin UI boundaries, visual standards or code generation policy, then run:
+
+```bash
+rtk node scripts/validate-platform-human-ai-development-protocol.mjs
+```
+
 Use `examples/external-capability` as the onboarding smoke test before attaching a real business package. It is intentionally not wired into the default runtime. From the repository root:
 
 ```bash

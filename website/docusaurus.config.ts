@@ -75,6 +75,7 @@ const config: Config = {
       items: [
         {to: '/docs/intro', label: '文档 / Docs', position: 'left'},
         {to: '/docs/capabilities', label: '能力 / Capabilities', position: 'left'},
+        {to: '/docs/human-ai-development', label: '协同 / Collaboration', position: 'left'},
         {to: '/docs/operations', label: '运维 / Operations', position: 'left'},
         {type: 'localeDropdown', position: 'right'},
         {label: 'v0.1.0', href: 'https://github.com/GnosiST/platform-go/releases/tag/v0.1.0', position: 'right'},
@@ -92,7 +93,7 @@ const config: Config = {
       style: 'dark',
       links: [
         {title: '项目 / Project', items: [{label: 'GitHub', href: 'https://github.com/GnosiST/platform-go'}, {label: '发行版本 / Releases', href: 'https://github.com/GnosiST/platform-go/releases'}]},
-        {title: '文档 / Docs', items: [{label: '快速开始 / Quick start', to: '/docs/intro'}, {label: '能力与扩展 / Capabilities', to: '/docs/capabilities'}, {label: '运维与安全 / Operations', to: '/docs/operations'}]},
+        {title: '文档 / Docs', items: [{label: '快速开始 / Quick start', to: '/docs/intro'}, {label: '能力与扩展 / Capabilities', to: '/docs/capabilities'}, {label: '人机协同 / Collaboration', to: '/docs/human-ai-development'}, {label: '运维与安全 / Operations', to: '/docs/operations'}]},
       ],
       copyright: `Copyright © ${new Date().getFullYear()} GnosiST. Built with Docusaurus.`,
     },

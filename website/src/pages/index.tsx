@@ -8,6 +8,7 @@ const capabilityCards = [
   {index: '01', zh: '身份与授权', en: 'Identity & access', textZh: 'JWT 会话、Casbin RBAC、租户范围、组织与菜单边界，从第一天就可审计。', textEn: 'JWT sessions, Casbin RBAC, tenant scopes, organizations and menu boundaries with auditability built in.', link: '/docs/intro', linkZh: '开始阅读', linkEn: 'Get started'},
   {index: '02', zh: '能力合同', en: 'Capability contracts', textZh: '用 manifest 描述资源、路由、权限、生命周期和稳定性，让业务包按合同接入。', textEn: 'Manifests describe resources, routes, permissions, lifecycle and stability so business packages attach by contract.', link: '/docs/capabilities', linkZh: '查看能力模型', linkEn: 'Explore capabilities'},
   {index: '03', zh: '运行治理', en: 'Runtime governance', textZh: 'OpenAPI、代码生成、迁移检查和发布证据，让每次扩展都可验证、可追溯。', textEn: 'OpenAPI, code generation, migration checks and release evidence keep every extension verifiable.', link: '/docs/operations', linkZh: '查看运维手册', linkEn: 'Read operations guide'},
+  {index: '04', zh: '人机协同', en: 'Human + AI workflow', textZh: '接口、UI、视觉、代码生成和数据安全都有共同协议，让人和 AI 按同一套门禁定制业务。', textEn: 'Interfaces, UI, visual standards, codegen and data security share one protocol so humans and AI customize through the same gates.', link: '/docs/human-ai-development', linkZh: '查看协同规范', linkEn: 'Read the protocol'},
 ];
 
 const proofPoints = [
@@ -35,7 +36,7 @@ export default function Home(): JSX.Element {
             <div className="platform-hero__copy">
               <p className="platform-kicker"><span className="platform-kicker__mark" aria-hidden="true" />GO OPERATIONS FOUNDATION / 0.1</p>
               <h1>{text('先把平台层做好，业务才能跑得更快。', 'Build the platform layer first. Let business move faster.')}</h1>
-              <p className="platform-hero__lede">{text('面向 Go 服务的业务中立底座，把能力、身份、授权、数据合同和生产运维收进一套可扩展的系统边界。', 'A business-neutral foundation for Go services that brings capabilities, identity, authorization, data contracts and production operations into one extensible boundary.')}</p>
+              <p className="platform-hero__lede">{text('面向 Go 服务的业务中立底座，把能力、身份、授权、数据合同、人机协同和生产运维收进一套可扩展的系统边界。', 'A business-neutral foundation for Go services that brings capabilities, identity, authorization, data contracts, human + AI workflow and production operations into one extensible boundary.')}</p>
               <div className="platform-actions" aria-label={text('主要操作', 'Primary actions')}>
                 <Link className="button button--primary button--lg" to="/docs/intro">{text('开始阅读文档', 'Read the docs')} <span aria-hidden="true">↗</span></Link>
                 <a className="button button--secondary button--lg" href="https://github.com/GnosiST/platform-go">{text('在 GitHub 查看', 'View on GitHub')} <span aria-hidden="true">↗</span></a>

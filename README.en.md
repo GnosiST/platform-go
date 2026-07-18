@@ -160,9 +160,12 @@ contracts and can validate manifests, tests and contract previews:
 node scripts/validate-external-capability-example.mjs
 ```
 
+Human developers and AI agents should follow the [Human + AI development protocol](docs/platform-human-ai-development-protocol.md) before starting a highly customized business system: declare interface, UI, visual, data and codegen contracts first, then verify the matching gates.
+
 ## Documentation
 
 - [Capability development guide](docs/platform-capability-development.md)
+- [Human + AI development protocol](docs/platform-human-ai-development-protocol.md)
 - [Authentication, sessions and RBAC](docs/platform-auth.md)
 - [Admin resources and menus](docs/admin-resource-schema.md)
 - [Data lifecycle and retention](docs/platform-data-lifecycle-retention.md)
