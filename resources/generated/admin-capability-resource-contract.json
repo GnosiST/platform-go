@@ -903,7 +903,7 @@
             "zh": "层级",
             "en": "Level"
           },
-          "type": "select",
+          "type": "text",
           "source": "values",
           "help": {
             "zh": "",
@@ -914,71 +914,29 @@
           "inForm": true,
           "inDetail": true,
           "width": 130,
-          "options": [
-            {
-              "value": "continent",
-              "label": {
-                "zh": "洲/大区",
-                "en": "Continent / Region"
-              }
-            },
-            {
-              "value": "country",
-              "label": {
-                "zh": "国家",
-                "en": "Country"
-              }
-            },
-            {
-              "value": "subdivision",
-              "label": {
-                "zh": "一级行政区",
-                "en": "Subdivision"
-              }
-            },
-            {
-              "value": "state",
-              "label": {
-                "zh": "州/邦",
-                "en": "State"
-              }
-            },
-            {
-              "value": "province",
-              "label": {
-                "zh": "省/直辖市",
-                "en": "Province"
-              }
-            },
-            {
-              "value": "city",
-              "label": {
-                "zh": "城市",
-                "en": "City"
-              }
-            },
-            {
-              "value": "district",
-              "label": {
-                "zh": "区县",
-                "en": "District"
-              }
-            },
-            {
-              "value": "street",
-              "label": {
-                "zh": "街道",
-                "en": "Street"
-              }
-            },
-            {
-              "value": "custom",
-              "label": {
-                "zh": "自定义",
-                "en": "Custom"
-              }
-            }
-          ],
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "depth",
+          "label": {
+            "zh": "层级深度",
+            "en": "Depth"
+          },
+          "type": "number",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 110,
           "validation": {},
           "sensitivity": "public",
           "storageMode": "plain",
@@ -1002,6 +960,96 @@
           "inForm": true,
           "inDetail": true,
           "width": 220,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "sourceSystem",
+          "label": {
+            "zh": "来源体系",
+            "en": "Source System"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "sourceCode",
+          "label": {
+            "zh": "来源编码",
+            "en": "Source Code"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "dataSet",
+          "label": {
+            "zh": "数据集",
+            "en": "Data Set"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 160,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "metadata",
+          "label": {
+            "zh": "扩展元数据",
+            "en": "Metadata"
+          },
+          "type": "textarea",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 260,
           "validation": {},
           "sensitivity": "public",
           "storageMode": "plain",
@@ -1120,7 +1168,12 @@
         "description",
         "parentCode",
         "level",
-        "path"
+        "depth",
+        "path",
+        "sourceSystem",
+        "sourceCode",
+        "dataSet",
+        "metadata"
       ],
       "defaultSortKey": "sortOrder",
       "deletion": {

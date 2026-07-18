@@ -698,14 +698,19 @@ func areaCodeAdminResource() capability.AdminResource {
 			adminField("code", "地址码", "Area Code", "text", "record", true, false, true, true, true, true, 150, nil),
 			adminField("name", "区域名称", "Area Name", "text", "record", true, false, true, true, true, true, 180, nil),
 			relationAdminField(adminField("parentCode", "上级地址码", "Parent Code", "select", "values", false, false, true, true, true, true, 150, nil), areaCodeAdminFieldRelation(enabledAdminRelationFilter())),
-			adminField("level", "层级", "Level", "select", "values", false, false, true, true, true, true, 130, areaLevelOptions()),
+			adminField("level", "层级", "Level", "text", "values", false, false, true, true, true, true, 130, nil),
+			adminField("depth", "层级深度", "Depth", "number", "values", false, false, true, true, true, true, 110, nil),
 			adminField("path", "层级路径", "Path", "text", "values", false, false, true, true, true, true, 220, nil),
+			adminField("sourceSystem", "来源体系", "Source System", "text", "values", false, false, true, true, true, true, 160, nil),
+			adminField("sourceCode", "来源编码", "Source Code", "text", "values", false, false, true, false, true, true, 160, nil),
+			adminField("dataSet", "数据集", "Data Set", "text", "values", false, false, true, true, true, true, 160, nil),
+			adminField("metadata", "扩展元数据", "Metadata", "textarea", "values", false, false, true, false, true, true, 260, nil),
 			adminField("sortOrder", "排序", "Sort Order", "number", "values", false, false, false, true, true, true, 110, nil),
 			adminField("status", "状态", "Status", "select", "record", false, false, true, true, true, true, 120, enabledDisabledOptions()),
 			adminField("description", "说明", "Description", "textarea", "record", false, false, false, false, true, true, 220, nil),
 			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
 		},
-		SearchFields:   []string{"name", "code", "status", "description", "parentCode", "level", "path"},
+		SearchFields:   []string{"name", "code", "status", "description", "parentCode", "level", "depth", "path", "sourceSystem", "sourceCode", "dataSet", "metadata"},
 		DefaultSortKey: "sortOrder",
 	}
 }
@@ -1130,20 +1135,6 @@ func orgUnitTypeOptions() []capability.AdminFieldOption {
 		adminFieldOption("department", "部门", "Department"),
 		adminFieldOption("team", "团队", "Team"),
 		adminFieldOption("store", "门店", "Store"),
-		adminFieldOption("custom", "自定义", "Custom"),
-	}
-}
-
-func areaLevelOptions() []capability.AdminFieldOption {
-	return []capability.AdminFieldOption{
-		adminFieldOption("continent", "洲/大区", "Continent / Region"),
-		adminFieldOption("country", "国家", "Country"),
-		adminFieldOption("subdivision", "一级行政区", "Subdivision"),
-		adminFieldOption("state", "州/邦", "State"),
-		adminFieldOption("province", "省/直辖市", "Province"),
-		adminFieldOption("city", "城市", "City"),
-		adminFieldOption("district", "区县", "District"),
-		adminFieldOption("street", "街道", "Street"),
 		adminFieldOption("custom", "自定义", "Custom"),
 	}
 }

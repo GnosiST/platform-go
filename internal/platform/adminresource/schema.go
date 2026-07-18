@@ -811,11 +811,16 @@ func areaCodeResourceSchema() Schema {
 	)
 	schema.Fields = append(schema.Fields,
 		withRelation(valueField("parentCode", text("上级地址码", "Parent Code"), "select", false, true, true, true, true, 150, nil), areaCodeFieldRelation(enabledRelationFilter())),
-		valueField("level", text("层级", "Level"), "select", false, true, true, true, true, 130, areaLevelOptions()),
+		valueField("level", text("层级", "Level"), "text", false, true, true, true, true, 130, nil),
+		valueField("depth", text("层级深度", "Depth"), "number", false, true, true, true, true, 110, nil),
 		valueField("path", text("层级路径", "Path"), "text", false, true, true, true, true, 220, nil),
+		valueField("sourceSystem", text("来源体系", "Source System"), "text", false, true, true, true, true, 160, nil),
+		valueField("sourceCode", text("来源编码", "Source Code"), "text", false, true, false, true, true, 160, nil),
+		valueField("dataSet", text("数据集", "Data Set"), "text", false, true, true, true, true, 160, nil),
+		valueField("metadata", text("扩展元数据", "Metadata"), "textarea", false, true, false, true, true, 260, nil),
 		valueField("sortOrder", text("排序", "Sort Order"), "number", false, false, false, true, true, 110, nil),
 	)
-	schema.SearchFields = []string{"name", "code", "status", "description", "parentCode", "level", "path"}
+	schema.SearchFields = []string{"name", "code", "status", "description", "parentCode", "level", "depth", "path", "sourceSystem", "sourceCode", "dataSet", "metadata"}
 	schema.DefaultSortKey = "sortOrder"
 	return schema
 }
@@ -1555,20 +1560,6 @@ func orgUnitTypeOptions() []FieldOption {
 		option("team", "团队", "Team"),
 		option("store", "门店", "Store"),
 		option("custom", "自定义", "Custom"),
-	}
-}
-
-func areaLevelOptions() []FieldOption {
-	return []FieldOption{
-		option("continent", "洲/大区", "Continent / Region"),
-		option("country", "国家", "Country"),
-		option("subdivision", "一级行政区", "Subdivision"),
-		option("state", "州/邦", "State"),
-		option("province", "省/直辖市", "Province"),
-		option("city", "城市", "City"),
-		option("district", "区县", "District"),
-		option("street", "街道", "Street"),
-		option("custom", "自定义区域", "Custom Area"),
 	}
 }
 

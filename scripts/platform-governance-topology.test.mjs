@@ -305,7 +305,8 @@ describe("validate-platform-governance-topology", () => {
     topology.areaCodePolicy.attachmentRequiredByDefault = true;
     topology.areaCodePolicy.defaultConsumers = ["tenants", "users"];
     topology.areaCodePolicy.optionalConsumers = [];
-    topology.areaCodePolicy.levels = ["country", "city"];
+    topology.areaCodePolicy.levelStrategy = "fixed-enum";
+    topology.areaCodePolicy.metadataFields = ["depth", "sourceSystem"];
     const topologyPath = tempJSON("platform-governance-topology.json", topology);
 
     const result = runValidator(["--topology", topologyPath]);
@@ -315,7 +316,8 @@ describe("validate-platform-governance-topology", () => {
     assert.match(result.stderr, /areaCodePolicy\.attachmentRequiredByDefault must stay false/);
     assert.match(result.stderr, /areaCodePolicy\.defaultConsumers must include org-units/);
     assert.match(result.stderr, /areaCodePolicy\.optionalConsumers must include personnel-profiles/);
-    assert.match(result.stderr, /areaCodePolicy\.levels must include continent, country, subdivision, state, province, city, district, street, custom/);
+    assert.match(result.stderr, /areaCodePolicy\.levelStrategy must stay data-driven/);
+    assert.match(result.stderr, /areaCodePolicy\.metadataFields must include depth, sourceSystem, sourceCode, dataSet, metadata/);
   });
 
   it("rejects area-code policies that remove attachment fields or promote detailed addresses into the default foundation", () => {

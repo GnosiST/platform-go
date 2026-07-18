@@ -1058,8 +1058,12 @@ func TestDefaultStoreIncludesOrganizationRoleGroupAndAreaResources(t *testing.T)
 		t.Fatalf("Schema(area-codes) error = %v", err)
 	}
 	levelField := fieldByKey(areaSchema.Fields, "level")
-	if levelField == nil || !hasFieldOption(levelField.Options, "street") {
-		t.Fatalf("default area-codes.level options = %+v, want street level", levelField)
+	if levelField == nil || levelField.Type != "text" || len(levelField.Options) != 0 {
+		t.Fatalf("default area-codes.level field = %+v, want data-driven text field without fixed options", levelField)
+	}
+	depthField := fieldByKey(areaSchema.Fields, "depth")
+	if depthField == nil || depthField.Type != "number" || !depthField.Searchable {
+		t.Fatalf("default area-codes.depth field = %+v, want searchable numeric depth", depthField)
 	}
 
 	menus := store.MenuItemsForPrincipal(store.CurrentPrincipal("admin"))
@@ -1411,8 +1415,24 @@ func TestCoreSchemaExposesOrganizationAndAreaRelations(t *testing.T) {
 		t.Fatalf("area-codes.parentCode relation path field = %+v, want path", parentField.Relation)
 	}
 	levelField := fieldByKey(areaSchema.Fields, "level")
-	if levelField == nil || !hasFieldOption(levelField.Options, "continent") || !hasFieldOption(levelField.Options, "country") || !hasFieldOption(levelField.Options, "subdivision") || !hasFieldOption(levelField.Options, "state") || !hasFieldOption(levelField.Options, "province") || !hasFieldOption(levelField.Options, "street") || !hasFieldOption(levelField.Options, "custom") {
-		t.Fatalf("area-codes.level options = %+v, want global country/subdivision/state/province/street/custom levels", levelField)
+	if levelField == nil || levelField.Type != "text" || len(levelField.Options) != 0 {
+		t.Fatalf("area-codes.level field = %+v, want data-driven text field without fixed options", levelField)
+	}
+	expectedMetadataFields := map[string]string{
+		"depth":        "number",
+		"sourceSystem": "text",
+		"sourceCode":   "text",
+		"dataSet":      "text",
+		"metadata":     "textarea",
+	}
+	for key, fieldType := range expectedMetadataFields {
+		field := fieldByKey(areaSchema.Fields, key)
+		if field == nil || field.Type != fieldType {
+			t.Fatalf("area-codes.%s field = %+v, want %s", key, field, fieldType)
+		}
+		if !slices.Contains(areaSchema.SearchFields, key) {
+			t.Fatalf("area-codes search fields = %+v, want %s", areaSchema.SearchFields, key)
+		}
 	}
 }
 

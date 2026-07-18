@@ -567,6 +567,10 @@ function fieldByKey(resource, key) {
   return (resource?.schema?.fields ?? []).find((field) => field.key === key);
 }
 
+function arrayValues(items) {
+  return Array.isArray(items) ? items.filter(Boolean) : [];
+}
+
 function optionValues(field) {
   return new Set(
     (field?.options ?? [])
@@ -661,12 +665,29 @@ function validatePlatformGovernanceContract(resourcesByCode) {
       errors.push("area-codes must declare parentCode tree relation to area-codes");
     }
     const levelField = fieldByKey(areaCodes, "level");
-    if (!levelField || levelField.type !== "select" || !hasOptions(levelField, ["continent", "country", "subdivision", "state", "province", "city", "district", "street", "custom"])) {
-      errors.push("area-codes must declare level select options");
+    if (!levelField || levelField.type !== "text" || arrayValues(levelField.options).length !== 0) {
+      errors.push("area-codes must declare level as a data-driven text field without fixed options");
     }
     const pathField = fieldByKey(areaCodes, "path");
     if (!pathField || pathField.type !== "text") {
       errors.push("area-codes must declare path hierarchy field");
+    }
+    const metadataFields = new Map([
+      ["depth", "number"],
+      ["sourceSystem", "text"],
+      ["sourceCode", "text"],
+      ["dataSet", "text"],
+      ["metadata", "textarea"],
+    ]);
+    const searchFields = new Set(arrayValues(areaCodes.schema?.search ?? areaCodes.searchFields));
+    for (const [key, expectedType] of metadataFields) {
+      const field = fieldByKey(areaCodes, key);
+      if (!field || field.type !== expectedType) {
+        errors.push(`area-codes must declare ${key} as ${expectedType}`);
+      }
+      if (!searchFields.has(key)) {
+        errors.push(`area-codes search fields must include ${key}`);
+      }
     }
   }
 

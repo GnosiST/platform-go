@@ -17,7 +17,10 @@ type AreaCode struct {
 	Description string `gorm:"type:text" json:"description"`
 	ParentCode string `json:"parentCode"`
 	Level string `json:"level"`
+	Depth string `json:"depth"`
 	Path string `json:"path"`
+	SourceSystem string `json:"sourceSystem"`
+	DataSet string `json:"dataSet"`
 	SortOrder string `json:"sortOrder"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }

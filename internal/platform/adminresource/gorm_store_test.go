@@ -259,7 +259,7 @@ func TestGORMAdminResourceRepositoryNormalizesGovernanceResources(t *testing.T) 
 				{ID: "role-group-system-admin", Code: "system-admin", Name: "System Admin", Status: "enabled", Description: "System role group", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"sortOrder": "10"}},
 			},
 			"area-codes": {
-				{ID: "area-beijing", Code: "110000", Name: "Beijing", Status: "enabled", Description: "Area", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"parentCode": "CN", "level": "province", "path": "CN/110000", "sortOrder": "20"}},
+				{ID: "area-beijing", Code: "110000", Name: "Beijing", Status: "enabled", Description: "Area", UpdatedAt: "2026-07-04T00:00:00Z", Values: map[string]string{"parentCode": "CN", "level": "province", "depth": "2", "path": "CN/110000", "sortOrder": "20"}},
 			},
 		},
 	}

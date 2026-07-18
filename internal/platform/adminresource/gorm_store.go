@@ -137,7 +137,8 @@ var normalizedGORMResourceLayouts = map[string]gormAdminResourceLayout{
 		Table: adminAreaCodesTable,
 		ValueProjections: map[string][]string{
 			"parentCode": {adminAreaCodesTable + ".parent_code"}, "level": {adminAreaCodesTable + ".level"},
-			"path": {adminAreaCodesTable + ".path"}, "sortOrder": {adminAreaCodesTable + ".sort_order"},
+			"depth": {adminAreaCodesTable + ".depth"}, "path": {adminAreaCodesTable + ".path"},
+			"sortOrder": {adminAreaCodesTable + ".sort_order"},
 		},
 	},
 	"audit-logs": {
@@ -346,6 +347,7 @@ type gormAdminAreaCode struct {
 	UpdatedAt   string `gorm:"column:updated_at;not null"`
 	ParentCode  string `gorm:"column:parent_code;index;not null"`
 	Level       string `gorm:"column:level;index;not null"`
+	Depth       int    `gorm:"column:depth;index;not null;default:0"`
 	Path        string `gorm:"column:path;index;not null"`
 	SortOrder   int    `gorm:"column:sort_order;index;not null"`
 	ValuesJSON  string `gorm:"column:values_json;not null"`
@@ -433,6 +435,9 @@ func OpenGORMAdminResourceRepository(ctx context.Context, db *gorm.DB) (*GORMAdm
 		}
 	}
 	if !db.WithContext(ctx).Migrator().HasColumn(&gormAdminPermission{}, "ResourceType") {
+		return nil, errors.New("gorm admin resource schema is not prepared")
+	}
+	if !db.WithContext(ctx).Migrator().HasColumn(&gormAdminAreaCode{}, "Depth") {
 		return nil, errors.New("gorm admin resource schema is not prepared")
 	}
 	return &GORMAdminResourceRepository{db: db}, nil
@@ -1359,6 +1364,7 @@ func (r *GORMAdminResourceRepository) loadAreaCodes(ctx context.Context) ([]Reco
 		}
 		values["parentCode"] = row.ParentCode
 		values["level"] = row.Level
+		values["depth"] = strconv.Itoa(areaDepthWithFallback(row.Depth, row.Path))
 		values["path"] = row.Path
 		values["sortOrder"] = strconv.Itoa(row.SortOrder)
 		records = append(records, recordFromNormalized(row.ID, row.Code, row.Name, row.Status, row.Description, row.UpdatedAt, values))
@@ -1756,6 +1762,7 @@ func saveAreaCodes(tx *gorm.DB, records []Record) error {
 			UpdatedAt:   record.UpdatedAt,
 			ParentCode:  record.Values["parentCode"],
 			Level:       record.Values["level"],
+			Depth:       parseAreaDepth(record.Values["depth"], record.Values["path"]),
 			Path:        record.Values["path"],
 			SortOrder:   parseOrder(record.Values["sortOrder"]),
 			ValuesJSON:  valuesJSON,
@@ -1916,6 +1923,31 @@ func valuesFromJSON(raw string) (map[string]string, error) {
 		values = map[string]string{}
 	}
 	return values, nil
+}
+
+func parseAreaDepth(value string, path string) int {
+	if depth, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && depth >= 0 {
+		return depth
+	}
+	return areaDepthFromPath(path)
+}
+
+func areaDepthWithFallback(depth int, path string) int {
+	if depth > 0 {
+		return depth
+	}
+	return areaDepthFromPath(path)
+}
+
+func areaDepthFromPath(path string) int {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	depth := 0
+	for _, part := range parts {
+		if strings.TrimSpace(part) != "" {
+			depth++
+		}
+	}
+	return depth
 }
 
 func emptyValuesToNil(values map[string]string) map[string]string {

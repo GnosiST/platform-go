@@ -1718,31 +1718,44 @@
         "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
       },
       "schema": {
-        "fieldCount": 8,
+        "fieldCount": 13,
         "search": [
           "code",
+          "dataSet",
+          "depth",
           "level",
+          "metadata",
           "name",
           "parentCode",
           "path",
+          "sourceCode",
+          "sourceSystem",
           "status"
         ],
         "filter": [
           "code",
+          "dataSet",
+          "depth",
           "level",
+          "metadata",
           "name",
           "parentCode",
           "path",
           "sortOrder",
+          "sourceCode",
+          "sourceSystem",
           "status"
         ],
         "sort": [
           "code",
+          "dataSet",
+          "depth",
           "level",
           "name",
           "parentCode",
           "path",
           "sortOrder",
+          "sourceSystem",
           "status"
         ],
         "table": [
@@ -1750,7 +1763,10 @@
           "name",
           "parentCode",
           "level",
+          "depth",
           "path",
+          "sourceSystem",
+          "dataSet",
           "sortOrder",
           "status"
         ],
@@ -1759,7 +1775,12 @@
           "name",
           "parentCode",
           "level",
+          "depth",
           "path",
+          "sourceSystem",
+          "sourceCode",
+          "dataSet",
+          "metadata",
           "sortOrder",
           "status",
           "description"

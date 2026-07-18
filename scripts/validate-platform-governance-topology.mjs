@@ -20,7 +20,7 @@ const profilesPath = path.resolve(repoRoot, argValue("--profiles", "resources/pl
 const matrixPath = path.resolve(repoRoot, argValue("--matrix", "resources/platform-engineering-capabilities.json"));
 const personnelAdminContractPath = argValue("--personnel-admin-contract", "");
 const requiredOrgUnitTypeOptions = ["group", "company", "branch", "organization", "department", "team", "store", "custom"];
-const requiredAreaCodeLevelOptions = ["continent", "country", "subdivision", "state", "province", "city", "district", "street", "custom"];
+const requiredAreaCodeMetadataFields = ["depth", "sourceSystem", "sourceCode", "dataSet", "metadata"];
 const requiredOrganizationMigrationTaskIDs = [
   "organization-rbac-menu-contract-and-migration-design",
   "organization-role-pool-backend-and-migration",
@@ -286,6 +286,12 @@ function validateGovernanceEvaluation(topology, errors) {
   if (areaCodes.implicitAuthorization !== topology.areaCodePolicy?.implicitAuthorization) {
     errors.push("governanceEvaluation.areaCodes.implicitAuthorization must match areaCodePolicy.implicitAuthorization");
   }
+  if (areaCodes.levelStrategy !== topology.areaCodePolicy?.levelStrategy) {
+    errors.push("governanceEvaluation.areaCodes.levelStrategy must match areaCodePolicy.levelStrategy");
+  }
+  if (!includesAll(values(areaCodes.metadataFields), requiredAreaCodeMetadataFields)) {
+    errors.push(`governanceEvaluation.areaCodes.metadataFields must include ${requiredAreaCodeMetadataFields.join(", ")}`);
+  }
   for (const field of ["tenants.areaCode", "org-units.areaCode", "users.areaCode"]) {
     if (!values(areaCodes.defaultAttachments).includes(field)) {
       errors.push(`governanceEvaluation.areaCodes.defaultAttachments must include ${field}`);
@@ -545,8 +551,11 @@ function validatePolicyFlags(topology, errors) {
   if (topology.areaCodePolicy?.dataScopeOwner !== "roles.dataScopeAreaCodes") {
     errors.push("areaCodePolicy.dataScopeOwner must stay roles.dataScopeAreaCodes");
   }
-  if (!includesAll(values(topology.areaCodePolicy?.levels), requiredAreaCodeLevelOptions)) {
-    errors.push(`areaCodePolicy.levels must include ${requiredAreaCodeLevelOptions.join(", ")}`);
+  if (topology.areaCodePolicy?.levelStrategy !== "data-driven") {
+    errors.push("areaCodePolicy.levelStrategy must stay data-driven");
+  }
+  if (!includesAll(values(topology.areaCodePolicy?.metadataFields), requiredAreaCodeMetadataFields)) {
+    errors.push(`areaCodePolicy.metadataFields must include ${requiredAreaCodeMetadataFields.join(", ")}`);
   }
   for (const field of ["tenants.areaCode", "org-units.areaCode", "users.areaCode", "personnel-profiles.areaCode"]) {
     if (!values(topology.areaCodePolicy?.attachmentFields).includes(field)) {

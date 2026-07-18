@@ -8,26 +8,24 @@ The reusable platform foundation should provide identity, RBAC, tenant/org/area 
 
 ## Address-Code Scope
 
-Use `area-codes` as global regional master data, not as a China-only administrative code table. The contract now supports these tree levels:
+Use `area-codes` as global regional master data, not as a China-only administrative code table. Keep it as one logical resource/table. Do not split China and world data into separate platform resources, and do not hard-code a closed set of geographic levels into the platform contract.
 
-- `continent`
-- `country`
-- `subdivision`
-- `state`
-- `province`
-- `city`
-- `district`
-- `street`
-- `custom`
+The hierarchy is data-driven:
+
+- `parentCode` and `path` define the tree.
+- `level` is a free data label initialized by the selected data package, such as `country`, `subdivision`, `province`, `city`, `venue-market` or a business-owned region type.
+- `depth` records tree depth for filtering, sorting and future tree projections.
+- `sourceSystem`, `sourceCode` and `dataSet` keep import provenance.
+- `metadata` carries source-specific JSON strings such as ISO 3166 alpha-2/alpha-3, ISO 3166-2, UN M49, CLDR territory ids, GeoNames ids, OSM ids, aliases, localized names, latitude/longitude or bounding boxes.
 
 Recommended code conventions:
 
 - Use ISO 3166-1 alpha-2 values for country roots where possible, such as `CN`, `US`, `DE` and `AE`.
 - Use ISO 3166-2 style values for first-level subdivisions when available, such as `US-CA`, `DE-BE` or `CN-110000`.
-- Use stable business-owned codes for venues, halls or local operating regions only when public standards do not fit.
+- Use stable business-owned codes for venues, halls, exhibition market cities or local operating regions only when public standards do not fit.
 - Keep detailed postal/street/contact addresses in the owning exhibition capability. Do not add `addresses` or `user-addresses` to the platform default foundation.
 
-The default seed data should remain small. A production exhibition product should import global countries and target-market subdivisions through a reviewed seed/import job owned by the business deployment, not by hard-coding a full world geographic dataset into `platform-go`.
+The default seed data should remain small. A production exhibition product should import global countries, target-market subdivisions, China administrative divisions or exhibition-market cities through reviewed deployment-owned data packages such as `global-countries`, `global-subdivisions`, `cn-admin-divisions` and `exhibition-market-cities`, not by hard-coding a full world geographic dataset into `platform-go`.
 
 ## Business Capability Shape
 
@@ -48,8 +46,11 @@ Use relation fields to the foundation where applicable:
 - `tenantCode -> tenants`
 - `orgUnitCode -> org-units`
 - `areaCode -> area-codes`
+- `serviceAreaCodes -> area-codes` for multi-region service coverage when the business resource supports many areas
 
 This lets the existing data-scope layer filter regional or tenant-owned records after RBAC allows the read action.
+
+For data isolation, use `tenantCode` as the hard tenant boundary, `orgUnitCode` as the organization/team boundary, and `areaCode` as optional regional ownership. Role regional authorization must use `roles.dataScopeAreaCodes`; an `areaCode` reference on a row is ownership metadata, not an access grant by itself. Booth builders or exhibitors that serve many regions should model coverage with `serviceAreaCodes` or a downstream `area-groups` capability instead of overloading a single `areaCode`.
 
 ## Feasibility
 

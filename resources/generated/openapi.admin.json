@@ -2468,37 +2468,55 @@
                 "x-platform-resource": "areaCodes",
                 "x-platform-allowed-fields": [
                   "code",
+                  "dataSet",
+                  "depth",
                   "level",
+                  "metadata",
                   "name",
                   "parentCode",
                   "path",
                   "sortOrder",
+                  "sourceCode",
+                  "sourceSystem",
                   "status"
                 ],
                 "x-platform-search-fields": [
                   "code",
+                  "dataSet",
+                  "depth",
                   "level",
+                  "metadata",
                   "name",
                   "parentCode",
                   "path",
+                  "sourceCode",
+                  "sourceSystem",
                   "status"
                 ],
                 "x-platform-filter-fields": [
                   "code",
+                  "dataSet",
+                  "depth",
                   "level",
+                  "metadata",
                   "name",
                   "parentCode",
                   "path",
                   "sortOrder",
+                  "sourceCode",
+                  "sourceSystem",
                   "status"
                 ],
                 "x-platform-sort-fields": [
                   "code",
+                  "dataSet",
+                  "depth",
                   "level",
                   "name",
                   "parentCode",
                   "path",
                   "sortOrder",
+                  "sourceSystem",
                   "status"
                 ],
                 "x-platform-localized-fields": [
@@ -15503,9 +15521,45 @@
             },
             "description": "Extensible values for plugin or business fields that have not been promoted to first-class columns."
           },
+          "dataSet": {
+            "description": "en: Data Set; zh: 数据集",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "数据集",
+              "en": "Data Set"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "depth": {
+            "description": "en: Depth; zh: 层级深度",
+            "x-platform-field-type": "number",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "层级深度",
+              "en": "Depth"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "number"
+          },
           "level": {
             "description": "en: Level; zh: 层级",
-            "x-platform-field-type": "select",
+            "x-platform-field-type": "text",
             "x-platform-field-source": "values",
             "x-platform-label": {
               "zh": "层级",
@@ -15519,18 +15573,25 @@
             "x-platform-storage-mode": "plain",
             "x-platform-response-mode": "full",
             "x-platform-export-mode": "full",
-            "type": "string",
-            "enum": [
-              "continent",
-              "country",
-              "subdivision",
-              "state",
-              "province",
-              "city",
-              "district",
-              "street",
-              "custom"
-            ]
+            "type": "string"
+          },
+          "metadata": {
+            "description": "en: Metadata; zh: 扩展元数据",
+            "x-platform-field-type": "textarea",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "扩展元数据",
+              "en": "Metadata"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
           },
           "parentCode": {
             "description": "en: Parent Code; zh: 上级地址码",
@@ -15602,6 +15663,42 @@
             "x-platform-response-mode": "full",
             "x-platform-export-mode": "full",
             "type": "number"
+          },
+          "sourceCode": {
+            "description": "en: Source Code; zh: 来源编码",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "来源编码",
+              "en": "Source Code"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "sourceSystem": {
+            "description": "en: Source System; zh: 来源体系",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "来源体系",
+              "en": "Source System"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
           }
         },
         "x-platform-resource": "areaCodes",
@@ -15684,7 +15781,7 @@
           },
           "level": {
             "description": "en: Level; zh: 层级",
-            "x-platform-field-type": "select",
+            "x-platform-field-type": "text",
             "x-platform-field-source": "values",
             "x-platform-label": {
               "zh": "层级",
@@ -15698,18 +15795,25 @@
             "x-platform-storage-mode": "plain",
             "x-platform-response-mode": "full",
             "x-platform-export-mode": "full",
-            "type": "string",
-            "enum": [
-              "continent",
-              "country",
-              "subdivision",
-              "state",
-              "province",
-              "city",
-              "district",
-              "street",
-              "custom"
-            ]
+            "type": "string"
+          },
+          "depth": {
+            "description": "en: Depth; zh: 层级深度",
+            "x-platform-field-type": "number",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "层级深度",
+              "en": "Depth"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "number"
           },
           "path": {
             "description": "en: Path; zh: 层级路径",
@@ -15718,6 +15822,78 @@
             "x-platform-label": {
               "zh": "层级路径",
               "en": "Path"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "sourceSystem": {
+            "description": "en: Source System; zh: 来源体系",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "来源体系",
+              "en": "Source System"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "sourceCode": {
+            "description": "en: Source Code; zh: 来源编码",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "来源编码",
+              "en": "Source Code"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "dataSet": {
+            "description": "en: Data Set; zh: 数据集",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "数据集",
+              "en": "Data Set"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "metadata": {
+            "description": "en: Metadata; zh: 扩展元数据",
+            "x-platform-field-type": "textarea",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "扩展元数据",
+              "en": "Metadata"
             },
             "x-platform-searchable": true,
             "x-platform-filterable": false,

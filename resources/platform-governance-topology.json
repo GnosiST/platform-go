@@ -30,6 +30,8 @@
       "resource": "area-codes",
       "defaultResourceRequired": true,
       "attachmentRequiredByDefault": false,
+      "levelStrategy": "data-driven",
+      "metadataFields": ["depth", "sourceSystem", "sourceCode", "dataSet", "metadata"],
       "defaultAttachments": ["tenants.areaCode", "org-units.areaCode", "users.areaCode"],
       "optionalAttachments": ["personnel-profiles.areaCode"],
       "authorizationConsumer": "roles.dataScopeAreaCodes",
@@ -124,8 +126,13 @@
       "resource": "area-codes",
       "fields": [
         { "key": "parentCode", "relationResource": "area-codes", "display": "tree", "parentField": "parentCode", "pathField": "path" },
-        { "key": "level", "type": "select", "options": ["continent", "country", "subdivision", "state", "province", "city", "district", "street", "custom"] },
-        { "key": "path", "type": "text" }
+        { "key": "level", "type": "text" },
+        { "key": "depth", "type": "number" },
+        { "key": "path", "type": "text" },
+        { "key": "sourceSystem", "type": "text" },
+        { "key": "sourceCode", "type": "text" },
+        { "key": "dataSet", "type": "text" },
+        { "key": "metadata", "type": "textarea" }
       ]
     },
     {
@@ -173,6 +180,10 @@
     "attachmentRequiredByDefault": false,
     "implicitAuthorization": false,
     "dataScopeOwner": "roles.dataScopeAreaCodes",
+    "levelStrategy": "data-driven",
+    "recommendedLevelExamples": ["continent", "country", "subdivision", "state", "province", "city", "district", "street", "custom"],
+    "metadataFields": ["depth", "sourceSystem", "sourceCode", "dataSet", "metadata"],
+    "recommendedDataPackages": ["global-countries", "global-subdivisions", "cn-admin-divisions", "exhibition-market-cities"],
     "attachmentFields": ["tenants.areaCode", "org-units.areaCode", "users.areaCode", "personnel-profiles.areaCode"],
     "authorizationConsumers": ["roles.dataScopeAreaCodes"],
     "detailedAddressPolicy": {
@@ -181,8 +192,7 @@
       "promotionRule": "promote-only-after-two-reusable-capabilities"
     },
     "defaultConsumers": ["tenants", "org-units", "users"],
-    "optionalConsumers": ["personnel-profiles"],
-    "levels": ["continent", "country", "subdivision", "state", "province", "city", "district", "street", "custom"]
+    "optionalConsumers": ["personnel-profiles"]
   },
   "personnelBoundary": {
     "defaultCapability": "excluded",

@@ -768,8 +768,8 @@ func seedRowsForResource(resource string, updatedAt string) []Record {
 		}
 	case "area-codes":
 		return []Record{
-			seedLocalized("area-cn", "CN", "中国", "China", "enabled", "国家级区域根节点。", "Country-level area root.", updatedAt, map[string]string{"parentCode": "", "level": "country", "path": "CN", "sortOrder": "10"}),
-			seedLocalized("area-beijing", "110000", "北京市", "Beijing", "enabled", "示例省/直辖市地址码。", "Sample province/municipality area code.", updatedAt, map[string]string{"parentCode": "CN", "level": "province", "path": "CN/110000", "sortOrder": "20"}),
+			seedLocalized("area-cn", "CN", "中国", "China", "enabled", "国家级区域根节点。", "Country-level area root.", updatedAt, map[string]string{"parentCode": "", "level": "country", "depth": "1", "path": "CN", "sourceSystem": "platform", "sourceCode": "CN", "dataSet": "platform-default", "metadata": "{\"iso3166Alpha2\":\"CN\"}", "sortOrder": "10"}),
+			seedLocalized("area-beijing", "110000", "北京市", "Beijing", "enabled", "示例省/直辖市地址码。", "Sample province/municipality area code.", updatedAt, map[string]string{"parentCode": "CN", "level": "province", "depth": "2", "path": "CN/110000", "sourceSystem": "platform", "sourceCode": "CN-110000", "dataSet": "platform-default", "metadata": "{\"iso3166Subdivision\":\"CN-110000\"}", "sortOrder": "20"}),
 		}
 	case "api-resources":
 		return []Record{

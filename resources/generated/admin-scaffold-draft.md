@@ -264,12 +264,12 @@ Audit candidates: `area_code.create`, `area_code.delete`, `area_code.update`
 
 ### Schema
 
-- Field count: 8
-- Search: `code`, `level`, `name`, `parentCode`, `path`, `status`
-- Filter: `code`, `level`, `name`, `parentCode`, `path`, `sortOrder`, `status`
-- Sort: `code`, `level`, `name`, `parentCode`, `path`, `sortOrder`, `status`
-- Table: `code`, `name`, `parentCode`, `level`, `path`, `sortOrder`, `status`
-- Form: `code`, `name`, `parentCode`, `level`, `path`, `sortOrder`, `status`, `description`
+- Field count: 13
+- Search: `code`, `dataSet`, `depth`, `level`, `metadata`, `name`, `parentCode`, `path`, `sourceCode`, `sourceSystem`, `status`
+- Filter: `code`, `dataSet`, `depth`, `level`, `metadata`, `name`, `parentCode`, `path`, `sortOrder`, `sourceCode`, `sourceSystem`, `status`
+- Sort: `code`, `dataSet`, `depth`, `level`, `name`, `parentCode`, `path`, `sortOrder`, `sourceSystem`, `status`
+- Table: `code`, `name`, `parentCode`, `level`, `depth`, `path`, `sourceSystem`, `dataSet`, `sortOrder`, `status`
+- Form: `code`, `name`, `parentCode`, `level`, `depth`, `path`, `sourceSystem`, `sourceCode`, `dataSet`, `metadata`, `sortOrder`, `status`, `description`
 - Localized fields: `description`, `name`
 
 ### Dry-run Candidate Files

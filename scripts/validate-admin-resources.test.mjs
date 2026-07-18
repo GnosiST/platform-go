@@ -441,21 +441,26 @@ describe("validate-admin-resources relation contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /area-codes must declare parentCode tree relation to area-codes/);
-    assert.match(result.stderr, /area-codes must declare level select options/);
+    assert.match(result.stderr, /area-codes must declare level as a data-driven text field without fixed options/);
     assert.match(result.stderr, /area-codes must declare path hierarchy field/);
   });
 
-  it("rejects area-code resources that drop global, street or custom levels", () => {
+  it("rejects area-code resources that restore fixed levels or omit source metadata", () => {
     const manifestPath = writeBrokenManifest((manifest) => {
       const areaCodes = manifest.resources.find((resource) => resource.code === "area-codes");
       const level = areaCodes.schema.fields.find((field) => field.key === "level");
-      level.options = level.options.filter((option) => option !== "continent" && option !== "subdivision" && option !== "state" && option !== "street" && option !== "custom");
+      level.type = "select";
+      level.options = ["country", "city"];
+      areaCodes.schema.fields = areaCodes.schema.fields.filter((field) => field.key !== "sourceSystem");
+      areaCodes.schema.search = areaCodes.schema.search.filter((field) => field !== "metadata");
     });
 
     const result = runValidator(["--manifest", manifestPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /area-codes must declare level select options/);
+    assert.match(result.stderr, /area-codes must declare level as a data-driven text field without fixed options/);
+    assert.match(result.stderr, /area-codes must declare sourceSystem as text/);
+    assert.match(result.stderr, /area-codes search fields must include metadata/);
   });
 
   it("rejects role resources that omit role-group or data-scope governance fields", () => {

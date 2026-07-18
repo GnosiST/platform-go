@@ -2090,6 +2090,38 @@
           "exportMode": "full"
         },
         {
+          "key": "dataSet",
+          "label": {
+            "zh": "数据集",
+            "en": "Data Set"
+          },
+          "type": "text",
+          "search": true,
+          "table": true,
+          "form": true,
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "depth",
+          "label": {
+            "zh": "层级深度",
+            "en": "Depth"
+          },
+          "type": "number",
+          "search": true,
+          "table": true,
+          "form": true,
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
           "key": "description",
           "label": {
             "zh": "说明",
@@ -2109,21 +2141,25 @@
             "zh": "层级",
             "en": "Level"
           },
-          "type": "select",
+          "type": "text",
           "search": true,
           "table": true,
           "form": true,
-          "options": [
-            "continent",
-            "country",
-            "subdivision",
-            "state",
-            "province",
-            "city",
-            "district",
-            "street",
-            "custom"
-          ],
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "metadata",
+          "label": {
+            "zh": "扩展元数据",
+            "en": "Metadata"
+          },
+          "type": "textarea",
+          "search": true,
+          "form": true,
+          "detail": true,
           "sensitivity": "public",
           "storageMode": "plain",
           "responseMode": "full",
@@ -2210,6 +2246,37 @@
           "exportMode": "full"
         },
         {
+          "key": "sourceCode",
+          "label": {
+            "zh": "来源编码",
+            "en": "Source Code"
+          },
+          "type": "text",
+          "search": true,
+          "form": true,
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "sourceSystem",
+          "label": {
+            "zh": "来源体系",
+            "en": "Source System"
+          },
+          "type": "text",
+          "search": true,
+          "table": true,
+          "form": true,
+          "detail": true,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
           "key": "status",
           "label": {
             "zh": "状态",
@@ -2230,28 +2297,41 @@
       ],
       "search": [
         "code",
+        "dataSet",
+        "depth",
         "level",
+        "metadata",
         "name",
         "parentCode",
         "path",
+        "sourceCode",
+        "sourceSystem",
         "status"
       ],
       "filter": [
         "code",
+        "dataSet",
+        "depth",
         "level",
+        "metadata",
         "name",
         "parentCode",
         "path",
         "sortOrder",
+        "sourceCode",
+        "sourceSystem",
         "status"
       ],
       "sort": [
         "code",
+        "dataSet",
+        "depth",
         "level",
         "name",
         "parentCode",
         "path",
         "sortOrder",
+        "sourceSystem",
         "status"
       ],
       "table": [
@@ -2259,7 +2339,10 @@
         "name",
         "parentCode",
         "level",
+        "depth",
         "path",
+        "sourceSystem",
+        "dataSet",
         "sortOrder",
         "status"
       ],
@@ -2268,7 +2351,12 @@
         "name",
         "parentCode",
         "level",
+        "depth",
         "path",
+        "sourceSystem",
+        "sourceCode",
+        "dataSet",
+        "metadata",
         "sortOrder",
         "status",
         "description"
@@ -7130,6 +7218,38 @@
             "exportMode": "full"
           },
           {
+            "key": "dataSet",
+            "label": {
+              "zh": "数据集",
+              "en": "Data Set"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "depth",
+            "label": {
+              "zh": "层级深度",
+              "en": "Depth"
+            },
+            "type": "number",
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
             "key": "description",
             "label": {
               "zh": "说明",
@@ -7149,21 +7269,25 @@
               "zh": "层级",
               "en": "Level"
             },
-            "type": "select",
+            "type": "text",
             "search": true,
             "table": true,
             "form": true,
-            "options": [
-              "continent",
-              "country",
-              "subdivision",
-              "state",
-              "province",
-              "city",
-              "district",
-              "street",
-              "custom"
-            ],
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "metadata",
+            "label": {
+              "zh": "扩展元数据",
+              "en": "Metadata"
+            },
+            "type": "textarea",
+            "search": true,
+            "form": true,
+            "detail": true,
             "sensitivity": "public",
             "storageMode": "plain",
             "responseMode": "full",
@@ -7250,6 +7374,37 @@
             "exportMode": "full"
           },
           {
+            "key": "sourceCode",
+            "label": {
+              "zh": "来源编码",
+              "en": "Source Code"
+            },
+            "type": "text",
+            "search": true,
+            "form": true,
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "sourceSystem",
+            "label": {
+              "zh": "来源体系",
+              "en": "Source System"
+            },
+            "type": "text",
+            "search": true,
+            "table": true,
+            "form": true,
+            "detail": true,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
             "key": "status",
             "label": {
               "zh": "状态",
@@ -7270,28 +7425,41 @@
         ],
         "search": [
           "code",
+          "dataSet",
+          "depth",
           "level",
+          "metadata",
           "name",
           "parentCode",
           "path",
+          "sourceCode",
+          "sourceSystem",
           "status"
         ],
         "filter": [
           "code",
+          "dataSet",
+          "depth",
           "level",
+          "metadata",
           "name",
           "parentCode",
           "path",
           "sortOrder",
+          "sourceCode",
+          "sourceSystem",
           "status"
         ],
         "sort": [
           "code",
+          "dataSet",
+          "depth",
           "level",
           "name",
           "parentCode",
           "path",
           "sortOrder",
+          "sourceSystem",
           "status"
         ],
         "table": [
@@ -7299,7 +7467,10 @@
           "name",
           "parentCode",
           "level",
+          "depth",
           "path",
+          "sourceSystem",
+          "dataSet",
           "sortOrder",
           "status"
         ],
@@ -7308,7 +7479,12 @@
           "name",
           "parentCode",
           "level",
+          "depth",
           "path",
+          "sourceSystem",
+          "sourceCode",
+          "dataSet",
+          "metadata",
           "sortOrder",
           "status",
           "description"

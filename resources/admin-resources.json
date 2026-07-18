@@ -2408,37 +2408,84 @@
               "zh": "层级",
               "en": "Level"
             },
-            "type": "select",
-            "search": true,
-            "table": true,
-            "form": true,
-            "options": [
-              "continent",
-              "country",
-              "subdivision",
-              "state",
-              "province",
-              "city",
-              "district",
-              "street",
-              "custom"
-            ]
-          },
-          {
-            "key": "path",
+	            "type": "text",
+	            "search": true,
+	            "table": true,
+	            "form": true
+	          },
+	          {
+	            "key": "depth",
+	            "label": {
+	              "zh": "层级深度",
+	              "en": "Depth"
+	            },
+	            "type": "number",
+	            "search": true,
+	            "table": true,
+	            "form": true,
+	            "detail": true
+	          },
+	          {
+	            "key": "path",
             "label": {
               "zh": "层级路径",
               "en": "Path"
             },
             "type": "text",
             "search": true,
-            "table": true,
-            "form": true,
-            "detail": true
-          },
-          {
-            "key": "sortOrder",
-            "label": {
+	            "table": true,
+	            "form": true,
+	            "detail": true
+	          },
+	          {
+	            "key": "sourceSystem",
+	            "label": {
+	              "zh": "来源体系",
+	              "en": "Source System"
+	            },
+	            "type": "text",
+	            "search": true,
+	            "table": true,
+	            "form": true,
+	            "detail": true
+	          },
+	          {
+	            "key": "sourceCode",
+	            "label": {
+	              "zh": "来源编码",
+	              "en": "Source Code"
+	            },
+	            "type": "text",
+	            "search": true,
+	            "form": true,
+	            "detail": true
+	          },
+	          {
+	            "key": "dataSet",
+	            "label": {
+	              "zh": "数据集",
+	              "en": "Data Set"
+	            },
+	            "type": "text",
+	            "search": true,
+	            "table": true,
+	            "form": true,
+	            "detail": true
+	          },
+	          {
+	            "key": "metadata",
+	            "label": {
+	              "zh": "扩展元数据",
+	              "en": "Metadata"
+	            },
+	            "type": "textarea",
+	            "search": true,
+	            "form": true,
+	            "detail": true
+	          },
+	          {
+	            "key": "sortOrder",
+	            "label": {
               "zh": "排序",
               "en": "Sort Order"
             },
@@ -2475,29 +2522,42 @@
         "search": [
           "code",
           "name",
-          "parentCode",
-          "level",
-          "path",
-          "status"
-        ],
-        "table": [
+	          "parentCode",
+	          "level",
+	          "depth",
+	          "path",
+	          "sourceSystem",
+	          "sourceCode",
+	          "dataSet",
+	          "metadata",
+	          "status"
+	        ],
+	        "table": [
           "code",
           "name",
-          "parentCode",
-          "level",
-          "path",
-          "sortOrder",
-          "status"
-        ],
+	          "parentCode",
+	          "level",
+	          "depth",
+	          "path",
+	          "sourceSystem",
+	          "dataSet",
+	          "sortOrder",
+	          "status"
+	        ],
         "form": [
           "code",
           "name",
-          "parentCode",
-          "level",
-          "path",
-          "sortOrder",
-          "status",
-          "description"
+	          "parentCode",
+	          "level",
+	          "depth",
+	          "path",
+	          "sourceSystem",
+	          "sourceCode",
+	          "dataSet",
+	          "metadata",
+	          "sortOrder",
+	          "status",
+	          "description"
         ]
       },
       "codegen": {

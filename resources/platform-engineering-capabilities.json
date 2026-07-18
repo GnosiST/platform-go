@@ -298,7 +298,7 @@
           },
           {
             "path": "scripts/validate-admin-resources.mjs",
-            "contains": "\"continent\", \"country\", \"subdivision\", \"state\", \"province\", \"city\", \"district\", \"street\", \"custom\""
+            "contains": "area-codes must declare level as a data-driven text field without fixed options"
           },
           {
             "path": "scripts/validate-platform-governance-topology.mjs",
