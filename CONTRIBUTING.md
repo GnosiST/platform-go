@@ -33,6 +33,8 @@ tooling or local machine configuration is required.
 ## Change Requirements
 
 - Keep capability manifests and resource schemas as the contract source.
+- Update the capability operation policy when install, disable, uninstall,
+  profile or removable-boundary behavior changes.
 - Use platform ports instead of reaching into concrete storage or handlers.
 - Add Chinese and English i18n keys for shared Admin UI changes.
 - Add focused tests and update generated artifacts when their source changes.

@@ -25,6 +25,7 @@ const requiredDomains = [
   "admin-ui-contracts",
   "visual-system",
   "code-generation",
+  "capability-lifecycle-operations",
   "data-security-governance",
   "docs-handoff",
 ];
@@ -35,6 +36,7 @@ const requiredCustomizationModes = [
 ];
 const requiredAcceptanceCommands = [
   "rtk node scripts/validate-platform-human-ai-development-protocol.mjs",
+  "rtk node scripts/validate-platform-capability-operation-policy.mjs",
   "rtk node scripts/validate-external-capability-example.mjs",
   "rtk node scripts/validate-admin-resources.mjs",
   "rtk node scripts/validate-platform-admin-api-boundary.mjs",
@@ -169,11 +171,15 @@ function validateProtocol(protocol) {
   requireIncludes(protocol.minimumAcceptanceCommands, requiredAcceptanceCommands, "minimumAcceptanceCommands", errors);
   requireIncludes(protocol.requiredValidators, [
     "scripts/validate-platform-human-ai-development-protocol.mjs",
+    "scripts/validate-platform-capability-operation-policy.mjs",
     "scripts/validate-external-capability-example.mjs",
     "scripts/validate-admin-ui-contracts.mjs",
     "scripts/validate-platform-codegen-source-writing-readiness.mjs",
   ], "requiredValidators", errors);
-  requireIncludes(protocol.requiredTests, ["scripts/platform-human-ai-development-protocol.test.mjs"], "requiredTests", errors);
+  requireIncludes(protocol.requiredTests, [
+    "scripts/platform-human-ai-development-protocol.test.mjs",
+    "scripts/platform-capability-operation-policy.test.mjs",
+  ], "requiredTests", errors);
 
   for (const principle of values(protocol.principles)) {
     validateLocalizedLabel(principle, `principle ${principle.id ?? "<missing>"}`, errors);

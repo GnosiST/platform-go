@@ -217,6 +217,41 @@
       ]
     },
     {
+      "id": "capability-lifecycle-operations",
+      "sourceOfTruth": [
+        "resources/platform-capability-operation-policy.json",
+        "resources/platform-capability-contracts.json",
+        "resources/platform-capability-profiles.json",
+        "capability.Manifest"
+      ],
+      "requiredDocs": [
+        "docs/platform-capability-development.md",
+        "docs/platform-human-ai-development-protocol.md",
+        "website/docs/capabilities.md",
+        "website/docs/human-ai-development.md",
+        "website/i18n/en/docusaurus-plugin-content-docs/current/capabilities.md",
+        "website/i18n/en/docusaurus-plugin-content-docs/current/human-ai-development.md"
+      ],
+      "requiredValidators": [
+        "scripts/validate-platform-capability-operation-policy.mjs",
+        "scripts/validate-platform-capability-contracts.mjs",
+        "scripts/validate-platform-capability-profiles.mjs",
+        "scripts/validate-external-capability-example.mjs"
+      ],
+      "requiredTests": [
+        "scripts/platform-capability-operation-policy.test.mjs",
+        "scripts/platform-capability-contracts.test.mjs",
+        "scripts/platform-capability-profiles.test.mjs"
+      ],
+      "requiredPractices": [
+        "capability install means startup-time enablement through profiles, PLATFORM_CAPABILITIES or a downstream composition root",
+        "foundation capabilities are non-removable",
+        "disable removes schemas, menus, providers, routes and demo data from the registered surface while retaining data by default",
+        "destructive uninstall or persisted data purge requires reviewed migration, rollback and owner evidence",
+        "supported capability combinations run through cmd/platform-contracts audit before being documented as usable"
+      ]
+    },
+    {
       "id": "data-security-governance",
       "sourceOfTruth": [
         "resources/platform-production-readiness.json",
@@ -272,6 +307,7 @@
   ],
   "minimumAcceptanceCommands": [
     "rtk node scripts/validate-platform-human-ai-development-protocol.mjs",
+    "rtk node scripts/validate-platform-capability-operation-policy.mjs",
     "rtk node scripts/validate-external-capability-example.mjs",
     "rtk node scripts/validate-admin-resources.mjs",
     "rtk node scripts/validate-platform-admin-api-boundary.mjs",
@@ -303,6 +339,14 @@
       "contains": "platform-human-ai-development-protocol"
     },
     {
+      "path": "docs/platform-capability-development.md",
+      "contains": "platform-capability-operation-policy"
+    },
+    {
+      "path": "docs/platform-human-ai-development-protocol.md",
+      "contains": "install, disable and uninstall"
+    },
+    {
       "path": "website/docs/human-ai-development.md",
       "contains": "examples/external-capability"
     },
@@ -317,10 +361,15 @@
     {
       "path": "resources/platform-codegen-source-writing-readiness.json",
       "contains": "\"sourceWriting\": \"disabled\""
+    },
+    {
+      "path": "resources/platform-capability-operation-policy.json",
+      "contains": "\"runtimeHotInstall\": false"
     }
   ],
   "requiredValidators": [
     "scripts/validate-platform-human-ai-development-protocol.mjs",
+    "scripts/validate-platform-capability-operation-policy.mjs",
     "scripts/validate-external-capability-example.mjs",
     "scripts/validate-admin-resources.mjs",
     "scripts/validate-platform-admin-api-boundary.mjs",
@@ -329,6 +378,7 @@
     "scripts/validate-platform-codegen-source-writing-readiness.mjs"
   ],
   "requiredTests": [
-    "scripts/platform-human-ai-development-protocol.test.mjs"
+    "scripts/platform-human-ai-development-protocol.test.mjs",
+    "scripts/platform-capability-operation-policy.test.mjs"
   ]
 }

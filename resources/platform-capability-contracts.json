@@ -158,6 +158,22 @@
       "docs": ["docs/platform-auth.md", "docs/platform-capability-development.md"]
     },
     {
+      "id": "admin-oidc",
+      "label": { "zh": "后台 OIDC 登录", "en": "Admin OIDC Login" },
+      "classification": "optional-platform",
+      "profilePolicy": "profile-only",
+      "source": { "kind": "platform-extension-manifest", "package": "internal/platform/core" },
+      "ownership": "platform-auth-provider",
+      "boundary": "Admin OIDC provider declaration, admin identity bindings and production demo-disabled login readiness. It supplies operator authentication infrastructure, not business user onboarding.",
+      "replaceability": "replace-through-auth-provider",
+      "includedInProfiles": ["production-admin-oidc-ready"],
+      "excludedFromProfiles": ["minimal-admin", "platform-default", "platform-app-ready", "platform-personnel-ready", "platform-notification-ready", "platform-job-ready", "enterprise-governance"],
+      "dependencies": ["audit", "identity", "session"],
+      "adminResources": ["admin-identities"],
+      "authProviders": ["oidc"],
+      "docs": ["docs/platform-auth.md", "docs/platform-capability-development.md"]
+    },
+    {
       "id": "parameter",
       "label": { "zh": "参数与品牌", "en": "Parameters And Branding" },
       "classification": "foundation-default",
@@ -315,7 +331,7 @@
       "ownership": "business-application",
       "boundary": "Placeholder boundary for downstream business capabilities. It must stay outside platform defaults and must not be implemented inside the reusable foundation.",
       "replaceability": "owned-by-consuming-application",
-      "excludedFromProfiles": ["minimal-admin", "platform-default", "platform-app-ready", "platform-personnel-ready", "platform-notification-ready", "platform-job-ready", "enterprise-governance"],
+      "excludedFromProfiles": ["minimal-admin", "platform-default", "platform-app-ready", "platform-personnel-ready", "platform-notification-ready", "platform-job-ready", "enterprise-governance", "production-admin-oidc-ready"],
       "docs": ["docs/platform-capability-development.md", "docs/platform-foundation-task-map.md"]
     }
   ],

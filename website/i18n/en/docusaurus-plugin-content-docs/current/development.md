@@ -22,7 +22,8 @@ root instead of editing platform core.
 3. Declare resources, menus, permissions, App routes, service contracts, lifecycle steps and demo data in the manifest.
 4. Inject storage, HTTP handlers, Admin action handlers and optional UI registration from the downstream composition root.
 5. Generate OpenAPI, resource contracts, codegen previews and documentation.
-6. Add unit, consumer-contract and migration/rollback evidence.
+6. Update capability classification, profiles and operation policy.
+7. Add unit, consumer-contract and migration/rollback evidence.
 
 The example gate verifies that the external package does not import
 `internal/platform/**`, then runs `go test ./...` and `go run .` inside the
@@ -32,6 +33,8 @@ example directory:
 node scripts/validate-external-capability-example.mjs
 node scripts/validate-admin-resources.mjs
 node scripts/validate-platform-capability-contracts.mjs
+node scripts/validate-platform-capability-profiles.mjs
+node scripts/validate-platform-capability-operation-policy.mjs
 node scripts/validate-platform-foundation-alignment.mjs
 npm --prefix website run build
 ```

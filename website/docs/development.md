@@ -24,7 +24,8 @@ API 默认监听 `http://127.0.0.1:9200`，Admin 默认监听 `http://127.0.0.1:
 3. 在 manifest 中声明资源 schema、菜单、权限、App 路由、服务合同、生命周期和演示数据。
 4. 在下游 composition root 注入 storage、HTTP handler、Admin action handler 和可选 UI 注册。
 5. 同步生成 OpenAPI、资源合同、代码生成预览和文档。
-6. 添加单元测试、合同测试和必要的迁移/回滚证据。
+6. 更新能力分类、profile 和装停卸策略。
+7. 添加单元测试、合同测试和必要的迁移/回滚证据。
 
 示例门禁会检查外部包没有导入 `internal/platform/**`，并在示例目录内执行 `go test ./...` 与 `go run .`：
 
@@ -38,6 +39,8 @@ node scripts/validate-external-capability-example.mjs
 node scripts/validate-external-capability-example.mjs
 node scripts/validate-admin-resources.mjs
 node scripts/validate-platform-capability-contracts.mjs
+node scripts/validate-platform-capability-profiles.mjs
+node scripts/validate-platform-capability-operation-policy.mjs
 node scripts/validate-platform-admin-api-boundary.mjs
 node scripts/validate-platform-foundation-alignment.mjs
 npm --prefix admin run build

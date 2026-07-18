@@ -222,4 +222,19 @@ describe("validate-platform-capability-profiles", () => {
     assert.ok(jobProfile.mustIncludeResources.includes("job-run-attempts"));
     assert.ok(!jobProfile.business, "job is a reusable platform extension, not a business capability");
   });
+
+  it("keeps production Admin OIDC as a demo-free profile-only capability", () => {
+    const profiles = readProfiles();
+    const defaultProfile = profiles.profiles.find((profile) => profile.id === profiles.runtimeDefault);
+    const oidcProfile = profiles.profiles.find((profile) => profile.id === "production-admin-oidc-ready");
+
+    assert.ok(defaultProfile.mustExcludeCapabilities.includes("admin-oidc"));
+    assert.ok(!defaultProfile.capabilities.includes("admin-oidc"));
+    assert.ok(oidcProfile, "production-admin-oidc-ready profile is required");
+    assert.ok(oidcProfile.capabilities.includes("admin-oidc"));
+    assert.ok(!oidcProfile.capabilities.includes("demo-data"));
+    assert.ok(oidcProfile.mustIncludeResources.includes("admin-identities"));
+    assert.ok(oidcProfile.mustExcludeCapabilities.includes("external-business-capability"));
+    assert.ok(!oidcProfile.business, "admin OIDC is platform auth infrastructure, not a business capability");
+  });
 });

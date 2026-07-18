@@ -70,6 +70,18 @@ describe("validate-platform-capability-contracts", () => {
     assert.match(result.stderr, /capability contract job is profile-only and must not be enabled by default/);
   });
 
+  it("classifies admin OIDC as a production profile-only platform capability", () => {
+    const contracts = readJSON("resources/platform-capability-contracts.json");
+    const adminOIDC = contracts.capabilities.find((capability) => capability.id === "admin-oidc");
+
+    assert.ok(adminOIDC, "admin-oidc contract is required");
+    assert.equal(adminOIDC.classification, "optional-platform");
+    assert.equal(adminOIDC.profilePolicy, "profile-only");
+    assert.ok(adminOIDC.includedInProfiles.includes("production-admin-oidc-ready"));
+    assert.deepEqual(adminOIDC.authProviders, ["oidc"]);
+    assert.ok(adminOIDC.adminResources.includes("admin-identities"));
+  });
+
   it("rejects declared contract surface drift from audited manifests", () => {
     const contracts = readJSON("resources/platform-capability-contracts.json");
     contracts.capabilities.find((capability) => capability.id === "rbac").adminResources =

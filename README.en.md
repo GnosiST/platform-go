@@ -151,6 +151,8 @@ The default release supports one datasource and one native transaction boundary.
 
 Platform owns shared mechanisms. Business code must not reach into concrete platform storage, HTTP handlers or Admin internals; use the public capability, service, query/command and storage-port contracts.
 
+Capability operations are governed by [resources/platform-capability-operation-policy.json](resources/platform-capability-operation-policy.json): the platform supports startup-time enablement through profiles, `PLATFORM_CAPABILITIES` or a downstream composition root. It does not support runtime hot-plugging or generic destructive uninstall. Disabled capability surfaces must disappear from contracts, and foundation capabilities are non-removable.
+
 Before onboarding a business capability, copy or adapt the minimum example in
 [examples/external-capability](examples/external-capability), then run the
 standalone example gate to confirm that external packages rely only on public

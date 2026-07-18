@@ -16,6 +16,10 @@ This document is the public protocol for starting a highly customized business s
 5. Implement through platform ports: storage, HTTP route registration, Admin action handlers, Refine data provider, App request/upload ports and service Query/Command objects.
 6. Run the changed-plane validators and keep evidence in docs, generated artifacts or review packages.
 
+## Capability Lifecycle Operations
+
+Capability install, disable and uninstall decisions must use `resources/platform-capability-operation-policy.json`. The platform supports startup-time composition, not runtime hot-plugging: enabling a capability means selecting a registered manifest through a profile, `PLATFORM_CAPABILITIES` or a downstream composition root before startup and contract generation. Disabling a default or optional capability means removing it from the enabled set, regenerating contracts and restarting; disabled resources, menus, providers, routes and demo data must not remain exposed. Foundation capabilities are non-removable. Destructive data purge or source-package removal is not a generic platform operation and requires reviewed migration, rollback and owner evidence.
+
 ## Collaboration Rules
 
 Human and AI contributors follow the same gates.
@@ -88,6 +92,7 @@ For a meaningful business customization, start with the narrow checks for the ch
 
 ```bash
 rtk node scripts/validate-platform-human-ai-development-protocol.mjs
+rtk node scripts/validate-platform-capability-operation-policy.mjs
 rtk node scripts/validate-external-capability-example.mjs
 rtk node scripts/validate-admin-resources.mjs
 rtk node scripts/validate-platform-admin-api-boundary.mjs

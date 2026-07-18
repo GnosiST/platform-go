@@ -36,6 +36,7 @@
       ],
       "mustExcludeCapabilities": [
         "external-business-capability",
+        "admin-oidc",
         "policy-review",
         "personnel",
         "notification",
@@ -98,6 +99,7 @@
       ],
       "mustExcludeCapabilities": [
         "external-business-capability",
+        "admin-oidc",
         "policy-review",
         "personnel",
         "notification",
@@ -138,6 +140,7 @@
       ],
       "mustExcludeCapabilities": [
         "external-business-capability",
+        "admin-oidc",
         "policy-review",
         "personnel",
         "notification",
@@ -182,6 +185,7 @@
       ],
       "mustExcludeCapabilities": [
         "external-business-capability",
+        "admin-oidc",
         "policy-review",
         "notification",
         "job",
@@ -225,6 +229,7 @@
       ],
       "mustExcludeCapabilities": [
         "external-business-capability",
+        "admin-oidc",
         "policy-review",
         "personnel",
         "job",
@@ -268,6 +273,7 @@
       ],
       "mustExcludeCapabilities": [
         "external-business-capability",
+        "admin-oidc",
         "policy-review",
         "personnel",
         "notification",
@@ -311,6 +317,51 @@
       ],
       "mustExcludeCapabilities": [
         "external-business-capability",
+        "admin-oidc",
+        "personnel",
+        "notification",
+        "job",
+        "app-phone"
+      ]
+    },
+    {
+      "id": "production-admin-oidc-ready",
+      "label": {
+        "zh": "生产后台 OIDC 底座",
+        "en": "Production Admin OIDC Foundation"
+      },
+      "purpose": "Production-oriented admin foundation that removes local demo data and enables the admin OIDC provider manifest for demo-disabled deployments.",
+      "capabilities": [
+        "tenant",
+        "identity",
+        "session",
+        "rbac",
+        "menu",
+        "api-resource",
+        "audit",
+        "admin-oidc",
+        "dictionary",
+        "parameter",
+        "file-storage",
+        "admin-shell",
+        "system-admin"
+      ],
+      "mustIncludeCapabilities": [
+        "admin-oidc"
+      ],
+      "mustIncludeResources": [
+        "admin-identities",
+        "sessions",
+        "users",
+        "audit-logs",
+        "api-tokens",
+        "versions"
+      ],
+      "mustExcludeCapabilities": [
+        "external-business-capability",
+        "demo-data",
+        "wechat-login",
+        "policy-review",
         "personnel",
         "notification",
         "job",

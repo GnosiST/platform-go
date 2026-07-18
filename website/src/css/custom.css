@@ -75,7 +75,7 @@ body { background: var(--platform-paper); color: var(--platform-ink); }
 .platform-section__heading--row { display: flex; justify-content: space-between; align-items: end; gap: 44px; }
 .platform-section__heading--row h2, .platform-boundary h2, .platform-closing h2 { max-width: 650px; margin: 0; font-size: clamp(2.2rem, 4vw, 4rem); letter-spacing: -.055em; line-height: 1.05; }
 .platform-section__heading--row > p { max-width: 390px; margin: 0 0 3px; color: var(--platform-muted); line-height: 1.7; }
-.platform-capabilities { display: grid; grid-template-columns: 1.25fr 1fr 1fr; margin-top: 64px; border-top: 1px solid var(--platform-line); border-bottom: 1px solid var(--platform-line); }
+.platform-capabilities { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 64px; border-top: 1px solid var(--platform-line); border-bottom: 1px solid var(--platform-line); }
 .platform-capability { min-height: 290px; padding: 28px 30px 32px; border-right: 1px solid var(--platform-line); }
 .platform-capability:first-child { background: #f2f6fc; }
 .platform-capability:last-child { border-right: 0; }

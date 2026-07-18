@@ -42,15 +42,28 @@ describe("validate-platform-human-ai-development-protocol", () => {
     assert.match(result.stderr, /domains must include code-generation/);
   });
 
+  it("rejects a protocol that drops capability lifecycle operations", () => {
+    const protocol = readJSON("resources/platform-human-ai-development-protocol.json");
+    protocol.domains = protocol.domains.filter((domain) => domain.id !== "capability-lifecycle-operations");
+    const result = runValidator(["--protocol", tempJSON("protocol.json", protocol)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /domains must include capability-lifecycle-operations/);
+  });
+
   it("rejects a protocol that removes required validator gates", () => {
     const protocol = readJSON("resources/platform-human-ai-development-protocol.json");
     protocol.minimumAcceptanceCommands = ["rtk go test ./..."];
     protocol.requiredValidators = ["scripts/validate-platform-human-ai-development-protocol.mjs"];
+    protocol.requiredTests = ["scripts/platform-human-ai-development-protocol.test.mjs"];
     const result = runValidator(["--protocol", tempJSON("protocol.json", protocol)]);
 
     assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /minimumAcceptanceCommands must include rtk node scripts\/validate-platform-capability-operation-policy\.mjs/);
     assert.match(result.stderr, /minimumAcceptanceCommands must include rtk node scripts\/validate-external-capability-example\.mjs/);
+    assert.match(result.stderr, /requiredValidators must include scripts\/validate-platform-capability-operation-policy\.mjs/);
     assert.match(result.stderr, /requiredValidators must include scripts\/validate-admin-ui-contracts\.mjs/);
+    assert.match(result.stderr, /requiredTests must include scripts\/platform-capability-operation-policy\.test\.mjs/);
   });
 
   it("rejects missing source snippets in contributor-facing docs", () => {

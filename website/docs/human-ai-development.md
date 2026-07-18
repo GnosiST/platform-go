@@ -23,14 +23,20 @@ title: 人机协同开发
 | UI | Admin 使用平台 UI wrapper、Refine provider 和 schema-driven 表单 |
 | 视觉 | 通过主题、布局、密度、品牌和注册组件定制，不绕过可访问性和 i18n |
 | 代码生成 | 默认只生成合同、预览和 scaffold；运行时代码写入需要人工评审 |
+| 能力生命周期 | 安装、禁用、卸载按 operation policy 执行；基础能力不可卸载 |
 | 数据安全 | 租户、组织、区域和敏感字段都由服务端合同与策略控制 |
 
 完整协议见仓库中的 [Human + AI Development Protocol](https://github.com/GnosiST/platform-go/blob/main/docs/platform-human-ai-development-protocol.md)。
+
+## 扩展生命周期
+
+当前平台支持启动前组合能力，不支持运行时热插拔。启用能力要先注册 manifest，再通过 profile、`PLATFORM_CAPABILITIES` 或下游 composition root 选择；禁用后重新生成合同并重启，已禁用资源不能继续从 Admin/API 暴露。历史数据清理或源码移除不是通用卸载按钮，需要迁移、回滚和负责人证据。
 
 ## 验证入口
 
 ```bash
 node scripts/validate-platform-human-ai-development-protocol.mjs
+node scripts/validate-platform-capability-operation-policy.mjs
 node scripts/validate-external-capability-example.mjs
 node scripts/validate-admin-resources.mjs
 node scripts/validate-admin-ui-contracts.mjs

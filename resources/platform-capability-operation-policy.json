@@ -1,0 +1,285 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-capability-operation-policy.json",
+  "capturedAt": "2026-07-18",
+  "contractVersion": "0.1.0",
+  "purpose": "Machine-checkable install, disable, uninstall and composition policy for platform and downstream capabilities. The platform is profile/config composed, not a runtime hot-plug marketplace.",
+  "operationModel": {
+    "installSemantics": "Enable a registered manifest through a capability profile, PLATFORM_CAPABILITIES or a downstream composition root before process startup and contract generation.",
+    "disableSemantics": "Remove the capability from the enabled profile or PLATFORM_CAPABILITIES, regenerate contracts and restart; disabled schemas, menus, providers, routes and demo datasets must not be registered.",
+    "uninstallSemantics": "Runtime destructive uninstall is unsupported. Removing source packages or purging persisted data requires a reviewed migration or downstream-owned removal plan.",
+    "runtimeHotInstall": false,
+    "runtimeHotUninstall": false,
+    "destructiveUninstallRequiresReview": true,
+    "dataAfterDisableDefault": "retained-unreachable"
+  },
+  "nonRemovableCapabilities": [
+    "dictionary",
+    "tenant",
+    "identity",
+    "session",
+    "rbac",
+    "menu",
+    "admin-shell"
+  ],
+  "allowedModes": {
+    "installMode": [
+      "required-foundation",
+      "default-profile",
+      "development-default",
+      "profile-only",
+      "external-business"
+    ],
+    "disableMode": [
+      "blocked-foundation",
+      "config-remove-retain-data",
+      "downstream-owned"
+    ],
+    "uninstallMode": [
+      "not-supported-foundation",
+      "disable-only-retain-data",
+      "downstream-owned-reviewed-removal"
+    ],
+    "dataAfterDisable": [
+      "required-foundation",
+      "retained-unreachable",
+      "downstream-owned"
+    ]
+  },
+  "capabilities": [
+    {
+      "id": "dictionary",
+      "installMode": "required-foundation",
+      "disableMode": "blocked-foundation",
+      "uninstallMode": "not-supported-foundation",
+      "dataAfterDisable": "required-foundation",
+      "reason": "Tenant, identity, personnel and area governance depend on shared dictionary and area-code data."
+    },
+    {
+      "id": "tenant",
+      "installMode": "required-foundation",
+      "disableMode": "blocked-foundation",
+      "uninstallMode": "not-supported-foundation",
+      "dataAfterDisable": "required-foundation",
+      "reason": "Tenant identity is the root isolation boundary for reusable platform data."
+    },
+    {
+      "id": "identity",
+      "installMode": "required-foundation",
+      "disableMode": "blocked-foundation",
+      "uninstallMode": "not-supported-foundation",
+      "dataAfterDisable": "required-foundation",
+      "reason": "Users, app identities and organization units are shared by RBAC, sessions and optional capabilities."
+    },
+    {
+      "id": "session",
+      "installMode": "required-foundation",
+      "disableMode": "blocked-foundation",
+      "uninstallMode": "not-supported-foundation",
+      "dataAfterDisable": "required-foundation",
+      "reason": "Admin and App authentication flows require session records and lifecycle history."
+    },
+    {
+      "id": "rbac",
+      "installMode": "required-foundation",
+      "disableMode": "blocked-foundation",
+      "uninstallMode": "not-supported-foundation",
+      "dataAfterDisable": "required-foundation",
+      "reason": "Backend authorization is authoritative for protected Admin and App actions."
+    },
+    {
+      "id": "menu",
+      "installMode": "required-foundation",
+      "disableMode": "blocked-foundation",
+      "uninstallMode": "not-supported-foundation",
+      "dataAfterDisable": "required-foundation",
+      "reason": "The Admin shell depends on dynamic menu projection for visible navigation."
+    },
+    {
+      "id": "api-resource",
+      "installMode": "default-profile",
+      "disableMode": "config-remove-retain-data",
+      "uninstallMode": "disable-only-retain-data",
+      "dataAfterDisable": "retained-unreachable",
+      "reason": "It is part of the default platform foundation but can be removed in smaller controlled profiles."
+    },
+    {
+      "id": "audit",
+      "installMode": "default-profile",
+      "disableMode": "config-remove-retain-data",
+      "uninstallMode": "disable-only-retain-data",
+      "dataAfterDisable": "retained-unreachable",
+      "reason": "Audit data is retained after disable; production profiles and optional capabilities commonly depend on it."
+    },
+    {
+      "id": "wechat-login",
+      "installMode": "default-profile",
+      "disableMode": "config-remove-retain-data",
+      "uninstallMode": "disable-only-retain-data",
+      "dataAfterDisable": "retained-unreachable",
+      "reason": "The provider declaration can be removed from enabled capabilities; provider credentials must remain environment-owned."
+    },
+    {
+      "id": "admin-oidc",
+      "installMode": "profile-only",
+      "disableMode": "config-remove-retain-data",
+      "uninstallMode": "disable-only-retain-data",
+      "dataAfterDisable": "retained-unreachable",
+      "reason": "Production Admin OIDC is enabled by the production-admin-oidc-ready profile and disabled by removing its manifest from the enabled set."
+    },
+    {
+      "id": "parameter",
+      "installMode": "default-profile",
+      "disableMode": "config-remove-retain-data",
+      "uninstallMode": "disable-only-retain-data",
+      "dataAfterDisable": "retained-unreachable",
+      "reason": "Settings and branding are reusable defaults; business flags must attach through their owning capability."
+    },
+    {
+      "id": "file-storage",
+      "installMode": "default-profile",
+      "disableMode": "config-remove-retain-data",
+      "uninstallMode": "disable-only-retain-data",
+      "dataAfterDisable": "retained-unreachable",
+      "reason": "File metadata and blobs are retained after disable. Purging requires the data lifecycle and backup gates."
+    },
+    {
+      "id": "admin-shell",
+      "installMode": "required-foundation",
+      "disableMode": "blocked-foundation",
+      "uninstallMode": "not-supported-foundation",
+      "dataAfterDisable": "required-foundation",
+      "reason": "The reusable Admin console hosts declared resources and capability status."
+    },
+    {
+      "id": "demo-data",
+      "installMode": "development-default",
+      "disableMode": "config-remove-retain-data",
+      "uninstallMode": "disable-only-retain-data",
+      "dataAfterDisable": "retained-unreachable",
+      "productionForbidden": true,
+      "reason": "Demo datasets are local development surfaces and are forbidden in production runtime."
+    },
+    {
+      "id": "system-admin",
+      "installMode": "default-profile",
+      "disableMode": "config-remove-retain-data",
+      "uninstallMode": "disable-only-retain-data",
+      "dataAfterDisable": "retained-unreachable",
+      "reason": "Operational resources are default but can be removed in smaller deployment profiles."
+    },
+    {
+      "id": "app-phone",
+      "installMode": "profile-only",
+      "disableMode": "config-remove-retain-data",
+      "uninstallMode": "disable-only-retain-data",
+      "dataAfterDisable": "retained-unreachable",
+      "reason": "Phone verification and bindings are optional App identity extensions."
+    },
+    {
+      "id": "personnel",
+      "installMode": "profile-only",
+      "disableMode": "config-remove-retain-data",
+      "uninstallMode": "disable-only-retain-data",
+      "dataAfterDisable": "retained-unreachable",
+      "reason": "Personnel resources are reusable optional records; business HR workflows stay downstream."
+    },
+    {
+      "id": "notification",
+      "installMode": "profile-only",
+      "disableMode": "config-remove-retain-data",
+      "uninstallMode": "disable-only-retain-data",
+      "dataAfterDisable": "retained-unreachable",
+      "reason": "Notification ledgers are optional platform records without a bundled delivery engine."
+    },
+    {
+      "id": "job",
+      "installMode": "profile-only",
+      "disableMode": "config-remove-retain-data",
+      "uninstallMode": "disable-only-retain-data",
+      "dataAfterDisable": "retained-unreachable",
+      "reason": "Job ledgers are optional platform records; worker engines attach separately."
+    },
+    {
+      "id": "policy-review",
+      "installMode": "profile-only",
+      "disableMode": "config-remove-retain-data",
+      "uninstallMode": "disable-only-retain-data",
+      "dataAfterDisable": "retained-unreachable",
+      "reason": "Policy review is an enterprise governance profile, not a business approval workflow."
+    },
+    {
+      "id": "external-business-capability",
+      "installMode": "external-business",
+      "disableMode": "downstream-owned",
+      "uninstallMode": "downstream-owned-reviewed-removal",
+      "dataAfterDisable": "downstream-owned",
+      "reason": "Concrete business capabilities live in downstream packages or repositories and own their removal plans."
+    }
+  ],
+  "validatedCombinations": [
+    {
+      "id": "minimal-admin",
+      "profile": "minimal-admin",
+      "purpose": "Smallest supported Admin foundation.",
+      "expectedCapabilities": ["dictionary", "tenant", "identity", "session", "rbac", "menu", "admin-shell"],
+      "expectedExcludedCapabilities": ["admin-oidc", "app-phone", "demo-data", "external-business-capability", "file-storage", "job", "notification", "personnel", "policy-review", "system-admin"],
+      "expectedAdminResources": ["area-codes", "capabilities", "menus", "overview", "roles", "sessions", "tenants", "users"],
+      "expectedAppRoutes": ["GET /api/app/session/current", "POST /api/app/auth/login", "POST /api/app/auth/logout"]
+    },
+    {
+      "id": "platform-default",
+      "profile": "platform-default",
+      "purpose": "Default development foundation from config.Load.",
+      "expectedCapabilities": ["api-resource", "audit", "demo-data", "dictionary", "file-storage", "identity", "menu", "parameter", "rbac", "session", "tenant", "wechat-login", "admin-shell", "system-admin"],
+      "expectedExcludedCapabilities": ["admin-oidc", "app-phone", "external-business-capability", "job", "notification", "personnel", "policy-review"],
+      "expectedAdminResources": ["api-resources", "area-codes", "capabilities", "demo-data", "files", "overview", "settings", "users"],
+      "expectedAppRoutes": ["GET /api/app/files/:id/content", "GET /api/app/session/current", "POST /api/app/auth/login", "POST /api/app/auth/logout", "POST /api/app/files"],
+      "expectedAuthProviders": ["demo", "wechat"]
+    },
+    {
+      "id": "production-admin-oidc-ready",
+      "profile": "production-admin-oidc-ready",
+      "purpose": "Production-oriented Admin OIDC profile without demo data.",
+      "expectedCapabilities": ["admin-oidc", "api-resource", "audit", "dictionary", "file-storage", "identity", "menu", "parameter", "rbac", "session", "tenant", "admin-shell", "system-admin"],
+      "expectedExcludedCapabilities": ["app-phone", "demo-data", "external-business-capability", "job", "notification", "personnel", "policy-review", "wechat-login"],
+      "expectedAdminResources": ["admin-identities", "api-tokens", "audit-logs", "sessions", "users", "versions"],
+      "expectedAppRoutes": ["GET /api/app/files/:id/content", "GET /api/app/session/current", "POST /api/app/auth/login", "POST /api/app/auth/logout", "POST /api/app/files"],
+      "expectedAuthProviders": ["demo", "oidc"]
+    },
+    {
+      "id": "all-optional-platform-without-demo",
+      "purpose": "Contract conflict scan for all reusable optional platform extensions while keeping local demo data disabled.",
+      "capabilities": ["dictionary", "tenant", "identity", "session", "rbac", "menu", "api-resource", "audit", "wechat-login", "admin-oidc", "app-phone", "parameter", "file-storage", "personnel", "notification", "job", "policy-review", "admin-shell", "system-admin"],
+      "expectedCapabilities": ["admin-oidc", "app-phone", "job", "notification", "personnel", "policy-review"],
+      "expectedExcludedCapabilities": ["demo-data", "external-business-capability"],
+      "expectedAdminResources": ["admin-identities", "app-phone-bindings", "app-phone-verifications", "job-definitions", "job-run-attempts", "job-runs", "notification-deliveries", "notification-templates", "notifications", "personnel-profiles", "policy-reviews", "position-assignments", "positions"],
+      "expectedAppRoutes": ["GET /api/app/files/:id/content", "GET /api/app/session/current", "POST /api/app/auth/login", "POST /api/app/auth/logout", "POST /api/app/files", "POST /api/app/identity/phone-bindings", "POST /api/app/identity/phone-verifications"],
+      "expectedAuthProviders": ["demo", "oidc", "wechat"]
+    }
+  ],
+  "requiredValidators": [
+    "scripts/validate-platform-capability-operation-policy.mjs",
+    "scripts/validate-platform-capability-contracts.mjs",
+    "scripts/validate-platform-capability-profiles.mjs",
+    "scripts/validate-external-capability-example.mjs"
+  ],
+  "requiredTests": [
+    "scripts/platform-capability-operation-policy.test.mjs",
+    "scripts/platform-capability-contracts.test.mjs",
+    "scripts/platform-capability-profiles.test.mjs"
+  ],
+  "requiredSourceSnippets": [
+    {
+      "path": "docs/platform-capability-development.md",
+      "contains": "platform-capability-operation-policy"
+    },
+    {
+      "path": "docs/platform-human-ai-development-protocol.md",
+      "contains": "install, disable and uninstall"
+    },
+    {
+      "path": "resources/platform-human-ai-development-protocol.json",
+      "contains": "capability-lifecycle-operations"
+    }
+  ]
+}
