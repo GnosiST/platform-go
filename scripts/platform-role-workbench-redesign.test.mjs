@@ -91,7 +91,8 @@ describe("role workbench redesign contracts", () => {
     assert.match(workbench, /"aria-selected": node\.key === selectedKey/);
     assert.match(workbench, /"aria-level": depth/);
     assert.match(workbench, /children\.map\(\(child\) => build\(child, depth \+ 1\)\)/);
-    assert.match(workbench, /title=\{typeof node\.label === "string" \? node\.label : node\.searchText\}/);
+    assert.match(workbench, /const title = typeof node\.label === "string" \? node\.label : node\.searchText;/);
+    assert.match(workbench, /className="admin-tree-workbench-node-label" title=\{title\}/);
   });
 
   it("keeps role detail localized, focused and split by responsibility", () => {
@@ -157,12 +158,12 @@ describe("role workbench redesign contracts", () => {
     assert.doesNotMatch(transfer, /visibleCheckedKeys/);
   });
 
-  it("keeps desktop tracks bounded and mobile transfer controls stable", () => {
+  it("keeps desktop tracks readable and mobile transfer controls stable", () => {
     const styles = source("admin/src/styles.css");
 
-    assert.match(styles, /grid-template-columns: clamp\(264px, 28vw, 320px\) minmax\(0, 1fr\);/);
+    assert.match(styles, /grid-template-columns: clamp\(320px, 32vw, 440px\) minmax\(0, 1fr\);/);
     assert.match(styles, /\.role-governance-detail-focus-target,[\s\S]*?min-height: 360px;/);
-    assert.match(styles, /\.admin-tree-workbench-node-label,[\s\S]*?text-overflow: ellipsis;[\s\S]*?white-space: nowrap;/);
+    assert.match(styles, /\.admin-tree-workbench-node-label,[\s\S]*?overflow-wrap: anywhere;[\s\S]*?white-space: normal;/);
     assert.match(styles, /@media \(min-width: 1024px\)[\s\S]*?\.admin-tree-workbench-detail[\s\S]*?position: sticky;/);
     assert.match(styles, /@media screen and \(max-width: 767px\)[\s\S]*?\.platform-tree-transfer-toolbar[\s\S]*?position: sticky;[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
     assert.match(styles, /\.platform-tree-transfer-toolbar \.ant-input-affix-wrapper[\s\S]*?grid-column: 1 \/ -1;[\s\S]*?width: 100%;/);
