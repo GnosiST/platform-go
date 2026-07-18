@@ -151,9 +151,10 @@ The default release supports one datasource and one native transaction boundary.
 
 Platform owns shared mechanisms. Business code must not reach into concrete platform storage, HTTP handlers or Admin internals; use the public capability, service, query/command and storage-port contracts.
 
-Before onboarding a business capability, run the standalone example gate to
-confirm that external packages rely only on public contracts and can validate
-manifests, tests and contract previews:
+Before onboarding a business capability, copy or adapt the minimum example in
+[examples/external-capability](examples/external-capability), then run the
+standalone example gate to confirm that external packages rely only on public
+contracts and can validate manifests, tests and contract previews:
 
 ```bash
 node scripts/validate-external-capability-example.mjs
