@@ -3039,7 +3039,8 @@ describe("validate-admin-ui-contracts", () => {
   });
 
   for (const [name, selector, message] of [
-    ["account/settings trigger", ".platform-topbar .user-menu-trigger {", "Mobile account/settings trigger must expose a 44px touch target"],
+    ["profile trigger", ".platform-topbar .profile-menu-trigger {", "Mobile profile trigger must expose a 44px touch target"],
+    ["settings trigger", ".platform-topbar .settings-trigger-button {", "Mobile settings trigger must expose a 44px touch target"],
     ["resource search", ".platform-data-table-panel .platform-table-search {", "Mobile resource search must expose a 44px touch target"],
     ["resource toolbar", ".platform-data-table-panel .table-actions .ant-btn {", "Mobile resource table actions must expose 44px touch targets"],
     ["pagination main controls", ".platform-pagination-main :where(.ant-pagination-prev, .ant-pagination-item, .ant-pagination-jump-prev, .ant-pagination-jump-next, .ant-pagination-next, .ant-pagination-item-link, a) {", "Mobile pagination main controls must expose 44px touch targets"],

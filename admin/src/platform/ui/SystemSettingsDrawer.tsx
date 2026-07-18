@@ -152,6 +152,16 @@ export function SystemSettingsDrawer({
           <Typography.Text>{dictionary.densitySetting}</Typography.Text>
           <strong>{uiConfig.density === "compact" ? dictionary.densityCompact : dictionary.densityComfortable}</strong>
         </div>
+        <div>
+          <Typography.Text>{dictionary.environment}</Typography.Text>
+          <strong>{dictionary.production}</strong>
+          <Tag>{dictionary.readOnlyContext}</Tag>
+        </div>
+        <div>
+          <Typography.Text>{dictionary.tenant}</Typography.Text>
+          <strong>{`${dictionary.platformTenant} (platform)`}</strong>
+          <Tag>{dictionary.readOnlyContext}</Tag>
+        </div>
       </div>
 
       <Tabs

@@ -1295,7 +1295,8 @@ select {
   background: var(--primary);
 }
 
-.user-menu-trigger {
+.user-menu-trigger,
+.profile-menu-trigger {
   display: inline-flex;
   min-height: var(--control-height);
   align-items: center;
@@ -1303,6 +1304,18 @@ select {
   padding: 0 10px 0 3px;
   color: var(--text);
   font-weight: 600;
+}
+
+.profile-menu-name {
+  display: inline-block;
+  max-width: 132px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-trigger-button {
+  flex: 0 0 auto;
 }
 
 .mobile-nav-button {
@@ -2587,6 +2600,105 @@ select {
   color: var(--text);
 }
 
+.profile-summary-panel {
+  width: min(360px, calc(100vw - 32px));
+}
+
+.profile-summary-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 0 10px;
+}
+
+.profile-summary-header > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.profile-summary-header .ant-typography {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-summary-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.profile-summary-facts > div,
+.profile-field-grid > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface) 82%, var(--page) 18%);
+}
+
+.profile-summary-facts dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.profile-summary-facts dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-role-tags {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.profile-role-tags .ant-tag {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  text-overflow: ellipsis;
+}
+
+.profile-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.profile-field-grid .ant-typography {
+  font-size: 12px;
+}
+
+.profile-field-grid strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-summary-disabled-action {
+  display: block;
+}
+
 .ant-select-dropdown,
 .ant-picker-dropdown .ant-picker-panel-container {
   border: 1px solid var(--border);
@@ -3508,7 +3620,7 @@ select {
 
 .settings-status-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
   gap: 6px;
   margin-top: 8px;
 }
@@ -3538,6 +3650,12 @@ select {
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.settings-status-grid .ant-tag {
+  width: fit-content;
+  margin: 0;
+  color: var(--muted);
 }
 
 .settings-tabs {
@@ -5513,7 +5631,13 @@ select {
 }
 
 @media (max-width: 767px) {
-  .platform-topbar .user-menu-trigger {
+  .platform-topbar .profile-menu-trigger {
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .platform-topbar .settings-trigger-button {
     min-width: 44px;
     height: 44px;
     min-height: 44px;
@@ -5607,7 +5731,8 @@ select {
     min-height: 44px;
   }
 
-  .user-menu-name {
+  .user-menu-name,
+  .profile-menu-name {
     display: none;
   }
 

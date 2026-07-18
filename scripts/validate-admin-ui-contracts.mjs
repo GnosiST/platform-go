@@ -651,7 +651,8 @@ requireIncludes(files.capabilityMetadata, 'makeOptional("personnel", { zh: "人�
 requireIncludes(files.capabilityMetadata, "默认平台底座已提供组织机构", "Optional personnel copy must state that organization units are part of the default foundation.");
 
 requireIncludes(files.shell, "SystemSettingsDrawer", "AdminShell must expose account/system settings through the shared drawer.");
-requireIncludes(files.shell, "user-menu-trigger", "AdminShell must keep the avatar/settings trigger in the topbar.");
+requireIncludes(files.shell, "profile-menu-trigger", "AdminShell must keep the personal profile trigger in the topbar.");
+requireIncludes(files.shell, "settings-trigger-button", "AdminShell must keep a separate system settings trigger in the topbar.");
 requireIncludes(files.shell, "language-toggle-button", "AdminShell must use an icon language toggle, not a language dropdown.");
 requireCountExactly(files.shell, 'className="brand-collapse-button"', 1, "AdminShell must expose one sidebar collapse affordance in the brand area.");
 requireNotIncludes(files.shell, 'className="desktop-sider-toggle"', "AdminShell must not render a second desktop sidebar collapse affordance in the topbar.");
@@ -1090,7 +1091,8 @@ requireRegex(
   "Mobile Drawer search must use a 44px minimum target below the desktop breakpoint.",
 );
 requireCssRule(mobileStyles, ".platform-data-table-panel .platform-table-search", ["min-height: 44px;"], "Mobile resource search must expose a 44px touch target.");
-requireCssRule(mobileStyles, ".platform-topbar .user-menu-trigger", ["min-width: 44px;", "height: 44px;", "min-height: 44px;"], "Mobile account/settings trigger must expose a 44px touch target.");
+requireCssRule(mobileStyles, ".platform-topbar .profile-menu-trigger", ["min-width: 44px;", "height: 44px;", "min-height: 44px;"], "Mobile profile trigger must expose a 44px touch target.");
+requireCssRule(mobileStyles, ".platform-topbar .settings-trigger-button", ["min-width: 44px;", "height: 44px;", "min-height: 44px;"], "Mobile settings trigger must expose a 44px touch target.");
 requireCssRule(
   mobileStyles,
   ".login-submit,\n  .login-oidc-action,\n  .login-recovery-action",

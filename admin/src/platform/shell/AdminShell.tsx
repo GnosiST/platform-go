@@ -11,6 +11,7 @@ import {
   ControlOutlined,
   DatabaseOutlined,
   DownOutlined,
+  EditOutlined,
   GlobalOutlined,
   HomeOutlined,
   LeftOutlined,
@@ -117,6 +118,7 @@ export function AdminShell({
 }: AdminShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [openContext, setOpenContext] = useState<"mobile-work" | "mobile-runtime" | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
   const workTabsRef = useRef<HTMLElement | null>(null);
@@ -464,13 +466,29 @@ export function AdminShell({
                 onClick={() => changeTheme(themeName === "black" ? "tech" : "black")}
               />
             </Tooltip>
-            <Button className="user-menu-trigger" aria-label={dictionary.userSettings} onClick={() => setSettingsOpen(true)}>
-              <Avatar size={28} className="admin-avatar">
-                {avatarLetter}
-              </Avatar>
-              <span className="user-menu-name">{displayName}</span>
-              <SettingOutlined />
-            </Button>
+            <PlatformDropdownPlugin
+              open={profileOpen}
+              content={<ProfileSummaryPanel avatarLetter={avatarLetter} dictionary={dictionary} displayName={displayName} session={session} />}
+              placement="bottomRight"
+              trigger={["click", "hover"]}
+              onOpenChange={setProfileOpen}
+            >
+              <Button className="profile-menu-trigger" aria-label={dictionary.personalProfile}>
+                <Avatar size={28} className="admin-avatar">
+                  {avatarLetter}
+                </Avatar>
+                <span className="profile-menu-name">{displayName}</span>
+                <DownOutlined />
+              </Button>
+            </PlatformDropdownPlugin>
+            <Tooltip title={dictionary.userSettings}>
+              <Button
+                aria-label={dictionary.userSettings}
+                className="topbar-icon-button settings-trigger-button"
+                icon={<SettingOutlined />}
+                onClick={() => setSettingsOpen(true)}
+              />
+            </Tooltip>
           </Space>
         </header>
 
@@ -572,8 +590,8 @@ export function AdminShell({
           </PlatformDropdownPlugin>
         </section>
 
-        <section className={uiConfig.showWorkTabs ? "platform-workbar" : "platform-workbar without-tabs"}>
-          {uiConfig.showWorkTabs ? (
+        {uiConfig.showWorkTabs ? (
+          <section className="platform-workbar">
             <div className="platform-work-tabs-shell">
               {workTabsScroll.left || workTabsScroll.right ? (
                 <Button
@@ -640,20 +658,8 @@ export function AdminShell({
                 />
               ) : null}
             </div>
-          ) : null}
-          <div className="context-controls">
-            <div className="context-chip context-readonly" aria-label={dictionary.environmentContext}>
-              <span>{dictionary.environment}</span>
-              <strong>{dictionary.production}</strong>
-              <Tag>{dictionary.readOnlyContext}</Tag>
-            </div>
-            <div className="context-chip context-readonly" aria-label={dictionary.tenantContext}>
-              <span>{dictionary.tenant}</span>
-              <strong>{`${dictionary.platformTenant} (platform)`}</strong>
-              <Tag>{dictionary.readOnlyContext}</Tag>
-            </div>
-          </div>
-        </section>
+          </section>
+        ) : null}
 
         {frontendUpdateAvailable ? (
           <Alert
@@ -718,6 +724,85 @@ export function AdminShell({
         onLogout={onLogout}
       />
     </div>
+  );
+}
+
+function ProfileSummaryPanel({
+  avatarLetter,
+  dictionary,
+  displayName,
+  session,
+}: {
+  avatarLetter: string;
+  dictionary: Dictionary;
+  displayName: string;
+  session: AdminCurrentSession;
+}) {
+  const tenantCode = session.user.tenantCode || "platform";
+  const tenantDisplay = tenantCode === "platform" ? `${dictionary.platformTenant} (platform)` : tenantCode;
+  const organizationDisplay = session.user.orgUnitCode || dictionary.notConfigured;
+  const roles = session.roles.filter(Boolean);
+  const profileFields = [
+    { label: dictionary.avatar, value: dictionary.notConfigured },
+    { label: dictionary.nickname, value: session.user.name || dictionary.notConfigured },
+    { label: dictionary.phone, value: dictionary.notConfigured },
+    { label: dictionary.email, value: dictionary.notConfigured },
+    { label: dictionary.address, value: dictionary.notConfigured },
+  ];
+
+  return (
+    <PlatformDropdownPanel
+      className="profile-summary-panel"
+      title={dictionary.personalProfile}
+      description={session.user.username || displayName}
+      width={360}
+      footer={(
+        <Tooltip title={dictionary.editProfileUnavailable}>
+          <span className="profile-summary-disabled-action">
+            <Button block disabled icon={<EditOutlined />}>
+              {dictionary.editProfile}
+            </Button>
+          </span>
+        </Tooltip>
+      )}
+    >
+      <div className="profile-summary-header">
+        <Avatar size={44} className="admin-avatar">
+          {avatarLetter}
+        </Avatar>
+        <div>
+          <Typography.Text strong>{displayName}</Typography.Text>
+          <Typography.Text type="secondary">{session.user.username || dictionary.notConfigured}</Typography.Text>
+        </div>
+      </div>
+      <dl className="profile-summary-facts">
+        <div>
+          <dt>{dictionary.tenant}</dt>
+          <dd>{tenantDisplay}</dd>
+        </div>
+        <div>
+          <dt>{dictionary.organization}</dt>
+          <dd>{organizationDisplay}</dd>
+        </div>
+        <div>
+          <dt>{dictionary.roles}</dt>
+          <dd>{roles.length > 0 ? roles.length : dictionary.notConfigured}</dd>
+        </div>
+      </dl>
+      {roles.length > 0 ? (
+        <div className="profile-role-tags" aria-label={dictionary.roles}>
+          {roles.map((role) => <Tag key={role}>{role}</Tag>)}
+        </div>
+      ) : null}
+      <div className="profile-field-grid">
+        {profileFields.map((field) => (
+          <div key={field.label}>
+            <Typography.Text type="secondary">{field.label}</Typography.Text>
+            <strong>{field.value}</strong>
+          </div>
+        ))}
+      </div>
+    </PlatformDropdownPanel>
   );
 }
 
