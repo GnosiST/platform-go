@@ -1,13 +1,13 @@
 # Admin RBAC And Dynamic Menu
 
 Date: 2026-07-04
-Last updated: 2026-07-17
+Last updated: 2026-07-19
 
 ## Purpose
 
 The admin foundation now has a runtime RBAC slice for platform menus and generic admin resources. Menu records are generated from enabled capability manifests, then filtered by the current principal.
 
-The default legacy mode below remains the migration-source experience. The target backend contract in `docs/platform-organization-rbac-menu-contract.md` is implemented behind `PLATFORM_ORGANIZATION_RBAC_MODE=target`: role groups are non-nested and scoped, organizations bind tenant role groups, tenant users derive tenant from one primary organization, and API/page-button permission resources are separated. The organization/user Admin UI, strict role-group-to-role workbench and dedicated menu tree/detail workbench are implemented. Page-only `role_menu` persistence, menu/page-button schema, service objects and revision-aware target resolution exist behind production-default serving and write gates. The organization E2E gate has verified full Tree Transfer scale, all-principal dual-read equivalence and cutover/rollback behavior. Production still serves legacy menus and keeps role-menu writes disabled until an explicit rollout approval changes those defaults.
+The default legacy mode below remains the migration-source experience. The target backend contract in `docs/platform-organization-rbac-menu-contract.md` is implemented behind `PLATFORM_ORGANIZATION_RBAC_MODE=target`: role groups are non-nested and scoped, organizations bind tenant role groups, tenant users derive tenant from one primary organization, and API/page-button permission resources are separated. The organization/user Admin UI, strict role-group-to-role workbench, dedicated menu tree/detail workbench and read-only permission catalog workbench are implemented. Page-only `role_menu` persistence, menu/page-button schema, service objects and revision-aware target resolution exist behind production-default serving and write gates. The organization E2E gate has verified full Tree Transfer scale, all-principal dual-read equivalence and cutover/rollback behavior. Production still serves legacy menus and keeps role-menu writes disabled until an explicit rollout approval changes those defaults.
 
 This slice turns resource permission codes into executable behavior:
 
@@ -131,6 +131,8 @@ These fields support tenant, institution/department, account-principal and regio
 The base account model intentionally supports one primary org relation through `users.orgUnitCode`. Reference-project multi-org membership tables such as `user_org_memberships` are classified as an optional extension boundary, not a default RBAC primitive. If a deployment needs users in several org units, add that through an explicit identity/personnel/consumer capability and keep data-scope semantics documented there.
 
 The `permissions` resource is a generated catalog from enabled capability manifests plus registered platform control-plane permissions. The legacy `roles` schema keeps `permissions` and `denyPermissions` fields for compatibility, while target mode uses the dedicated Tree Transfer and reviewed domain command instead of generic resource mutation. API and page-button permissions are grouped separately; disabled or missing historical entries can be removed but not newly assigned.
+
+The Admin `/permissions` route is intentionally read-only. It renders `PermissionGovernanceConsole` instead of the generic resource console, grouping generated permission records as resource type -> capability -> resource -> permission code. This view supports search and detail inspection, but it does not expose create, update or delete actions for the permission catalog. Capability manifests and platform control-plane declarations remain the source of truth for permission codes.
 
 Current persistence boundary: tenants, org units, users, role groups, roles, user-role bindings, role-permission bindings, permissions, menus, area codes and operations logs are in-memory by default. Set `PLATFORM_ADMIN_RESOURCE_FILE` to use the file-backed admin resource repository for local persistence, or set `PLATFORM_ADMIN_RESOURCE_DRIVER` and `PLATFORM_ADMIN_RESOURCE_DSN` to use the GORM-backed repository. The GORM adapter stores these standard platform resources in normalized tables while mapping them back to the generic resource API contract.
 

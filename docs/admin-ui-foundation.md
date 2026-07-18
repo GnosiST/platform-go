@@ -27,6 +27,7 @@ Platform UI layer
   AdminDesignProvider, AdminPage, AdminMetricStrip, AdminListPanel,
   AdminActionButton, AdminFeedback, AdminFormModal, PlatformDataTable,
   PlatformDropdownPanel, PlatformDropdownPlugin, PlatformPaginationBar, PlatformOverflowText,
+  AdminTreeWorkbench,
   SystemSettingsDrawer
 Ant Design v5
   Table, Button, Modal, Alert, Form, Select, Dropdown...
@@ -73,6 +74,7 @@ Do not wrap a component when:
 - Prefer `PlatformPaginationBar` through `PlatformDataTable` for list pagination. Do not place ad hoc pagination outside the table panel; use the integrated operation bar so total count, page size, page numbers and page jump stay visually grouped in one compact table footer. Page buttons must remain horizontally centered even when total, page-size and jump controls are visible.
 - Prefer `PlatformDataTable` extension slots before forking table columns or panels. `toolbarExtra`, `batchActions`, `rowActions`, `expandedRow`, `inlineEditor`, `detailDrawer`, `emptyState` and `mobileCards` provide caller-owned behavior while the table keeps platform density, sorting, filters, pagination, dropdowns, overflow handling and accessibility defaults. If a slot is not provided, default table behavior remains unchanged.
 - Prefer `PlatformTreeSelect` for schema-declared tree relations. Generic resource forms and filters should switch to it from `relation.display`, not from resource-name branches.
+- Prefer `AdminTreeWorkbench` for governance surfaces whose primary object is hierarchical, such as roles, menus and generated permission catalogs. Tree nodes should show display name, code, status and compact metadata without truncating core context; long trees must scroll inside the navigation pane rather than stretching the whole page.
 - Shared admin shell, list and generic resource-form behavior must remain covered by `rtk node scripts/validate-admin-ui-contracts.mjs`, including settings drawer controls, sidebar collapse, work tabs, multi-level menu paths, table plugins, pagination density tokens, relation option loading through the Refine data provider, tree relation controls and AntD Form control-prop passthrough. `rtk node --test scripts/admin-ui-contracts.test.mjs` must stay in the task graph, goal audit and objective conformance evidence so the UI contract validator itself has drift coverage.
 - Global context controls such as environment and tenant belong near work tabs because they affect every page. They should remain lighter than resource-level filters and use dropdown panels for explanation or future selection.
 - Use raw AntD components inside slots when the business page needs field-level or layout-specific control.
@@ -80,7 +82,7 @@ Do not wrap a component when:
 - Keep page-specific class names for domain layout only, not for redefining base button, modal, alert or table style.
 - Navigation entries should come from `GET /api/admin/menus`; do not hard-code business menus in the shell.
 - List pages should default to dense, full-width tables with pagination. Avoid always-on side inspectors unless the task requires continuous comparison.
-- Details should open through row actions in `Drawer`; edit forms should use `AdminFormModal` and must hydrate from the selected record.
+- Generic resource details should open through row actions in `Drawer`; edit forms should use `AdminFormModal` and must hydrate from the selected record. Custom catalog or account surfaces may use a modal card when the task is focused inspection rather than continuous side-by-side comparison, such as capability detail and personal profile editing.
 - Resource schemas may declare metadata-only `actions` and `panels`. Row and batch actions must carry localized labels and permission codes; dangerous actions require confirmation metadata. Drawer panels render as tabs and may use semantic kinds such as detail fields, permissions, audit, approval, files and custom extension. Component values are semantic keys, not React import paths or scripts.
 - Binary enable/disable states should use `Switch`; non-binary runtime states such as `healthy` or `recorded` should remain tags.
 - Resource, plugin and dashboard sample data should use `LocalizedText`. Business data that needs translation should reserve localized fields or translation tables instead of hard-coded UI strings.
@@ -218,6 +220,10 @@ Reusable pagination operation bar used by `PlatformDataTable`. It owns:
 
 Callers pass labels from the dictionary and a normal AntD `TablePaginationConfig`. Server-side lists receive pagination events through `onTableChange`; static local lists are sliced inside `PlatformDataTable`.
 
+### AdminTreeWorkbench
+
+Reusable governance workbench for hierarchical Admin surfaces. It owns the two-column tree/detail shell, search area, active tree semantics, structured node rendering and internal tree scrolling. Role governance uses a role-group to role tree, menu governance uses directory/page nodes, and permission governance uses a generated read-only hierarchy grouped by resource type, capability, resource and permission code.
+
 ### PlatformDropdownPanel
 
 Reusable solid dropdown surface for column settings, filters and future lightweight plugin menus. Use it instead of transparent ad hoc dropdown content. It exports `PlatformDropdownPanelProps` and supports default platform spacing plus header, body, footer, width and max-height slots so dropdown plugins can stay visually consistent without losing flexibility.
@@ -228,12 +234,13 @@ Reusable dropdown trigger wrapper over Ant Design `Dropdown`. It keeps overlays 
 
 ### SystemSettingsDrawer
 
-Account and system settings drawer opened from the avatar trigger. It owns:
+Account and system settings drawer opened from the dedicated settings button in the topbar. It owns:
 
 - appearance theme and custom primary preview;
 - layout mode, density, work tabs, page transition and sidebar collapse through visual setting cards;
 - layout legend cards for side, top, mixed and split layouts;
 - watermark master/scope/count controls and visual-aid switches;
+- read-only environment and tenant context summaries;
 - config import, export and reset actions;
 - persistence through the app shell, so language, theme, layout and UI preferences survive page reloads.
 
@@ -250,7 +257,9 @@ The shell supports:
 - fixed default home tab at `/overview`;
 - browser-like work tabs that are opened on navigation and can be closed;
 - right-click tab menu for closing current, other, all, left and right tabs;
-- theme and layout settings inside the account/settings dropdown;
+- a dedicated settings button for system settings and an avatar-only profile button for personal context;
+- click-only personal profile dropdown with tenant, organization, role, contact and address fields; click outside or Escape closes it, and the profile editor modal stays viewport-scrollable while profile/password persistence remains disabled until backend support exists;
+- theme and layout settings inside the system settings drawer;
 - manual sidebar collapse in the sidebar brand area for desktop side/mixed/split layouts;
 - collapsed side/mixed navigation renders a flat icon list from the same resource contract so hidden multi-level `<details>` branches cannot overlap or block clicks;
 - icon-only language switch;
@@ -296,7 +305,7 @@ The OIDC login implementation is closed as `production-admin-oidc-auth` after au
 
 This evidence validates the implemented contract but is not WCAG certification. Screen-reader announcements, high zoom/reflow and platform-specific assistive technology remain separate acceptance work when a deployment requires those claims.
 
-Page rendering under the shell is routed through `PlatformRoutePages` in `admin/src/App.tsx`. Custom platform pages such as overview, capabilities, demo data and API docs are explicit route elements. Backend-declared internal menu resources become route elements that render `ResourceRoutePage` in `admin/src/platform/refine/ResourceRoutePage.tsx`. That route page reads Refine resource metadata with `useResourceParams`, guards read access with `useCan`, and then delegates the schema-driven CRUD surface to `GenericResourceConsole`. `GenericResourceConsole` owns the platform schema UI, but list/create/update/delete now flow through Refine `useList`, `useCreate`, `useUpdate` and `useDelete` instead of direct API calls. This keeps the visible shell stable while moving route ownership, access control and CRUD flow toward React Router and Refine resource semantics.
+Page rendering under the shell is routed through `PlatformRoutePages` in `admin/src/App.tsx`. Custom platform pages such as overview, capabilities, demo data and API docs are explicit route elements. Backend-declared internal menu resources become route elements that render `ResourceRoutePage` in `admin/src/platform/refine/ResourceRoutePage.tsx`. That route page reads Refine resource metadata with `useResourceParams`, guards read access with `useCan`, and then delegates most schema-driven CRUD surfaces to `GenericResourceConsole`. Dedicated governance routes are exceptions: `/roles` and `/menus` use their tree/detail governance consoles, and `/permissions` uses the read-only permission governance workbench rather than a generic editable table. `GenericResourceConsole` owns the platform schema UI for standard resources, but list/create/update/delete now flow through Refine `useList`, `useCreate`, `useUpdate` and `useDelete` instead of direct API calls. This keeps the visible shell stable while moving route ownership, access control and CRUD flow toward React Router and Refine resource semantics.
 
 `rtk npm --prefix admin run build` runs `scripts/validate-admin-refine-runtime.mjs`, `scripts/validate-admin-refine-crud.mjs` and `scripts/validate-admin-ui-contracts.mjs` after i18n validation. Those gates prevent schema-driven resource routes from drifting back into local `App.tsx` adapters, direct resource API calls, relation-field option shortcuts, form-control passthrough regressions, or shell/list regressions that remove required platform UI primitives. `scripts/admin-ui-contracts.test.mjs` exercises the validator against temporary UI source copies, so dropping shared pagination or settings-drawer configuration support is caught as a validator regression instead of relying only on the live source tree.
 
