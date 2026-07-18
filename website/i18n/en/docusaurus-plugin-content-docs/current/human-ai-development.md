@@ -9,7 +9,7 @@ title: Human + AI development
 
 ## Start a business system
 
-1. Read `AGENTS.md`, the capability development guide and `examples/external-capability`.
+1. Read `README.md`, `CONTRIBUTING.md`, the capability development guide and `examples/external-capability`.
 2. Put concrete business capabilities in a downstream repository or downstream composition root.
 3. Import only the public contract package `github.com/GnosiST/platform-go/pkg/platform/capability`.
 4. Declare manifests, resource schemas, menus, permissions, App routes, service contracts and lifecycle steps first.

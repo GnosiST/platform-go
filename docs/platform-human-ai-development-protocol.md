@@ -6,7 +6,7 @@ This document is the public protocol for starting a highly customized business s
 
 ## Operating Model
 
-1. Read `AGENTS.md`, this document, `docs/platform-capability-development.md` and `examples/external-capability/README.md` before changing platform or business surfaces.
+1. Read `README.md`, `CONTRIBUTING.md`, this document, `docs/platform-capability-development.md` and `examples/external-capability/README.md` before changing platform or business surfaces. Local agent rule files may add workspace-specific commands, but they are not the public release contract.
 2. Decide the customization mode:
    - external business package: preferred for product-specific systems;
    - platform extension capability: only for reusable platform behavior;

@@ -10,6 +10,10 @@ capabilities in external packages.
 - Search existing issues before opening a new one.
 - For security issues, follow [SECURITY.md](SECURITY.md) instead of opening a
   public issue.
+- For business customization, follow the
+  [Human + AI development protocol](docs/platform-human-ai-development-protocol.md)
+  so interface, UI, visual, data and codegen contracts are declared before
+  implementation.
 - For substantial architecture or API changes, describe the contract and
   migration plan in an issue first.
 

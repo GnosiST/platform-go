@@ -9,7 +9,7 @@ title: 人机协同开发
 
 ## 启动业务系统
 
-1. 先读 `AGENTS.md`、能力开发指南和 `examples/external-capability`。
+1. 先读 `README.md`、`CONTRIBUTING.md`、能力开发指南和 `examples/external-capability`。
 2. 业务能力优先放在下游仓库或下游 composition root。
 3. 只导入公开合同 `github.com/GnosiST/platform-go/pkg/platform/capability`。
 4. 先声明 manifest、资源 schema、菜单、权限、App 路由、服务合同和生命周期。

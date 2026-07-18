@@ -9,7 +9,7 @@
     "platform-maintainers"
   ],
   "entrypoints": {
-    "agentRules": "AGENTS.md",
+    "contributorRules": "CONTRIBUTING.md",
     "publicGuide": "docs/platform-human-ai-development-protocol.md",
     "capabilityGuide": "docs/platform-capability-development.md",
     "externalExample": "examples/external-capability/README.md",
@@ -247,14 +247,14 @@
       "sourceOfTruth": [
         "README.md",
         "README.en.md",
-        "AGENTS.md",
+        "CONTRIBUTING.md",
         "docs/platform-human-ai-development-protocol.md",
         "website/docs/human-ai-development.md"
       ],
       "requiredDocs": [
         "README.md",
         "README.en.md",
-        "AGENTS.md",
+        "CONTRIBUTING.md",
         "docs/platform-human-ai-development-protocol.md",
         "website/docs/human-ai-development.md",
         "website/i18n/en/docusaurus-plugin-content-docs/current/human-ai-development.md"
@@ -283,8 +283,8 @@
   ],
   "requiredSourceSnippets": [
     {
-      "path": "AGENTS.md",
-      "contains": "Human + AI Development Protocol"
+      "path": "CONTRIBUTING.md",
+      "contains": "Human + AI development protocol"
     },
     {
       "path": "README.md",
