@@ -42,3 +42,25 @@ func TestHMACIdentifierHasherRejectsInvalidSMSOTPInput(t *testing.T) {
 		t.Fatal("HashSMSOTP(empty code) error = nil")
 	}
 }
+
+func TestHMACIdentifierHasherBindsChallengeProofToKindPurposeAndChallenge(t *testing.T) {
+	hasher, err := NewHMACIdentifierHasher([]byte(strings.Repeat("i", 32)))
+	if err != nil {
+		t.Fatalf("NewHMACIdentifierHasher() error = %v", err)
+	}
+	first, err := hasher.HashChallengeProof(ChallengeKindCaptcha, ChallengePurposeLogin, "challenge-a", "ABC123")
+	if err != nil {
+		t.Fatalf("HashChallengeProof() error = %v", err)
+	}
+	otherKind, err := hasher.HashChallengeProof(ChallengeKindSlider, ChallengePurposeLogin, "challenge-a", "ABC123")
+	if err != nil {
+		t.Fatalf("HashChallengeProof(other kind) error = %v", err)
+	}
+	otherChallenge, err := hasher.HashChallengeProof(ChallengeKindCaptcha, ChallengePurposeLogin, "challenge-b", "ABC123")
+	if err != nil {
+		t.Fatalf("HashChallengeProof(other challenge) error = %v", err)
+	}
+	if first == otherKind || first == otherChallenge || !strings.HasPrefix(first, challengeProofHashPrefix) {
+		t.Fatalf("challenge proof digests = %q, %q, %q; want distinct prefixed digests", first, otherKind, otherChallenge)
+	}
+}

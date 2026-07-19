@@ -3,8 +3,10 @@ package httpapi
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -41,9 +43,26 @@ type credentialAuthSecretRequest struct {
 }
 
 type credentialAuthChallengeRequest struct {
-	ID    string `json:"id"`
-	Kind  string `json:"kind"`
-	Proof string `json:"proof"`
+	ID                string `json:"id"`
+	Kind              string `json:"kind"`
+	Proof             string `json:"proof"`
+	ClientFingerprint string `json:"clientFingerprint"`
+}
+
+type credentialAuthChallengeStartRequest struct {
+	Kind              string `json:"kind"`
+	Purpose           string `json:"purpose"`
+	ClientFingerprint string `json:"clientFingerprint"`
+}
+
+type credentialAuthChallengeStartResponse struct {
+	ID         string            `json:"id"`
+	Kind       string            `json:"kind"`
+	Purpose    string            `json:"purpose"`
+	Prompt     string            `json:"prompt"`
+	Parameters map[string]string `json:"parameters,omitempty"`
+	ExpiresAt  time.Time         `json:"expiresAt"`
+	DebugProof string            `json:"debugProof,omitempty"`
 }
 
 type credentialAuthSMSOTPStartRequest struct {
@@ -82,6 +101,7 @@ type CredentialAuthRuntime struct {
 	IdentifierHasher        credentialauth.IdentifierHasher
 	SecretTransport         *credentialauth.SecretTransport
 	SMSOTPHasher            credentialAuthSMSOTPHasher
+	ChallengeProofHasher    credentialauth.ChallengeProofHasher
 	SMSSender               notification.SMSSender
 	LoginTemplateID         string
 	DebugCodeEnabled        bool
@@ -89,6 +109,10 @@ type CredentialAuthRuntime struct {
 	Now                     func() time.Time
 	SMSOTPTTL               time.Duration
 	MaxSMSOTPAttempts       int
+	MaxChallengeAttempts    int
+	ChallengeTTL            time.Duration
+	PasswordHashParams      credentialauth.Argon2idParams
+	PasswordParamsVersion   string
 	RequireEncryptedSecrets bool
 }
 
@@ -130,6 +154,9 @@ func (s *Server) credentialAuthPasswordLogin(ctx *gin.Context, provider capabili
 	}
 	if secretType != "password" {
 		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
+		return
+	}
+	if !s.verifyCredentialAuthLoginChallenge(ctx, input.Challenge) {
 		return
 	}
 	if runtime.RequireEncryptedSecrets {
@@ -319,6 +346,9 @@ func (s *Server) credentialAuthSMSOTPLogin(ctx *gin.Context, provider capability
 		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
 		return
 	}
+	if !s.verifyCredentialAuthLoginChallenge(ctx, input.Challenge) {
+		return
+	}
 	code := strings.TrimSpace(input.Secret.Code)
 	if runtime.RequireEncryptedSecrets {
 		if credentialAuthPlaintextSecretPresent(input.Secret) {
@@ -384,6 +414,90 @@ func (s *Server) credentialAuthSMSOTPLogin(ctx *gin.Context, provider capability
 	s.issueAdminLogin(ctx, principal, provider)
 }
 
+func (s *Server) credentialAuthChallengeStart(ctx *gin.Context) {
+	var input credentialAuthChallengeStartRequest
+	if err := ctx.ShouldBindJSON(&input); err != nil {
+		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
+		return
+	}
+	if !s.enforceRateLimit(ctx, ratelimit.OperationCredentialChallenge, rateLimitClientIP(ctx), "credential-challenge") {
+		return
+	}
+	if !s.requireCredentialAuthSecureTransport(ctx) {
+		return
+	}
+	runtime := s.credentialAuth
+	if runtime == nil || runtime.Service == nil {
+		writePlatformError(ctx, errorcode.CodeAuthProviderNotConfigured)
+		return
+	}
+	kind := credentialauth.ChallengeKind(strings.TrimSpace(input.Kind))
+	if kind == "" {
+		kind = credentialauth.ChallengeKindCaptcha
+	}
+	purpose := credentialauth.ChallengePurpose(strings.TrimSpace(input.Purpose))
+	if purpose == "" {
+		purpose = credentialauth.ChallengePurposeLogin
+	}
+	created, err := runtime.Service.CreateCredentialChallenge(ctx.Request.Context(), credentialauth.CreateCredentialChallengeInput{
+		Kind:                  kind,
+		Purpose:               purpose,
+		ClientFingerprintHash: credentialAuthClientFingerprintHash(input.ClientFingerprint),
+		TTL:                   runtime.ChallengeTTL,
+	})
+	if err != nil {
+		writeCredentialAuthLoginError(ctx, s.internalErrorSink, err)
+		return
+	}
+	response := credentialAuthChallengeStartResponse{
+		ID:         created.ChallengeID,
+		Kind:       string(created.Kind),
+		Purpose:    string(created.Purpose),
+		Prompt:     created.Prompt,
+		Parameters: created.Parameters,
+		ExpiresAt:  created.ExpiresAt,
+	}
+	if runtime.DebugCodeEnabled {
+		response.DebugProof = created.Proof
+	}
+	ctx.JSON(http.StatusCreated, Response[credentialAuthChallengeStartResponse]{Data: response})
+}
+
+func (s *Server) verifyCredentialAuthLoginChallenge(ctx *gin.Context, input credentialAuthChallengeRequest) bool {
+	challengeID := strings.TrimSpace(input.ID)
+	kind := credentialauth.ChallengeKind(strings.TrimSpace(input.Kind))
+	proof := strings.TrimSpace(input.Proof)
+	if challengeID == "" && kind == "" && proof == "" && strings.TrimSpace(input.ClientFingerprint) == "" {
+		return true
+	}
+	runtime := s.credentialAuth
+	if runtime == nil || runtime.Service == nil || runtime.ChallengeProofHasher == nil {
+		writePlatformError(ctx, errorcode.CodeAuthProviderNotConfigured)
+		return false
+	}
+	if challengeID == "" || kind == "" || proof == "" {
+		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
+		return false
+	}
+	answerDigest, err := runtime.ChallengeProofHasher.HashChallengeProof(kind, credentialauth.ChallengePurposeLogin, challengeID, proof)
+	if err != nil {
+		writeCredentialAuthLoginError(ctx, s.internalErrorSink, err)
+		return false
+	}
+	if err := runtime.Service.VerifyCredentialChallenge(ctx.Request.Context(), credentialauth.CredentialChallengeProof{
+		ChallengeID:           challengeID,
+		Kind:                  kind,
+		Purpose:               credentialauth.ChallengePurposeLogin,
+		AnswerDigest:          answerDigest,
+		ClientFingerprintHash: credentialAuthClientFingerprintHash(input.ClientFingerprint),
+		MaxAttempts:           runtime.MaxChallengeAttempts,
+	}); err != nil {
+		writeCredentialAuthLoginError(ctx, s.internalErrorSink, err)
+		return false
+	}
+	return true
+}
+
 func credentialAuthProviderSpecFor(provider capability.AuthProvider) (credentialAuthProviderSpec, bool) {
 	id := strings.TrimSpace(provider.ID)
 	kind := strings.ToLower(strings.TrimSpace(provider.Kind))
@@ -437,6 +551,15 @@ func credentialAuthSecureTransport(request *http.Request, security SecurityOptio
 	}
 	peer, ok := directPeerAddress(request.RemoteAddr)
 	return ok && peer.IsLoopback()
+}
+
+func credentialAuthClientFingerprintHash(fingerprint string) string {
+	fingerprint = strings.TrimSpace(fingerprint)
+	if fingerprint == "" {
+		return ""
+	}
+	digest := sha256.Sum256([]byte(fmt.Sprintf("platform-go credential-auth challenge fingerprint v1\x00%d:%s", len(fingerprint), fingerprint)))
+	return "v1:sha256:client-fingerprint:" + hex.EncodeToString(digest[:])
 }
 
 func credentialAuthIdentifierFromRequest(input credentialAuthIdentifierRequest, expected credentialauth.IdentifierType) (credentialauth.Identifier, bool) {

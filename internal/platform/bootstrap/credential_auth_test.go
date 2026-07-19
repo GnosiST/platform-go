@@ -6,7 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
 	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/core"
 	"github.com/GnosiST/platform-go/internal/platform/credentialauth"
 	"github.com/GnosiST/platform-go/internal/platform/notification"
 )
@@ -33,8 +35,9 @@ func TestCredentialAuthRuntimeFromConfigSeedsBootstrapAdmin(t *testing.T) {
 	cfg.NotificationSMSProvider = notification.SMSProviderMockLocal
 	cfg.NotificationSMSLoginTemplateID = "login-template"
 	sms := NotificationSMSRuntime{Sender: notification.NewMockLocalSMSSender(), LoginTemplateID: "login-template", MockLocalEnabled: true}
+	resources := adminresource.NewStoreFromCapabilities(core.DefaultManifests())
 
-	runtime, err := CredentialAuthRuntimeFromConfig(context.Background(), cfg, sms)
+	runtime, err := CredentialAuthRuntimeFromConfig(context.Background(), cfg, sms, resources)
 	if err != nil {
 		t.Fatalf("CredentialAuthRuntimeFromConfig() error = %v", err)
 	}
@@ -48,8 +51,33 @@ func TestCredentialAuthRuntimeFromConfigSeedsBootstrapAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("VerifyPassword() error = %v", err)
 	}
+	if login.Principal.Type != credentialauth.PrincipalTypeAdmin || login.Principal.ID != "user-admin" {
+		t.Fatalf("VerifyPassword principal = %+v, want admin user principal", login.Principal)
+	}
+}
+
+func TestCredentialAuthRuntimeFromConfigKeepsUsernamePrincipalWithoutResources(t *testing.T) {
+	cfg := config.Load()
+	cfg.Capabilities = append(cfg.Capabilities, "notification", "credential-auth")
+	cfg.CredentialAuthUsernamePassword = true
+	cfg.CredentialAuthIdentifierHMACKey = strings.Repeat("i", 32)
+	cfg.CredentialAuthBootstrapAdminUsername = "admin"
+	cfg.CredentialAuthBootstrapAdminPassword = "correct-password"
+	sms := NotificationSMSRuntime{}
+
+	runtime, err := CredentialAuthRuntimeFromConfig(context.Background(), cfg, sms)
+	if err != nil {
+		t.Fatalf("CredentialAuthRuntimeFromConfig() error = %v", err)
+	}
+	login, err := runtime.Service.VerifyPassword(context.Background(), credentialauth.PasswordLoginInput{
+		Identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypeUsername, Value: "admin"},
+		Secret:     "correct-password",
+	})
+	if err != nil {
+		t.Fatalf("VerifyPassword() error = %v", err)
+	}
 	if login.Principal.Type != credentialauth.PrincipalTypeAdmin || login.Principal.ID != "admin" {
-		t.Fatalf("VerifyPassword principal = %+v, want admin bootstrap principal", login.Principal)
+		t.Fatalf("VerifyPassword principal = %+v, want username fallback principal", login.Principal)
 	}
 }
 

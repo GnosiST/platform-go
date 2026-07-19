@@ -14,8 +14,10 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AdminAPIError,
   queryAdminResource,
+  runMessageCenterDeliveries,
   testSendMessageCenter,
   type AdminResourceRecord,
+  type MessageCenterDeliveriesRunResult,
   type MessageCenterTestSendResult,
 } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
@@ -57,6 +59,14 @@ type MessageCenterResourceConfig = {
 
 type MessageCenterRecords = Record<MessageCenterResourceKey, AdminResourceRecord[]>;
 type MessageCenterErrors = Partial<Record<MessageCenterResourceKey, string>>;
+type MessageCenterChannelCard = {
+  key: string;
+  label: string;
+  description: string;
+  icon: ReactNode;
+  statusLabel: string;
+  statusTone: string;
+};
 
 type MessageCenterTestSendForm = {
   channel: "sms";
@@ -124,6 +134,8 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
   const [testSendOpen, setTestSendOpen] = useState(false);
   const [testSendSubmitting, setTestSendSubmitting] = useState(false);
   const [testSendResult, setTestSendResult] = useState<MessageCenterTestSendResult | null>(null);
+  const [deliveryRunSubmitting, setDeliveryRunSubmitting] = useState(false);
+  const [deliveryRunResult, setDeliveryRunResult] = useState<MessageCenterDeliveriesRunResult | null>(null);
   const resourceRoutes = useMemo(() => new Set(resources.map((resource) => resource.route)), [resources]);
   const availableConfigs = useMemo(
     () => resourceConfigs.filter((config) => resourceRoutes.has(config.route)),
@@ -186,6 +198,19 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
       setTestSendSubmitting(false);
     }
   };
+  const runDeliveryWorker = async () => {
+    setDeliveryRunSubmitting(true);
+    try {
+      const result = await runMessageCenterDeliveries();
+      setDeliveryRunResult(result);
+      toast.success(dictionary.messageCenterDeliveryRunSuccess);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : dictionary.messageCenterDeliveryRunFailed);
+    } finally {
+      setDeliveryRunSubmitting(false);
+    }
+  };
   const errorMessages = Object.entries(errors).filter(([, message]) => Boolean(message));
 
   return (
@@ -195,6 +220,9 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
       description={dictionary.messageCenterDescription}
       actions={(
         <Space size={8} wrap>
+          <Button icon={<ReloadOutlined />} loading={deliveryRunSubmitting} onClick={() => void runDeliveryWorker()}>
+            {dictionary.messageCenterRunDeliveries}
+          </Button>
           <Button icon={<SendOutlined />} onClick={() => openTestSend()}>
             {dictionary.messageCenterDryRun}
           </Button>
@@ -232,6 +260,18 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
         message={dictionary.messageCenterTrialReadyTitle}
         description={dictionary.messageCenterTrialReadyDescription}
       />
+      {deliveryRunResult ? (
+        <AdminFeedback
+          type={deliveryRunResult.failed > 0 ? "warning" : "success"}
+          message={dictionary.messageCenterDeliveryRunResult}
+          description={formatTemplate(dictionary.messageCenterDeliveryRunResultDescription, {
+            attempted: String(deliveryRunResult.attempted),
+            delivered: String(deliveryRunResult.delivered),
+            failed: String(deliveryRunResult.failed),
+            skipped: String(deliveryRunResult.skipped),
+          })}
+        />
+      ) : null}
       <MessageCenterClosedLoop
         dictionary={dictionary}
         records={records}
@@ -260,7 +300,7 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
                 <Typography.Text strong>{card.label}</Typography.Text>
                 <Typography.Paragraph type="secondary">{card.description}</Typography.Paragraph>
               </div>
-              <Tag color={card.ready ? "success" : "default"}>{card.ready ? dictionary.configured : dictionary.notConfigured}</Tag>
+              <Tag color={card.statusTone}>{card.statusLabel}</Tag>
             </div>
           ))}
         </div>
@@ -601,18 +641,38 @@ function tableLabels(dictionary: Dictionary) {
   };
 }
 
-function channelCards(records: MessageCenterRecords, dictionary: Dictionary) {
-  const providersByChannel = new Set(records.providers.map((record) => valueOf(record, "channel")).filter(Boolean));
+function channelCards(records: MessageCenterRecords, dictionary: Dictionary): MessageCenterChannelCard[] {
+  const providersByChannel = new Set(
+    records.providers
+      .filter((record) => ["enabled", "active"].includes(record.status))
+      .map((record) => valueOf(record, "channel"))
+      .filter(Boolean),
+  );
+  const configuredChannels = new Set(
+    records.channels
+      .filter((record) => ["enabled", "active"].includes(record.status))
+      .map((record) => valueOf(record, "channel") || record.code)
+      .filter(Boolean),
+  );
   const channels = records.channels.length > 0
     ? records.channels.map((record) => valueOf(record, "channel") || record.code)
     : ["in_app", "sms", "email", "wechat_official", "wechat_miniapp"];
-  return channels.map((channel) => ({
-    key: channel,
-    label: channelLabel(channel, dictionary),
-    description: channelDescription(channel, dictionary),
-    icon: channelIcon(channel),
-    ready: channel === "in_app" || providersByChannel.has(channel) || records.channels.some((record) => (valueOf(record, "channel") || record.code) === channel && record.status === "enabled"),
-  }));
+  return channels.map((channel) => {
+    const runtimeReady = channel === "in_app" || (channel === "sms" && providersByChannel.has("sms"));
+    const configuredOnly = configuredChannels.has(channel) || providersByChannel.has(channel);
+    return {
+      key: channel,
+      label: channelLabel(channel, dictionary),
+      description: channelDescription(channel, dictionary),
+      icon: channelIcon(channel),
+      statusLabel: runtimeReady
+        ? dictionary.messageCenterChannelRuntimeReady
+        : configuredOnly
+          ? dictionary.messageCenterChannelConfiguredOnly
+          : dictionary.messageCenterChannelConfigSlot,
+      statusTone: runtimeReady ? "success" : configuredOnly ? "processing" : "default",
+    };
+  });
 }
 
 function messageCenterClosedLoopSteps(

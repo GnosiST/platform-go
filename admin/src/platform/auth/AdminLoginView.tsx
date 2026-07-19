@@ -13,10 +13,12 @@ import { Button, Form, Input, Space, Tabs, Tooltip, Typography } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   loginWithAuthProvider,
+  startCredentialChallenge,
   startCredentialSMSOTP,
   type AdminCurrentSession,
   type AuthProvider,
   type BrandingConfig,
+  type CredentialChallengeStartResult,
   type CredentialSMSOTPStartResult,
 } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
@@ -55,6 +57,7 @@ type LoginFormValues = {
   identifier: string;
   password: string;
   smsCode: string;
+  challengeProof: string;
 };
 
 type CallbackPhase = "idle" | "processing" | "failed";
@@ -83,6 +86,8 @@ export function AdminLoginView({
   const [submitting, setSubmitting] = useState(false);
   const [sendingSMSOTP, setSendingSMSOTP] = useState(false);
   const [smsOTPTransaction, setSMSOTPTransaction] = useState<CredentialSMSOTPStartResult | null>(null);
+  const [credentialChallenge, setCredentialChallenge] = useState<CredentialChallengeStartResult | null>(null);
+  const [credentialChallengeLoading, setCredentialChallengeLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [callbackPhase, setCallbackPhase] = useState<CallbackPhase>("idle");
   const [callbackFailure, setCallbackFailure] = useState<OIDCCallbackFailure | "generic" | null>(null);
@@ -118,8 +123,18 @@ export function AdminLoginView({
     if (availableProviders.some((provider) => provider.id === selectedProviderID)) return;
     setSelectedProviderID(availableProviders[0].id);
     setSMSOTPTransaction(null);
+    setCredentialChallenge(null);
     form.resetFields();
   }, [availableProviders, form, selectedProviderID]);
+
+  useEffect(() => {
+    if (!credentialSpec) {
+      setCredentialChallenge(null);
+      form.setFieldValue("challengeProof", "");
+      return;
+    }
+    void refreshCredentialChallenge();
+  }, [credentialSpec?.identifierType, credentialSpec?.mode, selectedProvider?.id]);
 
   useEffect(() => {
     if (callbackPhase !== "idle" || !hasOIDCCallbackParams(search)) return;
@@ -157,6 +172,8 @@ export function AdminLoginView({
     setLoginError("");
     try {
       let result;
+      const challenge = credentialChallengeRequest(credentialChallenge, values.challengeProof);
+      if (credentialSpec && !challenge) throw new Error(dictionary.loginChallengeRequired);
       if (selectedProvider.kind === "demo") {
         result = await loginWithAuthProvider({
           provider: selectedProvider.id,
@@ -167,6 +184,7 @@ export function AdminLoginView({
           provider: selectedProvider.id,
           identifier: { type: credentialSpec.identifierType, value: values.identifier },
           secret: { type: "password", value: values.password },
+          challenge,
         });
       } else if (credentialSpec?.mode === "sms-otp") {
         if (!smsOTPTransaction?.transactionId) throw new Error(dictionary.loginSMSCodeRequired);
@@ -174,6 +192,7 @@ export function AdminLoginView({
           provider: selectedProvider.id,
           identifier: { type: "phone", value: values.identifier },
           secret: { type: "sms-otp", transactionId: smsOTPTransaction.transactionId, code: values.smsCode },
+          challenge,
         });
       } else {
         throw new Error(dictionary.loginProviderUnavailable);
@@ -181,6 +200,7 @@ export function AdminLoginView({
       onLoginSuccess(result.principal);
     } catch (nextError) {
       setLoginError(nextError instanceof Error ? nextError.message : dictionary.loginFailed);
+      if (credentialSpec) void refreshCredentialChallenge();
     } finally {
       submissionLockRef.current.release();
       setSubmitting(false);
@@ -205,6 +225,20 @@ export function AdminLoginView({
       setLoginError(nextError instanceof Error ? nextError.message : dictionary.loginSMSStartFailed);
     } finally {
       setSendingSMSOTP(false);
+    }
+  };
+
+  const refreshCredentialChallenge = async () => {
+    setCredentialChallengeLoading(true);
+    try {
+      const nextChallenge = await startCredentialChallenge({ kind: "captcha", purpose: "login" });
+      setCredentialChallenge(nextChallenge);
+      form.setFieldValue("challengeProof", "");
+    } catch (nextError) {
+      setCredentialChallenge(null);
+      setLoginError(nextError instanceof Error ? nextError.message : dictionary.loginChallengeStartFailed);
+    } finally {
+      setCredentialChallengeLoading(false);
     }
   };
 
@@ -350,6 +384,12 @@ export function AdminLoginView({
                 >
                   <Input.Password prefix={<LockOutlined />} autoComplete="current-password" placeholder={dictionary.loginPasswordCredentialPlaceholder} />
                 </Form.Item>
+                <CredentialChallengeField
+                  challenge={credentialChallenge}
+                  dictionary={dictionary}
+                  loading={credentialChallengeLoading}
+                  onRefresh={() => void refreshCredentialChallenge()}
+                />
                 <Button
                   block
                   className="login-submit"
@@ -357,7 +397,7 @@ export function AdminLoginView({
                   icon={<LoginOutlined />}
                   loading={submitting}
                   type="primary"
-                  disabled={!selectedProvider.configured || loading || submitting}
+                  disabled={!selectedProvider.configured || loading || submitting || !credentialChallenge}
                 >
                   {dictionary.login}
                 </Button>
@@ -398,6 +438,12 @@ export function AdminLoginView({
                     {smsOTPTransaction.debugCode ? ` ${smsOTPTransaction.debugCode}` : ""}
                   </Typography.Text>
                 ) : null}
+                <CredentialChallengeField
+                  challenge={credentialChallenge}
+                  dictionary={dictionary}
+                  loading={credentialChallengeLoading}
+                  onRefresh={() => void refreshCredentialChallenge()}
+                />
                 <Button
                   block
                   className="login-submit"
@@ -405,7 +451,7 @@ export function AdminLoginView({
                   icon={<LoginOutlined />}
                   loading={submitting}
                   type="primary"
-                  disabled={!selectedProvider.configured || loading || submitting || !smsOTPTransaction}
+                  disabled={!selectedProvider.configured || loading || submitting || !smsOTPTransaction || !credentialChallenge}
                 >
                   {dictionary.login}
                 </Button>
@@ -475,6 +521,61 @@ export function AdminLoginView({
       </section>
     </main>
   );
+}
+
+function CredentialChallengeField({
+  challenge,
+  dictionary,
+  loading,
+  onRefresh,
+}: {
+  challenge: CredentialChallengeStartResult | null;
+  dictionary: Dictionary;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <Form.Item label={dictionary.loginChallenge} required>
+      <div className="login-challenge-card">
+        <div className="login-challenge-prompt">
+          <Typography.Text strong>{challengePrompt(challenge, dictionary)}</Typography.Text>
+          {challenge?.debugProof ? (
+            <Typography.Text code>{dictionary.loginChallengeDebugProof.replace("{proof}", challenge.debugProof)}</Typography.Text>
+          ) : null}
+        </div>
+        <Space.Compact className="login-challenge-row">
+          <Form.Item noStyle name="challengeProof" rules={[{ required: true, message: dictionary.loginChallengeRequired }]}>
+            <Input
+              prefix={<SafetyCertificateOutlined />}
+              autoComplete="off"
+              disabled={!challenge || loading}
+              placeholder={dictionary.loginChallengePlaceholder}
+            />
+          </Form.Item>
+          <Button loading={loading} onClick={onRefresh}>
+            {dictionary.loginChallengeRefresh}
+          </Button>
+        </Space.Compact>
+      </div>
+    </Form.Item>
+  );
+}
+
+function credentialChallengeRequest(challenge: CredentialChallengeStartResult | null, proof: string | undefined) {
+  const normalizedProof = String(proof ?? "").trim();
+  if (!challenge || normalizedProof === "") return undefined;
+  return {
+    id: challenge.id,
+    kind: challenge.kind,
+    proof: normalizedProof,
+  };
+}
+
+function challengePrompt(challenge: CredentialChallengeStartResult | null, dictionary: Dictionary) {
+  if (!challenge) return dictionary.loginChallengeLoading;
+  const text = challenge.parameters?.text;
+  if (text) return dictionary.loginChallengeText.replace("{text}", text);
+  return challenge.prompt || dictionary.loginChallengePlaceholder;
 }
 
 function callbackFailureReason(error: unknown): OIDCCallbackFailure | "generic" {

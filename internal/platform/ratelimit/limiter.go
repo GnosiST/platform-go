@@ -27,6 +27,7 @@ type Operation string
 const (
 	OperationAdminLogin                Operation = "admin-login"
 	OperationAppLogin                  Operation = "app-login"
+	OperationCredentialChallenge       Operation = "credential-challenge"
 	OperationAdminOIDCStart            Operation = "admin-oidc-start"
 	OperationPhoneVerificationRequest  Operation = "phone-verification-request"
 	OperationPhoneBindingVerification  Operation = "phone-binding-verification"
@@ -34,6 +35,8 @@ const (
 	OperationAppUpload                 Operation = "app-upload"
 	OperationAdminServiceObjectQuery   Operation = "admin-service-object-query"
 	OperationAdminServiceObjectCommand Operation = "admin-service-object-command"
+	OperationAdminProfilePassword      Operation = "admin-profile-password"
+	OperationMessageCenterDelivery     Operation = "message-center-delivery"
 	OperationSensitiveRevealChallenge  Operation = "sensitive-reveal-challenge"
 	OperationSensitiveRevealFactor     Operation = "sensitive-reveal-factor"
 	OperationSensitiveRevealConsume    Operation = "sensitive-reveal-consume"
@@ -47,6 +50,7 @@ type Policy struct {
 var policies = map[Operation]Policy{
 	OperationAdminLogin:                {Limit: 10, Window: 5 * time.Minute},
 	OperationAppLogin:                  {Limit: 10, Window: 5 * time.Minute},
+	OperationCredentialChallenge:       {Limit: 20, Window: 5 * time.Minute},
 	OperationAdminOIDCStart:            {Limit: 20, Window: 5 * time.Minute},
 	OperationPhoneVerificationRequest:  {Limit: 5, Window: 10 * time.Minute},
 	OperationPhoneBindingVerification:  {Limit: 10, Window: 10 * time.Minute},
@@ -54,6 +58,8 @@ var policies = map[Operation]Policy{
 	OperationAppUpload:                 {Limit: 30, Window: time.Minute},
 	OperationAdminServiceObjectQuery:   {Limit: 120, Window: time.Minute},
 	OperationAdminServiceObjectCommand: {Limit: 60, Window: time.Minute},
+	OperationAdminProfilePassword:      {Limit: 10, Window: time.Minute},
+	OperationMessageCenterDelivery:     {Limit: 10, Window: time.Minute},
 	OperationSensitiveRevealChallenge:  {Limit: 10, Window: 10 * time.Minute},
 	OperationSensitiveRevealFactor:     {Limit: 15, Window: 10 * time.Minute},
 	OperationSensitiveRevealConsume:    {Limit: 10, Window: 5 * time.Minute},

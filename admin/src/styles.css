@@ -2342,6 +2342,35 @@ select {
   min-width: 104px;
 }
 
+.login-challenge-card {
+  display: grid;
+  gap: 8px;
+}
+
+.login-challenge-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--row-hover);
+}
+
+.login-challenge-row {
+  width: 100%;
+}
+
+.login-challenge-row .ant-input {
+  min-width: 0;
+}
+
+.login-challenge-row .ant-btn {
+  min-width: 92px;
+}
+
 .login-sms-status {
   display: block;
   margin: -6px 0 12px;
@@ -6092,7 +6121,8 @@ select {
     min-height: 44px;
   }
 
-  .login-sms-code-row .ant-btn {
+  .login-sms-code-row .ant-btn,
+  .login-challenge-row .ant-btn {
     min-height: 44px;
   }
 

@@ -306,7 +306,7 @@
           {
             "channel": "sms",
             "providers": ["aliyun", "tencent", "mock-local"],
-            "runtimeStatus": "config-contract-plus-mock-local-sender",
+            "runtimeStatus": "official-sdk-live-adapters-plus-dry-run-and-mock-local",
             "productionPolicy": "mock-local is development/test only; production requires a real SMS provider adapter and secret-backed credentials"
           },
           {
@@ -326,7 +326,7 @@
           }
         ],
         "credentialPolicy": "Provider credentials, app secrets, webhook secrets and raw vendor errors must be encrypted, masked or omitted by field policy.",
-        "runtimeBoundary": "P0 proves the product configuration contract and SMS mock-local sender; concrete Aliyun, Tencent Cloud, SMTP and WeChat send adapters are follow-up runtime slices."
+        "runtimeBoundary": "v1 proves the product configuration contract, SMS mock-local sender, non-network SMS dry-run, and official SDK-backed Aliyun/Tencent Cloud live SMS adapters; concrete SMTP and WeChat send adapters remain follow-up runtime slices."
       },
       "docs": ["docs/platform-capability-development.md", "docs/platform-foundation-task-map.md"]
     },

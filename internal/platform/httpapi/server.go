@@ -330,6 +330,7 @@ func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 	api.GET("/platform/cache/stats", s.platformCacheStats)
 	api.GET("/auth/providers", s.authProviders)
 	api.GET("/auth/credential-secret-key", s.credentialAuthSecretKey)
+	api.POST("/auth/challenges", s.credentialAuthChallengeStart)
 	api.POST("/auth/providers/:provider/start", s.authProviderStart)
 	api.POST("/auth/sms-otp/start", s.credentialAuthSMSOTPStart)
 	api.POST("/auth/login", s.authLogin)
@@ -343,6 +344,7 @@ func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 	api.PUT("/admin/settings/:resource/:id", s.adminSettingsUpdate)
 	api.GET("/admin/plugin-management/status", s.adminPluginManagementStatus)
 	api.POST("/admin/message-center/test-send", s.adminMessageCenterTestSend)
+	api.POST("/admin/message-center/deliveries/run", s.adminMessageCenterDeliveriesRun)
 	api.GET("/admin/demo-data", s.adminDemoDataList)
 	api.POST("/admin/demo-data/:capability/:dataset/apply", s.adminDemoDataApply)
 	api.GET("/admin/policy-reviews/export", s.adminPolicyReviewExport)
@@ -2698,6 +2700,26 @@ func (s *Server) authorize(ctx *gin.Context, permission string) bool {
 	}
 	writePlatformError(ctx, errorcode.CodeAdminForbidden)
 	return false
+}
+
+func (s *Server) authorizeAdminBearerSession(ctx *gin.Context, permission string) (rbac.Principal, bool) {
+	if !s.refreshAdminResourceState(ctx, errorcode.CodeAdminAuthStateRefreshFailed) {
+		return rbac.Principal{}, false
+	}
+	if _, ok := bearerToken(ctx.GetHeader("Authorization")); !ok {
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
+		return rbac.Principal{}, false
+	}
+	principal, ok := s.currentPrincipal(ctx)
+	if !ok {
+		writePlatformError(ctx, errorcode.CodeAuthUnauthorized)
+		return rbac.Principal{}, false
+	}
+	if s.can(principal, permission) {
+		return principal, true
+	}
+	writePlatformError(ctx, errorcode.CodeAdminForbidden)
+	return rbac.Principal{}, false
 }
 
 func (s *Server) can(principal rbac.Principal, permission string) bool {

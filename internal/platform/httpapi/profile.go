@@ -12,10 +12,21 @@ import (
 	"github.com/GnosiST/platform-go/internal/platform/adminresource"
 	"github.com/GnosiST/platform-go/internal/platform/credentialauth"
 	"github.com/GnosiST/platform-go/internal/platform/errorcode"
+	"github.com/GnosiST/platform-go/internal/platform/ratelimit"
 	"github.com/GnosiST/platform-go/internal/platform/rbac"
 )
 
 const adminProfileUsersResource = "users"
+
+const (
+	adminProfilePasswordChangeProvider        = "profile-password-change"
+	adminProfilePasswordResetProvider         = "profile-password-reset"
+	adminProfilePasswordCurrentSecretType     = "current-password"
+	adminProfilePasswordNewSecretType         = "new-password"
+	adminProfilePasswordSecretIdentifierType  = "admin-profile"
+	adminProfilePasswordParamsVersionFallback = "argon2id-default"
+	adminProfileCredentialStatusReady         = "credential-auth-ready"
+)
 
 type adminProfileResponse struct {
 	Profile adminProfile `json:"profile"`
@@ -54,6 +65,20 @@ type adminProfileUpdateRequest struct {
 	Address   *string `json:"address,omitempty"`
 }
 
+type adminProfilePasswordChangeRequest struct {
+	CurrentSecret credentialAuthSecretRequest `json:"currentSecret"`
+	NewSecret     credentialAuthSecretRequest `json:"newSecret"`
+}
+
+type adminProfilePasswordResetRequest struct {
+	NewSecret credentialAuthSecretRequest `json:"newSecret"`
+}
+
+type adminProfilePasswordMutationResponse struct {
+	Credentials adminProfileCredentialStatus `json:"credentials"`
+	MustChange  bool                         `json:"mustChange"`
+}
+
 // RegisterAdminProfileRoutes wires the current-user profile slice without
 // requiring changes to the default server route table.
 func (s *Server) RegisterAdminProfileRoutes() {
@@ -69,6 +94,8 @@ func (s *Server) registerAdminProfileRoutes(api *gin.RouterGroup) {
 	api.GET("/admin/profile/current", s.adminProfileCurrent)
 	api.PUT("/admin/profile/current", s.adminProfileUpdateCurrent)
 	api.PUT("/admin/profile/:id", s.adminProfileUpdateByID)
+	api.POST("/admin/profile/current/password/change", s.adminProfilePasswordChangeCurrent)
+	api.POST("/admin/profile/:id/password/reset", s.adminProfilePasswordResetByID)
 }
 
 func (s *Server) adminProfileCurrent(ctx *gin.Context) {
@@ -86,6 +113,110 @@ func (s *Server) adminProfileUpdateCurrent(ctx *gin.Context) {
 
 func (s *Server) adminProfileUpdateByID(ctx *gin.Context) {
 	s.updateAdminProfile(ctx, ctx.Param("id"))
+}
+
+func (s *Server) adminProfilePasswordChangeCurrent(ctx *gin.Context) {
+	principal, record, ok := s.currentAdminProfileRecord(ctx)
+	if !ok {
+		return
+	}
+	runtime, ok := s.adminProfileCredentialAuthRuntime(ctx)
+	if !ok {
+		return
+	}
+	if !s.requireCredentialAuthSecureTransport(ctx) {
+		return
+	}
+	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationAdminProfilePassword, rateLimitClientIP(ctx), principal.User.Username, "change") {
+		return
+	}
+	var input adminProfilePasswordChangeRequest
+	decoder := json.NewDecoder(ctx.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writePlatformError(ctx, errorcode.CodeRequestBodyInvalid)
+		return
+	}
+	currentSecret, err := s.decryptAdminProfilePasswordSecret(ctx, input.CurrentSecret, adminProfilePasswordChangeProvider, adminProfilePasswordCurrentSecretType)
+	if err != nil {
+		writeCredentialAuthLoginError(ctx, s.internalErrorSink, err)
+		return
+	}
+	newSecret, err := s.decryptAdminProfilePasswordSecret(ctx, input.NewSecret, adminProfilePasswordChangeProvider, adminProfilePasswordNewSecretType)
+	if err != nil || !validAdminProfilePassword(newSecret) {
+		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
+		return
+	}
+	if _, err := runtime.Service.VerifyPassword(ctx.Request.Context(), credentialauth.PasswordLoginInput{
+		Identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypeUsername, Value: principal.User.Username},
+		Secret:     currentSecret,
+	}); err != nil {
+		_ = s.recordAdminProfilePasswordAudit(ctx, principal.User.ID, "admin_profile.password.change", "failure", "current-password-rejected")
+		writeCredentialAuthLoginError(ctx, s.internalErrorSink, err)
+		return
+	}
+	if err := s.putAdminProfilePasswordCredential(ctx, runtime, record, newSecret, false); err != nil {
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthProviderResolveFailed, err)
+		return
+	}
+	if err := s.recordAdminProfilePasswordAudit(ctx, record.ID, "admin_profile.password.change", "success", "password-changed"); err != nil {
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
+		return
+	}
+	ctx.JSON(http.StatusOK, Response[adminProfilePasswordMutationResponse]{Data: adminProfilePasswordMutationResponse{
+		Credentials: s.adminProfileCredentialStatus(principal),
+		MustChange:  false,
+	}})
+}
+
+func (s *Server) adminProfilePasswordResetByID(ctx *gin.Context) {
+	principal, ok := s.authorizeAdminBearerSession(ctx, "admin:user:update")
+	if !ok {
+		return
+	}
+	runtime, ok := s.adminProfileCredentialAuthRuntime(ctx)
+	if !ok {
+		return
+	}
+	if !s.requireCredentialAuthSecureTransport(ctx) {
+		return
+	}
+	targetID := strings.TrimSpace(ctx.Param("id"))
+	if targetID == "" || targetID == "current" {
+		targetID = principal.User.ID
+	}
+	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationAdminProfilePassword, rateLimitClientIP(ctx), principal.User.Username, "reset", targetID) {
+		return
+	}
+	target, err := s.resources.InternalRecord(adminProfileUsersResource, targetID)
+	if err != nil {
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
+		return
+	}
+	var input adminProfilePasswordResetRequest
+	decoder := json.NewDecoder(ctx.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writePlatformError(ctx, errorcode.CodeRequestBodyInvalid)
+		return
+	}
+	newSecret, err := s.decryptAdminProfilePasswordSecret(ctx, input.NewSecret, adminProfilePasswordResetProvider, adminProfilePasswordNewSecretType)
+	if err != nil || !validAdminProfilePassword(newSecret) {
+		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
+		return
+	}
+	if err := s.putAdminProfilePasswordCredential(ctx, runtime, target, newSecret, true); err != nil {
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthProviderResolveFailed, err)
+		return
+	}
+	if err := s.recordAdminProfilePasswordAudit(ctx, target.ID, "admin_profile.password.reset", "success", "password-reset"); err != nil {
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
+		return
+	}
+	ctx.JSON(http.StatusOK, Response[adminProfilePasswordMutationResponse]{Data: adminProfilePasswordMutationResponse{
+		Credentials: s.adminProfileCredentialStatus(principal),
+		MustChange:  true,
+	}})
 }
 
 func (s *Server) updateAdminProfile(ctx *gin.Context, targetID string) {
@@ -150,6 +281,88 @@ func (s *Server) currentAdminProfileRecord(ctx *gin.Context) (rbac.Principal, ad
 		return rbac.Principal{}, adminresource.Record{}, false
 	}
 	return principal, record, true
+}
+
+func (s *Server) adminProfileCredentialAuthRuntime(ctx *gin.Context) (*CredentialAuthRuntime, bool) {
+	runtime := s.credentialAuth
+	if runtime == nil || runtime.Service == nil || runtime.SecretTransport == nil {
+		writePlatformError(ctx, errorcode.CodeAuthProviderNotConfigured)
+		return nil, false
+	}
+	return runtime, true
+}
+
+func (s *Server) decryptAdminProfilePasswordSecret(ctx *gin.Context, input credentialAuthSecretRequest, provider string, expectedSecretType string) (string, error) {
+	secretType := strings.TrimSpace(input.Type)
+	if secretType == "" {
+		secretType = expectedSecretType
+	}
+	if secretType != expectedSecretType {
+		return "", credentialauth.ErrInvalidSecret
+	}
+	if s.credentialAuth != nil && s.credentialAuth.RequireEncryptedSecrets {
+		if credentialAuthPlaintextSecretPresent(input) {
+			return "", credentialauth.ErrInvalidSecret
+		}
+		return s.decryptCredentialAuthSecret(ctx, input, provider, expectedSecretType, adminProfilePasswordSecretIdentifierType)
+	}
+	if strings.TrimSpace(input.Value) != "" {
+		return input.Value, nil
+	}
+	return s.decryptCredentialAuthSecret(ctx, input, provider, expectedSecretType, adminProfilePasswordSecretIdentifierType)
+}
+
+func validAdminProfilePassword(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if len([]rune(trimmed)) < 8 || len([]rune(trimmed)) > 128 {
+		return false
+	}
+	return strings.IndexFunc(trimmed, unicode.IsControl) < 0
+}
+
+func (s *Server) putAdminProfilePasswordCredential(ctx *gin.Context, runtime *CredentialAuthRuntime, user adminresource.Record, password string, mustChange bool) error {
+	principal := credentialauth.PrincipalRef{Type: credentialauth.PrincipalTypeAdmin, ID: strings.TrimSpace(user.ID)}
+	if _, err := runtime.Service.RegisterIdentifier(ctx.Request.Context(), credentialauth.RegisterIdentifierInput{
+		Principal:  principal,
+		Identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypeUsername, Value: user.Code},
+		Status:     credentialauth.StatusEnabled,
+	}); err != nil {
+		return err
+	}
+	params := runtime.PasswordHashParams
+	passwordHash, err := credentialauth.HashPasswordArgon2id(password, params)
+	if err != nil {
+		return err
+	}
+	paramsVersion := strings.TrimSpace(runtime.PasswordParamsVersion)
+	if paramsVersion == "" {
+		paramsVersion = adminProfilePasswordParamsVersionFallback
+	}
+	return runtime.Service.PutPasswordCredential(ctx.Request.Context(), credentialauth.PasswordCredential{
+		Principal:         principal,
+		PasswordHash:      passwordHash,
+		Algorithm:         credentialauth.PasswordAlgorithmArgon2id,
+		ParamsVersion:     paramsVersion,
+		PasswordUpdatedAt: credentialAuthRuntimeNow(runtime).UTC(),
+		MustChange:        mustChange,
+		Status:            credentialauth.StatusEnabled,
+	})
+}
+
+func (s *Server) recordAdminProfilePasswordAudit(ctx *gin.Context, targetID string, action string, result string, reasonCode string) error {
+	correlation := correlationFromGinContext(ctx)
+	_, err := s.resources.RecordAudit(requestAuditEvent(ctx.Request.Context(), adminresource.AuditEvent{
+		Actor:      s.auditActorID(ctx),
+		Action:     action,
+		Resource:   adminProfileUsersResource,
+		TargetID:   strings.TrimSpace(targetID),
+		Result:     result,
+		EventID:    internalErrorEventID(ctx),
+		ReasonCode: reasonCode,
+		RequestID:  correlation.RequestID,
+		TraceID:    correlation.TraceID,
+	}))
+	return err
 }
 
 func (s *Server) adminProfileWriteInput(record adminresource.Record, input adminProfileUpdateRequest) (adminresource.WriteInput, error) {
@@ -338,7 +551,7 @@ func maskedAdminProfileIdentifier(identifierType credentialauth.IdentifierType, 
 }
 
 func (s *Server) adminProfileCredentialStatus(_ rbac.Principal) adminProfileCredentialStatus {
-	if s.credentialAuth == nil {
+	if s.credentialAuth == nil || s.credentialAuth.Service == nil || s.credentialAuth.SecretTransport == nil {
 		return adminProfileCredentialStatus{
 			PasswordChange: "credential-auth-not-connected",
 			PasswordReset:  "credential-auth-not-connected",
@@ -346,8 +559,8 @@ func (s *Server) adminProfileCredentialStatus(_ rbac.Principal) adminProfileCred
 		}
 	}
 	return adminProfileCredentialStatus{
-		PasswordChange: "credential-auth-ready-route-pending",
-		PasswordReset:  "credential-auth-ready-route-pending",
-		Message:        "credential-auth is available, but profile password change/reset routes are not connected",
+		PasswordChange: adminProfileCredentialStatusReady,
+		PasswordReset:  adminProfileCredentialStatusReady,
+		Message:        "credential-auth profile password change/reset routes are available",
 	}
 }

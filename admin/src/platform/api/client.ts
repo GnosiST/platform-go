@@ -151,14 +151,40 @@ export type AuthLoginInput = {
     type: "username" | "phone" | "email";
     value: string;
   };
-  secret?: {
-    type: "password" | "sms-otp";
-    value?: string;
-    transactionId?: string;
-    code?: string;
-    encrypted?: CredentialSecretEnvelope;
+  secret?: AuthLoginSecretInput;
+  challenge?: {
+    id: string;
+    kind: string;
+    proof: string;
+    clientFingerprint?: string;
   };
 };
+
+export type AuthLoginSecretInput =
+  | {
+    type: "password";
+    value: string;
+  }
+  | {
+    type: "sms-otp";
+    transactionId: string;
+    code: string;
+  };
+
+type AuthLoginRequest = Omit<AuthLoginInput, "secret"> & {
+  secret?: AuthLoginRequestSecret;
+};
+
+type AuthLoginRequestSecret =
+  | {
+    type: "password";
+    encrypted: CredentialSecretEnvelope;
+  }
+  | {
+    type: "sms-otp";
+    transactionId: string;
+    encrypted: CredentialSecretEnvelope;
+  };
 
 export type CredentialSecretKey = {
   version: "pgo-auth-secret-v1";
@@ -199,6 +225,27 @@ export type CredentialSMSOTPStartResult = {
   debugCode?: string;
 };
 
+export type CredentialChallengeStartInput = {
+  kind?: "captcha" | "slider" | string;
+  purpose?: "login" | string;
+  clientFingerprint?: string;
+};
+
+export type CredentialChallengeStartResult = {
+  id: string;
+  kind: string;
+  purpose: string;
+  prompt: string;
+  parameters?: Record<string, string>;
+  expiresAt: string;
+  debugProof?: string;
+};
+
+export type CredentialEncryptedPasswordSecret = {
+  type: "password" | "current-password" | "new-password" | string;
+  encrypted: CredentialSecretEnvelope;
+};
+
 export type AuthLoginResult = {
   token: string;
   expiresAt: string;
@@ -220,8 +267,8 @@ export type AdminCurrentSession = {
 };
 
 export type AdminProfileCredentialStatus = {
-  passwordChange: "credential-auth-not-connected" | "credential-auth-ready-route-pending" | string;
-  passwordReset: "credential-auth-not-connected" | "credential-auth-ready-route-pending" | string;
+  passwordChange: "credential-auth-not-connected" | "credential-auth-ready" | string;
+  passwordReset: "credential-auth-not-connected" | "credential-auth-ready" | string;
   message: string;
 };
 
@@ -253,6 +300,23 @@ export type AdminProfileUpdateInput = {
   phone?: string;
   email?: string;
   address?: string;
+};
+
+export type AdminCurrentPasswordChangeInput = {
+  currentPassword: string;
+  newPassword: string;
+};
+
+export type AdminProfilePasswordResetInput = {
+  newPassword: string;
+};
+
+export type AdminPasswordMutationResult = {
+  profile?: AdminProfile;
+  changed?: boolean;
+  reset?: boolean;
+  credentials?: AdminProfileCredentialStatus;
+  mustChange?: boolean;
 };
 
 export type AdminMenuItem = {
@@ -664,6 +728,18 @@ export type MessageCenterTestSendResult = {
   };
 };
 
+export type MessageCenterDeliveriesRunInput = {
+  limit?: number;
+};
+
+export type MessageCenterDeliveriesRunResult = {
+  scanned: number;
+  attempted: number;
+  delivered: number;
+  failed: number;
+  skipped: number;
+};
+
 type PlatformResponseMode = "data" | "raw" | "blob";
 type PlatformRequestInit = RequestInit & {
   auth?: "stored-token" | "none";
@@ -817,6 +893,14 @@ export function startCredentialSMSOTP(input: CredentialSMSOTPStartInput) {
   });
 }
 
+export function startCredentialChallenge(input: CredentialChallengeStartInput = {}) {
+  return request<CredentialChallengeStartResult>("/auth/challenges", {
+    auth: "none",
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export async function loginWithAuthProvider(input: AuthLoginInput) {
   const body = await withEncryptedCredentialSecret(input);
   const result = await request<AuthLoginResult>("/auth/login", {
@@ -861,8 +945,32 @@ export function updateCurrentAdminProfile(input: AdminProfileUpdateInput) {
   });
 }
 
+export async function changeCurrentAdminPassword(input: AdminCurrentPasswordChangeInput) {
+  const currentSecret = await encryptedPasswordSecret("profile-password-change", "current-password", "admin-profile", input.currentPassword);
+  const newSecret = await encryptedPasswordSecret("profile-password-change", "new-password", "admin-profile", input.newPassword);
+  return request<AdminPasswordMutationResult>("/admin/profile/current/password/change", {
+    method: "POST",
+    body: JSON.stringify({ currentSecret, newSecret } satisfies AdminCurrentPasswordChangeRequest),
+  });
+}
+
+export async function resetAdminProfilePassword(id: string, input: AdminProfilePasswordResetInput) {
+  const newSecret = await encryptedPasswordSecret("profile-password-reset", "new-password", "admin-profile", input.newPassword);
+  return request<AdminPasswordMutationResult>(`/admin/profile/${encodeURIComponent(id)}/password/reset`, {
+    method: "POST",
+    body: JSON.stringify({ newSecret } satisfies AdminProfilePasswordResetRequest),
+  });
+}
+
 export function testSendMessageCenter(input: MessageCenterTestSendInput) {
   return request<MessageCenterTestSendResult>("/admin/message-center/test-send", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function runMessageCenterDeliveries(input: MessageCenterDeliveriesRunInput = {}) {
+  return request<MessageCenterDeliveriesRunResult>("/admin/message-center/deliveries/run", {
     method: "POST",
     body: JSON.stringify(input),
   });
@@ -1075,12 +1183,23 @@ export async function getAdminFileBlob(id: string) {
   return parsePlatformResponse<Blob>(response, requestToken, "blob");
 }
 
-async function withEncryptedCredentialSecret(input: AuthLoginInput): Promise<AuthLoginInput> {
-  if (!input.secret || !input.identifier) return input;
+type AdminCurrentPasswordChangeRequest = {
+  currentSecret: CredentialEncryptedPasswordSecret;
+  newSecret: CredentialEncryptedPasswordSecret;
+};
+
+type AdminProfilePasswordResetRequest = {
+  newSecret: CredentialEncryptedPasswordSecret;
+};
+
+async function withEncryptedCredentialSecret(input: AuthLoginInput): Promise<AuthLoginRequest> {
+  if (!input.secret) return { ...input, secret: undefined };
+  if (!input.identifier) {
+    throw new Error("Credential identifier is required before secret encryption.");
+  }
   const secret = input.secret;
   const identifierType = input.identifier.type;
   if (secret.type === "password") {
-    if (!secret.value) return input;
     const encrypted = await encryptCredentialSecret(input.provider, "password", identifierType, secret.value);
     return {
       ...input,
@@ -1088,20 +1207,31 @@ async function withEncryptedCredentialSecret(input: AuthLoginInput): Promise<Aut
     };
   }
   if (secret.type === "sms-otp") {
-    if (!secret.code) return input;
     const encrypted = await encryptCredentialSecret(input.provider, "sms-otp", identifierType, secret.code);
     return {
       ...input,
       secret: { type: "sms-otp", transactionId: secret.transactionId, encrypted },
     };
   }
-  return input;
+  throw new Error("Unsupported credential secret type.");
+}
+
+async function encryptedPasswordSecret(
+  provider: string,
+  secretType: "password" | "current-password" | "new-password",
+  identifierType: "username" | "phone" | "email" | "admin-profile",
+  value: string,
+): Promise<CredentialEncryptedPasswordSecret> {
+  return {
+    type: secretType,
+    encrypted: await encryptCredentialSecret(provider, secretType, identifierType, value),
+  };
 }
 
 async function encryptCredentialSecret(
   provider: string,
-  secretType: "password" | "sms-otp",
-  identifierType: "username" | "phone" | "email",
+  secretType: "password" | "sms-otp" | "current-password" | "new-password",
+  identifierType: "username" | "phone" | "email" | "admin-profile",
   value: string,
 ): Promise<CredentialSecretEnvelope> {
   if (!globalThis.crypto?.subtle) {

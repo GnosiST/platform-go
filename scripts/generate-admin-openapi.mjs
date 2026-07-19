@@ -930,6 +930,15 @@ function schemas() {
         encrypted: { $ref: "#/components/schemas/AdminCredentialAuthSecretEnvelope" },
       },
     },
+    AdminCredentialProfilePasswordSecret: {
+      type: "object",
+      required: ["type", "encrypted"],
+      additionalProperties: false,
+      properties: {
+        type: { type: "string", enum: ["current-password", "new-password"] },
+        encrypted: { $ref: "#/components/schemas/AdminCredentialAuthSecretEnvelope" },
+      },
+    },
     AdminCredentialAuthSecretEnvelope: {
       type: "object",
       required: ["version", "algorithm", "keyId", "clientPublicKey", "salt", "nonce", "ciphertext"],
@@ -965,6 +974,42 @@ function schemas() {
         proof: { type: "string", writeOnly: true },
       },
     },
+    AdminCredentialAuthChallengeStartRequest: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        kind: { type: "string", enum: ["captcha", "slider"] },
+        purpose: { type: "string", enum: ["login"] },
+        clientFingerprint: {
+          type: "string",
+          writeOnly: true,
+          description: "Optional client-side risk fingerprint; only a digest may be persisted by credential-auth.",
+        },
+      },
+    },
+    AdminCredentialAuthChallengeStartData: {
+      type: "object",
+      required: ["id", "kind", "purpose", "prompt", "expiresAt"],
+      additionalProperties: false,
+      properties: {
+        id: { type: "string", minLength: 1 },
+        kind: { type: "string", enum: ["captcha", "slider"] },
+        purpose: { type: "string", enum: ["login"] },
+        prompt: { type: "string" },
+        parameters: {
+          type: "object",
+          additionalProperties: { type: "string" },
+        },
+        expiresAt: { type: "string", format: "date-time" },
+        debugProof: {
+          type: "string",
+          writeOnly: true,
+          description: "Development/test only proof returned when credential-auth debug mode is enabled.",
+          "x-platform-development-only": true,
+          "x-platform-sensitivity": "secret",
+        },
+      },
+    },
     AdminCredentialSMSOTPStartRequest: {
       type: "object",
       required: ["provider", "identifier"],
@@ -989,6 +1034,44 @@ function schemas() {
           "x-platform-sensitivity": "secret",
         },
       },
+    },
+    AdminCredentialPasswordChangeRequest: {
+      type: "object",
+      required: ["currentSecret", "newSecret"],
+      additionalProperties: false,
+      properties: {
+        currentSecret: { $ref: "#/components/schemas/AdminCredentialProfilePasswordSecret" },
+        newSecret: { $ref: "#/components/schemas/AdminCredentialProfilePasswordSecret" },
+      },
+      "x-platform-secret-transport": "ECDH-P256-HKDF-SHA256+A256GCM",
+    },
+    AdminCredentialPasswordResetRequest: {
+      type: "object",
+      required: ["newSecret"],
+      additionalProperties: false,
+      properties: {
+        newSecret: { $ref: "#/components/schemas/AdminCredentialProfilePasswordSecret" },
+      },
+      "x-platform-secret-transport": "ECDH-P256-HKDF-SHA256+A256GCM",
+    },
+    AdminCredentialPasswordMutationData: {
+      type: "object",
+      required: ["credentials", "mustChange"],
+      additionalProperties: false,
+      properties: {
+        credentials: {
+          type: "object",
+          required: ["passwordChange", "passwordReset", "message"],
+          additionalProperties: false,
+          properties: {
+            passwordChange: { type: "string" },
+            passwordReset: { type: "string" },
+            message: { type: "string" },
+          },
+        },
+        mustChange: { type: "boolean" },
+      },
+      "x-platform-secret-projection": "no password, verifier, reset token or encrypted secret material is returned",
     },
     AdminAuthLoginRequest: {
       type: "object",
@@ -1372,6 +1455,27 @@ function schemas() {
         receipt: { $ref: "#/components/schemas/AdminMessageCenterSMSReceipt" },
       },
     },
+    AdminMessageCenterDeliveriesRunRequest: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+      },
+      "x-platform-runtime": "notification-delivery-worker-v1",
+    },
+    AdminMessageCenterDeliveriesRunData: {
+      type: "object",
+      required: ["scanned", "attempted", "delivered", "failed", "skipped"],
+      additionalProperties: false,
+      properties: {
+        scanned: { type: "integer", minimum: 0 },
+        attempted: { type: "integer", minimum: 0 },
+        delivered: { type: "integer", minimum: 0 },
+        failed: { type: "integer", minimum: 0 },
+        skipped: { type: "integer", minimum: 0 },
+      },
+      "x-platform-secret-projection": "worker result exposes aggregate counts only; delivery records retain redacted target metadata",
+    },
     PluginManagementLockStatus: {
       type: "object",
       required: ["configured", "exists", "valid"],
@@ -1602,6 +1706,34 @@ paths["/api/auth/login"] = {
   },
 };
 
+paths["/api/auth/challenges"] = {
+  post: {
+    tags: ["auth"],
+    operationId: "startAdminCredentialChallenge",
+    summary: "Start an Admin credential-auth login challenge",
+    description:
+      "Credential-auth v1 runtime. Creates a digest-only CAPTCHA or slider challenge transaction for login; Admin login currently closes the CAPTCHA flow, while slider presentation and risk strategy can continue to evolve without changing the secret transport contract.",
+    security: [],
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: { $ref: "#/components/schemas/AdminCredentialAuthChallengeStartRequest" },
+        },
+      },
+    },
+    responses: {
+      "201": successResponse(
+        "Admin credential-auth challenge",
+        apiResponse({ $ref: "#/components/schemas/AdminCredentialAuthChallengeStartData" }),
+      ),
+      ...publicAuthErrorResponses(),
+    },
+    "x-platform-capability": "credential-auth",
+    "x-platform-runtime-status": "deliverable-v1",
+  },
+};
+
 paths["/api/auth/sms-otp/start"] = {
   post: {
     tags: ["auth"],
@@ -1627,6 +1759,65 @@ paths["/api/auth/sms-otp/start"] = {
     },
     "x-platform-capability": "credential-auth",
     "x-platform-runtime-status": "persistent-runtime-p0",
+  },
+};
+
+paths["/api/admin/profile/current/password/change"] = {
+  post: {
+    tags: ["profile"],
+    operationId: "changeCurrentAdminPassword",
+    summary: "Change the current Admin credential-auth password",
+    description:
+      "Credential-auth v1 contract for current-user password change. Current and new secrets use the same ECDH P-256, HKDF-SHA256 and AES-256-GCM/A256GCM encrypted secret envelope as login.",
+    security: [{ bearerAuth: [] }],
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: { $ref: "#/components/schemas/AdminCredentialPasswordChangeRequest" },
+        },
+      },
+    },
+    responses: {
+      "200": successResponse(
+        "Admin password change",
+        apiResponse({ $ref: "#/components/schemas/AdminCredentialPasswordMutationData" }),
+      ),
+      ...errorResponses(),
+    },
+    "x-platform-capability": "credential-auth",
+    "x-platform-permission": "admin:profile:update",
+    "x-platform-secret-transport": "ECDH-P256-HKDF-SHA256+A256GCM",
+  },
+};
+
+paths["/api/admin/profile/{id}/password/reset"] = {
+  post: {
+    tags: ["profile"],
+    operationId: "resetAdminProfilePassword",
+    summary: "Reset one Admin credential-auth password",
+    description:
+      "Credential-auth v1 privileged password reset contract. The new password secret uses the same application-layer encrypted secret envelope; no reset token, raw password or verifier material is returned.",
+    security: [{ bearerAuth: [] }],
+    parameters: [pathParameter("id")],
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: { $ref: "#/components/schemas/AdminCredentialPasswordResetRequest" },
+        },
+      },
+    },
+    responses: {
+      "200": successResponse(
+        "Admin password reset",
+        apiResponse({ $ref: "#/components/schemas/AdminCredentialPasswordMutationData" }),
+      ),
+      ...errorResponses(),
+    },
+    "x-platform-capability": "credential-auth",
+    "x-platform-permission": "admin:user:update",
+    "x-platform-secret-transport": "ECDH-P256-HKDF-SHA256+A256GCM",
   },
 };
 
@@ -1730,6 +1921,35 @@ paths["/api/admin/message-center/test-send"] = {
     "x-platform-permission": "admin:message-center:update",
     "x-platform-runtime": "notification-sms-test-send-p0",
     "x-platform-secret-handling": "request recipient and template parameter values are write-only; records and receipts expose redacted target metadata only",
+  },
+};
+
+paths["/api/admin/message-center/deliveries/run"] = {
+  post: {
+    tags: ["message-center"],
+    operationId: "runMessageCenterDeliveries",
+    summary: "Run the message-center delivery worker",
+    description:
+      "Manual v1 run endpoint for the notification delivery worker contract. It validates SMS provider configuration, uses Aliyun/Tencent live SMS SDK adapters when live sending is enabled, and still supports dry-run/config validation receipts. SMTP/WeChat supplier integration is not claimed until separate adapter evidence exists.",
+    security: [{ bearerAuth: [] }],
+    requestBody: {
+      required: true,
+      content: { "application/json": { schema: { $ref: "#/components/schemas/AdminMessageCenterDeliveriesRunRequest" } } },
+    },
+    responses: {
+      "200": successResponse(
+        "Message center delivery worker run",
+        apiResponse({ $ref: "#/components/schemas/AdminMessageCenterDeliveriesRunData" }),
+      ),
+      ...errorResponses(),
+      "503": {
+        ...platformErrorResponse("Message center delivery runtime is unavailable"),
+        "x-platform-error-codes": ["ADMIN_MESSAGE_CENTER_UNAVAILABLE"],
+      },
+    },
+    "x-platform-permission": "admin:message-center:update",
+    "x-platform-runtime": "notification-delivery-worker-v1",
+    "x-platform-provider-truth": "Aliyun/Tencent live SMS SDK adapters plus dry-run/config validation; SMTP/WeChat supplier integration not claimed",
   },
 };
 

@@ -49,7 +49,7 @@ describe("validate-platform-credential-auth-v1", () => {
     ]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /runtimeBoundary\.status must be persistent-runtime-p0/);
+    assert.match(result.stderr, /runtimeBoundary\.status must be deliverable-v1/);
     assert.match(result.stderr, /runtimeBoundary\.defaultRuntimeMutation must stay forbidden/);
     assert.match(result.stderr, /existing password provider guard must remain active/);
     assert.match(result.stderr, /runtimeBoundary\.productionComplete must stay false/);
@@ -75,6 +75,10 @@ describe("validate-platform-credential-auth-v1", () => {
     contract.providerModes = contract.providerModes.filter((item) => item.id !== "phone-sms-otp");
     contract.challengeContract.modes = ["off"];
     contract.notificationSmsBoundary.productionMockProviderAllowed = true;
+    contract.notificationSmsBoundary.adapterContract = "SMTP live supplier integration is claimed";
+    contract.messageCenterContract.runtimeEndpoints = ["POST /api/admin/message-center/test-send"];
+    contract.messageCenterContract.deliveryWorker.providerRuntimeTruth = "SMTP live supplier integration is claimed";
+    contract.apiContract.implementedNow = contract.apiContract.implementedNow.filter((item) => !item.includes("POST /api/auth/challenges"));
     contract.apiContract.endpoints = contract.apiContract.endpoints.filter((item) => item.path !== "/api/auth/sms-otp/start");
 
     const result = runValidator(["--contract", tempFile("platform-credential-auth-v1-", "contract.json", contract)]);
@@ -83,7 +87,34 @@ describe("validate-platform-credential-auth-v1", () => {
     assert.match(result.stderr, /providerModes must include phone-sms-otp/);
     assert.match(result.stderr, /challengeContract\.modes must include after-failure/);
     assert.match(result.stderr, /notificationSmsBoundary\.productionMockProviderAllowed must stay false/);
+    assert.match(result.stderr, /notificationSmsBoundary\.adapterContract must describe official SDK live adapters plus dry-run\/config validation/);
+    assert.match(result.stderr, /messageCenterContract\.runtimeEndpoints must include POST \/api\/admin\/message-center\/deliveries\/run/);
+    assert.match(result.stderr, /messageCenterContract\.deliveryWorker\.providerRuntimeTruth must describe Aliyun\/Tencent live SMS SDK adapters plus dry-run\/config validation/);
+    assert.match(result.stderr, /apiContract\.implementedNow must include POST \/api\/auth\/challenges creates digest-only CAPTCHA\/slider challenge transactions for login/);
     assert.match(result.stderr, /apiContract\.endpoints must include POST \/api\/auth\/sms-otp\/start/);
+  });
+
+  it("rejects missing OpenAPI coverage for credential auth and message-center v1 endpoints", () => {
+    const openapi = readJSON("resources/generated/openapi.admin.json");
+    delete openapi.paths["/api/auth/challenges"];
+    delete openapi.paths["/api/admin/profile/current/password/change"];
+    delete openapi.paths["/api/admin/profile/{id}/password/reset"];
+    openapi.paths["/api/admin/message-center/deliveries/run"] = {
+      post: {
+        operationId: "runMessageCenterDeliveries",
+        description: "SMTP live supplier integration is claimed",
+        "x-platform-runtime": "wrong",
+      },
+    };
+
+    const result = runValidator(["--openapi-admin", tempFile("platform-credential-auth-v1-openapi-", "openapi.admin.json", openapi)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /resources\/generated\/openapi\.admin\.json must include POST \/api\/auth\/challenges/);
+    assert.match(result.stderr, /resources\/generated\/openapi\.admin\.json must include POST \/api\/admin\/profile\/current\/password\/change/);
+    assert.match(result.stderr, /resources\/generated\/openapi\.admin\.json must include POST \/api\/admin\/profile\/\{id\}\/password\/reset/);
+    assert.match(result.stderr, /OpenAPI message-center deliveries run must use notification-delivery-worker-v1 runtime marker/);
+    assert.match(result.stderr, /OpenAPI message-center deliveries run must describe Aliyun\/Tencent live SMS SDK adapters plus dry-run\/config validation/);
   });
 
   it("rejects HTTPS-only or plaintext-compatible credential secret transport drift", () => {

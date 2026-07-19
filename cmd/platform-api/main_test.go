@@ -123,19 +123,22 @@ func TestNotificationSMSSenderFromConfigCreatesVendorDryRunSender(t *testing.T) 
 	}
 }
 
-func TestNotificationSMSSenderFromConfigFailsClosedForLiveSendWithoutImplementation(t *testing.T) {
+func TestNotificationSMSSenderFromConfigCreatesVendorLiveSenderWhenEnabled(t *testing.T) {
 	t.Setenv(notification.EnvNotificationSMSLiveSendEnabled, "true")
 	t.Setenv(notification.EnvNotificationSMSAliyunRegion, "cn-hangzhou")
 	t.Setenv(notification.EnvNotificationSMSAliyunAccessKeyID, "test-access-key")
 	t.Setenv(notification.EnvNotificationSMSAliyunSecretKey, "test-secret-key")
 	t.Setenv(notification.EnvNotificationSMSSignName, "Platform")
 
-	_, err := notificationSMSSenderFromConfig(config.Config{
+	sender, err := notificationSMSSenderFromConfig(config.Config{
 		RuntimeEnvironment:      config.RuntimeEnvironmentProduction,
 		NotificationSMSProvider: notification.SMSProviderAliyun,
 	})
-	if err == nil || !strings.Contains(err.Error(), "live sending is not implemented") {
-		t.Fatalf("notificationSMSSenderFromConfig() error = %v, want live-send implementation failure", err)
+	if err != nil {
+		t.Fatalf("notificationSMSSenderFromConfig() error = %v", err)
+	}
+	if sender == nil || sender.Kind() != notification.SMSProviderAliyun {
+		t.Fatalf("notificationSMSSenderFromConfig() = %T/%v, want aliyun live sender", sender, sender)
 	}
 }
 

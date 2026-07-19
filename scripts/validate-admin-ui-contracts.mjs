@@ -171,6 +171,17 @@ requireIncludes(files.login, "adminProviders.filter((provider) => provider.enabl
 requireIncludes(files.login, 'className="login-provider-tabs"', "Admin login providers must render as tabs instead of disabled option cards.");
 requireNotIncludes(files.login, "dictionary.notConfigured", "Admin login must not show unconfigured providers in the login selector.");
 requireNotIncludes(files.login, "disabled={!provider.configured || loading || submitting}", "Admin login must not render unconfigured providers as disabled selector options.");
+requireIncludes(files.client, "type AuthLoginRequest = Omit<AuthLoginInput, \"secret\">", "Credential login requests must separate form input from encrypted transport payloads.");
+requireIncludes(files.client, "const body = await withEncryptedCredentialSecret(input);", "Credential login must encrypt secrets before request serialization.");
+requireIncludes(files.client, 'secret: { type: "password", encrypted }', "Credential password login must submit only the encrypted password envelope.");
+requireIncludes(files.client, 'secret: { type: "sms-otp", transactionId: secret.transactionId, encrypted }', "Credential SMS login must submit only the encrypted OTP envelope.");
+requireIncludes(files.client, "satisfies AdminCurrentPasswordChangeRequest", "Current-user password changes must serialize encrypted secret envelopes.");
+requireIncludes(files.client, "satisfies AdminProfilePasswordResetRequest", "Admin password resets must serialize encrypted secret envelopes.");
+requireRegex(
+  files.client,
+  /export async function loginWithAuthProvider\(input: AuthLoginInput\)[\s\S]*?const body = await withEncryptedCredentialSecret\(input\);[\s\S]*?body: JSON\.stringify\(body\)/,
+  "Credential login must not serialize raw form input directly.",
+);
 requireIncludes(files.oidcPolicy, "assertAdminAuthProvider(provider);", "OIDC start must reject providers without the Admin audience.");
 requireIncludes(files.client, "export function startAdminAuthProvider", "The Admin client must expose provider-start support.");
 requireRegex(
@@ -538,6 +549,10 @@ requireIncludes(files.messageCenter, "messageCenterClosedLoopSteps(resourceConfi
 requireIncludes(files.messageCenter, "dictionary.messageCenterDryRun", "Message center must expose a dry-run entry state.");
 requireIncludes(files.messageCenter, "dictionary.messageCenterTrialReadyTitle", "Message center must explain that SMS test send is connected to the runtime endpoint.");
 requireIncludes(files.messageCenter, "workflowStepIcon", "Message center closed-loop cards must distinguish channel, provider, template, policy, notification, and delivery steps.");
+requireIncludes(files.messageCenter, "dictionary.messageCenterChannelRuntimeReady", "Message center channel cards must distinguish runtime-ready channels from configuration slots.");
+requireIncludes(files.messageCenter, "dictionary.messageCenterChannelConfiguredOnly", "Message center channel cards must distinguish configured-only channels from runtime-ready channels.");
+requireIncludes(files.messageCenter, "dictionary.messageCenterChannelConfigSlot", "Message center channel cards must expose future channel configuration slots without claiming runtime readiness.");
+requireNotIncludes(files.messageCenter, "card.ready ? dictionary.configured : dictionary.notConfigured", "Message center channel cards must not collapse runtime readiness into a generic configured tag.");
 for (const key of [
   "settingsCenterTitle",
   "settingsCenterDescription",
@@ -570,6 +585,9 @@ for (const key of [
   "messageCenterResourceMissing",
   "messageCenterRecordCount",
   "messageCenterProvidersDescription",
+  "messageCenterChannelRuntimeReady",
+  "messageCenterChannelConfiguredOnly",
+  "messageCenterChannelConfigSlot",
   "messageCenterChannelSMSDescription",
   "messageCenterChannelEmailDescription",
   "messageCenterChannelWechatOfficialDescription",

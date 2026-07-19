@@ -7,6 +7,7 @@ import {
   FilePdfOutlined,
   FileTextOutlined,
   FileUnknownOutlined,
+  KeyOutlined,
   MoreOutlined,
   PlusOutlined,
   UploadOutlined,
@@ -19,6 +20,7 @@ import {
   executeAdminResourceAction,
   getAdminFileBlob,
   getAdminResourceSchema,
+  resetAdminProfilePassword,
   startAdminSensitiveRevealOIDC,
   uploadAdminFile,
   type AdminResourceAction,
@@ -99,6 +101,10 @@ type SensitiveRevealTarget = {
   recordId: string;
   field: AdminResourceField;
 };
+type PasswordResetFormValues = {
+  newPassword: string;
+  confirmPassword: string;
+};
 type ConfirmModal = ReturnType<typeof App.useApp>["modal"]["confirm"];
 
 const FOCUSABLE_RESOURCE_FORM_CONTROL_SELECTOR = [
@@ -138,11 +144,14 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
   const [detailRecordID, setDetailRecordID] = useState("");
   const [detachedDetailRecord, setDetachedDetailRecord] = useState<AdminResourceRecord | null>(null);
   const [sensitiveRevealTarget, setSensitiveRevealTarget] = useState<SensitiveRevealTarget | null>(null);
+  const [passwordResetRecord, setPasswordResetRecord] = useState<AdminResourceRecord | null>(null);
+  const [passwordResetting, setPasswordResetting] = useState(false);
   const [issuedToken, setIssuedToken] = useState("");
   const [togglingRecordID, setTogglingRecordID] = useState("");
   const [actionExecutingKey, setActionExecutingKey] = useState("");
   const [form] = Form.useForm<ResourceFormValues>();
-  const { modal } = App.useApp();
+  const [passwordResetForm] = Form.useForm<PasswordResetFormValues>();
+  const { message, modal } = App.useApp();
   const watchedFormValues = Form.useWatch([], form) as ResourceFormValues | undefined;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const oidcResumeOpeningRef = useRef("");
@@ -200,6 +209,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
   const canUpdate = useMemo(() => permissionAllows(permissions, schema.permissions.update, deniedPermissions), [deniedPermissions, permissions, schema.permissions.update]);
   const canDelete = useMemo(() => permissionAllows(permissions, schema.permissions.delete, deniedPermissions), [deniedPermissions, permissions, schema.permissions.delete]);
   const effectiveCanDelete = canDelete && experience.allowDelete;
+  const canResetUserPassword = resourceKey === "users" && canUpdate;
   const filterFields = useMemo(() => resourceFilterFields(schema.fields, language, dictionary), [dictionary, language, schema.fields]);
   const customRowActions = useMemo(
     () => (schema.actions ?? []).filter((action) => action.kind === "row" && permissionAllows(permissions, action.permission, deniedPermissions)),
@@ -408,6 +418,20 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
     setModalOpen(false);
   };
 
+  const openPasswordReset = (record: AdminResourceRecord) => {
+    passwordResetForm.resetFields();
+    setPasswordResetRecord(record);
+    setError("");
+  };
+
+  const closePasswordReset = () => {
+    if (passwordResetting) {
+      return;
+    }
+    setPasswordResetRecord(null);
+    passwordResetForm.resetFields();
+  };
+
   const openDetail = (record: AdminResourceRecord) => {
     setDetachedDetailRecord(null);
     setSelectedID(record.id);
@@ -556,6 +580,31 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
       setError("");
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : dictionary.loadResourceFailed);
+    }
+  };
+
+  const submitPasswordReset = async () => {
+    if (!passwordResetRecord) {
+      return;
+    }
+    let values: PasswordResetFormValues;
+    try {
+      values = await passwordResetForm.validateFields();
+    } catch {
+      return;
+    }
+    setPasswordResetting(true);
+    try {
+      await resetAdminProfilePassword(passwordResetRecord.id, { newPassword: values.newPassword });
+      await refreshResource();
+      setPasswordResetRecord(null);
+      passwordResetForm.resetFields();
+      setError("");
+      message.success(dictionary.userPasswordResetSuccess);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : dictionary.userPasswordResetFailed);
+    } finally {
+      setPasswordResetting(false);
     }
   };
 
@@ -788,6 +837,19 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
           }}
         />
       ) : null}
+      {canResetUserPassword ? (
+        <AdminActionButton
+          icon={<KeyOutlined />}
+          label={dictionary.resetPassword}
+          loading={passwordResetting && passwordResetRecord?.id === record.id}
+          size="small"
+          type="text"
+          onClick={(event) => {
+            event.stopPropagation();
+            openPasswordReset(record);
+          }}
+        />
+      ) : null}
       {effectiveCanDelete ? (
         <Popconfirm title={dictionary.deleteConfirm} okText={dictionary.deleteRecord} cancelText={dictionary.cancel} onConfirm={() => removeRecord(record)}>
           <AdminActionButton
@@ -889,7 +951,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
           filterValues={filters}
           rowActions={renderResourceRowActions}
           rowActionsColumnTitle={dictionary.actions}
-          rowActionsColumnWidth={isFileResource ? 196 : 164}
+          rowActionsColumnWidth={isFileResource ? 196 : canResetUserPassword ? 220 : 164}
           actions={
             canCreate ? (
               isFileResource ? (
@@ -1071,6 +1133,54 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
           onFinish={submitForm}
         />
       </AdminFormModal>
+      <AdminModal
+        open={Boolean(passwordResetRecord)}
+        preset="form"
+        size="md"
+        title={dictionary.userPasswordResetTitle}
+        okText={dictionary.resetPassword}
+        cancelText={dictionary.cancel}
+        confirmLoading={passwordResetting}
+        onCancel={closePasswordReset}
+        onOk={() => void submitPasswordReset()}
+      >
+        <Typography.Paragraph type="secondary">
+          {formatTemplate(dictionary.userPasswordResetDescription, {
+            user: passwordResetRecord ? recordDisplayName(passwordResetRecord, language) : "",
+          })}
+        </Typography.Paragraph>
+        <Form form={passwordResetForm} layout="vertical" requiredMark={false}>
+          <Form.Item
+            label={dictionary.newPassword}
+            name="newPassword"
+            rules={[
+              { required: true, message: dictionary.newPasswordRequired },
+              { min: 8, message: formatTemplate(dictionary.validationMinLength, { label: dictionary.newPassword, min: "8" }) },
+            ]}
+          >
+            <Input.Password autoComplete="new-password" placeholder={dictionary.newPasswordPlaceholder} />
+          </Form.Item>
+          <Form.Item
+            dependencies={["newPassword"]}
+            label={dictionary.confirmPassword}
+            name="confirmPassword"
+            rules={[
+              { required: true, message: dictionary.confirmPasswordRequired },
+              ({ getFieldValue }) => ({
+                validator: async (_rule, value) => {
+                  if (!value || getFieldValue("newPassword") === value) {
+                    return;
+                  }
+                  throw new Error(dictionary.passwordConfirmMismatch);
+                },
+              }),
+            ]}
+          >
+            <Input.Password autoComplete="new-password" placeholder={dictionary.confirmPasswordPlaceholder} />
+          </Form.Item>
+        </Form>
+        <AdminFeedback type="info" message={dictionary.userPasswordResetMustChange} description={dictionary.passwordEncryptedSecretHint} />
+      </AdminModal>
       <AdminModal
         className="one-time-secret-modal"
         title={dictionary.oneTimeSecretTitle}
@@ -2880,6 +2990,10 @@ function defaultFormGroupForField(key: string) {
 }
 
 function fileRecordName(record: AdminResourceRecord, language: Language = "zh") {
+  return localizedRecordValue(record, "name", language) || record.name || record.code || record.id;
+}
+
+function recordDisplayName(record: AdminResourceRecord, language: Language) {
   return localizedRecordValue(record, "name", language) || record.name || record.code || record.id;
 }
 

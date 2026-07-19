@@ -136,6 +136,8 @@ describe("validate-platform-capability-contracts", () => {
     assert.deepEqual(providersByChannel.get("email"), ["smtp"]);
     assert.deepEqual(providersByChannel.get("wechat_official"), ["wechat-official"]);
     assert.deepEqual(providersByChannel.get("wechat_miniapp"), ["wechat-miniapp"]);
+    assert.match(notification.productization.runtimeBoundary, /official SDK-backed Aliyun\/Tencent Cloud live SMS adapters/);
+    assert.match(notification.productization.runtimeBoundary, /SMTP and WeChat send adapters remain follow-up/);
   });
 
   it("rejects notification productization that regresses to SMS-only or drops common provider configuration", () => {

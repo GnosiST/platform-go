@@ -13,11 +13,16 @@ import (
 const (
 	identifierHashPrefix      = "v1:hmac-sha256:identifier:"
 	smsOTPHashPrefix          = "v1:hmac-sha256:sms-otp:"
+	challengeProofHashPrefix  = "v1:hmac-sha256:challenge-proof:"
 	identifierHashKeyMinBytes = 32
 )
 
 type IdentifierHasher interface {
 	HashIdentifier(IdentifierType, string) (string, error)
+}
+
+type ChallengeProofHasher interface {
+	HashChallengeProof(ChallengeKind, ChallengePurpose, string, string) (string, error)
 }
 
 type HMACIdentifierHasher struct {
@@ -68,6 +73,30 @@ func (h *HMACIdentifierHasher) HashSMSOTP(phoneHash string, challengeID string, 
 	_, _ = fmt.Fprintf(mac, "\x00%d:", len(code))
 	_, _ = mac.Write([]byte(code))
 	return smsOTPHashPrefix + keyID + ":" + hex.EncodeToString(mac.Sum(nil)), nil
+}
+
+func (h *HMACIdentifierHasher) HashChallengeProof(kind ChallengeKind, purpose ChallengePurpose, challengeID string, proof string) (string, error) {
+	if h == nil || len(h.key) < identifierHashKeyMinBytes {
+		return "", fmt.Errorf("%w: challenge proof hasher is not configured", ErrInvalidInput)
+	}
+	kind = ChallengeKind(strings.TrimSpace(string(kind)))
+	purpose = ChallengePurpose(strings.TrimSpace(string(purpose)))
+	challengeID = strings.TrimSpace(challengeID)
+	proof = strings.TrimSpace(proof)
+	if !validChallengeKind(kind) || !validChallengePurpose(purpose) || challengeID == "" || proof == "" || !utf8.ValidString(proof) || strings.IndexFunc(proof, unicode.IsControl) >= 0 {
+		return "", fmt.Errorf("%w: challenge proof hash input is invalid", ErrInvalidInput)
+	}
+	keyID := sha256Hex("platform-credential-auth-challenge-proof-key-id\x00v1\x00", h.key)
+	mac := hmac.New(sha256.New, h.key)
+	_, _ = mac.Write([]byte("platform-credential-auth-challenge-proof\x00v1\x00"))
+	_, _ = mac.Write([]byte(kind))
+	_, _ = fmt.Fprintf(mac, "\x00%d:", len(purpose))
+	_, _ = mac.Write([]byte(purpose))
+	_, _ = fmt.Fprintf(mac, "\x00%d:", len(challengeID))
+	_, _ = mac.Write([]byte(challengeID))
+	_, _ = fmt.Fprintf(mac, "\x00%d:", len(proof))
+	_, _ = mac.Write([]byte(proof))
+	return challengeProofHashPrefix + keyID + ":" + hex.EncodeToString(mac.Sum(nil)), nil
 }
 
 func sha256Hex(domain string, key []byte) string {

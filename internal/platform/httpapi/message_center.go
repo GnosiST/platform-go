@@ -15,6 +15,7 @@ import (
 	"github.com/GnosiST/platform-go/internal/platform/adminresource"
 	"github.com/GnosiST/platform-go/internal/platform/errorcode"
 	"github.com/GnosiST/platform-go/internal/platform/notification"
+	"github.com/GnosiST/platform-go/internal/platform/ratelimit"
 )
 
 const (
@@ -39,6 +40,10 @@ type adminMessageCenterTestSendResponse struct {
 	Notification adminresource.Record            `json:"notification"`
 	Delivery     adminresource.Record            `json:"delivery"`
 	Receipt      notification.SMSDeliveryReceipt `json:"receipt"`
+}
+
+type adminMessageCenterDeliveriesRunRequest struct {
+	Limit int `json:"limit,omitempty"`
 }
 
 func (s *Server) adminMessageCenterTestSend(ctx *gin.Context) {
@@ -99,6 +104,47 @@ func (s *Server) adminMessageCenterTestSend(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusCreated, Response[adminMessageCenterTestSendResponse]{Data: response})
+}
+
+func (s *Server) adminMessageCenterDeliveriesRun(ctx *gin.Context) {
+	principal, ok := s.authorizeAdminBearerSession(ctx, "admin:message-center:update")
+	if !ok {
+		return
+	}
+	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationMessageCenterDelivery, principal.User.Username, rateLimitClientIP(ctx)) {
+		return
+	}
+	var input adminMessageCenterDeliveriesRunRequest
+	if ctx.Request.Body != nil && ctx.Request.ContentLength != 0 {
+		decoder := json.NewDecoder(ctx.Request.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&input); err != nil {
+			writePlatformError(ctx, errorcode.CodeRequestBodyInvalid)
+			return
+		}
+		if input.Limit < 0 || input.Limit > 100 {
+			writePlatformError(ctx, errorcode.CodeRequestBodyInvalid)
+			return
+		}
+	}
+	options := notification.DeliveryWorkerOptions{Now: s.now}
+	if input.Limit > 0 {
+		options.MaxBatch = input.Limit
+	}
+	if !smsSenderNil(s.notificationSMSSender) {
+		provider := notification.CanonicalSMSProvider(s.notificationSMSSender.Kind())
+		options.DefaultSMSProvider = provider
+		options.SMSSenders = map[string]notification.SMSSender{provider: s.notificationSMSSender}
+	}
+	result, err := notification.NewDeliveryWorker(s.resources, options).RunOnce(ctx.Request.Context())
+	if err != nil {
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
+		return
+	}
+	if result.Attempted > 0 {
+		s.invalidateCachesForResource(ctx.Request.Context(), messageCenterDeliveries)
+	}
+	ctx.JSON(http.StatusOK, Response[notification.DeliveryWorkerResult]{Data: result})
 }
 
 type preparedMessageCenterTestSend struct {

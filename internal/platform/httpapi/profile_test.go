@@ -2,13 +2,17 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/GnosiST/platform-go/internal/platform/adminresource"
 	"github.com/GnosiST/platform-go/internal/platform/capability"
+	"github.com/GnosiST/platform-go/internal/platform/credentialauth"
 )
 
 type adminProfileTestPayload struct {
@@ -134,8 +138,8 @@ func TestAdminProfileUpdatesCurrentUserResourceRecord(t *testing.T) {
 	if profile.TenantCode != "platform" || profile.OrgUnitCode != "platform-ops" || profile.AreaCode != "110000" {
 		t.Fatalf("profile context = %+v, want read-only user context preserved", profile)
 	}
-	if profile.Credentials.PasswordChange == "" {
-		t.Fatalf("profile credential status is empty: %+v", profile.Credentials)
+	if profile.Credentials.PasswordChange != "credential-auth-not-connected" {
+		t.Fatalf("profile credential status = %+v, want credential auth disconnected without runtime", profile.Credentials)
 	}
 	stored, err := resources.InternalRecord("users", "user-ops")
 	if err != nil {
@@ -160,6 +164,183 @@ func TestAdminProfileUpdatesCurrentUserResourceRecord(t *testing.T) {
 	}
 }
 
+func TestAdminProfilePasswordChangeUpdatesCredentialAuthPassword(t *testing.T) {
+	server, _, runtime := newAdminProfileCredentialTestServer(t)
+	login := loginForTest(t, server, "ops")
+	body := adminProfilePasswordChangeBodyForTest(t, runtime, "current-password", "next-password")
+
+	recorder := postAdminProfileForTest(server, login.Data.Token, "/api/admin/profile/current/password/change", body)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("POST password change status = %d body = %s, want 200", recorder.Code, recorder.Body.String())
+	}
+	var payload struct {
+		Data struct {
+			Credentials struct {
+				PasswordChange string `json:"passwordChange"`
+				PasswordReset  string `json:"passwordReset"`
+			} `json:"credentials"`
+			MustChange bool `json:"mustChange"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode password change response: %v", err)
+	}
+	if payload.Data.Credentials.PasswordChange != "credential-auth-ready" || payload.Data.Credentials.PasswordReset != "credential-auth-ready" || payload.Data.MustChange {
+		t.Fatalf("password change response = %+v, want ready credential status and mustChange=false", payload.Data)
+	}
+	if _, err := runtime.Service.VerifyPassword(context.Background(), credentialauth.PasswordLoginInput{
+		Identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypeUsername, Value: "ops"},
+		Secret:     "next-password",
+	}); err != nil {
+		t.Fatalf("VerifyPassword(next-password) error = %v", err)
+	}
+}
+
+func TestAdminProfilePasswordChangeRebindsBootstrapUsernamePrincipal(t *testing.T) {
+	server, _, runtime := newAdminProfileCredentialTestServer(t)
+	registerProfilePasswordCredentialForTest(t, runtime.Service, credentialauth.PrincipalRef{Type: credentialauth.PrincipalTypeAdmin, ID: "admin"}, "admin", "bootstrap-password", runtime.PasswordHashParams)
+	login := loginForTest(t, server, "admin")
+	body := adminProfilePasswordChangeBodyForTest(t, runtime, "bootstrap-password", "next-admin-password")
+
+	recorder := postAdminProfileForTest(server, login.Data.Token, "/api/admin/profile/current/password/change", body)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("POST password change status = %d body = %s, want 200", recorder.Code, recorder.Body.String())
+	}
+	if _, err := runtime.Service.VerifyPassword(context.Background(), credentialauth.PasswordLoginInput{
+		Identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypeUsername, Value: "admin"},
+		Secret:     "next-admin-password",
+	}); err != nil {
+		t.Fatalf("VerifyPassword(next-admin-password) error = %v", err)
+	}
+	if _, err := runtime.Service.VerifyPassword(context.Background(), credentialauth.PasswordLoginInput{
+		Identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypeUsername, Value: "admin"},
+		Secret:     "bootstrap-password",
+	}); err == nil {
+		t.Fatalf("VerifyPassword(bootstrap-password) error = nil, want old bootstrap credential rejected")
+	}
+}
+
+func TestAdminProfilePasswordChangeSupportsSubsequentCredentialLogin(t *testing.T) {
+	server, runtime := newAdminProfileCredentialPlatformTestServer(t)
+	login := loginForTest(t, server, "admin")
+	body := adminProfilePasswordChangeBodyForTest(t, runtime, "admin-password", "next-admin-password")
+
+	recorder := postAdminProfileForTest(server, login.Data.Token, "/api/admin/profile/current/password/change", body)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("POST password change status = %d body = %s, want 200", recorder.Code, recorder.Body.String())
+	}
+	newLoginRecorder := httptest.NewRecorder()
+	newLoginRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", credentialAuthPasswordLoginBodyForTest(t, runtime, "next-admin-password"))
+	newLoginRequest.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(newLoginRecorder, newLoginRequest)
+
+	if newLoginRecorder.Code != http.StatusOK {
+		t.Fatalf("POST credential login after password change status = %d body = %s, want 200", newLoginRecorder.Code, newLoginRecorder.Body.String())
+	}
+	oldLoginRecorder := httptest.NewRecorder()
+	oldLoginRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", credentialAuthPasswordLoginBodyForTest(t, runtime, "admin-password"))
+	oldLoginRequest.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(oldLoginRecorder, oldLoginRequest)
+
+	if oldLoginRecorder.Code != http.StatusUnauthorized || !strings.Contains(oldLoginRecorder.Body.String(), "AUTH_INVALID_CREDENTIALS") {
+		t.Fatalf("POST credential login with old password status = %d body = %s, want invalid credentials", oldLoginRecorder.Code, oldLoginRecorder.Body.String())
+	}
+}
+
+func TestAdminProfilePasswordChangeRejectsWrongCurrentPasswordAndAuditsFailure(t *testing.T) {
+	server, resources, runtime := newAdminProfileCredentialTestServer(t)
+	login := loginForTest(t, server, "ops")
+	body := adminProfilePasswordChangeBodyForTest(t, runtime, "wrong-password", "next-password")
+
+	recorder := postAdminProfileForTest(server, login.Data.Token, "/api/admin/profile/current/password/change", body)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("POST password change with wrong current password status = %d body = %s, want 401", recorder.Code, recorder.Body.String())
+	}
+	if _, err := runtime.Service.VerifyPassword(context.Background(), credentialauth.PasswordLoginInput{
+		Identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypeUsername, Value: "ops"},
+		Secret:     "current-password",
+	}); err != nil {
+		t.Fatalf("VerifyPassword(current-password) error = %v", err)
+	}
+	if !adminProfileAuditExists(t, resources, "admin_profile.password.change", "failure", "current-password-rejected") {
+		t.Fatalf("password change failure audit missing")
+	}
+}
+
+func TestAdminProfilePasswordResetUpdatesTargetCredentialAndRequiresChange(t *testing.T) {
+	server, _, runtime := newAdminProfileCredentialTestServer(t)
+	server.authorizer = permissionSetAuthorizer{"admin:user:update": true}
+	login := loginForTest(t, server, "ops")
+	body := adminProfilePasswordResetBodyForTest(t, runtime, "reset-password")
+
+	recorder := postAdminProfileForTest(server, login.Data.Token, "/api/admin/profile/user-admin/password/reset", body)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("POST password reset status = %d body = %s, want 200", recorder.Code, recorder.Body.String())
+	}
+	var payload struct {
+		Data struct {
+			Credentials struct {
+				PasswordChange string `json:"passwordChange"`
+				PasswordReset  string `json:"passwordReset"`
+			} `json:"credentials"`
+			MustChange bool `json:"mustChange"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode password reset response: %v", err)
+	}
+	if payload.Data.Credentials.PasswordChange != "credential-auth-ready" || payload.Data.Credentials.PasswordReset != "credential-auth-ready" || !payload.Data.MustChange {
+		t.Fatalf("password reset response = %+v, want ready credential status and mustChange=true", payload.Data)
+	}
+	result, err := runtime.Service.VerifyPassword(context.Background(), credentialauth.PasswordLoginInput{
+		Identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypeUsername, Value: "admin"},
+		Secret:     "reset-password",
+	})
+	if err != nil {
+		t.Fatalf("VerifyPassword(reset-password) error = %v", err)
+	}
+	if !result.MustChange {
+		t.Fatalf("VerifyPassword(reset-password).MustChange = false, want true")
+	}
+}
+
+func TestAdminProfilePasswordResetRebindsBootstrapUsernamePrincipal(t *testing.T) {
+	server, _, runtime := newAdminProfileCredentialTestServer(t)
+	server.authorizer = permissionSetAuthorizer{"admin:user:update": true}
+	registerProfilePasswordCredentialForTest(t, runtime.Service, credentialauth.PrincipalRef{Type: credentialauth.PrincipalTypeAdmin, ID: "admin"}, "admin", "bootstrap-password", runtime.PasswordHashParams)
+	login := loginForTest(t, server, "ops")
+	body := adminProfilePasswordResetBodyForTest(t, runtime, "reset-admin-password")
+
+	recorder := postAdminProfileForTest(server, login.Data.Token, "/api/admin/profile/user-admin/password/reset", body)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("POST password reset status = %d body = %s, want 200", recorder.Code, recorder.Body.String())
+	}
+	result, err := runtime.Service.VerifyPassword(context.Background(), credentialauth.PasswordLoginInput{
+		Identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypeUsername, Value: "admin"},
+		Secret:     "reset-admin-password",
+	})
+	if err != nil {
+		t.Fatalf("VerifyPassword(reset-admin-password) error = %v", err)
+	}
+	if !result.MustChange {
+		t.Fatalf("VerifyPassword(reset-admin-password).MustChange = false, want true")
+	}
+	if _, err := runtime.Service.VerifyPassword(context.Background(), credentialauth.PasswordLoginInput{
+		Identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypeUsername, Value: "admin"},
+		Secret:     "bootstrap-password",
+	}); err == nil {
+		t.Fatalf("VerifyPassword(bootstrap-password) error = nil, want old bootstrap credential rejected")
+	}
+}
+
 func newAdminProfileTestServer(t *testing.T) (*Server, *adminresource.Store) {
 	t.Helper()
 	manifests := []capability.Manifest{authProviderTestManifest(), adminProfileTestManifest()}
@@ -167,6 +348,88 @@ func newAdminProfileTestServer(t *testing.T) (*Server, *adminresource.Store) {
 	server := newTestServer(ServerOptions{Capabilities: manifests, Resources: resources})
 	server.RegisterAdminProfileRoutes()
 	return server, resources
+}
+
+func newAdminProfileCredentialTestServer(t *testing.T) (*Server, *adminresource.Store, *CredentialAuthRuntime) {
+	t.Helper()
+	manifests := []capability.Manifest{authProviderTestManifest(), adminProfileTestManifest()}
+	resources := adminresource.NewStoreFromCapabilities(manifests)
+	runtime := credentialAuthRuntimeForProfileTest(t)
+	server := newTestServer(ServerOptions{Capabilities: manifests, Resources: resources, CredentialAuth: runtime})
+	server.RegisterAdminProfileRoutes()
+	return server, resources, runtime
+}
+
+func newAdminProfileCredentialPlatformTestServer(t *testing.T) (*Server, *CredentialAuthRuntime) {
+	t.Helper()
+	manifests := configuredCredentialAuthManifestsForTest(t)
+	resources := adminresource.NewStoreFromCapabilities(manifests)
+	runtime := credentialAuthRuntimeForProfileTest(t)
+	server := newTestServer(ServerOptions{Capabilities: manifests, Resources: resources, CredentialAuth: runtime})
+	server.RegisterAdminProfileRoutes()
+	return server, runtime
+}
+
+func credentialAuthRuntimeForProfileTest(t *testing.T) *CredentialAuthRuntime {
+	t.Helper()
+	hasher, err := credentialauth.NewHMACIdentifierHasher([]byte(strings.Repeat("k", 32)))
+	if err != nil {
+		t.Fatalf("NewHMACIdentifierHasher() error = %v", err)
+	}
+	params := credentialauth.Argon2idParams{MemoryKiB: 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32}
+	service, err := credentialauth.NewService(credentialauth.Options{
+		Repository:           credentialauth.NewMemoryRepository(),
+		IdentifierHasher:     hasher,
+		PasswordVerifier:     credentialauth.NewArgon2idVerifier(params),
+		ChallengeProofHasher: hasher,
+		Now:                  func() time.Time { return time.Date(2026, 7, 19, 9, 0, 0, 0, time.UTC) },
+	})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	registerProfilePasswordCredentialForTest(t, service, credentialauth.PrincipalRef{Type: credentialauth.PrincipalTypeAdmin, ID: "user-ops"}, "ops", "current-password", params)
+	registerProfilePasswordCredentialForTest(t, service, credentialauth.PrincipalRef{Type: credentialauth.PrincipalTypeAdmin, ID: "user-admin"}, "admin", "admin-password", params)
+	secretTransport, err := credentialauth.NewSecretTransport(credentialauth.SecretTransportOptions{
+		KeyID: "test-profile-auth-transport-v1",
+		Now:   func() time.Time { return time.Date(2026, 7, 19, 9, 0, 0, 0, time.UTC) },
+	})
+	if err != nil {
+		t.Fatalf("NewSecretTransport() error = %v", err)
+	}
+	return &CredentialAuthRuntime{
+		Service:                 service,
+		IdentifierHasher:        hasher,
+		SecretTransport:         secretTransport,
+		ChallengeProofHasher:    hasher,
+		Now:                     func() time.Time { return time.Date(2026, 7, 19, 9, 0, 0, 0, time.UTC) },
+		PasswordHashParams:      params,
+		PasswordParamsVersion:   "test-v1",
+		RequireEncryptedSecrets: true,
+	}
+}
+
+func registerProfilePasswordCredentialForTest(t *testing.T, service *credentialauth.Service, principal credentialauth.PrincipalRef, username string, password string, params credentialauth.Argon2idParams) {
+	t.Helper()
+	if _, err := service.RegisterIdentifier(context.Background(), credentialauth.RegisterIdentifierInput{
+		Principal:  principal,
+		Identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypeUsername, Value: username},
+		Status:     credentialauth.StatusEnabled,
+	}); err != nil {
+		t.Fatalf("RegisterIdentifier(%s) error = %v", username, err)
+	}
+	hash, err := credentialauth.HashPasswordArgon2id(password, params)
+	if err != nil {
+		t.Fatalf("HashPasswordArgon2id(%s) error = %v", username, err)
+	}
+	if err := service.PutPasswordCredential(context.Background(), credentialauth.PasswordCredential{
+		Principal:     principal,
+		PasswordHash:  hash,
+		Algorithm:     credentialauth.PasswordAlgorithmArgon2id,
+		ParamsVersion: "test-v1",
+		Status:        credentialauth.StatusEnabled,
+	}); err != nil {
+		t.Fatalf("PutPasswordCredential(%s) error = %v", username, err)
+	}
 }
 
 func putAdminProfileForTest(server *Server, token string, path string, body string) *httptest.ResponseRecorder {
@@ -178,6 +441,58 @@ func putAdminProfileForTest(server *Server, token string, path string, body stri
 	}
 	server.Router().ServeHTTP(recorder, request)
 	return recorder
+}
+
+func postAdminProfileForTest(server *Server, token string, path string, body string) *httptest.ResponseRecorder {
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(body))
+	request.RemoteAddr = "127.0.0.1:43110"
+	request.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
+	server.Router().ServeHTTP(recorder, request)
+	return recorder
+}
+
+func adminProfilePasswordChangeBodyForTest(t *testing.T, runtime *CredentialAuthRuntime, currentPassword string, newPassword string) string {
+	t.Helper()
+	currentSecret := credentialAuthEncryptedSecretForTest(t, runtime, adminProfilePasswordChangeProvider, adminProfilePasswordCurrentSecretType, adminProfilePasswordSecretIdentifierType, currentPassword)
+	newSecret := credentialAuthEncryptedSecretForTest(t, runtime, adminProfilePasswordChangeProvider, adminProfilePasswordNewSecretType, adminProfilePasswordSecretIdentifierType, newPassword)
+	body, err := json.Marshal(map[string]any{
+		"currentSecret": map[string]any{"type": adminProfilePasswordCurrentSecretType, "encrypted": currentSecret},
+		"newSecret":     map[string]any{"type": adminProfilePasswordNewSecretType, "encrypted": newSecret},
+	})
+	if err != nil {
+		t.Fatalf("marshal password change body: %v", err)
+	}
+	return string(body)
+}
+
+func adminProfilePasswordResetBodyForTest(t *testing.T, runtime *CredentialAuthRuntime, newPassword string) string {
+	t.Helper()
+	newSecret := credentialAuthEncryptedSecretForTest(t, runtime, adminProfilePasswordResetProvider, adminProfilePasswordNewSecretType, adminProfilePasswordSecretIdentifierType, newPassword)
+	body, err := json.Marshal(map[string]any{
+		"newSecret": map[string]any{"type": adminProfilePasswordNewSecretType, "encrypted": newSecret},
+	})
+	if err != nil {
+		t.Fatalf("marshal password reset body: %v", err)
+	}
+	return string(body)
+}
+
+func adminProfileAuditExists(t *testing.T, resources *adminresource.Store, action string, result string, reason string) bool {
+	t.Helper()
+	records, err := resources.List("audit-logs")
+	if err != nil {
+		t.Fatalf("List(audit-logs) error = %v", err)
+	}
+	for _, record := range records {
+		if record.Values["action"] == action && record.Values["outcome"] == result && record.Values["reasonCode"] == reason {
+			return true
+		}
+	}
+	return false
 }
 
 func adminProfileTestManifest() capability.Manifest {

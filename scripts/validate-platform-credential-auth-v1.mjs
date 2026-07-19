@@ -15,6 +15,7 @@ const contractPath = path.resolve(repoRoot, argValue("--contract", "resources/pl
 const authDocPath = path.resolve(repoRoot, argValue("--auth-doc", "docs/platform-auth.md"));
 const capabilityDocPath = path.resolve(repoRoot, argValue("--capability-doc", "docs/platform-capability-development.md"));
 const dataGovernanceDocPath = path.resolve(repoRoot, argValue("--data-governance-doc", "docs/platform-data-governance-and-integrations-assessment.md"));
+const openapiAdminPath = path.resolve(repoRoot, argValue("--openapi-admin", "resources/generated/openapi.admin.json"));
 const mainGoPath = path.resolve(repoRoot, argValue("--main-go", "cmd/platform-api/main.go"));
 const httpCredentialAuthPath = path.resolve(repoRoot, argValue("--http-credential-auth", "internal/platform/httpapi/credential_auth.go"));
 const adminClientPath = path.resolve(repoRoot, argValue("--admin-client", "admin/src/platform/api/client.ts"));
@@ -59,6 +60,16 @@ const requiredEndpoints = new Set([
   "POST /api/auth/challenges",
   "POST /api/auth/sms-otp/start",
   "POST /api/auth/login",
+  "POST /api/admin/profile/current/password/change",
+  "POST /api/admin/profile/{id}/password/reset",
+  "POST /api/admin/message-center/deliveries/run",
+]);
+
+const requiredOpenAPIPaths = new Map([
+  ["/api/auth/challenges", "post"],
+  ["/api/admin/profile/current/password/change", "post"],
+  ["/api/admin/profile/{id}/password/reset", "post"],
+  ["/api/admin/message-center/deliveries/run", "post"],
 ]);
 
 const requiredDocs = [
@@ -146,8 +157,8 @@ function uniqueErrors(items, label) {
 
 function validateRuntimeBoundary(contract, mainGo, errors) {
   const boundary = contract.runtimeBoundary ?? {};
-  if (boundary.status !== "persistent-runtime-p0") {
-    errors.push("runtimeBoundary.status must be persistent-runtime-p0 after dedicated repository and encrypted secret transport work");
+  if (boundary.status !== "deliverable-v1") {
+    errors.push("runtimeBoundary.status must be deliverable-v1 after challenge, password mutation and message-center delivery runtime work");
   }
   if (boundary.defaultRuntimeMutation !== "forbidden") {
     errors.push("runtimeBoundary.defaultRuntimeMutation must stay forbidden");
@@ -159,13 +170,13 @@ function validateRuntimeBoundary(contract, mainGo, errors) {
     errors.push("existing password provider guard must remain active");
   }
   if (boundary.productionComplete !== false) {
-    errors.push("runtimeBoundary.productionComplete must stay false until challenge, live SMS and full governance evidence are complete");
+    errors.push("runtimeBoundary.productionComplete must stay false until risk policy hardening, real-vendor SMS evidence and full governance evidence are complete");
   }
   if (!String(boundary.devRuntimeStorage ?? "").includes("in-memory credential-auth repository")) {
     errors.push("runtimeBoundary.devRuntimeStorage must document the in-memory development repository fallback");
   }
-  if (!String(boundary.p0RuntimeStorage ?? "").includes("dedicated GORM credential-auth repository")) {
-    errors.push("runtimeBoundary.p0RuntimeStorage must document the dedicated GORM credential-auth repository");
+  if (!String(boundary.v1RuntimeStorage ?? "").includes("dedicated GORM credential-auth repository")) {
+    errors.push("runtimeBoundary.v1RuntimeStorage must document the dedicated GORM credential-auth repository");
   }
   const secretTransport = String(boundary.secretTransport ?? "");
   for (const snippet of [
@@ -225,6 +236,7 @@ function validateCapabilityBoundary(contract, errors) {
       "identifier normalization and hash lookup",
       "password credential verification policy",
       "login challenge transaction policy",
+      "password change and reset contracts",
       "SMS OTP transaction policy",
     ],
     "capabilityBoundary.owns",
@@ -322,8 +334,8 @@ function validateChallengeAndSecretPolicies(contract, errors) {
   if (challenge.defaultMode !== "after-failure") {
     errors.push("challengeContract.defaultMode must be after-failure");
   }
-  if (challenge.defaultKind !== "slider") {
-    errors.push("challengeContract.defaultKind must be slider");
+  if (challenge.defaultKind !== "captcha") {
+    errors.push("challengeContract.defaultKind must be captcha");
   }
   if (challenge.proofPersistence !== "digest-only") {
     errors.push("challengeContract.proofPersistence must be digest-only");
@@ -341,6 +353,15 @@ function validateChallengeAndSecretPolicies(contract, errors) {
   }
   if (password.rehashOnParamsUpgrade !== true) {
     errors.push("passwordPolicy.rehashOnParamsUpgrade must be true");
+  }
+  if (password.changeEndpoint !== "POST /api/admin/profile/current/password/change") {
+    errors.push("passwordPolicy.changeEndpoint must be POST /api/admin/profile/current/password/change");
+  }
+  if (password.resetEndpoint !== "POST /api/admin/profile/{id}/password/reset") {
+    errors.push("passwordPolicy.resetEndpoint must be POST /api/admin/profile/{id}/password/reset");
+  }
+  if (password.secretTransportRequired !== true) {
+    errors.push("passwordPolicy.secretTransportRequired must stay true");
   }
 
   const sms = contract.smsOtpPolicy ?? {};
@@ -379,12 +400,67 @@ function validateNotificationSms(contract, errors) {
   if (sms.deliveryLedgerRequired !== true) {
     errors.push("notificationSmsBoundary.deliveryLedgerRequired must be true");
   }
+  const adapterContract = String(sms.adapterContract ?? "");
+  if (!adapterContract.includes("official SDK clients") || !adapterContract.includes("dry-run/config validation")) {
+    errors.push("notificationSmsBoundary.adapterContract must describe official SDK live adapters plus dry-run/config validation");
+  }
+  if (/SMTP.*live|WeChat.*live/i.test(adapterContract)) {
+    errors.push("notificationSmsBoundary.adapterContract must not claim SMTP/WeChat supplier integration");
+  }
+  if (!String(sms.configurationClosedLoop ?? "").includes("/settings") || !String(sms.configurationClosedLoop ?? "").includes("/message-center")) {
+    errors.push("notificationSmsBoundary.configurationClosedLoop must include /settings and /message-center");
+  }
+}
+
+function validateMessageCenterContract(contract, errors) {
+  const messageCenter = contract.messageCenterContract ?? {};
+  if (messageCenter.capability !== "notification") {
+    errors.push("messageCenterContract.capability must be notification");
+  }
+  if (messageCenter.workbenchRoute !== "/message-center") {
+    errors.push("messageCenterContract.workbenchRoute must be /message-center");
+  }
+  if (messageCenter.settingsRoute !== "/settings") {
+    errors.push("messageCenterContract.settingsRoute must be /settings");
+  }
+  requireIncludes(
+    messageCenter.requiredResources,
+    [
+      "notification-channels",
+      "notification-providers",
+      "notification-send-policies",
+      "notification-templates",
+      "notifications",
+      "notification-deliveries",
+    ],
+    "messageCenterContract.requiredResources",
+    errors,
+  );
+  requireIncludes(
+    messageCenter.runtimeEndpoints,
+    ["POST /api/admin/message-center/test-send", "POST /api/admin/message-center/deliveries/run"],
+    "messageCenterContract.runtimeEndpoints",
+    errors,
+  );
+  if (messageCenter.deliveryWorker?.manualRunEndpoint !== "POST /api/admin/message-center/deliveries/run") {
+    errors.push("messageCenterContract.deliveryWorker.manualRunEndpoint must be POST /api/admin/message-center/deliveries/run");
+  }
+  const providerTruth = String(messageCenter.deliveryWorker?.providerRuntimeTruth ?? "");
+  if (!providerTruth.includes("Aliyun/Tencent live SMS SDK adapters") || !providerTruth.includes("dry-run/config validation")) {
+    errors.push("messageCenterContract.deliveryWorker.providerRuntimeTruth must describe Aliyun/Tencent live SMS SDK adapters plus dry-run/config validation");
+  }
+  if (!providerTruth.includes("SMTP/WeChat supplier integration is not claimed")) {
+    errors.push("messageCenterContract.deliveryWorker.providerRuntimeTruth must not claim SMTP/WeChat supplier integration");
+  }
+  if (!String(messageCenter.configurationClosedLoop ?? "").includes("Provider configuration") || !String(messageCenter.configurationClosedLoop ?? "").includes("manual run")) {
+    errors.push("messageCenterContract.configurationClosedLoop must document provider configuration through manual run closure");
+  }
 }
 
 function validateAPIContract(contract, errors) {
   const api = contract.apiContract ?? {};
-  if (api.status !== "persistent-runtime-p0") {
-    errors.push("apiContract.status must be persistent-runtime-p0 for the current encrypted persistent HTTP/UI slice");
+  if (api.status !== "deliverable-v1") {
+    errors.push("apiContract.status must be deliverable-v1 for the current encrypted credential-auth and message-center v1 slice");
   }
   if (api.providerDriven !== true) {
     errors.push("apiContract.providerDriven must be true");
@@ -425,9 +501,11 @@ function validateAPIContract(contract, errors) {
     [
       "GET /api/auth/providers includes enabled credential-auth provider declarations",
       "GET /api/auth/credential-secret-key exposes short-lived public key metadata for application-layer hybrid encrypted credential secrets",
+      "POST /api/auth/challenges creates digest-only CAPTCHA/slider challenge transactions for login",
       "POST /api/auth/sms-otp/start starts phone SMS OTP transactions through notification.sms",
       "POST /api/auth/login accepts structured encrypted credential-password and credential-sms-otp requests while preserving demo/OIDC compatibility",
       "Admin login UI renders credential provider modes from discovery and encrypts credential secrets with WebCrypto",
+      "credential-auth request paths use rate-limit enforcement and redacted internal error/audit surfaces",
     ],
     "apiContract.implementedNow",
     errors,
@@ -435,10 +513,10 @@ function validateAPIContract(contract, errors) {
   requireIncludes(
     api.notProductionComplete,
     [
-      "POST /api/auth/challenges CAPTCHA/slider runtime",
-      "external Aliyun/Tencent live SMS adapters and delivery ledger",
-      "complete OpenAPI/error-code/audit-redaction/rate-limit governance",
-      "credential reset, password rotation, breach response and migration governance",
+      "CAPTCHA login UI is wired; slider presentation and risk strategy can be enhanced beyond the current CAPTCHA/slider transaction contract",
+      "real-vendor SMS delivery evidence against approved Aliyun/Tencent accounts",
+      "password rotation, breach response and migration governance",
+      "production promotion evidence",
     ],
     "apiContract.notProductionComplete",
     errors,
@@ -550,8 +628,12 @@ function validateEvidenceWiring(contract, errors) {
   if (!packageD || packageD.status !== "in-progress") {
     errors.push("implementationPackages.D-auth-api-compatibility must be in-progress for the partial HTTP runtime slice");
   }
-  if (!String(packageD?.scope ?? "").includes("internal/platform/httpapi") || !String(packageD?.scope ?? "").includes("credential-secret-key")) {
-    errors.push("implementationPackages.D-auth-api-compatibility scope must point to internal/platform/httpapi and credential-secret-key");
+  if (
+    !String(packageD?.scope ?? "").includes("internal/platform/httpapi") ||
+    !String(packageD?.scope ?? "").includes("credential-secret-key") ||
+    !String(packageD?.scope ?? "").includes("challenge creation")
+  ) {
+    errors.push("implementationPackages.D-auth-api-compatibility scope must point to internal/platform/httpapi, credential-secret-key and challenge creation");
   }
   const packageE = packages.get("E-admin-login-ui");
   if (!packageE || packageE.status !== "in-progress") {
@@ -561,8 +643,21 @@ function validateEvidenceWiring(contract, errors) {
     errors.push("implementationPackages.E-admin-login-ui scope must document provider-discovery driven Admin login form state");
   }
   const packageF = packages.get("F-security-governance");
-  if (!packageF || packageF.status !== "remaining") {
-    errors.push("implementationPackages.F-security-governance must remain remaining until security governance starts");
+  if (!packageF || packageF.status !== "in-progress") {
+    errors.push("implementationPackages.F-security-governance must be in-progress after OpenAPI/rate-limit/audit contract sync starts");
+  }
+  if (!String(packageF?.scope ?? "").includes("OpenAPI contract coverage") || !String(packageF?.scope ?? "").includes("rate-limit enforcement")) {
+    errors.push("implementationPackages.F-security-governance scope must document OpenAPI contract coverage and rate-limit enforcement");
+  }
+  const packageG = packages.get("G-message-center-delivery");
+  if (!packageG || packageG.status !== "in-progress") {
+    errors.push("implementationPackages.G-message-center-delivery must be in-progress for message-center delivery v1");
+  }
+  const packageGScope = String(packageG?.scope ?? "");
+  for (const snippet of ["SMS provider configuration", "message delivery worker contract", "manual deliveries run endpoint", "settings configuration loop"]) {
+    if (!packageGScope.includes(snippet)) {
+      errors.push(`implementationPackages.G-message-center-delivery scope must document ${snippet}`);
+    }
   }
 }
 
@@ -571,10 +666,15 @@ function validateDocs(authDoc, capabilityDoc, dataGovernanceDoc, errors) {
     ["Credential Auth v1", "docs/platform-auth.md must document credential-auth v1"],
     ["resources/platform-credential-auth-v1.json", "docs/platform-auth.md must point to the credential-auth v1 contract"],
     ["internal/platform/credentialauth", "docs/platform-auth.md must point to the credential-auth service foundation package"],
-    ["persistent P0 HTTP/UI runtime", "docs/platform-auth.md must document the persistent P0 HTTP/UI runtime"],
+    ["deliverable v1 HTTP/UI runtime", "docs/platform-auth.md must document the deliverable v1 HTTP/UI runtime"],
     ["preserves the current demo/OIDC runtime", "docs/platform-auth.md must state current demo/OIDC runtime is preserved"],
     ["password credentials must not be stored in generic `Record.Values`", "docs/platform-auth.md must forbid password credentials in generic Record.Values"],
     ["notification` SMS channel", "docs/platform-auth.md must assign SMS delivery to notification"],
+    ["`POST /api/auth/challenges` is implemented in the backend runtime", "docs/platform-auth.md must state POST /api/auth/challenges is implemented in backend runtime"],
+    ["password change/reset", "docs/platform-auth.md must document password change/reset contract"],
+    ["rate-limit enforcement and redacted audit/error surfaces", "docs/platform-auth.md must document rate-limit and redacted audit/error surfaces"],
+    ["message delivery worker", "docs/platform-auth.md must document message delivery worker"],
+    ["manual run endpoint", "docs/platform-auth.md must document message-center manual run endpoint"],
     ["application-layer hybrid encryption", "docs/platform-auth.md must document application-layer hybrid encryption"],
     ["GET /api/auth/credential-secret-key", "docs/platform-auth.md must document credential secret key discovery"],
     ["ECDH P-256", "docs/platform-auth.md must document ECDH P-256 key agreement"],
@@ -595,8 +695,14 @@ function validateDocs(authDoc, capabilityDoc, dataGovernanceDoc, errors) {
     ["credential-auth capability rules", "docs/platform-capability-development.md must document credential-auth capability rules"],
     ["resources/platform-credential-auth-v1.json", "docs/platform-capability-development.md must point to the credential-auth v1 contract"],
     ["internal/platform/credentialauth", "docs/platform-capability-development.md must point to the credential-auth service foundation package"],
-    ["persistent-runtime-p0", "docs/platform-capability-development.md must document the current P0 runtime status"],
+    ["deliverable-v1", "docs/platform-capability-development.md must document the current v1 runtime status"],
     ["Do not declare provider kind `password`", "docs/platform-capability-development.md must keep provider kind password blocked until implementation"],
+    ["`POST /api/auth/challenges` is now a backend runtime endpoint", "docs/platform-capability-development.md must state POST /api/auth/challenges is implemented in backend runtime"],
+    ["password change/reset contract", "docs/platform-capability-development.md must document password change/reset contract"],
+    ["message delivery worker contract", "docs/platform-capability-development.md must document message delivery worker contract"],
+    ["manual run endpoint `POST /api/admin/message-center/deliveries/run`", "docs/platform-capability-development.md must document message-center delivery run endpoint"],
+    ["Aliyun/Tencent live SMS SDK adapters", "docs/platform-capability-development.md must document Aliyun/Tencent live SMS SDK adapters"],
+    ["dry-run/config validation", "docs/platform-capability-development.md must document SMS dry-run/config validation"],
     ["ECDH P-256", "docs/platform-capability-development.md must document ECDH P-256 key agreement"],
     ["HKDF-SHA256", "docs/platform-capability-development.md must document HKDF-SHA256 derivation"],
     ["AES-256-GCM/A256GCM", "docs/platform-capability-development.md must document AES-256-GCM/A256GCM encryption"],
@@ -652,8 +758,47 @@ function validateSecretTransportImplementation(httpCredentialAuth, adminClient, 
   }
 }
 
+function validateOpenAPI(openapi, errors) {
+  const paths = openapi.paths ?? {};
+  for (const [routePath, method] of requiredOpenAPIPaths.entries()) {
+    if (!paths[routePath]?.[method]) {
+      errors.push(`resources/generated/openapi.admin.json must include ${method.toUpperCase()} ${routePath}`);
+    }
+  }
+  const challenge = paths["/api/auth/challenges"]?.post;
+  if (challenge) {
+    if (challenge.operationId !== "startAdminCredentialChallenge") {
+      errors.push("OpenAPI /api/auth/challenges operationId must be startAdminCredentialChallenge");
+    }
+    if (challenge["x-platform-runtime-status"] !== "deliverable-v1") {
+      errors.push("OpenAPI /api/auth/challenges must keep x-platform-runtime-status deliverable-v1");
+    }
+  }
+  const change = paths["/api/admin/profile/current/password/change"]?.post;
+  if (change && change["x-platform-secret-transport"] !== "ECDH-P256-HKDF-SHA256+A256GCM") {
+    errors.push("OpenAPI password change must use the credential-auth encrypted secret transport");
+  }
+  const reset = paths["/api/admin/profile/{id}/password/reset"]?.post;
+  if (reset && reset["x-platform-permission"] !== "admin:user:update") {
+    errors.push("OpenAPI password reset must require admin:user:update");
+  }
+  const run = paths["/api/admin/message-center/deliveries/run"]?.post;
+  if (run) {
+    if (run["x-platform-runtime"] !== "notification-delivery-worker-v1") {
+      errors.push("OpenAPI message-center deliveries run must use notification-delivery-worker-v1 runtime marker");
+    }
+    if (!String(run.description ?? "").includes("Aliyun/Tencent live SMS SDK adapters") || !String(run.description ?? "").includes("dry-run/config validation")) {
+      errors.push("OpenAPI message-center deliveries run must describe Aliyun/Tencent live SMS SDK adapters plus dry-run/config validation");
+    }
+    if (/SMTP.*live|WeChat.*live/i.test(String(run.description ?? ""))) {
+      errors.push("OpenAPI message-center deliveries run must not claim SMTP/WeChat supplier integration");
+    }
+  }
+}
+
 const errors = [];
 const contract = readJSON(contractPath);
+const openapiAdmin = readJSON(openapiAdminPath);
 const mainGo = readText(mainGoPath);
 const authDoc = readText(authDocPath);
 const capabilityDoc = readText(capabilityDocPath);
@@ -675,11 +820,13 @@ validateGenericValuesPolicy(contract, errors);
 validateStorageContracts(contract, errors);
 validateChallengeAndSecretPolicies(contract, errors);
 validateNotificationSms(contract, errors);
+validateMessageCenterContract(contract, errors);
 validateAPIContract(contract, errors);
 validateConfiguration(contract, errors);
 validateEvidenceWiring(contract, errors);
 validateDocs(authDoc, capabilityDoc, dataGovernanceDoc, errors);
 validateSecretTransportImplementation(httpCredentialAuth, adminClient, errors);
+validateOpenAPI(openapiAdmin, errors);
 
 if (errors.length > 0) {
   console.error(errors.join("\n"));

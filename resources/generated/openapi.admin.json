@@ -374,6 +374,82 @@
         }
       }
     },
+    "/api/admin/message-center/deliveries/run": {
+      "post": {
+        "tags": [
+          "message-center"
+        ],
+        "operationId": "runMessageCenterDeliveries",
+        "summary": "Run the message-center delivery worker",
+        "description": "Manual v1 run endpoint for the notification delivery worker contract. It validates SMS provider configuration, uses Aliyun/Tencent live SMS SDK adapters when live sending is enabled, and still supports dry-run/config validation receipts. SMTP/WeChat supplier integration is not claimed until separate adapter evidence exists.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminMessageCenterDeliveriesRunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Message center delivery worker run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminMessageCenterDeliveriesRunData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "description": "Message center delivery runtime is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-platform-error-codes": [
+              "ADMIN_MESSAGE_CENTER_UNAVAILABLE"
+            ]
+          }
+        },
+        "x-platform-permission": "admin:message-center:update",
+        "x-platform-runtime": "notification-delivery-worker-v1",
+        "x-platform-provider-truth": "Aliyun/Tencent live SMS SDK adapters plus dry-run/config validation; SMTP/WeChat supplier integration not claimed"
+      }
+    },
     "/api/admin/message-center/test-send": {
       "post": {
         "tags": [
@@ -584,6 +660,143 @@
         },
         "x-platform-permission": "admin:capability:read",
         "x-platform-plugin-management": "restart-required-v1"
+      }
+    },
+    "/api/admin/profile/{id}/password/reset": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "operationId": "resetAdminProfilePassword",
+        "summary": "Reset one Admin credential-auth password",
+        "description": "Credential-auth v1 privileged password reset contract. The new password secret uses the same application-layer encrypted secret envelope; no reset token, raw password or verifier material is returned.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCredentialPasswordResetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Admin password reset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminCredentialPasswordMutationData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-capability": "credential-auth",
+        "x-platform-permission": "admin:user:update",
+        "x-platform-secret-transport": "ECDH-P256-HKDF-SHA256+A256GCM"
+      }
+    },
+    "/api/admin/profile/current/password/change": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "operationId": "changeCurrentAdminPassword",
+        "summary": "Change the current Admin credential-auth password",
+        "description": "Credential-auth v1 contract for current-user password change. Current and new secrets use the same ECDH P-256, HKDF-SHA256 and AES-256-GCM/A256GCM encrypted secret envelope as login.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCredentialPasswordChangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Admin password change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminCredentialPasswordMutationData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-capability": "credential-auth",
+        "x-platform-permission": "admin:profile:update",
+        "x-platform-secret-transport": "ECDH-P256-HKDF-SHA256+A256GCM"
       }
     },
     "/api/admin/resources/{resource}/{id}/fields/{field}/reveal": {
@@ -9123,6 +9336,67 @@
         "x-platform-runtime": "settings-runtime-p0"
       }
     },
+    "/api/auth/challenges": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "startAdminCredentialChallenge",
+        "summary": "Start an Admin credential-auth login challenge",
+        "description": "Credential-auth v1 runtime. Creates a digest-only CAPTCHA or slider challenge transaction for login; Admin login currently closes the CAPTCHA flow, while slider presentation and risk strategy can continue to evolve without changing the secret transport contract.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCredentialAuthChallengeStartRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Admin credential-auth challenge",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminCredentialAuthChallengeStartData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "501": {
+            "$ref": "#/components/responses/NotImplemented"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          }
+        },
+        "x-platform-capability": "credential-auth",
+        "x-platform-runtime-status": "deliverable-v1"
+      }
+    },
     "/api/auth/credential-secret-key": {
       "get": {
         "tags": [
@@ -14591,6 +14865,26 @@
           }
         }
       },
+      "AdminCredentialProfilePasswordSecret": {
+        "type": "object",
+        "required": [
+          "type",
+          "encrypted"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "current-password",
+              "new-password"
+            ]
+          },
+          "encrypted": {
+            "$ref": "#/components/schemas/AdminCredentialAuthSecretEnvelope"
+          }
+        }
+      },
       "AdminCredentialAuthSecretEnvelope": {
         "type": "object",
         "required": [
@@ -14699,6 +14993,80 @@
           }
         }
       },
+      "AdminCredentialAuthChallengeStartRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "captcha",
+              "slider"
+            ]
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "login"
+            ]
+          },
+          "clientFingerprint": {
+            "type": "string",
+            "writeOnly": true,
+            "description": "Optional client-side risk fingerprint; only a digest may be persisted by credential-auth."
+          }
+        }
+      },
+      "AdminCredentialAuthChallengeStartData": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "purpose",
+          "prompt",
+          "expiresAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "captcha",
+              "slider"
+            ]
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "login"
+            ]
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "debugProof": {
+            "type": "string",
+            "writeOnly": true,
+            "description": "Development/test only proof returned when credential-auth debug mode is enabled.",
+            "x-platform-development-only": true,
+            "x-platform-sensitivity": "secret"
+          }
+        }
+      },
       "AdminCredentialSMSOTPStartRequest": {
         "type": "object",
         "required": [
@@ -14746,6 +15114,70 @@
             "x-platform-sensitivity": "secret"
           }
         }
+      },
+      "AdminCredentialPasswordChangeRequest": {
+        "type": "object",
+        "required": [
+          "currentSecret",
+          "newSecret"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "currentSecret": {
+            "$ref": "#/components/schemas/AdminCredentialProfilePasswordSecret"
+          },
+          "newSecret": {
+            "$ref": "#/components/schemas/AdminCredentialProfilePasswordSecret"
+          }
+        },
+        "x-platform-secret-transport": "ECDH-P256-HKDF-SHA256+A256GCM"
+      },
+      "AdminCredentialPasswordResetRequest": {
+        "type": "object",
+        "required": [
+          "newSecret"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "newSecret": {
+            "$ref": "#/components/schemas/AdminCredentialProfilePasswordSecret"
+          }
+        },
+        "x-platform-secret-transport": "ECDH-P256-HKDF-SHA256+A256GCM"
+      },
+      "AdminCredentialPasswordMutationData": {
+        "type": "object",
+        "required": [
+          "credentials",
+          "mustChange"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "credentials": {
+            "type": "object",
+            "required": [
+              "passwordChange",
+              "passwordReset",
+              "message"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "passwordChange": {
+                "type": "string"
+              },
+              "passwordReset": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          },
+          "mustChange": {
+            "type": "boolean"
+          }
+        },
+        "x-platform-secret-projection": "no password, verifier, reset token or encrypted secret material is returned"
       },
       "AdminAuthLoginRequest": {
         "type": "object",
@@ -15570,6 +16002,53 @@
             "$ref": "#/components/schemas/AdminMessageCenterSMSReceipt"
           }
         }
+      },
+      "AdminMessageCenterDeliveriesRunRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          }
+        },
+        "x-platform-runtime": "notification-delivery-worker-v1"
+      },
+      "AdminMessageCenterDeliveriesRunData": {
+        "type": "object",
+        "required": [
+          "scanned",
+          "attempted",
+          "delivered",
+          "failed",
+          "skipped"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "scanned": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "attempted": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "delivered": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "skipped": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "x-platform-secret-projection": "worker result exposes aggregate counts only; delivery records retain redacted target metadata"
       },
       "PluginManagementLockStatus": {
         "type": "object",

@@ -122,7 +122,7 @@ func main() {
 	if notificationSMS.Sender != nil {
 		log.Printf("notification sms provider=%s mockLocal=%t loginTemplateConfigured=%t", notificationSMS.Sender.Kind(), notificationSMS.MockLocalEnabled, notificationSMS.LoginTemplateID != "")
 	}
-	credentialAuth, err := bootstrap.CredentialAuthRuntimeFromConfig(ctx, cfg, notificationSMS)
+	credentialAuth, err := bootstrap.CredentialAuthRuntimeFromConfig(ctx, cfg, notificationSMS, resources)
 	if err != nil {
 		log.Fatalf("build credential auth runtime: %v", err)
 	}

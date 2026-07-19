@@ -299,8 +299,12 @@ function validateNotificationProductization(contract, errors) {
   if (!productization.credentialPolicy?.includes("encrypted") || !productization.credentialPolicy.includes("omitted")) {
     errors.push(`${prefix}.credentialPolicy must require encrypted and omitted provider secrets`);
   }
-  if (!productization.runtimeBoundary?.includes("follow-up runtime slices")) {
-    errors.push(`${prefix}.runtimeBoundary must keep concrete provider adapters as follow-up runtime slices`);
+  const runtimeBoundary = String(productization.runtimeBoundary ?? "");
+  if (!runtimeBoundary.includes("official SDK-backed Aliyun/Tencent Cloud live SMS adapters")) {
+    errors.push(`${prefix}.runtimeBoundary must document official SDK-backed Aliyun/Tencent Cloud live SMS adapters`);
+  }
+  if (!runtimeBoundary.includes("concrete SMTP and WeChat send adapters remain follow-up runtime slices")) {
+    errors.push(`${prefix}.runtimeBoundary must keep SMTP and WeChat send adapters as follow-up runtime slices`);
   }
 }
 

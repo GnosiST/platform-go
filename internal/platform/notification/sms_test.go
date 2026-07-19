@@ -2,8 +2,13 @@ package notification
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
+
+	aliyunsms "github.com/alibabacloud-go/dysmsapi-20170525/v5/client"
+	tencentsms "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms/v20210111"
 )
 
 func TestMockLocalSMSSenderRecordsDevelopmentDeliveryWithRedactedReceipt(t *testing.T) {
@@ -150,8 +155,8 @@ func TestVendorSMSSenderRejectsMissingConfigurationWithoutSecretLeak(t *testing.
 	}
 }
 
-func TestVendorSMSSenderRejectsLiveSendUntilImplemented(t *testing.T) {
-	_, err := NewVendorSMSSender(SMSProviderConfig{
+func TestVendorSMSSenderCreatesLiveSDKSenderWhenEnabled(t *testing.T) {
+	sender, err := NewVendorSMSSender(SMSProviderConfig{
 		Provider:         SMSProviderTencent,
 		TencentRegion:    "ap-guangzhou",
 		TencentSecretID:  "test-secret-id",
@@ -160,8 +165,141 @@ func TestVendorSMSSenderRejectsLiveSendUntilImplemented(t *testing.T) {
 		SignName:         "Platform",
 		LiveSendEnabled:  true,
 	})
-	if err == nil || !strings.Contains(err.Error(), "live sending is not implemented") {
-		t.Fatalf("NewVendorSMSSender() error = %v, want live-send implementation failure", err)
+	if err != nil {
+		t.Fatalf("NewVendorSMSSender() error = %v", err)
+	}
+	if sender.Kind() != SMSProviderTencent {
+		t.Fatalf("sender.Kind() = %q, want tencent", sender.Kind())
+	}
+}
+
+func TestAliyunSMSSenderLiveSendBuildsSDKRequestAndReceipt(t *testing.T) {
+	fake := &fakeAliyunSMSClient{response: &aliyunsms.SendSmsResponse{Body: &aliyunsms.SendSmsResponseBody{
+		Code:      testStringPtr("OK"),
+		BizId:     testStringPtr("aliyun-biz-1"),
+		RequestId: testStringPtr("aliyun-request-1"),
+	}}}
+	sender, err := newAliyunSMSSenderWithClient(SMSProviderConfig{
+		Provider:          SMSProviderAliyun,
+		AliyunRegion:      "cn-hangzhou",
+		AliyunAccessKeyID: "test-access-key",
+		AliyunSecretKey:   "test-secret-key",
+		SignName:          "Platform",
+		LiveSendEnabled:   true,
+	}, fake)
+	if err != nil {
+		t.Fatalf("newAliyunSMSSenderWithClient() error = %v", err)
+	}
+
+	receipt, err := sender.SendSMS(context.Background(), SMSMessage{
+		Recipient:  "+8613800000000",
+		TemplateID: "SMS_123456",
+		TemplateParams: map[string]string{
+			SMSProviderTemplateParamOrderKey: "code",
+			"code":                           "123456",
+		},
+		TraceID: "trace-aliyun",
+	})
+	if err != nil {
+		t.Fatalf("SendSMS() error = %v", err)
+	}
+	if receipt.Provider != SMSProviderAliyun || receipt.MessageID != "aliyun-biz-1" || receipt.Status != SMSDeliveryAccepted || receipt.RedactedTarget != "****0000" {
+		t.Fatalf("receipt = %+v, want accepted aliyun receipt", receipt)
+	}
+	if fake.request == nil ||
+		stringPtrValue(fake.request.PhoneNumbers) != "+8613800000000" ||
+		stringPtrValue(fake.request.SignName) != "Platform" ||
+		stringPtrValue(fake.request.TemplateCode) != "SMS_123456" ||
+		stringPtrValue(fake.request.OutId) != "trace-aliyun" {
+		t.Fatalf("aliyun request = %+v, want hydrated SDK request", fake.request)
+	}
+	var params map[string]string
+	if err := json.Unmarshal([]byte(stringPtrValue(fake.request.TemplateParam)), &params); err != nil {
+		t.Fatalf("TemplateParam JSON error = %v", err)
+	}
+	if params["code"] != "123456" || params[SMSProviderTemplateParamOrderKey] != "" {
+		t.Fatalf("TemplateParam = %+v, want template params without order metadata", params)
+	}
+}
+
+func TestTencentSMSSenderLiveSendBuildsSDKRequestAndReceipt(t *testing.T) {
+	fake := &fakeTencentSMSClient{response: &tencentsms.SendSmsResponse{Response: &tencentsms.SendSmsResponseParams{
+		RequestId: testStringPtr("tencent-request-1"),
+		SendStatusSet: []*tencentsms.SendStatus{{
+			Code:     testStringPtr("Ok"),
+			SerialNo: testStringPtr("tencent-serial-1"),
+		}},
+	}}}
+	sender, err := newTencentSMSSenderWithClient(SMSProviderConfig{
+		Provider:         SMSProviderTencent,
+		TencentRegion:    "ap-guangzhou",
+		TencentSecretID:  "test-secret-id",
+		TencentSecretKey: "test-secret-key",
+		TencentSDKAppID:  "1400000000",
+		SignName:         "Platform",
+		LiveSendEnabled:  true,
+	}, fake)
+	if err != nil {
+		t.Fatalf("newTencentSMSSenderWithClient() error = %v", err)
+	}
+
+	receipt, err := sender.SendSMS(context.Background(), SMSMessage{
+		Recipient:  "+8613800000000",
+		TemplateID: "123456",
+		TemplateParams: map[string]string{
+			SMSProviderTemplateParamOrderKey: "code,name",
+			"code":                           "123456",
+			"name":                           "Kai",
+		},
+		TraceID: "trace-tencent",
+	})
+	if err != nil {
+		t.Fatalf("SendSMS() error = %v", err)
+	}
+	if receipt.Provider != SMSProviderTencent || receipt.MessageID != "tencent-serial-1" || receipt.Status != SMSDeliveryAccepted || receipt.RedactedTarget != "****0000" {
+		t.Fatalf("receipt = %+v, want accepted tencent receipt", receipt)
+	}
+	if fake.request == nil ||
+		len(fake.request.PhoneNumberSet) != 1 ||
+		stringPtrValue(fake.request.PhoneNumberSet[0]) != "+8613800000000" ||
+		stringPtrValue(fake.request.SmsSdkAppId) != "1400000000" ||
+		stringPtrValue(fake.request.SignName) != "Platform" ||
+		stringPtrValue(fake.request.TemplateId) != "123456" ||
+		stringPtrValue(fake.request.SessionContext) != "trace-tencent" {
+		t.Fatalf("tencent request = %+v, want hydrated SDK request", fake.request)
+	}
+	if len(fake.request.TemplateParamSet) != 2 ||
+		stringPtrValue(fake.request.TemplateParamSet[0]) != "123456" ||
+		stringPtrValue(fake.request.TemplateParamSet[1]) != "Kai" {
+		t.Fatalf("TemplateParamSet = %+v, want declared order", fake.request.TemplateParamSet)
+	}
+}
+
+func TestVendorSMSSenderNormalizesProviderFailureWithoutLeakingRawError(t *testing.T) {
+	secret := "do-not-print-this-secret"
+	fake := &fakeTencentSMSClient{err: errors.New("provider failed for +8613800000000 with " + secret)}
+	sender, err := newTencentSMSSenderWithClient(SMSProviderConfig{
+		Provider:         SMSProviderTencent,
+		TencentRegion:    "ap-guangzhou",
+		TencentSecretID:  "test-secret-id",
+		TencentSecretKey: secret,
+		TencentSDKAppID:  "1400000000",
+		SignName:         "Platform",
+		LiveSendEnabled:  true,
+	}, fake)
+	if err != nil {
+		t.Fatalf("newTencentSMSSenderWithClient() error = %v", err)
+	}
+
+	receipt, err := sender.SendSMS(context.Background(), SMSMessage{Recipient: "+8613800000000", TemplateID: "123456"})
+	if err == nil || !strings.Contains(err.Error(), "request failed") {
+		t.Fatalf("SendSMS() error = %v, want normalized provider failure", err)
+	}
+	if strings.Contains(err.Error(), "+8613800000000") || strings.Contains(err.Error(), secret) {
+		t.Fatalf("SendSMS() leaked raw provider error: %v", err)
+	}
+	if receipt.Provider != SMSProviderTencent || receipt.RedactedTarget != "****0000" || receipt.Status != "failed" {
+		t.Fatalf("receipt = %+v, want failed redacted receipt", receipt)
 	}
 }
 
@@ -177,4 +315,30 @@ func TestSMSProviderContract(t *testing.T) {
 	if CanonicalSMSProvider(" MOCK-LOCAL ") != SMSProviderMockLocal {
 		t.Fatal("CanonicalSMSProvider() did not trim and lowercase")
 	}
+}
+
+type fakeAliyunSMSClient struct {
+	request  *aliyunsms.SendSmsRequest
+	response *aliyunsms.SendSmsResponse
+	err      error
+}
+
+func (c *fakeAliyunSMSClient) SendSms(request *aliyunsms.SendSmsRequest) (*aliyunsms.SendSmsResponse, error) {
+	c.request = request
+	return c.response, c.err
+}
+
+type fakeTencentSMSClient struct {
+	request  *tencentsms.SendSmsRequest
+	response *tencentsms.SendSmsResponse
+	err      error
+}
+
+func (c *fakeTencentSMSClient) SendSms(request *tencentsms.SendSmsRequest) (*tencentsms.SendSmsResponse, error) {
+	c.request = request
+	return c.response, c.err
+}
+
+func testStringPtr(value string) *string {
+	return &value
 }

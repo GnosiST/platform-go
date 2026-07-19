@@ -34,6 +34,7 @@ import {
 import { Alert, App, Avatar, Button, Drawer, Dropdown, Form, Input, Space, Tag, Tooltip, Typography, type MenuProps } from "antd";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type WheelEvent } from "react";
 import {
+  changeCurrentAdminPassword,
   getCurrentAdminProfile,
   getFrontendVersion,
   updateCurrentAdminProfile,
@@ -886,9 +887,11 @@ function ProfileEditorModal({
 }) {
   const { message } = App.useApp();
   const [form] = Form.useForm<ProfileEditorFormValues>();
+  const [passwordForm] = Form.useForm<ProfilePasswordFormValues>();
   const [loadedProfile, setLoadedProfile] = useState<AdminProfile | null>(profile);
   const [profileLoading, setProfileLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const [profileError, setProfileError] = useState("");
   const watchedAvatarUrl = Form.useWatch("avatarUrl", form) as string | undefined;
   const effectiveProfile = loadedProfile ?? profile;
@@ -904,6 +907,7 @@ function ProfileEditorModal({
       return;
     }
     form.setFieldsValue(profileFormValues(profile, session));
+    passwordForm.resetFields();
     setLoadedProfile(profile);
     setProfileError("");
     setProfileLoading(true);
@@ -927,7 +931,7 @@ function ProfileEditorModal({
     return () => {
       cancelled = true;
     };
-  }, [dictionary.profileLoadFailed, form, open, session.user.id]);
+  }, [dictionary.profileLoadFailed, form, open, passwordForm, session.user.id]);
 
   const handleSave = () => {
     void form.validateFields()
@@ -951,13 +955,39 @@ function ProfileEditorModal({
       .finally(() => setSaving(false));
   };
 
+  const handleChangePassword = () => {
+    void passwordForm.validateFields()
+      .then((values) => {
+        setChangingPassword(true);
+        return changeCurrentAdminPassword({
+          currentPassword: values.currentPassword,
+          newPassword: values.newPassword,
+        });
+      })
+      .then((result) => {
+        if (result.profile) {
+          setLoadedProfile(result.profile);
+          onProfileSaved(result.profile);
+        }
+        passwordForm.resetFields();
+        message.success(dictionary.passwordChangeSuccess);
+      })
+      .catch((error: unknown) => {
+        if (isProfileFormValidationError(error)) {
+          return;
+        }
+        message.error(profileRequestErrorMessage(error, dictionary.passwordChangeFailed));
+      })
+      .finally(() => setChangingPassword(false));
+  };
+
   return (
     <AdminModal
       className="profile-editor-modal"
       title={dictionary.editProfile}
       open={open}
       size="xl"
-      width={880}
+      width={980}
       footer={[
         <Button key="close" onClick={onClose}>{dictionary.close}</Button>,
         <Button key="save" loading={saving} type="primary" onClick={handleSave}>{dictionary.saveProfile}</Button>,
@@ -1013,26 +1043,52 @@ function ProfileEditorModal({
         </section>
         <section className="profile-editor-section">
           <Typography.Text strong>{dictionary.accountSecurity}</Typography.Text>
-          <Alert showIcon type="info" message={dictionary.passwordActionUnavailable} description={credentialStatus} />
-          <div className="profile-editor-grid">
-            <label className="profile-editor-field">
-              <span>{dictionary.currentPassword}</span>
-              <Input.Password disabled readOnly placeholder={dictionary.passwordActionUnavailable} value="" />
-            </label>
-            <label className="profile-editor-field">
-              <span>{dictionary.newPassword}</span>
-              <Input.Password disabled readOnly placeholder={dictionary.passwordActionUnavailable} value="" />
-            </label>
-            <label className="profile-editor-field">
-              <span>{dictionary.confirmPassword}</span>
-              <Input.Password disabled readOnly placeholder={dictionary.passwordActionUnavailable} value="" />
-            </label>
-          </div>
+          <Alert showIcon type="info" message={dictionary.passwordChangeReady} description={credentialStatus} />
+          <Form form={passwordForm} layout="vertical" className="profile-editor-grid" disabled={profileLoading || changingPassword}>
+            <Form.Item
+              className="profile-editor-field"
+              label={dictionary.currentPassword}
+              name="currentPassword"
+              rules={[{ required: true, message: dictionary.currentPasswordRequired }]}
+            >
+              <Input.Password autoComplete="current-password" placeholder={dictionary.currentPasswordPlaceholder} />
+            </Form.Item>
+            <Form.Item
+              className="profile-editor-field"
+              label={dictionary.newPassword}
+              name="newPassword"
+              rules={[
+                { required: true, message: dictionary.newPasswordRequired },
+                { min: 8, message: formatTemplate(dictionary.validationMinLength, { label: dictionary.newPassword, min: "8" }) },
+              ]}
+            >
+              <Input.Password autoComplete="new-password" placeholder={dictionary.newPasswordPlaceholder} />
+            </Form.Item>
+            <Form.Item
+              className="profile-editor-field"
+              dependencies={["newPassword"]}
+              label={dictionary.confirmPassword}
+              name="confirmPassword"
+              rules={[
+                { required: true, message: dictionary.confirmPasswordRequired },
+                ({ getFieldValue }) => ({
+                  validator: async (_rule, value) => {
+                    if (!value || getFieldValue("newPassword") === value) {
+                      return;
+                    }
+                    throw new Error(dictionary.passwordConfirmMismatch);
+                  },
+                }),
+              ]}
+            >
+              <Input.Password autoComplete="new-password" placeholder={dictionary.confirmPasswordPlaceholder} />
+            </Form.Item>
+          </Form>
           <Space wrap className="profile-editor-security-actions">
-            <Button disabled>{dictionary.changePassword}</Button>
+            <Button type="primary" loading={changingPassword} onClick={handleChangePassword}>{dictionary.changePassword}</Button>
             <Button disabled>{dictionary.resetPassword}</Button>
           </Space>
-          <Typography.Text type="secondary">{dictionary.passwordActionUnavailable}</Typography.Text>
+          <Typography.Text type="secondary">{dictionary.passwordEncryptedSecretHint}</Typography.Text>
         </section>
       </div>
     </AdminModal>
@@ -1045,6 +1101,12 @@ type ProfileEditorFormValues = {
   phone?: string;
   email?: string;
   address?: string;
+};
+
+type ProfilePasswordFormValues = {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
 };
 
 function profileFormValues(profile: AdminProfile | null, session: AdminCurrentSession): ProfileEditorFormValues {
@@ -1093,6 +1155,10 @@ function profileRequestErrorMessage(error: unknown, fallback: string) {
     return error.message;
   }
   return fallback;
+}
+
+function formatTemplate(template: string, values: Record<string, string>) {
+  return Object.entries(values).reduce((result, [key, value]) => result.replaceAll(`{${key}}`, value), template);
 }
 
 function normalizeProfileRoleLabels(rawRoles: unknown) {

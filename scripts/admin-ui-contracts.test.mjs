@@ -564,6 +564,21 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /SMS test send is connected to the runtime endpoint/);
   });
 
+  it("rejects message center channel cards that collapse runtime readiness into generic configured state", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/message-center/MessageCenterConsole.tsx",
+      "<Tag color={card.statusTone}>{card.statusLabel}</Tag>",
+      '<Tag color={card.ready ? "success" : "default"}>{card.ready ? dictionary.configured : dictionary.notConfigured}</Tag>',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /generic configured tag/);
+  });
+
   it("rejects capability details that no longer open from the list into a modal", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
@@ -3084,6 +3099,51 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /Admin login must not show unconfigured providers in the login selector/);
+  });
+
+  it("rejects credential login clients that serialize raw form input", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTempIfPresent(
+      tempRoot,
+      "admin/src/platform/api/client.ts",
+      "const body = await withEncryptedCredentialSecret(input);",
+      "const body = input;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Credential login must encrypt secrets before request serialization/);
+  });
+
+  it("rejects password mutation clients that drop encrypted transport request contracts", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTempIfPresent(
+      tempRoot,
+      "admin/src/platform/api/client.ts",
+      "satisfies AdminCurrentPasswordChangeRequest",
+      "as unknown",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Current-user password changes must serialize encrypted secret envelopes/);
+  });
+
+  it("rejects admin password reset clients that drop encrypted transport request contracts", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTempIfPresent(
+      tempRoot,
+      "admin/src/platform/api/client.ts",
+      "satisfies AdminProfilePasswordResetRequest",
+      "as unknown",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Admin password resets must serialize encrypted secret envelopes/);
   });
 
   it("rejects unauthenticated route normalization during OIDC callback cleanup", () => {

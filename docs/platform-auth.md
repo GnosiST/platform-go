@@ -32,17 +32,21 @@ The current browser login flows send demo usernames or provider authorization co
 
 ## Credential Auth v1
 
-`credential-auth` is the local credential authentication capability. The current package has the contract, documentation, validation gate, internal service foundation in `internal/platform/credentialauth`, dedicated GORM persistence, application-layer hybrid encrypted secret transport and a persistent P0 HTTP/UI runtime tracked by `resources/platform-credential-auth-v1.json` and `rtk node scripts/validate-platform-credential-auth-v1.mjs`. It preserves the current demo/OIDC runtime, does not enable provider kind `password` in `cmd/platform-api`, and does not replace demo login, Admin OIDC exchange, app login or server-side session issuance flows.
+`credential-auth` is the local credential authentication capability. The current package has the contract, documentation, validation gate, internal service foundation in `internal/platform/credentialauth`, dedicated GORM persistence, application-layer hybrid encrypted secret transport and a deliverable v1 HTTP/UI runtime tracked by `resources/platform-credential-auth-v1.json` and `rtk node scripts/validate-platform-credential-auth-v1.mjs`. It preserves the current demo/OIDC runtime, does not enable provider kind `password` in `cmd/platform-api`, and does not replace demo login, Admin OIDC exchange, app login or server-side session issuance flows.
 
 The capability is business-neutral. It now declares provider modes for `username-password`, `phone-password`, `email-password` and `phone-sms-otp`, and the login UI must stay provider-discovery driven rather than hard-coding those four modes. A successful credential login still delegates JWT signing, session persistence, renewal and revocation to the existing `session` boundary, then RBAC and Casbin calculate authorization after login.
 
 The storage boundary is deliberately separate from generic Admin resources: password credentials must not be stored in generic `Record.Values`. The first service foundation implements normalized identifier hashes, an in-memory repository for development/test, a dedicated GORM repository for persistent runtime, Argon2id PHC verification, SMS OTP one-time consumption semantics and a bootstrap runtime seeded from Admin credential environment variables. Production credential-auth requires `PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER`, `PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN`, `PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_KEY_ID` and `PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY`. The dedicated stores remain `auth_identifiers`, `password_credentials`, `credential_challenges` and `sms_otp_challenges`. They store normalized hashes, masked identifiers, Argon2id verifier metadata, digests, expiry, attempt and one-time consumption state, not raw passwords, raw OTP codes, raw challenge answers or raw phone/email values.
 
-Challenge support is scoped to login for v1: `off`, `always`, `after-failure` or `risk-based`, with `captcha` or `slider` as implementation choices. SMS OTP login belongs to `credential-auth` as a secret type, while SMS delivery itself belongs to the `notification` SMS channel so delivery ledgers, provider adapters, templates, rate limits and production provider validation stay reusable outside authentication. The first notification SMS foundation defines the SMS sender port, `mock-local` development/test sender, provider canonicalization and production fail-closed config validation; external Aliyun/Tencent adapters remain downstream/vendor work. Production must reject mock SMS providers.
+Challenge support is scoped to login for v1: `off`, `always`, `after-failure` or `risk-based`, with `captcha` or `slider` as implementation choices. `POST /api/auth/challenges` is implemented in the backend runtime and creates digest-only challenge transactions with rate-limit enforcement and redacted audit/error surfaces; the Admin login UI currently closes the CAPTCHA flow, while slider presentation and risk strategy can continue to improve without changing the credential secret transport contract.
 
-Credential-auth configuration should surface through provider discovery and the system settings center, not through four hard-coded login menus. The enabled provider modes are rendered from `GET /api/auth/providers`; password policy, challenge policy and SMS OTP policy belong to the `credential-auth` capability contract. SMS account configuration, SMS templates, provider selection, retry and rate-limit policy belong to `notification` resources such as `notification-channels`, `notification-providers`, `notification-send-policies`, `notification-templates` and `notification-deliveries`, normally reached through `/settings` and `/message-center`.
+The password change/reset contract belongs to the same credential-auth boundary. `POST /api/admin/profile/current/password/change` changes the current Admin password, and `POST /api/admin/profile/{id}/password/reset` is the privileged reset contract. Current and new secrets use the same ECDH-P256-HKDF-SHA256+A256GCM `secret.encrypted` envelope as login; raw password, verifier, reset token and challenge answer material must not be returned or stored in generic resources.
 
-The current persistent P0 API shape is:
+SMS OTP login belongs to `credential-auth` as a secret type, while SMS delivery itself belongs to the `notification` SMS channel so delivery ledgers, provider adapters, templates, rate limits and production provider validation stay reusable outside authentication. The notification SMS foundation defines the SMS sender port, `mock-local` development/test sender, provider canonicalization and production fail-closed config validation; Aliyun/Tencent use official SDK-backed live adapters when `PLATFORM_NOTIFICATION_SMS_LIVE_SEND_ENABLED=true` and keep dry-run/config validation for rehearsals. Production must reject mock SMS providers.
+
+Credential-auth configuration should surface through provider discovery and the system settings center, not through four hard-coded login menus. The enabled provider modes are rendered from `GET /api/auth/providers`; password policy, challenge policy and SMS OTP policy belong to the `credential-auth` capability contract. SMS account configuration, SMS templates, provider selection, retry and rate-limit policy belong to `notification` resources such as `notification-channels`, `notification-providers`, `notification-send-policies`, `notification-templates` and `notification-deliveries`, normally reached through `/settings` and `/message-center`. Message center v1 includes SMS provider configuration, Aliyun/Tencent live SMS SDK adapters, dry-run validation, the message delivery worker contract, the manual run endpoint `POST /api/admin/message-center/deliveries/run` and the configuration-page closed loop; it still does not claim SMTP/WeChat supplier sending before separate adapters and evidence exist.
+
+The current deliverable v1 API shape is:
 
 ```text
 GET /api/auth/providers
@@ -50,6 +54,9 @@ GET /api/auth/credential-secret-key
 POST /api/auth/challenges
 POST /api/auth/sms-otp/start
 POST /api/auth/login
+POST /api/admin/profile/current/password/change
+POST /api/admin/profile/{id}/password/reset
+POST /api/admin/message-center/deliveries/run
 ```
 
 Password login request:
@@ -123,7 +130,7 @@ PLATFORM_AUTH_SMS_OTP_TTL_SECONDS=300
 PLATFORM_AUTH_SMS_OTP_MAX_ATTEMPTS=5
 ```
 
-The remaining implementation packages are CAPTCHA/slider challenge runtime, external notification SMS live adapters, credential reset/rotation/breach-response/migration governance, complete audit-redaction/rate-limit evidence and production promotion evidence. The current runtime is a persistent P0 slice, not a production-complete credential system.
+The remaining implementation packages are slider/risk-policy hardening, real-vendor SMS delivery evidence, password rotation/breach-response/migration governance, production environment gates and production promotion evidence. The current runtime is a deliverable v1 slice, not a production-complete credential system.
 
 ## APIs
 

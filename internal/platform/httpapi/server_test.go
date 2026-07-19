@@ -68,6 +68,17 @@ type adminResourceRecordTestPayload struct {
 	} `json:"data"`
 }
 
+type adminMessageCenterDeliveryRunTestPayload struct {
+	Data struct {
+		Scanned   int `json:"scanned"`
+		Attempted int `json:"attempted"`
+		Delivered int `json:"delivered"`
+		Failed    int `json:"failed"`
+		Skipped   int `json:"skipped"`
+	} `json:"data"`
+	Error *ErrorBody `json:"error"`
+}
+
 type policyReviewApproveTestPayload struct {
 	Data struct {
 		Review adminResourceRecordTest `json:"review"`
@@ -182,6 +193,18 @@ type credentialAuthSMSOTPStartTestPayload struct {
 	} `json:"data"`
 }
 
+type credentialAuthChallengeStartTestPayload struct {
+	Data struct {
+		ID         string            `json:"id"`
+		Kind       string            `json:"kind"`
+		Purpose    string            `json:"purpose"`
+		Prompt     string            `json:"prompt"`
+		Parameters map[string]string `json:"parameters"`
+		ExpiresAt  time.Time         `json:"expiresAt"`
+		DebugProof string            `json:"debugProof"`
+	} `json:"data"`
+}
+
 type adminIdentityStartTestPayload struct {
 	Data struct {
 		AuthorizationURL string    `json:"authorizationUrl"`
@@ -271,6 +294,7 @@ func (s *rateLimitTestStub) Allow(_ context.Context, key string, _ int, _ time.D
 		ratelimit.OperationAppUpload,
 		ratelimit.OperationAdminServiceObjectQuery,
 		ratelimit.OperationAdminServiceObjectCommand,
+		ratelimit.OperationMessageCenterDelivery,
 	} {
 		if strings.Contains(key, ":"+string(operation)+":") {
 			s.calls[operation]++
@@ -1112,6 +1136,73 @@ func TestCredentialAuthPasswordLoginUsesDedicatedRuntime(t *testing.T) {
 
 	if badRecorder.Code != http.StatusUnauthorized || !strings.Contains(badRecorder.Body.String(), "AUTH_INVALID_CREDENTIALS") {
 		t.Fatalf("POST bad credential login = %d body = %s, want invalid credentials", badRecorder.Code, badRecorder.Body.String())
+	}
+}
+
+func TestCredentialAuthChallengeStartAndPasswordLoginConsumesProof(t *testing.T) {
+	runtime, _ := credentialAuthRuntimeForTest(t)
+	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
+	startRecorder := httptest.NewRecorder()
+	startRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/challenges", bytes.NewBufferString(`{"kind":"slider","purpose":"login","clientFingerprint":"browser-1"}`))
+	startRequest.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(startRecorder, startRequest)
+
+	if startRecorder.Code != http.StatusCreated {
+		t.Fatalf("POST credential challenge start status = %d body = %s", startRecorder.Code, startRecorder.Body.String())
+	}
+	var started credentialAuthChallengeStartTestPayload
+	if err := json.Unmarshal(startRecorder.Body.Bytes(), &started); err != nil {
+		t.Fatalf("decode credential challenge start: %v body = %s", err, startRecorder.Body.String())
+	}
+	if started.Data.ID == "" || started.Data.Kind != "slider" || started.Data.Purpose != "login" || started.Data.DebugProof == "" || started.Data.Prompt == "" || started.Data.Parameters["targetOffset"] == "" || started.Data.ExpiresAt.IsZero() {
+		t.Fatalf("credential challenge start = %+v, want slider material and debug proof", started.Data)
+	}
+
+	loginRecorder := httptest.NewRecorder()
+	loginRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", credentialAuthPasswordLoginBodyWithChallengeForTest(t, runtime, "correct-password", started.Data.ID, "slider", started.Data.DebugProof, "browser-1"))
+	loginRequest.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(loginRecorder, loginRequest)
+
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("POST credential password login with challenge status = %d body = %s", loginRecorder.Code, loginRecorder.Body.String())
+	}
+
+	reuseRecorder := httptest.NewRecorder()
+	reuseRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", credentialAuthPasswordLoginBodyWithChallengeForTest(t, runtime, "correct-password", started.Data.ID, "slider", started.Data.DebugProof, "browser-1"))
+	reuseRequest.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(reuseRecorder, reuseRequest)
+
+	if reuseRecorder.Code != http.StatusUnauthorized || !strings.Contains(reuseRecorder.Body.String(), "AUTH_INVALID_CREDENTIALS") {
+		t.Fatalf("POST credential password login reused challenge = %d body = %s, want invalid credentials", reuseRecorder.Code, reuseRecorder.Body.String())
+	}
+}
+
+func TestCredentialAuthPasswordLoginRejectsWrongChallengeProof(t *testing.T) {
+	runtime, _ := credentialAuthRuntimeForTest(t)
+	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
+	startRecorder := httptest.NewRecorder()
+	startRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/challenges", bytes.NewBufferString(`{"kind":"captcha","purpose":"login"}`))
+	startRequest.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(startRecorder, startRequest)
+	if startRecorder.Code != http.StatusCreated {
+		t.Fatalf("POST credential challenge start status = %d body = %s", startRecorder.Code, startRecorder.Body.String())
+	}
+	var started credentialAuthChallengeStartTestPayload
+	if err := json.Unmarshal(startRecorder.Body.Bytes(), &started); err != nil {
+		t.Fatalf("decode credential challenge start: %v body = %s", err, startRecorder.Body.String())
+	}
+
+	loginRecorder := httptest.NewRecorder()
+	loginRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", credentialAuthPasswordLoginBodyWithChallengeForTest(t, runtime, "correct-password", started.Data.ID, "captcha", "wrong-proof", ""))
+	loginRequest.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(loginRecorder, loginRequest)
+
+	if loginRecorder.Code != http.StatusUnauthorized || !strings.Contains(loginRecorder.Body.String(), "AUTH_INVALID_CREDENTIALS") {
+		t.Fatalf("POST credential password login wrong challenge = %d body = %s, want invalid credentials", loginRecorder.Code, loginRecorder.Body.String())
 	}
 }
 
@@ -3304,6 +3395,138 @@ func TestCredentialEndpointsApplyRateLimitPolicies(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAdminMessageCenterDeliveryRunRequiresBearerSession(t *testing.T) {
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit", "notification"}),
+		Authorizer:   permissionSetAuthorizer{"admin:message-center:update": true},
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/message-center/deliveries/run", nil)
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("POST message-center deliveries run without bearer status = %d body = %s, want 401", recorder.Code, recorder.Body.String())
+	}
+	var payload adminMessageCenterDeliveryRunTestPayload
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode unauthorized response: %v body = %s", err, recorder.Body.String())
+	}
+	if payload.Error == nil || payload.Error.Code != errorcode.CodeAuthUnauthorized {
+		t.Fatalf("error = %+v, want %s", payload.Error, errorcode.CodeAuthUnauthorized)
+	}
+}
+
+func TestAdminMessageCenterDeliveryRunRunsWorkerForAuthorizedSession(t *testing.T) {
+	now := time.Date(2026, 7, 19, 11, 20, 0, 0, time.UTC)
+	limiter := &rateLimitTestStub{}
+	sender := notification.NewMockLocalSMSSender()
+	server := newTestServer(ServerOptions{
+		Capabilities:          capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit", "notification"}),
+		NotificationSMSSender: sender,
+		RateLimiter:           limiter,
+		Now:                   func() time.Time { return now },
+	})
+	login := loginForTest(t, server, "admin")
+	notice := createHTTPMessageCenterWorkerNotice(t, server.resources, map[string]string{
+		"tenantCode": "platform",
+		"category":   "ops",
+		"payload":    `{"templateId":"SMS_OPS","templateParams":{"ticket":"T-100"}}`,
+	})
+	delivery := createHTTPMessageCenterWorkerDelivery(t, server.resources, map[string]string{
+		"tenantCode":       "platform",
+		"notificationCode": notice.Code,
+		"channel":          notification.ChannelSMS,
+		"deliveryStatus":   notification.DeliveryStatusPending,
+		"target":           "+8613800000000",
+		"provider":         notification.SMSProviderMockLocal,
+		"attempts":         "0",
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/message-center/deliveries/run", nil)
+	request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("POST message-center deliveries run status = %d body = %s, want 200", recorder.Code, recorder.Body.String())
+	}
+	var payload adminMessageCenterDeliveryRunTestPayload
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode delivery run response: %v body = %s", err, recorder.Body.String())
+	}
+	if payload.Data.Attempted != 1 || payload.Data.Delivered != 1 || payload.Data.Failed != 0 {
+		t.Fatalf("delivery run payload = %+v, want one delivered attempt", payload.Data)
+	}
+	if limiter.calls[ratelimit.OperationMessageCenterDelivery] != 1 {
+		t.Fatalf("message-center delivery rate limit calls = %d, want 1", limiter.calls[ratelimit.OperationMessageCenterDelivery])
+	}
+	sent := sender.Sent()
+	if len(sent) != 1 || sent[0].Recipient != "+8613800000000" || sent[0].TemplateID != "SMS_OPS" || sent[0].TemplateParams["ticket"] != "T-100" {
+		t.Fatalf("sent messages = %+v, want hydrated SMS from pending delivery", sent)
+	}
+	updated, err := server.resources.InternalRecord("notification-deliveries", delivery.ID)
+	if err != nil {
+		t.Fatalf("InternalRecord(notification-deliveries) error = %v", err)
+	}
+	if updated.Values["deliveryStatus"] != notification.DeliveryStatusDelivered ||
+		updated.Values["attempts"] != "1" ||
+		updated.Values["target"] != "****0000" ||
+		updated.Values["provider"] != notification.SMSProviderMockLocal ||
+		!strings.HasPrefix(updated.Values["providerMessageId"], "mock-local-") ||
+		updated.Values["lastAttemptAt"] != now.Format(time.RFC3339) ||
+		updated.Values["deliveredAt"] != now.Format(time.RFC3339) {
+		t.Fatalf("updated delivery values = %+v, want delivered worker ledger", updated.Values)
+	}
+}
+
+func TestAdminMessageCenterDeliveryRunRejectsInvalidLimit(t *testing.T) {
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit", "notification"}),
+	})
+	login := loginForTest(t, server, "admin")
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/message-center/deliveries/run", bytes.NewBufferString(`{"limit":101}`))
+	request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	request.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("POST message-center deliveries run invalid limit status = %d body = %s, want 400", recorder.Code, recorder.Body.String())
+	}
+}
+
+func createHTTPMessageCenterWorkerNotice(t *testing.T, store *adminresource.Store, values map[string]string) adminresource.Record {
+	t.Helper()
+	result, err := store.CreateInternalWithAudit("notifications", adminresource.WriteInput{
+		Code:        "notice-http-worker-" + values["category"],
+		Name:        "HTTP Worker Notice",
+		Status:      "sent",
+		Description: "HTTP worker notice body.",
+		Values:      values,
+	}, adminresource.AuditEvent{Actor: "test", Action: "message-center.worker.test.seed", Result: "success", ReasonCode: "seeded"})
+	if err != nil {
+		t.Fatalf("CreateInternalWithAudit(notifications) error = %v", err)
+	}
+	return result.Record
+}
+
+func createHTTPMessageCenterWorkerDelivery(t *testing.T, store *adminresource.Store, values map[string]string) adminresource.Record {
+	t.Helper()
+	result, err := store.CreateInternalWithAudit("notification-deliveries", adminresource.WriteInput{
+		Code:        "delivery-http-worker-" + values["provider"],
+		Name:        "HTTP Worker Delivery",
+		Status:      "enabled",
+		Description: "HTTP worker delivery ledger.",
+		Values:      values,
+	}, adminresource.AuditEvent{Actor: "test", Action: "message-center.worker.test.seed", Result: "success", ReasonCode: "seeded"})
+	if err != nil {
+		t.Fatalf("CreateInternalWithAudit(notification-deliveries) error = %v", err)
+	}
+	return result.Record
 }
 
 func TestRateLimitBackendErrorsReturnStableServiceUnavailable(t *testing.T) {
@@ -7703,10 +7926,11 @@ func credentialAuthRuntimeForTest(t *testing.T) (*CredentialAuthRuntime, *notifi
 	}
 	params := credentialauth.Argon2idParams{MemoryKiB: 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32}
 	service, err := credentialauth.NewService(credentialauth.Options{
-		Repository:       credentialauth.NewMemoryRepository(),
-		IdentifierHasher: hasher,
-		PasswordVerifier: credentialauth.NewArgon2idVerifier(params),
-		Now:              func() time.Time { return time.Date(2026, 7, 19, 9, 0, 0, 0, time.UTC) },
+		Repository:           credentialauth.NewMemoryRepository(),
+		IdentifierHasher:     hasher,
+		PasswordVerifier:     credentialauth.NewArgon2idVerifier(params),
+		ChallengeProofHasher: hasher,
+		Now:                  func() time.Time { return time.Date(2026, 7, 19, 9, 0, 0, 0, time.UTC) },
 	})
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
@@ -7747,6 +7971,7 @@ func credentialAuthRuntimeForTest(t *testing.T) (*CredentialAuthRuntime, *notifi
 		IdentifierHasher:        hasher,
 		SecretTransport:         secretTransport,
 		SMSOTPHasher:            hasher,
+		ChallengeProofHasher:    hasher,
 		SMSSender:               sender,
 		LoginTemplateID:         "login-template",
 		DebugCodeEnabled:        true,
@@ -7754,6 +7979,8 @@ func credentialAuthRuntimeForTest(t *testing.T) (*CredentialAuthRuntime, *notifi
 		Now:                     func() time.Time { return time.Date(2026, 7, 19, 9, 0, 0, 0, time.UTC) },
 		SMSOTPTTL:               5 * time.Minute,
 		MaxSMSOTPAttempts:       credentialauth.DefaultMaxSMSOTPAttempts,
+		MaxChallengeAttempts:    credentialauth.DefaultMaxChallengeAttempts,
+		ChallengeTTL:            credentialauth.DefaultCredentialChallengeTTL,
 		RequireEncryptedSecrets: true,
 	}, sender
 }
@@ -7775,6 +8002,27 @@ func credentialAuthPasswordLoginBodyForTest(t *testing.T, runtime *CredentialAut
 	body, err := json.Marshal(payload)
 	if err != nil {
 		t.Fatalf("marshal credential password body: %v", err)
+	}
+	return bytes.NewReader(body)
+}
+
+func credentialAuthPasswordLoginBodyWithChallengeForTest(t *testing.T, runtime *CredentialAuthRuntime, password string, challengeID string, kind string, proof string, clientFingerprint string) io.Reader {
+	t.Helper()
+	envelope := credentialAuthEncryptedSecretForTest(t, runtime, "username-password", "password", "username", password)
+	payload := map[string]any{
+		"provider":   "username-password",
+		"identifier": map[string]string{"type": "username", "value": "admin"},
+		"secret":     map[string]any{"type": "password", "encrypted": envelope},
+		"challenge": map[string]string{
+			"id":                challengeID,
+			"kind":              kind,
+			"proof":             proof,
+			"clientFingerprint": clientFingerprint,
+		},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal credential password challenge body: %v", err)
 	}
 	return bytes.NewReader(body)
 }

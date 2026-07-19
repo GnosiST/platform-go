@@ -241,6 +241,77 @@ func TestServiceRejectsExpiredChallenges(t *testing.T) {
 	}
 }
 
+func TestServiceCreatesCredentialChallengeWithDigestAndConsumesProof(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 7, 19, 10, 0, 0, 0, time.UTC)
+	repository := NewMemoryRepository()
+	hasher, err := NewHMACIdentifierHasher([]byte(strings.Repeat("i", 32)))
+	if err != nil {
+		t.Fatalf("NewHMACIdentifierHasher() error = %v", err)
+	}
+	service, err := NewService(Options{
+		Repository:           repository,
+		ChallengeProofHasher: hasher,
+		ChallengeIDGenerator: func() (string, error) { return "challenge-fixed", nil },
+		ChallengeMaterialGenerator: func(kind ChallengeKind) (ChallengeMaterial, error) {
+			if kind != ChallengeKindSlider {
+				t.Fatalf("challenge kind = %q, want slider", kind)
+			}
+			return ChallengeMaterial{
+				Prompt:     "Move the slider.",
+				Parameters: map[string]string{"targetOffset": "72", "unit": "px"},
+				Proof:      "72",
+			}, nil
+		},
+		Now: func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+
+	created, err := service.CreateCredentialChallenge(ctx, CreateCredentialChallengeInput{
+		Kind:                  ChallengeKindSlider,
+		Purpose:               ChallengePurposeLogin,
+		ClientFingerprintHash: "fingerprint-hash",
+		TTL:                   2 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("CreateCredentialChallenge() error = %v", err)
+	}
+	if created.ChallengeID != "challenge-fixed" || created.Kind != ChallengeKindSlider || created.Proof != "72" || created.Parameters["targetOffset"] != "72" || !created.ExpiresAt.Equal(now.Add(2*time.Minute)) {
+		t.Fatalf("created challenge = %+v, want fixed slider material", created)
+	}
+	stored, ok, err := repository.CredentialChallenge(ctx, "challenge-fixed")
+	if err != nil || !ok {
+		t.Fatalf("CredentialChallenge() = %+v, %v, %v; want stored challenge", stored, ok, err)
+	}
+	if stored.AnswerDigest == "72" || !strings.HasPrefix(stored.AnswerDigest, challengeProofHashPrefix) || stored.ClientFingerprintHash != "fingerprint-hash" {
+		t.Fatalf("stored challenge = %+v, want digest and fingerprint binding", stored)
+	}
+	digest, err := hasher.HashChallengeProof(ChallengeKindSlider, ChallengePurposeLogin, "challenge-fixed", "72")
+	if err != nil {
+		t.Fatalf("HashChallengeProof() error = %v", err)
+	}
+	if err := service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
+		ChallengeID:           "challenge-fixed",
+		Kind:                  ChallengeKindSlider,
+		Purpose:               ChallengePurposeLogin,
+		AnswerDigest:          digest,
+		ClientFingerprintHash: "fingerprint-hash",
+	}); err != nil {
+		t.Fatalf("VerifyCredentialChallenge() error = %v", err)
+	}
+	if err := service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
+		ChallengeID:           "challenge-fixed",
+		Kind:                  ChallengeKindSlider,
+		Purpose:               ChallengePurposeLogin,
+		AnswerDigest:          digest,
+		ClientFingerprintHash: "fingerprint-hash",
+	}); !errors.Is(err, ErrChallengeConsumed) {
+		t.Fatalf("VerifyCredentialChallenge(reuse) error = %v, want ErrChallengeConsumed", err)
+	}
+}
+
 func newPasswordServiceForTest(t *testing.T, verifier PasswordVerifier, now *time.Time, maxAttempts int) (*MemoryRepository, *Service) {
 	t.Helper()
 	repository := NewMemoryRepository()

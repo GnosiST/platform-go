@@ -24,6 +24,7 @@ const (
 
 	DefaultMaxPasswordAttempts  = 5
 	DefaultPasswordLockDuration = 15 * time.Minute
+	DefaultCredentialChallengeTTL = 5 * time.Minute
 	DefaultMaxChallengeAttempts = 5
 	DefaultMaxSMSOTPAttempts    = 5
 )

@@ -6,13 +6,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
 	"github.com/GnosiST/platform-go/internal/platform/config"
 	"github.com/GnosiST/platform-go/internal/platform/credentialauth"
 	"github.com/GnosiST/platform-go/internal/platform/httpapi"
 	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
 
-func CredentialAuthRuntimeFromConfig(ctx context.Context, cfg config.Config, sms NotificationSMSRuntime) (*httpapi.CredentialAuthRuntime, error) {
+func CredentialAuthRuntimeFromConfig(ctx context.Context, cfg config.Config, sms NotificationSMSRuntime, resources ...*adminresource.Store) (*httpapi.CredentialAuthRuntime, error) {
 	if !cfg.CredentialAuthConfigured() {
 		return nil, nil
 	}
@@ -33,15 +34,16 @@ func CredentialAuthRuntimeFromConfig(ctx context.Context, cfg config.Config, sms
 		return nil, err
 	}
 	service, err := credentialauth.NewService(credentialauth.Options{
-		Repository:       repository,
-		IdentifierHasher: hasher,
-		PasswordVerifier: credentialauth.NewArgon2idVerifier(credentialauth.DefaultArgon2idParams()),
-		Now:              time.Now,
+		Repository:           repository,
+		IdentifierHasher:     hasher,
+		PasswordVerifier:     credentialauth.NewArgon2idVerifier(credentialauth.DefaultArgon2idParams()),
+		ChallengeProofHasher: hasher,
+		Now:                  time.Now,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build credential auth service: %w", err)
 	}
-	if err := seedCredentialAuthBootstrapAdmin(ctx, cfg, service); err != nil {
+	if err := seedCredentialAuthBootstrapAdmin(ctx, cfg, service, resources...); err != nil {
 		return nil, err
 	}
 	if cfg.CredentialAuthPhoneSMSOTP && sms.Sender == nil {
@@ -52,12 +54,17 @@ func CredentialAuthRuntimeFromConfig(ctx context.Context, cfg config.Config, sms
 		IdentifierHasher:        hasher,
 		SecretTransport:         secretTransport,
 		SMSOTPHasher:            hasher,
+		ChallengeProofHasher:    hasher,
 		SMSSender:               sms.Sender,
 		LoginTemplateID:         sms.LoginTemplateID,
 		DebugCodeEnabled:        sms.MockLocalEnabled && (environment == config.RuntimeEnvironmentDevelopment || environment == config.RuntimeEnvironmentTest),
 		Now:                     time.Now,
 		SMSOTPTTL:               5 * time.Minute,
 		MaxSMSOTPAttempts:       credentialauth.DefaultMaxSMSOTPAttempts,
+		MaxChallengeAttempts:    credentialauth.DefaultMaxChallengeAttempts,
+		ChallengeTTL:            credentialauth.DefaultCredentialChallengeTTL,
+		PasswordHashParams:      credentialauth.DefaultArgon2idParams(),
+		PasswordParamsVersion:   "argon2id-default",
 		RequireEncryptedSecrets: true,
 	}, nil
 }
@@ -118,12 +125,12 @@ func credentialAuthSecretTransportFromConfig(cfg config.Config, environment stri
 	return transport, nil
 }
 
-func seedCredentialAuthBootstrapAdmin(ctx context.Context, cfg config.Config, service *credentialauth.Service) error {
+func seedCredentialAuthBootstrapAdmin(ctx context.Context, cfg config.Config, service *credentialauth.Service, resources ...*adminresource.Store) error {
 	username := strings.TrimSpace(cfg.CredentialAuthBootstrapAdminUsername)
 	if username == "" {
 		return nil
 	}
-	principal := credentialauth.PrincipalRef{Type: credentialauth.PrincipalTypeAdmin, ID: username}
+	principal := credentialAuthBootstrapAdminPrincipal(username, resources...)
 	if cfg.CredentialAuthUsernamePassword {
 		if _, err := service.RegisterIdentifier(ctx, credentialauth.RegisterIdentifierInput{
 			Principal:  principal,
@@ -168,4 +175,18 @@ func seedCredentialAuthBootstrapAdmin(ctx context.Context, cfg config.Config, se
 		}
 	}
 	return nil
+}
+
+func credentialAuthBootstrapAdminPrincipal(username string, resources ...*adminresource.Store) credentialauth.PrincipalRef {
+	username = strings.TrimSpace(username)
+	for _, store := range resources {
+		if store == nil {
+			continue
+		}
+		principal, err := adminresource.ValidateAdminPrincipal(store, username)
+		if err == nil && strings.TrimSpace(principal.User.ID) != "" {
+			return credentialauth.PrincipalRef{Type: credentialauth.PrincipalTypeAdmin, ID: principal.User.ID}
+		}
+	}
+	return credentialauth.PrincipalRef{Type: credentialauth.PrincipalTypeAdmin, ID: username}
 }
