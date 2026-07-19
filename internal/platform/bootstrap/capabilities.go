@@ -23,6 +23,7 @@ type NotificationSMSRuntime struct {
 	Sender           notification.SMSSender
 	LoginTemplateID  string
 	MockLocalEnabled bool
+	DryRunEnabled    bool
 }
 
 type RateLimitRuntime struct {
@@ -216,10 +217,15 @@ func NotificationSMSRuntimeFromConfig(cfg config.Config, sender notification.SMS
 	if actualProvider != provider {
 		return NotificationSMSRuntime{}, fmt.Errorf("notification SMS sender %q does not match configured provider %q", actualProvider, provider)
 	}
+	dryRunEnabled := false
+	if reporter, ok := sender.(interface{ DryRun() bool }); ok {
+		dryRunEnabled = reporter.DryRun()
+	}
 	return NotificationSMSRuntime{
 		Sender:           sender,
 		LoginTemplateID:  loginTemplateID,
 		MockLocalEnabled: provider == notification.SMSProviderMockLocal,
+		DryRunEnabled:    dryRunEnabled,
 	}, nil
 }
 

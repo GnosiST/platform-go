@@ -509,9 +509,16 @@ requireNotIncludes(files.settings, "settings-status-grid", "System settings must
 requireIncludes(files.settings, "aria-pressed={active === mode}", "Layout-mode options must expose their selected state to assistive technology.");
 requireIncludes(files.settings, "layoutDescription(dictionary, mode)", "Layout-mode options must include the approved explanatory copy.");
 requireIncludes(files.settings, "showPreviews={uiConfig.showLayoutLegend}", "The persisted layout-legend preference must control preview visibility without hiding the selector.");
-requireIncludes(files.settingsCenter, "projectSettingsResourceConfigs(resources, dictionary, language)", "Settings center must derive configuration entries from the authorized manifest-projected resources.");
-requireIncludes(files.settingsCenter, 'resource.parent === "configuration"', "Settings center must automatically include configuration resources contributed by enabled capabilities.");
+requireIncludes(files.client, "export function getAdminSettingsRuntime", "Settings center must read the authorized backend settings runtime.");
+requireIncludes(files.settingsCenter, "getAdminSettingsRuntime()", "Settings center must derive configuration entries from the authorized backend manifest projection.");
+requireIncludes(files.settingsCenter, "projectSettingsResourceConfigs(runtimeItems, resources, dictionary, language)", "Settings center must project configuration entries from settings runtime items.");
+requireIncludes(files.settingsCenter, "runtimeItems.flatMap", "Settings center must automatically include configuration resources contributed by enabled capabilities.");
 requireIncludes(files.settingsCenter, "knownSettingsResourceCatalog", "Settings center must keep productized metadata for known platform configuration resources.");
+requireIncludes(files.settingsCenter, 'route: "/dictionary-parameters"', "Settings center must expose dictionary parameters as a system-level configuration entry.");
+requireIncludes(files.settingsCenter, 'route: "/notification-templates"', "Settings center must expose notification templates as message configuration.");
+requireIncludes(files.settingsCenter, "groupSettingsResourceConfigs(availableConfigs, dictionary)", "Settings center must group configuration resources into productized system, message, and capability sections.");
+requireIncludes(files.settingsCenter, '"manifest" as const', "Settings center must keep a dynamic manifest-backed configuration path beyond the known platform catalog.");
+requireIncludes(files.settingsCenter, "sourceLabel(config.source, dictionary)", "Settings center must distinguish platform catalog entries from capability-manifest entries.");
 requireNotIncludes(files.settingsCenter, 'type SettingsResourceKey = "parameters"', "Settings center must not hard-code a closed configuration resource union.");
 requireIncludes(files.messageCenter, 'resource: "notification-channels"', "Message center must expose notification channel configuration.");
 requireIncludes(files.messageCenter, 'resource: "notification-providers"', "Message center must expose notification provider account configuration.");
@@ -520,14 +527,44 @@ requireIncludes(files.messageCenter, 'resource: "notification-send-policies"', "
 requireIncludes(files.messageCenter, 'resource: "notifications"', "Message center must expose notification records.");
 requireIncludes(files.messageCenter, 'resource: "notification-deliveries"', "Message center must expose delivery ledgers.");
 requireIncludes(files.messageCenter, '["in_app", "sms", "email", "wechat_official", "wechat_miniapp"]', "Message center must expose the common in-app, SMS, email, and WeChat channel set even before records exist.");
-requireIncludes(files.messageCenter, "dictionary.messageCenterTestSendUnavailable", "Message center must avoid presenting test-send as implemented before a send-test endpoint exists.");
+requireIncludes(files.client, "testSendMessageCenter", "Admin API client must expose the message-center test-send runtime endpoint.");
+requireIncludes(files.messageCenter, "testSendMessageCenter", "Message center must call the backend test-send endpoint instead of showing a disabled placeholder.");
+requireIncludes(files.messageCenter, "<MessageCenterClosedLoop", "Message center must render the operating loop instead of only resource tabs.");
+requireIncludes(files.messageCenter, "messageCenterClosedLoopSteps(resourceConfigs, records, resourceRoutes, dictionary)", "Message center runtime loop must be derived from the full notification resource sequence.");
+requireIncludes(files.messageCenter, "dictionary.messageCenterDryRun", "Message center must expose a dry-run entry state.");
+requireIncludes(files.messageCenter, "dictionary.messageCenterTrialReadyTitle", "Message center must explain that SMS test send is connected to the runtime endpoint.");
+requireIncludes(files.messageCenter, "workflowStepIcon", "Message center closed-loop cards must distinguish channel, provider, template, policy, notification, and delivery steps.");
 for (const key of [
   "settingsCenterTitle",
   "settingsCenterDescription",
   "settingsCenterDynamicMap",
   "settingsCenterResourceListDescription",
+  "settingsCenterDictionaryParameters",
+  "settingsCenterDictionaryParametersDescription",
+  "settingsCenterNotificationTemplates",
+  "settingsCenterNotificationTemplatesDescription",
+  "settingsCenterCoreGroup",
+  "settingsCenterCoreGroupDescription",
+  "settingsCenterMessageGroup",
+  "settingsCenterMessageGroupDescription",
+  "settingsCenterCapabilityGroup",
+  "settingsCenterCapabilityGroupDescription",
+  "settingsCenterCatalogSource",
+  "settingsCenterManifestSource",
   "messageCenterTitle",
   "messageCenterDescription",
+  "messageCenterClosedLoopTitle",
+  "messageCenterClosedLoopDescription",
+  "messageCenterDryRun",
+  "messageCenterTrialReadyTitle",
+  "messageCenterTrialReadyDescription",
+  "messageCenterTestSendTitle",
+  "messageCenterTestSendDescription",
+  "messageCenterTemplateParamsInvalid",
+  "messageCenterTestSendResultDescription",
+  "messageCenterResourceConnected",
+  "messageCenterResourceMissing",
+  "messageCenterRecordCount",
   "messageCenterProvidersDescription",
   "messageCenterChannelSMSDescription",
   "messageCenterChannelEmailDescription",

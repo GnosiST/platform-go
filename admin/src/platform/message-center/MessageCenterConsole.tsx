@@ -1,4 +1,5 @@
 import {
+  ApiOutlined,
   BellOutlined,
   CheckCircleOutlined,
   MailOutlined,
@@ -8,18 +9,21 @@ import {
   SettingOutlined,
   WechatOutlined,
 } from "@ant-design/icons";
-import { Button, Empty, Space, Tabs, Tag, Tooltip, Typography } from "antd";
+import { App, Button, Empty, Form, Input, Select, Space, Tabs, Tag, Tooltip, Typography } from "antd";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AdminAPIError,
   queryAdminResource,
+  testSendMessageCenter,
   type AdminResourceRecord,
+  type MessageCenterTestSendResult,
 } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
 import {
   AdminActionButton,
   AdminFeedback,
   AdminListPanel,
+  AdminModal,
   AdminMetricStrip,
   AdminPage,
   PlatformDataTable,
@@ -53,6 +57,16 @@ type MessageCenterResourceConfig = {
 
 type MessageCenterRecords = Record<MessageCenterResourceKey, AdminResourceRecord[]>;
 type MessageCenterErrors = Partial<Record<MessageCenterResourceKey, string>>;
+
+type MessageCenterTestSendForm = {
+  channel: "sms";
+  tenantCode: string;
+  recipient: string;
+  templateId: string;
+  templateParams: string;
+  title: string;
+  body: string;
+};
 
 const PAGE_SIZE = 200;
 
@@ -102,9 +116,14 @@ const resourceConfigs: MessageCenterResourceConfig[] = [
 ];
 
 export function MessageCenterConsole({ language, dictionary, resources, onRouteChange }: MessageCenterConsoleProps) {
+  const { message: toast } = App.useApp();
+  const [testSendForm] = Form.useForm<MessageCenterTestSendForm>();
   const [records, setRecords] = useState<MessageCenterRecords>(() => emptyMessageCenterRecords());
   const [errors, setErrors] = useState<MessageCenterErrors>({});
   const [loading, setLoading] = useState(true);
+  const [testSendOpen, setTestSendOpen] = useState(false);
+  const [testSendSubmitting, setTestSendSubmitting] = useState(false);
+  const [testSendResult, setTestSendResult] = useState<MessageCenterTestSendResult | null>(null);
   const resourceRoutes = useMemo(() => new Set(resources.map((resource) => resource.route)), [resources]);
   const availableConfigs = useMemo(
     () => resourceConfigs.filter((config) => resourceRoutes.has(config.route)),
@@ -136,6 +155,37 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
   }, [resourceRoutes]);
 
   const openResource = (config: MessageCenterResourceConfig) => onRouteChange(config.route);
+  const openTestSend = (record?: AdminResourceRecord, config?: MessageCenterResourceConfig) => {
+    setTestSendResult(null);
+    testSendForm.setFieldsValue(messageCenterTestSendInitialValues(record, config, language));
+    setTestSendOpen(true);
+  };
+  const closeTestSend = () => {
+    if (testSendSubmitting) {
+      return;
+    }
+    setTestSendOpen(false);
+  };
+  const submitTestSend = async () => {
+    const values = await testSendForm.validateFields();
+    setTestSendSubmitting(true);
+    try {
+      const result = await testSendMessageCenter({
+        channel: "sms",
+        tenantCode: values.tenantCode,
+        recipient: values.recipient,
+        templateId: values.templateId,
+        templateParams: parseTemplateParams(values.templateParams),
+        title: values.title,
+        body: values.body,
+      });
+      setTestSendResult(result);
+      toast.success(dictionary.messageCenterTestSendSuccess);
+      await load();
+    } finally {
+      setTestSendSubmitting(false);
+    }
+  };
   const errorMessages = Object.entries(errors).filter(([, message]) => Boolean(message));
 
   return (
@@ -144,9 +194,14 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
       title={dictionary.messageCenterTitle}
       description={dictionary.messageCenterDescription}
       actions={(
-        <AdminActionButton icon={<ReloadOutlined />} label={dictionary.refresh} loading={loading} onClick={() => void load()}>
-          {dictionary.refresh}
-        </AdminActionButton>
+        <Space size={8} wrap>
+          <Button icon={<SendOutlined />} onClick={() => openTestSend()}>
+            {dictionary.messageCenterDryRun}
+          </Button>
+          <AdminActionButton icon={<ReloadOutlined />} label={dictionary.refresh} loading={loading} onClick={() => void load()}>
+            {dictionary.refresh}
+          </AdminActionButton>
+        </Space>
       )}
       summary={(
         <AdminMetricStrip
@@ -172,6 +227,17 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
           description={errorMessages.map(([key, message]) => `${resourceLabel(key as MessageCenterResourceKey, dictionary)}: ${message}`).join("; ")}
         />
       ) : null}
+      <AdminFeedback
+        type="info"
+        message={dictionary.messageCenterTrialReadyTitle}
+        description={dictionary.messageCenterTrialReadyDescription}
+      />
+      <MessageCenterClosedLoop
+        dictionary={dictionary}
+        records={records}
+        resourceRoutes={resourceRoutes}
+        onOpen={openResource}
+      />
       <AdminListPanel
         className="message-center-overview"
         title={dictionary.messageCenterRuntimeOverview}
@@ -217,11 +283,76 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
                 loading={loading}
                 records={records[config.key]}
                 onOpen={() => openResource(config)}
+                onTestSend={(record) => openTestSend(record, config)}
               />
             ),
           }))}
         />
       )}
+      <AdminModal
+        open={testSendOpen}
+        preset="form"
+        size="lg"
+        title={dictionary.messageCenterTestSendTitle}
+        okText={dictionary.messageCenterTestSend}
+        cancelText={dictionary.cancel}
+        confirmLoading={testSendSubmitting}
+        onCancel={closeTestSend}
+        onOk={() => void submitTestSend()}
+      >
+        <Typography.Paragraph type="secondary">{dictionary.messageCenterTestSendDescription}</Typography.Paragraph>
+        <Form form={testSendForm} layout="vertical" requiredMark={false}>
+          <Space className="message-center-test-send-grid" direction="vertical" size={0}>
+            <Form.Item label={dictionary.messageCenterChannel} name="channel" rules={[{ required: true }]}>
+              <Select
+                options={[{ value: "sms", label: dictionary.messageCenterChannelSMS }]}
+              />
+            </Form.Item>
+            <Form.Item label={dictionary.tenant} name="tenantCode">
+              <Input />
+            </Form.Item>
+            <Form.Item label={dictionary.messageCenterRecipient} name="recipient" rules={[{ required: true }]}>
+              <Input placeholder={dictionary.messageCenterRecipientPlaceholder} />
+            </Form.Item>
+            <Form.Item label={dictionary.messageCenterTemplateId} name="templateId" rules={[{ required: true }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item label={dictionary.messageCenterTitleField} name="title">
+              <Input />
+            </Form.Item>
+            <Form.Item label={dictionary.messageCenterBodyField} name="body">
+              <Input.TextArea autoSize={{ minRows: 3, maxRows: 5 }} />
+            </Form.Item>
+            <Form.Item
+              label={dictionary.messageCenterTemplateParams}
+              name="templateParams"
+              rules={[{
+                validator: async (_rule, value) => {
+                  try {
+                    parseTemplateParams(value);
+                  } catch {
+                    throw new Error(dictionary.messageCenterTemplateParamsInvalid);
+                  }
+                },
+              }]}
+            >
+              <Input.TextArea autoSize={{ minRows: 3, maxRows: 5 }} placeholder={dictionary.messageCenterTemplateParamsPlaceholder} />
+            </Form.Item>
+          </Space>
+        </Form>
+        {testSendResult ? (
+          <AdminFeedback
+            type="success"
+            message={dictionary.messageCenterTestSendResult}
+            description={formatTemplate(dictionary.messageCenterTestSendResultDescription, {
+              provider: testSendResult.receipt.provider || "-",
+              status: testSendResult.receipt.status || "-",
+              target: testSendResult.receipt.redactedTarget || "-",
+              messageId: testSendResult.receipt.messageId || "-",
+            })}
+          />
+        ) : null}
+      </AdminModal>
     </AdminPage>
   );
 }
@@ -233,6 +364,7 @@ function MessageCenterTab({
   loading,
   records,
   onOpen,
+  onTestSend,
 }: {
   config: MessageCenterResourceConfig;
   dictionary: Dictionary;
@@ -240,6 +372,7 @@ function MessageCenterTab({
   loading: boolean;
   records: AdminResourceRecord[];
   onOpen: () => void;
+  onTestSend: (record: AdminResourceRecord) => void;
 }) {
   return (
     <AdminListPanel
@@ -266,17 +399,73 @@ function MessageCenterTab({
               </Button>
             </Tooltip>
             {config.key === "providers" ? (
-              <Tooltip title={dictionary.messageCenterTestSendUnavailable}>
-                <Button disabled icon={<SendOutlined />} size="small" type="text">
-                  {dictionary.messageCenterTestSend}
-                </Button>
-              </Tooltip>
+              <Button icon={<SendOutlined />} size="small" type="text" onClick={() => onTestSend(record)}>
+                {dictionary.messageCenterTestSend}
+              </Button>
+            ) : null}
+            {supportsTrialEntry(config.key) ? (
+              <Button icon={<SendOutlined />} size="small" type="text" onClick={() => onTestSend(record)}>
+                {dictionary.messageCenterDryRun}
+              </Button>
             ) : null}
           </Space>
         )}
-        rowActionsColumnWidth={config.key === "providers" ? 180 : 112}
+        rowActionsColumnWidth={supportsTrialEntry(config.key) || config.key === "providers" ? 220 : 112}
         emptyState={<Empty description={dictionary.emptyData} />}
       />
+    </AdminListPanel>
+  );
+}
+
+function MessageCenterClosedLoop({
+  dictionary,
+  records,
+  resourceRoutes,
+  onOpen,
+}: {
+  dictionary: Dictionary;
+  records: MessageCenterRecords;
+  resourceRoutes: Set<string>;
+  onOpen: (config: MessageCenterResourceConfig) => void;
+}) {
+  const steps = messageCenterClosedLoopSteps(resourceConfigs, records, resourceRoutes, dictionary);
+  return (
+    <AdminListPanel
+      className="message-center-closed-loop"
+      title={dictionary.messageCenterClosedLoopTitle}
+      toolbar={<Typography.Text type="secondary">{dictionary.messageCenterClosedLoopDescription}</Typography.Text>}
+    >
+      <div className="message-center-channel-strip">
+        {steps.map((step) => {
+          const content = (
+            <>
+              <span className="message-center-channel-icon">{step.icon}</span>
+              <div className="settings-center-config-cell">
+                <Typography.Text strong>{step.title}</Typography.Text>
+                <Typography.Text type="secondary">{step.description}</Typography.Text>
+              </div>
+              <Space direction="vertical" size={2} align="end">
+                <Tag color={step.available ? "success" : "warning"}>
+                  {step.available ? dictionary.messageCenterResourceConnected : dictionary.messageCenterResourceMissing}
+                </Tag>
+                <Tag>{formatTemplate(dictionary.messageCenterRecordCount, { count: String(step.count) })}</Tag>
+              </Space>
+            </>
+          );
+          if (!step.available) {
+            return (
+              <div className="message-center-channel-card" key={step.key} aria-label={step.title}>
+                {content}
+              </div>
+            );
+          }
+          return (
+            <button className="settings-center-card" key={step.key} type="button" onClick={() => onOpen(step.config)}>
+              {content}
+            </button>
+          );
+        })}
+      </div>
     </AdminListPanel>
   );
 }
@@ -426,6 +615,36 @@ function channelCards(records: MessageCenterRecords, dictionary: Dictionary) {
   }));
 }
 
+function messageCenterClosedLoopSteps(
+  configs: MessageCenterResourceConfig[],
+  records: MessageCenterRecords,
+  resourceRoutes: Set<string>,
+  dictionary: Dictionary,
+) {
+  return configs.map((config) => ({
+    key: config.key,
+    config,
+    title: config.title(dictionary),
+    description: config.description(dictionary),
+    available: resourceRoutes.has(config.route),
+    count: records[config.key].length,
+    icon: workflowStepIcon(config.key),
+  }));
+}
+
+function workflowStepIcon(key: MessageCenterResourceKey) {
+  if (key === "channels") return <BellOutlined />;
+  if (key === "providers") return <ApiOutlined />;
+  if (key === "templates") return <MailOutlined />;
+  if (key === "policies") return <SettingOutlined />;
+  if (key === "deliveries") return <CheckCircleOutlined />;
+  return <SendOutlined />;
+}
+
+function supportsTrialEntry(key: MessageCenterResourceKey) {
+  return key === "templates" || key === "policies";
+}
+
 function channelIcon(channel: string) {
   if (channel === "sms") return <MessageOutlined />;
   if (channel === "email") return <MailOutlined />;
@@ -516,6 +735,43 @@ function statusLabel(status: string, dictionary: Dictionary) {
 
 function valueOf(record: AdminResourceRecord, key: string) {
   return record.values?.[key] ?? (record as unknown as Record<string, string | undefined>)[key] ?? "";
+}
+
+function messageCenterTestSendInitialValues(
+  record: AdminResourceRecord | undefined,
+  config: MessageCenterResourceConfig | undefined,
+  language: Language,
+): MessageCenterTestSendForm {
+  const templateId = record && config?.key === "templates"
+    ? record.code
+    : record
+      ? valueOf(record, "templateCode")
+      : "";
+  return {
+    channel: "sms",
+    tenantCode: record ? valueOf(record, "tenantCode") || "platform" : "platform",
+    recipient: "",
+    templateId,
+    templateParams: "{}",
+    title: record ? localizedName(record, language) : "Message center SMS test",
+    body: record?.description || "",
+  };
+}
+
+function parseTemplateParams(raw: string | undefined): Record<string, string> | undefined {
+  const trimmed = String(raw ?? "").trim();
+  if (trimmed === "" || trimmed === "{}") {
+    return undefined;
+  }
+  const parsed = JSON.parse(trimmed) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("template params must be a JSON object");
+  }
+  return Object.fromEntries(
+    Object.entries(parsed as Record<string, unknown>)
+      .filter(([key]) => key.trim() !== "")
+      .map(([key, value]) => [key, value == null ? "" : String(value)]),
+  );
 }
 
 function formatTemplate(template: string, values: Record<string, string>) {

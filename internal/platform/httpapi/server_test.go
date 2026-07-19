@@ -3,6 +3,12 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/ecdh"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +41,7 @@ import (
 	"github.com/GnosiST/platform-go/internal/platform/ratelimit"
 	"github.com/GnosiST/platform-go/internal/platform/session"
 	"github.com/GnosiST/platform-go/internal/platform/storage"
+	"golang.org/x/crypto/hkdf"
 )
 
 type adminResourceListTestPayload struct {
@@ -1040,7 +1047,7 @@ func TestCredentialAuthProviderRequiresRuntime(t *testing.T) {
 
 	loginBody := bytes.NewBufferString(`{"provider":"username-password","identifier":{"type":"username","value":"admin"},"secret":{"type":"password","value":"password"}}`)
 	loginRecorder := httptest.NewRecorder()
-	loginRequest := httptest.NewRequest(http.MethodPost, "/api/auth/login", loginBody)
+	loginRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", loginBody)
 	loginRequest.Header.Set("Content-Type", "application/json")
 
 	server.Router().ServeHTTP(loginRecorder, loginRequest)
@@ -1053,12 +1060,34 @@ func TestCredentialAuthProviderRequiresRuntime(t *testing.T) {
 	}
 }
 
+func TestCredentialAuthSecretKeyDiscovery(t *testing.T) {
+	runtime, _ := credentialAuthRuntimeForTest(t)
+	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/auth/credential-secret-key", nil)
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET credential secret key = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	var payload struct {
+		Data credentialAuthSecretKeyResponse `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode credential secret key: %v body = %s", err, recorder.Body.String())
+	}
+	if payload.Data.Version != credentialauth.SecretTransportVersion || payload.Data.Algorithm != credentialauth.SecretTransportAlgorithm || payload.Data.KeyID == "" || payload.Data.PublicKey == "" || payload.Data.ExpiresAt.IsZero() {
+		t.Fatalf("credential secret key = %+v, want public encryption metadata", payload.Data)
+	}
+}
+
 func TestCredentialAuthPasswordLoginUsesDedicatedRuntime(t *testing.T) {
 	runtime, _ := credentialAuthRuntimeForTest(t)
 	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
-	loginBody := bytes.NewBufferString(`{"provider":"username-password","identifier":{"type":"username","value":"admin"},"secret":{"type":"password","value":"correct-password"}}`)
+	loginBody := credentialAuthPasswordLoginBodyForTest(t, runtime, "correct-password")
 	loginRecorder := httptest.NewRecorder()
-	loginRequest := httptest.NewRequest(http.MethodPost, "/api/auth/login", loginBody)
+	loginRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", loginBody)
 	loginRequest.Header.Set("Content-Type", "application/json")
 
 	server.Router().ServeHTTP(loginRecorder, loginRequest)
@@ -1074,9 +1103,9 @@ func TestCredentialAuthPasswordLoginUsesDedicatedRuntime(t *testing.T) {
 		t.Fatalf("credential principal = %+v, want validated admin user", login.Data.Principal)
 	}
 
-	badBody := bytes.NewBufferString(`{"provider":"username-password","identifier":{"type":"username","value":"admin"},"secret":{"type":"password","value":"wrong-password"}}`)
+	badBody := credentialAuthPasswordLoginBodyForTest(t, runtime, "wrong-password")
 	badRecorder := httptest.NewRecorder()
-	badRequest := httptest.NewRequest(http.MethodPost, "/api/auth/login", badBody)
+	badRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", badBody)
 	badRequest.Header.Set("Content-Type", "application/json")
 
 	server.Router().ServeHTTP(badRecorder, badRequest)
@@ -1086,12 +1115,119 @@ func TestCredentialAuthPasswordLoginUsesDedicatedRuntime(t *testing.T) {
 	}
 }
 
+func TestCredentialAuthPasswordLoginRejectsPlaintextSecretWhenEncryptedTransportIsRequired(t *testing.T) {
+	runtime, _ := credentialAuthRuntimeForTest(t)
+	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
+	mixedPayload := map[string]any{
+		"provider":   "username-password",
+		"identifier": map[string]string{"type": "username", "value": "admin"},
+		"secret": map[string]any{
+			"type":      "password",
+			"value":     "correct-password",
+			"encrypted": credentialAuthEncryptedSecretForTest(t, runtime, "username-password", "password", "username", "correct-password"),
+		},
+	}
+	mixedBody, err := json.Marshal(mixedPayload)
+	if err != nil {
+		t.Fatalf("marshal mixed plaintext/encrypted password body: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		body []byte
+	}{
+		{
+			name: "plaintext only",
+			body: []byte(`{"provider":"username-password","identifier":{"type":"username","value":"admin"},"secret":{"type":"password","value":"correct-password"}}`),
+		},
+		{
+			name: "plaintext mixed with encrypted envelope",
+			body: mixedBody,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			loginRecorder := httptest.NewRecorder()
+			loginRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(tt.body))
+			loginRequest.Header.Set("Content-Type", "application/json")
+
+			server.Router().ServeHTTP(loginRecorder, loginRequest)
+
+			if loginRecorder.Code != http.StatusBadRequest || !strings.Contains(loginRecorder.Body.String(), "AUTH_INVALID_REQUEST") {
+				t.Fatalf("POST plaintext credential password login = %d body = %s, want invalid request", loginRecorder.Code, loginRecorder.Body.String())
+			}
+		})
+	}
+}
+
+func TestCredentialAuthRejectsCleartextTransportOutsideLoopback(t *testing.T) {
+	runtime, sender := credentialAuthRuntimeForTest(t)
+	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
+
+	loginRecorder := httptest.NewRecorder()
+	loginRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/api/auth/login",
+		bytes.NewBufferString(`{"provider":"username-password","identifier":{"type":"username","value":"admin"},"secret":{"type":"password","value":"correct-password"}}`),
+	)
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginRequest.RemoteAddr = "198.51.100.10:43110"
+
+	server.Router().ServeHTTP(loginRecorder, loginRequest)
+
+	if loginRecorder.Code != http.StatusBadRequest || !strings.Contains(loginRecorder.Body.String(), "AUTH_INVALID_REQUEST") {
+		t.Fatalf("POST credential password over cleartext external peer = %d body = %s, want invalid request", loginRecorder.Code, loginRecorder.Body.String())
+	}
+
+	startRecorder := httptest.NewRecorder()
+	startRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/api/auth/sms-otp/start",
+		bytes.NewBufferString(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"+8613800138000"}}`),
+	)
+	startRequest.Header.Set("Content-Type", "application/json")
+	startRequest.RemoteAddr = "198.51.100.10:43110"
+
+	server.Router().ServeHTTP(startRecorder, startRequest)
+
+	if startRecorder.Code != http.StatusBadRequest || !strings.Contains(startRecorder.Body.String(), "AUTH_INVALID_REQUEST") {
+		t.Fatalf("POST credential sms start over cleartext external peer = %d body = %s, want invalid request", startRecorder.Code, startRecorder.Body.String())
+	}
+	if sent := sender.Sent(); len(sent) != 0 {
+		t.Fatalf("sent sms = %+v, want no delivery when transport is rejected", sent)
+	}
+}
+
+func TestCredentialAuthAllowsTrustedForwardedHTTPS(t *testing.T) {
+	runtime, _ := credentialAuthRuntimeForTest(t)
+	server := newTestServer(ServerOptions{
+		Capabilities:   configuredCredentialAuthManifestsForTest(t),
+		CredentialAuth: runtime,
+		Security:       SecurityOptions{TrustedProxies: []string{"10.20.0.0/16"}},
+	})
+	loginRecorder := httptest.NewRecorder()
+	loginRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/api/auth/login",
+		credentialAuthPasswordLoginBodyForTest(t, runtime, "correct-password"),
+	)
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginRequest.Header.Set("X-Forwarded-Proto", "https")
+	loginRequest.RemoteAddr = "10.20.0.12:43110"
+
+	server.Router().ServeHTTP(loginRecorder, loginRequest)
+
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("POST credential password through trusted HTTPS proxy = %d body = %s, want ok", loginRecorder.Code, loginRecorder.Body.String())
+	}
+}
+
 func TestCredentialAuthSMSOTPLoginConsumesTransaction(t *testing.T) {
 	runtime, sender := credentialAuthRuntimeForTest(t)
 	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
 	startBody := bytes.NewBufferString(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"+8613800138000"}}`)
 	startRecorder := httptest.NewRecorder()
-	startRequest := httptest.NewRequest(http.MethodPost, "/api/auth/sms-otp/start", startBody)
+	startRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/sms-otp/start", startBody)
 	startRequest.Header.Set("Content-Type", "application/json")
 
 	server.Router().ServeHTTP(startRecorder, startRequest)
@@ -1111,9 +1247,8 @@ func TestCredentialAuthSMSOTPLoginConsumesTransaction(t *testing.T) {
 		t.Fatalf("sent sms = %+v, want login code delivery", sent)
 	}
 
-	loginJSON := fmt.Sprintf(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"+8613800138000"},"secret":{"type":"sms-otp","transactionId":%q,"code":"123456"}}`, started.Data.TransactionID)
 	loginRecorder := httptest.NewRecorder()
-	loginRequest := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(loginJSON))
+	loginRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", credentialAuthSMSOTPLoginBodyForTest(t, runtime, started.Data.TransactionID, "123456"))
 	loginRequest.Header.Set("Content-Type", "application/json")
 
 	server.Router().ServeHTTP(loginRecorder, loginRequest)
@@ -1130,13 +1265,76 @@ func TestCredentialAuthSMSOTPLoginConsumesTransaction(t *testing.T) {
 	}
 
 	reuseRecorder := httptest.NewRecorder()
-	reuseRequest := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(loginJSON))
+	reuseRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", credentialAuthSMSOTPLoginBodyForTest(t, runtime, started.Data.TransactionID, "123456"))
 	reuseRequest.Header.Set("Content-Type", "application/json")
 
 	server.Router().ServeHTTP(reuseRecorder, reuseRequest)
 
 	if reuseRecorder.Code != http.StatusUnauthorized || !strings.Contains(reuseRecorder.Body.String(), "AUTH_INVALID_CREDENTIALS") {
 		t.Fatalf("POST reused sms otp login = %d body = %s, want one-time invalid credentials", reuseRecorder.Code, reuseRecorder.Body.String())
+	}
+}
+
+func TestCredentialAuthSMSOTPLoginRejectsPlaintextSecretWhenEncryptedTransportIsRequired(t *testing.T) {
+	runtime, _ := credentialAuthRuntimeForTest(t)
+	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
+	startRecorder := httptest.NewRecorder()
+	startRequest := newCredentialAuthHTTPTestRequest(
+		http.MethodPost,
+		"/api/auth/sms-otp/start",
+		bytes.NewBufferString(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"+8613800138000"}}`),
+	)
+	startRequest.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(startRecorder, startRequest)
+
+	if startRecorder.Code != http.StatusCreated {
+		t.Fatalf("POST credential sms otp start status = %d body = %s", startRecorder.Code, startRecorder.Body.String())
+	}
+	var started credentialAuthSMSOTPStartTestPayload
+	if err := json.Unmarshal(startRecorder.Body.Bytes(), &started); err != nil {
+		t.Fatalf("decode sms otp start: %v body = %s", err, startRecorder.Body.String())
+	}
+	mixedPayload := map[string]any{
+		"provider":   "phone-sms-otp",
+		"identifier": map[string]string{"type": "phone", "value": "+8613800138000"},
+		"secret": map[string]any{
+			"type":          "sms-otp",
+			"transactionId": started.Data.TransactionID,
+			"code":          "123456",
+			"encrypted":     credentialAuthEncryptedSecretForTest(t, runtime, "phone-sms-otp", "sms-otp", "phone", "123456"),
+		},
+	}
+	mixedBody, err := json.Marshal(mixedPayload)
+	if err != nil {
+		t.Fatalf("marshal mixed plaintext/encrypted sms otp body: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		body []byte
+	}{
+		{
+			name: "plaintext only",
+			body: []byte(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"+8613800138000"},"secret":{"type":"sms-otp","transactionId":"` + started.Data.TransactionID + `","code":"123456"}}`),
+		},
+		{
+			name: "plaintext mixed with encrypted envelope",
+			body: mixedBody,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			loginRecorder := httptest.NewRecorder()
+			loginRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(tt.body))
+			loginRequest.Header.Set("Content-Type", "application/json")
+
+			server.Router().ServeHTTP(loginRecorder, loginRequest)
+
+			if loginRecorder.Code != http.StatusBadRequest || !strings.Contains(loginRecorder.Body.String(), "AUTH_INVALID_REQUEST") {
+				t.Fatalf("POST plaintext sms otp login = %d body = %s, want invalid request", loginRecorder.Code, loginRecorder.Body.String())
+			}
+		})
 	}
 }
 
@@ -1152,7 +1350,7 @@ func TestCredentialAuthSMSOTPRequiresEnabledIdentifier(t *testing.T) {
 		}
 		server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/api/auth/sms-otp/start", bytes.NewBufferString(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"+8613800138000"}}`))
+		request := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/sms-otp/start", bytes.NewBufferString(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"+8613800138000"}}`))
 		request.Header.Set("Content-Type", "application/json")
 
 		server.Router().ServeHTTP(recorder, request)
@@ -1169,7 +1367,7 @@ func TestCredentialAuthSMSOTPRequiresEnabledIdentifier(t *testing.T) {
 		runtime, _ := credentialAuthRuntimeForTest(t)
 		server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
 		startRecorder := httptest.NewRecorder()
-		startRequest := httptest.NewRequest(http.MethodPost, "/api/auth/sms-otp/start", bytes.NewBufferString(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"+8613800138000"}}`))
+		startRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/sms-otp/start", bytes.NewBufferString(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"+8613800138000"}}`))
 		startRequest.Header.Set("Content-Type", "application/json")
 		server.Router().ServeHTTP(startRecorder, startRequest)
 		if startRecorder.Code != http.StatusCreated {
@@ -1186,9 +1384,9 @@ func TestCredentialAuthSMSOTPRequiresEnabledIdentifier(t *testing.T) {
 		}); err != nil {
 			t.Fatalf("disable phone identifier: %v", err)
 		}
-		loginJSON := fmt.Sprintf(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"+8613800138000"},"secret":{"type":"sms-otp","transactionId":%q,"code":"123456"}}`, started.Data.TransactionID)
+		loginJSON := credentialAuthSMSOTPLoginBodyForTest(t, runtime, started.Data.TransactionID, "123456")
 		loginRecorder := httptest.NewRecorder()
-		loginRequest := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(loginJSON))
+		loginRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", loginJSON)
 		loginRequest.Header.Set("Content-Type", "application/json")
 
 		server.Router().ServeHTTP(loginRecorder, loginRequest)
@@ -7537,18 +7735,123 @@ func credentialAuthRuntimeForTest(t *testing.T) (*CredentialAuthRuntime, *notifi
 		t.Fatalf("PutPasswordCredential() error = %v", err)
 	}
 	sender := notification.NewMockLocalSMSSender()
+	secretTransport, err := credentialauth.NewSecretTransport(credentialauth.SecretTransportOptions{
+		KeyID: "test-auth-transport-v1",
+		Now:   func() time.Time { return time.Date(2026, 7, 19, 9, 0, 0, 0, time.UTC) },
+	})
+	if err != nil {
+		t.Fatalf("NewSecretTransport() error = %v", err)
+	}
 	return &CredentialAuthRuntime{
-		Service:           service,
-		IdentifierHasher:  hasher,
-		SMSOTPHasher:      hasher,
-		SMSSender:         sender,
-		LoginTemplateID:   "login-template",
-		DebugCodeEnabled:  true,
-		CodeGenerator:     func() (string, error) { return "123456", nil },
-		Now:               func() time.Time { return time.Date(2026, 7, 19, 9, 0, 0, 0, time.UTC) },
-		SMSOTPTTL:         5 * time.Minute,
-		MaxSMSOTPAttempts: credentialauth.DefaultMaxSMSOTPAttempts,
+		Service:                 service,
+		IdentifierHasher:        hasher,
+		SecretTransport:         secretTransport,
+		SMSOTPHasher:            hasher,
+		SMSSender:               sender,
+		LoginTemplateID:         "login-template",
+		DebugCodeEnabled:        true,
+		CodeGenerator:           func() (string, error) { return "123456", nil },
+		Now:                     func() time.Time { return time.Date(2026, 7, 19, 9, 0, 0, 0, time.UTC) },
+		SMSOTPTTL:               5 * time.Minute,
+		MaxSMSOTPAttempts:       credentialauth.DefaultMaxSMSOTPAttempts,
+		RequireEncryptedSecrets: true,
 	}, sender
+}
+
+func newCredentialAuthHTTPTestRequest(method string, target string, body io.Reader) *http.Request {
+	request := httptest.NewRequest(method, target, body)
+	request.RemoteAddr = "127.0.0.1:43110"
+	return request
+}
+
+func credentialAuthPasswordLoginBodyForTest(t *testing.T, runtime *CredentialAuthRuntime, password string) io.Reader {
+	t.Helper()
+	envelope := credentialAuthEncryptedSecretForTest(t, runtime, "username-password", "password", "username", password)
+	payload := map[string]any{
+		"provider":   "username-password",
+		"identifier": map[string]string{"type": "username", "value": "admin"},
+		"secret":     map[string]any{"type": "password", "encrypted": envelope},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal credential password body: %v", err)
+	}
+	return bytes.NewReader(body)
+}
+
+func credentialAuthSMSOTPLoginBodyForTest(t *testing.T, runtime *CredentialAuthRuntime, transactionID string, code string) io.Reader {
+	t.Helper()
+	envelope := credentialAuthEncryptedSecretForTest(t, runtime, "phone-sms-otp", "sms-otp", "phone", code)
+	payload := map[string]any{
+		"provider":   "phone-sms-otp",
+		"identifier": map[string]string{"type": "phone", "value": "+8613800138000"},
+		"secret": map[string]any{
+			"type":          "sms-otp",
+			"transactionId": transactionID,
+			"encrypted":     envelope,
+		},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal credential sms otp body: %v", err)
+	}
+	return bytes.NewReader(body)
+}
+
+func credentialAuthEncryptedSecretForTest(t *testing.T, runtime *CredentialAuthRuntime, providerID string, secretType string, identifierType string, plaintext string) credentialauth.SecretEnvelope {
+	t.Helper()
+	if runtime == nil || runtime.SecretTransport == nil {
+		t.Fatal("credential auth runtime missing secret transport")
+	}
+	publicKey := runtime.SecretTransport.PublicKey()
+	serverPublic, err := base64.RawURLEncoding.Strict().DecodeString(publicKey.PublicKey)
+	if err != nil {
+		t.Fatalf("decode server public key: %v", err)
+	}
+	peer, err := ecdh.P256().NewPublicKey(serverPublic)
+	if err != nil {
+		t.Fatalf("server public key: %v", err)
+	}
+	clientPrivate, err := ecdh.P256().GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+	shared, err := clientPrivate.ECDH(peer)
+	if err != nil {
+		t.Fatalf("ECDH() error = %v", err)
+	}
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		t.Fatalf("rand salt: %v", err)
+	}
+	aad := credentialAuthSecretAAD(providerID, secretType, identifierType)
+	reader := hkdf.New(sha256.New, shared, salt, []byte("platform-go credential-auth secret v1\x00"+publicKey.KeyID+"\x00"+aad))
+	key := make([]byte, 32)
+	if _, err := io.ReadFull(reader, key); err != nil {
+		t.Fatalf("derive key: %v", err)
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatalf("NewCipher() error = %v", err)
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatalf("NewGCM() error = %v", err)
+	}
+	nonce := make([]byte, 12)
+	if _, err := rand.Read(nonce); err != nil {
+		t.Fatalf("rand nonce: %v", err)
+	}
+	ciphertext := aead.Seal(nil, nonce, []byte(plaintext), []byte(aad))
+	return credentialauth.SecretEnvelope{
+		Version:         publicKey.Version,
+		Algorithm:       publicKey.Algorithm,
+		KeyID:           publicKey.KeyID,
+		ClientPublicKey: base64.RawURLEncoding.EncodeToString(clientPrivate.PublicKey().Bytes()),
+		Salt:            base64.RawURLEncoding.EncodeToString(salt),
+		Nonce:           base64.RawURLEncoding.EncodeToString(nonce),
+		Ciphertext:      base64.RawURLEncoding.EncodeToString(ciphertext),
+	}
 }
 
 func authProviderByIDForTest(t *testing.T, manifests []capability.Manifest, providerID string) capability.AuthProvider {

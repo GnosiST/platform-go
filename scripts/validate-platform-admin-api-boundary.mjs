@@ -180,11 +180,65 @@ function validateAdminOIDCOpenAPIContract(errors) {
   if (smsOTPStart?.operationId !== "startAdminCredentialSMSOTP" || !Array.isArray(smsOTPStart?.security) || smsOTPStart.security.length !== 0) {
     errors.push("admin OpenAPI must expose the public credential-auth SMS OTP start operation");
   }
-  if (smsOTPStart?.["x-platform-runtime-status"] !== "dev-http-runtime-memory-bootstrap") {
-    errors.push("credential-auth SMS OTP OpenAPI operation must declare the development runtime status");
+  if (smsOTPStart?.["x-platform-runtime-status"] !== "persistent-runtime-p0") {
+    errors.push("credential-auth SMS OTP OpenAPI operation must declare the persistent P0 runtime status");
   }
-  if (!start?.responses?.["501"] || !login?.responses?.["501"] || !smsOTPStart?.responses?.["501"]) {
+  const credentialSecretKey = openAPI.paths?.["/api/auth/credential-secret-key"]?.get;
+  if (credentialSecretKey?.operationId !== "getAdminCredentialSecretKey" || !Array.isArray(credentialSecretKey?.security) || credentialSecretKey.security.length !== 0) {
+    errors.push("admin OpenAPI must expose the public credential-auth secret key operation");
+  }
+  if (credentialSecretKey?.["x-platform-runtime-status"] !== "persistent-runtime-p0") {
+    errors.push("credential-auth secret key OpenAPI operation must declare the persistent P0 runtime status");
+  }
+  if (!start?.responses?.["501"] || !login?.responses?.["501"] || !smsOTPStart?.responses?.["501"] || !credentialSecretKey?.responses?.["501"]) {
     errors.push("admin OpenAPI auth operations must declare the missing resolver 501 response");
+  }
+  const settingsRuntime = openAPI.paths?.["/api/admin/settings"]?.get;
+  if (settingsRuntime?.operationId !== "getAdminSettingsRuntime" || settingsRuntime?.["x-platform-runtime"] !== "settings-runtime-p0") {
+    errors.push("admin OpenAPI must expose the settings runtime P0 aggregation operation");
+  }
+  if (settingsRuntime?.["x-platform-permission"] !== "admin:settings:read") {
+    errors.push("settings runtime read operation must require admin:settings:read");
+  }
+  const settingsUpdate = openAPI.paths?.["/api/admin/settings/{resource}/{id}"]?.put;
+  if (settingsUpdate?.operationId !== "updateAdminSettingsResource" || settingsUpdate?.["x-platform-runtime"] !== "settings-runtime-p0") {
+    errors.push("admin OpenAPI must expose the settings runtime P0 update operation");
+  }
+  if (settingsUpdate?.["x-platform-permission"] !== "admin:settings:update") {
+    errors.push("settings runtime update operation must require admin:settings:update");
+  }
+  if (settingsUpdate?.requestBody?.content?.["application/json"]?.schema?.$ref !== "#/components/schemas/AdminSettingsUpdateRequest") {
+    errors.push("settings runtime update operation must use AdminSettingsUpdateRequest");
+  }
+  const settingsItem = openAPI.components?.schemas?.AdminSettingsResourceItem;
+  if (settingsItem?.["x-platform-secret-projection"] !== "response projection must mask or omit protected provider secrets") {
+    errors.push("AdminSettingsResourceItem must declare masked/omitted secret projection");
+  }
+  const messageCenterTestSend = openAPI.paths?.["/api/admin/message-center/test-send"]?.post;
+  if (messageCenterTestSend?.operationId !== "testSendMessageCenter" || messageCenterTestSend?.["x-platform-runtime"] !== "notification-sms-test-send-p0") {
+    errors.push("admin OpenAPI must expose the message-center SMS test-send runtime operation");
+  }
+  if (messageCenterTestSend?.["x-platform-permission"] !== "admin:message-center:update") {
+    errors.push("message-center test-send operation must require admin:message-center:update");
+  }
+  if (messageCenterTestSend?.requestBody?.content?.["application/json"]?.schema?.$ref !== "#/components/schemas/AdminMessageCenterTestSendRequest") {
+    errors.push("message-center test-send operation must use AdminMessageCenterTestSendRequest");
+  }
+  const unavailableCodes = messageCenterTestSend?.responses?.["503"]?.["x-platform-error-codes"] ?? [];
+  if (!Array.isArray(unavailableCodes) || !unavailableCodes.includes("ADMIN_MESSAGE_CENTER_UNAVAILABLE")) {
+    errors.push("message-center test-send operation must declare ADMIN_MESSAGE_CENTER_UNAVAILABLE for unavailable SMS runtime");
+  }
+  const messageCenterRequest = openAPI.components?.schemas?.AdminMessageCenterTestSendRequest;
+  if (
+    messageCenterRequest?.properties?.recipient?.writeOnly !== true ||
+    messageCenterRequest?.properties?.recipient?.["x-platform-response-policy"] !== "redacted target only" ||
+    messageCenterRequest?.properties?.templateParams?.writeOnly !== true
+  ) {
+    errors.push("AdminMessageCenterTestSendRequest must keep recipient and template params write-only with redacted response policy");
+  }
+  const messageCenterReceipt = openAPI.components?.schemas?.AdminMessageCenterSMSReceipt;
+  if (messageCenterReceipt?.["x-platform-secret-projection"] !== "only redacted SMS target and provider receipt metadata are returned") {
+    errors.push("AdminMessageCenterSMSReceipt must declare redacted SMS target projection");
   }
   const startRequest = openAPI.components?.schemas?.AdminAuthProviderStartRequest;
   const challenge = startRequest?.properties?.codeChallenge;
@@ -224,9 +278,28 @@ function validateAdminOIDCOpenAPIContract(errors) {
     !credentialSecret?.properties?.type?.enum?.includes("password") ||
     !credentialSecret?.properties?.type?.enum?.includes("sms-otp") ||
     credentialSecret.properties?.value?.writeOnly !== true ||
-    credentialSecret.properties?.code?.writeOnly !== true
+    credentialSecret.properties?.code?.writeOnly !== true ||
+    credentialSecret.properties?.encrypted?.$ref !== "#/components/schemas/AdminCredentialAuthSecretEnvelope"
   ) {
-    errors.push("AdminCredentialAuthSecret must constrain password and SMS OTP secrets as write-only request fields");
+    errors.push("AdminCredentialAuthSecret must constrain password and SMS OTP secrets as encrypted write-only request fields");
+  }
+  const credentialEnvelope = openAPI.components?.schemas?.AdminCredentialAuthSecretEnvelope;
+  if (
+    credentialEnvelope?.additionalProperties !== false ||
+    !credentialEnvelope?.required?.includes("clientPublicKey") ||
+    !credentialEnvelope?.required?.includes("ciphertext") ||
+    credentialEnvelope?.properties?.ciphertext?.writeOnly !== true
+  ) {
+    errors.push("AdminCredentialAuthSecretEnvelope must require client public key and write-only ciphertext");
+  }
+  const credentialKey = openAPI.components?.schemas?.AdminCredentialAuthSecretKeyData;
+  if (
+    credentialKey?.additionalProperties !== false ||
+    !credentialKey?.required?.includes("publicKey") ||
+    !credentialKey?.required?.includes("expiresAt") ||
+    !credentialKey?.properties?.algorithm?.enum?.includes("ECDH-P256-HKDF-SHA256+A256GCM")
+  ) {
+    errors.push("AdminCredentialAuthSecretKeyData must expose ECDH/AES public key metadata");
   }
   const smsStartRequest = openAPI.components?.schemas?.AdminCredentialSMSOTPStartRequest;
   const smsStartData = openAPI.components?.schemas?.AdminCredentialSMSOTPStartData;

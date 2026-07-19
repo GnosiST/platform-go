@@ -335,6 +335,10 @@ func userAdminResource() capability.AdminResource {
 		Fields: []capability.AdminField{
 			adminField("code", "用户名", "Username", "text", "record", true, false, true, true, true, true, 160, nil),
 			adminField("name", "姓名", "Name", "text", "record", true, false, true, true, true, true, 160, nil),
+			adminField("avatarUrl", "头像", "Avatar URL", "text", "values", false, false, false, true, true, true, 180, nil),
+			adminField("phone", "手机号码", "Phone", "text", "values", false, false, true, true, true, true, 150, nil),
+			adminField("email", "邮箱", "Email", "text", "values", false, false, true, true, true, true, 180, nil),
+			adminField("address", "地址", "Address", "textarea", "values", false, false, false, true, true, true, 220, nil),
 			relationAdminField(adminField("tenantCode", "租户", "Tenant", "select", "values", true, false, true, true, true, true, 150, nil), adminFieldRelation("tenants", "code", "name", false, enabledAdminRelationFilter())),
 			relationAdminField(adminField("orgUnitCode", "机构", "Org Unit", "select", "values", false, false, true, true, true, true, 160, nil), treeAdminFieldRelation("org-units", "code", "name", "parentCode", enabledAdminRelationFilter())),
 			relationAdminField(adminField("areaCode", "地址码", "Area Code", "select", "values", false, false, true, true, true, true, 140, nil), areaCodeAdminFieldRelation(enabledAdminRelationFilter())),
@@ -343,7 +347,7 @@ func userAdminResource() capability.AdminResource {
 			adminField("description", "描述", "Description", "textarea", "record", false, false, false, false, true, true, 220, nil),
 			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
 		},
-		SearchFields:   []string{"name", "code", "status", "description", "tenantCode", "orgUnitCode", "areaCode", "roles"},
+		SearchFields:   []string{"name", "code", "status", "description", "avatarUrl", "phone", "email", "address", "tenantCode", "orgUnitCode", "areaCode", "roles"},
 		DefaultSortKey: "updatedAt",
 	}
 }
@@ -731,6 +735,9 @@ func notificationDeliveryAdminResource() capability.AdminResource {
 			relationAdminField(adminField("tenantCode", "租户", "Tenant", "select", "values", false, false, true, true, true, true, 150, nil), adminFieldRelation("tenants", "code", "name", false, enabledAdminRelationFilter())),
 			relationAdminField(adminField("notificationCode", "通知", "Notification", "select", "values", true, false, true, true, true, true, 180, nil), adminFieldRelation("notifications", "code", "name", false, enabledAdminRelationFilter())),
 			relationAdminField(adminField("recipientUserCode", "接收用户", "Recipient User", "select", "values", false, false, true, true, true, true, 160, nil), adminFieldRelation("users", "code", "name", false, enabledAdminRelationFilter())),
+			adminField("target", "投递目标", "Target", "text", "values", false, false, true, true, true, true, 180, nil),
+			adminField("provider", "供应商", "Provider", "text", "values", false, false, true, true, true, true, 140, nil),
+			adminField("providerMessageId", "厂商消息 ID", "Provider Message ID", "text", "values", false, false, true, true, true, true, 180, nil),
 			adminField("channel", "通知渠道", "Channel", "select", "values", true, false, true, true, true, true, 130, notificationChannelOptions()),
 			adminField("deliveryStatus", "投递状态", "Delivery Status", "select", "values", true, false, true, true, true, true, 130, notificationDeliveryStatusOptions()),
 			adminField("attempts", "尝试次数", "Attempts", "number", "values", false, false, true, true, true, true, 110, nil),
@@ -741,7 +748,7 @@ func notificationDeliveryAdminResource() capability.AdminResource {
 			adminField("description", "说明", "Description", "textarea", "record", false, false, false, false, true, true, 220, nil),
 			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
 		},
-		SearchFields:   []string{"name", "code", "status", "description", "tenantCode", "notificationCode", "recipientUserCode", "channel", "deliveryStatus", "lastAttemptAt", "deliveredAt", "errorMessage"},
+		SearchFields:   []string{"name", "code", "status", "description", "tenantCode", "notificationCode", "recipientUserCode", "target", "provider", "providerMessageId", "channel", "deliveryStatus", "lastAttemptAt", "deliveredAt", "errorMessage"},
 		DefaultSortKey: "lastAttemptAt",
 	}
 }

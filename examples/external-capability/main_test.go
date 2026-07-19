@@ -22,6 +22,26 @@ func TestExampleManifestResolvesThroughPublicContracts(t *testing.T) {
 	}
 }
 
+func TestManifestDeclaresSettingsResource(t *testing.T) {
+	manifests, err := ResolveExampleManifests()
+	if err != nil {
+		t.Fatalf("ResolveExampleManifests() error = %v", err)
+	}
+	for _, resource := range manifests[0].Admin.Resources {
+		if resource.Resource != "catalog-settings" {
+			continue
+		}
+		if resource.PermissionPrefix != "admin:catalog-setting" {
+			t.Fatalf("settings permission prefix = %q, want admin:catalog-setting", resource.PermissionPrefix)
+		}
+		if resource.Menu.Parent != "configuration" || resource.Menu.Route != "/catalog-settings" {
+			t.Fatalf("settings menu = %+v, want configuration parent and /catalog-settings route", resource.Menu)
+		}
+		return
+	}
+	t.Fatalf("manifest missing catalog-settings resource")
+}
+
 func TestContractPreviewIsJSONSafe(t *testing.T) {
 	preview, err := BuildContractPreview()
 	if err != nil {
@@ -33,6 +53,12 @@ func TestContractPreviewIsJSONSafe(t *testing.T) {
 	}
 	if !strings.Contains(string(encoded), `"catalog-items"`) {
 		t.Fatalf("preview JSON = %s, want catalog-items", encoded)
+	}
+	if !strings.Contains(string(encoded), `"catalog-settings"`) {
+		t.Fatalf("preview JSON = %s, want catalog-settings", encoded)
+	}
+	if strings.Join(preview.ConfigResources, ",") != "catalog-settings" {
+		t.Fatalf("config resources = %v, want catalog-settings", preview.ConfigResources)
 	}
 	if !strings.HasPrefix(preview.ServiceContractHash, "sha256:") || preview.ServiceCount != 1 {
 		t.Fatalf("service preview = hash:%q count:%d, want one hashed service contract", preview.ServiceContractHash, preview.ServiceCount)

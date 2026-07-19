@@ -28,24 +28,25 @@ The current platform still has no legacy local-password provider kind or product
 
 Do not add password hashes to `Record.Values`. A future local-password capability requires a separately approved authentication and migration design with an Argon2id password-hashing boundary, dedicated storage, upgrade parameters, reset/rotation behavior, breach response and historical-data migration. Passwords are not reversibly encrypted, and changing hashing policy cannot be treated as an ordinary runtime configuration toggle.
 
-The current browser login flows send demo usernames or provider authorization codes, not local passwords. JWTs, provider codes and API tokens are credentials and must cross browser-to-server and provider-to-server boundaries over the production HTTPS contract. TLS protects credentials in transit; application payload encoding is not a substitute for HTTPS. The Admin client currently keeps its bearer token in browser storage, so CSP and same-origin delivery reduce exposure but do not remove the residual localStorage/XSS risk. Moving credentials to cookies requires a separate CSRF and session-client specification.
+The current browser login flows send demo usernames or provider authorization codes, while `credential-auth` local password and SMS OTP flows use application-layer hybrid encryption for credential secrets. HTTPS is still the production baseline for all credential-bearing requests, but it is not the application-layer credential secret encryption mechanism and cannot be used as a substitute for `secret.encrypted`. The Admin client fetches `GET /api/auth/credential-secret-key`, uses ECDH P-256 to agree on a shared key, derives the encryption key with HKDF-SHA256, encrypts the password or SMS OTP secret with AES-256-GCM/A256GCM, and submits only `secret.encrypted` to `POST /api/auth/login`. When `RequireEncryptedSecrets=true`, the server rejects plaintext `secret.value` or `secret.code`, including requests that try to send those fields alongside an encrypted envelope. JWTs, provider codes and API tokens are credentials and must cross browser-to-server and provider-to-server boundaries over the production HTTPS contract. The Admin client currently keeps its bearer token in browser storage, so CSP and same-origin delivery reduce exposure but do not remove the residual localStorage/XSS risk. Moving credentials to cookies requires a separate CSRF and session-client specification.
 
 ## Credential Auth v1
 
-`credential-auth` is the local credential authentication capability. The current package has the contract, documentation, validation gate, first internal service foundation in `internal/platform/credentialauth`, and a partial development HTTP/UI runtime tracked by `resources/platform-credential-auth-v1.json` and `rtk node scripts/validate-platform-credential-auth-v1.mjs`. It preserves the current demo/OIDC runtime, does not enable provider kind `password` in `cmd/platform-api`, and does not replace demo login, Admin OIDC exchange, app login or server-side session issuance flows.
+`credential-auth` is the local credential authentication capability. The current package has the contract, documentation, validation gate, internal service foundation in `internal/platform/credentialauth`, dedicated GORM persistence, application-layer hybrid encrypted secret transport and a persistent P0 HTTP/UI runtime tracked by `resources/platform-credential-auth-v1.json` and `rtk node scripts/validate-platform-credential-auth-v1.mjs`. It preserves the current demo/OIDC runtime, does not enable provider kind `password` in `cmd/platform-api`, and does not replace demo login, Admin OIDC exchange, app login or server-side session issuance flows.
 
 The capability is business-neutral. It now declares provider modes for `username-password`, `phone-password`, `email-password` and `phone-sms-otp`, and the login UI must stay provider-discovery driven rather than hard-coding those four modes. A successful credential login still delegates JWT signing, session persistence, renewal and revocation to the existing `session` boundary, then RBAC and Casbin calculate authorization after login.
 
-The storage boundary is deliberately separate from generic Admin resources: password credentials must not be stored in generic `Record.Values`. The first service foundation implements normalized identifier hashes, an in-memory repository, Argon2id PHC verification, SMS OTP one-time consumption semantics and a development bootstrap runtime seeded from Admin credential environment variables. File/GORM persistence is still pending, and production credential-auth remains blocked until a persistent credential repository is approved. The dedicated stores remain `auth_identifiers`, `password_credentials`, `credential_challenges` and `sms_otp_challenges`. They store normalized hashes, masked identifiers, Argon2id verifier metadata, digests, expiry, attempt and one-time consumption state, not raw passwords, raw OTP codes, raw challenge answers or raw phone/email values.
+The storage boundary is deliberately separate from generic Admin resources: password credentials must not be stored in generic `Record.Values`. The first service foundation implements normalized identifier hashes, an in-memory repository for development/test, a dedicated GORM repository for persistent runtime, Argon2id PHC verification, SMS OTP one-time consumption semantics and a bootstrap runtime seeded from Admin credential environment variables. Production credential-auth requires `PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER`, `PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN`, `PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_KEY_ID` and `PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY`. The dedicated stores remain `auth_identifiers`, `password_credentials`, `credential_challenges` and `sms_otp_challenges`. They store normalized hashes, masked identifiers, Argon2id verifier metadata, digests, expiry, attempt and one-time consumption state, not raw passwords, raw OTP codes, raw challenge answers or raw phone/email values.
 
 Challenge support is scoped to login for v1: `off`, `always`, `after-failure` or `risk-based`, with `captcha` or `slider` as implementation choices. SMS OTP login belongs to `credential-auth` as a secret type, while SMS delivery itself belongs to the `notification` SMS channel so delivery ledgers, provider adapters, templates, rate limits and production provider validation stay reusable outside authentication. The first notification SMS foundation defines the SMS sender port, `mock-local` development/test sender, provider canonicalization and production fail-closed config validation; external Aliyun/Tencent adapters remain downstream/vendor work. Production must reject mock SMS providers.
 
 Credential-auth configuration should surface through provider discovery and the system settings center, not through four hard-coded login menus. The enabled provider modes are rendered from `GET /api/auth/providers`; password policy, challenge policy and SMS OTP policy belong to the `credential-auth` capability contract. SMS account configuration, SMS templates, provider selection, retry and rate-limit policy belong to `notification` resources such as `notification-channels`, `notification-providers`, `notification-send-policies`, `notification-templates` and `notification-deliveries`, normally reached through `/settings` and `/message-center`.
 
-The current partial API shape is:
+The current persistent P0 API shape is:
 
 ```text
 GET /api/auth/providers
+GET /api/auth/credential-secret-key
 POST /api/auth/challenges
 POST /api/auth/sms-otp/start
 POST /api/auth/login
@@ -57,7 +58,18 @@ Password login request:
 {
   "provider": "phone-password",
   "identifier": { "type": "phone", "value": "+8613800000000" },
-  "secret": { "type": "password", "value": "plain-password" },
+  "secret": {
+    "type": "password",
+    "encrypted": {
+      "version": "pgo-auth-secret-v1",
+      "algorithm": "ECDH-P256-HKDF-SHA256+A256GCM",
+      "keyId": "auth-transport-v1",
+      "clientPublicKey": "base64url-client-public-key",
+      "salt": "base64url-salt",
+      "nonce": "base64url-nonce",
+      "ciphertext": "base64url-ciphertext"
+    }
+  },
   "challenge": { "id": "challenge-id", "kind": "slider", "proof": "client-proof" }
 }
 ```
@@ -68,7 +80,19 @@ SMS login request:
 {
   "provider": "phone-sms-otp",
   "identifier": { "type": "phone", "value": "+8613800000000" },
-  "secret": { "type": "sms-otp", "transactionId": "otp-id", "code": "123456" },
+  "secret": {
+    "type": "sms-otp",
+    "transactionId": "otp-id",
+    "encrypted": {
+      "version": "pgo-auth-secret-v1",
+      "algorithm": "ECDH-P256-HKDF-SHA256+A256GCM",
+      "keyId": "auth-transport-v1",
+      "clientPublicKey": "base64url-client-public-key",
+      "salt": "base64url-salt",
+      "nonce": "base64url-nonce",
+      "ciphertext": "base64url-ciphertext"
+    }
+  },
   "challenge": { "id": "challenge-id", "kind": "captcha", "proof": "abcd" }
 }
 ```
@@ -81,7 +105,11 @@ PLATFORM_CREDENTIAL_AUTH_USERNAME_PASSWORD=true
 PLATFORM_CREDENTIAL_AUTH_PHONE_PASSWORD=true
 PLATFORM_CREDENTIAL_AUTH_EMAIL_PASSWORD=true
 PLATFORM_CREDENTIAL_AUTH_PHONE_SMS_OTP=true
+PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER=postgres
+PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN=...
 PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY=...
+PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_KEY_ID=auth-transport-v1
+PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY=<base64url-32-byte-p256-private-key>
 PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_USERNAME=admin
 PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PASSWORD=...
 PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PHONE=+8613800000000
@@ -95,7 +123,7 @@ PLATFORM_AUTH_SMS_OTP_TTL_SECONDS=300
 PLATFORM_AUTH_SMS_OTP_MAX_ATTEMPTS=5
 ```
 
-The remaining implementation packages are persistent file/GORM credential repositories, CAPTCHA/slider challenge runtime, external notification SMS vendor adapters, complete OpenAPI/error-code/audit-redaction/rate-limit governance and production enablement evidence. The current runtime is a development slice, not a production-complete credential system.
+The remaining implementation packages are CAPTCHA/slider challenge runtime, external notification SMS live adapters, credential reset/rotation/breach-response/migration governance, complete audit-redaction/rate-limit evidence and production promotion evidence. The current runtime is a persistent P0 slice, not a production-complete credential system.
 
 ## APIs
 

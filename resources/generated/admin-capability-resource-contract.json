@@ -4920,6 +4920,96 @@
           "exportMode": "full"
         },
         {
+          "key": "avatarUrl",
+          "label": {
+            "zh": "头像",
+            "en": "Avatar URL"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "phone",
+          "label": {
+            "zh": "手机号码",
+            "en": "Phone"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 150,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "email",
+          "label": {
+            "zh": "邮箱",
+            "en": "Email"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "searchable": true,
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "address",
+          "label": {
+            "zh": "地址",
+            "en": "Address"
+          },
+          "type": "textarea",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "inTable": true,
+          "inForm": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
           "key": "tenantCode",
           "label": {
             "zh": "租户",
@@ -5162,6 +5252,10 @@
         "code",
         "status",
         "description",
+        "avatarUrl",
+        "phone",
+        "email",
+        "address",
         "tenantCode",
         "orgUnitCode",
         "areaCode",

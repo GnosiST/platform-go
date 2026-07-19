@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -110,7 +111,10 @@ func main() {
 	if err := httpapi.ValidatePhoneProtectionHistory(resources, phoneVerification.Protector); err != nil {
 		log.Fatalf("validate phone protection history: %v", err)
 	}
-	notificationSMSSender := notificationSMSSenderFromConfig(cfg)
+	notificationSMSSender, err := notificationSMSSenderFromConfig(cfg)
+	if err != nil {
+		log.Fatalf("build notification SMS sender: %v", err)
+	}
 	notificationSMS, err := bootstrap.NotificationSMSRuntimeFromConfig(cfg, notificationSMSSender)
 	if err != nil {
 		log.Fatalf("build notification SMS runtime: %v", err)
@@ -166,6 +170,7 @@ func main() {
 		AppIdentityResolver:      appIdentityResolver,
 		PhoneProtector:           phoneVerification.Protector,
 		PhoneVerificationSender:  phoneVerification.Sender,
+		NotificationSMSSender:    notificationSMS.Sender,
 		AdminStepUpPhoneResolver: adminStepUpPhoneResolver,
 		SensitiveReveal:          sensitiveReveal,
 		ServiceObjects:           serviceObjects,
@@ -284,9 +289,71 @@ func phoneVerificationSenderFromConfig(cfg config.Config) httpapi.PhoneVerificat
 	return nil
 }
 
-func notificationSMSSenderFromConfig(cfg config.Config) notification.SMSSender {
-	if cfg.NotificationSMSProvider == notification.SMSProviderMockLocal {
-		return notification.NewMockLocalSMSSender()
+func notificationSMSSenderFromConfig(cfg config.Config) (notification.SMSSender, error) {
+	rawProvider := cfg.NotificationSMSProvider
+	provider := notification.CanonicalSMSProvider(rawProvider)
+	if rawProvider != provider {
+		return nil, nil
 	}
-	return nil
+	switch provider {
+	case "":
+		return nil, nil
+	case notification.SMSProviderMockLocal:
+		return notification.NewMockLocalSMSSender(), nil
+	case notification.SMSProviderAliyun, notification.SMSProviderTencent:
+		config, err := notificationSMSProviderConfigFromEnv(provider)
+		if err != nil {
+			return nil, err
+		}
+		return notification.NewVendorSMSSender(config)
+	default:
+		return nil, nil
+	}
+}
+
+func notificationSMSProviderConfigFromEnv(provider string) (notification.SMSProviderConfig, error) {
+	dryRun, dryRunConfigured, dryRunErr := notificationSMSBoolEnv(notification.EnvNotificationSMSDryRun)
+	liveSendEnabled, _, liveSendErr := notificationSMSBoolEnv(notification.EnvNotificationSMSLiveSendEnabled)
+	if dryRunErr != nil {
+		return notification.SMSProviderConfig{}, dryRunErr
+	}
+	if liveSendErr != nil {
+		return notification.SMSProviderConfig{}, liveSendErr
+	}
+	config := notification.SMSProviderConfig{
+		Provider:          provider,
+		DryRun:            dryRunConfigured && dryRun,
+		LiveSendEnabled:   liveSendEnabled,
+		SignName:          os.Getenv(notification.EnvNotificationSMSSignName),
+		AliyunRegion:      os.Getenv(notification.EnvNotificationSMSAliyunRegion),
+		AliyunAccessKeyID: os.Getenv(notification.EnvNotificationSMSAliyunAccessKeyID),
+		AliyunSecretKey:   os.Getenv(notification.EnvNotificationSMSAliyunSecretKey),
+		TencentRegion:     os.Getenv(notification.EnvNotificationSMSTencentRegion),
+		TencentSecretID:   os.Getenv(notification.EnvNotificationSMSTencentSecretID),
+		TencentSecretKey:  os.Getenv(notification.EnvNotificationSMSTencentSecretKey),
+		TencentSDKAppID:   os.Getenv(notification.EnvNotificationSMSTencentSDKAppID),
+	}
+	if dryRunConfigured && dryRun && liveSendEnabled {
+		return notification.SMSProviderConfig{}, fmt.Errorf("%s and %s cannot both be true", notification.EnvNotificationSMSDryRun, notification.EnvNotificationSMSLiveSendEnabled)
+	}
+	if !liveSendEnabled {
+		config.DryRun = true
+	}
+	return config, nil
+}
+
+func notificationSMSBoolEnv(key string) (bool, bool, error) {
+	raw, ok := os.LookupEnv(key)
+	if !ok {
+		return false, false, nil
+	}
+	value := strings.ToLower(strings.TrimSpace(raw))
+	switch value {
+	case "true", "1", "yes", "y":
+		return true, true, nil
+	case "false", "0", "no", "n":
+		return false, true, nil
+	default:
+		return false, true, fmt.Errorf("%s must be a boolean", key)
+	}
 }

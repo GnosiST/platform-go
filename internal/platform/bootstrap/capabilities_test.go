@@ -363,6 +363,43 @@ func TestNotificationSMSRuntimeFromConfigComposesDevelopmentMockSender(t *testin
 	}
 }
 
+func TestNotificationSMSRuntimeFromConfigComposesProductionVendorDryRunSender(t *testing.T) {
+	sender, err := notification.NewVendorSMSSender(notification.SMSProviderConfig{
+		Provider:          notification.SMSProviderAliyun,
+		AliyunRegion:      "cn-hangzhou",
+		AliyunAccessKeyID: "test-access-key",
+		AliyunSecretKey:   "test-secret-key",
+		SignName:          "Platform",
+		DryRun:            true,
+	})
+	if err != nil {
+		t.Fatalf("NewVendorSMSSender() error = %v", err)
+	}
+	runtime, err := NotificationSMSRuntimeFromConfig(config.Config{
+		RuntimeEnvironment:             config.RuntimeEnvironmentProduction,
+		Capabilities:                   []string{"notification"},
+		NotificationSMSProvider:        "aliyun",
+		NotificationSMSLoginTemplateID: "login-template",
+	}, sender)
+	if err != nil {
+		t.Fatalf("NotificationSMSRuntimeFromConfig() error = %v", err)
+	}
+	if runtime.Sender == nil || runtime.Sender.Kind() != notification.SMSProviderAliyun || runtime.MockLocalEnabled || !runtime.DryRunEnabled {
+		t.Fatalf("notification SMS runtime = %+v, want production vendor dry-run runtime", runtime)
+	}
+	receipt, err := runtime.Sender.SendSMS(context.Background(), notification.SMSMessage{
+		Recipient:  "+8613800000000",
+		TemplateID: runtime.LoginTemplateID,
+		Purpose:    "login",
+	})
+	if err != nil {
+		t.Fatalf("SendSMS() error = %v", err)
+	}
+	if receipt.Status != notification.SMSDeliveryDryRunAccepted {
+		t.Fatalf("receipt = %+v, want dry-run accepted", receipt)
+	}
+}
+
 func TestNotificationSMSRuntimeFromConfigRejectsMockSenderOutsideDevelopmentAndTest(t *testing.T) {
 	for _, environment := range []string{config.RuntimeEnvironmentStaging, config.RuntimeEnvironmentProduction} {
 		t.Run(environment, func(t *testing.T) {

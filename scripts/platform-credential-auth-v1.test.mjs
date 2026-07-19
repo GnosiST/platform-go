@@ -49,7 +49,7 @@ describe("validate-platform-credential-auth-v1", () => {
     ]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /runtimeBoundary\.status must be dev-http-runtime-memory-bootstrap/);
+    assert.match(result.stderr, /runtimeBoundary\.status must be persistent-runtime-p0/);
     assert.match(result.stderr, /runtimeBoundary\.defaultRuntimeMutation must stay forbidden/);
     assert.match(result.stderr, /existing password provider guard must remain active/);
     assert.match(result.stderr, /runtimeBoundary\.productionComplete must stay false/);
@@ -84,6 +84,61 @@ describe("validate-platform-credential-auth-v1", () => {
     assert.match(result.stderr, /challengeContract\.modes must include after-failure/);
     assert.match(result.stderr, /notificationSmsBoundary\.productionMockProviderAllowed must stay false/);
     assert.match(result.stderr, /apiContract\.endpoints must include POST \/api\/auth\/sms-otp\/start/);
+  });
+
+  it("rejects HTTPS-only or plaintext-compatible credential secret transport drift", () => {
+    const contract = readJSON("resources/platform-credential-auth-v1.json");
+    contract.runtimeBoundary.secretTransport = "HTTPS protects credential-bearing requests.";
+    contract.apiContract.secretTransportContract.algorithm = "HTTPS";
+    contract.apiContract.secretTransportContract.plaintextSecretFieldsRejectedWhenRequired = ["secret.encrypted"];
+    contract.apiContract.secretTransportContract.httpsRole = "HTTPS satisfies credential secret encryption.";
+    contract.apiContract.endpoints = contract.apiContract.endpoints.filter((item) => item.path !== "/api/auth/credential-secret-key");
+    const authDoc = fs
+      .readFileSync(path.join(repoRoot, "docs/platform-auth.md"), "utf8")
+      .replace("When `RequireEncryptedSecrets=true`, the server rejects plaintext `secret.value` or `secret.code`", "")
+      .replace("cannot be used as a substitute for `secret.encrypted`", "");
+    const capabilityDoc = fs
+      .readFileSync(path.join(repoRoot, "docs/platform-capability-development.md"), "utf8")
+      .replace("When encrypted secrets are required, `secret.value` and `secret.code` are invalid", "")
+      .replace("cannot be used as a substitute for `secret.encrypted`", "");
+    const dataGovernanceDoc = fs
+      .readFileSync(path.join(repoRoot, "docs/platform-data-governance-and-integrations-assessment.md"), "utf8")
+      .replace("application-layer hybrid encryption", "HTTPS-only transport")
+      .replace("HTTPS cannot be used as a substitute for `secret.encrypted`", "HTTPS protects credential secrets.");
+
+    const result = runValidator([
+      "--contract",
+      tempFile("platform-credential-auth-v1-", "contract.json", contract),
+      "--auth-doc",
+      tempFile("platform-credential-auth-v1-doc-", "platform-auth.md", authDoc),
+      "--capability-doc",
+      tempFile("platform-credential-auth-v1-doc-", "platform-capability-development.md", capabilityDoc),
+      "--data-governance-doc",
+      tempFile("platform-credential-auth-v1-doc-", "platform-data-governance-and-integrations-assessment.md", dataGovernanceDoc),
+      "--http-credential-auth",
+      tempFile("platform-credential-auth-v1-http-", "credential_auth.go", "package httpapi\n"),
+      "--admin-client",
+      tempFile("platform-credential-auth-v1-client-", "client.ts", "export {};\n"),
+    ]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /runtimeBoundary\.secretTransport must document application-layer hybrid encryption/);
+    assert.match(result.stderr, /runtimeBoundary\.secretTransport must document ECDH P-256/);
+    assert.match(result.stderr, /runtimeBoundary\.secretTransport must document AES-256-GCM\/A256GCM/);
+    assert.match(result.stderr, /runtimeBoundary\.secretTransport must state HTTPS is only a production baseline/);
+    assert.match(result.stderr, /runtimeBoundary\.secretTransport must state HTTPS cannot substitute secret\.encrypted/);
+    assert.match(result.stderr, /apiContract\.secretTransportContract\.algorithm must be ECDH-P256-HKDF-SHA256\+A256GCM/);
+    assert.match(result.stderr, /apiContract\.secretTransportContract\.plaintextSecretFieldsRejectedWhenRequired must include secret\.value/);
+    assert.match(result.stderr, /apiContract\.secretTransportContract\.httpsRole must state HTTPS cannot substitute secret\.encrypted/);
+    assert.match(result.stderr, /apiContract\.endpoints must include GET \/api\/auth\/credential-secret-key/);
+    assert.match(result.stderr, /docs\/platform-auth\.md must document plaintext secret field rejection/);
+    assert.match(result.stderr, /docs\/platform-auth\.md must state HTTPS cannot substitute secret\.encrypted/);
+    assert.match(result.stderr, /docs\/platform-capability-development\.md must document plaintext secret field rejection/);
+    assert.match(result.stderr, /docs\/platform-capability-development\.md must state HTTPS cannot substitute secret\.encrypted/);
+    assert.match(result.stderr, /docs\/platform-data-governance-and-integrations-assessment\.md must document application-layer hybrid encryption/);
+    assert.match(result.stderr, /docs\/platform-data-governance-and-integrations-assessment\.md must state HTTPS cannot substitute secret\.encrypted/);
+    assert.match(result.stderr, /internal\/platform\/httpapi\/credential_auth\.go must reject plaintext secret fields/);
+    assert.match(result.stderr, /admin API client must encrypt password and sms-otp secrets before login submission/);
   });
 
   it("rejects docs that omit credential-auth boundary language", () => {

@@ -5,6 +5,7 @@ const (
 	CodeAdminDemoDataNotFound                  Code = "ADMIN_DEMO_DATA_NOT_FOUND"
 	CodeAdminForbidden                         Code = "ADMIN_FORBIDDEN"
 	CodeAdminMenuResolutionFailed              Code = "ADMIN_MENU_RESOLUTION_FAILED"
+	CodeAdminMessageCenterUnavailable          Code = "ADMIN_MESSAGE_CENTER_UNAVAILABLE"
 	CodeAdminPolicyReviewWatermarkInvalid      Code = "ADMIN_POLICY_REVIEW_WATERMARK_INVALID"
 	CodeOpenAPINotConfigured                   Code = "OPENAPI_NOT_CONFIGURED"
 	CodeAuthAuditFailed                        Code = "AUTH_AUDIT_FAILED"
@@ -126,6 +127,7 @@ var builtinDefinitions = []Definition{
 	public(CodeAdminDemoDataNotFound, "platform.http", []Plane{PlaneAdmin}, []Audience{AudienceOperator}, CategoryNotFound, 404, "demo data set not found"),
 	public(CodeAdminForbidden, "platform.http", []Plane{PlaneAdmin}, []Audience{AudienceOperator}, CategoryAuthorization, 403, "permission denied"),
 	public(CodeAdminMenuResolutionFailed, "platform.http", []Plane{PlaneAdmin}, []Audience{AudienceOperator}, CategoryDependency, 503, "admin menu navigation is unavailable"),
+	public(CodeAdminMessageCenterUnavailable, "platform.notification", []Plane{PlaneAdmin}, []Audience{AudienceOperator}, CategoryDependency, 503, "message center runtime is unavailable"),
 	public(CodeAdminPolicyReviewWatermarkInvalid, "platform.http", []Plane{PlaneAdmin}, []Audience{AudienceOperator}, CategoryValidation, 400, "watermark must be true or false"),
 	public(CodeOpenAPINotConfigured, "platform.http", []Plane{PlaneAdmin}, []Audience{AudienceOperator}, CategoryNotFound, 404, "openapi document is not configured"),
 	public(CodeAuthAuditFailed, "platform.auth", []Plane{PlaneAdmin}, []Audience{AudienceOperator}, CategoryInternal, 500, "auth audit failed"),

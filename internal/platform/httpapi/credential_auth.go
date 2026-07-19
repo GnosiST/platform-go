@@ -33,10 +33,11 @@ type credentialAuthIdentifierRequest struct {
 }
 
 type credentialAuthSecretRequest struct {
-	Type          string `json:"type"`
-	Value         string `json:"value"`
-	TransactionID string `json:"transactionId"`
-	Code          string `json:"code"`
+	Type          string                         `json:"type"`
+	Value         string                         `json:"value"`
+	TransactionID string                         `json:"transactionId"`
+	Code          string                         `json:"code"`
+	Encrypted     *credentialauth.SecretEnvelope `json:"encrypted,omitempty"`
 }
 
 type credentialAuthChallengeRequest struct {
@@ -57,6 +58,14 @@ type credentialAuthSMSOTPStartResponse struct {
 	DebugCode        string    `json:"debugCode,omitempty"`
 }
 
+type credentialAuthSecretKeyResponse struct {
+	Version   string    `json:"version"`
+	Algorithm string    `json:"algorithm"`
+	KeyID     string    `json:"keyId"`
+	PublicKey string    `json:"publicKey"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}
+
 type credentialAuthProviderSpec struct {
 	ID             string
 	Kind           string
@@ -69,16 +78,34 @@ type credentialAuthSMSOTPHasher interface {
 }
 
 type CredentialAuthRuntime struct {
-	Service           *credentialauth.Service
-	IdentifierHasher  credentialauth.IdentifierHasher
-	SMSOTPHasher      credentialAuthSMSOTPHasher
-	SMSSender         notification.SMSSender
-	LoginTemplateID   string
-	DebugCodeEnabled  bool
-	CodeGenerator     func() (string, error)
-	Now               func() time.Time
-	SMSOTPTTL         time.Duration
-	MaxSMSOTPAttempts int
+	Service                 *credentialauth.Service
+	IdentifierHasher        credentialauth.IdentifierHasher
+	SecretTransport         *credentialauth.SecretTransport
+	SMSOTPHasher            credentialAuthSMSOTPHasher
+	SMSSender               notification.SMSSender
+	LoginTemplateID         string
+	DebugCodeEnabled        bool
+	CodeGenerator           func() (string, error)
+	Now                     func() time.Time
+	SMSOTPTTL               time.Duration
+	MaxSMSOTPAttempts       int
+	RequireEncryptedSecrets bool
+}
+
+func (s *Server) credentialAuthSecretKey(ctx *gin.Context) {
+	runtime := s.credentialAuth
+	if runtime == nil || runtime.SecretTransport == nil {
+		writePlatformError(ctx, errorcode.CodeAuthProviderNotConfigured)
+		return
+	}
+	key := runtime.SecretTransport.PublicKey()
+	ctx.JSON(http.StatusOK, Response[credentialAuthSecretKeyResponse]{Data: credentialAuthSecretKeyResponse{
+		Version:   key.Version,
+		Algorithm: key.Algorithm,
+		KeyID:     key.KeyID,
+		PublicKey: key.PublicKey,
+		ExpiresAt: key.ExpiresAt,
+	}})
 }
 
 func (s *Server) credentialAuthPasswordLogin(ctx *gin.Context, provider capability.AuthProvider, input authLoginRequest) {
@@ -101,7 +128,30 @@ func (s *Server) credentialAuthPasswordLogin(ctx *gin.Context, provider capabili
 	if secretType == "" {
 		secretType = "password"
 	}
-	if secretType != "password" || strings.TrimSpace(input.Secret.Value) == "" {
+	if secretType != "password" {
+		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
+		return
+	}
+	if runtime.RequireEncryptedSecrets {
+		if credentialAuthPlaintextSecretPresent(input.Secret) {
+			writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
+			return
+		}
+		secret, err := s.decryptCredentialAuthSecret(ctx, input.Secret, provider.ID, "password", string(spec.IdentifierType))
+		if err != nil {
+			writeCredentialAuthLoginError(ctx, s.internalErrorSink, err)
+			return
+		}
+		input.Secret.Value = secret
+	} else if strings.TrimSpace(input.Secret.Value) == "" {
+		secret, err := s.decryptCredentialAuthSecret(ctx, input.Secret, provider.ID, "password", string(spec.IdentifierType))
+		if err != nil {
+			writeCredentialAuthLoginError(ctx, s.internalErrorSink, err)
+			return
+		}
+		input.Secret.Value = secret
+	}
+	if strings.TrimSpace(input.Secret.Value) == "" {
 		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
 		return
 	}
@@ -150,6 +200,9 @@ func (s *Server) credentialAuthSMSOTPStart(ctx *gin.Context) {
 	spec, ok := credentialAuthProviderSpecFor(provider)
 	if !ok || spec.SecretType != "sms-otp" {
 		writePlatformError(ctx, errorcode.CodeAuthProviderUnsupported)
+		return
+	}
+	if !s.requireCredentialAuthSecureTransport(ctx) {
 		return
 	}
 	runtime := s.credentialAuth
@@ -258,12 +311,35 @@ func (s *Server) credentialAuthSMSOTPLogin(ctx *gin.Context, provider capability
 		return
 	}
 	transactionID := strings.TrimSpace(input.Secret.TransactionID)
-	code := strings.TrimSpace(input.Secret.Code)
 	secretType := strings.TrimSpace(input.Secret.Type)
 	if secretType == "" {
 		secretType = "sms-otp"
 	}
-	if secretType != "sms-otp" || transactionID == "" || code == "" {
+	if secretType != "sms-otp" || transactionID == "" {
+		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
+		return
+	}
+	code := strings.TrimSpace(input.Secret.Code)
+	if runtime.RequireEncryptedSecrets {
+		if credentialAuthPlaintextSecretPresent(input.Secret) {
+			writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
+			return
+		}
+		secret, err := s.decryptCredentialAuthSecret(ctx, input.Secret, provider.ID, "sms-otp", string(spec.IdentifierType))
+		if err != nil {
+			writeCredentialAuthLoginError(ctx, s.internalErrorSink, err)
+			return
+		}
+		code = secret
+	} else if code == "" {
+		secret, err := s.decryptCredentialAuthSecret(ctx, input.Secret, provider.ID, "sms-otp", string(spec.IdentifierType))
+		if err != nil {
+			writeCredentialAuthLoginError(ctx, s.internalErrorSink, err)
+			return
+		}
+		code = secret
+	}
+	if strings.TrimSpace(code) == "" {
 		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
 		return
 	}
@@ -325,6 +401,44 @@ func credentialAuthProviderSpecFor(provider capability.AuthProvider) (credential
 	}
 }
 
+func (s *Server) requireCredentialAuthSecureTransport(ctx *gin.Context) bool {
+	if credentialAuthSecureTransport(ctx.Request, s.security) {
+		return true
+	}
+	writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
+	return false
+}
+
+func (s *Server) decryptCredentialAuthSecret(ctx *gin.Context, input credentialAuthSecretRequest, providerID string, secretType string, identifierType string) (string, error) {
+	runtime := s.credentialAuth
+	if runtime == nil || runtime.SecretTransport == nil {
+		return "", credentialauth.ErrInvalidSecret
+	}
+	if input.Encrypted == nil {
+		return "", credentialauth.ErrInvalidSecret
+	}
+	return runtime.SecretTransport.Decrypt(ctx.Request.Context(), *input.Encrypted, credentialAuthSecretAAD(providerID, secretType, identifierType))
+}
+
+func credentialAuthPlaintextSecretPresent(input credentialAuthSecretRequest) bool {
+	return strings.TrimSpace(input.Value) != "" || strings.TrimSpace(input.Code) != ""
+}
+
+func credentialAuthSecretAAD(providerID string, secretType string, identifierType string) string {
+	return strings.TrimSpace(providerID) + "\x00" + strings.TrimSpace(secretType) + "\x00" + strings.TrimSpace(identifierType)
+}
+
+func credentialAuthSecureTransport(request *http.Request, security SecurityOptions) bool {
+	if request == nil {
+		return false
+	}
+	if requestUsesHTTPS(request, trustedProxyPrefixes(security.TrustedProxies)) {
+		return true
+	}
+	peer, ok := directPeerAddress(request.RemoteAddr)
+	return ok && peer.IsLoopback()
+}
+
 func credentialAuthIdentifierFromRequest(input credentialAuthIdentifierRequest, expected credentialauth.IdentifierType) (credentialauth.Identifier, bool) {
 	identifierType := credentialauth.IdentifierType(strings.TrimSpace(input.Type))
 	if identifierType == "" {
@@ -362,7 +476,8 @@ func (s *Server) adminPrincipalFromCredential(ctx context.Context, principal cre
 
 func writeCredentialAuthLoginError(ctx *gin.Context, sink InternalErrorSink, err error) {
 	switch {
-	case errors.Is(err, credentialauth.ErrInvalidInput):
+	case errors.Is(err, credentialauth.ErrInvalidInput),
+		errors.Is(err, credentialauth.ErrInvalidSecret):
 		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
 	case errors.Is(err, credentialauth.ErrCredentialRejected),
 		errors.Is(err, credentialauth.ErrCredentialLocked),

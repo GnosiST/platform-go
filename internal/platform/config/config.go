@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/ecdh"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"mime"
@@ -88,7 +90,11 @@ type Config struct {
 	CredentialAuthPhonePassword          bool
 	CredentialAuthEmailPassword          bool
 	CredentialAuthPhoneSMSOTP            bool
+	CredentialAuthRepositoryDriver       string
+	CredentialAuthRepositoryDSN          string
 	CredentialAuthIdentifierHMACKey      string
+	CredentialAuthSecretTransportKeyID   string
+	CredentialAuthSecretTransportKey     string
 	CredentialAuthBootstrapAdminUsername string
 	CredentialAuthBootstrapAdminPassword string
 	CredentialAuthBootstrapAdminPhone    string
@@ -306,7 +312,11 @@ func Load() Config {
 		CredentialAuthPhonePassword:          credentialAuthPhonePassword,
 		CredentialAuthEmailPassword:          credentialAuthEmailPassword,
 		CredentialAuthPhoneSMSOTP:            credentialAuthPhoneSMSOTP,
+		CredentialAuthRepositoryDriver:       env("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER", ""),
+		CredentialAuthRepositoryDSN:          env("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN", ""),
 		CredentialAuthIdentifierHMACKey:      env("PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY", ""),
+		CredentialAuthSecretTransportKeyID:   env("PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_KEY_ID", ""),
+		CredentialAuthSecretTransportKey:     env("PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY", ""),
 		CredentialAuthBootstrapAdminUsername: env("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_USERNAME", ""),
 		CredentialAuthBootstrapAdminPassword: env("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PASSWORD", ""),
 		CredentialAuthBootstrapAdminPhone:    env("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PHONE", ""),
@@ -780,8 +790,17 @@ func (c Config) validateCredentialAuth(environment string) []error {
 	if len([]byte(c.CredentialAuthIdentifierHMACKey)) < 32 {
 		errs = append(errs, fmt.Errorf("%s requires PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY to be at least 32 bytes", prefix))
 	}
+	errs = append(errs, validateDriverPair("credential auth repository", c.CredentialAuthRepositoryDriver, c.CredentialAuthRepositoryDSN)...)
 	if environment == RuntimeEnvironmentProduction {
-		errs = append(errs, errors.New("production credential-auth requires a persistent credential repository before enabling local credential providers"))
+		if !isGORMDriver(c.CredentialAuthRepositoryDriver) || strings.TrimSpace(c.CredentialAuthRepositoryDSN) == "" {
+			errs = append(errs, errors.New("production credential-auth requires PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER and PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN for the dedicated credential repository"))
+		}
+		if strings.TrimSpace(c.CredentialAuthSecretTransportKeyID) == "" {
+			errs = append(errs, errors.New("production credential-auth requires PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_KEY_ID for application-layer encrypted secrets"))
+		}
+		if err := validateCredentialAuthSecretTransportKey(c.CredentialAuthSecretTransportKey); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	if c.CredentialAuthUsernamePassword || c.CredentialAuthPhonePassword || c.CredentialAuthEmailPassword {
 		if strings.TrimSpace(c.CredentialAuthBootstrapAdminUsername) == "" || strings.TrimSpace(c.CredentialAuthBootstrapAdminPassword) == "" {
@@ -805,6 +824,24 @@ func (c Config) validateCredentialAuth(environment string) []error {
 		}
 	}
 	return errs
+}
+
+func validateCredentialAuthSecretTransportKey(value string) error {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return errors.New("production credential-auth requires PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY for application-layer encrypted secrets")
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(trimmed)
+	if err != nil {
+		decoded, err = base64.StdEncoding.DecodeString(trimmed)
+	}
+	if err != nil || len(decoded) != 32 {
+		return errors.New("production credential-auth requires PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY to be a base64-encoded 32-byte P-256 private key")
+	}
+	if _, err := ecdh.P256().NewPrivateKey(decoded); err != nil {
+		return errors.New("production credential-auth requires PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY to be a valid P-256 private key")
+	}
+	return nil
 }
 
 func (c Config) validateProductionRuntime() []error {

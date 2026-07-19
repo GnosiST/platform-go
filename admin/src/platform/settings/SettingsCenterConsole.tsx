@@ -1,7 +1,7 @@
 import { ApiOutlined, BellOutlined, BgColorsOutlined, DatabaseOutlined, ReloadOutlined, SettingOutlined } from "@ant-design/icons";
 import { Button, Empty, Space, Tag, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { queryAdminResource, type AdminResourceRecord } from "../api/client";
+import { getAdminSettingsRuntime, type AdminResourceRecord, type AdminSettingsResourceItem } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
 import {
   AdminActionButton,
@@ -27,21 +27,25 @@ type SettingsResourceConfig = {
   route: string;
   resource: string;
   capability: string;
+  group: SettingsResourceGroup;
   icon: ReactNode;
   title: string;
   description: string;
   source: "catalog" | "manifest";
   order: number;
+  records: AdminResourceRecord[];
+  recordCount: number;
+  enabledCount: number;
+  updatedAt: string;
 };
 
-type SettingsResourceState = Record<string, AdminResourceRecord[]>;
+type SettingsResourceGroup = "core" | "message" | "capability";
 type SettingsErrorState = Partial<Record<string, string>>;
-
-const PAGE_SIZE = 100;
 
 type KnownSettingsResourceConfig = {
   route: string;
   capability: string;
+  group: SettingsResourceGroup;
   icon: ReactNode;
   title: (dictionary: Dictionary) => string;
   description: (dictionary: Dictionary) => string;
@@ -51,6 +55,7 @@ const knownSettingsResourceCatalog: KnownSettingsResourceConfig[] = [
   {
     route: "/parameters",
     capability: "parameter",
+    group: "core",
     icon: <DatabaseOutlined />,
     title: (dictionary) => dictionary.settingsCenterParameters,
     description: (dictionary) => dictionary.settingsCenterParametersDescription,
@@ -58,13 +63,23 @@ const knownSettingsResourceCatalog: KnownSettingsResourceConfig[] = [
   {
     route: "/branding",
     capability: "parameter",
+    group: "core",
     icon: <BgColorsOutlined />,
     title: (dictionary) => dictionary.settingsCenterBranding,
     description: (dictionary) => dictionary.settingsCenterBrandingDescription,
   },
   {
+    route: "/dictionary-parameters",
+    capability: "dictionary",
+    group: "core",
+    icon: <DatabaseOutlined />,
+    title: (dictionary) => dictionary.settingsCenterDictionaryParameters,
+    description: (dictionary) => dictionary.settingsCenterDictionaryParametersDescription,
+  },
+  {
     route: "/notification-channels",
     capability: "notification",
+    group: "message",
     icon: <BellOutlined />,
     title: (dictionary) => dictionary.settingsCenterNotificationChannels,
     description: (dictionary) => dictionary.settingsCenterNotificationChannelsDescription,
@@ -72,6 +87,7 @@ const knownSettingsResourceCatalog: KnownSettingsResourceConfig[] = [
   {
     route: "/notification-providers",
     capability: "notification",
+    group: "message",
     icon: <ApiOutlined />,
     title: (dictionary) => dictionary.settingsCenterNotificationProviders,
     description: (dictionary) => dictionary.settingsCenterNotificationProvidersDescription,
@@ -79,49 +95,57 @@ const knownSettingsResourceCatalog: KnownSettingsResourceConfig[] = [
   {
     route: "/notification-send-policies",
     capability: "notification",
+    group: "message",
     icon: <SettingOutlined />,
     title: (dictionary) => dictionary.settingsCenterNotificationPolicies,
     description: (dictionary) => dictionary.settingsCenterNotificationPoliciesDescription,
   },
+  {
+    route: "/notification-templates",
+    capability: "notification",
+    group: "message",
+    icon: <BellOutlined />,
+    title: (dictionary) => dictionary.settingsCenterNotificationTemplates,
+    description: (dictionary) => dictionary.settingsCenterNotificationTemplatesDescription,
+  },
 ];
 
 export function SettingsCenterConsole({ language, dictionary, resources, onRouteChange }: SettingsCenterConsoleProps) {
-  const [records, setRecords] = useState<SettingsResourceState>({});
+  const [runtimeItems, setRuntimeItems] = useState<AdminSettingsResourceItem[]>([]);
   const [errors, setErrors] = useState<SettingsErrorState>({});
   const [loading, setLoading] = useState(true);
   const availableConfigs = useMemo(
-    () => projectSettingsResourceConfigs(resources, dictionary, language),
-    [dictionary, language, resources],
+    () => projectSettingsResourceConfigs(runtimeItems, resources, dictionary, language),
+    [dictionary, language, resources, runtimeItems],
   );
   const rows = useMemo(
-    () => availableConfigs.map((config) => settingsRow(config, records[config.key] ?? [])),
-    [availableConfigs, records],
+    () => availableConfigs.map((config) => settingsRow(config)),
+    [availableConfigs],
   );
+  const groups = useMemo(() => groupSettingsResourceConfigs(availableConfigs, dictionary), [availableConfigs, dictionary]);
   const metrics = useMemo(() => {
-    const recordCount = availableConfigs.reduce((total, config) => total + (records[config.key]?.length ?? 0), 0);
+    const recordCount = availableConfigs.reduce((total, config) => total + config.recordCount, 0);
     return {
       resources: availableConfigs.length,
       capabilities: new Set(availableConfigs.map((config) => config.capability)).size,
       records: recordCount,
       warnings: Object.values(errors).filter(Boolean).length,
     };
-  }, [availableConfigs, errors, records]);
+  }, [availableConfigs, errors]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const nextRecords = emptyState(availableConfigs);
-    const nextErrors: SettingsErrorState = {};
-    await Promise.all(availableConfigs.map(async (config) => {
-      try {
-        nextRecords[config.key] = await loadAllRecords(config.resource);
-      } catch (error) {
-        nextErrors[config.key] = error instanceof Error ? error.message : dictionary.loadResourceFailed;
-      }
-    }));
-    setRecords(nextRecords);
-    setErrors(nextErrors);
-    setLoading(false);
-  }, [availableConfigs, dictionary.loadResourceFailed]);
+    try {
+      const runtime = await getAdminSettingsRuntime();
+      setRuntimeItems(runtime.items ?? []);
+      setErrors({});
+    } catch (error) {
+      setRuntimeItems([]);
+      setErrors({ runtime: error instanceof Error ? error.message : dictionary.loadResourceFailed });
+    } finally {
+      setLoading(false);
+    }
+  }, [dictionary.loadResourceFailed]);
 
   useEffect(() => {
     void load();
@@ -167,18 +191,34 @@ export function SettingsCenterConsole({ language, dictionary, resources, onRoute
         {availableConfigs.length === 0 ? (
           <Empty description={dictionary.settingsCenterNoResources} />
         ) : (
-          <div className="settings-center-card-grid">
-            {availableConfigs.map((config) => (
-              <button className="settings-center-card" key={config.key} type="button" onClick={() => onRouteChange(config.route)}>
-                <span className="settings-center-card-icon">{config.icon}</span>
-                <span>
-                  <Typography.Text strong>{config.title}</Typography.Text>
-                  <Typography.Text type="secondary">{config.description}</Typography.Text>
-                </span>
-                <Tag>{records[config.key]?.length ?? 0}</Tag>
-              </button>
+          <Space direction="vertical" size={14} style={{ width: "100%" }}>
+            {groups.map((group) => (
+              <section key={group.key} aria-label={group.title}>
+                <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                  <Space align="baseline" size={8} wrap>
+                    <Typography.Text strong>{group.title}</Typography.Text>
+                    <Typography.Text type="secondary">{group.description}</Typography.Text>
+                    <Tag>{group.configs.length}</Tag>
+                  </Space>
+                  <div className="settings-center-card-grid">
+                    {group.configs.map((config) => (
+                      <button className="settings-center-card" key={config.key} type="button" onClick={() => onRouteChange(config.route)}>
+                        <span className="settings-center-card-icon">{config.icon}</span>
+                        <span>
+                          <Typography.Text strong>{config.title}</Typography.Text>
+                          <Typography.Text type="secondary">{config.description}</Typography.Text>
+                        </span>
+                        <Space direction="vertical" size={2} align="end">
+                          <Tag>{config.recordCount}</Tag>
+                          <Tag color={config.source === "catalog" ? "blue" : "default"}>{sourceLabel(config.source, dictionary)}</Tag>
+                        </Space>
+                      </button>
+                    ))}
+                  </div>
+                </Space>
+              </section>
             ))}
-          </div>
+          </Space>
         )}
       </AdminListPanel>
       <AdminListPanel
@@ -267,98 +307,117 @@ function columns(dictionary: Dictionary, language: Language): PlatformDataTableC
   ];
 }
 
-function settingsRow(config: SettingsResourceConfig, records: AdminResourceRecord[]): SettingsRow {
+function settingsRow(config: SettingsResourceConfig): SettingsRow {
   return {
     key: config.key,
     route: config.route,
     title: config.title,
     capability: config.capability,
     description: config.description,
-    records: records.length,
-    enabled: records.filter((record) => record.status === "enabled" || record.status === "active").length,
-    updatedAt: records.map((record) => record.updatedAt).filter(Boolean).sort().at(-1) ?? "",
+    records: config.recordCount,
+    enabled: config.enabledCount,
+    updatedAt: config.updatedAt,
   };
 }
 
-async function loadAllRecords(resource: string) {
-  const records: AdminResourceRecord[] = [];
-  for (let page = 1; ; page += 1) {
-    const result = await queryAdminResource(resource, {
-      page,
-      pageSize: PAGE_SIZE,
-      sort: [{ field: "updatedAt", order: "desc" }],
-    });
-    records.push(...result.items);
-    if (result.items.length < PAGE_SIZE || records.length >= result.total) {
-      return records;
-    }
-  }
-}
-
-function projectSettingsResourceConfigs(resources: AdminResourceDefinition[], dictionary: Dictionary, language: Language): SettingsResourceConfig[] {
-  const resourcesByRoute = new Map(resources.map((resource) => [resource.route, resource]));
+function projectSettingsResourceConfigs(
+  runtimeItems: AdminSettingsResourceItem[],
+  resources: AdminResourceDefinition[],
+  dictionary: Dictionary,
+  language: Language,
+): SettingsResourceConfig[] {
+  const resourcesByName = new Map(resources.map((resource) => [resource.name, resource]));
+  const catalogByRoute = new Map(knownSettingsResourceCatalog.map((catalog, index) => [catalog.route, { catalog, index }]));
   const seenRoutes = new Set<string>();
-  const catalogConfigs = knownSettingsResourceCatalog.flatMap((catalog, index) => {
-    const resource = resourcesByRoute.get(catalog.route);
-    if (!resource) return [];
-    seenRoutes.add(resource.route);
+  const configs = runtimeItems.flatMap((item, index) => {
+    const route = item.route || resourcesByName.get(item.resource)?.route || `/${item.resource}`;
+    if (!route || seenRoutes.has(route)) return [];
+    seenRoutes.add(route);
+    const catalogMatch = catalogByRoute.get(route);
+    const records = item.records ?? [];
     return [{
-      key: resource.route,
-      route: resource.route,
-      resource: resource.name,
-      capability: catalog.capability,
-      icon: catalog.icon,
-      title: catalog.title(dictionary),
-      description: catalog.description(dictionary),
-      source: "catalog" as const,
-      order: index * 10,
+      key: route,
+      route,
+      resource: item.resource,
+      capability: item.capabilityId,
+      group: catalogMatch?.catalog.group ?? inferRuntimeSettingsResourceGroup(item),
+      icon: catalogMatch?.catalog.icon ?? iconForRuntimeSettingsResource(item),
+      title: catalogMatch?.catalog.title(dictionary) ?? localizedText(item.title, language, item.resource),
+      description: catalogMatch?.catalog.description(dictionary) ?? localizedText(item.description, language, ""),
+      source: catalogMatch ? "catalog" as const : "manifest" as const,
+      order: itemOrder(item, catalogMatch?.index, index),
+      records,
+      recordCount: item.recordCount ?? records.length,
+      enabledCount: records.filter((record) => record.status === "enabled" || record.status === "active").length,
+      updatedAt: records.map((record) => record.updatedAt).filter(Boolean).sort().at(-1) ?? "",
     }];
   });
-  const manifestConfigs = resources
-    .filter((resource) => !seenRoutes.has(resource.route) && isCapabilityConfigurationResource(resource))
-    .map((resource, index) => ({
-      key: resource.route,
-      route: resource.route,
-      resource: resource.name,
-      capability: inferCapabilityLabel(resource),
-      icon: iconForSettingsResource(resource),
-      title: resource.title[language] || resource.title.zh || resource.title.en || resource.name,
-      description: resource.description[language] || resource.description.zh || resource.description.en || "",
-      source: "manifest" as const,
-      order: 1000 + index,
-    }));
-  return [...catalogConfigs, ...manifestConfigs].sort((left, right) => left.order - right.order || left.title.localeCompare(right.title));
+  return configs.sort((left, right) => left.order - right.order || left.title.localeCompare(right.title));
 }
 
-function isCapabilityConfigurationResource(resource: AdminResourceDefinition) {
-  if (resource.isExternal || !resource.route.startsWith("/") || resource.route === "/settings") {
-    return false;
+function inferRuntimeSettingsResourceGroup(item: AdminSettingsResourceItem): SettingsResourceGroup {
+  if (item.capabilityId === "notification" || item.resource.startsWith("notification-")) return "message";
+  if (item.capabilityId === "parameter" || item.capabilityId === "dictionary") return "core";
+  return "capability";
+}
+
+function groupSettingsResourceConfigs(configs: SettingsResourceConfig[], dictionary: Dictionary) {
+  const groups: Array<{
+    key: SettingsResourceGroup;
+    title: string;
+    description: string;
+    configs: SettingsResourceConfig[];
+  }> = [
+    {
+      key: "core",
+      title: dictionary.settingsCenterCoreGroup,
+      description: dictionary.settingsCenterCoreGroupDescription,
+      configs: [],
+    },
+    {
+      key: "message",
+      title: dictionary.settingsCenterMessageGroup,
+      description: dictionary.settingsCenterMessageGroupDescription,
+      configs: [],
+    },
+    {
+      key: "capability",
+      title: dictionary.settingsCenterCapabilityGroup,
+      description: dictionary.settingsCenterCapabilityGroupDescription,
+      configs: [],
+    },
+  ];
+  const byKey = new Map(groups.map((group) => [group.key, group]));
+  for (const config of configs) {
+    byKey.get(config.group)?.configs.push(config);
   }
-  return resource.parent === "configuration" || /(?:settings|config|parameter|provider|channel|policy|template)/iu.test(resource.name);
+  return groups.filter((group) => group.configs.length > 0);
 }
 
-function inferCapabilityLabel(resource: AdminResourceDefinition) {
-  if (resource.name.startsWith("notification-")) return "notification";
-  if (resource.name === "branding" || resource.name === "parameters" || resource.name === "settings") return "parameter";
-  if (resource.name.includes("dictionary") || resource.name.includes("area-code")) return "dictionary";
-  const permissionResource = resource.permission.match(/^admin:([^:]+):read$/u)?.[1];
-  return permissionResource || resource.parent || resource.group;
+function sourceLabel(source: SettingsResourceConfig["source"], dictionary: Dictionary) {
+  return source === "catalog" ? dictionary.settingsCenterCatalogSource : dictionary.settingsCenterManifestSource;
 }
 
-function iconForSettingsResource(resource: AdminResourceDefinition) {
-  if (resource.name === "branding") return <BgColorsOutlined />;
-  if (resource.name.includes("provider")) return <ApiOutlined />;
-  if (resource.name.startsWith("notification-")) return <BellOutlined />;
-  if (resource.name.includes("dictionary") || resource.name.includes("parameter") || resource.name.includes("area-code")) return <DatabaseOutlined />;
+function iconForRuntimeSettingsResource(item: AdminSettingsResourceItem) {
+  if (item.resource === "branding") return <BgColorsOutlined />;
+  if (item.resource.includes("provider")) return <ApiOutlined />;
+  if (item.resource.startsWith("notification-")) return <BellOutlined />;
+  if (item.resource.includes("dictionary") || item.resource.includes("parameter") || item.resource.includes("area-code")) return <DatabaseOutlined />;
   return <SettingOutlined />;
 }
 
-function emptyState(configs: SettingsResourceConfig[]): SettingsResourceState {
-  return Object.fromEntries(configs.map((config) => [config.key, []]));
+function itemOrder(item: AdminSettingsResourceItem, catalogIndex: number | undefined, fallbackIndex: number) {
+  if (typeof catalogIndex === "number") return catalogIndex * 10;
+  return 1000 + fallbackIndex;
 }
 
 function settingsResourceLabel(key: string, configs: SettingsResourceConfig[]) {
   return configs.find((config) => config.key === key)?.title ?? key;
+}
+
+function localizedText(value: { zh?: string; en?: string } | undefined, language: Language, fallback: string) {
+  if (!value) return fallback;
+  return value[language] || value.zh || value.en || fallback;
 }
 
 function tableLabels(dictionary: Dictionary) {

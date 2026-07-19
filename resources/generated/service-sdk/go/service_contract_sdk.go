@@ -4,7 +4,7 @@ package servicecontractsdk
 import "encoding/json"
 
 const PlatformErrorContractSource = "resources/generated/platform-error-code-contract.json"
-const PlatformErrorContractHash = "sha256:f4dbaa69b70312857a17553662ce5986a90c0ba0ef4c5fbbcc77056db10f36a8"
+const PlatformErrorContractHash = "sha256:e227a68f12805fa3280929cd4c91237d030915965c70a39e84ddf39e281ddb71"
 
 type PlatformErrorCode string
 type PlatformErrorDefinition struct { Code PlatformErrorCode `json:"code"`; Owner string `json:"owner"`; Planes []string `json:"planes"`; Audiences []string `json:"audiences"`; Category string `json:"category"`; HTTPStatus int `json:"httpStatus"`; RetryPolicy string `json:"retryPolicy"`; RedactionClass string `json:"redactionClass"`; PublicMessage string `json:"publicMessage"`; IntroducedIn string `json:"introducedIn"`; Deprecated bool `json:"deprecated"` }
@@ -39,6 +39,7 @@ const (
 	CodeAdminFileUploadOpenFailed PlatformErrorCode = "ADMIN_FILE_UPLOAD_OPEN_FAILED"
 	CodeAdminForbidden PlatformErrorCode = "ADMIN_FORBIDDEN"
 	CodeAdminMenuResolutionFailed PlatformErrorCode = "ADMIN_MENU_RESOLUTION_FAILED"
+	CodeAdminMessageCenterUnavailable PlatformErrorCode = "ADMIN_MESSAGE_CENTER_UNAVAILABLE"
 	CodeAdminPolicyReviewWatermarkInvalid PlatformErrorCode = "ADMIN_POLICY_REVIEW_WATERMARK_INVALID"
 	CodeAdminResourceDomainOwnedMutation PlatformErrorCode = "ADMIN_RESOURCE_DOMAIN_OWNED_MUTATION"
 	CodeAdminResourceError PlatformErrorCode = "ADMIN_RESOURCE_ERROR"
@@ -160,6 +161,7 @@ var platformErrorDefinitions = []PlatformErrorDefinition{
 	{Code: CodeAdminFileUploadOpenFailed, Owner: "platform.file", Planes: []string{"admin"}, Audiences: []string{"operator"}, Category: "validation", HTTPStatus: 400, RetryPolicy: "never", RedactionClass: "public-safe", PublicMessage: "open uploaded file failed", IntroducedIn: "0.1.0", Deprecated: false},
 	{Code: CodeAdminForbidden, Owner: "platform.http", Planes: []string{"admin"}, Audiences: []string{"operator"}, Category: "authorization", HTTPStatus: 403, RetryPolicy: "never", RedactionClass: "public-safe", PublicMessage: "permission denied", IntroducedIn: "0.1.0", Deprecated: false},
 	{Code: CodeAdminMenuResolutionFailed, Owner: "platform.http", Planes: []string{"admin"}, Audiences: []string{"operator"}, Category: "dependency", HTTPStatus: 503, RetryPolicy: "backoff", RedactionClass: "generic-only", PublicMessage: "admin menu navigation is unavailable", IntroducedIn: "0.1.0", Deprecated: false},
+	{Code: CodeAdminMessageCenterUnavailable, Owner: "platform.notification", Planes: []string{"admin"}, Audiences: []string{"operator"}, Category: "dependency", HTTPStatus: 503, RetryPolicy: "backoff", RedactionClass: "generic-only", PublicMessage: "message center runtime is unavailable", IntroducedIn: "0.1.0", Deprecated: false},
 	{Code: CodeAdminPolicyReviewWatermarkInvalid, Owner: "platform.http", Planes: []string{"admin"}, Audiences: []string{"operator"}, Category: "validation", HTTPStatus: 400, RetryPolicy: "never", RedactionClass: "public-safe", PublicMessage: "watermark must be true or false", IntroducedIn: "0.1.0", Deprecated: false},
 	{Code: CodeAdminResourceDomainOwnedMutation, Owner: "platform.adminresource", Planes: []string{"admin"}, Audiences: []string{"operator"}, Category: "conflict", HTTPStatus: 409, RetryPolicy: "never", RedactionClass: "public-safe", PublicMessage: "resource mutation requires a governed domain command", IntroducedIn: "0.1.0", Deprecated: false},
 	{Code: CodeAdminResourceError, Owner: "platform.adminresource", Planes: []string{"admin"}, Audiences: []string{"operator"}, Category: "internal", HTTPStatus: 500, RetryPolicy: "never", RedactionClass: "correlation-only", PublicMessage: "admin resource operation failed", IntroducedIn: "0.1.0", Deprecated: false},

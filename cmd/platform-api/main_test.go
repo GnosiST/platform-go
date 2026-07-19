@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/GnosiST/platform-go/internal/apps"
@@ -49,14 +50,153 @@ func TestPhoneVerificationSenderFromConfigCreatesOnlyCanonicalDebugSender(t *tes
 }
 
 func TestNotificationSMSSenderFromConfigCreatesOnlyCanonicalMockLocalSender(t *testing.T) {
-	mock := notificationSMSSenderFromConfig(config.Config{NotificationSMSProvider: notification.SMSProviderMockLocal})
+	mock, err := notificationSMSSenderFromConfig(config.Config{NotificationSMSProvider: notification.SMSProviderMockLocal})
+	if err != nil {
+		t.Fatalf("notificationSMSSenderFromConfig(mock-local) error = %v", err)
+	}
 	if _, ok := mock.(*notification.MockLocalSMSSender); !ok {
 		t.Fatalf("notificationSMSSenderFromConfig(mock-local) = %T, want built-in mock sender", mock)
 	}
-	for _, provider := range []string{"aliyun", " MOCK-LOCAL ", "", "debug"} {
-		if sender := notificationSMSSenderFromConfig(config.Config{NotificationSMSProvider: provider}); sender != nil {
+	for _, provider := range []string{" MOCK-LOCAL ", "", "debug"} {
+		sender, err := notificationSMSSenderFromConfig(config.Config{NotificationSMSProvider: provider})
+		if err != nil {
+			t.Fatalf("notificationSMSSenderFromConfig(%q) error = %v", provider, err)
+		}
+		if sender != nil {
 			t.Fatalf("notificationSMSSenderFromConfig(%q) = %T, want nil", provider, sender)
 		}
+	}
+}
+
+func TestNotificationSMSSenderFromConfigCreatesVendorDryRunSender(t *testing.T) {
+	tests := []struct {
+		name        string
+		provider    string
+		setProvider func(*testing.T)
+	}{
+		{
+			name:     "aliyun",
+			provider: notification.SMSProviderAliyun,
+			setProvider: func(t *testing.T) {
+				t.Setenv(notification.EnvNotificationSMSAliyunRegion, "cn-hangzhou")
+				t.Setenv(notification.EnvNotificationSMSAliyunAccessKeyID, "test-access-key")
+				t.Setenv(notification.EnvNotificationSMSAliyunSecretKey, "test-secret-key")
+				t.Setenv(notification.EnvNotificationSMSSignName, "Platform")
+			},
+		},
+		{
+			name:     "tencent",
+			provider: notification.SMSProviderTencent,
+			setProvider: func(t *testing.T) {
+				t.Setenv(notification.EnvNotificationSMSTencentRegion, "ap-guangzhou")
+				t.Setenv(notification.EnvNotificationSMSTencentSecretID, "test-secret-id")
+				t.Setenv(notification.EnvNotificationSMSTencentSecretKey, "test-secret-key")
+				t.Setenv(notification.EnvNotificationSMSTencentSDKAppID, "1400000000")
+				t.Setenv(notification.EnvNotificationSMSSignName, "Platform")
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(notification.EnvNotificationSMSDryRun, "true")
+			tt.setProvider(t)
+
+			sender, err := notificationSMSSenderFromConfig(config.Config{NotificationSMSProvider: tt.provider})
+			if err != nil {
+				t.Fatalf("notificationSMSSenderFromConfig() error = %v", err)
+			}
+			if sender == nil || sender.Kind() != tt.provider {
+				t.Fatalf("notificationSMSSenderFromConfig() = %T/%v, want %s dry-run sender", sender, sender, tt.provider)
+			}
+			receipt, err := sender.SendSMS(context.Background(), notification.SMSMessage{
+				Recipient:  "+8613800000000",
+				TemplateID: "login-template",
+				Purpose:    "login",
+			})
+			if err != nil {
+				t.Fatalf("SendSMS() error = %v", err)
+			}
+			if receipt.Status != notification.SMSDeliveryDryRunAccepted || receipt.Provider != tt.provider {
+				t.Fatalf("receipt = %+v, want vendor dry-run receipt", receipt)
+			}
+		})
+	}
+}
+
+func TestNotificationSMSSenderFromConfigFailsClosedForLiveSendWithoutImplementation(t *testing.T) {
+	t.Setenv(notification.EnvNotificationSMSLiveSendEnabled, "true")
+	t.Setenv(notification.EnvNotificationSMSAliyunRegion, "cn-hangzhou")
+	t.Setenv(notification.EnvNotificationSMSAliyunAccessKeyID, "test-access-key")
+	t.Setenv(notification.EnvNotificationSMSAliyunSecretKey, "test-secret-key")
+	t.Setenv(notification.EnvNotificationSMSSignName, "Platform")
+
+	_, err := notificationSMSSenderFromConfig(config.Config{
+		RuntimeEnvironment:      config.RuntimeEnvironmentProduction,
+		NotificationSMSProvider: notification.SMSProviderAliyun,
+	})
+	if err == nil || !strings.Contains(err.Error(), "live sending is not implemented") {
+		t.Fatalf("notificationSMSSenderFromConfig() error = %v, want live-send implementation failure", err)
+	}
+}
+
+func TestNotificationSMSSenderFromConfigRejectsMissingVendorConfigWithoutSecretLeak(t *testing.T) {
+	secret := "do-not-print-this-secret"
+	t.Setenv(notification.EnvNotificationSMSDryRun, "true")
+	t.Setenv(notification.EnvNotificationSMSAliyunRegion, "cn-hangzhou")
+	t.Setenv(notification.EnvNotificationSMSAliyunSecretKey, secret)
+	t.Setenv(notification.EnvNotificationSMSSignName, "Platform")
+
+	_, err := notificationSMSSenderFromConfig(config.Config{NotificationSMSProvider: notification.SMSProviderAliyun})
+	if err == nil || !strings.Contains(err.Error(), notification.EnvNotificationSMSAliyunAccessKeyID) {
+		t.Fatalf("notificationSMSSenderFromConfig() error = %v, want missing access key", err)
+	}
+	if strings.Contains(err.Error(), secret) {
+		t.Fatalf("notificationSMSSenderFromConfig() leaked secret in error: %v", err)
+	}
+}
+
+func TestNotificationSMSSenderFromConfigRejectsInvalidSMSRuntimeBoolean(t *testing.T) {
+	t.Setenv(notification.EnvNotificationSMSDryRun, "sometimes")
+
+	_, err := notificationSMSSenderFromConfig(config.Config{NotificationSMSProvider: notification.SMSProviderAliyun})
+	if err == nil || !strings.Contains(err.Error(), notification.EnvNotificationSMSDryRun+" must be a boolean") {
+		t.Fatalf("notificationSMSSenderFromConfig() error = %v, want dry-run boolean rejection", err)
+	}
+}
+
+func TestNotificationSMSSenderFromConfigTreatsLiveDisabledAsDryRun(t *testing.T) {
+	t.Setenv(notification.EnvNotificationSMSLiveSendEnabled, "false")
+	t.Setenv(notification.EnvNotificationSMSDryRun, "false")
+	t.Setenv(notification.EnvNotificationSMSTencentRegion, "ap-guangzhou")
+	t.Setenv(notification.EnvNotificationSMSTencentSecretID, "test-secret-id")
+	t.Setenv(notification.EnvNotificationSMSTencentSecretKey, "test-secret-key")
+	t.Setenv(notification.EnvNotificationSMSTencentSDKAppID, "1400000000")
+	t.Setenv(notification.EnvNotificationSMSSignName, "Platform")
+
+	sender, err := notificationSMSSenderFromConfig(config.Config{NotificationSMSProvider: notification.SMSProviderTencent})
+	if err != nil {
+		t.Fatalf("notificationSMSSenderFromConfig() error = %v", err)
+	}
+	receipt, err := sender.SendSMS(context.Background(), notification.SMSMessage{
+		Recipient:  "+8613800000000",
+		TemplateID: "login-template",
+		Purpose:    "login",
+	})
+	if err != nil {
+		t.Fatalf("SendSMS() error = %v", err)
+	}
+	if receipt.Status != notification.SMSDeliveryDryRunAccepted {
+		t.Fatalf("receipt = %+v, want dry-run when live send is disabled", receipt)
+	}
+}
+
+func TestNotificationSMSSenderFromConfigRejectsConflictingDryRunAndLiveSend(t *testing.T) {
+	t.Setenv(notification.EnvNotificationSMSDryRun, "true")
+	t.Setenv(notification.EnvNotificationSMSLiveSendEnabled, "true")
+
+	_, err := notificationSMSSenderFromConfig(config.Config{NotificationSMSProvider: notification.SMSProviderTencent})
+	if err == nil || !strings.Contains(err.Error(), "cannot both be true") {
+		t.Fatalf("notificationSMSSenderFromConfig() error = %v, want conflict rejection", err)
 	}
 }
 

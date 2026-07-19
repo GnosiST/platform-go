@@ -9,7 +9,7 @@ import (
 
 func TestBuiltinsAreUniqueCompleteAndStable(t *testing.T) {
 	definitions := All()
-	if got, want := len(definitions), 118; got != want {
+	if got, want := len(definitions), 119; got != want {
 		t.Fatalf("len(All()) = %d, want %d", got, want)
 	}
 	seen := map[Code]struct{}{}

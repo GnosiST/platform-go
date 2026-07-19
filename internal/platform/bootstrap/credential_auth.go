@@ -9,6 +9,7 @@ import (
 	"github.com/GnosiST/platform-go/internal/platform/config"
 	"github.com/GnosiST/platform-go/internal/platform/credentialauth"
 	"github.com/GnosiST/platform-go/internal/platform/httpapi"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
 
 func CredentialAuthRuntimeFromConfig(ctx context.Context, cfg config.Config, sms NotificationSMSRuntime) (*httpapi.CredentialAuthRuntime, error) {
@@ -19,14 +20,18 @@ func CredentialAuthRuntimeFromConfig(ctx context.Context, cfg config.Config, sms
 	if environment == "" {
 		environment = config.RuntimeEnvironmentDevelopment
 	}
-	if environment == config.RuntimeEnvironmentProduction {
-		return nil, fmt.Errorf("production credential-auth requires a persistent credential repository")
-	}
 	hasher, err := credentialauth.NewHMACIdentifierHasher([]byte(cfg.CredentialAuthIdentifierHMACKey))
 	if err != nil {
 		return nil, fmt.Errorf("build credential identifier hasher: %w", err)
 	}
-	repository := credentialauth.NewMemoryRepository()
+	repository, err := credentialAuthRepositoryFromConfig(ctx, cfg, environment)
+	if err != nil {
+		return nil, err
+	}
+	secretTransport, err := credentialAuthSecretTransportFromConfig(cfg, environment)
+	if err != nil {
+		return nil, err
+	}
 	service, err := credentialauth.NewService(credentialauth.Options{
 		Repository:       repository,
 		IdentifierHasher: hasher,
@@ -43,16 +48,74 @@ func CredentialAuthRuntimeFromConfig(ctx context.Context, cfg config.Config, sms
 		return nil, fmt.Errorf("credential-auth phone SMS OTP requires notification SMS sender")
 	}
 	return &httpapi.CredentialAuthRuntime{
-		Service:           service,
-		IdentifierHasher:  hasher,
-		SMSOTPHasher:      hasher,
-		SMSSender:         sms.Sender,
-		LoginTemplateID:   sms.LoginTemplateID,
-		DebugCodeEnabled:  sms.MockLocalEnabled && (environment == config.RuntimeEnvironmentDevelopment || environment == config.RuntimeEnvironmentTest),
-		Now:               time.Now,
-		SMSOTPTTL:         5 * time.Minute,
-		MaxSMSOTPAttempts: credentialauth.DefaultMaxSMSOTPAttempts,
+		Service:                 service,
+		IdentifierHasher:        hasher,
+		SecretTransport:         secretTransport,
+		SMSOTPHasher:            hasher,
+		SMSSender:               sms.Sender,
+		LoginTemplateID:         sms.LoginTemplateID,
+		DebugCodeEnabled:        sms.MockLocalEnabled && (environment == config.RuntimeEnvironmentDevelopment || environment == config.RuntimeEnvironmentTest),
+		Now:                     time.Now,
+		SMSOTPTTL:               5 * time.Minute,
+		MaxSMSOTPAttempts:       credentialauth.DefaultMaxSMSOTPAttempts,
+		RequireEncryptedSecrets: true,
 	}, nil
+}
+
+func credentialAuthRepositoryFromConfig(ctx context.Context, cfg config.Config, environment string) (credentialauth.Repository, error) {
+	driver := strings.TrimSpace(cfg.CredentialAuthRepositoryDriver)
+	dsn := strings.TrimSpace(cfg.CredentialAuthRepositoryDSN)
+	if driver == "" && dsn == "" {
+		if environment == config.RuntimeEnvironmentProduction {
+			return nil, fmt.Errorf("production credential-auth requires a persistent credential repository")
+		}
+		return credentialauth.NewMemoryRepository(), nil
+	}
+	if driver == "" || dsn == "" {
+		return nil, fmt.Errorf("credential-auth repository driver and dsn are required together")
+	}
+	db, err := storage.OpenGORM(storage.Config{Driver: driver, DSN: dsn})
+	if err != nil {
+		return nil, fmt.Errorf("open credential-auth repository database: %w", err)
+	}
+	repository, err := credentialauth.NewGORMRepository(ctx, db)
+	if err != nil {
+		if sqlDB, dbErr := db.DB(); dbErr == nil {
+			_ = sqlDB.Close()
+		}
+		return nil, fmt.Errorf("open credential-auth repository: %w", err)
+	}
+	return repository, nil
+}
+
+func credentialAuthSecretTransportFromConfig(cfg config.Config, environment string) (*credentialauth.SecretTransport, error) {
+	keyID := strings.TrimSpace(cfg.CredentialAuthSecretTransportKeyID)
+	privateKeyValue := strings.TrimSpace(cfg.CredentialAuthSecretTransportKey)
+	if keyID == "" {
+		if environment == config.RuntimeEnvironmentProduction {
+			return nil, fmt.Errorf("production credential-auth requires application-layer secret transport key id")
+		}
+		keyID = "development-ephemeral"
+	}
+	var privateKey []byte
+	if privateKeyValue != "" {
+		decoded, err := credentialauth.DecodeSecretTransportPrivateKey(privateKeyValue)
+		if err != nil {
+			return nil, fmt.Errorf("decode credential-auth secret transport private key: %w", err)
+		}
+		privateKey = decoded
+	} else if environment == config.RuntimeEnvironmentProduction {
+		return nil, fmt.Errorf("production credential-auth requires application-layer secret transport private key")
+	}
+	transport, err := credentialauth.NewSecretTransport(credentialauth.SecretTransportOptions{
+		KeyID:      keyID,
+		PrivateKey: privateKey,
+		Now:        time.Now,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("build credential-auth secret transport: %w", err)
+	}
+	return transport, nil
 }
 
 func seedCredentialAuthBootstrapAdmin(ctx context.Context, cfg config.Config, service *credentialauth.Service) error {

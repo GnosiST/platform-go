@@ -1,0 +1,92 @@
+{
+  "schema": "platform-go.external-business-project-template.v1",
+  "answer": {
+    "startPath": "create a downstream business package or service",
+    "doNotStartBy": "editing platform core source",
+    "reason": "business capabilities are registered through public capability manifests and projected into platform contracts"
+  },
+  "platformBase": {
+    "module": "github.com/GnosiST/platform-go",
+    "defaultProfile": "platform-default",
+    "composition": "restart-required desired-state",
+    "mustNotModify": [
+      "internal/platform/**",
+      "internal/apps/**",
+      "resources/admin-resources.json",
+      "resources/platform-capability-profiles.json for a concrete business capability"
+    ]
+  },
+  "businessCapability": {
+    "id": "example-catalog",
+    "module": "github.com/GnosiST/platform-go/examples/external-capability",
+    "manifestFunction": "CatalogManifest",
+    "publicCapabilityImport": "github.com/GnosiST/platform-go/pkg/platform/capability",
+    "registration": "append CatalogManifest() in the downstream composition root before resolving enabled capabilities"
+  },
+  "adminSurface": {
+    "projection": "capability.Manifest.Admin.Resources -> admin resource contract -> menu, permissions, schema and settings aggregation",
+    "resources": [
+      {
+        "resource": "catalog-items",
+        "permissionPrefix": "admin:catalog-item",
+        "menuRoute": "/catalog-items",
+        "menuGroup": "business",
+        "settingsEntry": false
+      },
+      {
+        "resource": "catalog-settings",
+        "permissionPrefix": "admin:catalog-setting",
+        "menuRoute": "/catalog-settings",
+        "menuParent": "configuration",
+        "menuGroup": "foundation",
+        "settingsEntry": true
+      }
+    ]
+  },
+  "appSurface": {
+    "routes": [
+      {
+        "method": "GET",
+        "path": "/api/app/catalog/items",
+        "auth": "session",
+        "permission": "app:catalog-item:read"
+      }
+    ]
+  },
+  "configuration": {
+    "settingsCenter": "/settings",
+    "settingsResource": "catalog-settings",
+    "authProviderConfigKeys": [
+      "CATALOG_PARTNER_CLIENT_ID",
+      "CATALOG_PARTNER_CLIENT_SECRET"
+    ]
+  },
+  "validationCommands": [
+    {
+      "cwd": ".",
+      "command": "rtk node scripts/validate-external-capability-example.mjs"
+    },
+    {
+      "cwd": ".",
+      "command": "rtk node --test scripts/validate-external-capability-example.test.mjs"
+    },
+    {
+      "cwd": "examples/external-capability",
+      "command": "rtk go test ./..."
+    },
+    {
+      "cwd": "examples/external-capability",
+      "command": "rtk go run ."
+    }
+  ],
+  "deployment": {
+    "package": "build a downstream API binary or service image that includes the business capability manifest",
+    "enable": "select platform capabilities plus example-catalog in the downstream desired capability list",
+    "restart": "regenerate contracts and restart the API process; v1 does not hot-load external packages"
+  },
+  "upgradeStrategy": {
+    "platform": "upgrade the platform module version, run contract validators, then rebuild the downstream composition root",
+    "business": "bump the capability semver, keep resource keys and permission prefixes stable, add idempotent migrations for data changes",
+    "rollback": "roll back the downstream binary and desired capability set; persisted business data remains owned by the business package"
+  }
+}

@@ -14,7 +14,10 @@ function argValue(name, fallback) {
 const contractPath = path.resolve(repoRoot, argValue("--contract", "resources/platform-credential-auth-v1.json"));
 const authDocPath = path.resolve(repoRoot, argValue("--auth-doc", "docs/platform-auth.md"));
 const capabilityDocPath = path.resolve(repoRoot, argValue("--capability-doc", "docs/platform-capability-development.md"));
+const dataGovernanceDocPath = path.resolve(repoRoot, argValue("--data-governance-doc", "docs/platform-data-governance-and-integrations-assessment.md"));
 const mainGoPath = path.resolve(repoRoot, argValue("--main-go", "cmd/platform-api/main.go"));
+const httpCredentialAuthPath = path.resolve(repoRoot, argValue("--http-credential-auth", "internal/platform/httpapi/credential_auth.go"));
+const adminClientPath = path.resolve(repoRoot, argValue("--admin-client", "admin/src/platform/api/client.ts"));
 
 const requiredProviderModes = new Map([
   ["username-password", { identifierType: "username", secretType: "password", configKey: "PLATFORM_CREDENTIAL_AUTH_USERNAME_PASSWORD" }],
@@ -52,6 +55,7 @@ const requiredStorageContracts = new Map([
 
 const requiredEndpoints = new Set([
   "GET /api/auth/providers",
+  "GET /api/auth/credential-secret-key",
   "POST /api/auth/challenges",
   "POST /api/auth/sms-otp/start",
   "POST /api/auth/login",
@@ -60,6 +64,7 @@ const requiredEndpoints = new Set([
 const requiredDocs = [
   "docs/platform-auth.md",
   "docs/platform-capability-development.md",
+  "docs/platform-data-governance-and-integrations-assessment.md",
 ];
 
 const requiredValidators = ["scripts/validate-platform-credential-auth-v1.mjs"];
@@ -69,10 +74,14 @@ const requiredBackendFiles = [
   "internal/platform/credentialauth/normalizer.go",
   "internal/platform/credentialauth/hmac_identifier.go",
   "internal/platform/credentialauth/memory_repository.go",
+  "internal/platform/credentialauth/gorm_repository.go",
   "internal/platform/credentialauth/service.go",
   "internal/platform/credentialauth/argon2id.go",
+  "internal/platform/credentialauth/secret_transport.go",
   "internal/platform/credentialauth/service_test.go",
   "internal/platform/credentialauth/argon2id_test.go",
+  "internal/platform/credentialauth/gorm_repository_test.go",
+  "internal/platform/credentialauth/secret_transport_test.go",
 ];
 const requiredRuntimeFiles = [
   "internal/platform/httpapi/credential_auth.go",
@@ -137,8 +146,8 @@ function uniqueErrors(items, label) {
 
 function validateRuntimeBoundary(contract, mainGo, errors) {
   const boundary = contract.runtimeBoundary ?? {};
-  if (boundary.status !== "dev-http-runtime-memory-bootstrap") {
-    errors.push("runtimeBoundary.status must be dev-http-runtime-memory-bootstrap until production storage and governance are complete");
+  if (boundary.status !== "persistent-runtime-p0") {
+    errors.push("runtimeBoundary.status must be persistent-runtime-p0 after dedicated repository and encrypted secret transport work");
   }
   if (boundary.defaultRuntimeMutation !== "forbidden") {
     errors.push("runtimeBoundary.defaultRuntimeMutation must stay forbidden");
@@ -150,13 +159,38 @@ function validateRuntimeBoundary(contract, mainGo, errors) {
     errors.push("existing password provider guard must remain active");
   }
   if (boundary.productionComplete !== false) {
-    errors.push("runtimeBoundary.productionComplete must stay false for the current development slice");
+    errors.push("runtimeBoundary.productionComplete must stay false until challenge, live SMS and full governance evidence are complete");
   }
   if (!String(boundary.devRuntimeStorage ?? "").includes("in-memory credential-auth repository")) {
-    errors.push("runtimeBoundary.devRuntimeStorage must document the in-memory development repository");
+    errors.push("runtimeBoundary.devRuntimeStorage must document the in-memory development repository fallback");
   }
-  if (!String(boundary.productionEnablementGate ?? "").includes("persistent credential repository")) {
-    errors.push("runtimeBoundary.productionEnablementGate must require a persistent credential repository");
+  if (!String(boundary.p0RuntimeStorage ?? "").includes("dedicated GORM credential-auth repository")) {
+    errors.push("runtimeBoundary.p0RuntimeStorage must document the dedicated GORM credential-auth repository");
+  }
+  const secretTransport = String(boundary.secretTransport ?? "");
+  for (const snippet of [
+    "application-layer hybrid encryption",
+    "GET /api/auth/credential-secret-key",
+    "ECDH P-256",
+    "HKDF-SHA256",
+    "AES-256-GCM/A256GCM",
+    "password or SMS OTP secrets",
+  ]) {
+    if (!secretTransport.includes(snippet)) {
+      errors.push(`runtimeBoundary.secretTransport must document ${snippet}`);
+    }
+  }
+  if (!secretTransport.includes("secret.encrypted")) {
+    errors.push("runtimeBoundary.secretTransport must document secret.encrypted envelopes");
+  }
+  if (!secretTransport.includes("HTTPS remains a production baseline") || !secretTransport.includes("not the credential secret encryption mechanism")) {
+    errors.push("runtimeBoundary.secretTransport must state HTTPS is only a production baseline and not the credential secret encryption mechanism");
+  }
+  if (!secretTransport.includes("cannot be used as a substitute for secret.encrypted")) {
+    errors.push("runtimeBoundary.secretTransport must state HTTPS cannot substitute secret.encrypted");
+  }
+  if (!String(boundary.productionEnablementGate ?? "").includes("repository driver/dsn")) {
+    errors.push("runtimeBoundary.productionEnablementGate must require repository driver/dsn and encrypted secret transport keys");
   }
   requireIncludes(
     boundary.mustNotChange,
@@ -349,14 +383,36 @@ function validateNotificationSms(contract, errors) {
 
 function validateAPIContract(contract, errors) {
   const api = contract.apiContract ?? {};
-  if (api.status !== "implemented-partial") {
-    errors.push("apiContract.status must be implemented-partial for the current development HTTP/UI slice");
+  if (api.status !== "persistent-runtime-p0") {
+    errors.push("apiContract.status must be persistent-runtime-p0 for the current encrypted persistent HTTP/UI slice");
   }
   if (api.providerDriven !== true) {
     errors.push("apiContract.providerDriven must be true");
   }
   if (api.frontEndMustNotHardCodeProviderModes !== true) {
     errors.push("apiContract.frontEndMustNotHardCodeProviderModes must be true");
+  }
+  const secretTransport = api.secretTransportContract ?? {};
+  if (secretTransport.algorithm !== "ECDH-P256-HKDF-SHA256+A256GCM") {
+    errors.push("apiContract.secretTransportContract.algorithm must be ECDH-P256-HKDF-SHA256+A256GCM");
+  }
+  if (secretTransport.keyDiscoveryEndpoint !== "GET /api/auth/credential-secret-key") {
+    errors.push("apiContract.secretTransportContract.keyDiscoveryEndpoint must be GET /api/auth/credential-secret-key");
+  }
+  if (secretTransport.loginEnvelopeField !== "secret.encrypted") {
+    errors.push("apiContract.secretTransportContract.loginEnvelopeField must be secret.encrypted");
+  }
+  requireIncludes(
+    secretTransport.plaintextSecretFieldsRejectedWhenRequired,
+    ["secret.value", "secret.code"],
+    "apiContract.secretTransportContract.plaintextSecretFieldsRejectedWhenRequired",
+    errors,
+  );
+  if (!String(secretTransport.httpsRole ?? "").includes("not the application-layer credential secret encryption mechanism")) {
+    errors.push("apiContract.secretTransportContract.httpsRole must state HTTPS is not the application-layer credential secret encryption mechanism");
+  }
+  if (!String(secretTransport.httpsRole ?? "").includes("cannot be used as a substitute for secret.encrypted")) {
+    errors.push("apiContract.secretTransportContract.httpsRole must state HTTPS cannot substitute secret.encrypted");
   }
   const endpoints = new Set(values(api.endpoints).map((item) => `${item.method} ${item.path}`));
   for (const endpoint of requiredEndpoints) {
@@ -368,9 +424,10 @@ function validateAPIContract(contract, errors) {
     api.implementedNow,
     [
       "GET /api/auth/providers includes enabled credential-auth provider declarations",
+      "GET /api/auth/credential-secret-key exposes short-lived public key metadata for application-layer hybrid encrypted credential secrets",
       "POST /api/auth/sms-otp/start starts phone SMS OTP transactions through notification.sms",
-      "POST /api/auth/login accepts structured credential-password and credential-sms-otp requests while preserving demo/OIDC compatibility",
-      "Admin login UI renders credential provider modes from discovery",
+      "POST /api/auth/login accepts structured encrypted credential-password and credential-sms-otp requests while preserving demo/OIDC compatibility",
+      "Admin login UI renders credential provider modes from discovery and encrypts credential secrets with WebCrypto",
     ],
     "apiContract.implementedNow",
     errors,
@@ -379,10 +436,9 @@ function validateAPIContract(contract, errors) {
     api.notProductionComplete,
     [
       "POST /api/auth/challenges CAPTCHA/slider runtime",
-      "persistent file/GORM credential repository",
-      "external Aliyun/Tencent SMS adapters and delivery ledger",
+      "external Aliyun/Tencent live SMS adapters and delivery ledger",
       "complete OpenAPI/error-code/audit-redaction/rate-limit governance",
-      "production enablement beyond development in-memory bootstrap",
+      "credential reset, password rotation, breach response and migration governance",
     ],
     "apiContract.notProductionComplete",
     errors,
@@ -416,7 +472,11 @@ function validateConfiguration(contract, errors) {
   requireIncludes(
     config.securityKeys,
     [
+      "PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER",
+      "PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN",
       "PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY",
+      "PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_KEY_ID",
+      "PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY",
       "PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_USERNAME",
       "PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PASSWORD",
       "PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PHONE",
@@ -458,10 +518,10 @@ function validateEvidenceWiring(contract, errors) {
     errors.push("implementationPackages must keep A-contract-docs-validator tracked as in-progress or done");
   }
   const packageB = packages.get("B-backend-repositories-services");
-  if (!packageB || !["in-progress", "done"].includes(packageB.status)) {
-    errors.push("implementationPackages must track B-backend-repositories-services as in-progress or done after service foundation work starts");
+  if (!packageB || packageB.status !== "done") {
+    errors.push("implementationPackages.B-backend-repositories-services must be done after GORM repository and secret transport work");
   }
-  if (!String(packageB?.scope ?? "").includes("internal/platform/credentialauth")) {
+  if (!String(packageB?.scope ?? "").includes("GORM persistence") || !String(packageB?.scope ?? "").includes("encrypted secret transport")) {
     errors.push("implementationPackages.B-backend-repositories-services scope must point to internal/platform/credentialauth");
   }
   for (const filePath of requiredBackendFiles) {
@@ -490,8 +550,8 @@ function validateEvidenceWiring(contract, errors) {
   if (!packageD || packageD.status !== "in-progress") {
     errors.push("implementationPackages.D-auth-api-compatibility must be in-progress for the partial HTTP runtime slice");
   }
-  if (!String(packageD?.scope ?? "").includes("internal/platform/httpapi")) {
-    errors.push("implementationPackages.D-auth-api-compatibility scope must point to internal/platform/httpapi");
+  if (!String(packageD?.scope ?? "").includes("internal/platform/httpapi") || !String(packageD?.scope ?? "").includes("credential-secret-key")) {
+    errors.push("implementationPackages.D-auth-api-compatibility scope must point to internal/platform/httpapi and credential-secret-key");
   }
   const packageE = packages.get("E-admin-login-ui");
   if (!packageE || packageE.status !== "in-progress") {
@@ -506,15 +566,23 @@ function validateEvidenceWiring(contract, errors) {
   }
 }
 
-function validateDocs(authDoc, capabilityDoc, errors) {
+function validateDocs(authDoc, capabilityDoc, dataGovernanceDoc, errors) {
   const authSnippets = [
     ["Credential Auth v1", "docs/platform-auth.md must document credential-auth v1"],
     ["resources/platform-credential-auth-v1.json", "docs/platform-auth.md must point to the credential-auth v1 contract"],
     ["internal/platform/credentialauth", "docs/platform-auth.md must point to the credential-auth service foundation package"],
-    ["partial development HTTP/UI runtime", "docs/platform-auth.md must document the partial development HTTP/UI runtime"],
+    ["persistent P0 HTTP/UI runtime", "docs/platform-auth.md must document the persistent P0 HTTP/UI runtime"],
     ["preserves the current demo/OIDC runtime", "docs/platform-auth.md must state current demo/OIDC runtime is preserved"],
     ["password credentials must not be stored in generic `Record.Values`", "docs/platform-auth.md must forbid password credentials in generic Record.Values"],
     ["notification` SMS channel", "docs/platform-auth.md must assign SMS delivery to notification"],
+    ["application-layer hybrid encryption", "docs/platform-auth.md must document application-layer hybrid encryption"],
+    ["GET /api/auth/credential-secret-key", "docs/platform-auth.md must document credential secret key discovery"],
+    ["ECDH P-256", "docs/platform-auth.md must document ECDH P-256 key agreement"],
+    ["HKDF-SHA256", "docs/platform-auth.md must document HKDF-SHA256 derivation"],
+    ["AES-256-GCM/A256GCM", "docs/platform-auth.md must document AES-256-GCM/A256GCM encryption"],
+    ["When `RequireEncryptedSecrets=true`, the server rejects plaintext `secret.value` or `secret.code`", "docs/platform-auth.md must document plaintext secret field rejection"],
+    ["not the application-layer credential secret encryption mechanism", "docs/platform-auth.md must state HTTPS is not the credential secret encryption mechanism"],
+    ["cannot be used as a substitute for `secret.encrypted`", "docs/platform-auth.md must state HTTPS cannot substitute secret.encrypted"],
     ["not a production-complete credential system", "docs/platform-auth.md must state credential-auth is not production-complete"],
   ];
   for (const [snippet, message] of authSnippets) {
@@ -527,13 +595,59 @@ function validateDocs(authDoc, capabilityDoc, errors) {
     ["credential-auth capability rules", "docs/platform-capability-development.md must document credential-auth capability rules"],
     ["resources/platform-credential-auth-v1.json", "docs/platform-capability-development.md must point to the credential-auth v1 contract"],
     ["internal/platform/credentialauth", "docs/platform-capability-development.md must point to the credential-auth service foundation package"],
-    ["dev-http-runtime-memory-bootstrap", "docs/platform-capability-development.md must document the current development runtime status"],
+    ["persistent-runtime-p0", "docs/platform-capability-development.md must document the current P0 runtime status"],
     ["Do not declare provider kind `password`", "docs/platform-capability-development.md must keep provider kind password blocked until implementation"],
+    ["ECDH P-256", "docs/platform-capability-development.md must document ECDH P-256 key agreement"],
+    ["HKDF-SHA256", "docs/platform-capability-development.md must document HKDF-SHA256 derivation"],
+    ["AES-256-GCM/A256GCM", "docs/platform-capability-development.md must document AES-256-GCM/A256GCM encryption"],
+    ["When encrypted secrets are required, `secret.value` and `secret.code` are invalid", "docs/platform-capability-development.md must document plaintext secret field rejection"],
+    ["not the application-layer credential secret encryption mechanism", "docs/platform-capability-development.md must state HTTPS is not the credential secret encryption mechanism"],
+    ["cannot be used as a substitute for `secret.encrypted`", "docs/platform-capability-development.md must state HTTPS cannot substitute secret.encrypted"],
     ["rtk node scripts/validate-platform-credential-auth-v1.mjs", "docs/platform-capability-development.md must document the credential-auth validator"],
   ];
   for (const [snippet, message] of capabilitySnippets) {
     if (!capabilityDoc.includes(snippet)) {
       errors.push(message);
+    }
+  }
+
+  const dataGovernanceSnippets = [
+    ["application-layer hybrid encryption", "docs/platform-data-governance-and-integrations-assessment.md must document application-layer hybrid encryption"],
+    ["GET /api/auth/credential-secret-key", "docs/platform-data-governance-and-integrations-assessment.md must document credential secret key discovery"],
+    ["ECDH P-256", "docs/platform-data-governance-and-integrations-assessment.md must document ECDH P-256 key agreement"],
+    ["HKDF-SHA256", "docs/platform-data-governance-and-integrations-assessment.md must document HKDF-SHA256 derivation"],
+    ["AES-256-GCM/A256GCM", "docs/platform-data-governance-and-integrations-assessment.md must document AES-256-GCM/A256GCM encryption"],
+    ["HTTPS cannot be used as a substitute for `secret.encrypted`", "docs/platform-data-governance-and-integrations-assessment.md must state HTTPS cannot substitute secret.encrypted"],
+  ];
+  for (const [snippet, message] of dataGovernanceSnippets) {
+    if (!dataGovernanceDoc.includes(snippet)) {
+      errors.push(message);
+    }
+  }
+}
+
+function validateSecretTransportImplementation(httpCredentialAuth, adminClient, errors) {
+  if (!httpCredentialAuth.includes("credentialAuthPlaintextSecretPresent")) {
+    errors.push("internal/platform/httpapi/credential_auth.go must reject plaintext secret fields when encrypted secrets are required");
+  }
+  if (!httpCredentialAuth.includes("strings.TrimSpace(input.Value) != \"\"") || !httpCredentialAuth.includes("strings.TrimSpace(input.Code) != \"\"")) {
+    errors.push("credentialAuthPlaintextSecretPresent must reject both secret.value and secret.code");
+  }
+  if (!/RequireEncryptedSecrets[\s\S]{0,400}credentialAuthPlaintextSecretPresent/.test(httpCredentialAuth)) {
+    errors.push("credential-auth login must call plaintext secret rejection inside RequireEncryptedSecrets handling");
+  }
+  if (!adminClient.includes("encryptCredentialSecret(input.provider, \"password\"") || !adminClient.includes("encryptCredentialSecret(input.provider, \"sms-otp\"")) {
+    errors.push("admin API client must encrypt password and sms-otp secrets before login submission");
+  }
+  if (!adminClient.includes("secret: { type: \"password\", encrypted }")) {
+    errors.push("admin API client must submit password login secrets only as secret.encrypted");
+  }
+  if (!adminClient.includes("secret: { type: \"sms-otp\", transactionId: secret.transactionId, encrypted }")) {
+    errors.push("admin API client must submit sms-otp login secrets only as secret.encrypted plus transactionId");
+  }
+  for (const snippet of ["ECDH", "P-256", "HKDF", "SHA-256", "AES-GCM"]) {
+    if (!adminClient.includes(snippet)) {
+      errors.push(`admin API client credential encryption must use ${snippet}`);
     }
   }
 }
@@ -543,6 +657,9 @@ const contract = readJSON(contractPath);
 const mainGo = readText(mainGoPath);
 const authDoc = readText(authDocPath);
 const capabilityDoc = readText(capabilityDocPath);
+const dataGovernanceDoc = readText(dataGovernanceDocPath);
+const httpCredentialAuth = readText(httpCredentialAuthPath);
+const adminClient = readText(adminClientPath);
 
 if (contract.contractVersion !== "0.1.0") {
   errors.push("contractVersion must be 0.1.0");
@@ -561,7 +678,8 @@ validateNotificationSms(contract, errors);
 validateAPIContract(contract, errors);
 validateConfiguration(contract, errors);
 validateEvidenceWiring(contract, errors);
-validateDocs(authDoc, capabilityDoc, errors);
+validateDocs(authDoc, capabilityDoc, dataGovernanceDoc, errors);
+validateSecretTransportImplementation(httpCredentialAuth, adminClient, errors);
 
 if (errors.length > 0) {
   console.error(errors.join("\n"));

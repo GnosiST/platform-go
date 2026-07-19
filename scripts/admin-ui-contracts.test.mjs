@@ -159,8 +159,8 @@ describe("validate-admin-ui-contracts", () => {
     replaceInTemp(
       tempRoot,
       "admin/src/platform/shell/AdminShell.tsx",
-      "<Avatar size={28} className=\"admin-avatar\">\n                  {avatarLetter}\n                </Avatar>",
-      "<Avatar size={28} className=\"admin-avatar\">\n                  {avatarLetter}\n                </Avatar>\n                <span className=\"profile-menu-name\">{displayName}</span>",
+      "<Avatar size={28} className=\"admin-avatar\" src={avatarUrl || undefined}>\n                  {avatarLetter}\n                </Avatar>",
+      "<Avatar size={28} className=\"admin-avatar\" src={avatarUrl || undefined}>\n                  {avatarLetter}\n                </Avatar>\n                <span className=\"profile-menu-name\">{displayName}</span>",
     );
 
     const result = runValidator(["--root", tempRoot]);
@@ -432,14 +432,44 @@ describe("validate-admin-ui-contracts", () => {
     replaceInTemp(
       tempRoot,
       "admin/src/platform/settings/SettingsCenterConsole.tsx",
-      "projectSettingsResourceConfigs(resources, dictionary, language)",
-      "knownSettingsResourceCatalog.map((config) => config as never)",
+      "projectSettingsResourceConfigs(runtimeItems, resources, dictionary, language)",
+      "projectSettingsResourceConfigs([], resources, dictionary, language)",
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /must derive configuration entries from the authorized manifest-projected resources/);
+    assert.match(result.stderr, /must project configuration entries from settings runtime items/);
+  });
+
+  it("rejects settings center pages that drop dictionary parameters from system configuration", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/settings/SettingsCenterConsole.tsx",
+      'route: "/dictionary-parameters"',
+      'route: "/dictionary-links"',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /dictionary parameters as a system-level configuration entry/);
+  });
+
+  it("rejects settings center pages that drop manifest-backed capability configuration", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/settings/SettingsCenterConsole.tsx",
+      '"manifest" as const',
+      '"catalog" as const',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /dynamic manifest-backed configuration path/);
   });
 
   it("rejects removing the formal system settings route", () => {
@@ -465,6 +495,51 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /Message center must expose the common in-app, SMS, email, and WeChat channel set/);
+  });
+
+  it("rejects message center pages that remove the operating loop workbench", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/message-center/MessageCenterConsole.tsx",
+      "<MessageCenterClosedLoop",
+      "<MessageCenterResourceTabs",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must render the operating loop/);
+  });
+
+  it("rejects message center pages that reduce the runtime loop to a partial resource list", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/message-center/MessageCenterConsole.tsx",
+      "messageCenterClosedLoopSteps(resourceConfigs, records, resourceRoutes, dictionary)",
+      "messageCenterClosedLoopSteps([resourceConfigs[0]], records, resourceRoutes, dictionary)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /full notification resource sequence/);
+  });
+
+  it("rejects message center pages that present dry run without runtime connected explanation", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/message-center/MessageCenterConsole.tsx",
+      "dictionary.messageCenterTrialReadyTitle",
+      "dictionary.messageCenterRuntimeOverview",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /SMS test send is connected to the runtime endpoint/);
   });
 
   it("rejects capability details that no longer open from the list into a modal", () => {

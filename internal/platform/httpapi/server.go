@@ -31,6 +31,7 @@ import (
 	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
 	"github.com/GnosiST/platform-go/internal/platform/errorcode"
 	"github.com/GnosiST/platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/notification"
 	"github.com/GnosiST/platform-go/internal/platform/ratelimit"
 	"github.com/GnosiST/platform-go/internal/platform/rbac"
 	"github.com/GnosiST/platform-go/internal/platform/sensitivereveal"
@@ -60,6 +61,7 @@ type ServerOptions struct {
 	AppIdentityBindings      AppIdentityBindingStore
 	PhoneProtector           PhoneProtector
 	PhoneVerificationSender  PhoneVerificationSender
+	NotificationSMSSender    notification.SMSSender
 	AdminStepUpPhoneResolver AdminStepUpPhoneResolver
 	SensitiveReveal          *sensitivereveal.Runtime
 	ServiceObjects           *serviceobject.Runtime
@@ -141,6 +143,7 @@ type Server struct {
 	appIdentityBindings      AppIdentityBindingStore
 	phoneProtector           PhoneProtector
 	phoneVerificationSender  PhoneVerificationSender
+	notificationSMSSender    notification.SMSSender
 	appPhoneCodeGenerator    func() (string, error)
 	adminStepUpPhoneResolver AdminStepUpPhoneResolver
 	sensitiveReveal          *sensitivereveal.Runtime
@@ -156,6 +159,8 @@ type Server struct {
 	policyAuthorizer         Authorizer
 	allowInsecureHeaderAuth  bool
 	disableDemoAuthProvider  bool
+	security                 SecurityOptions
+	profileRoutesRegistered  bool
 	rateLimiter              ratelimit.Limiter
 	rateLimitKeyBuilder      *ratelimit.KeyBuilder
 	adminMenuServingMode     AdminMenuServingMode
@@ -279,6 +284,7 @@ func New(options ServerOptions) *Server {
 		appIdentityBindings:      appIdentityBindings,
 		phoneProtector:           options.PhoneProtector,
 		phoneVerificationSender:  options.PhoneVerificationSender,
+		notificationSMSSender:    options.NotificationSMSSender,
 		appPhoneCodeGenerator:    appPhoneCodeGenerator,
 		adminStepUpPhoneResolver: options.AdminStepUpPhoneResolver,
 		sensitiveReveal:          options.SensitiveReveal,
@@ -291,6 +297,7 @@ func New(options ServerOptions) *Server {
 		authorizer:               options.Authorizer,
 		allowInsecureHeaderAuth:  options.AllowInsecureHeaderAuth,
 		disableDemoAuthProvider:  options.DisableDemoAuthProvider,
+		security:                 options.Security,
 		rateLimiter:              rateLimiter,
 		rateLimitKeyBuilder:      rateLimitKeyBuilder,
 		adminMenuServingMode:     options.AdminMenuServingMode,
@@ -322,6 +329,7 @@ func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 	api.GET("/platform/branding", s.platformBranding)
 	api.GET("/platform/cache/stats", s.platformCacheStats)
 	api.GET("/auth/providers", s.authProviders)
+	api.GET("/auth/credential-secret-key", s.credentialAuthSecretKey)
 	api.POST("/auth/providers/:provider/start", s.authProviderStart)
 	api.POST("/auth/sms-otp/start", s.credentialAuthSMSOTPStart)
 	api.POST("/auth/login", s.authLogin)
@@ -329,8 +337,12 @@ func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 	api.POST("/auth/logout", s.authLogout)
 	s.registerManifestAppRoutes(api)
 	api.GET("/admin/session/current", s.adminCurrentSession)
+	s.registerAdminProfileRoutes(api)
 	api.GET("/admin/menus", s.adminMenus)
+	api.GET("/admin/settings", s.adminSettingsRuntime)
+	api.PUT("/admin/settings/:resource/:id", s.adminSettingsUpdate)
 	api.GET("/admin/plugin-management/status", s.adminPluginManagementStatus)
+	api.POST("/admin/message-center/test-send", s.adminMessageCenterTestSend)
 	api.GET("/admin/demo-data", s.adminDemoDataList)
 	api.POST("/admin/demo-data/:capability/:dataset/apply", s.adminDemoDataApply)
 	api.GET("/admin/policy-reviews/export", s.adminPolicyReviewExport)
@@ -1030,8 +1042,14 @@ func (s *Server) authLogin(ctx *gin.Context) {
 		}
 		s.issueAdminLogin(ctx, principal, provider)
 	case authProviderKindCredentialPassword:
+		if !s.requireCredentialAuthSecureTransport(ctx) {
+			return
+		}
 		s.credentialAuthPasswordLogin(ctx, provider, input)
 	case authProviderKindCredentialSMSOTP:
+		if !s.requireCredentialAuthSecureTransport(ctx) {
+			return
+		}
 		s.credentialAuthSMSOTPLogin(ctx, provider, input)
 	default:
 		writePlatformError(ctx, errorcode.CodeAuthProviderUnsupported)

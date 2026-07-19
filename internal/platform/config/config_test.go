@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/ecdh"
+	"crypto/rand"
 	"encoding/base64"
 	"os"
 	"path/filepath"
@@ -82,7 +84,11 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_CREDENTIAL_AUTH_PHONE_PASSWORD", "")
 	t.Setenv("PLATFORM_CREDENTIAL_AUTH_EMAIL_PASSWORD", "")
 	t.Setenv("PLATFORM_CREDENTIAL_AUTH_PHONE_SMS_OTP", "")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER", "")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN", "")
 	t.Setenv("PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY", "")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_KEY_ID", "")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY", "")
 	t.Setenv("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_USERNAME", "")
 	t.Setenv("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PASSWORD", "")
 	t.Setenv("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PHONE", "")
@@ -221,8 +227,8 @@ func TestLoadUsesDefaults(t *testing.T) {
 	if cfg.DisableDemoAuthProvider {
 		t.Fatalf("DisableDemoAuthProvider = true, want false by default")
 	}
-	if cfg.CredentialAuthConfigured() || cfg.CredentialAuthIdentifierHMACKey != "" || cfg.CredentialAuthBootstrapAdminUsername != "" || cfg.CredentialAuthBootstrapAdminPassword != "" {
-		t.Fatalf("credential auth defaults = configured(%t), key/user/password should be empty", cfg.CredentialAuthConfigured())
+	if cfg.CredentialAuthConfigured() || cfg.CredentialAuthRepositoryDriver != "" || cfg.CredentialAuthRepositoryDSN != "" || cfg.CredentialAuthIdentifierHMACKey != "" || cfg.CredentialAuthSecretTransportKeyID != "" || cfg.CredentialAuthSecretTransportKey != "" || cfg.CredentialAuthBootstrapAdminUsername != "" || cfg.CredentialAuthBootstrapAdminPassword != "" {
+		t.Fatalf("credential auth defaults = configured(%t), repository/keys/user/password should be empty", cfg.CredentialAuthConfigured())
 	}
 	if cfg.AdminStepUpPhoneSourceConfigured() {
 		t.Fatal("admin step-up phone source must be disabled by default")
@@ -1635,7 +1641,7 @@ func TestValidateRuntimeRejectsCredentialAuthUnsafeConfiguration(t *testing.T) {
 	}
 }
 
-func TestValidateRuntimeRejectsCredentialAuthInProductionUntilPersistentStoreExists(t *testing.T) {
+func TestValidateRuntimeRejectsProductionCredentialAuthWithoutSecretTransportAndRepository(t *testing.T) {
 	cfg := validProductionRuntimeConfig()
 	cfg.Capabilities = append(cfg.Capabilities, "notification", "credential-auth")
 	cfg.CredentialAuthUsernamePassword = true
@@ -1644,8 +1650,34 @@ func TestValidateRuntimeRejectsCredentialAuthInProductionUntilPersistentStoreExi
 	cfg.CredentialAuthBootstrapAdminPassword = "correct-password"
 
 	err := cfg.ValidateRuntime()
-	if err == nil || !strings.Contains(err.Error(), "persistent credential repository") {
-		t.Fatalf("ValidateRuntime() error = %v, want production credential repository gate", err)
+	if err == nil {
+		t.Fatalf("ValidateRuntime() error = nil, want production credential-auth gates")
+	}
+	for _, want := range []string{
+		"PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER and PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN",
+		"PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_KEY_ID",
+		"PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("ValidateRuntime() error = %v, missing %q", err, want)
+		}
+	}
+}
+
+func TestValidateRuntimeAcceptsProductionCredentialAuthWithSecretTransportAndRepository(t *testing.T) {
+	cfg := validProductionRuntimeConfig()
+	cfg.Capabilities = append(cfg.Capabilities, "notification", "credential-auth")
+	cfg.CredentialAuthUsernamePassword = true
+	cfg.CredentialAuthRepositoryDriver = "postgres"
+	cfg.CredentialAuthRepositoryDSN = "postgres://platform:secret@localhost:5432/platform"
+	cfg.CredentialAuthIdentifierHMACKey = strings.Repeat("i", 32)
+	cfg.CredentialAuthSecretTransportKeyID = "auth-transport-v1"
+	cfg.CredentialAuthSecretTransportKey = credentialTransportPrivateKeyForTest()
+	cfg.CredentialAuthBootstrapAdminUsername = "admin"
+	cfg.CredentialAuthBootstrapAdminPassword = "correct-password"
+
+	if err := cfg.ValidateRuntime(); err != nil {
+		t.Fatalf("ValidateRuntime() error = %v", err)
 	}
 }
 
@@ -1805,6 +1837,14 @@ func validProductionRuntimeConfig() Config {
 	cfg.DataBlindIndexActiveKeyID = dataProtection.DataBlindIndexActiveKeyID
 	cfg.DataBlindIndexKeyringJSON = dataProtection.DataBlindIndexKeyringJSON
 	return cfg
+}
+
+func credentialTransportPrivateKeyForTest() string {
+	key, err := ecdh.P256().GenerateKey(rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	return base64.RawURLEncoding.EncodeToString(key.Bytes())
 }
 
 func validDataProtectionConfig(environment string, provider string) Config {

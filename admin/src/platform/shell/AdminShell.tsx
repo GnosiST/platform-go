@@ -31,9 +31,16 @@ import {
   UploadOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Alert, Avatar, Button, Drawer, Dropdown, Input, Space, Tag, Tooltip, Typography, type MenuProps } from "antd";
+import { Alert, App, Avatar, Button, Drawer, Dropdown, Form, Input, Space, Tag, Tooltip, Typography, type MenuProps } from "antd";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type WheelEvent } from "react";
-import { getFrontendVersion, type AdminCurrentSession, type BrandingConfig } from "../api/client";
+import {
+  getCurrentAdminProfile,
+  getFrontendVersion,
+  updateCurrentAdminProfile,
+  type AdminCurrentSession,
+  type AdminProfile,
+  type BrandingConfig,
+} from "../api/client";
 import type { Dictionary, Language } from "../i18n";
 import { themeTokens, type AdminLayoutMode, type ThemeName } from "../theme";
 import type { AdminResourceDefinition } from "../resources/registry";
@@ -131,6 +138,7 @@ export function AdminShell({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
+  const [profileSnapshot, setProfileSnapshot] = useState<AdminProfile | null>(null);
   const [openContext, setOpenContext] = useState<"mobile-work" | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
   const workTabsRef = useRef<HTMLElement | null>(null);
@@ -176,9 +184,13 @@ export function AdminShell({
     .map((route) => resourcesByRoute.get(route))
     .filter((resource): resource is AdminResourceDefinition => Boolean(resource));
   const targetLanguage = language === "zh" ? "en" : "zh";
-  const displayName = session.user.name || session.user.username || dictionary.admin;
+  useEffect(() => {
+    setProfileSnapshot(null);
+  }, [session.user.id]);
+  const displayName = profileSnapshot?.name || session.user.name || session.user.username || dictionary.admin;
   const watermarkText = `${branding?.shortName || "platform-go"} · ${displayName}`;
   const showScreenWatermark = uiConfig.watermark && uiConfig.watermarkScopes.includes("screen");
+  const avatarUrl = profileSnapshot?.avatarUrl || "";
   const avatarLetter = (displayName.trim()[0] || "A").toUpperCase();
   const shellStyle = {
     "--sidebar-width": `${uiConfig.sidebarCollapsed ? 64 : uiConfig.sidebarWidth}px`,
@@ -529,8 +541,10 @@ export function AdminShell({
               content={(
                 <ProfileSummaryPanel
                   avatarLetter={avatarLetter}
+                  avatarUrl={avatarUrl}
                   dictionary={dictionary}
                   displayName={displayName}
+                  profile={profileSnapshot}
                   session={session}
                   onEditProfile={() => {
                     setProfileOpen(false);
@@ -543,7 +557,7 @@ export function AdminShell({
               onOpenChange={setProfileOpen}
             >
               <Button className="profile-menu-trigger" aria-label={dictionary.personalProfile}>
-                <Avatar size={28} className="admin-avatar">
+                <Avatar size={28} className="admin-avatar" src={avatarUrl || undefined}>
                   {avatarLetter}
                 </Avatar>
               </Button>
@@ -754,10 +768,13 @@ export function AdminShell({
       <ProfileEditorModal
         open={profileEditorOpen}
         avatarLetter={avatarLetter}
+        avatarUrl={avatarUrl}
         dictionary={dictionary}
         displayName={displayName}
+        profile={profileSnapshot}
         session={session}
         onClose={() => setProfileEditorOpen(false)}
+        onProfileSaved={setProfileSnapshot}
       />
     </div>
   );
@@ -765,27 +782,31 @@ export function AdminShell({
 
 function ProfileSummaryPanel({
   avatarLetter,
+  avatarUrl,
   dictionary,
   displayName,
+  profile,
   session,
   onEditProfile,
 }: {
   avatarLetter: string;
+  avatarUrl: string;
   dictionary: Dictionary;
   displayName: string;
+  profile: AdminProfile | null;
   session: AdminCurrentSession;
   onEditProfile: () => void;
 }) {
-  const tenantCode = session.user.tenantCode || "platform";
+  const tenantCode = profile?.tenantCode || session.user.tenantCode || "platform";
   const tenantDisplay = tenantCode === "platform" ? `${dictionary.platformTenant} (platform)` : tenantCode;
-  const organizationDisplay = session.user.orgUnitCode || dictionary.notConfigured;
+  const organizationDisplay = profile?.orgUnitCode || session.user.orgUnitCode || dictionary.notConfigured;
   const roles = normalizeProfileRoleLabels(session.roles);
   const profileFields = [
-    { label: dictionary.avatar, value: dictionary.notConfigured },
-    { label: dictionary.nickname, value: session.user.name || dictionary.notConfigured },
-    { label: dictionary.phone, value: dictionary.notConfigured },
-    { label: dictionary.email, value: dictionary.notConfigured },
-    { label: dictionary.address, value: dictionary.notConfigured },
+    { label: dictionary.avatar, value: avatarUrl || dictionary.notConfigured },
+    { label: dictionary.nickname, value: profile?.nickname || profile?.name || session.user.name || dictionary.notConfigured },
+    { label: dictionary.phone, value: profile?.phone || dictionary.notConfigured },
+    { label: dictionary.email, value: profile?.email || dictionary.notConfigured },
+    { label: dictionary.address, value: profile?.address || dictionary.notConfigured },
   ];
 
   return (
@@ -803,7 +824,7 @@ function ProfileSummaryPanel({
       )}
     >
       <div className="profile-summary-header">
-        <Avatar size={44} className="admin-avatar">
+        <Avatar size={44} className="admin-avatar" src={avatarUrl || undefined}>
           {avatarLetter}
         </Avatar>
         <div>
@@ -845,29 +866,90 @@ function ProfileFact({ label, value }: { label: string; value: string }) {
 function ProfileEditorModal({
   open,
   avatarLetter,
+  avatarUrl,
   dictionary,
   displayName,
+  profile,
   session,
   onClose,
+  onProfileSaved,
 }: {
   open: boolean;
   avatarLetter: string;
+  avatarUrl: string;
   dictionary: Dictionary;
   displayName: string;
+  profile: AdminProfile | null;
   session: AdminCurrentSession;
   onClose: () => void;
+  onProfileSaved: (profile: AdminProfile) => void;
 }) {
-  const tenantCode = session.user.tenantCode || "platform";
+  const { message } = App.useApp();
+  const [form] = Form.useForm<ProfileEditorFormValues>();
+  const [loadedProfile, setLoadedProfile] = useState<AdminProfile | null>(profile);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const watchedAvatarUrl = Form.useWatch("avatarUrl", form) as string | undefined;
+  const effectiveProfile = loadedProfile ?? profile;
+  const tenantCode = effectiveProfile?.tenantCode || session.user.tenantCode || "platform";
   const tenantDisplay = tenantCode === "platform" ? `${dictionary.platformTenant} (platform)` : tenantCode;
-  const organizationDisplay = session.user.orgUnitCode || dictionary.notConfigured;
+  const organizationDisplay = effectiveProfile?.orgUnitCode || session.user.orgUnitCode || dictionary.notConfigured;
   const roles = normalizeProfileRoleLabels(session.roles);
-  const profileFields = [
-    { label: dictionary.username, value: session.user.username || dictionary.notConfigured },
-    { label: dictionary.nickname, value: session.user.name || dictionary.notConfigured },
-    { label: dictionary.phone, value: dictionary.notConfigured },
-    { label: dictionary.email, value: dictionary.notConfigured },
-    { label: dictionary.address, value: dictionary.notConfigured, multiline: true },
-  ];
+  const avatarPreviewUrl = (watchedAvatarUrl ?? avatarUrl).trim();
+  const credentialStatus = effectiveProfile?.credentials.message || dictionary.passwordActionUnavailable;
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    form.setFieldsValue(profileFormValues(profile, session));
+    setLoadedProfile(profile);
+    setProfileError("");
+    setProfileLoading(true);
+    let cancelled = false;
+    getCurrentAdminProfile()
+      .then((result) => {
+        if (cancelled) return;
+        setLoadedProfile(result.profile);
+        onProfileSaved(result.profile);
+        form.setFieldsValue(profileFormValues(result.profile, session));
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setProfileError(profileRequestErrorMessage(error, dictionary.profileLoadFailed));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setProfileLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dictionary.profileLoadFailed, form, open, session.user.id]);
+
+  const handleSave = () => {
+    void form.validateFields()
+      .then((values) => {
+        setSaving(true);
+        return updateCurrentAdminProfile(profileUpdateInput(values));
+      })
+      .then((result) => {
+        setLoadedProfile(result.profile);
+        onProfileSaved(result.profile);
+        form.setFieldsValue(profileFormValues(result.profile, session));
+        setProfileError("");
+        message.success(dictionary.profileSaveSuccess);
+      })
+      .catch((error: unknown) => {
+        if (isProfileFormValidationError(error)) {
+          return;
+        }
+        message.error(profileRequestErrorMessage(error, dictionary.profileSaveFailed));
+      })
+      .finally(() => setSaving(false));
+  };
 
   return (
     <AdminModal
@@ -878,38 +960,43 @@ function ProfileEditorModal({
       width={880}
       footer={[
         <Button key="close" onClick={onClose}>{dictionary.close}</Button>,
-        <Button key="save" disabled type="primary">{dictionary.saveProfile}</Button>,
+        <Button key="save" loading={saving} type="primary" onClick={handleSave}>{dictionary.saveProfile}</Button>,
       ]}
       onCancel={onClose}
     >
       <div className="profile-editor-content">
-        <Alert
-          showIcon
-          type="info"
-          message={dictionary.profileUpdateUnavailable}
-          description={dictionary.profileUpdateUnavailableDescription}
-        />
+        {profileError ? (
+          <Alert showIcon type="warning" message={dictionary.profileLoadFailed} description={profileError} />
+        ) : null}
         <section className="profile-editor-section">
           <header className="profile-editor-section-header">
-            <Avatar size={52} className="admin-avatar">{avatarLetter}</Avatar>
+            <Avatar size={52} className="admin-avatar" src={avatarPreviewUrl || undefined}>{avatarLetter}</Avatar>
             <div>
               <Typography.Text type="secondary">{dictionary.profileBasics}</Typography.Text>
               <Typography.Text strong>{displayName}</Typography.Text>
               <Typography.Text type="secondary">{session.user.username || dictionary.notConfigured}</Typography.Text>
             </div>
           </header>
-          <div className="profile-editor-grid">
-            {profileFields.map((field) => (
-              <label className={field.multiline ? "profile-editor-field full" : "profile-editor-field"} key={field.label}>
-                <span>{field.label}</span>
-                {field.multiline ? (
-                  <Input.TextArea disabled readOnly autoSize={{ minRows: 2, maxRows: 4 }} value={field.value} />
-                ) : (
-                  <Input disabled readOnly value={field.value} />
-                )}
-              </label>
-            ))}
-          </div>
+          <Form form={form} layout="vertical" className="profile-editor-grid" disabled={profileLoading || saving}>
+            <Form.Item className="profile-editor-field" label={dictionary.username}>
+              <Input readOnly value={session.user.username || dictionary.notConfigured} />
+            </Form.Item>
+            <Form.Item className="profile-editor-field" label={dictionary.nickname} name="nickname" rules={[{ required: true, message: dictionary.profileNameRequired }]}>
+              <Input autoComplete="name" maxLength={80} />
+            </Form.Item>
+            <Form.Item className="profile-editor-field" label={dictionary.avatar} name="avatarUrl">
+              <Input autoComplete="photo" maxLength={2048} />
+            </Form.Item>
+            <Form.Item className="profile-editor-field" label={dictionary.phone} name="phone" rules={[{ validator: optionalPhoneValidator(dictionary.profilePhoneInvalid) }]}>
+              <Input autoComplete="tel" maxLength={32} />
+            </Form.Item>
+            <Form.Item className="profile-editor-field" label={dictionary.email} name="email" rules={[{ type: "email", message: dictionary.profileEmailInvalid }]}>
+              <Input autoComplete="email" maxLength={254} />
+            </Form.Item>
+            <Form.Item className="profile-editor-field full" label={dictionary.address} name="address">
+              <Input.TextArea autoComplete="street-address" autoSize={{ minRows: 2, maxRows: 4 }} maxLength={240} />
+            </Form.Item>
+          </Form>
         </section>
         <section className="profile-editor-section">
           <Typography.Text strong>{dictionary.profileIdentityContext}</Typography.Text>
@@ -926,6 +1013,7 @@ function ProfileEditorModal({
         </section>
         <section className="profile-editor-section">
           <Typography.Text strong>{dictionary.accountSecurity}</Typography.Text>
+          <Alert showIcon type="info" message={dictionary.passwordActionUnavailable} description={credentialStatus} />
           <div className="profile-editor-grid">
             <label className="profile-editor-field">
               <span>{dictionary.currentPassword}</span>
@@ -949,6 +1037,62 @@ function ProfileEditorModal({
       </div>
     </AdminModal>
   );
+}
+
+type ProfileEditorFormValues = {
+  avatarUrl?: string;
+  nickname?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+};
+
+function profileFormValues(profile: AdminProfile | null, session: AdminCurrentSession): ProfileEditorFormValues {
+  return {
+    avatarUrl: profile?.avatarUrl ?? "",
+    nickname: profile?.nickname || profile?.name || session.user.name || "",
+    phone: profile?.phone ?? "",
+    email: profile?.email ?? "",
+    address: profile?.address ?? "",
+  };
+}
+
+function profileUpdateInput(values: ProfileEditorFormValues) {
+  return {
+    avatarUrl: trimProfileFormValue(values.avatarUrl),
+    nickname: trimProfileFormValue(values.nickname),
+    phone: trimProfileFormValue(values.phone),
+    email: trimProfileFormValue(values.email),
+    address: trimProfileFormValue(values.address),
+  };
+}
+
+function trimProfileFormValue(value: string | undefined) {
+  return (value ?? "").trim();
+}
+
+function optionalPhoneValidator(message: string) {
+  return async (_rule: unknown, value?: string) => {
+    const normalized = trimProfileFormValue(value);
+    if (!normalized) {
+      return;
+    }
+    const compact = normalized.replace(/[ ()-]/g, "");
+    if (!/^\+?\d{6,18}$/.test(compact)) {
+      throw new Error(message);
+    }
+  };
+}
+
+function isProfileFormValidationError(error: unknown) {
+  return Boolean(error && typeof error === "object" && "errorFields" in error);
+}
+
+function profileRequestErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return fallback;
 }
 
 function normalizeProfileRoleLabels(rawRoles: unknown) {

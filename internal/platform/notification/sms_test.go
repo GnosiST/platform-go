@@ -2,6 +2,7 @@ package notification
 
 import (
 	"context"
+	"strings"
 	"testing"
 )
 
@@ -42,6 +43,125 @@ func TestMockLocalSMSSenderRejectsIncompleteMessage(t *testing.T) {
 	}
 	if _, err := sender.SendSMS(context.Background(), SMSMessage{Recipient: "+8613800000000"}); err == nil {
 		t.Fatal("SendSMS() error = nil, want template validation")
+	}
+}
+
+func TestDryRunSMSSenderReturnsVendorReceiptWithoutSending(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider string
+		cfg      SMSProviderConfig
+	}{
+		{
+			name:     "aliyun",
+			provider: SMSProviderAliyun,
+			cfg: SMSProviderConfig{
+				Provider:          SMSProviderAliyun,
+				AliyunRegion:      "cn-hangzhou",
+				AliyunAccessKeyID: "test-access-key",
+				AliyunSecretKey:   "test-secret-key",
+				SignName:          "Platform",
+				DryRun:            true,
+			},
+		},
+		{
+			name:     "tencent",
+			provider: SMSProviderTencent,
+			cfg: SMSProviderConfig{
+				Provider:         SMSProviderTencent,
+				TencentRegion:    "ap-guangzhou",
+				TencentSecretID:  "test-secret-id",
+				TencentSecretKey: "test-secret-key",
+				TencentSDKAppID:  "1400000000",
+				SignName:         "Platform",
+				DryRun:           true,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sender, err := NewVendorSMSSender(tt.cfg)
+			if err != nil {
+				t.Fatalf("NewVendorSMSSender() error = %v", err)
+			}
+			receipt, err := sender.SendSMS(context.Background(), SMSMessage{
+				Recipient:  "+8613800000000",
+				TemplateID: "login-template",
+				Purpose:    "login",
+				TraceID:    "trace-dry-run",
+			})
+			if err != nil {
+				t.Fatalf("SendSMS() error = %v", err)
+			}
+			if receipt.Provider != tt.provider || receipt.Status != SMSDeliveryDryRunAccepted || receipt.MessageID == "" {
+				t.Fatalf("receipt = %+v, want dry-run vendor receipt", receipt)
+			}
+			if !strings.HasPrefix(receipt.MessageID, tt.provider+"-dry-run-") {
+				t.Fatalf("MessageID = %q, want provider dry-run prefix", receipt.MessageID)
+			}
+			if receipt.RedactedTarget != "****0000" {
+				t.Fatalf("RedactedTarget = %q, want masked last four digits", receipt.RedactedTarget)
+			}
+		})
+	}
+}
+
+func TestVendorSMSSenderRejectsMissingConfigurationWithoutSecretLeak(t *testing.T) {
+	secret := "do-not-print-this-secret"
+	tests := []struct {
+		name string
+		cfg  SMSProviderConfig
+		want string
+	}{
+		{
+			name: "aliyun access key",
+			cfg: SMSProviderConfig{
+				Provider:        SMSProviderAliyun,
+				AliyunRegion:    "cn-hangzhou",
+				AliyunSecretKey: secret,
+				SignName:        "Platform",
+				DryRun:          true,
+			},
+			want: EnvNotificationSMSAliyunAccessKeyID,
+		},
+		{
+			name: "tencent sdk app id",
+			cfg: SMSProviderConfig{
+				Provider:         SMSProviderTencent,
+				TencentRegion:    "ap-guangzhou",
+				TencentSecretID:  "test-secret-id",
+				TencentSecretKey: secret,
+				SignName:         "Platform",
+				DryRun:           true,
+			},
+			want: EnvNotificationSMSTencentSDKAppID,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewVendorSMSSender(tt.cfg)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("NewVendorSMSSender() error = %v, want %s", err, tt.want)
+			}
+			if strings.Contains(err.Error(), secret) {
+				t.Fatalf("NewVendorSMSSender() leaked secret in error: %v", err)
+			}
+		})
+	}
+}
+
+func TestVendorSMSSenderRejectsLiveSendUntilImplemented(t *testing.T) {
+	_, err := NewVendorSMSSender(SMSProviderConfig{
+		Provider:         SMSProviderTencent,
+		TencentRegion:    "ap-guangzhou",
+		TencentSecretID:  "test-secret-id",
+		TencentSecretKey: "test-secret-key",
+		TencentSDKAppID:  "1400000000",
+		SignName:         "Platform",
+		LiveSendEnabled:  true,
+	})
+	if err == nil || !strings.Contains(err.Error(), "live sending is not implemented") {
+		t.Fatalf("NewVendorSMSSender() error = %v, want live-send implementation failure", err)
 	}
 }
 

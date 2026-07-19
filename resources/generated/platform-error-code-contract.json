@@ -4,8 +4,8 @@
   "sourceMode": "go-registry",
   "contractVersion": "1.0.0",
   "sourceVersion": "0.1.0",
-  "contractHash": "sha256:f4dbaa69b70312857a17553662ce5986a90c0ba0ef4c5fbbcc77056db10f36a8",
-  "codeCount": 118,
+  "contractHash": "sha256:e227a68f12805fa3280929cd4c91237d030915965c70a39e84ddf39e281ddb71",
+  "codeCount": 119,
   "catalogs": {
     "planes": [
       "admin",
@@ -328,6 +328,23 @@
       "retryPolicy": "backoff",
       "redactionClass": "generic-only",
       "publicMessage": "admin menu navigation is unavailable",
+      "introducedIn": "0.1.0",
+      "deprecated": false
+    },
+    {
+      "code": "ADMIN_MESSAGE_CENTER_UNAVAILABLE",
+      "owner": "platform.notification",
+      "planes": [
+        "admin"
+      ],
+      "audiences": [
+        "operator"
+      ],
+      "category": "dependency",
+      "httpStatus": 503,
+      "retryPolicy": "backoff",
+      "redactionClass": "generic-only",
+      "publicMessage": "message center runtime is unavailable",
       "introducedIn": "0.1.0",
       "deprecated": false
     },

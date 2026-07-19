@@ -924,9 +924,36 @@ function schemas() {
       additionalProperties: false,
       properties: {
         type: { type: "string", enum: ["password", "sms-otp"] },
-        value: { type: "string", writeOnly: true },
+        value: { type: "string", writeOnly: true, deprecated: true },
         transactionId: { type: "string", minLength: 1 },
-        code: { type: "string", writeOnly: true },
+        code: { type: "string", writeOnly: true, deprecated: true },
+        encrypted: { $ref: "#/components/schemas/AdminCredentialAuthSecretEnvelope" },
+      },
+    },
+    AdminCredentialAuthSecretEnvelope: {
+      type: "object",
+      required: ["version", "algorithm", "keyId", "clientPublicKey", "salt", "nonce", "ciphertext"],
+      additionalProperties: false,
+      properties: {
+        version: { type: "string", enum: ["pgo-auth-secret-v1"] },
+        algorithm: { type: "string", enum: ["ECDH-P256-HKDF-SHA256+A256GCM"] },
+        keyId: { type: "string", minLength: 1 },
+        clientPublicKey: { type: "string", minLength: 1, description: "Base64url encoded raw P-256 ephemeral public key." },
+        salt: { type: "string", minLength: 1 },
+        nonce: { type: "string", minLength: 1 },
+        ciphertext: { type: "string", minLength: 1, writeOnly: true },
+      },
+    },
+    AdminCredentialAuthSecretKeyData: {
+      type: "object",
+      required: ["version", "algorithm", "keyId", "publicKey", "expiresAt"],
+      additionalProperties: false,
+      properties: {
+        version: { type: "string", enum: ["pgo-auth-secret-v1"] },
+        algorithm: { type: "string", enum: ["ECDH-P256-HKDF-SHA256+A256GCM"] },
+        keyId: { type: "string", minLength: 1 },
+        publicKey: { type: "string", minLength: 1, description: "Base64url encoded raw P-256 server public key." },
+        expiresAt: { type: "string", format: "date-time" },
       },
     },
     AdminCredentialAuthChallengeProof: {
@@ -1177,6 +1204,174 @@ function schemas() {
         copyAllowed: { type: "boolean" },
       },
     },
+    AdminSettingsLocalizedText: {
+      type: "object",
+      required: ["zh", "en"],
+      additionalProperties: false,
+      properties: {
+        zh: { type: "string" },
+        en: { type: "string" },
+      },
+    },
+    AdminSettingsMetrics: {
+      type: "object",
+      required: ["capabilities", "resources", "records"],
+      additionalProperties: false,
+      properties: {
+        capabilities: { type: "integer", minimum: 0 },
+        resources: { type: "integer", minimum: 0 },
+        records: { type: "integer", minimum: 0 },
+      },
+    },
+    AdminSettingsResourceRecord: {
+      type: "object",
+      required: ["id", "code", "name", "status", "updatedAt"],
+      additionalProperties: false,
+      properties: {
+        id: { type: "string" },
+        code: { type: "string" },
+        name: { type: "string" },
+        status: { type: "string" },
+        description: { type: "string" },
+        updatedAt: { type: "string", format: "date-time" },
+        values: { type: "object", additionalProperties: { type: "string" } },
+      },
+      "x-platform-projection": "response",
+    },
+    AdminSettingsResourceItem: {
+      type: "object",
+      required: [
+        "capabilityId",
+        "capabilityName",
+        "resource",
+        "title",
+        "description",
+        "permissionPrefix",
+        "writable",
+        "schema",
+        "recordCount",
+        "records",
+      ],
+      additionalProperties: false,
+      properties: {
+        capabilityId: { type: "string", minLength: 1 },
+        capabilityName: { type: "string" },
+        capabilityVersion: { type: "string" },
+        resource: { type: "string", minLength: 1 },
+        title: { $ref: "#/components/schemas/AdminSettingsLocalizedText" },
+        description: { $ref: "#/components/schemas/AdminSettingsLocalizedText" },
+        route: { type: "string" },
+        group: { type: "string" },
+        permissionPrefix: { type: "string", minLength: 1 },
+        readOnly: { type: "boolean" },
+        writable: { type: "boolean" },
+        schema: {
+          type: "object",
+          additionalProperties: true,
+          description: "The active Admin resource schema for this enabled capability configuration resource.",
+        },
+        recordCount: { type: "integer", minimum: 0 },
+        records: {
+          type: "array",
+          items: { $ref: "#/components/schemas/AdminSettingsResourceRecord" },
+        },
+      },
+      "x-platform-runtime": "settings-runtime-p0",
+      "x-platform-secret-projection": "response projection must mask or omit protected provider secrets",
+    },
+    AdminSettingsRuntimeData: {
+      type: "object",
+      required: ["items", "metrics"],
+      additionalProperties: false,
+      properties: {
+        items: {
+          type: "array",
+          items: { $ref: "#/components/schemas/AdminSettingsResourceItem" },
+        },
+        metrics: { $ref: "#/components/schemas/AdminSettingsMetrics" },
+      },
+    },
+    AdminSettingsUpdateRequest: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        code: { type: "string" },
+        name: { type: "string" },
+        status: { type: "string" },
+        description: { type: "string" },
+        values: {
+          type: "object",
+          additionalProperties: {
+            oneOf: [
+              { type: "string" },
+              { type: "boolean" },
+              { type: "number" },
+              { type: "array" },
+              { type: "object" },
+              { type: "null" },
+            ],
+          },
+        },
+      },
+      "x-platform-write-policy": "Only writable public/plain value fields on enabled configuration resources may be submitted.",
+    },
+    AdminSettingsMutationData: {
+      type: "object",
+      required: ["resource", "record"],
+      additionalProperties: false,
+      properties: {
+        resource: { type: "string", minLength: 1 },
+        record: { $ref: "#/components/schemas/AdminSettingsResourceRecord" },
+      },
+    },
+    AdminMessageCenterTestSendRequest: {
+      type: "object",
+      required: ["channel", "recipient", "templateId"],
+      additionalProperties: false,
+      properties: {
+        channel: { type: "string", enum: ["sms"] },
+        tenantCode: { type: "string" },
+        recipient: {
+          type: "string",
+          minLength: 1,
+          writeOnly: true,
+          "x-platform-sensitivity": "personal",
+          "x-platform-response-policy": "redacted target only",
+        },
+        templateId: { type: "string", minLength: 1 },
+        templateParams: {
+          type: "object",
+          additionalProperties: { type: "string" },
+          writeOnly: true,
+          "x-platform-response-policy": "template parameter keys only",
+        },
+        title: { type: "string" },
+        body: { type: "string" },
+      },
+      "x-platform-runtime": "notification-sms-test-send-p0",
+    },
+    AdminMessageCenterSMSReceipt: {
+      type: "object",
+      required: ["provider", "messageId", "status", "redactedTarget"],
+      additionalProperties: false,
+      properties: {
+        provider: { type: "string" },
+        messageId: { type: "string" },
+        status: { type: "string" },
+        redactedTarget: { type: "string" },
+      },
+      "x-platform-secret-projection": "only redacted SMS target and provider receipt metadata are returned",
+    },
+    AdminMessageCenterTestSendData: {
+      type: "object",
+      required: ["notification", "delivery", "receipt"],
+      additionalProperties: false,
+      properties: {
+        notification: { $ref: "#/components/schemas/AdminSettingsResourceRecord" },
+        delivery: { $ref: "#/components/schemas/AdminSettingsResourceRecord" },
+        receipt: { $ref: "#/components/schemas/AdminMessageCenterSMSReceipt" },
+      },
+    },
     PluginManagementLockStatus: {
       type: "object",
       required: ["configured", "exists", "valid"],
@@ -1413,7 +1608,7 @@ paths["/api/auth/sms-otp/start"] = {
     operationId: "startAdminCredentialSMSOTP",
     summary: "Start an Admin credential-auth SMS OTP transaction",
     description:
-      "Development credential-auth slice. Creates a phone SMS OTP transaction through notification.sms for the configured phone-sms-otp provider.",
+      "Credential-auth P0 runtime. Creates a phone SMS OTP transaction through notification.sms for the configured phone-sms-otp provider.",
     security: [],
     requestBody: {
       required: true,
@@ -1431,7 +1626,27 @@ paths["/api/auth/sms-otp/start"] = {
       ...publicAuthErrorResponses(),
     },
     "x-platform-capability": "credential-auth",
-    "x-platform-runtime-status": "dev-http-runtime-memory-bootstrap",
+    "x-platform-runtime-status": "persistent-runtime-p0",
+  },
+};
+
+paths["/api/auth/credential-secret-key"] = {
+  get: {
+    tags: ["auth"],
+    operationId: "getAdminCredentialSecretKey",
+    summary: "Read the Admin credential-auth public encryption key",
+    description:
+      "Returns the short-lived public key metadata used by credential-auth clients to encrypt password or SMS OTP secrets with ECDH P-256 plus AES-256-GCM before POST /api/auth/login.",
+    security: [],
+    responses: {
+      "200": successResponse(
+        "Admin credential secret transport key",
+        apiResponse({ $ref: "#/components/schemas/AdminCredentialAuthSecretKeyData" }),
+      ),
+      ...publicAuthErrorResponses(),
+    },
+    "x-platform-capability": "credential-auth",
+    "x-platform-runtime-status": "persistent-runtime-p0",
   },
 };
 
@@ -1449,6 +1664,72 @@ paths["/api/admin/plugin-management/status"] = {
     },
     "x-platform-permission": "admin:capability:read",
     "x-platform-plugin-management": "restart-required-v1",
+  },
+};
+
+paths["/api/admin/settings"] = {
+  get: {
+    tags: ["settings"],
+    operationId: "getAdminSettingsRuntime",
+    summary: "Read enabled capability configuration runtime",
+    description:
+      "Returns the system settings center view assembled from enabled capability manifests. Records are response-projected, so protected provider secrets are masked or omitted.",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      "200": successResponse("Settings runtime", apiResponse({ $ref: "#/components/schemas/AdminSettingsRuntimeData" })),
+      ...errorResponses(),
+    },
+    "x-platform-permission": "admin:settings:read",
+    "x-platform-runtime": "settings-runtime-p0",
+  },
+};
+
+paths["/api/admin/settings/{resource}/{id}"] = {
+  put: {
+    tags: ["settings"],
+    operationId: "updateAdminSettingsResource",
+    summary: "Update one writable configuration record",
+    description:
+      "Updates an existing record owned by an enabled capability configuration resource. The settings runtime rejects non-configuration resources and non-writable value fields.",
+    security: [{ bearerAuth: [] }],
+    parameters: [pathParameter("resource"), pathParameter("id")],
+    requestBody: {
+      required: true,
+      content: { "application/json": { schema: { $ref: "#/components/schemas/AdminSettingsUpdateRequest" } } },
+    },
+    responses: {
+      "200": successResponse("Settings mutation", apiResponse({ $ref: "#/components/schemas/AdminSettingsMutationData" })),
+      ...errorResponses(),
+    },
+    "x-platform-permission": "admin:settings:update",
+    "x-platform-resource-permission-source": "target configuration resource update permission",
+    "x-platform-runtime": "settings-runtime-p0",
+  },
+};
+
+paths["/api/admin/message-center/test-send"] = {
+  post: {
+    tags: ["message-center"],
+    operationId: "testSendMessageCenter",
+    summary: "Send one message-center SMS test notification",
+    description:
+      "Exercises the notification SMS runtime from the message center. The request accepts a raw recipient only as a write-only send target; notification and delivery records store redacted target metadata and template parameter keys.",
+    security: [{ bearerAuth: [] }],
+    requestBody: {
+      required: true,
+      content: { "application/json": { schema: { $ref: "#/components/schemas/AdminMessageCenterTestSendRequest" } } },
+    },
+    responses: {
+      "201": successResponse("Message center test-send result", apiResponse({ $ref: "#/components/schemas/AdminMessageCenterTestSendData" })),
+      ...errorResponses(),
+      "503": {
+        ...platformErrorResponse("Message center SMS runtime is unavailable"),
+        "x-platform-error-codes": ["ADMIN_MESSAGE_CENTER_UNAVAILABLE"],
+      },
+    },
+    "x-platform-permission": "admin:message-center:update",
+    "x-platform-runtime": "notification-sms-test-send-p0",
+    "x-platform-secret-handling": "request recipient and template parameter values are write-only; records and receipts expose redacted target metadata only",
   },
 };
 
@@ -1515,6 +1796,7 @@ const openapi = {
   tags: [
     { name: "auth", description: "Public Admin authentication endpoints." },
     { name: "plugin-management", description: "Restart-required capability desired-state inspection." },
+    { name: "settings", description: "System settings runtime assembled from enabled capability manifests." },
     { name: "sensitive-reveal", description: "Step-up verification and one-time sensitive field reveal endpoints." },
     { name: "service-objects", description: "Versioned server-side QueryDefinition and CommandDefinition execution." },
     ...resources.map((resource) => ({

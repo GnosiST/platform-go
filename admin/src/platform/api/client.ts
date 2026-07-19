@@ -78,6 +78,42 @@ export type PluginManagementStatus = {
   desiredCapabilities: string[];
 };
 
+export type AdminSettingsMetrics = {
+  capabilities: number;
+  resources: number;
+  records: number;
+};
+
+export type AdminSettingsResourceItem = {
+  capabilityId: string;
+  capabilityName: string;
+  capabilityVersion?: string;
+  resource: string;
+  title: LocalizedText;
+  description: LocalizedText;
+  route?: string;
+  group?: string;
+  permissionPrefix: string;
+  readOnly?: boolean;
+  writable: boolean;
+  schema: AdminResourceSchema;
+  recordCount: number;
+  records: AdminResourceRecord[];
+};
+
+export type AdminSettingsRuntime = {
+  items: AdminSettingsResourceItem[];
+  metrics: AdminSettingsMetrics;
+};
+
+export type AdminSettingsUpdateInput = {
+  code?: string;
+  name?: string;
+  status?: string;
+  description?: string;
+  values?: Record<string, unknown>;
+};
+
 export type BrandingConfig = {
   productName: string;
   shortName: string;
@@ -120,7 +156,26 @@ export type AuthLoginInput = {
     value?: string;
     transactionId?: string;
     code?: string;
+    encrypted?: CredentialSecretEnvelope;
   };
+};
+
+export type CredentialSecretKey = {
+  version: "pgo-auth-secret-v1";
+  algorithm: "ECDH-P256-HKDF-SHA256+A256GCM";
+  keyId: string;
+  publicKey: string;
+  expiresAt: string;
+};
+
+export type CredentialSecretEnvelope = {
+  version: "pgo-auth-secret-v1";
+  algorithm: "ECDH-P256-HKDF-SHA256+A256GCM";
+  keyId: string;
+  clientPublicKey: string;
+  salt: string;
+  nonce: string;
+  ciphertext: string;
 };
 
 export type AuthProviderStartResult = {
@@ -162,6 +217,42 @@ export type AdminCurrentSession = {
   roles: string[];
   permissions: string[];
   deniedPermissions?: string[];
+};
+
+export type AdminProfileCredentialStatus = {
+  passwordChange: "credential-auth-not-connected" | "credential-auth-ready-route-pending" | string;
+  passwordReset: "credential-auth-not-connected" | "credential-auth-ready-route-pending" | string;
+  message: string;
+};
+
+export type AdminProfile = {
+  id: string;
+  username: string;
+  name: string;
+  nickname: string;
+  avatarUrl: string;
+  phone: string;
+  maskedPhone?: string;
+  email: string;
+  maskedEmail?: string;
+  address: string;
+  tenantCode?: string;
+  orgUnitCode?: string;
+  areaCode?: string;
+  credentials: AdminProfileCredentialStatus;
+};
+
+export type AdminProfileResult = {
+  profile: AdminProfile;
+};
+
+export type AdminProfileUpdateInput = {
+  avatarUrl?: string;
+  name?: string;
+  nickname?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
 };
 
 export type AdminMenuItem = {
@@ -552,6 +643,27 @@ export type AdminSensitiveRevealValue = {
   copyAllowed: boolean;
 };
 
+export type MessageCenterTestSendInput = {
+  channel: "sms";
+  tenantCode?: string;
+  recipient: string;
+  templateId: string;
+  templateParams?: Record<string, string>;
+  title?: string;
+  body?: string;
+};
+
+export type MessageCenterTestSendResult = {
+  notification: AdminResourceRecord;
+  delivery: AdminResourceRecord;
+  receipt: {
+    provider: string;
+    messageId: string;
+    status: string;
+    redactedTarget: string;
+  };
+};
+
 type PlatformResponseMode = "data" | "raw" | "blob";
 type PlatformRequestInit = RequestInit & {
   auth?: "stored-token" | "none";
@@ -685,6 +797,10 @@ export function listAuthProviders() {
   return request<AuthProviderList>("/auth/providers", { auth: "none" });
 }
 
+export function getCredentialSecretKey() {
+  return request<CredentialSecretKey>("/auth/credential-secret-key", { auth: "none" });
+}
+
 export function startAdminAuthProvider(provider: string, codeChallenge: string) {
   return request<AuthProviderStartResult>(`/auth/providers/${encodeURIComponent(provider)}/start`, {
     auth: "none",
@@ -702,10 +818,11 @@ export function startCredentialSMSOTP(input: CredentialSMSOTPStartInput) {
 }
 
 export async function loginWithAuthProvider(input: AuthLoginInput) {
+  const body = await withEncryptedCredentialSecret(input);
   const result = await request<AuthLoginResult>("/auth/login", {
     auth: "none",
     method: "POST",
-    body: JSON.stringify(input),
+    body: JSON.stringify(body),
   });
   setAuthToken(result.token);
   return result;
@@ -733,8 +850,37 @@ export function getCurrentAdminSession() {
   return request<AdminCurrentSession>("/admin/session/current");
 }
 
+export function getCurrentAdminProfile() {
+  return request<AdminProfileResult>("/admin/profile/current");
+}
+
+export function updateCurrentAdminProfile(input: AdminProfileUpdateInput) {
+  return request<AdminProfileResult>("/admin/profile/current", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function testSendMessageCenter(input: MessageCenterTestSendInput) {
+  return request<MessageCenterTestSendResult>("/admin/message-center/test-send", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export function listAdminMenus() {
   return request<AdminMenuList>("/admin/menus");
+}
+
+export function getAdminSettingsRuntime() {
+  return request<AdminSettingsRuntime>("/admin/settings");
+}
+
+export function updateAdminSettingsResource(resource: string, id: string, input: AdminSettingsUpdateInput) {
+  return request<AdminResourceMutation>(`/admin/settings/${resource}/${id}` as `/${string}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
 }
 
 export function listAdminDemoData() {
@@ -927,4 +1073,109 @@ export async function getAdminFileBlob(id: string) {
     headers: requestToken ? { Authorization: `Bearer ${requestToken}` } : undefined,
   });
   return parsePlatformResponse<Blob>(response, requestToken, "blob");
+}
+
+async function withEncryptedCredentialSecret(input: AuthLoginInput): Promise<AuthLoginInput> {
+  if (!input.secret || !input.identifier) return input;
+  const secret = input.secret;
+  const identifierType = input.identifier.type;
+  if (secret.type === "password") {
+    if (!secret.value) return input;
+    const encrypted = await encryptCredentialSecret(input.provider, "password", identifierType, secret.value);
+    return {
+      ...input,
+      secret: { type: "password", encrypted },
+    };
+  }
+  if (secret.type === "sms-otp") {
+    if (!secret.code) return input;
+    const encrypted = await encryptCredentialSecret(input.provider, "sms-otp", identifierType, secret.code);
+    return {
+      ...input,
+      secret: { type: "sms-otp", transactionId: secret.transactionId, encrypted },
+    };
+  }
+  return input;
+}
+
+async function encryptCredentialSecret(
+  provider: string,
+  secretType: "password" | "sms-otp",
+  identifierType: "username" | "phone" | "email",
+  value: string,
+): Promise<CredentialSecretEnvelope> {
+  if (!globalThis.crypto?.subtle) {
+    throw new Error("Credential encryption is unavailable in this browser context.");
+  }
+  const key = await getCredentialSecretKey();
+  const serverPublicKey = await globalThis.crypto.subtle.importKey(
+    "raw",
+    base64URLToBytes(key.publicKey),
+    { name: "ECDH", namedCurve: "P-256" },
+    false,
+    [],
+  );
+  const clientKeyPair = await globalThis.crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    ["deriveBits"],
+  );
+  const sharedSecret = await globalThis.crypto.subtle.deriveBits(
+    { name: "ECDH", public: serverPublicKey },
+    clientKeyPair.privateKey,
+    256,
+  );
+  const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  const nonce = globalThis.crypto.getRandomValues(new Uint8Array(12));
+  const aad = `${provider}\u0000${secretType}\u0000${identifierType}`;
+  const hkdfKey = await globalThis.crypto.subtle.importKey("raw", sharedSecret, "HKDF", false, ["deriveKey"]);
+  const aesKey = await globalThis.crypto.subtle.deriveKey(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt,
+      info: utf8Bytes(`platform-go credential-auth secret v1\u0000${key.keyId}\u0000${aad}`),
+    },
+    hkdfKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"],
+  );
+  const ciphertext = await globalThis.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: nonce, additionalData: utf8Bytes(aad) },
+    aesKey,
+    utf8Bytes(value),
+  );
+  const clientPublicKey = await globalThis.crypto.subtle.exportKey("raw", clientKeyPair.publicKey);
+  return {
+    version: key.version,
+    algorithm: key.algorithm,
+    keyId: key.keyId,
+    clientPublicKey: bytesToBase64URL(new Uint8Array(clientPublicKey)),
+    salt: bytesToBase64URL(salt),
+    nonce: bytesToBase64URL(nonce),
+    ciphertext: bytesToBase64URL(new Uint8Array(ciphertext)),
+  };
+}
+
+function utf8Bytes(value: string) {
+  return new TextEncoder().encode(value);
+}
+
+function base64URLToBytes(value: string) {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+function bytesToBase64URL(bytes: Uint8Array) {
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }

@@ -10,15 +10,26 @@ import (
 )
 
 type ContractPreview struct {
-	CapabilityID        string            `json:"capabilityId"`
-	Version             string            `json:"version"`
-	AdminResources      []string          `json:"adminResources"`
-	AppRoutes           []AppRoutePreview `json:"appRoutes"`
-	DemoDataSets        []string          `json:"demoDataSets"`
-	Migrations          []string          `json:"migrations"`
-	Seeds               []string          `json:"seeds"`
-	ServiceContractHash string            `json:"serviceContractHash"`
-	ServiceCount        int               `json:"serviceCount"`
+	CapabilityID           string                 `json:"capabilityId"`
+	Version                string                 `json:"version"`
+	AdminResources         []string               `json:"adminResources"`
+	AdminResourceContracts []AdminResourcePreview `json:"adminResourceContracts"`
+	PermissionPrefixes     []string               `json:"permissionPrefixes"`
+	ConfigResources        []string               `json:"configResources"`
+	ConfigKeys             []string               `json:"configKeys"`
+	AppRoutes              []AppRoutePreview      `json:"appRoutes"`
+	DemoDataSets           []string               `json:"demoDataSets"`
+	Migrations             []string               `json:"migrations"`
+	Seeds                  []string               `json:"seeds"`
+	ServiceContractHash    string                 `json:"serviceContractHash"`
+	ServiceCount           int                    `json:"serviceCount"`
+}
+
+type AdminResourcePreview struct {
+	Resource         string `json:"resource"`
+	PermissionPrefix string `json:"permissionPrefix"`
+	MenuRoute        string `json:"menuRoute,omitempty"`
+	MenuParent       string `json:"menuParent,omitempty"`
 }
 
 type AppRoutePreview struct {
@@ -59,15 +70,19 @@ func BuildContractPreview() (ContractPreview, error) {
 
 	manifest := manifests[0]
 	return ContractPreview{
-		CapabilityID:        string(manifest.ID),
-		Version:             manifest.Version,
-		AdminResources:      adminResourceIDs(manifest.Admin.Resources),
-		AppRoutes:           appRoutePreviews(routes),
-		DemoDataSets:        demoDataSetIDs(manifest.DemoData),
-		Migrations:          migrationIDs(manifest.Migrations),
-		Seeds:               seedIDs(manifest.Seeds),
-		ServiceContractHash: serviceDocument.ContractHash,
-		ServiceCount:        len(serviceDocument.Services),
+		CapabilityID:           string(manifest.ID),
+		Version:                manifest.Version,
+		AdminResources:         adminResourceIDs(manifest.Admin.Resources),
+		AdminResourceContracts: adminResourcePreviews(manifest.Admin.Resources),
+		PermissionPrefixes:     permissionPrefixes(manifest.Admin.Resources),
+		ConfigResources:        configResourceIDs(manifest.Admin.Resources),
+		ConfigKeys:             authProviderConfigKeys(manifest.AuthProviders),
+		AppRoutes:              appRoutePreviews(routes),
+		DemoDataSets:           demoDataSetIDs(manifest.DemoData),
+		Migrations:             migrationIDs(manifest.Migrations),
+		Seeds:                  seedIDs(manifest.Seeds),
+		ServiceContractHash:    serviceDocument.ContractHash,
+		ServiceCount:           len(serviceDocument.Services),
 	}, nil
 }
 
@@ -94,7 +109,7 @@ func CatalogManifest() capability.Manifest {
 		Name:    "Example Catalog",
 		Version: "0.1.0",
 		Admin: capability.AdminSurface{
-			Resources: []capability.AdminResource{catalogItemResource()},
+			Resources: []capability.AdminResource{catalogItemResource(), catalogSettingsResource()},
 		},
 		App: capability.AppSurface{
 			Routes: []capability.AppRoute{
@@ -151,6 +166,46 @@ func CatalogManifest() capability.Manifest {
 				},
 			},
 		},
+	}
+}
+
+func catalogSettingsResource() capability.AdminResource {
+	return capability.AdminResource{
+		Resource:         "catalog-settings",
+		Title:            capability.Text("目录配置", "Catalog Settings"),
+		Description:      capability.Text("外部目录能力的配置入口，由 /settings 动态聚合。", "Configuration entry for the external catalog capability, dynamically aggregated by /settings."),
+		PermissionPrefix: "admin:catalog-setting",
+		Deletion:         &capability.AdminResourceDeletionPolicy{Mode: capability.AdminDeletionDisabled, PolicyVersion: 1},
+		Menu: capability.AdminMenu{
+			Route:  "/catalog-settings",
+			Parent: "configuration",
+			Group:  "foundation",
+			Icon:   "settings",
+			Order:  320,
+			Cache:  true,
+		},
+		FormLayout: "single-column",
+		FormGroups: []capability.AdminFormGroup{
+			{Key: "runtime", Label: capability.Text("运行配置", "Runtime")},
+			{Key: "integration", Label: capability.Text("集成配置", "Integration")},
+		},
+		Fields: []capability.AdminField{
+			catalogField("code", "配置编码", "Setting Code", "text", "record", "runtime", true, false, true, true, true, true, 160, nil),
+			catalogField("name", "配置名称", "Setting Name", "text", "record", "runtime", true, false, true, true, true, true, 180, nil),
+			catalogField("tenantCode", "租户编码", "Tenant Code", "text", "values", "runtime", false, false, true, true, true, true, 160, nil),
+			catalogField("defaultVisibility", "默认可见性", "Default Visibility", "select", "values", "runtime", true, false, true, true, true, true, 160, []capability.AdminFieldOption{
+				{Value: "internal", Label: capability.Text("内部可见", "Internal")},
+				{Value: "public", Label: capability.Text("公开可见", "Public")},
+			}),
+			catalogField("approvalRequired", "发布需审批", "Approval Required", "switch", "values", "runtime", false, false, false, true, true, true, 140, nil),
+			catalogField("partnerProvider", "伙伴登录提供方", "Partner Provider", "select", "values", "integration", false, false, true, true, true, true, 180, []capability.AdminFieldOption{
+				{Value: "disabled", Label: capability.Text("未启用", "Disabled")},
+				{Value: "catalog-partner", Label: capability.Text("目录伙伴", "Catalog Partner")},
+			}),
+			catalogField("updatedAt", "更新时间", "Updated At", "datetime", "record", "runtime", false, true, false, true, false, true, 180, nil),
+		},
+		SearchFields:   []string{"code", "name", "tenantCode", "defaultVisibility", "partnerProvider"},
+		DefaultSortKey: "updatedAt",
 	}
 }
 
@@ -347,6 +402,45 @@ func adminResourceIDs(resources []capability.AdminResource) []string {
 		ids = append(ids, resource.Resource)
 	}
 	return ids
+}
+
+func adminResourcePreviews(resources []capability.AdminResource) []AdminResourcePreview {
+	previews := make([]AdminResourcePreview, 0, len(resources))
+	for _, resource := range resources {
+		previews = append(previews, AdminResourcePreview{
+			Resource:         resource.Resource,
+			PermissionPrefix: resource.PermissionPrefix,
+			MenuRoute:        resource.Menu.Route,
+			MenuParent:       resource.Menu.Parent,
+		})
+	}
+	return previews
+}
+
+func permissionPrefixes(resources []capability.AdminResource) []string {
+	prefixes := make([]string, 0, len(resources))
+	for _, resource := range resources {
+		prefixes = append(prefixes, resource.PermissionPrefix)
+	}
+	return prefixes
+}
+
+func configResourceIDs(resources []capability.AdminResource) []string {
+	ids := make([]string, 0, len(resources))
+	for _, resource := range resources {
+		if resource.Menu.Parent == "configuration" || resource.Resource == "settings" {
+			ids = append(ids, resource.Resource)
+		}
+	}
+	return ids
+}
+
+func authProviderConfigKeys(providers []capability.AuthProvider) []string {
+	keys := []string{}
+	for _, provider := range providers {
+		keys = append(keys, provider.ConfigKeys...)
+	}
+	return keys
 }
 
 func demoDataSetIDs(datasets []capability.DemoDataSet) []string {

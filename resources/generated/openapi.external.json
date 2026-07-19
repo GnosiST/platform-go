@@ -678,6 +678,7 @@
           "ADMIN_FILE_UPLOAD_OPEN_FAILED",
           "ADMIN_FORBIDDEN",
           "ADMIN_MENU_RESOLUTION_FAILED",
+          "ADMIN_MESSAGE_CENTER_UNAVAILABLE",
           "ADMIN_POLICY_REVIEW_WATERMARK_INVALID",
           "ADMIN_RESOURCE_DOMAIN_OWNED_MUTATION",
           "ADMIN_RESOURCE_ERROR",
@@ -950,5 +951,5 @@
   },
   "x-platform-contract-only-operations": [],
   "x-platform-error-registry-source": "resources/generated/platform-error-code-contract.json",
-  "x-platform-error-registry-hash": "sha256:f4dbaa69b70312857a17553662ce5986a90c0ba0ef4c5fbbcc77056db10f36a8"
+  "x-platform-error-registry-hash": "sha256:e227a68f12805fa3280929cd4c91237d030915965c70a39e84ddf39e281ddb71"
 }

@@ -67,6 +67,42 @@
       "contains": "method: \"POST\""
     },
     {
+      "path": "admin/src/platform/api/client.ts",
+      "contains": "export function getAdminSettingsRuntime"
+    },
+    {
+      "path": "admin/src/platform/api/client.ts",
+      "contains": "\"/admin/settings\""
+    },
+    {
+      "path": "admin/src/platform/api/client.ts",
+      "contains": "export function updateAdminSettingsResource"
+    },
+    {
+      "path": "admin/src/platform/api/client.ts",
+      "contains": "export function testSendMessageCenter"
+    },
+    {
+      "path": "admin/src/platform/api/client.ts",
+      "contains": "\"/admin/message-center/test-send\""
+    },
+    {
+      "path": "internal/platform/httpapi/settings.go",
+      "contains": "func (s *Server) adminSettingsRuntime"
+    },
+    {
+      "path": "internal/platform/httpapi/settings.go",
+      "contains": "s.projectAdminResourceRecords"
+    },
+    {
+      "path": "internal/platform/httpapi/message_center.go",
+      "contains": "func (s *Server) adminMessageCenterTestSend"
+    },
+    {
+      "path": "internal/platform/httpapi/message_center.go",
+      "contains": "notification.RedactSMSTarget"
+    },
+    {
       "path": "admin/src/platform/refine/dataProvider.ts",
       "contains": "const result = await queryAdminResource"
     },
