@@ -3,12 +3,30 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 
 import "./admin-menu-governance-behavior.test.mjs";
 import { pathToFileURL } from "node:url";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
+const tempRoots = new Set();
+
+function makeTempRoot(prefix) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  tempRoots.add(tempDir);
+  return tempDir;
+}
+
+function cleanupTempRoot(tempDir) {
+  fs.rmSync(tempDir, { recursive: true, force: true });
+  tempRoots.delete(tempDir);
+}
+
+after(() => {
+  for (const tempRoot of [...tempRoots]) {
+    cleanupTempRoot(tempRoot);
+  }
+});
 
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-admin-ui-contracts.mjs", ...args], {
@@ -18,7 +36,7 @@ function runValidator(args = []) {
 }
 
 function tempAdminRoot() {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "admin-ui-contracts-"));
+  const tempDir = makeTempRoot("admin-ui-contracts-");
   fs.mkdirSync(path.join(tempDir, "admin"), { recursive: true });
   fs.cpSync(path.join(repoRoot, "admin", "src"), path.join(tempDir, "admin", "src"), { recursive: true });
   return tempDir;
@@ -88,43 +106,47 @@ function relationSearchSchedulerProbe(body) {
 }
 
 function runAdminClientProbe(body) {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "admin-api-client-probe-"));
-  const apiDir = path.join(tempDir, "admin", "src", "platform", "api");
-  const errorSDKDir = path.join(tempDir, "resources", "generated", "error-sdk");
-  fs.mkdirSync(apiDir, { recursive: true });
-  const generator = spawnSync(
-    process.execPath,
-    ["scripts/generate-platform-error-code-artifacts.mjs", "--output-dir", errorSDKDir],
-    { cwd: repoRoot, encoding: "utf8" },
-  );
-  assert.equal(generator.status, 0, generator.stderr);
-  const clientSource = adminSource("admin/src/platform/api/client.ts")
-    .replace('const API_BASE = import.meta.env.VITE_PLATFORM_API_BASE ?? "/api";', 'const API_BASE = "/api";');
-  const sessionExpirySource = adminSource("admin/src/platform/api/sessionExpiry.ts");
-  fs.writeFileSync(path.join(apiDir, "client.ts"), clientSource);
-  fs.writeFileSync(path.join(apiDir, "sessionExpiry.ts"), sessionExpirySource);
-  const buildDir = path.join(tempDir, "build");
-  const tsc = path.join(repoRoot, "admin", "node_modules", ".bin", "tsc");
-  const compile = spawnSync(
-    tsc,
-    [
-      "--target", "ES2022",
-      "--module", "CommonJS",
-      "--moduleResolution", "node",
-      "--outDir", buildDir,
-      path.join(apiDir, "client.ts"),
-      path.join(apiDir, "sessionExpiry.ts"),
-      path.join(errorSDKDir, "typescript", "errorContract.ts"),
-    ],
-    { cwd: tempDir, encoding: "utf8" },
-  );
-  assert.equal(compile.status, 0, compile.stderr || compile.stdout);
-  const moduleURL = pathToFileURL(path.join(buildDir, "admin", "src", "platform", "api", "client.js")).href;
-  return spawnSync(
-    process.execPath,
-    ["--input-type=module", "--eval", body(moduleURL)],
-    { cwd: tempDir, encoding: "utf8" },
-  );
+  const tempDir = makeTempRoot("admin-api-client-probe-");
+  try {
+    const apiDir = path.join(tempDir, "admin", "src", "platform", "api");
+    const errorSDKDir = path.join(tempDir, "resources", "generated", "error-sdk");
+    fs.mkdirSync(apiDir, { recursive: true });
+    const generator = spawnSync(
+      process.execPath,
+      ["scripts/generate-platform-error-code-artifacts.mjs", "--output-dir", errorSDKDir],
+      { cwd: repoRoot, encoding: "utf8" },
+    );
+    assert.equal(generator.status, 0, generator.stderr);
+    const clientSource = adminSource("admin/src/platform/api/client.ts")
+      .replace('const API_BASE = import.meta.env.VITE_PLATFORM_API_BASE ?? "/api";', 'const API_BASE = "/api";');
+    const sessionExpirySource = adminSource("admin/src/platform/api/sessionExpiry.ts");
+    fs.writeFileSync(path.join(apiDir, "client.ts"), clientSource);
+    fs.writeFileSync(path.join(apiDir, "sessionExpiry.ts"), sessionExpirySource);
+    const buildDir = path.join(tempDir, "build");
+    const tsc = path.join(repoRoot, "admin", "node_modules", ".bin", "tsc");
+    const compile = spawnSync(
+      tsc,
+      [
+        "--target", "ES2022",
+        "--module", "CommonJS",
+        "--moduleResolution", "node",
+        "--outDir", buildDir,
+        path.join(apiDir, "client.ts"),
+        path.join(apiDir, "sessionExpiry.ts"),
+        path.join(errorSDKDir, "typescript", "errorContract.ts"),
+      ],
+      { cwd: tempDir, encoding: "utf8" },
+    );
+    assert.equal(compile.status, 0, compile.stderr || compile.stdout);
+    const moduleURL = pathToFileURL(path.join(buildDir, "admin", "src", "platform", "api", "client.js")).href;
+    return spawnSync(
+      process.execPath,
+      ["--input-type=module", "--eval", body(moduleURL)],
+      { cwd: tempDir, encoding: "utf8" },
+    );
+  } finally {
+    cleanupTempRoot(tempDir);
+  }
 }
 
 function adminSource(relativePath) {
