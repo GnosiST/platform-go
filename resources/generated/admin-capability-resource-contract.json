@@ -119,9 +119,7 @@
     "admin:session:create",
     "admin:session:read",
     "admin:session:update",
-    "admin:settings:create",
     "admin:settings:read",
-    "admin:settings:update",
     "admin:tenant:create",
     "admin:tenant:delete",
     "admin:tenant:purge",
@@ -4565,24 +4563,25 @@
       "capabilityId": "parameter",
       "resource": "settings",
       "title": {
-        "zh": "设置",
-        "en": "Settings"
+        "zh": "系统设置",
+        "en": "System Settings"
       },
       "description": {
-        "zh": "平台配置和品牌设置。",
-        "en": "Platform configuration and branding."
+        "zh": "系统级配置、品牌、参数和能力配置入口。",
+        "en": "System-level configuration, branding, parameters, and capability settings."
       },
       "permissionPrefix": "admin:settings",
+      "readOnly": true,
       "permissions": {
-        "create": "admin:settings:create",
-        "read": "admin:settings:read",
-        "update": "admin:settings:update"
+        "read": "admin:settings:read"
       },
       "menu": {
         "route": "/settings",
-        "group": "security",
+        "parent": "configuration",
+        "group": "governance",
         "icon": "settings",
-        "order": 310
+        "order": 310,
+        "cache": true
       },
       "deletion": {
         "mode": "disabled",

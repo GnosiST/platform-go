@@ -25,7 +25,7 @@ import (
 )
 
 func TestAdminResourcesFromConfigUsesMemoryStoreByDefault(t *testing.T) {
-	store, err := AdminResourcesFromConfig(config.Config{}, core.DefaultManifests(), nil)
+	store, err := AdminResourcesFromConfig(config.Config{}, core.DefaultManifests(), testDataProtectionRuntime(t))
 	if err != nil {
 		t.Fatalf("AdminResourcesFromConfig() error = %v", err)
 	}
@@ -37,7 +37,7 @@ func TestAdminResourcesFromConfigUsesMemoryStoreByDefault(t *testing.T) {
 
 func TestAdminResourcesFromConfigUsesFileBackedStore(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "admin-resources.json")
-	store, err := AdminResourcesFromConfig(config.Config{AdminResourceFile: path}, core.DefaultManifests(), nil)
+	store, err := AdminResourcesFromConfig(config.Config{AdminResourceFile: path}, core.DefaultManifests(), testDataProtectionRuntime(t))
 	if err != nil {
 		t.Fatalf("AdminResourcesFromConfig() error = %v", err)
 	}
@@ -51,7 +51,7 @@ func TestAdminResourcesFromConfigUsesFileBackedStore(t *testing.T) {
 		t.Fatalf("Create(tenants) error = %v", err)
 	}
 
-	reloaded, err := AdminResourcesFromConfig(config.Config{AdminResourceFile: path}, core.DefaultManifests(), nil)
+	reloaded, err := AdminResourcesFromConfig(config.Config{AdminResourceFile: path}, core.DefaultManifests(), testDataProtectionRuntime(t))
 	if err != nil {
 		t.Fatalf("reload AdminResourcesFromConfig() error = %v", err)
 	}
@@ -72,7 +72,7 @@ func TestAdminResourcesFromConfigUsesSQLStore(t *testing.T) {
 		AdminResourceDriver: "platform_admin_resource_test",
 		AdminResourceDSN:    "bootstrap-admin-resources",
 	}
-	store, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), nil)
+	store, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), testDataProtectionRuntime(t))
 	if err != nil {
 		t.Fatalf("AdminResourcesFromConfig() error = %v", err)
 	}
@@ -84,7 +84,7 @@ func TestAdminResourcesFromConfigUsesSQLStore(t *testing.T) {
 		t.Fatalf("Update(role-operator) error = %v", err)
 	}
 
-	reloaded, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), nil)
+	reloaded, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), testDataProtectionRuntime(t))
 	if err != nil {
 		t.Fatalf("reload AdminResourcesFromConfig() error = %v", err)
 	}
@@ -103,7 +103,7 @@ func TestAdminResourcesFromConfigUsesGORMStoreForSupportedDrivers(t *testing.T) 
 		AdminResourceDriver: "sqlite",
 		AdminResourceDSN:    dsn,
 	}
-	store, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), nil)
+	store, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), testDataProtectionRuntime(t))
 	if err != nil {
 		t.Fatalf("AdminResourcesFromConfig() error = %v", err)
 	}
@@ -115,7 +115,7 @@ func TestAdminResourcesFromConfigUsesGORMStoreForSupportedDrivers(t *testing.T) 
 		t.Fatalf("Update(role-operator) error = %v", err)
 	}
 
-	reloaded, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), nil)
+	reloaded, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), testDataProtectionRuntime(t))
 	if err != nil {
 		t.Fatalf("reload AdminResourcesFromConfig() error = %v", err)
 	}
@@ -135,7 +135,7 @@ func TestAdminResourcesFromConfigRequiresPreparedOrganizationRBACTarget(t *testi
 		AdminResourceDSN:     dsn,
 		OrganizationRBACMode: config.OrganizationRBACModeTarget,
 	}
-	if _, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), nil); err == nil {
+	if _, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), testDataProtectionRuntime(t)); err == nil {
 		t.Fatal("AdminResourcesFromConfig(unprepared target) error = nil")
 	}
 
@@ -180,7 +180,7 @@ func TestAdminResourcesFromConfigRequiresPreparedOrganizationRBACTarget(t *testi
 		t.Fatal(err)
 	}
 
-	store, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), nil)
+	store, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), testDataProtectionRuntime(t))
 	if err != nil {
 		t.Fatalf("AdminResourcesFromConfig(prepared target) error = %v", err)
 	}
@@ -340,7 +340,7 @@ func TestAdminResourcesFromConfigRequiresPreparedOrganizationRBACTarget(t *testi
 }
 
 func TestAdminResourcesFromConfigRejectsSQLStoreWithoutDSN(t *testing.T) {
-	_, err := AdminResourcesFromConfig(config.Config{AdminResourceDriver: "platform_admin_resource_test"}, core.DefaultManifests(), nil)
+	_, err := AdminResourcesFromConfig(config.Config{AdminResourceDriver: "platform_admin_resource_test"}, core.DefaultManifests(), testDataProtectionRuntime(t))
 	if err == nil {
 		t.Fatalf("AdminResourcesFromConfig() error = nil, want missing DSN")
 	}

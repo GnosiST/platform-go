@@ -262,6 +262,21 @@ func TestValidateAdminSurfaceRequiresSafeDeletionPolicy(t *testing.T) {
 	}
 }
 
+func TestValidateAdminSurfaceRequiresReadOnlyResourcesToDisableDeletion(t *testing.T) {
+	resource := validAdminResource("demo-workbench", "/demo-workbench", "admin:demo-workbench")
+	resource.ReadOnly = true
+
+	err := ValidateAdminSurface([]Manifest{{ID: "demo", Admin: AdminSurface{Resources: []AdminResource{resource}}}})
+	if err == nil || !strings.Contains(err.Error(), "read-only resources must disable deletion") {
+		t.Fatalf("ValidateAdminSurface() error = %v, want read-only deletion guard", err)
+	}
+
+	resource.Deletion = &AdminResourceDeletionPolicy{Mode: AdminDeletionDisabled, PolicyVersion: 1}
+	if err := ValidateAdminSurface([]Manifest{{ID: "demo", Admin: AdminSurface{Resources: []AdminResource{resource}}}}); err != nil {
+		t.Fatalf("ValidateAdminSurface() error = %v", err)
+	}
+}
+
 func TestAdminRetentionDurationIsBounded(t *testing.T) {
 	duration, ok := AdminRetentionDuration(MaximumAdminRetentionDays)
 	if !ok || duration != 36500*24*time.Hour {

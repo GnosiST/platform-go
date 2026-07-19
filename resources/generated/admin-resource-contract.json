@@ -132,7 +132,6 @@
     "admin:session:create",
     "admin:session:read",
     "admin:session:update",
-    "admin:settings:create",
     "admin:settings:read",
     "admin:settings:update",
     "admin:tenant:create",
@@ -12109,15 +12108,13 @@
       "apiBase": "/api/admin/settings",
       "permissions": {
         "read": "admin:settings:read",
-        "update": "admin:settings:update",
-        "create": "admin:settings:create"
+        "update": "admin:settings:update"
       },
       "deletion": {
         "mode": "disabled",
         "policyVersion": 1
       },
       "permissionCodes": [
-        "admin:settings:create",
         "admin:settings:read",
         "admin:settings:update"
       ],

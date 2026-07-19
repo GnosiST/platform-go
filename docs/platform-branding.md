@@ -1,7 +1,7 @@
 # Platform Branding
 
 Date: 2026-07-04
-Last updated: 2026-07-05
+Last updated: 2026-07-19
 
 ## Purpose
 
@@ -29,7 +29,7 @@ The admin frontend uses the same API to render the shell brand and initial theme
 
 ## Admin Configuration
 
-Branding is managed through the generic `settings` admin resource. The default record is:
+Branding is managed through the `/settings` system configuration workbench and the generic `settings` admin resource. The default record is:
 
 ```text
 resource: settings
@@ -50,3 +50,5 @@ PUT /api/admin/resources/settings/setting-branding
 Schemas and defaults are provided by the enabled platform capabilities. Runtime values come from the admin resource Store, which can be memory-backed, file-backed or GORM-backed through the `AdminResourceRepository` port.
 
 Business code should call the branding API or a typed service wrapper around it. It should not depend on the `settings` resource row shape.
+
+The topbar settings drawer is a frontend interface-preference drawer for theme, layout, density, watermark and local import/export. It must not become the product entry for branding, notification provider accounts, credential policy or other capability-owned system configuration.

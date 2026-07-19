@@ -12,7 +12,7 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 import { useCreate, useDataProvider, useDelete, useList, useUpdate, type CrudSort, type DataProvider, type HttpError } from "@refinedev/core";
-import { Button, Drawer, Dropdown, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Tabs, Tag, Typography, type FormInstance, type MenuProps, type TableProps } from "antd";
+import { App, Button, Drawer, Dropdown, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Tabs, Tag, Typography, type FormInstance, type MenuProps, type TableProps } from "antd";
 import type { Rule } from "antd/es/form";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type Key, type ReactNode } from "react";
 import {
@@ -38,6 +38,7 @@ import {
   AdminActionButton,
   AdminFeedback,
   AdminFormModal,
+  AdminModal,
   AdminPage,
   PlatformOverflowText,
   PlatformDataTable,
@@ -98,6 +99,7 @@ type SensitiveRevealTarget = {
   recordId: string;
   field: AdminResourceField;
 };
+type ConfirmModal = ReturnType<typeof App.useApp>["modal"]["confirm"];
 
 const FOCUSABLE_RESOURCE_FORM_CONTROL_SELECTOR = [
   '.resource-form-fields input:not([type="hidden"]):not([disabled]):not([readonly])',
@@ -140,6 +142,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
   const [togglingRecordID, setTogglingRecordID] = useState("");
   const [actionExecutingKey, setActionExecutingKey] = useState("");
   const [form] = Form.useForm<ResourceFormValues>();
+  const { modal } = App.useApp();
   const watchedFormValues = Form.useWatch([], form) as ResourceFormValues | undefined;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const oidcResumeOpeningRef = useRef("");
@@ -799,6 +802,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
       ) : null}
       <CustomRowActionOverflow
         actions={customRowActions}
+        confirm={modal.confirm}
         dictionary={dictionary}
         executingKey={actionExecutingKey}
         language={language}
@@ -921,6 +925,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
                   actions={customBatchActions}
                   dictionary={dictionary}
                   executingKey={actionExecutingKey}
+                  confirm={modal.confirm}
                   language={language}
                   onExecute={runBatchCustomAction}
                   selectedKeys={selectedKeys}
@@ -1066,10 +1071,11 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
           onFinish={submitForm}
         />
       </AdminFormModal>
-      <Modal
+      <AdminModal
         className="one-time-secret-modal"
         title={dictionary.oneTimeSecretTitle}
         open={Boolean(issuedToken)}
+        preset="confirm"
         okText={dictionary.copy}
         cancelText={dictionary.close}
         onCancel={() => setIssuedToken("")}
@@ -1080,7 +1086,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
       >
         <AdminFeedback type="warning" message={dictionary.oneTimeSecretWarning} description={dictionary.oneTimeSecretDescription} />
         <Input.TextArea readOnly rows={3} value={issuedToken} />
-      </Modal>
+      </AdminModal>
       <SensitiveFieldRevealModal
         dictionary={dictionary}
         field={sensitiveRevealTarget?.field}
@@ -1581,6 +1587,7 @@ function ResourceCustomPanel({
 
 function CustomRowActionOverflow({
   actions,
+  confirm,
   dictionary,
   executingKey,
   language,
@@ -1589,6 +1596,7 @@ function CustomRowActionOverflow({
   onUnavailable,
 }: {
   actions: AdminResourceAction[];
+  confirm: ConfirmModal;
   dictionary: Dictionary;
   executingKey: string;
   language: Language;
@@ -1612,7 +1620,7 @@ function CustomRowActionOverflow({
           domEvent.stopPropagation();
           const action = actions.find((item) => item.key === key);
           if (action?.confirm) {
-            Modal.confirm({
+            confirm({
               title: localizedText(action.confirm.title, language),
               content: action.confirm.description ? localizedText(action.confirm.description, language) : undefined,
               okText: action.confirm.okText ? localizedText(action.confirm.okText, language) : localizedText(action.label, language),
@@ -1647,6 +1655,7 @@ function CustomRowActionOverflow({
 function CustomBatchActions({
   actions,
   clearSelection,
+  confirm,
   dictionary,
   executingKey,
   language,
@@ -1656,6 +1665,7 @@ function CustomBatchActions({
 }: {
   actions: AdminResourceAction[];
   clearSelection: () => void;
+  confirm: ConfirmModal;
   dictionary: Dictionary;
   executingKey: string;
   language: Language;
@@ -1674,7 +1684,7 @@ function CustomBatchActions({
           type={action.tone === "primary" ? "primary" : "default"}
           onClick={() => {
             if (action.confirm) {
-              Modal.confirm({
+              confirm({
                 title: localizedText(action.confirm.title, language),
                 content: action.confirm.description ? localizedText(action.confirm.description, language) : undefined,
                 okText: action.confirm.okText ? localizedText(action.confirm.okText, language) : localizedText(action.label, language),

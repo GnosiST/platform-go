@@ -1282,7 +1282,7 @@ func TestRecordAuditWithoutContextGeneratesCanonicalCorrelation(t *testing.T) {
 
 func TestRecordAuditDoesNotPersistWhenCorrelationGenerationFails(t *testing.T) {
 	repository := &recordingRepository{snapshot: ResourceSnapshot{Resources: map[string][]Record{}}}
-	store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	store, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 	if err != nil {
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
 	}
@@ -1321,7 +1321,7 @@ func TestRepositoryBackedStoreNormalizesLegacyTraceWithoutCanonicalizingIt(t *te
 			},
 		}},
 	}}}
-	store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	store, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 	if err != nil {
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
 	}
@@ -1843,7 +1843,7 @@ func TestStoreInactiveWildcardCatalogEntryStopsExistingRolePolicy(t *testing.T) 
 
 func TestFileBackedStorePersistsResourceMutations(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "admin-resources.json")
-	store, err := NewFileBackedStoreFromCapabilities(path, core.DefaultManifests())
+	store, err := newFileBackedStoreFromDefaultCapabilitiesForTest(t, path)
 	if err != nil {
 		t.Fatalf("NewFileBackedStoreFromCapabilities() error = %v", err)
 	}
@@ -1859,7 +1859,7 @@ func TestFileBackedStorePersistsResourceMutations(t *testing.T) {
 		t.Fatalf("Create(tenants) error = %v", err)
 	}
 
-	reloaded, err := NewFileBackedStoreFromCapabilities(path, core.DefaultManifests())
+	reloaded, err := newFileBackedStoreFromDefaultCapabilitiesForTest(t, path)
 	if err != nil {
 		t.Fatalf("reload file-backed store error = %v", err)
 	}
@@ -1874,7 +1874,7 @@ func TestFileBackedStorePersistsResourceMutations(t *testing.T) {
 
 func TestFileBackedStorePersistsRolePermissionsForDynamicMenus(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "admin-resources.json")
-	store, err := NewFileBackedStoreFromCapabilities(path, core.DefaultManifests())
+	store, err := newFileBackedStoreFromDefaultCapabilitiesForTest(t, path)
 	if err != nil {
 		t.Fatalf("NewFileBackedStoreFromCapabilities() error = %v", err)
 	}
@@ -1887,7 +1887,7 @@ func TestFileBackedStorePersistsRolePermissionsForDynamicMenus(t *testing.T) {
 		t.Fatalf("Update(role-operator) error = %v", err)
 	}
 
-	reloaded, err := NewFileBackedStoreFromCapabilities(path, core.DefaultManifests())
+	reloaded, err := newFileBackedStoreFromDefaultCapabilitiesForTest(t, path)
 	if err != nil {
 		t.Fatalf("reload file-backed store error = %v", err)
 	}
@@ -1902,7 +1902,7 @@ func TestFileBackedStorePersistsRolePermissionsForDynamicMenus(t *testing.T) {
 
 func TestStorePersistsThroughRepositoryPort(t *testing.T) {
 	repository := &recordingRepository{}
-	store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	store, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 	if err != nil {
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
 	}
@@ -1933,7 +1933,7 @@ func TestRepositoryBackedStoreRollsBackFullSnapshotOnConflict(t *testing.T) {
 			"tenants": {{ID: "tenant-a", Code: "a", Name: "A", Status: "enabled"}},
 		},
 	}}
-	store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	store, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 	if err != nil {
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
 	}
@@ -1957,7 +1957,7 @@ func TestStoreUpdateAndDeleteRollBackWhenAuditPersistenceFails(t *testing.T) {
 	for _, operation := range []string{"update", "delete"} {
 		t.Run(operation, func(t *testing.T) {
 			repository := &auditFailingRepository{}
-			store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+			store, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 			if err != nil {
 				t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
 			}
@@ -1991,11 +1991,11 @@ func TestStoreUpdateAndDeleteRollBackWhenAuditPersistenceFails(t *testing.T) {
 
 func TestRepositoryBackedStoreReloadsBeforeMutationAndPreservesConcurrentRecord(t *testing.T) {
 	repository := &revisionMemoryRepository{snapshot: ResourceSnapshot{Resources: map[string][]Record{}}}
-	first, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	first, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 	if err != nil {
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities(first) error = %v", err)
 	}
-	second, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	second, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 	if err != nil {
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities(second) error = %v", err)
 	}
@@ -2024,7 +2024,7 @@ func TestRepositoryBackedStoreReloadsBeforeMutationAndPreservesConcurrentRecord(
 
 func TestRefreshContextTreatsFallbackRepositoryLoadAsChanged(t *testing.T) {
 	repository := &recordingRepository{}
-	store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	store, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 	if err != nil {
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
 	}

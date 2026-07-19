@@ -99,6 +99,7 @@ type adminResourceContractEntry struct {
 	Title            capability.LocalizedText                `json:"title"`
 	Description      capability.LocalizedText                `json:"description"`
 	PermissionPrefix string                                  `json:"permissionPrefix"`
+	ReadOnly         bool                                    `json:"readOnly,omitempty"`
 	Permissions      map[string]string                       `json:"permissions"`
 	Menu             adminMenuContract                       `json:"menu"`
 	FormGroups       []adminFormGroupContract                `json:"formGroups,omitempty"`
@@ -515,6 +516,7 @@ func buildAdminResourceContractDocument(manifests []capability.Manifest) (adminR
 				Title:            resource.Title,
 				Description:      resource.Description,
 				PermissionPrefix: resource.PermissionPrefix,
+				ReadOnly:         resource.ReadOnly,
 				Permissions:      adminResourcePermissions(resource),
 				Menu:             adminMenuFromCapability(resource.Menu),
 				FormGroups:       adminFormGroupsFromCapability(resource.FormGroups),
@@ -647,10 +649,13 @@ func serviceEventIDs(events []capability.ServiceEvent) []string {
 func adminResourcePermissions(resource capability.AdminResource) map[string]string {
 	prefix := resource.PermissionPrefix
 	permissions := map[string]string{
-		"read":   prefix + ":read",
-		"create": prefix + ":create",
-		"update": prefix + ":update",
+		"read": prefix + ":read",
 	}
+	if resource.ReadOnly {
+		return permissions
+	}
+	permissions["create"] = prefix + ":create"
+	permissions["update"] = prefix + ":update"
 	if resource.Deletion == nil {
 		return permissions
 	}

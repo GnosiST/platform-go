@@ -20,7 +20,14 @@ type AdminFeedbackProps = AlertProps & {
   compact?: boolean;
 };
 
-type AdminModalProps = ModalProps;
+export type AdminModalSize = "sm" | "md" | "lg" | "xl";
+
+export type AdminModalPreset = "form" | "detail" | "confirm";
+
+type AdminModalProps = ModalProps & {
+  size?: AdminModalSize;
+  preset?: AdminModalPreset;
+};
 
 type AdminFormModalProps = AdminModalProps & {
   children: ReactNode;
@@ -32,6 +39,19 @@ type PlatformOverflowTextProps = {
   className?: string;
   strong?: boolean;
   code?: boolean;
+};
+
+const ADMIN_MODAL_SIZE_WIDTH: Record<AdminModalSize, number> = {
+  sm: 420,
+  md: 560,
+  lg: 760,
+  xl: 960,
+};
+
+const ADMIN_MODAL_PRESET_SIZE: Record<AdminModalPreset, AdminModalSize> = {
+  form: "md",
+  detail: "lg",
+  confirm: "sm",
 };
 
 export function AdminListPanel({
@@ -79,12 +99,29 @@ export function AdminFeedback({ className, compact = true, ...alertProps }: Admi
   return <Alert className={cx("admin-feedback", compact && "compact", className)} showIcon {...alertProps} />;
 }
 
-export function AdminModal({ className, ...modalProps }: AdminModalProps) {
-  return <Modal className={cx("admin-modal", className)} {...modalProps} />;
+export function AdminModal({ className, preset, size, width, ...modalProps }: AdminModalProps) {
+  const resolvedSize = size ?? (preset ? ADMIN_MODAL_PRESET_SIZE[preset] : "md");
+  const resolvedWidth = width ?? ADMIN_MODAL_SIZE_WIDTH[resolvedSize];
+
+  return (
+    <Modal
+      className={cx("admin-modal", `admin-modal-size-${resolvedSize}`, preset && `admin-modal-preset-${preset}`, className)}
+      width={resolvedWidth}
+      {...modalProps}
+    />
+  );
 }
 
-export function AdminFormModal({ className, width = 560, destroyOnHidden = true, forceRender = true, ...modalProps }: AdminFormModalProps) {
-  return <AdminModal className={cx("admin-form-modal", className)} width={width} destroyOnHidden={destroyOnHidden} forceRender={forceRender} {...modalProps} />;
+export function AdminFormModal({ className, preset = "form", destroyOnHidden = true, forceRender = true, ...modalProps }: AdminFormModalProps) {
+  return (
+    <AdminModal
+      className={cx("admin-form-modal", className)}
+      destroyOnHidden={destroyOnHidden}
+      forceRender={forceRender}
+      preset={preset}
+      {...modalProps}
+    />
+  );
 }
 
 export function PlatformOverflowText({ value, tooltip = value, className, strong, code }: PlatformOverflowTextProps) {

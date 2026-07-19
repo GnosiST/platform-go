@@ -77,6 +77,77 @@
       }
     ]
   },
+  "manifestProjection": {
+    "sourceOfTruth": "Enabled capability.Manifest values resolved at API process startup.",
+    "settingsCenter": {
+      "route": "/settings",
+      "resource": "settings",
+      "ownerCapability": "parameter",
+      "aggregation": "dynamic-enabled-capability-config",
+      "uses": [
+        "GET /api/capabilities configResources",
+        "resources/generated/admin-resource-contract.json schemas",
+        "capability.Manifest.Admin.Resources"
+      ],
+      "topbarSettingsBoundary": "interface-preferences-only"
+    },
+    "projectedSurfaces": [
+      {
+        "id": "adminResources",
+        "source": "capability.Manifest.Admin.Resources",
+        "afterEnable": "resource schemas, generic CRUD contracts and custom workbench routes become visible after contract regeneration and restart",
+        "afterDisable": "resource schemas and workbench routes are absent from exposed contracts after restart"
+      },
+      {
+        "id": "menuRoutes",
+        "source": "capability.Manifest.Admin.Resources[].Menu",
+        "afterEnable": "navigation entries are generated from enabled resources and route metadata",
+        "afterDisable": "navigation entries disappear with the owning capability after restart"
+      },
+      {
+        "id": "permissions",
+        "source": "capability.Manifest.Admin.Resources[].PermissionPrefix and actions",
+        "afterEnable": "permission codes enter the generated resource and RBAC contract surfaces",
+        "afterDisable": "permission codes are no longer exposed for assignment after restart"
+      },
+      {
+        "id": "configResources",
+        "source": "enabled Admin resources under configuration plus the settings resource",
+        "afterEnable": "system settings center can group the capability configuration by enabled resources",
+        "afterDisable": "capability configuration entries are removed from the settings center after restart"
+      },
+      {
+        "id": "appRoutes",
+        "source": "capability.Manifest.App.Routes",
+        "afterEnable": "App OpenAPI and App client preview include the capability routes",
+        "afterDisable": "App routes are absent from App contracts after restart"
+      },
+      {
+        "id": "authProviders",
+        "source": "capability.Manifest.AuthProviders",
+        "afterEnable": "provider discovery and login UI can expose configured providers for their declared audience",
+        "afterDisable": "provider discovery no longer returns providers owned by the disabled capability"
+      },
+      {
+        "id": "demoDataSets",
+        "source": "capability.Manifest.DemoData",
+        "afterEnable": "development demo datasets are available only when their capability is enabled",
+        "afterDisable": "demo datasets are absent from exposed contracts after restart"
+      },
+      {
+        "id": "serviceOperations",
+        "source": "capability.Manifest.Service.Operations",
+        "afterEnable": "service-operation contracts are visible to service/codegen governance",
+        "afterDisable": "service-operation contracts are absent from generated surfaces after restart"
+      }
+    ],
+    "requiredPostRestartChecks": [
+      "GET /api/admin/plugin-management/status reports pendingRestart=false",
+      "GET /api/capabilities exposes enabled capability dependencies, adminResources, menuRoutes, permissions, configResources, serviceOperations and authProviders",
+      "disabled Admin resources, App routes, auth providers, demo datasets and service operations are absent from generated contracts",
+      "/settings groups configuration resources from the enabled capability set instead of hard-coding one menu per capability"
+    ]
+  },
   "lifecycleGates": [
     {
       "id": "declare-desired-state",

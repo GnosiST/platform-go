@@ -28,6 +28,7 @@ import (
 	"github.com/GnosiST/platform-go/internal/platform/capability"
 	"github.com/GnosiST/platform-go/internal/platform/core"
 	"github.com/GnosiST/platform-go/internal/platform/credentialauth"
+	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
 	"github.com/GnosiST/platform-go/internal/platform/errorcode"
 	"github.com/GnosiST/platform-go/internal/platform/kernel"
 	"github.com/GnosiST/platform-go/internal/platform/notification"
@@ -347,6 +348,9 @@ func (adminIdentityBindingStoreFunc) ValidateAdminIdentityBindingReadiness(conte
 
 func newTestServer(options ServerOptions) *Server {
 	options.AllowInsecureHeaderAuth = true
+	if options.DataProtection == nil {
+		options.DataProtection = newHTTPTestDataProtectionRuntime()
+	}
 	if options.PhoneProtector == nil {
 		options.PhoneProtector = NewHMACPhoneProtector([]byte(strings.Repeat("p", 32)), []byte(strings.Repeat("c", 32)))
 	}
@@ -355,6 +359,20 @@ func newTestServer(options ServerOptions) *Server {
 		options.DebugCodeEnabled = true
 	}
 	return New(options)
+}
+
+func newHTTPTestDataProtectionRuntime() dataprotection.Runtime {
+	provider, err := dataprotection.NewStaticKeyProvider(dataprotection.StaticKeyProviderConfig{
+		Kind:                  dataprotection.ProviderEnvAES256,
+		ActiveEncryptionKeyID: "enc-v1",
+		ActiveBlindIndexKeyID: "idx-v1",
+		EncryptionKeys:        map[string][]byte{"enc-v1": []byte(strings.Repeat("e", 32))},
+		BlindIndexKeys:        map[string][]byte{"idx-v1": []byte(strings.Repeat("i", 32))},
+	})
+	if err != nil {
+		panic("httpapi test data protection runtime: " + err.Error())
+	}
+	return dataprotection.NewRuntime(provider)
 }
 
 func TestErrorResponseCarriesServerOwnedRequestAndTraceIDs(t *testing.T) {
@@ -527,7 +545,21 @@ func TestHealthEndpoint(t *testing.T) {
 }
 
 func TestCapabilitiesEndpoint(t *testing.T) {
-	server := newTestServer(ServerOptions{Capabilities: []capability.Manifest{{ID: "tenant"}, {ID: "identity"}}})
+	server := newTestServer(ServerOptions{Capabilities: []capability.Manifest{
+		{ID: "tenant"},
+		{
+			ID:           "parameter",
+			Dependencies: []capability.ID{"tenant"},
+			Admin: capability.AdminSurface{Resources: []capability.AdminResource{{
+				Resource:         "parameters",
+				Title:            capability.Text("参数", "Parameters"),
+				Description:      capability.Text("参数配置。", "Parameter configuration."),
+				PermissionPrefix: "admin:parameter",
+				Menu:             capability.AdminMenu{Route: "/parameters", Parent: "configuration", Group: "governance"},
+				Deletion:         &capability.AdminResourceDeletionPolicy{Mode: capability.AdminDeletionSoftDelete, PolicyVersion: 1},
+			}}},
+		},
+	}})
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/capabilities", nil)
 
@@ -536,9 +568,37 @@ func TestCapabilitiesEndpoint(t *testing.T) {
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("GET /api/capabilities status = %d body = %s", recorder.Code, recorder.Body.String())
 	}
-	body := recorder.Body.String()
-	if !strings.Contains(body, `"id":"tenant"`) || !strings.Contains(body, `"id":"identity"`) {
-		t.Fatalf("GET /api/capabilities body = %s", body)
+	var payload Response[[]struct {
+		ID             string   `json:"id"`
+		Dependencies   []string `json:"dependencies"`
+		AdminResources []struct {
+			Resource string `json:"resource"`
+			Route    string `json:"route"`
+		} `json:"adminResources"`
+		ConfigResources []struct {
+			Resource string `json:"resource"`
+			Route    string `json:"route"`
+		} `json:"configResources"`
+		Permissions []string `json:"permissions"`
+	}]
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode capabilities response: %v body=%s", err, recorder.Body.String())
+	}
+	if len(payload.Data) != 2 || payload.Data[0].ID != "tenant" || payload.Data[1].ID != "parameter" {
+		t.Fatalf("GET /api/capabilities data = %+v", payload.Data)
+	}
+	parameter := payload.Data[1]
+	if len(parameter.Dependencies) != 1 || parameter.Dependencies[0] != "tenant" {
+		t.Fatalf("parameter dependencies = %+v, want tenant", parameter.Dependencies)
+	}
+	if len(parameter.AdminResources) != 1 || parameter.AdminResources[0].Resource != "parameters" || parameter.AdminResources[0].Route != "/parameters" {
+		t.Fatalf("parameter adminResources = %+v, want parameters route", parameter.AdminResources)
+	}
+	if len(parameter.ConfigResources) != 1 || parameter.ConfigResources[0].Resource != "parameters" {
+		t.Fatalf("parameter configResources = %+v, want parameters", parameter.ConfigResources)
+	}
+	if !strings.Contains(strings.Join(parameter.Permissions, ","), "admin:parameter:update") {
+		t.Fatalf("parameter permissions = %+v, want update permission", parameter.Permissions)
 	}
 }
 

@@ -55,6 +55,16 @@ const requiredAcceptedCombinations = new Set([
   "optional-personnel-disabled-after-profile-removal",
   "external-business-downstream-owned",
 ]);
+const requiredProjectedSurfaces = new Set([
+  "adminResources",
+  "menuRoutes",
+  "permissions",
+  "configResources",
+  "appRoutes",
+  "authProviders",
+  "demoDataSets",
+  "serviceOperations",
+]);
 const requiredValidators = [
   "scripts/validate-platform-plugin-management-v1.mjs",
   "scripts/validate-platform-capability-operation-policy.mjs",
@@ -205,6 +215,64 @@ function validateDesiredState(contract, errors) {
       errors.push(`${prefix} path is missing or unsafe: ${source.path}`);
     }
   }
+}
+
+function validateManifestProjection(contract, errors) {
+  const projection = contract.manifestProjection ?? {};
+  if (!projection.sourceOfTruth || !projection.sourceOfTruth.includes("capability.Manifest")) {
+    errors.push("manifestProjection.sourceOfTruth must describe enabled capability.Manifest values");
+  }
+
+  const settingsCenter = projection.settingsCenter ?? {};
+  if (settingsCenter.route !== "/settings") {
+    errors.push("manifestProjection.settingsCenter.route must be /settings");
+  }
+  if (settingsCenter.resource !== "settings") {
+    errors.push("manifestProjection.settingsCenter.resource must be settings");
+  }
+  if (settingsCenter.ownerCapability !== "parameter") {
+    errors.push("manifestProjection.settingsCenter.ownerCapability must be parameter");
+  }
+  if (settingsCenter.aggregation !== "dynamic-enabled-capability-config") {
+    errors.push("manifestProjection.settingsCenter.aggregation must be dynamic-enabled-capability-config");
+  }
+  if (!settingsCenter.topbarSettingsBoundary?.includes("interface-preferences")) {
+    errors.push("manifestProjection.settingsCenter.topbarSettingsBoundary must keep topbar settings as interface preferences");
+  }
+  requireIncludes(
+    settingsCenter.uses,
+    [
+      "GET /api/capabilities configResources",
+      "resources/generated/admin-resource-contract.json schemas",
+      "capability.Manifest.Admin.Resources",
+    ],
+    "manifestProjection.settingsCenter.uses",
+    errors,
+  );
+
+  const projectedSurfaces = byID(projection.projectedSurfaces);
+  for (const surfaceID of requiredProjectedSurfaces) {
+    if (!projectedSurfaces.has(surfaceID)) {
+      errors.push(`manifestProjection.projectedSurfaces must include ${surfaceID}`);
+    }
+  }
+  for (const surface of values(projection.projectedSurfaces)) {
+    const prefix = `manifestProjection surface ${surface.id ?? "<missing>"}`;
+    if (!surface.id || !surface.source || !surface.afterEnable || !surface.afterDisable) {
+      errors.push(`${prefix} must declare id, source, afterEnable and afterDisable`);
+    }
+  }
+  requireIncludes(
+    projection.requiredPostRestartChecks,
+    [
+      "GET /api/admin/plugin-management/status reports pendingRestart=false",
+      "GET /api/capabilities exposes enabled capability dependencies, adminResources, menuRoutes, permissions, configResources, serviceOperations and authProviders",
+      "disabled Admin resources, App routes, auth providers, demo datasets and service operations are absent from generated contracts",
+      "/settings groups configuration resources from the enabled capability set instead of hard-coding one menu per capability",
+    ],
+    "manifestProjection.requiredPostRestartChecks",
+    errors,
+  );
 }
 
 function validateLifecycleGates(contract, errors) {
@@ -391,6 +459,7 @@ function validate() {
 
   validateRuntimePolicy(contract, errors);
   validateDesiredState(contract, errors);
+  validateManifestProjection(contract, errors);
   validateLifecycleGates(contract, errors);
   validateAcceptedCombinations(contract, operationPolicy, profiles, errors);
   validatePolicyIntegration(operationPolicy, errors);

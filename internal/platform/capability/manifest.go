@@ -37,6 +37,7 @@ type AdminResource struct {
 	Title            LocalizedText
 	Description      LocalizedText
 	PermissionPrefix string
+	ReadOnly         bool
 	Deletion         *AdminResourceDeletionPolicy
 	Menu             AdminMenu
 	FormGroups       []AdminFormGroup

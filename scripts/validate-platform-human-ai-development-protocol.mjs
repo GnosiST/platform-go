@@ -46,6 +46,11 @@ const requiredAcceptanceCommands = [
   "rtk node scripts/validate-platform-codegen-source-writing-readiness.mjs",
   "rtk npm --prefix admin run build",
 ];
+const requiredCapabilityLifecyclePractices = [
+  "system-level settings use /settings as the dynamic configuration center and aggregate enabled capability configResources from manifest projection",
+  "topbar settings are interface preferences only and must not become the system function configuration entry",
+  "capability manifest projection must cover Admin resources, menu routes, permissions, configuration resources, App routes, auth providers, demo data sets and service operations",
+];
 
 function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -200,6 +205,15 @@ function validateProtocol(protocol) {
   }
   for (const domain of values(protocol.domains)) {
     validateDomain(domain, errors);
+  }
+  const lifecycleDomain = values(protocol.domains).find((domain) => domain.id === "capability-lifecycle-operations");
+  if (lifecycleDomain) {
+    requireIncludes(
+      lifecycleDomain.requiredPractices,
+      requiredCapabilityLifecyclePractices,
+      "capability-lifecycle-operations.requiredPractices",
+      errors,
+    );
   }
 
   validateRelativePaths(protocol, errors);

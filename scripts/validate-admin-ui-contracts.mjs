@@ -44,6 +44,8 @@ const files = {
   sensitiveRevealModal: readSource("admin/src/platform/resources/SensitiveFieldRevealModal.tsx"),
   sensitiveRevealOIDC: readSource("admin/src/platform/security/sensitiveRevealOIDC.ts"),
   shell: readSource("admin/src/platform/shell/AdminShell.tsx"),
+  settingsCenter: readSource("admin/src/platform/settings/SettingsCenterConsole.tsx"),
+  messageCenter: readSource("admin/src/platform/message-center/MessageCenterConsole.tsx"),
   settings: readSource("admin/src/platform/ui/SystemSettingsDrawer.tsx"),
   table: readSource("admin/src/platform/ui/PlatformDataTable.tsx"),
   pagination: readSource("admin/src/platform/ui/PlatformPaginationBar.tsx"),
@@ -124,6 +126,11 @@ requireNotIncludes(files.roleManagementNavigation, "as T", "Role-management proj
 requireIncludes(files.resourceRoute, 'resource.route === "/roles" || resource.route === "/role-groups"', "Both legacy role routes must retain the shared route adapter.");
 requireIncludes(files.resourceRoute, 'resource.route === "/permissions"', "The permissions route must use the dedicated permission governance console.");
 requireIncludes(files.resourceRoute, "<PermissionGovernanceConsole", "The permissions route must render PermissionGovernanceConsole instead of GenericResourceConsole.");
+requireIncludes(files.app, "SettingsCenterConsole", "App must mount the formal system settings center route.");
+requireIncludes(files.app, 'path="/settings"', "System settings must be a first-class route, not only a topbar interface-preference drawer.");
+requireIncludes(files.app, 'path="/message-center"', "Message center must be a first-class workbench route when notification resources are projected.");
+requireIncludes(files.app, "const hasMessageCenter = resources.some", "App must derive message-center availability from authorized capability resources.");
+requireIncludes(files.app, "isMessageCenterResourceRoute(resource.route)", "Message center must appear when notification child resources are projected by a capability.");
 requireCountExactly(files.i18n, "roleManagement:", 2, "Role management navigation must declare matching Chinese and English dictionary keys.");
 requireIncludes(files.i18n, 'roleManagement: "角色"', "Role navigation must declare the concise Chinese label.");
 requireIncludes(files.i18n, 'roleManagement: "Roles"', "Role navigation must declare the concise English label.");
@@ -502,14 +509,61 @@ requireNotIncludes(files.settings, "settings-status-grid", "System settings must
 requireIncludes(files.settings, "aria-pressed={active === mode}", "Layout-mode options must expose their selected state to assistive technology.");
 requireIncludes(files.settings, "layoutDescription(dictionary, mode)", "Layout-mode options must include the approved explanatory copy.");
 requireIncludes(files.settings, "showPreviews={uiConfig.showLayoutLegend}", "The persisted layout-legend preference must control preview visibility without hiding the selector.");
+requireIncludes(files.settingsCenter, "projectSettingsResourceConfigs(resources, dictionary, language)", "Settings center must derive configuration entries from the authorized manifest-projected resources.");
+requireIncludes(files.settingsCenter, 'resource.parent === "configuration"', "Settings center must automatically include configuration resources contributed by enabled capabilities.");
+requireIncludes(files.settingsCenter, "knownSettingsResourceCatalog", "Settings center must keep productized metadata for known platform configuration resources.");
+requireNotIncludes(files.settingsCenter, 'type SettingsResourceKey = "parameters"', "Settings center must not hard-code a closed configuration resource union.");
+requireIncludes(files.messageCenter, 'resource: "notification-channels"', "Message center must expose notification channel configuration.");
+requireIncludes(files.messageCenter, 'resource: "notification-providers"', "Message center must expose notification provider account configuration.");
+requireIncludes(files.messageCenter, 'resource: "notification-templates"', "Message center must expose reusable notification templates.");
+requireIncludes(files.messageCenter, 'resource: "notification-send-policies"', "Message center must expose send policy configuration.");
+requireIncludes(files.messageCenter, 'resource: "notifications"', "Message center must expose notification records.");
+requireIncludes(files.messageCenter, 'resource: "notification-deliveries"', "Message center must expose delivery ledgers.");
+requireIncludes(files.messageCenter, '["in_app", "sms", "email", "wechat_official", "wechat_miniapp"]', "Message center must expose the common in-app, SMS, email, and WeChat channel set even before records exist.");
+requireIncludes(files.messageCenter, "dictionary.messageCenterTestSendUnavailable", "Message center must avoid presenting test-send as implemented before a send-test endpoint exists.");
+for (const key of [
+  "settingsCenterTitle",
+  "settingsCenterDescription",
+  "settingsCenterDynamicMap",
+  "settingsCenterResourceListDescription",
+  "messageCenterTitle",
+  "messageCenterDescription",
+  "messageCenterProvidersDescription",
+  "messageCenterChannelSMSDescription",
+  "messageCenterChannelEmailDescription",
+  "messageCenterChannelWechatOfficialDescription",
+  "messageCenterChannelWechatMiniappDescription",
+]) {
+  requireCountExactly(files.i18n, `${key}:`, 2, `Settings/message center i18n key ${key} must exist in matching Chinese and English dictionaries.`);
+}
 requireRegex(files.styles, /\.layout-mode-option\s*\{[\s\S]*?grid-template-columns:\s*minmax\([^;]+\)\s+minmax\([^;]+\)\s+44px/, "Layout-mode options must keep preview, copy, and selection state in stable columns.");
 requireIncludes(files.roleGovernance, "AdminTreeWorkbench", "Role governance must use the platform tree workbench wrapper.");
 requireIncludes(files.roleGovernance, "PlatformTreeTransfer", "Role permission and menu entry points must use the platform Tree Transfer wrapper.");
 requireIncludes(files.primitives, "export function AdminModal", "Shared platform dialogs must expose the AdminModal wrapper.");
-requireIncludes(files.primitives, '<Modal className={cx("admin-modal", className)}', "AdminModal must remain the single Ant Modal boundary for shared platform dialogs.");
-requireIncludes(files.primitives, "return <AdminModal", "AdminFormModal must build on the shared AdminModal wrapper.");
+requireIncludes(files.primitives, 'export type AdminModalSize = "sm" | "md" | "lg" | "xl";', "AdminModal must expose sm/md/lg/xl product sizes.");
+requireIncludes(files.primitives, 'export type AdminModalPreset = "form" | "detail" | "confirm";', "AdminModal must expose form/detail/confirm product presets.");
+requireIncludes(files.primitives, "const ADMIN_MODAL_SIZE_WIDTH: Record<AdminModalSize, number>", "AdminModal must centralize product width tokens.");
+requireIncludes(files.primitives, "const ADMIN_MODAL_PRESET_SIZE: Record<AdminModalPreset, AdminModalSize>", "AdminModal presets must resolve through the shared size scale.");
+requireRegex(files.primitives, /<Modal[\s\S]*className=\{cx\("admin-modal"[\s\S]*`admin-modal-size-\$\{resolvedSize\}`[\s\S]*preset && `admin-modal-preset-\$\{preset\}`[\s\S]*width=\{resolvedWidth\}/, "AdminModal must remain the single Ant Modal boundary with productized size and preset classes.");
+requireRegex(files.primitives, /export function AdminFormModal[\s\S]*return \([\s\S]*<AdminModal/, "AdminFormModal must build on the shared AdminModal wrapper.");
+requireIncludes(files.primitives, 'preset = "form"', "AdminFormModal must default to the shared form preset.");
+requireCssRule(files.styles, ".admin-modal", ["top: var(--admin-modal-top, 24px);", "max-width: calc(100vw - 32px);", "padding-bottom: 0;"], "AdminModal shell must centralize top spacing and viewport width.");
+requireCssRule(files.styles, ".admin-modal .ant-modal-content", ["display: flex;", "max-height: calc(100dvh - var(--admin-modal-viewport-gap, 48px));", "flex-direction: column;", "overflow: hidden;"], "AdminModal content must stay bounded within the viewport.");
+requireCssRule(files.styles, ".admin-modal .ant-modal-body", ["flex: 1 1 auto;", "min-height: 0;", "overflow: auto;", "overscroll-behavior: contain;"], "AdminModal body must own viewport-bounded scrolling.");
+requireCssRule(files.styles, ".admin-modal .ant-modal-footer", ["display: flex;", "justify-content: flex-end;", "gap: 8px;"], "AdminModal footer must align actions consistently.");
+requireCssRule(mobileStyles, ".admin-modal", ["top: 12px;", "width: calc(100vw - 24px) !important;", "max-width: calc(100vw - 24px);"], "Mobile AdminModal must use full-width viewport rules.");
+requireCssRule(mobileStyles, ".admin-modal .ant-modal-footer", ["display: grid;", "grid-template-columns: minmax(0, 1fr);"], "Mobile AdminModal footer must stack actions full width.");
+requireCssRule(mobileStyles, ".admin-modal .ant-modal-footer .ant-btn", ["width: 100%;", "margin-inline-start: 0;"], "Mobile AdminModal buttons must fill the footer width.");
 requireIncludes(files.roleGovernance, "AdminModal", "Role governance dialogs must use the shared AdminModal wrapper.");
 requireNotIncludes(files.roleGovernance, "<Modal", "Role governance must not bypass the shared AdminModal wrapper.");
+requireIncludes(files.shell, "AdminModal", "Profile editor dialogs must use the shared AdminModal wrapper.");
+requireNotIncludes(files.shell, "<Modal", "Profile editor must not bypass the shared AdminModal wrapper.");
+requireIncludes(files.policyReview, "AdminModal", "Policy review dialogs must use the shared AdminModal wrapper.");
+requireNotIncludes(files.policyReview, "<Modal", "Policy review must not bypass the shared AdminModal wrapper.");
+requireIncludes(files.resourceConsole, "AdminModal", "Generic resource dialogs must use the shared AdminModal wrapper.");
+requireNotIncludes(files.resourceConsole, "<Modal", "Generic resource dialogs must not bypass the shared AdminModal wrapper.");
+requireIncludes(files.sensitiveRevealModal, "AdminModal", "Sensitive reveal dialogs must use the shared AdminModal wrapper.");
+requireNotIncludes(files.sensitiveRevealModal, "<Modal", "Sensitive reveal dialogs must not bypass the shared AdminModal wrapper.");
 requireIncludes(files.roleGovernance, "role-governance-action-groups", "Role governance actions must be grouped by authorization and lifecycle responsibility.");
 requireIncludes(files.roleGovernance, "roleGovernanceAuthorizationActions", "Role governance authorization actions must have a localized group label.");
 requireIncludes(files.roleGovernance, "roleGovernanceLifecycleActions", "Role governance lifecycle actions must have a localized group label.");
@@ -748,10 +802,27 @@ requireCountAtLeast(files.capabilityConsole, "openCapabilityDetail(capability.id
 requireIncludes(files.capabilityConsole, 'className="capability-detail-modal"', "Capability detail must render in a modal card.");
 requireIncludes(files.capabilityConsole, "<CapabilityInspector", "Capability detail modal must reuse the capability inspector content.");
 requireNotIncludes(files.capabilityConsole, "<aside className=\"capability-inspector\"", "Capability console must not restore a permanent right-side detail inspector.");
+requireIncludes(files.client, "adminResources?: CapabilityResourceContribution[];", "Capability API items must expose admin resource contributions.");
+requireIncludes(files.client, "menuRoutes?: CapabilityMenuContribution[];", "Capability API items must expose menu route contributions.");
+requireIncludes(files.client, "configResources?: CapabilityResourceContribution[];", "Capability API items must expose configuration resource contributions.");
+requireIncludes(files.client, "serviceOperations?: string[];", "Capability API items must expose service operation contributions.");
+requireIncludes(files.client, "authProviders?: string[];", "Capability API items must expose auth provider contributions.");
+requireIncludes(files.capabilityMetadata, "configResources: item.configResources ?? metadata.configResources ?? []", "Capability enrichment must preserve config resource contribution metadata with metadata fallback.");
+requireIncludes(files.capabilityMetadata, 'makeOptional("notification"', "Optional notification capability must keep pre-install impact metadata.");
+requireIncludes(files.capabilityMetadata, 'menuContribution("/message-center"', "Optional notification capability must preview the message-center route before installation.");
+requireIncludes(files.capabilityMetadata, 'resourceContribution("notification-channels"', "Optional notification capability must preview channel configuration before installation.");
+requireIncludes(files.capabilityMetadata, 'resourceContribution("notification-providers"', "Optional notification capability must preview provider configuration before installation.");
+requireIncludes(files.capabilityMetadata, 'resourceContribution("notification-send-policies"', "Optional notification capability must preview send-policy configuration before installation.");
+requireIncludes(files.capabilityConsole, "dictionary.capabilityInstallImpact", "Capability detail must explain install/disable impact.");
+requireIncludes(files.capabilityConsole, "dictionary.capabilityRestartActivationHint", "Capability detail must tell users capability changes require restart in v1.");
+requireIncludes(files.capabilityConsole, "dictionary.capabilityConfigResources", "Capability detail must show contributed configuration resources.");
+requireIncludes(files.capabilityConsole, "dictionary.capabilityPermissions", "Capability detail must show contributed permissions.");
+requireIncludes(files.capabilityConsole, "dictionary.capabilityServiceOperations", "Capability detail must show contributed service operations.");
+requireIncludes(files.capabilityConsole, "dictionary.capabilityAuthProviders", "Capability detail must show contributed auth providers.");
 
-requireIncludes(files.shell, "SystemSettingsDrawer", "AdminShell must expose account/system settings through the shared drawer.");
+requireIncludes(files.shell, "SystemSettingsDrawer", "AdminShell must expose interface preferences through the shared drawer.");
 requireIncludes(files.shell, "profile-menu-trigger", "AdminShell must keep the personal profile trigger in the topbar.");
-requireIncludes(files.shell, "settings-trigger-button", "AdminShell must keep a separate system settings trigger in the topbar.");
+requireIncludes(files.shell, "settings-trigger-button", "AdminShell must keep a separate interface-preference trigger in the topbar.");
 requireOrder(files.shell, 'className="topbar-icon-button settings-trigger-button"', 'className="profile-menu-trigger"', "AdminShell must keep the profile avatar as the right-most topbar action.");
 requireIncludes(files.shell, 'trigger={["click"]}', "Profile dropdown must be click-triggered.");
 requireNotIncludes(files.shell, 'trigger={["click", "hover"]}', "Profile dropdown must not open on hover.");

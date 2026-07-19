@@ -20,7 +20,7 @@ func TestBootstrapDevelopmentOrganizationRBAC(t *testing.T) {
 	now := time.Date(2026, 7, 17, 10, 0, 0, 0, time.UTC)
 	cfg := developmentOrganizationRBACConfig(t)
 
-	report, err := BootstrapDevelopmentOrganizationRBAC(ctx, cfg, core.DefaultManifests(), nil, now)
+	report, err := BootstrapDevelopmentOrganizationRBAC(ctx, cfg, core.DefaultManifests(), testDataProtectionRuntime(t), now)
 	if err != nil {
 		t.Fatalf("BootstrapDevelopmentOrganizationRBAC() error = %v", err)
 	}
@@ -32,7 +32,7 @@ func TestBootstrapDevelopmentOrganizationRBAC(t *testing.T) {
 	assertDevelopmentOrganizationRBACTargetMenus(t, cfg)
 	assertDevelopmentOrganizationRBACAPIStartup(t, cfg)
 
-	replayed, err := BootstrapDevelopmentOrganizationRBAC(ctx, cfg, core.DefaultManifests(), nil, now.Add(time.Minute))
+	replayed, err := BootstrapDevelopmentOrganizationRBAC(ctx, cfg, core.DefaultManifests(), testDataProtectionRuntime(t), now.Add(time.Minute))
 	if err != nil {
 		t.Fatalf("BootstrapDevelopmentOrganizationRBAC(replay) error = %v", err)
 	}
@@ -63,7 +63,7 @@ func TestBootstrapDevelopmentOrganizationRBACRejectsUnsafeInputs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := developmentOrganizationRBACConfig(t)
 			tc.configure(&cfg)
-			if report, err := BootstrapDevelopmentOrganizationRBAC(context.Background(), cfg, core.DefaultManifests(), nil, now); err == nil {
+			if report, err := BootstrapDevelopmentOrganizationRBAC(context.Background(), cfg, core.DefaultManifests(), testDataProtectionRuntime(t), now); err == nil {
 				t.Fatalf("BootstrapDevelopmentOrganizationRBAC() = %+v, nil error; want rejection", report)
 			}
 		})
@@ -95,7 +95,7 @@ func TestBootstrapDevelopmentOrganizationRBACRejectsNonEmptyUnbootstrappedDataba
 		t.Fatal(err)
 	}
 
-	_, err = BootstrapDevelopmentOrganizationRBAC(ctx, cfg, core.DefaultManifests(), nil, time.Date(2026, 7, 17, 10, 0, 0, 0, time.UTC))
+	_, err = BootstrapDevelopmentOrganizationRBAC(ctx, cfg, core.DefaultManifests(), testDataProtectionRuntime(t), time.Date(2026, 7, 17, 10, 0, 0, 0, time.UTC))
 	if err == nil || !strings.Contains(err.Error(), "empty development database") {
 		t.Fatalf("BootstrapDevelopmentOrganizationRBAC(non-empty) error = %v, want empty database rejection", err)
 	}
@@ -117,7 +117,7 @@ func TestBootstrapDevelopmentOrganizationRBACRejectsPartialBootstrapState(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := adminresource.NewRepositoryBackedStoreFromCapabilitiesWithProtection(repository, core.DefaultManifests(), nil)
+	store, err := adminresource.NewRepositoryBackedStoreFromCapabilitiesWithProtection(repository, core.DefaultManifests(), testDataProtectionRuntime(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestBootstrapDevelopmentOrganizationRBACRejectsPartialBootstrapState(t *tes
 		t.Fatal(err)
 	}
 
-	_, err = BootstrapDevelopmentOrganizationRBAC(ctx, cfg, core.DefaultManifests(), nil, time.Date(2026, 7, 17, 10, 0, 0, 0, time.UTC))
+	_, err = BootstrapDevelopmentOrganizationRBAC(ctx, cfg, core.DefaultManifests(), testDataProtectionRuntime(t), time.Date(2026, 7, 17, 10, 0, 0, 0, time.UTC))
 	if err == nil || !strings.Contains(err.Error(), "completed bootstrap state") {
 		t.Fatalf("BootstrapDevelopmentOrganizationRBAC(partial) error = %v, want completed state rejection", err)
 	}
@@ -208,7 +208,7 @@ func assertDevelopmentOrganizationRBACTargetMenus(t *testing.T, cfg config.Confi
 
 func assertDevelopmentOrganizationRBACAPIStartup(t *testing.T, cfg config.Config) {
 	t.Helper()
-	resources, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), nil)
+	resources, err := AdminResourcesFromConfig(cfg, core.DefaultManifests(), testDataProtectionRuntime(t))
 	if err != nil {
 		t.Fatalf("AdminResourcesFromConfig(target) error = %v", err)
 	}

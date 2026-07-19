@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GnosiST/platform-go/internal/platform/core"
 	"github.com/GnosiST/platform-go/internal/platform/storage"
 	"gorm.io/gorm"
 )
@@ -499,7 +498,7 @@ func TestGORMBackedStorePersistsRolePermissionsForDynamicMenus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewGORMAdminResourceRepository() error = %v", err)
 	}
-	store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	store, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 	if err != nil {
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
 	}
@@ -512,7 +511,7 @@ func TestGORMBackedStorePersistsRolePermissionsForDynamicMenus(t *testing.T) {
 		t.Fatalf("Update(role-operator) error = %v", err)
 	}
 
-	reloaded, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	reloaded, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 	if err != nil {
 		t.Fatalf("reload store error = %v", err)
 	}
@@ -540,7 +539,7 @@ func TestStoreMaterializeCapabilitySeedsInitializesEmptyGORMRepository(t *testin
 	if err != nil {
 		t.Fatalf("NewGORMAdminResourceRepository() error = %v", err)
 	}
-	store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	store, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 	if err != nil {
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
 	}
@@ -583,7 +582,7 @@ func TestStoreMaterializeCapabilitySeedsInitializesEmptyGORMRepository(t *testin
 	if replayed.Revision != loaded.Revision || !reflect.DeepEqual(replayed.Resources, loaded.Resources) {
 		t.Fatalf("replayed snapshot = %#v, want unchanged %#v", replayed, loaded)
 	}
-	reloaded, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	reloaded, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 	if err != nil {
 		t.Fatalf("reload materialized store error = %v", err)
 	}
@@ -607,7 +606,7 @@ func TestStoreMaterializeCapabilitySeedsLeavesNonEmptyGORMRepository(t *testing.
 	if err := db.Create(&existing).Error; err != nil {
 		t.Fatalf("Create(existing) error = %v", err)
 	}
-	store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	store, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 	if err != nil {
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
 	}
@@ -690,7 +689,7 @@ func TestGORMOrganizationRBACRepositoryExcludesGenericCapabilitySeeds(t *testing
 	if err != nil {
 		t.Fatalf("NewGORMAdminResourceRepository() error = %v", err)
 	}
-	store, err := NewRepositoryBackedStoreFromCapabilities(repository.WithOrganizationRBACOwnership(), core.DefaultManifests())
+	store, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository.WithOrganizationRBACOwnership())
 	if err != nil {
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
 	}

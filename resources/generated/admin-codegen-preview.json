@@ -195,7 +195,6 @@
       "admin:session:create",
       "admin:session:read",
       "admin:session:update",
-      "admin:settings:create",
       "admin:settings:read",
       "admin:settings:update",
       "admin:tenant:create",

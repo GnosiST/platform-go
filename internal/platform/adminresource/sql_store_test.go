@@ -11,8 +11,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/GnosiST/platform-go/internal/platform/core"
 )
 
 func TestSQLAdminResourceRepositoryPersistsSnapshots(t *testing.T) {
@@ -98,7 +96,7 @@ func TestSQLBackedStorePersistsRolePermissionsForDynamicMenus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLAdminResourceRepository() error = %v", err)
 	}
-	store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	store, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 	if err != nil {
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
 	}
@@ -111,7 +109,7 @@ func TestSQLBackedStorePersistsRolePermissionsForDynamicMenus(t *testing.T) {
 		t.Fatalf("Update(role-operator) error = %v", err)
 	}
 
-	reloaded, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	reloaded, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 	if err != nil {
 		t.Fatalf("reload store error = %v", err)
 	}

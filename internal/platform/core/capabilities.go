@@ -25,11 +25,11 @@ func DefaultManifests() []capability.Manifest {
 			authProvider("phone-sms-otp", "credential-sms-otp", "短信验证码", "SMS Code", "使用手机号和短信验证码登录管理台。", "Sign in to Admin with phone and SMS code.", false, []capability.AuthProviderAudience{capability.AuthProviderAudienceAdmin}, "PLATFORM_CREDENTIAL_AUTH_PHONE_SMS_OTP", "PLATFORM_NOTIFICATION_SMS_PROVIDER", "PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID"),
 		}, Migrations: lifecycleMigrations("credential-auth"), Seeds: lifecycleSeeds("credential-auth")},
 		{ID: "app-phone", Name: "App Phone", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "audit"}, Admin: adminSurface(appPhoneVerificationAdminResource(), appPhoneBindingAdminResource()), App: appSurface(appRoute("POST", "/api/app/identity/phone-verifications", capability.AppRouteAuthSession, "", "创建 App 手机验证码。", "Create app phone verification."), appRoute("POST", "/api/app/identity/phone-bindings", capability.AppRouteAuthSession, "", "绑定 App 手机号。", "Bind app phone number.")), Migrations: lifecycleMigrations("app-phone"), Seeds: lifecycleSeeds("app-phone")},
-		{ID: "notification", Name: "Notification", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity", "audit"}, Admin: adminSurface(notificationTemplateAdminResource(), notificationAdminResource(), notificationDeliveryAdminResource()), Service: notificationServiceSurface(), Migrations: lifecycleMigrations("notification"), Seeds: lifecycleSeeds("notification")},
+		{ID: "notification", Name: "Notification", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity", "audit"}, Admin: adminSurface(messageCenterAdminResource(), notificationChannelAdminResource(), notificationProviderAdminResource(), notificationSendPolicyAdminResource(), notificationTemplateAdminResource(), notificationAdminResource(), notificationDeliveryAdminResource()), Service: notificationServiceSurface(), Migrations: lifecycleMigrations("notification"), Seeds: lifecycleSeeds("notification")},
 		{ID: "job", Name: "Job", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity", "audit"}, Admin: adminSurface(jobDefinitionAdminResource(), jobRunAdminResource(), jobRunAttemptAdminResource()), Migrations: lifecycleMigrations("job"), Seeds: lifecycleSeeds("job")},
 		{ID: "personnel", Name: "Personnel", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity", "dictionary"}, Admin: adminSurface(personnelProfileAdminResource(), positionAdminResource(), positionAssignmentAdminResource()), Migrations: lifecycleMigrations("personnel"), Seeds: lifecycleSeeds("personnel")},
 		{ID: "dictionary", Name: "Dictionary", Version: "0.1.0", Admin: adminSurface(dictionaryAdminResource(), dictionaryParameterAdminResource(), areaCodeAdminResource()), Migrations: lifecycleMigrations("dictionary"), Seeds: lifecycleSeeds("dictionary")},
-		{ID: "parameter", Name: "Parameter", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "audit"}, Admin: adminSurface(parameterAdminResource(), brandingAdminResource(), adminResource("settings", "设置", "Settings", "平台配置和品牌设置。", "Platform configuration and branding.", "admin:settings", "/settings", "security", "settings", 310)), Migrations: lifecycleMigrations("parameter"), Seeds: lifecycleSeeds("parameter")},
+		{ID: "parameter", Name: "Parameter", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "audit"}, Admin: adminSurface(parameterAdminResource(), brandingAdminResource(), settingsAdminResource()), Migrations: lifecycleMigrations("parameter"), Seeds: lifecycleSeeds("parameter")},
 		{ID: "file-storage", Name: "File Storage", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity", "parameter", "audit"}, Admin: adminSurface(fileStorageAdminResource()), App: appSurface(appRoute("POST", "/api/app/files", capability.AppRouteAuthSession, "", "上传 App 文件。", "Upload app file."), appRoute("GET", "/api/app/files/:id/content", capability.AppRouteAuthSession, "", "读取 App 文件内容。", "Read app file content.")), Service: fileStorageServiceSurface(), Migrations: lifecycleMigrations("file-storage"), Seeds: lifecycleSeeds("file-storage")},
 		{ID: "admin-shell", Name: "Admin Shell", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "rbac", "menu"}, Admin: adminSurface(adminResource("capabilities", "能力清单", "Capabilities", "查看当前平台启用的能力包。", "View enabled platform capability packages.", "admin:capability", "/capabilities", "foundation", "capabilities", 20), adminResource("overview", "概览", "Overview", "平台底座运行概览。", "Platform foundation overview.", "admin:overview", "/overview", "foundation", "overview", 10)), Migrations: lifecycleMigrations("admin-shell"), Seeds: lifecycleSeeds("admin-shell")},
 		{ID: "demo-data", Name: "Demo Data", Version: "0.1.0", Dependencies: []capability.ID{"admin-shell", "tenant"}, Admin: adminSurface(demoDataAdminResource()), Migrations: lifecycleMigrations("demo-data"), Seeds: lifecycleSeeds("demo-data"), DemoData: platformDemoDataSets()},
@@ -47,14 +47,14 @@ func adminSurface(resources ...capability.AdminResource) capability.AdminSurface
 func coreDeletionPolicy(resource string) *capability.AdminResourceDeletionPolicy {
 	policy := &capability.AdminResourceDeletionPolicy{PolicyVersion: 1}
 	switch resource {
-	case "api-docs", "branding", "capabilities", "demo-data", "overview", "settings":
+	case "api-docs", "branding", "capabilities", "demo-data", "message-center", "overview", "settings":
 		policy.Mode = capability.AdminDeletionDisabled
 	case "app-phone-verifications", "audit-logs", "error-logs", "job-run-attempts", "job-runs", "login-logs", "notification-deliveries", "policy-reviews", "versions":
 		policy.Mode = capability.AdminDeletionAppendOnly
 	case "api-resources", "area-codes", "dictionaries", "permissions":
 		policy.Mode = capability.AdminDeletionRestrict
 		policy.RestrictReferences = true
-	case "dictionary-parameters", "job-definitions", "menus", "monitoring", "notification-templates", "notifications", "org-units", "parameters", "personnel-profiles", "position-assignments", "positions", "role-groups", "roles", "tenants", "users":
+	case "dictionary-parameters", "job-definitions", "menus", "monitoring", "notification-channels", "notification-providers", "notification-send-policies", "notification-templates", "notifications", "org-units", "parameters", "personnel-profiles", "position-assignments", "positions", "role-groups", "roles", "tenants", "users":
 		policy.Mode = capability.AdminDeletionSoftDelete
 		policy.RestrictReferences = true
 	case "admin-identities", "app-identities", "app-phone-bindings", "sessions":
@@ -570,13 +570,110 @@ func positionAssignmentAdminResource() capability.AdminResource {
 	}
 }
 
+func messageCenterAdminResource() capability.AdminResource {
+	return capability.AdminResource{
+		Resource:         "message-center",
+		Title:            capability.Text("消息中心", "Message Center"),
+		Description:      capability.Text("消息中心工作台入口，用于统一呈现渠道状态、供应商配置、模板、策略与投递概览。", "Message center workbench entry for channel status, provider configuration, templates, policies, and delivery overview."),
+		PermissionPrefix: "admin:message-center",
+		ReadOnly:         true,
+		Menu:             capability.AdminMenu{Route: "/message-center", Parent: "operations", Group: "operations", Icon: "audit", Order: 374, Cache: true},
+	}
+}
+
+func notificationChannelAdminResource() capability.AdminResource {
+	return capability.AdminResource{
+		Resource:         "notification-channels",
+		Title:            capability.Text("消息渠道", "Notification Channels"),
+		Description:      capability.Text("通用消息渠道配置，声明站内、短信、邮箱和微信类渠道的启用状态、默认供应商和发送限额。", "Generic notification channel configuration for in-app, SMS, email, and WeChat channels with provider defaults and sending limits."),
+		PermissionPrefix: "admin:notification-channel",
+		Menu:             capability.AdminMenu{Route: "/notification-channels", Parent: "configuration", Group: "governance", Icon: "settings", Order: 375, Cache: true},
+		Fields: []capability.AdminField{
+			adminField("code", "渠道编码", "Channel Code", "text", "record", true, false, true, true, true, true, 180, nil),
+			adminField("name", "渠道名称", "Channel Name", "text", "record", true, false, true, true, true, true, 180, nil),
+			relationAdminField(adminField("tenantCode", "租户", "Tenant", "select", "values", false, false, true, true, true, true, 150, nil), adminFieldRelation("tenants", "code", "name", false, enabledAdminRelationFilter())),
+			adminField("channel", "消息渠道", "Channel", "select", "values", true, false, true, true, true, true, 150, notificationChannelOptions()),
+			relationAdminField(adminField("defaultProviderCode", "默认供应商", "Default Provider", "select", "values", false, false, true, true, true, true, 180, nil), adminFieldRelation("notification-providers", "code", "name", false, enabledAdminRelationFilter())),
+			adminField("enabled", "是否启用", "Enabled", "switch", "values", false, false, true, true, true, true, 110, nil),
+			adminField("rateLimitPerMinute", "每分钟限额", "Rate Limit / Minute", "number", "values", false, false, true, true, true, true, 130, nil),
+			adminField("dailyQuota", "每日限额", "Daily Quota", "number", "values", false, false, true, true, true, true, 120, nil),
+			adminField("status", "状态", "Status", "select", "record", false, false, true, true, true, true, 120, enabledDisabledOptions()),
+			adminField("description", "说明", "Description", "textarea", "record", false, false, false, false, true, true, 260, nil),
+			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
+		},
+		SearchFields:   []string{"name", "code", "status", "description", "tenantCode", "channel", "defaultProviderCode"},
+		DefaultSortKey: "updatedAt",
+	}
+}
+
+func notificationProviderAdminResource() capability.AdminResource {
+	return capability.AdminResource{
+		Resource:         "notification-providers",
+		Title:            capability.Text("消息供应商", "Notification Providers"),
+		Description:      capability.Text("消息供应商账号配置入口。短信 P0 覆盖阿里云、腾讯云和 mock-local，邮箱 P0 覆盖通用 SMTP，微信类先提供配置合同和产品位。", "Notification provider account configuration. SMS P0 covers Aliyun, Tencent Cloud, and mock-local; email P0 covers generic SMTP; WeChat channels provide configuration contracts and product placeholders."),
+		PermissionPrefix: "admin:notification-provider",
+		Menu:             capability.AdminMenu{Route: "/notification-providers", Parent: "configuration", Group: "governance", Icon: "settings", Order: 376, Cache: true},
+		Fields: []capability.AdminField{
+			adminField("code", "供应商编码", "Provider Code", "text", "record", true, false, true, true, true, true, 180, nil),
+			adminField("name", "供应商名称", "Provider Name", "text", "record", true, false, true, true, true, true, 180, nil),
+			relationAdminField(adminField("tenantCode", "租户", "Tenant", "select", "values", false, false, true, true, true, true, 150, nil), adminFieldRelation("tenants", "code", "name", false, enabledAdminRelationFilter())),
+			adminField("channel", "消息渠道", "Channel", "select", "values", true, false, true, true, true, true, 150, notificationChannelOptions()),
+			adminField("provider", "供应商", "Provider", "select", "values", true, false, true, true, true, true, 160, notificationProviderOptions()),
+			adminField("accountName", "账号名称", "Account Name", "text", "values", false, false, true, true, true, true, 180, nil),
+			adminField("endpoint", "服务地址", "Endpoint", "text", "values", false, false, true, true, true, true, 220, nil),
+			adminField("region", "区域", "Region", "text", "values", false, false, true, true, true, true, 120, nil),
+			adminField("senderId", "发送标识", "Sender ID", "text", "values", false, false, true, true, true, true, 150, nil),
+			adminField("templateNamespace", "模板命名空间", "Template Namespace", "text", "values", false, false, true, true, true, true, 180, nil),
+			adminField("credentialStatus", "凭据状态", "Credential Status", "select", "values", false, true, true, true, false, true, 130, notificationCredentialStatusOptions()),
+			encryptedSecretAdminField(adminField("accessKey", "访问 Key", "Access Key", "text", "values", false, false, false, false, true, false, 220, nil)),
+			encryptedSecretAdminField(adminField("accessSecret", "访问密钥", "Access Secret", "text", "values", false, false, false, false, true, false, 220, nil)),
+			encryptedSecretAdminField(adminField("appSecret", "应用密钥", "App Secret", "text", "values", false, false, false, false, true, false, 220, nil)),
+			encryptedSecretAdminField(adminField("webhookSecret", "Webhook 密钥", "Webhook Secret", "text", "values", false, false, false, false, true, false, 220, nil)),
+			adminField("status", "状态", "Status", "select", "record", false, false, true, true, true, true, 120, enabledDisabledOptions()),
+			adminField("description", "说明", "Description", "textarea", "record", false, false, false, false, true, true, 260, nil),
+			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
+		},
+		SearchFields:   []string{"name", "code", "status", "description", "tenantCode", "channel", "provider", "accountName", "endpoint", "region", "senderId", "templateNamespace", "credentialStatus"},
+		DefaultSortKey: "updatedAt",
+		Protection:     &capability.AdminResourceProtection{SchemaVersion: 1, Scope: "global"},
+	}
+}
+
+func notificationSendPolicyAdminResource() capability.AdminResource {
+	return capability.AdminResource{
+		Resource:         "notification-send-policies",
+		Title:            capability.Text("发送策略", "Send Policies"),
+		Description:      capability.Text("通用消息发送策略，声明渠道、供应商选择、重试、频控和静默窗口，供平台能力和业务能力复用。", "Generic notification send policies for channel/provider selection, retries, rate limits, and quiet windows reused by platform and business capabilities."),
+		PermissionPrefix: "admin:notification-send-policy",
+		Menu:             capability.AdminMenu{Route: "/notification-send-policies", Parent: "configuration", Group: "governance", Icon: "settings", Order: 377, Cache: true},
+		Fields: []capability.AdminField{
+			adminField("code", "策略编码", "Policy Code", "text", "record", true, false, true, true, true, true, 180, nil),
+			adminField("name", "策略名称", "Policy Name", "text", "record", true, false, true, true, true, true, 180, nil),
+			relationAdminField(adminField("tenantCode", "租户", "Tenant", "select", "values", false, false, true, true, true, true, 150, nil), adminFieldRelation("tenants", "code", "name", false, enabledAdminRelationFilter())),
+			adminField("channel", "消息渠道", "Channel", "select", "values", true, false, true, true, true, true, 150, notificationChannelOptions()),
+			relationAdminField(adminField("templateCode", "通知模板", "Template", "select", "values", false, false, true, true, true, true, 180, nil), adminFieldRelation("notification-templates", "code", "name", false, enabledAdminRelationFilter())),
+			relationAdminField(adminField("providerCode", "供应商", "Provider", "select", "values", false, false, true, true, true, true, 180, nil), adminFieldRelation("notification-providers", "code", "name", false, enabledAdminRelationFilter())),
+			adminField("selectionMode", "选择模式", "Selection Mode", "select", "values", false, false, true, true, true, true, 140, notificationProviderSelectionOptions()),
+			adminField("maxAttempts", "最大尝试", "Max Attempts", "number", "values", false, false, true, true, true, true, 110, nil),
+			adminField("retryIntervalSeconds", "重试间隔秒", "Retry Interval Seconds", "number", "values", false, false, true, true, true, true, 140, nil),
+			adminField("rateLimitPerMinute", "每分钟限额", "Rate Limit / Minute", "number", "values", false, false, true, true, true, true, 130, nil),
+			adminField("quietHours", "静默窗口", "Quiet Hours", "text", "values", false, false, true, true, true, true, 160, nil),
+			adminField("status", "状态", "Status", "select", "record", false, false, true, true, true, true, 120, enabledDisabledOptions()),
+			adminField("description", "说明", "Description", "textarea", "record", false, false, false, false, true, true, 260, nil),
+			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
+		},
+		SearchFields:   []string{"name", "code", "status", "description", "tenantCode", "channel", "templateCode", "providerCode", "selectionMode", "quietHours"},
+		DefaultSortKey: "updatedAt",
+	}
+}
+
 func notificationTemplateAdminResource() capability.AdminResource {
 	return capability.AdminResource{
 		Resource:         "notification-templates",
 		Title:            capability.Text("通知模板", "Notification Templates"),
 		Description:      capability.Text("站内通知模板，供平台能力和业务能力复用。", "In-app notification templates reused by platform and business capabilities."),
 		PermissionPrefix: "admin:notification-template",
-		Menu:             capability.AdminMenu{Route: "/notification-templates", Parent: "operations", Group: "operations", Icon: "audit", Order: 380, Cache: true},
+		Menu:             capability.AdminMenu{Route: "/notification-templates", Parent: "configuration", Group: "governance", Icon: "audit", Order: 380, Cache: true},
 		Fields: []capability.AdminField{
 			adminField("code", "模板编码", "Template Code", "text", "record", true, false, true, true, true, true, 180, nil),
 			adminField("name", "模板名称", "Template Name", "text", "record", true, false, true, true, true, true, 180, nil),
@@ -1027,6 +1124,17 @@ func appPhoneBindingAdminResource() capability.AdminResource {
 	}
 }
 
+func settingsAdminResource() capability.AdminResource {
+	return capability.AdminResource{
+		Resource:         "settings",
+		Title:            capability.Text("系统设置", "System Settings"),
+		Description:      capability.Text("系统级配置、品牌、参数和能力配置入口。", "System-level configuration, branding, parameters, and capability settings."),
+		PermissionPrefix: "admin:settings",
+		ReadOnly:         true,
+		Menu:             capability.AdminMenu{Route: "/settings", Parent: "configuration", Group: "governance", Icon: "settings", Order: 310, Cache: true},
+	}
+}
+
 func monitoringAdminResource() capability.AdminResource {
 	return capability.AdminResource{
 		Resource:         "monitoring",
@@ -1110,6 +1218,12 @@ func secureAdminField(field capability.AdminField, sensitivity string, storageMo
 	field.StorageMode = storageMode
 	field.ResponseMode = responseMode
 	field.ExportMode = exportMode
+	return field
+}
+
+func encryptedSecretAdminField(field capability.AdminField) capability.AdminField {
+	field = secureAdminField(field, capability.FieldSensitivitySecret, capability.FieldStorageEncrypted, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted)
+	field.Protection = &capability.AdminFieldProtection{Format: "aes-256-gcm-v1", Normalization: "raw-v1"}
 	return field
 }
 
@@ -1254,6 +1368,37 @@ func notificationChannelOptions() []capability.AdminFieldOption {
 	return []capability.AdminFieldOption{
 		adminFieldOption("in_app", "站内", "In-App"),
 		adminFieldOption("sms", "短信", "SMS"),
+		adminFieldOption("email", "邮箱", "Email"),
+		adminFieldOption("wechat_official", "微信公众号", "WeChat Official Account"),
+		adminFieldOption("wechat_miniapp", "微信小程序", "WeChat Mini Program"),
+	}
+}
+
+func notificationProviderOptions() []capability.AdminFieldOption {
+	return []capability.AdminFieldOption{
+		adminFieldOption("aliyun", "阿里云短信", "Aliyun SMS"),
+		adminFieldOption("tencent", "腾讯云短信", "Tencent Cloud SMS"),
+		adminFieldOption("mock-local", "本地模拟", "Mock Local"),
+		adminFieldOption("smtp", "SMTP 邮箱", "SMTP Email"),
+		adminFieldOption("wechat-official", "微信公众号", "WeChat Official Account"),
+		adminFieldOption("wechat-miniapp", "微信小程序", "WeChat Mini Program"),
+	}
+}
+
+func notificationCredentialStatusOptions() []capability.AdminFieldOption {
+	return []capability.AdminFieldOption{
+		adminFieldOption("missing", "未配置", "Missing"),
+		adminFieldOption("configured", "已配置", "Configured"),
+		adminFieldOption("rotating", "轮换中", "Rotating"),
+	}
+}
+
+func notificationProviderSelectionOptions() []capability.AdminFieldOption {
+	return []capability.AdminFieldOption{
+		adminFieldOption("default", "默认供应商", "Default Provider"),
+		adminFieldOption("fixed", "固定供应商", "Fixed Provider"),
+		adminFieldOption("failover", "故障切换", "Failover"),
+		adminFieldOption("disabled", "禁用发送", "Disabled"),
 	}
 }
 

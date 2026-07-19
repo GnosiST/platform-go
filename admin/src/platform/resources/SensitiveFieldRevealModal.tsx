@@ -1,5 +1,5 @@
 import { CheckCircleOutlined, CopyOutlined, EyeOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
-import { Button, Input, Modal, Radio, Select, Space, Tag, Typography } from "antd";
+import { Button, Input, Radio, Select, Space, Tag, Typography } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AdminAPIError,
@@ -16,7 +16,7 @@ import {
 } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
 import type { SensitiveRevealOIDCBeginInput, SensitiveRevealOIDCResume } from "../security/sensitiveRevealOIDC";
-import { AdminFeedback } from "../ui";
+import { AdminFeedback, AdminModal } from "../ui";
 
 type RevealPhase = "loading" | "choosing" | "redirecting" | "sms" | "verifying" | "revealed" | "expired" | "error";
 
@@ -343,11 +343,12 @@ export function SensitiveFieldRevealModal({
   );
 
   return (
-    <Modal
+    <AdminModal
       className="sensitive-reveal-modal"
       destroyOnHidden
       maskClosable={false}
       open={open}
+      preset="form"
       title={title}
       width={520}
       afterOpenChange={(nextOpen) => {
@@ -440,7 +441,7 @@ export function SensitiveFieldRevealModal({
         {phase === "expired" ? <AdminFeedback type="warning" message={dictionary.sensitiveRevealExpired} /> : null}
         {phase === "error" ? <AdminFeedback type="error" message={errorMessage || dictionary.sensitiveRevealVerificationFailed} /> : null}
       </div>
-    </Modal>
+    </AdminModal>
   );
 }
 

@@ -433,16 +433,105 @@ func (s *Server) capabilitiesList(ctx *gin.Context) {
 	if !s.authorize(ctx, "admin:capability:read") {
 		return
 	}
+	type resourceItem struct {
+		Resource         string                   `json:"resource"`
+		Title            capability.LocalizedText `json:"title"`
+		Route            string                   `json:"route,omitempty"`
+		PermissionPrefix string                   `json:"permissionPrefix,omitempty"`
+		ReadOnly         bool                     `json:"readOnly,omitempty"`
+	}
+	type menuItem struct {
+		Route      string                   `json:"route"`
+		Title      capability.LocalizedText `json:"title"`
+		Permission string                   `json:"permission,omitempty"`
+	}
 	type item struct {
-		ID      capability.ID `json:"id"`
-		Name    string        `json:"name"`
-		Version string        `json:"version"`
+		ID                capability.ID   `json:"id"`
+		Name              string          `json:"name"`
+		Version           string          `json:"version"`
+		Dependencies      []capability.ID `json:"dependencies,omitempty"`
+		AdminResources    []resourceItem  `json:"adminResources,omitempty"`
+		MenuRoutes        []menuItem      `json:"menuRoutes,omitempty"`
+		Permissions       []string        `json:"permissions,omitempty"`
+		ConfigResources   []resourceItem  `json:"configResources,omitempty"`
+		ServiceOperations []string        `json:"serviceOperations,omitempty"`
+		AuthProviders     []string        `json:"authProviders,omitempty"`
 	}
 	items := make([]item, 0, len(s.capabilities))
 	for _, manifest := range s.capabilities {
-		items = append(items, item{ID: manifest.ID, Name: manifest.Name, Version: manifest.Version})
+		next := item{
+			ID:                manifest.ID,
+			Name:              manifest.Name,
+			Version:           manifest.Version,
+			Dependencies:      append([]capability.ID(nil), manifest.Dependencies...),
+			ServiceOperations: capabilityServiceOperationIDs(manifest.Service.Operations),
+			AuthProviders:     capabilityAuthProviderIDs(manifest.AuthProviders),
+		}
+		for _, resource := range manifest.Admin.Resources {
+			resourceContribution := resourceItem{
+				Resource:         resource.Resource,
+				Title:            resource.Title,
+				Route:            resource.Menu.Route,
+				PermissionPrefix: resource.PermissionPrefix,
+				ReadOnly:         resource.ReadOnly,
+			}
+			next.AdminResources = append(next.AdminResources, resourceContribution)
+			next.Permissions = append(next.Permissions, capabilityAdminResourcePermissions(resource)...)
+			if resource.Menu.Route != "" {
+				next.MenuRoutes = append(next.MenuRoutes, menuItem{
+					Route:      resource.Menu.Route,
+					Title:      resource.Title,
+					Permission: resource.PermissionPrefix + ":read",
+				})
+			}
+			if isCapabilityConfigResource(resource) {
+				next.ConfigResources = append(next.ConfigResources, resourceContribution)
+			}
+		}
+		items = append(items, next)
 	}
 	ctx.JSON(http.StatusOK, Response[[]item]{Data: items})
+}
+
+func capabilityAdminResourcePermissions(resource capability.AdminResource) []string {
+	permissions := []string{resource.PermissionPrefix + ":read"}
+	if resource.ReadOnly {
+		return permissions
+	}
+	permissions = append(permissions, resource.PermissionPrefix+":create", resource.PermissionPrefix+":update")
+	if resource.Deletion != nil && resource.Deletion.Mode != capability.AdminDeletionDisabled {
+		permissions = append(permissions, resource.PermissionPrefix+":delete")
+	}
+	for _, action := range resource.Actions {
+		if action.Permission != "" {
+			permissions = append(permissions, action.Permission)
+		}
+	}
+	return permissions
+}
+
+func isCapabilityConfigResource(resource capability.AdminResource) bool {
+	return resource.Menu.Parent == "configuration" || resource.Resource == "settings"
+}
+
+func capabilityServiceOperationIDs(operations []capability.ServiceOperation) []string {
+	ids := make([]string, 0, len(operations))
+	for _, operation := range operations {
+		if operation.ID != "" {
+			ids = append(ids, operation.ID)
+		}
+	}
+	return ids
+}
+
+func capabilityAuthProviderIDs(providers []capability.AuthProvider) []string {
+	ids := make([]string, 0, len(providers))
+	for _, provider := range providers {
+		if provider.ID != "" {
+			ids = append(ids, provider.ID)
+		}
+	}
+	return ids
 }
 
 type pluginManagementStatusResponse struct {

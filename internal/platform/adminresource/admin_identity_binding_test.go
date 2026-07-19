@@ -264,7 +264,7 @@ func cloneIdentityAuditSnapshot(snapshot ResourceSnapshot) ResourceSnapshot {
 
 func newIdentityAuditStore(t *testing.T, repository AdminResourceRepository) *Store {
 	t.Helper()
-	store, err := NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	store, err := newRepositoryBackedStoreFromDefaultCapabilitiesForTest(t, repository)
 	if err != nil {
 		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
 	}

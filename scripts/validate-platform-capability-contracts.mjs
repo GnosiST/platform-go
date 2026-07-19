@@ -25,6 +25,20 @@ const allowedClassifications = new Set([
   "external-business-boundary",
 ]);
 const allowedSourceKinds = new Set(["core-manifest", "platform-extension-manifest", "external-business-boundary"]);
+const requiredNotificationChannels = ["in_app", "sms", "email", "wechat_official", "wechat_miniapp"];
+const requiredNotificationConfigResources = [
+  "notification-channels",
+  "notification-providers",
+  "notification-send-policies",
+  "notification-templates",
+];
+const requiredNotificationProviderFamilies = {
+  in_app: [],
+  sms: ["aliyun", "tencent", "mock-local"],
+  email: ["smtp"],
+  wechat_official: ["wechat-official"],
+  wechat_miniapp: ["wechat-miniapp"],
+};
 
 function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -52,6 +66,15 @@ function uniqueErrors(items, label) {
     seen.add(item);
   }
   return errors;
+}
+
+function requireIncludes(items, requiredItems, label, errors) {
+  const actual = new Set(values(items));
+  for (const item of requiredItems) {
+    if (!actual.has(item)) {
+      errors.push(`${label} must include ${item}`);
+    }
+  }
 }
 
 function relativeExistingPath(relativePath) {
@@ -226,6 +249,61 @@ function validateProfilePolicy(contract, context, errors) {
   }
 }
 
+function validateNotificationProductization(contract, errors) {
+  if (contract.id !== "notification") {
+    return;
+  }
+  const productization = contract.productization;
+  const prefix = "capability contract notification.productization";
+  if (!productization) {
+    errors.push(`${prefix} is required`);
+    return;
+  }
+  if (productization.workbenchRoute !== "/message-center") {
+    errors.push(`${prefix}.workbenchRoute must be /message-center`);
+  }
+  if (productization.settingsCenterRoute !== "/settings") {
+    errors.push(`${prefix}.settingsCenterRoute must be /settings`);
+  }
+  if (productization.settingsAggregation !== "dynamic-enabled-capability-config") {
+    errors.push(`${prefix}.settingsAggregation must be dynamic-enabled-capability-config`);
+  }
+  if (productization.adminEntryPolicy !== "single-workbench-plus-settings-center") {
+    errors.push(`${prefix}.adminEntryPolicy must be single-workbench-plus-settings-center`);
+  }
+  requireIncludes(productization.channels, requiredNotificationChannels, `${prefix}.channels`, errors);
+  requireIncludes(
+    productization.settingsConfigResources,
+    requiredNotificationConfigResources,
+    `${prefix}.settingsConfigResources`,
+    errors,
+  );
+  requireIncludes(contract.adminResources, requiredNotificationConfigResources, "capability contract notification.adminResources", errors);
+
+  const providerFamilies = new Map(values(productization.providerFamilies).map((family) => [family.channel, family]));
+  for (const [channel, providers] of Object.entries(requiredNotificationProviderFamilies)) {
+    const family = providerFamilies.get(channel);
+    if (!family) {
+      errors.push(`${prefix}.providerFamilies must include channel ${channel}`);
+      continue;
+    }
+    requireIncludes(family.providers, providers, `${prefix}.providerFamilies[${channel}].providers`, errors);
+    if (!family.runtimeStatus) {
+      errors.push(`${prefix}.providerFamilies[${channel}].runtimeStatus is required`);
+    }
+  }
+  const smsFamily = providerFamilies.get("sms");
+  if (!smsFamily?.productionPolicy?.includes("mock-local") || !smsFamily.productionPolicy.includes("development/test")) {
+    errors.push(`${prefix}.providerFamilies[sms].productionPolicy must mark mock-local as development/test only`);
+  }
+  if (!productization.credentialPolicy?.includes("encrypted") || !productization.credentialPolicy.includes("omitted")) {
+    errors.push(`${prefix}.credentialPolicy must require encrypted and omitted provider secrets`);
+  }
+  if (!productization.runtimeBoundary?.includes("follow-up runtime slices")) {
+    errors.push(`${prefix}.runtimeBoundary must keep concrete provider adapters as follow-up runtime slices`);
+  }
+}
+
 function validateContract(contract, context) {
   const errors = [];
   const prefix = `capability contract ${contract.id ?? "<missing>"}`;
@@ -270,6 +348,7 @@ function validateContract(contract, context) {
   if (contract.classification === "external-business-boundary" && contract.profilePolicy !== "business-external-only") {
     errors.push(`${prefix} external-business-boundary must use business-external-only profilePolicy`);
   }
+  validateNotificationProductization(contract, errors);
   return errors;
 }
 

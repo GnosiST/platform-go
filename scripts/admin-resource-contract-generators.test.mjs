@@ -1255,14 +1255,53 @@ describe("admin resource contract generators", () => {
         "tenant,identity,session,rbac,menu,api-resource,audit,wechat-login,dictionary,parameter,file-storage,notification,admin-shell,demo-data,system-admin",
     });
 
+    const workbench = contract.resources.find((resource) => resource.name === "message-center");
+    const channels = contract.resources.find((resource) => resource.name === "notification-channels");
+    const providers = contract.resources.find((resource) => resource.name === "notification-providers");
+    const sendPolicies = contract.resources.find((resource) => resource.name === "notification-send-policies");
     const templates = contract.resources.find((resource) => resource.name === "notification-templates");
     const notifications = contract.resources.find((resource) => resource.name === "notifications");
     const deliveries = contract.resources.find((resource) => resource.name === "notification-deliveries");
 
+    assert.ok(workbench, "expected message-center workbench resource");
+    assert.ok(channels, "expected notification-channels resource");
+    assert.ok(providers, "expected notification-providers resource");
+    assert.ok(sendPolicies, "expected notification-send-policies resource");
     assert.ok(templates, "expected notification-templates resource");
     assert.ok(notifications, "expected notifications resource");
     assert.ok(deliveries, "expected notification-deliveries resource");
+    assert.deepEqual(workbench.permissions, { read: "admin:message-center:read" });
+    assert.equal(workbench.menu.path, "/message-center");
+    assert.deepEqual(contract.schemas["message-center"].fields, []);
+    assert.deepEqual(
+      contract.routes.filter((route) => route.resource === "message-center").map((route) => `${route.method} ${route.path}`),
+      ["POST /api/admin/resources/message-center/query"],
+    );
+    assert.ok(contract.codegenBuckets.customWorkbench.includes("message-center"));
     assert.equal(notifications.permissions.read, "admin:notification:read");
+    assert.ok(contract.schemas["notification-channels"].fields.some((field) => field.key === "defaultProviderCode" && field.relation?.resource === "notification-providers"));
+    assert.ok(contract.schemas["notification-providers"].fields.some((field) => field.key === "tenantCode" && field.relation?.resource === "tenants"));
+    assert.ok(contract.schemas["notification-send-policies"].fields.some((field) => field.key === "providerCode" && field.relation?.resource === "notification-providers"));
+    for (const channelResource of ["notification-channels", "notification-providers", "notification-send-policies", "notification-templates", "notification-deliveries"]) {
+      const channelField = contract.schemas[channelResource].fields.find((field) => field.key === "channel");
+      assert.ok(channelField.options.some((option) => option.value === "in_app"));
+      assert.ok(channelField.options.some((option) => option.value === "sms"));
+      assert.ok(channelField.options.some((option) => option.value === "email"));
+      assert.ok(channelField.options.some((option) => option.value === "wechat_official"));
+      assert.ok(channelField.options.some((option) => option.value === "wechat_miniapp"));
+    }
+    const providerField = contract.schemas["notification-providers"].fields.find((field) => field.key === "provider");
+    for (const provider of ["aliyun", "tencent", "mock-local", "smtp", "wechat-official", "wechat-miniapp"]) {
+      assert.ok(providerField.options.some((option) => option.value === provider), `missing notification provider option ${provider}`);
+    }
+    for (const secretKey of ["accessKey", "accessSecret", "appSecret", "webhookSecret"]) {
+      const field = contract.schemas["notification-providers"].fields.find((candidate) => candidate.key === secretKey);
+      assert.equal(field.sensitivity, "secret");
+      assert.equal(field.storageMode, "encrypted");
+      assert.equal(field.responseMode, "omitted");
+      assert.equal(field.exportMode, "omitted");
+      assert.equal(field.protection?.format, "aes-256-gcm-v1");
+    }
     assert.ok(contract.schemas["notification-templates"].fields.some((field) => field.key === "tenantCode" && field.relation?.resource === "tenants"));
     assert.ok(contract.schemas.notifications.fields.some((field) => field.key === "tenantCode" && field.relation?.resource === "tenants"));
     assert.ok(contract.schemas.notifications.fields.some((field) => field.key === "templateCode" && field.relation?.resource === "notification-templates"));

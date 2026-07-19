@@ -208,10 +208,10 @@ export const coreResources: AdminResourceDefinition[] = [
     route: "/settings",
     parent: "configuration",
     cacheEnabled: true,
-    title: { zh: "设置", en: "Settings" },
-    description: { zh: "平台配置和品牌设置。", en: "Platform configuration and branding." },
+    title: { zh: "系统设置", en: "System Settings" },
+    description: { zh: "系统级配置、品牌、参数和能力配置入口。", en: "System-level configuration, branding, parameters, and capability settings." },
     permission: "admin:settings:read",
-    group: "security",
+    group: "governance",
     icon: "settings",
   },
 ];

@@ -31,13 +31,13 @@ import {
   UploadOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Alert, Avatar, Button, Drawer, Dropdown, Input, Modal, Space, Tag, Tooltip, Typography, type MenuProps } from "antd";
+import { Alert, Avatar, Button, Drawer, Dropdown, Input, Space, Tag, Tooltip, Typography, type MenuProps } from "antd";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type WheelEvent } from "react";
 import { getFrontendVersion, type AdminCurrentSession, type BrandingConfig } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
 import { themeTokens, type AdminLayoutMode, type ThemeName } from "../theme";
 import type { AdminResourceDefinition } from "../resources/registry";
-import { PlatformDropdownPanel, PlatformDropdownPlugin, SystemSettingsDrawer, type AdminUIConfig } from "../ui";
+import { AdminModal, PlatformDropdownPanel, PlatformDropdownPlugin, SystemSettingsDrawer, type AdminUIConfig } from "../ui";
 
 const HOME_ROUTE = "/overview";
 
@@ -98,6 +98,17 @@ const navParentOrder = [
   "business/support",
 ];
 
+const aggregatedWorkbenchChildRoutes = new Set([
+  "/branding",
+  "/parameters",
+  "/notification-channels",
+  "/notification-providers",
+  "/notification-send-policies",
+  "/notification-templates",
+  "/notifications",
+  "/notification-deliveries",
+]);
+
 export function AdminShell({
   resources,
   language,
@@ -132,26 +143,32 @@ export function AdminShell({
   const frontendVersionSignatureRef = useRef("");
   const activeResource = resources.find((resource) => resource.route === activeRoute) ?? resources[0];
   const resourcesByRoute = useMemo(() => new Map(resources.map((resource) => [resource.route, resource])), [resources]);
+  const navigationResources = useMemo(
+    () => resources.filter((resource) => !aggregatedWorkbenchChildRoutes.has(resource.route)),
+    [resources],
+  );
   const groupedResources = useMemo(
     () =>
       groupOrder
         .map((group) => ({
           group,
           label: dictionary[group],
-          resources: resources.filter((resource) => resource.group === group),
+          resources: navigationResources.filter((resource) => resource.group === group),
         }))
         .filter((group) => group.resources.length > 0),
-    [dictionary, resources],
+    [dictionary, navigationResources],
   );
-  const activeGroup = groupedResources.find((group) => group.resources.some((resource) => resource.route === activeRoute)) ?? groupedResources[0];
+  const activeGroup = groupedResources.find((group) => group.resources.some((resource) => resource.route === activeRoute))
+    ?? groupedResources.find((group) => group.group === activeResource?.group)
+    ?? groupedResources[0];
   const globalSearchResults = useMemo(() => {
     const normalizedQuery = globalSearchQuery.trim().toLowerCase();
     if (!normalizedQuery) return [];
-    return resources.filter((resource) =>
+    return navigationResources.filter((resource) =>
       [resource.name, resource.title.zh, resource.title.en, resource.description.zh, resource.description.en]
         .some((value) => value.toLowerCase().includes(normalizedQuery)),
     ).slice(0, 8);
-  }, [globalSearchQuery, resources]);
+  }, [globalSearchQuery, navigationResources]);
   const globalSearchMenuItems = globalSearchResults.length > 0
     ? globalSearchResults.map((resource) => ({ key: resource.route, label: resource.title[language] }))
     : [{ key: "__no_results__", label: dictionary.globalSearchNoResults, disabled: true }];
@@ -853,10 +870,11 @@ function ProfileEditorModal({
   ];
 
   return (
-    <Modal
+    <AdminModal
       className="profile-editor-modal"
       title={dictionary.editProfile}
       open={open}
+      size="xl"
       width={880}
       footer={[
         <Button key="close" onClick={onClose}>{dictionary.close}</Button>,
@@ -929,7 +947,7 @@ function ProfileEditorModal({
           <Typography.Text type="secondary">{dictionary.passwordActionUnavailable}</Typography.Text>
         </section>
       </div>
-    </Modal>
+    </AdminModal>
   );
 }
 

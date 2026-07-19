@@ -21,9 +21,9 @@ import (
 
 func TestAdminIdentityBindingProvisionResolveAndPersistHashesOnly(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "admin-resources.json")
-	store, err := adminresource.NewFileBackedStoreFromCapabilities(path, core.DefaultManifests())
+	store, err := adminresource.NewRepositoryBackedStoreFromCapabilitiesWithProtection(adminresource.NewFileAdminResourceRepository(path), core.DefaultManifests(), newHTTPTestDataProtectionRuntime())
 	if err != nil {
-		t.Fatalf("NewFileBackedStoreFromCapabilities() error = %v", err)
+		t.Fatalf("NewRepositoryBackedStoreFromCapabilitiesWithProtection() error = %v", err)
 	}
 	createdAt := time.Date(2026, time.July, 11, 8, 0, 0, 0, time.UTC)
 	lastLoginAt := createdAt.Add(time.Hour)
@@ -711,9 +711,9 @@ func cloneAdminIdentityValues(values map[string]string) map[string]string {
 
 func newAdminIdentityRepositoryStore(t *testing.T, repository adminresource.AdminResourceRepository) *adminresource.Store {
 	t.Helper()
-	store, err := adminresource.NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests())
+	store, err := adminresource.NewRepositoryBackedStoreFromCapabilitiesWithProtection(repository, core.DefaultManifests(), newHTTPTestDataProtectionRuntime())
 	if err != nil {
-		t.Fatalf("NewRepositoryBackedStoreFromCapabilities() error = %v", err)
+		t.Fatalf("NewRepositoryBackedStoreFromCapabilitiesWithProtection() error = %v", err)
 	}
 	return store
 }

@@ -14,7 +14,7 @@ const scaffoldPlanPath = path.join(repoRoot, "resources", "generated", "admin-sc
 const scaffoldFilesPath = path.join(repoRoot, "resources", "generated", "admin-scaffold-files.json");
 const allowedFieldTypes = new Set(["text", "textarea", "select", "multiselect", "datetime", "switch", "number", "color"]);
 const allowedFormLayouts = new Set(["single-column", "grouped-sections", "two-column-density", "side-detail-preview"]);
-const allowedCodegenModes = new Set(["scaffold", "readOnly", "readOnlySeeded", "guardedCatalog", "custom"]);
+const allowedCodegenModes = new Set(["scaffold", "readOnly", "readOnlySeeded", "guardedCatalog", "custom", "customWorkbench"]);
 const allowedRelationOperators = new Set(["contains", "=", "!=", ">", ">=", "<", "<="]);
 const allowedRelationDisplays = new Set(["select", "tree"]);
 const allowedActionKinds = new Set(["row", "batch", "resource"]);

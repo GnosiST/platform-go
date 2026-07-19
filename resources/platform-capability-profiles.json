@@ -198,7 +198,7 @@
         "zh": "通知能力底座",
         "en": "Notification-Ready Platform Foundation"
       },
-      "purpose": "Default platform foundation plus optional in-app notification templates, notification records and delivery ledgers.",
+      "purpose": "Default platform foundation plus optional message-center workbench, channel configuration, provider accounts, send policies, notification templates, notification records and delivery ledgers.",
       "capabilities": [
         "tenant",
         "identity",
@@ -220,6 +220,10 @@
         "notification"
       ],
       "mustIncludeResources": [
+        "message-center",
+        "notification-channels",
+        "notification-providers",
+        "notification-send-policies",
         "notification-templates",
         "notifications",
         "notification-deliveries",

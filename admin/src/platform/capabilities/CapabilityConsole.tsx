@@ -2,13 +2,14 @@ import {
   ApiOutlined,
   EyeOutlined,
 } from "@ant-design/icons";
-import { Modal, Progress, Segmented, Space, Tag, Typography } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { Progress, Segmented, Space, Tag, Typography } from "antd";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { PluginManagementStatus } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
 import {
   AdminActionButton,
   AdminFeedback,
+  AdminModal,
   AdminMetricStrip,
   AdminPage,
   PlatformDataTable,
@@ -376,18 +377,18 @@ export function CapabilityConsole({
 
         </div>
       </div>
-      <Modal
+      <AdminModal
         centered
         className="capability-detail-modal"
         destroyOnHidden
         footer={null}
         open={detailOpen && Boolean(selectedCapability)}
+        preset="detail"
         title={null}
-        width={560}
         onCancel={() => setDetailOpen(false)}
       >
         <CapabilityInspector capability={selectedCapability} dictionary={dictionary} language={language} />
-      </Modal>
+      </AdminModal>
     </AdminPage>
   );
 }
@@ -445,6 +446,12 @@ function CapabilityInspector({
   }
 
   const dependencyChain = capability.dependencies.length > 0 ? [...capability.dependencies, capability.id] : [capability.id];
+  const configResources = capability.configResources ?? [];
+  const menuRoutes = capability.menuRoutes ?? [];
+  const adminResources = capability.adminResources ?? [];
+  const permissions = capability.permissions ?? [];
+  const serviceOperations = capability.serviceOperations ?? [];
+  const authProviders = capability.authProviders ?? [];
 
   return (
     <div className="capability-detail-panel">
@@ -493,6 +500,50 @@ function CapabilityInspector({
       </section>
 
       <section className="inspector-section">
+        <Typography.Text strong>{dictionary.capabilityInstallImpact}</Typography.Text>
+        <Typography.Paragraph className="secondary-text">{dictionary.capabilityRestartActivationHint}</Typography.Paragraph>
+        <div className="capability-impact-grid">
+          <CapabilityImpactBlock title={dictionary.capabilityMenus} empty={menuRoutes.length === 0} emptyText={dictionary.capabilityNoContributions}>
+            {menuRoutes.map((route) => (
+              <div className="capability-impact-row" key={route.route}>
+                <PlatformOverflowText strong value={route.title[language]} />
+                <Typography.Text code>{route.route}</Typography.Text>
+              </div>
+            ))}
+          </CapabilityImpactBlock>
+          <CapabilityImpactBlock title={dictionary.capabilityConfigResources} empty={configResources.length === 0} emptyText={dictionary.capabilityNoContributions}>
+            {configResources.map((resource) => (
+              <div className="capability-impact-row" key={resource.resource}>
+                <PlatformOverflowText strong value={resource.title[language]} />
+                <Typography.Text code>{resource.route || resource.resource}</Typography.Text>
+              </div>
+            ))}
+          </CapabilityImpactBlock>
+          <CapabilityImpactBlock title={dictionary.capabilityResources} empty={adminResources.length === 0} emptyText={dictionary.capabilityNoContributions}>
+            {adminResources.map((resource) => (
+              <Tag key={resource.resource}>{resource.resource}</Tag>
+            ))}
+          </CapabilityImpactBlock>
+          <CapabilityImpactBlock title={dictionary.capabilityPermissions} empty={permissions.length === 0} emptyText={dictionary.capabilityNoContributions}>
+            {permissions.slice(0, 18).map((permission) => (
+              <Typography.Text code key={permission}>{permission}</Typography.Text>
+            ))}
+            {permissions.length > 18 ? <Tag>+{permissions.length - 18}</Tag> : null}
+          </CapabilityImpactBlock>
+          <CapabilityImpactBlock title={dictionary.capabilityServiceOperations} empty={serviceOperations.length === 0} emptyText={dictionary.capabilityNoContributions}>
+            {serviceOperations.map((operation) => (
+              <Tag key={operation}>{operation}</Tag>
+            ))}
+          </CapabilityImpactBlock>
+          <CapabilityImpactBlock title={dictionary.capabilityAuthProviders} empty={authProviders.length === 0} emptyText={dictionary.capabilityNoContributions}>
+            {authProviders.map((provider) => (
+              <Tag key={provider}>{provider}</Tag>
+            ))}
+          </CapabilityImpactBlock>
+        </div>
+      </section>
+
+      <section className="inspector-section">
         <Typography.Text strong>{dictionary.providedApis}</Typography.Text>
         <div className="api-list">
           {capability.apis.length > 0 ? (
@@ -509,6 +560,27 @@ function CapabilityInspector({
         </div>
       </section>
 
+    </div>
+  );
+}
+
+function CapabilityImpactBlock({
+  title,
+  empty,
+  emptyText,
+  children,
+}: {
+  title: string;
+  empty: boolean;
+  emptyText: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="capability-impact-block">
+      <Typography.Text strong>{title}</Typography.Text>
+      <div className="capability-impact-content">
+        {empty ? <Typography.Text className="secondary-text">{emptyText}</Typography.Text> : children}
+      </div>
     </div>
   );
 }

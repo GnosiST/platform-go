@@ -196,6 +196,10 @@ describe("validate-platform-capability-profiles", () => {
     }
     assert.ok(notificationProfile, "platform-notification-ready profile is required");
     assert.ok(notificationProfile.capabilities.includes("notification"));
+    assert.ok(notificationProfile.mustIncludeResources.includes("message-center"));
+    assert.ok(notificationProfile.mustIncludeResources.includes("notification-channels"));
+    assert.ok(notificationProfile.mustIncludeResources.includes("notification-providers"));
+    assert.ok(notificationProfile.mustIncludeResources.includes("notification-send-policies"));
     assert.ok(notificationProfile.mustIncludeResources.includes("notification-templates"));
     assert.ok(notificationProfile.mustIncludeResources.includes("notifications"));
     assert.ok(notificationProfile.mustIncludeResources.includes("notification-deliveries"));

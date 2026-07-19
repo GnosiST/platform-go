@@ -51,6 +51,21 @@ describe("validate-platform-human-ai-development-protocol", () => {
     assert.match(result.stderr, /domains must include capability-lifecycle-operations/);
   });
 
+  it("rejects a lifecycle protocol that drops settings-center projection practices", () => {
+    const protocol = readJSON("resources/platform-human-ai-development-protocol.json");
+    const lifecycleDomain = protocol.domains.find((domain) => domain.id === "capability-lifecycle-operations");
+    lifecycleDomain.requiredPractices = lifecycleDomain.requiredPractices.filter(
+      (practice) => !practice.startsWith("system-level settings use /settings"),
+    );
+    const result = runValidator(["--protocol", tempJSON("protocol.json", protocol)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(
+      result.stderr,
+      /capability-lifecycle-operations\.requiredPractices must include system-level settings use \/settings as the dynamic configuration center/,
+    );
+  });
+
   it("rejects a protocol that removes required validator gates", () => {
     const protocol = readJSON("resources/platform-human-ai-development-protocol.json");
     protocol.minimumAcceptanceCommands = ["rtk go test ./..."];

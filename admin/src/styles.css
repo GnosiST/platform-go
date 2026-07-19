@@ -28,6 +28,7 @@
   --pagination-item-size: 22px;
   --pagination-item-inner: 16px;
   --pagination-font-size: 11px;
+  --admin-modal-viewport-gap: 48px;
   --primary: #1d63ed;
   --primary-weak: #eaf1ff;
   --success: #258f67;
@@ -630,6 +631,7 @@
 
 .role-authorization-modal,
 .role-menu-visibility-modal {
+  --admin-modal-top: 16px;
   top: 16px;
   padding-bottom: 0;
 }
@@ -3473,32 +3475,58 @@ select {
   display: none;
 }
 
-.admin-form-modal {
-  top: 24px;
+.admin-modal {
+  top: var(--admin-modal-top, 24px);
+  max-width: calc(100vw - 32px);
   padding-bottom: 0;
 }
 
-.admin-form-modal .ant-modal-content {
+.admin-modal .ant-modal-content {
   display: flex;
-  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - var(--admin-modal-viewport-gap, 48px));
   flex-direction: column;
   overflow: hidden;
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-floating);
 }
 
-.admin-form-modal .ant-modal-header {
+.admin-modal .ant-modal-header {
   flex: 0 0 auto;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+  background: transparent;
+}
+
+.admin-modal .ant-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.admin-modal .ant-modal-footer {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  background: transparent;
+}
+
+.admin-modal .ant-modal-footer .ant-btn {
+  margin-inline-start: 0;
+}
+
+.admin-modal-preset-confirm .ant-modal-body {
+  max-height: min(420px, calc(100dvh - 190px));
 }
 
 .admin-form-modal .ant-modal-body {
-  min-height: 0;
-  overflow: auto;
   padding-right: 18px;
-}
-
-.admin-form-modal .ant-modal-footer {
-  flex: 0 0 auto;
 }
 
 .resource-form {
@@ -4522,6 +4550,45 @@ select {
   padding: 2px;
 }
 
+.capability-impact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.capability-impact-block {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-elevated) 82%, var(--page) 18%);
+}
+
+.capability-impact-content {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.capability-impact-content .ant-typography code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.capability-impact-row {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.9fr);
+  gap: 8px;
+  align-items: center;
+}
+
 .resource-inspector {
   position: sticky;
   top: 0;
@@ -4651,6 +4718,72 @@ select {
 .api-row small {
   grid-column: 2;
   color: var(--muted);
+}
+
+.settings-center-card-grid,
+.message-center-channel-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.settings-center-card,
+.message-center-channel-card {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-elevated) 86%, var(--page) 14%);
+  color: var(--text);
+  text-align: left;
+}
+
+.settings-center-card {
+  width: 100%;
+  cursor: pointer;
+}
+
+.settings-center-card:hover,
+.settings-center-card:focus-visible {
+  border-color: color-mix(in srgb, var(--primary) 56%, var(--border) 44%);
+  background: color-mix(in srgb, var(--primary-weak) 38%, var(--surface) 62%);
+  outline: none;
+}
+
+.settings-center-card-icon,
+.message-center-channel-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--primary);
+  background: var(--surface);
+}
+
+.settings-center-card > span:nth-child(2),
+.message-center-channel-card > div:nth-child(2),
+.settings-center-config-cell {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.settings-center-card .ant-typography,
+.settings-center-config-cell .ant-typography,
+.message-center-channel-card .ant-typography {
+  min-width: 0;
+  margin: 0;
+}
+
+.message-center-tabs .admin-list-panel,
+.settings-center-resource-table {
+  margin-top: 10px;
 }
 
 .inspector-actions {
@@ -6097,6 +6230,37 @@ select {
   .settings-tabs .ant-tabs-nav-more {
     min-width: 44px;
     min-height: 44px;
+  }
+
+  .admin-modal {
+    --admin-modal-viewport-gap: 24px;
+    top: 12px;
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px);
+  }
+
+  .admin-modal .ant-modal-content {
+    max-height: calc(100dvh - 24px);
+  }
+
+  .admin-modal .ant-modal-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-modal .ant-modal-footer .ant-btn {
+    width: 100%;
+    margin-inline-start: 0;
+  }
+
+  .capability-impact-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .capability-impact-row,
+  .settings-center-card,
+  .message-center-channel-card {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .profile-editor-modal {

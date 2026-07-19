@@ -427,6 +427,46 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /old cramped status grid/);
   });
 
+  it("rejects settings center resources that are no longer projected from manifests", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/settings/SettingsCenterConsole.tsx",
+      "projectSettingsResourceConfigs(resources, dictionary, language)",
+      "knownSettingsResourceCatalog.map((config) => config as never)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must derive configuration entries from the authorized manifest-projected resources/);
+  });
+
+  it("rejects removing the formal system settings route", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/App.tsx", 'path="/settings"', 'path="/interface-preferences"');
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /System settings must be a first-class route/);
+  });
+
+  it("rejects message center pages that drop common SMS, email, and WeChat channels", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/message-center/MessageCenterConsole.tsx",
+      '["in_app", "sms", "email", "wechat_official", "wechat_miniapp"]',
+      '["in_app"]',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Message center must expose the common in-app, SMS, email, and WeChat channel set/);
+  });
+
   it("rejects capability details that no longer open from the list into a modal", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
@@ -440,6 +480,36 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /Capability detail must render in a modal card/);
+  });
+
+  it("rejects capability details that hide install impact configuration resources", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/capabilities/CapabilityConsole.tsx",
+      "dictionary.capabilityConfigResources",
+      "dictionary.capabilityResources",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Capability detail must show contributed configuration resources/);
+  });
+
+  it("rejects optional notification metadata without pre-install impact preview", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/capabilities/metadata.ts",
+      'menuContribution("/message-center"',
+      'menuContribution("/notifications"',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Optional notification capability must preview the message-center route before installation/);
   });
 
   it("rejects restoring the verbose Role Management navigation label", () => {
@@ -1587,6 +1657,44 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /must not bypass the shared AdminModal wrapper/);
+  });
+
+  it("rejects product dialogs that bypass the shared AdminModal wrapper", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/platform/shell/AdminShell.tsx", "<AdminModal", "<Modal");
+    replaceInTemp(tempRoot, "admin/src/platform/policy-review/PolicyReviewConsole.tsx", "<AdminModal", "<Modal");
+    replaceInTemp(tempRoot, "admin/src/platform/resources/GenericResourceConsole.tsx", "<AdminModal", "<Modal");
+    replaceInTemp(tempRoot, "admin/src/platform/resources/SensitiveFieldRevealModal.tsx", "<AdminModal", "<Modal");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Profile editor must not bypass the shared AdminModal wrapper/);
+    assert.match(result.stderr, /Policy review must not bypass the shared AdminModal wrapper/);
+    assert.match(result.stderr, /Generic resource dialogs must not bypass the shared AdminModal wrapper/);
+    assert.match(result.stderr, /Sensitive reveal dialogs must not bypass the shared AdminModal wrapper/);
+  });
+
+  it("rejects shared AdminModal regressions without product sizing and scroll-safe layout", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/ui/AdminPrimitives.tsx",
+      'export type AdminModalSize = "sm" | "md" | "lg" | "xl";',
+      'export type AdminModalSize = "md";',
+    );
+    replaceInTemp(
+      tempRoot,
+      "admin/src/styles.css",
+      ".admin-modal .ant-modal-body {",
+      ".admin-modal .ant-modal-body.missing {",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /AdminModal must expose sm\/md\/lg\/xl product sizes/);
+    assert.match(result.stderr, /AdminModal body must own viewport-bounded scrolling/);
   });
 
   it("rejects role move options that cross scope or tenant boundaries", () => {

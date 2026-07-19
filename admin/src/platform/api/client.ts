@@ -32,6 +32,27 @@ export type CapabilityItem = {
   id: string;
   name: string;
   version: string;
+  dependencies?: string[];
+  adminResources?: CapabilityResourceContribution[];
+  menuRoutes?: CapabilityMenuContribution[];
+  permissions?: string[];
+  configResources?: CapabilityResourceContribution[];
+  serviceOperations?: string[];
+  authProviders?: string[];
+};
+
+export type CapabilityResourceContribution = {
+  resource: string;
+  title: LocalizedText;
+  route?: string;
+  permissionPrefix?: string;
+  readOnly?: boolean;
+};
+
+export type CapabilityMenuContribution = {
+  route: string;
+  title: LocalizedText;
+  permission?: string;
 };
 
 export type PluginManagementLockStatus = {

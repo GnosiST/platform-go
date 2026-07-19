@@ -30,7 +30,7 @@ func TestPrepareAndOpenOrganizationRBAC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := adminresource.NewRepositoryBackedStoreFromCapabilities(repository, core.DefaultManifests()); err != nil {
+	if _, err := adminresource.NewRepositoryBackedStoreFromCapabilitiesWithProtection(repository, core.DefaultManifests(), testDataProtectionRuntime(t)); err != nil {
 		t.Fatal(err)
 	}
 	sqlDB, _ := db.DB()

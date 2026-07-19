@@ -82,6 +82,80 @@ describe("validate-platform-capability-contracts", () => {
     assert.ok(adminOIDC.adminResources.includes("admin-identities"));
   });
 
+  it("classifies parameter as the productized system settings center", () => {
+    const contracts = readJSON("resources/platform-capability-contracts.json");
+    const parameter = contracts.capabilities.find((capability) => capability.id === "parameter");
+
+    assert.ok(parameter, "parameter contract is required");
+    assert.equal(parameter.classification, "foundation-default");
+    assert.equal(parameter.profilePolicy, "default-enabled");
+    assert.ok(parameter.adminResources.includes("settings"));
+    assert.ok(parameter.adminResources.includes("parameters"));
+    assert.ok(parameter.adminResources.includes("branding"));
+    assert.match(parameter.boundary, /system settings center/);
+    assert.match(parameter.boundary, /\/settings workbench/);
+    assert.match(parameter.boundary, /enabled capability configuration resources/);
+    assert.match(parameter.boundary, /topbar settings remain interface preferences/);
+  });
+
+  it("classifies notification as a productized message-center capability", () => {
+    const contracts = readJSON("resources/platform-capability-contracts.json");
+    const notification = contracts.capabilities.find((capability) => capability.id === "notification");
+
+    assert.ok(notification, "notification contract is required");
+    assert.equal(notification.classification, "optional-platform");
+    assert.equal(notification.profilePolicy, "profile-only");
+    assert.ok(notification.includedInProfiles.includes("platform-notification-ready"));
+    for (const resource of [
+      "message-center",
+      "notification-channels",
+      "notification-providers",
+      "notification-send-policies",
+      "notification-templates",
+      "notifications",
+      "notification-deliveries",
+    ]) {
+      assert.ok(notification.adminResources.includes(resource), `notification contract missing ${resource}`);
+    }
+    assert.match(notification.boundary, /Aliyun/);
+    assert.match(notification.boundary, /generic SMTP/);
+    assert.match(notification.boundary, /WeChat channels/);
+    assert.match(notification.boundary, /encrypted, masked or omitted/);
+    assert.equal(notification.productization.workbenchRoute, "/message-center");
+    assert.equal(notification.productization.settingsCenterRoute, "/settings");
+    assert.equal(notification.productization.settingsAggregation, "dynamic-enabled-capability-config");
+    assert.deepEqual(notification.productization.channels, ["in_app", "sms", "email", "wechat_official", "wechat_miniapp"]);
+    assert.deepEqual(notification.productization.settingsConfigResources, [
+      "notification-channels",
+      "notification-providers",
+      "notification-send-policies",
+      "notification-templates",
+    ]);
+    const providersByChannel = new Map(notification.productization.providerFamilies.map((family) => [family.channel, family.providers]));
+    assert.deepEqual(providersByChannel.get("sms"), ["aliyun", "tencent", "mock-local"]);
+    assert.deepEqual(providersByChannel.get("email"), ["smtp"]);
+    assert.deepEqual(providersByChannel.get("wechat_official"), ["wechat-official"]);
+    assert.deepEqual(providersByChannel.get("wechat_miniapp"), ["wechat-miniapp"]);
+  });
+
+  it("rejects notification productization that regresses to SMS-only or drops common provider configuration", () => {
+    const contracts = readJSON("resources/platform-capability-contracts.json");
+    const notification = contracts.capabilities.find((capability) => capability.id === "notification");
+    notification.productization.channels = ["sms"];
+    notification.productization.providerFamilies = notification.productization.providerFamilies.filter((family) => family.channel === "sms");
+    notification.productization.providerFamilies[0].providers = ["mock-local"];
+    const contractsPath = tempJSON("platform-capability-contracts.json", contracts);
+
+    const result = runValidator(["--contracts", contractsPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /notification\.productization\.channels must include email/);
+    assert.match(result.stderr, /notification\.productization\.channels must include wechat_official/);
+    assert.match(result.stderr, /notification\.productization\.providerFamilies\[sms\]\.providers must include aliyun/);
+    assert.match(result.stderr, /notification\.productization\.providerFamilies must include channel email/);
+    assert.match(result.stderr, /notification\.productization\.providerFamilies must include channel wechat_miniapp/);
+  });
+
   it("rejects declared contract surface drift from audited manifests", () => {
     const contracts = readJSON("resources/platform-capability-contracts.json");
     contracts.capabilities.find((capability) => capability.id === "rbac").adminResources =

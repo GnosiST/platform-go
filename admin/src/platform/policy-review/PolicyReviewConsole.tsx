@@ -7,7 +7,7 @@ import {
   ReloadOutlined,
   SendOutlined,
 } from "@ant-design/icons";
-import { Button, Descriptions, Input, Modal, Popconfirm, Space, Tag, Timeline, Typography } from "antd";
+import { Button, Descriptions, Input, Popconfirm, Space, Tag, Timeline, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   approveAdminPolicyReview,
@@ -24,6 +24,7 @@ import {
   AdminActionButton,
   AdminFeedback,
   AdminListPanel,
+  AdminModal,
   AdminMetricStrip,
   AdminPage,
   PlatformDataTable,
@@ -220,11 +221,12 @@ export function PolicyReviewConsole({ resource, language, dictionary, permission
 
         <PolicyReviewInspector dictionary={dictionary} language={language} review={selectedReview} audits={selectedAudits} />
       </div>
-      <Modal
+      <AdminModal
         className="policy-review-reject-modal"
         okButtonProps={{ disabled: !rejectState?.reason.trim(), loading: actingID.endsWith(":reject") }}
         okText={dictionary.policyReviewRejectReview}
         open={Boolean(rejectState)}
+        preset="confirm"
         title={dictionary.policyReviewRejectTitle}
         onCancel={() => setRejectState(null)}
         onOk={() => {
@@ -242,7 +244,7 @@ export function PolicyReviewConsole({ resource, language, dictionary, permission
           value={rejectState?.reason ?? ""}
           onChange={(event) => setRejectState((current) => (current ? { ...current, reason: event.target.value } : current))}
         />
-      </Modal>
+      </AdminModal>
     </AdminPage>
   );
 }

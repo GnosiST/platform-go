@@ -40,6 +40,8 @@ The storage boundary is deliberately separate from generic Admin resources: pass
 
 Challenge support is scoped to login for v1: `off`, `always`, `after-failure` or `risk-based`, with `captcha` or `slider` as implementation choices. SMS OTP login belongs to `credential-auth` as a secret type, while SMS delivery itself belongs to the `notification` SMS channel so delivery ledgers, provider adapters, templates, rate limits and production provider validation stay reusable outside authentication. The first notification SMS foundation defines the SMS sender port, `mock-local` development/test sender, provider canonicalization and production fail-closed config validation; external Aliyun/Tencent adapters remain downstream/vendor work. Production must reject mock SMS providers.
 
+Credential-auth configuration should surface through provider discovery and the system settings center, not through four hard-coded login menus. The enabled provider modes are rendered from `GET /api/auth/providers`; password policy, challenge policy and SMS OTP policy belong to the `credential-auth` capability contract. SMS account configuration, SMS templates, provider selection, retry and rate-limit policy belong to `notification` resources such as `notification-channels`, `notification-providers`, `notification-send-policies`, `notification-templates` and `notification-deliveries`, normally reached through `/settings` and `/message-center`.
+
 The current partial API shape is:
 
 ```text

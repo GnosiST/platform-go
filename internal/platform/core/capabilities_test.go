@@ -319,12 +319,21 @@ func TestNotificationManifestIsOptionalAndBusinessNeutral(t *testing.T) {
 	for _, resource := range notification.Admin.Resources {
 		resources[resource.Resource] = resource
 	}
-	for _, resourceID := range []string{"notification-templates", "notifications", "notification-deliveries"} {
+	for _, resourceID := range []string{"message-center", "notification-channels", "notification-providers", "notification-send-policies", "notification-templates", "notifications", "notification-deliveries"} {
 		if _, ok := resources[resourceID]; !ok {
 			t.Fatalf("notification resources missing %q: %+v", resourceID, notification.Admin.Resources)
 		}
 	}
 
+	if workbench := resources["message-center"]; !workbench.ReadOnly || workbench.Menu.Route != "/message-center" || workbench.PermissionPrefix != "admin:message-center" || len(workbench.Fields) != 0 {
+		t.Fatalf("message-center resource = %+v, want read-only custom workbench entry", workbench)
+	}
+	requireFieldRelation(t, resources["notification-channels"], "tenantCode", "tenants")
+	requireFieldRelation(t, resources["notification-channels"], "defaultProviderCode", "notification-providers")
+	requireFieldRelation(t, resources["notification-providers"], "tenantCode", "tenants")
+	requireFieldRelation(t, resources["notification-send-policies"], "tenantCode", "tenants")
+	requireFieldRelation(t, resources["notification-send-policies"], "templateCode", "notification-templates")
+	requireFieldRelation(t, resources["notification-send-policies"], "providerCode", "notification-providers")
 	requireFieldRelation(t, resources["notification-templates"], "tenantCode", "tenants")
 	requireFieldRelation(t, resources["notifications"], "tenantCode", "tenants")
 	requireFieldRelation(t, resources["notifications"], "templateCode", "notification-templates")
@@ -333,17 +342,24 @@ func TestNotificationManifestIsOptionalAndBusinessNeutral(t *testing.T) {
 	requireFieldRelation(t, resources["notification-deliveries"], "notificationCode", "notifications")
 	requireFieldRelation(t, resources["notification-deliveries"], "recipientUserCode", "users")
 
-	for _, resource := range []capability.AdminResource{resources["notification-templates"], resources["notification-deliveries"]} {
+	for _, resource := range []capability.AdminResource{resources["notification-channels"], resources["notification-providers"], resources["notification-send-policies"], resources["notification-templates"], resources["notification-deliveries"]} {
 		channelField := adminResourceField(t, resource, "channel")
-		var smsOptionFound bool
-		for _, option := range channelField.Options {
-			if option.Value == "sms" && option.Label.ZH != "" && option.Label.EN == "SMS" {
-				smsOptionFound = true
-			}
+		for _, optionValue := range []string{"in_app", "sms", "email", "wechat_official", "wechat_miniapp"} {
+			requireFieldOption(t, resource.Resource, channelField, optionValue)
 		}
-		if !smsOptionFound {
-			t.Fatalf("resource %q channel options missing sms: %+v", resource.Resource, channelField.Options)
+	}
+	providerField := adminResourceField(t, resources["notification-providers"], "provider")
+	for _, optionValue := range []string{"aliyun", "tencent", "mock-local", "smtp", "wechat-official", "wechat-miniapp"} {
+		requireFieldOption(t, "notification-providers", providerField, optionValue)
+	}
+	for _, fieldKey := range []string{"accessKey", "accessSecret", "appSecret", "webhookSecret"} {
+		field := adminResourceField(t, resources["notification-providers"], fieldKey)
+		if field.Sensitivity != capability.FieldSensitivitySecret || field.StorageMode != capability.FieldStorageEncrypted || field.ResponseMode != capability.FieldProjectionOmitted || field.ExportMode != capability.FieldProjectionOmitted || field.Protection == nil {
+			t.Fatalf("notification-providers field %q policy = %+v, want encrypted secret omitted from response/export", fieldKey, field)
 		}
+	}
+	if resources["notification-providers"].Protection == nil || resources["notification-providers"].Protection.Scope != "global" {
+		t.Fatalf("notification-providers protection = %+v, want resource protection metadata", resources["notification-providers"].Protection)
 	}
 
 	if notification.Service.ID != "notification" {
@@ -469,6 +485,16 @@ func adminResourceField(t *testing.T, resource capability.AdminResource, fieldKe
 	}
 	t.Fatalf("resource %q missing field %q", resource.Resource, fieldKey)
 	return capability.AdminField{}
+}
+
+func requireFieldOption(t *testing.T, resource string, field capability.AdminField, optionValue string) {
+	t.Helper()
+	for _, option := range field.Options {
+		if option.Value == optionValue && option.Label.ZH != "" && option.Label.EN != "" {
+			return
+		}
+	}
+	t.Fatalf("resource %q field %q options missing %q: %+v", resource, field.Key, optionValue, field.Options)
 }
 
 func TestDefaultManifestsExposeDemoDataDeclarations(t *testing.T) {

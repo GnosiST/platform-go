@@ -28,7 +28,7 @@ Platform UI layer
   AdminActionButton, AdminFeedback, AdminFormModal, PlatformDataTable,
   PlatformDropdownPanel, PlatformDropdownPlugin, PlatformPaginationBar, PlatformOverflowText,
   AdminTreeWorkbench,
-  SystemSettingsDrawer
+  SystemSettingsDrawer (topbar interface preferences)
 Ant Design v5
   Table, Button, Modal, Alert, Form, Select, Dropdown...
 CSS tokens
@@ -60,7 +60,7 @@ Do not wrap a component when:
 - All admin pages must be rendered under `AdminDesignProvider`. It maps platform theme tokens into AntD `ConfigProvider`.
 - All shared components must source visible text from `admin/src/platform/i18n.ts` or localized data contracts. New component text in `.tsx` files under `admin/src` is blocked by `rtk node scripts/validate-admin-i18n.mjs`, except approved localized data files such as resource registries, capability metadata and dashboard sample data. `rtk npm --prefix admin run build` runs that gate before TypeScript and Vite. The validator also requires the Chinese and English dictionaries to expose the same keys.
 - i18n is a hard gate for every new shared component. When adding a component, add Chinese and English dictionary keys, localized sample data if needed, and run the i18n validator in the same change.
-- Admin preferences are platform concerns. Language, theme, layout mode and UI configuration are persisted in browser storage by the app shell; branding default theme is used only when the user has not chosen a theme.
+- Admin interface preferences are platform concerns. Language, theme, layout mode and UI configuration are persisted in browser storage by the app shell; branding default theme is used only when the user has not chosen a theme. System-level function configuration belongs to the `/settings` workbench and enabled capability resource schemas, not to the topbar preference drawer.
 - Login screens must use provider declarations from `GET /api/auth/providers`; do not couple the shell to one concrete login provider.
 - Admin login must filter provider audiences to `admin`. OIDC must never render irrelevant username/password controls, auto-provision users or authorization relationships, expose callback material, or reuse the App identity resolver boundary.
 - Logout must clear the platform token and return to the login view.
@@ -234,7 +234,9 @@ Reusable dropdown trigger wrapper over Ant Design `Dropdown`. It keeps overlays 
 
 ### SystemSettingsDrawer
 
-Account and system settings drawer opened from the dedicated settings button in the topbar. It owns:
+Topbar interface-preference drawer opened from the dedicated settings button. The component name is historical; product behavior is intentionally limited to frontend display and local UI preference management. Formal system configuration uses the `/settings` workbench resource and capability-owned configuration schemas.
+
+It owns:
 
 - appearance theme and custom primary preview;
 - layout mode, density, work tabs, page transition and sidebar collapse through visual setting cards;
@@ -257,9 +259,10 @@ The shell supports:
 - fixed default home tab at `/overview`;
 - browser-like work tabs that are opened on navigation and can be closed;
 - right-click tab menu for closing current, other, all, left and right tabs;
-- a dedicated settings button for system settings and an avatar-only profile button for personal context;
+- a dedicated settings button for interface preferences and an avatar-only profile button for personal context;
+- topbar settings as interface preferences only; system-level function configuration is reached from the `/settings` menu entry;
 - click-only personal profile dropdown with tenant, organization, role, contact and address fields; click outside or Escape closes it, and the profile editor modal stays viewport-scrollable while profile/password persistence remains disabled until backend support exists;
-- theme and layout settings inside the system settings drawer;
+- theme and layout preferences inside the topbar interface-preference drawer;
 - manual sidebar collapse in the sidebar brand area for desktop side/mixed/split layouts;
 - collapsed side/mixed navigation renders a flat icon list from the same resource contract so hidden multi-level `<details>` branches cannot overlap or block clicks;
 - icon-only language switch;

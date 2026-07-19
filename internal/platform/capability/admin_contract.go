@@ -193,6 +193,9 @@ func validateAdminResource(owner ID, resource AdminResource, revealPolicies map[
 	if err := validateAdminResourceDeletion(owner, resource); err != nil {
 		return err
 	}
+	if resource.ReadOnly && resource.Deletion.Mode != AdminDeletionDisabled {
+		return fmt.Errorf("capability %q admin resource %q read-only resources must disable deletion", owner, resource.Resource)
+	}
 	if layout := strings.TrimSpace(resource.FormLayout); layout != "" && !slices.Contains(adminFormLayouts, layout) {
 		return fmt.Errorf("capability %q admin resource %q form layout must be one of %s", owner, resource.Resource, strings.Join(adminFormLayouts, ","))
 	}

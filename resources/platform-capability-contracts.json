@@ -180,7 +180,7 @@
       "profilePolicy": "default-enabled",
       "source": { "kind": "core-manifest", "package": "internal/platform/core" },
       "ownership": "platform-core",
-      "boundary": "Reusable settings, parameters and brand configuration. Business feature flags must attach through their own capability.",
+      "boundary": "Reusable system settings center, parameters and brand configuration. The /settings workbench dynamically aggregates enabled capability configuration resources; topbar settings remain interface preferences only. Business feature flags must attach through their own capability.",
       "replaceability": "replace-through-config-adapter",
       "requiredInProfiles": ["platform-default"],
       "dependencies": ["audit", "tenant"],
@@ -284,12 +284,50 @@
       "profilePolicy": "profile-only",
       "source": { "kind": "platform-extension-manifest", "package": "internal/platform/core" },
       "ownership": "platform-operations-extension",
-      "boundary": "Reusable notification templates, records, delivery ledgers and SMS sender adapter contracts without binding to one business domain. The stock process only bundles mock-local for development/test; production must use a configured provider adapter.",
+      "boundary": "Reusable message-center workbench, channel configuration, provider accounts, send policies, templates, records, delivery ledgers and sender adapter contracts without binding to one business domain. SMS P0 exposes Aliyun, Tencent Cloud and mock-local configuration entries, email P0 exposes generic SMTP, and WeChat channels expose configuration contracts/product placeholders. Provider credentials must be encrypted, masked or omitted by field policy instead of plain generic values.",
       "replaceability": "replace-through-notification-adapter",
       "includedInProfiles": ["platform-notification-ready"],
       "excludedFromProfiles": ["minimal-admin", "platform-default"],
       "dependencies": ["audit", "identity", "tenant"],
-      "adminResources": ["notification-deliveries", "notification-templates", "notifications"],
+      "adminResources": ["message-center", "notification-channels", "notification-deliveries", "notification-providers", "notification-send-policies", "notification-templates", "notifications"],
+      "productization": {
+        "workbenchRoute": "/message-center",
+        "settingsCenterRoute": "/settings",
+        "settingsAggregation": "dynamic-enabled-capability-config",
+        "settingsConfigResources": ["notification-channels", "notification-providers", "notification-send-policies", "notification-templates"],
+        "adminEntryPolicy": "single-workbench-plus-settings-center",
+        "channels": ["in_app", "sms", "email", "wechat_official", "wechat_miniapp"],
+        "providerFamilies": [
+          {
+            "channel": "in_app",
+            "providers": [],
+            "runtimeStatus": "foundation-records"
+          },
+          {
+            "channel": "sms",
+            "providers": ["aliyun", "tencent", "mock-local"],
+            "runtimeStatus": "config-contract-plus-mock-local-sender",
+            "productionPolicy": "mock-local is development/test only; production requires a real SMS provider adapter and secret-backed credentials"
+          },
+          {
+            "channel": "email",
+            "providers": ["smtp"],
+            "runtimeStatus": "generic-smtp-config-contract"
+          },
+          {
+            "channel": "wechat_official",
+            "providers": ["wechat-official"],
+            "runtimeStatus": "configuration-placeholder"
+          },
+          {
+            "channel": "wechat_miniapp",
+            "providers": ["wechat-miniapp"],
+            "runtimeStatus": "configuration-placeholder"
+          }
+        ],
+        "credentialPolicy": "Provider credentials, app secrets, webhook secrets and raw vendor errors must be encrypted, masked or omitted by field policy.",
+        "runtimeBoundary": "P0 proves the product configuration contract and SMS mock-local sender; concrete Aliyun, Tencent Cloud, SMTP and WeChat send adapters are follow-up runtime slices."
+      },
       "docs": ["docs/platform-capability-development.md", "docs/platform-foundation-task-map.md"]
     },
     {

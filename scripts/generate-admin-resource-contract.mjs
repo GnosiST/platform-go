@@ -215,6 +215,7 @@ function capabilityField(field) {
 
 function capabilityResourceToManifestResource(resource) {
   const fields = (resource.fields ?? []).map(capabilityField);
+  const readOnly = resource.readOnly === true;
   return {
     name: resource.resource,
     code: resource.resource,
@@ -238,6 +239,7 @@ function capabilityResourceToManifestResource(resource) {
     apiBase: `/api/admin/${resource.resource}`,
     permissions: resource.permissions ?? {},
     deletion: resource.deletion,
+    ...(readOnly ? { readOnly: true } : {}),
     actions: resource.actions ?? [],
     panels: resource.panels ?? [],
     routes: capabilityRoutes(resource),
@@ -252,8 +254,10 @@ function capabilityResourceToManifestResource(resource) {
       localizedFields: fields.filter((field) => field.localize).map((field) => field.key),
     },
     codegen: {
-      mode: "custom",
-      reason: "Capability resource runs through the generic admin resource engine; source-writing scaffold is disabled.",
+      mode: readOnly ? "customWorkbench" : "custom",
+      reason: readOnly
+        ? "Capability workbench entry is read-only and must be implemented by a dedicated admin page; source-writing scaffold is disabled."
+        : "Capability resource runs through the generic admin resource engine; source-writing scaffold is disabled.",
       capabilityId: resource.capabilityId,
     },
   };

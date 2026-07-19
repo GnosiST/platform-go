@@ -59,6 +59,28 @@ describe("validate-platform-plugin-management-v1", () => {
     assert.match(result.stderr, /lifecycleGates must include manual-restart/);
   });
 
+  it("rejects contracts that omit manifest projection surfaces or settings-center aggregation", () => {
+    const contract = readJSON("resources/platform-plugin-management-v1.json");
+    contract.manifestProjection.settingsCenter.route = "/capability-settings";
+    contract.manifestProjection.settingsCenter.uses = contract.manifestProjection.settingsCenter.uses.filter(
+      (source) => source !== "GET /api/capabilities configResources",
+    );
+    contract.manifestProjection.projectedSurfaces = contract.manifestProjection.projectedSurfaces.filter(
+      (surface) => surface.id !== "configResources",
+    );
+    contract.manifestProjection.requiredPostRestartChecks = contract.manifestProjection.requiredPostRestartChecks.filter(
+      (check) => !check.startsWith("/settings groups"),
+    );
+
+    const result = runValidator(["--contract", tempJSON("plugin-management-v1.json", contract)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /manifestProjection\.settingsCenter\.route must be \/settings/);
+    assert.match(result.stderr, /manifestProjection\.settingsCenter\.uses must include GET \/api\/capabilities configResources/);
+    assert.match(result.stderr, /manifestProjection\.projectedSurfaces must include configResources/);
+    assert.match(result.stderr, /manifestProjection\.requiredPostRestartChecks must include \/settings groups configuration resources/);
+  });
+
   it("rejects accepted combinations that are not backed by profiles or operation policy", () => {
     const contract = readJSON("resources/platform-plugin-management-v1.json");
     const combination = contract.acceptedCombinations.find((item) => item.id === "minimal-admin");

@@ -256,6 +256,43 @@ func TestRunAdminResourcesStdoutWritesSingleJSONDocument(t *testing.T) {
 	}
 }
 
+func TestRunAdminResourcesKeepsMessageCenterReadOnly(t *testing.T) {
+	t.Setenv("PLATFORM_CAPABILITIES", "tenant,identity,session,rbac,menu,api-resource,audit,wechat-login,dictionary,parameter,file-storage,notification,admin-shell,demo-data,system-admin")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	if err := run([]string{"admin-resources", "--stdout"}, &stdout, &stderr); err != nil {
+		t.Fatalf("run(admin-resources --stdout) error = %v, stderr = %s", err, stderr.String())
+	}
+
+	var document struct {
+		Resources []struct {
+			Resource    string            `json:"resource"`
+			ReadOnly    bool              `json:"readOnly,omitempty"`
+			Permissions map[string]string `json:"permissions"`
+			Menu        struct {
+				Route string `json:"route"`
+			} `json:"menu"`
+		} `json:"resources"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &document); err != nil {
+		t.Fatalf("Unmarshal(stdout) error = %v, stdout = %s", err, stdout.String())
+	}
+	for _, resource := range document.Resources {
+		if resource.Resource != "message-center" {
+			continue
+		}
+		if !resource.ReadOnly || resource.Menu.Route != "/message-center" {
+			t.Fatalf("message-center = %+v, want read-only /message-center workbench", resource)
+		}
+		if resource.Permissions["read"] != "admin:message-center:read" || resource.Permissions["create"] != "" || resource.Permissions["update"] != "" || resource.Permissions["delete"] != "" {
+			t.Fatalf("message-center permissions = %+v, want read-only permission surface", resource.Permissions)
+		}
+		return
+	}
+	t.Fatalf("admin resource contract missing message-center: %+v", document.Resources)
+}
+
 func TestRunServiceManifestsWritesCanonicalReference(t *testing.T) {
 	outputPath := filepath.Join(t.TempDir(), "platform-service-contract.json")
 	var stdout bytes.Buffer

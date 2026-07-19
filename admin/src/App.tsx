@@ -32,7 +32,9 @@ import { APIDocsPage } from "./platform/api-docs/APIDocsPage";
 import { DemoDataConsole } from "./platform/demo-data/DemoDataConsole";
 import { DashboardHome } from "./platform/dashboard/DashboardHome";
 import { AdminLoginView } from "./platform/auth/AdminLoginView";
+import { MessageCenterConsole } from "./platform/message-center/MessageCenterConsole";
 import { PolicyReviewConsole } from "./platform/policy-review/PolicyReviewConsole";
+import { SettingsCenterConsole } from "./platform/settings/SettingsCenterConsole";
 import {
   projectRoleManagementNavigation,
   resolveRoleManagementActiveRoute,
@@ -423,6 +425,7 @@ function PlatformRoutePages({
   onRouteChange: (route: string, mode?: "push" | "replace") => void;
 }) {
   const policyReviewResource = resources.find((resource) => resource.route === "/policy-reviews");
+  const hasMessageCenter = resources.some((resource) => resource.route === "/message-center" || isMessageCenterResourceRoute(resource.route));
   const resourceRoutes = resources.filter((resource) => isInternalResourceRoute(resource) && !isCustomRoute(resource.route) && resource.route !== "/policy-reviews");
 
   return (
@@ -458,6 +461,30 @@ function PlatformRoutePages({
       />
       <Route path="/demo-data" element={<DemoDataConsole language={language} dictionary={dictionary} permissions={permissions} deniedPermissions={deniedPermissions} />} />
       <Route path="/api-docs" element={<APIDocsPage language={language} dictionary={dictionary} />} />
+      <Route
+        path="/settings"
+        element={(
+          <SettingsCenterConsole
+            language={language}
+            dictionary={dictionary}
+            resources={resources}
+            onRouteChange={onRouteChange}
+          />
+        )}
+      />
+      {hasMessageCenter ? (
+        <Route
+          path="/message-center"
+          element={(
+            <MessageCenterConsole
+              language={language}
+              dictionary={dictionary}
+              resources={resources}
+              onRouteChange={onRouteChange}
+            />
+          )}
+        />
+      ) : null}
       {policyReviewResource ? (
         <Route
           path="/policy-reviews"
@@ -612,7 +639,18 @@ function resourceDefinitionToRefineResource(resource: AdminResourceDefinition): 
 }
 
 function isCustomRoute(route: string) {
-  return route === "/overview" || route === "/capabilities" || route === "/demo-data" || route === "/api-docs";
+  return route === "/overview" || route === "/capabilities" || route === "/demo-data" || route === "/api-docs" || route === "/settings" || route === "/message-center";
+}
+
+function isMessageCenterResourceRoute(route: string) {
+  return [
+    "/notification-channels",
+    "/notification-providers",
+    "/notification-templates",
+    "/notification-send-policies",
+    "/notifications",
+    "/notification-deliveries",
+  ].includes(route);
 }
 
 function isInternalResourceRoute(resource: AdminResourceDefinition) {
