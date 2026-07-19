@@ -4,16 +4,14 @@ import {
   DownloadOutlined,
   EyeOutlined,
   LayoutOutlined,
-  LogoutOutlined,
   ReloadOutlined,
   SettingOutlined,
   ThunderboltOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
-import { Avatar, Button, Checkbox, ColorPicker, Divider, Drawer, InputNumber, Segmented, Slider, Space, Switch, Tabs, Tag, Typography } from "antd";
+import { Button, Checkbox, ColorPicker, Drawer, InputNumber, Segmented, Slider, Space, Switch, Tabs, Typography } from "antd";
 import { useMemo, type ReactNode } from "react";
-import type { AdminCurrentSession, BrandingConfig } from "../api/client";
-import type { Dictionary, Language } from "../i18n";
+import type { Dictionary } from "../i18n";
 import { adminLayoutModes, themeNames, type AdminLayoutMode, type ThemeName } from "../theme";
 import {
   defaultAdminUIConfig,
@@ -27,37 +25,27 @@ import {
 
 type SystemSettingsDrawerProps = {
   open: boolean;
-  language: Language;
   dictionary: Dictionary;
   themeName: ThemeName;
   layoutMode: AdminLayoutMode;
   uiConfig: AdminUIConfig;
-  branding: BrandingConfig | null;
-  session: AdminCurrentSession;
   onClose: () => void;
   onThemeChange: (theme: ThemeName) => void;
   onLayoutModeChange: (mode: AdminLayoutMode) => void;
   onUIConfigChange: (config: AdminUIConfig) => void;
-  onLogout: () => void;
 };
 
 export function SystemSettingsDrawer({
   open,
-  language,
   dictionary,
   themeName,
   layoutMode,
   uiConfig,
-  branding,
-  session,
   onClose,
   onThemeChange,
   onLayoutModeChange,
   onUIConfigChange,
-  onLogout,
 }: SystemSettingsDrawerProps) {
-  const displayName = session.user.name || session.user.username || dictionary.admin;
-  const avatarLetter = (displayName.trim()[0] || "A").toUpperCase();
   const densityOptions = useMemo(
     () => [
       { label: dictionary.densityCompact, value: "compact" },
@@ -124,44 +112,6 @@ export function SystemSettingsDrawer({
       width={560}
       onClose={onClose}
     >
-      <div className="settings-profile-card">
-        <Avatar size={40} className="admin-avatar">
-          {avatarLetter}
-        </Avatar>
-        <div className="settings-profile-main">
-          <Typography.Text strong>{displayName}</Typography.Text>
-          <Typography.Text type="secondary">{branding?.productName || "platform-go"}</Typography.Text>
-          <div className="settings-profile-tags">
-            <Tag>{themeLabel(dictionary, themeName)}</Tag>
-            <Tag>{layoutLabel(dictionary, layoutMode)}</Tag>
-            <Tag>{language === "zh" ? dictionary.cn : dictionary.en}</Tag>
-          </div>
-        </div>
-      </div>
-
-      <div className="settings-summary-groups" aria-label={dictionary.currentContext}>
-        <section className="settings-summary-group" aria-label={dictionary.interfacePreferences}>
-          <div className="settings-summary-group-header">
-            <Typography.Text strong>{dictionary.interfacePreferences}</Typography.Text>
-          </div>
-          <div className="settings-summary-items compact">
-            <SettingSummaryItem label={dictionary.theme} value={themeLabel(dictionary, themeName)} />
-            <SettingSummaryItem label={dictionary.layout} value={layoutLabel(dictionary, layoutMode)} />
-            <SettingSummaryItem label={dictionary.densitySetting} value={uiConfig.density === "compact" ? dictionary.densityCompact : dictionary.densityComfortable} />
-          </div>
-        </section>
-        <section className="settings-summary-group" aria-label={dictionary.runtimeContext}>
-          <div className="settings-summary-group-header">
-            <Typography.Text strong>{dictionary.runtimeContext}</Typography.Text>
-            <Tag>{dictionary.readOnlyContext}</Tag>
-          </div>
-          <div className="settings-summary-items">
-            <SettingSummaryItem label={dictionary.environmentContext} value={dictionary.production} hint={dictionary.environmentContextHelp} />
-            <SettingSummaryItem label={dictionary.tenantContext} value={`${dictionary.platformTenant} (platform)`} hint={dictionary.tenantContextHelp} />
-          </div>
-        </section>
-      </div>
-
       <Tabs
         className="settings-tabs"
         items={[
@@ -255,13 +205,6 @@ export function SystemSettingsDrawer({
             icon: <SettingOutlined />,
             children: (
               <div className="settings-section">
-                <SettingRow label={dictionary.system}>
-                  <Typography.Text>{branding?.productName || "platform-go"}</Typography.Text>
-                </SettingRow>
-                <SettingRow label={dictionary.version}>
-                  <Typography.Text code>0.1.0</Typography.Text>
-                </SettingRow>
-                <Divider />
                 <Space wrap>
                   <Button icon={<ReloadOutlined />} onClick={resetConfig}>
                     {dictionary.resetConfig}
@@ -273,10 +216,6 @@ export function SystemSettingsDrawer({
                     {dictionary.importConfig}
                   </Button>
                 </Space>
-                <Divider />
-                <Button danger icon={<LogoutOutlined />} onClick={onLogout}>
-                  {dictionary.logout}
-                </Button>
               </div>
             ),
           },
@@ -404,16 +343,6 @@ function SettingRow({ label, hint, children }: { label: string; hint?: string; c
         {hint ? <Typography.Text type="secondary">{hint}</Typography.Text> : null}
       </div>
       <div>{children}</div>
-    </div>
-  );
-}
-
-function SettingSummaryItem({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="settings-summary-item">
-      <Typography.Text type="secondary">{label}</Typography.Text>
-      <strong>{value}</strong>
-      {hint ? <Typography.Text type="secondary">{hint}</Typography.Text> : null}
     </div>
   );
 }

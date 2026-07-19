@@ -15,6 +15,7 @@ import {
   GlobalOutlined,
   HomeOutlined,
   LeftOutlined,
+  LogoutOutlined,
   MenuFoldOutlined,
   MenuOutlined,
   MenuUnfoldOutlined,
@@ -551,6 +552,10 @@ export function AdminShell({
                     setProfileOpen(false);
                     setProfileEditorOpen(true);
                   }}
+                  onLogout={() => {
+                    setProfileOpen(false);
+                    onLogout();
+                  }}
                 />
               )}
               placement="bottomRight"
@@ -753,18 +758,14 @@ export function AdminShell({
       </Drawer>
       <SystemSettingsDrawer
         open={settingsOpen}
-        language={language}
         dictionary={dictionary}
         themeName={themeName}
         layoutMode={layoutMode}
         uiConfig={uiConfig}
-        branding={branding}
-        session={session}
         onClose={() => setSettingsOpen(false)}
         onThemeChange={changeTheme}
         onLayoutModeChange={onLayoutModeChange}
         onUIConfigChange={onUIConfigChange}
-        onLogout={onLogout}
       />
       {profileEditorOpen ? (
         <ProfileEditorModal
@@ -791,6 +792,7 @@ function ProfileSummaryPanel({
   profile,
   session,
   onEditProfile,
+  onLogout,
 }: {
   avatarLetter: string;
   avatarUrl: string;
@@ -799,6 +801,7 @@ function ProfileSummaryPanel({
   profile: AdminProfile | null;
   session: AdminCurrentSession;
   onEditProfile: () => void;
+  onLogout: () => void;
 }) {
   const tenantCode = profile?.tenantCode || session.user.tenantCode || "platform";
   const tenantDisplay = tenantCode === "platform" ? `${dictionary.platformTenant} (platform)` : tenantCode;
@@ -821,9 +824,14 @@ function ProfileSummaryPanel({
       width={460}
       maxHeight="min(720px, calc(100vh - 32px))"
       footer={(
-        <Button block icon={<EditOutlined />} onClick={onEditProfile}>
-          {dictionary.editProfile}
-        </Button>
+        <div className="profile-summary-actions">
+          <Button block icon={<EditOutlined />} onClick={onEditProfile}>
+            {dictionary.editProfile}
+          </Button>
+          <Button block danger icon={<LogoutOutlined />} onClick={onLogout}>
+            {dictionary.logout}
+          </Button>
+        </div>
       )}
     >
       <div className="profile-summary-header">

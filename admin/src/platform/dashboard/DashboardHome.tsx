@@ -108,8 +108,9 @@ export function DashboardHome({
               columns={[
                 {
                   title: dictionary.dashboardLatestPlugins,
+                  className: "dashboard-table-title-cell",
                   dataIndex: "title",
-                  render: (value: LocalizedText) => <Typography.Text strong>{localizedText(value, language)}</Typography.Text>,
+                  render: (value: LocalizedText) => localizedText(value, language),
                 },
                 {
                   title: dictionary.description,

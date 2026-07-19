@@ -434,19 +434,23 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /must not derive hierarchy depth from colon-delimited permission codes/);
   });
 
-  it("rejects system settings that restore the unclassified status grid", () => {
+  it("rejects topbar interface settings that restore account or runtime context", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
       tempRoot,
       "admin/src/platform/ui/SystemSettingsDrawer.tsx",
-      "settings-summary-groups",
-      "settings-status-grid",
+      "<Tabs",
+      '<div className="settings-profile-card">{dictionary.runtimeContext}{dictionary.environmentContext}{dictionary.tenantContext}<button onClick={onLogout}>{dictionary.logout}</button></div><Tabs',
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /old cramped status grid/);
+    assert.match(result.stderr, /must not render user profile information/);
+    assert.match(result.stderr, /must not render runtime or tenant context/);
+    assert.match(result.stderr, /must not render environment context/);
+    assert.match(result.stderr, /must not render tenant context/);
+    assert.match(result.stderr, /Logout must live in the personal profile menu/);
   });
 
   it("rejects settings center resources that are no longer projected from manifests", () => {
@@ -2461,6 +2465,22 @@ describe("validate-admin-ui-contracts", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /SystemSettingsDrawer must keep exportConfig support/);
     assert.match(result.stderr, /SystemSettingsDrawer must keep importConfig support/);
+  });
+
+  it("rejects dashboard table cells that reintroduce ReactElement render warnings", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/dashboard/DashboardHome.tsx",
+      'className: "dashboard-table-title-cell",\n                  dataIndex: "title",\n                  render: (value: LocalizedText) => localizedText(value, language),',
+      'dataIndex: "title",\n                  render: (value: LocalizedText) => <Typography.Text strong>{localizedText(value, language)}</Typography.Text>,',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Dashboard plugin title column must preserve emphasis/);
+    assert.match(result.stderr, /must not render React elements/);
   });
 
   it("normalizes legacy and invalid watermark preferences", () => {
