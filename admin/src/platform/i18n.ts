@@ -3,7 +3,7 @@ export type Language = "zh" | "en";
 export const dictionaries = {
   zh: {
     appSubtitle: "底座控制台",
-    topSearch: "搜索能力、接口、文档...",
+    topSearch: "搜索可访问页面...",
     globalSearchNoResults: "未找到匹配的页面",
     commandHint: "K",
     language: "语言",
@@ -771,6 +771,8 @@ export const dictionaries = {
     mobileRuntimeContext: "环境与租户上下文",
     sessionReadOnlyDescription: "仅展示 sessions 查询接口返回的只读记录。当前认证会话存储尚未接入该资源，暂无撤销命令和审计闭环。",
     sessionReadOnlyBadge: "只读",
+    sessionRefreshList: "刷新会话列表",
+    sessionColumnSettings: "会话列设置",
     sessionUser: "用户",
     sessionTokenType: "令牌类型",
     sessionExpiresAt: "过期时间",
@@ -781,7 +783,7 @@ export const dictionaries = {
   },
   en: {
     appSubtitle: "Foundation Console",
-    topSearch: "Search capabilities, APIs, docs...",
+    topSearch: "Search accessible pages...",
     globalSearchNoResults: "No matching pages found",
     commandHint: "K",
     language: "Language",
@@ -1549,6 +1551,8 @@ export const dictionaries = {
     mobileRuntimeContext: "Environment and tenant context",
     sessionReadOnlyDescription: "Only read-only records returned by the sessions query endpoint are shown. The authentication session store is not wired to this resource yet, so revocation and its audit trail are unavailable.",
     sessionReadOnlyBadge: "Read-only",
+    sessionRefreshList: "Refresh session list",
+    sessionColumnSettings: "Session columns",
     sessionUser: "User",
     sessionTokenType: "Token Type",
     sessionExpiresAt: "Expires At",

@@ -35,6 +35,7 @@ const files = {
   rolePermissionWriteMode: readSource("admin/src/platform/resources/rolePermissionWriteMode.ts"),
   rolePermissionWorkflow: readSource("admin/src/platform/resources/rolePermissionWorkflow.ts"),
   roleManagementNavigation: readSource("admin/src/platform/resources/roleManagementNavigation.ts"),
+  sessionConsole: readSource("admin/src/platform/resources/SessionConsole.tsx"),
   permissionGovernance: readSource("admin/src/platform/resources/PermissionGovernanceConsole.tsx"),
   menuGovernance: readSourceOptional("admin/src/platform/resources/MenuGovernanceConsole.tsx"),
   menuGovernanceRuntime: readSourceOptional("admin/src/platform/resources/menuGovernanceRuntime.ts"),
@@ -744,6 +745,14 @@ requireIncludes(files.shell, "workTabMenuItems", "AdminShell work tabs must keep
 requireIncludes(files.shell, "dictionary.globalSearchNoResults", "Global search must expose a localized no-results state.");
 requireIncludes(files.shell, "open={Boolean(globalSearchQuery.trim())}", "Global search must keep its result surface open for no-results feedback.");
 requireIncludes(files.shell, "items: globalSearchMenuItems", "Global search must use the result-or-empty menu contract.");
+requireIncludes(files.i18n, 'topSearch: "搜索可访问页面..."', "Global search copy must describe page navigation instead of unavailable data, API or doc search.");
+requireIncludes(files.i18n, 'topSearch: "Search accessible pages..."', "Global search copy must describe page navigation instead of unavailable data, API or doc search.");
+requireNotIncludes(files.i18n, 'topSearch: "搜索能力、接口、文档..."', "Global search must not imply unavailable API or document search.");
+requireNotIncludes(files.i18n, 'topSearch: "Search capabilities, APIs, docs..."', "Global search must not imply unavailable API or document search.");
+requireCountExactly(files.i18n, "sessionRefreshList:", 2, "Session console must declare localized refresh action copy.");
+requireCountExactly(files.i18n, "sessionColumnSettings:", 2, "Session console must declare localized column action copy.");
+requireIncludes(files.sessionConsole, "refresh: dictionary.sessionRefreshList", "Session console refresh action must use read-only session-specific copy.");
+requireIncludes(files.sessionConsole, "columns: dictionary.sessionColumnSettings", "Session console column action must use read-only session-specific copy.");
 requireIncludes(files.shell, "buildNavigationTree", "AdminShell must build multi-level navigation from resource parents.");
 requireIncludes(files.shell, "operations: dictionary.operations", "AdminShell must localize the legacy operations navigation directory.");
 requireIncludes(files.i18n, "operations: { zh: dictionaries.zh.operations, en: dictionaries.en.operations }", "Menu governance must localize projected legacy operations directories in both languages.");

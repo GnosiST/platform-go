@@ -125,8 +125,8 @@ export function SessionConsole({ resource, language, dictionary }: SessionConsol
 function tableLabels(dictionary: Dictionary) {
   return {
     search: dictionary.searchResource,
-    refresh: dictionary.refresh,
-    columns: dictionary.tableColumns,
+    refresh: dictionary.sessionRefreshList,
+    columns: dictionary.sessionColumnSettings,
     rowActions: dictionary.actions,
     selected: (count: number) => formatTemplate(dictionary.selectedItems, { count: String(count) }),
     selectRow: (key: string) => formatTemplate(dictionary.selectRow, { key }),

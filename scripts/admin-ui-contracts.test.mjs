@@ -429,6 +429,27 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /Shared role governance page must display Role Management as its English H1/);
   });
 
+  it("rejects global search copy that implies unavailable API or document search", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/platform/i18n.ts", 'topSearch: "Search accessible pages..."', 'topSearch: "Search capabilities, APIs, docs..."');
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Global search copy must describe page navigation/);
+  });
+
+  it("rejects generic session table action labels", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/platform/resources/SessionConsole.tsx", "refresh: dictionary.sessionRefreshList", "refresh: dictionary.refresh");
+    replaceInTemp(tempRoot, "admin/src/platform/resources/SessionConsole.tsx", "columns: dictionary.sessionColumnSettings", "columns: dictionary.tableColumns");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Session console refresh action must use read-only session-specific copy/);
+  });
+
   it("rejects resource writes that narrow schema values to strings", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
