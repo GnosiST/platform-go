@@ -31,6 +31,7 @@ type CapabilityConsoleProps = {
 };
 
 type CapabilityFilter = "all" | "enabled" | "not-enabled" | "pending-restart" | CapabilityKind;
+type CapabilityRestartState = "stable" | "enable-pending" | "disable-pending";
 
 export function CapabilityConsole({
   capabilities,
@@ -109,6 +110,7 @@ export function CapabilityConsole({
   const enabledCount = catalogCapabilities.filter((capability) => currentCapabilityIDs.has(capability.id)).length;
   const optionalCount = catalogCapabilities.filter((capability) => capability.kind === "optional" && !currentCapabilityIDs.has(capability.id)).length;
   const disabledCount = catalogCapabilities.filter((capability) => !currentCapabilityIDs.has(capability.id) && !desiredCapabilityIDs.has(capability.id)).length;
+  const pendingRestartCount = catalogCapabilities.filter((capability) => capabilityRestartState(capability, currentCapabilityIDs, desiredCapabilityIDs) !== "stable").length;
   const domainCount = new Set(catalogCapabilities.map((capability) => capability.domain.en)).size;
   const healthyCount = catalogCapabilities.filter((capability) => capability.health === "healthy").length;
   const healthPercent = Math.round((healthyCount / Math.max(catalogCapabilities.length, 1)) * 100);
@@ -247,6 +249,7 @@ export function CapabilityConsole({
               { key: "total", label: dictionary.totalCapabilities, value: catalogCapabilities.length },
               { key: "enabled", label: dictionary.enabled, value: enabledCount, tone: "accent" },
               { key: "optional", label: dictionary.optional, value: optionalCount, tone: "warning" },
+              { key: "pending", label: dictionary.pendingRestart, value: pendingRestartCount, tone: pendingRestartCount > 0 ? "warning" : "default" },
               { key: "disabled", label: dictionary.disabled, value: disabledCount },
               { key: "domains", label: dictionary.domains, value: domainCount },
               { key: "installed", label: dictionary.installedPlugins, value: installedPluginCount },
@@ -267,7 +270,7 @@ export function CapabilityConsole({
       }
     >
       {error ? <AdminFeedback className="api-alert" type="warning" message={dictionary.apiUnavailable} description={error} /> : null}
-      <PluginManagementPanel status={status} dictionary={dictionary} />
+      <PluginManagementPanel status={status} dictionary={dictionary} capabilities={catalogCapabilities} language={language} />
 
       <div className="console-grid">
         <div className="capability-workspace-stack">
@@ -387,23 +390,36 @@ export function CapabilityConsole({
         title={null}
         onCancel={() => setDetailOpen(false)}
       >
-        <CapabilityInspector capability={selectedCapability} dictionary={dictionary} language={language} />
+        <CapabilityInspector
+          capability={selectedCapability}
+          currentCapabilityIDs={currentCapabilityIDs}
+          desiredCapabilityIDs={desiredCapabilityIDs}
+          dictionary={dictionary}
+          language={language}
+        />
       </AdminModal>
     </AdminPage>
   );
 }
 
 function PluginManagementPanel({
+  capabilities,
   status,
   dictionary,
+  language,
 }: {
+  capabilities: CapabilityView[];
   status: PluginManagementStatus;
   dictionary: Dictionary;
+  language: Language;
 }) {
   const restartRequired = status.restartRequiredForChanges;
+  const changes = pluginRestartImpactPreview(status, capabilities, language);
   const facts = [
     { label: dictionary.operationMode, value: status.operationMode },
     { label: dictionary.activation, value: status.activation },
+    { label: dictionary.currentCapabilities, value: String(status.currentCapabilities.length) },
+    { label: dictionary.desiredCapabilities, value: String(status.desiredCapabilities.length) },
     { label: dictionary.lockStatus, value: formatLockStatus(status.lockStatus, dictionary) },
     { label: dictionary.source, value: status.source },
   ];
@@ -428,16 +444,50 @@ function PluginManagementPanel({
           </div>
         ))}
       </dl>
+      {status.pendingRestart ? (
+        <div className="plugin-restart-callout">
+          <Typography.Text strong>{dictionary.pluginManualRestartRequired}</Typography.Text>
+          <Typography.Text type="secondary">{dictionary.pluginManualRestartHint}</Typography.Text>
+        </div>
+      ) : null}
+      {changes.length > 0 ? (
+        <div className="plugin-restart-preview" aria-label={dictionary.pluginRestartImpactPreview}>
+          <Typography.Text strong>{dictionary.pluginRestartImpactPreview}</Typography.Text>
+          <div className="plugin-restart-preview-list">
+            {changes.map((change) => (
+              <div className="plugin-restart-preview-row" key={change.id}>
+                <Tag color={change.action === "enable" ? "success" : "warning"}>
+                  {change.action === "enable" ? dictionary.capabilityEnableAfterRestart : dictionary.capabilityDisableAfterRestart}
+                </Tag>
+                <PlatformOverflowText strong value={change.label} />
+                <Typography.Text type="secondary">
+                  {formatTemplate(dictionary.pluginRestartImpactCounts, {
+                    menus: String(change.menuRoutes),
+                    resources: String(change.adminResources),
+                    configResources: String(change.configResources),
+                    permissions: String(change.permissions),
+                    authProviders: String(change.authProviders),
+                  })}
+                </Typography.Text>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
 
 function CapabilityInspector({
   capability,
+  currentCapabilityIDs,
+  desiredCapabilityIDs,
   dictionary,
   language,
 }: {
   capability?: CapabilityView;
+  currentCapabilityIDs: Set<string>;
+  desiredCapabilityIDs: Set<string>;
   dictionary: Dictionary;
   language: Language;
 }) {
@@ -452,6 +502,7 @@ function CapabilityInspector({
   const permissions = capability.permissions ?? [];
   const serviceOperations = capability.serviceOperations ?? [];
   const authProviders = capability.authProviders ?? [];
+  const restartState = capabilityRestartState(capability, currentCapabilityIDs, desiredCapabilityIDs);
 
   return (
     <div className="capability-detail-panel">
@@ -464,6 +515,14 @@ function CapabilityInspector({
           <Tag className={`kind-tag kind-${capability.kind}`}>{kindLabel(dictionary, capability.kind)}</Tag>
         </div>
       </div>
+
+      {restartState !== "stable" ? (
+        <AdminFeedback
+          type="warning"
+          message={restartState === "enable-pending" ? dictionary.capabilityEnableAfterRestart : dictionary.capabilityDisableAfterRestart}
+          description={dictionary.capabilityRestartActivationHint}
+        />
+      ) : null}
 
       <dl className="detail-list">
         <div>
@@ -650,14 +709,15 @@ function matchesCapabilityStatus(
   desiredCapabilityIDs: Set<string>,
 ) {
   const enabled = currentCapabilityIDs.has(capability.id);
-  const pendingRestart = !enabled && desiredCapabilityIDs.has(capability.id);
+  const desired = desiredCapabilityIDs.has(capability.id);
+  const pendingRestart = enabled !== desired;
   switch (status) {
   case "enabled":
-    return enabled;
+    return enabled && desired;
   case "pending-restart":
     return pendingRestart;
   case "not-enabled":
-    return !enabled && !pendingRestart;
+    return !enabled && !desired;
   default:
     return true;
   }
@@ -669,15 +729,29 @@ function capabilityRuntimeStatusTag(
   desiredCapabilityIDs: Set<string>,
   dictionary: Dictionary,
 ) {
-  const enabled = currentCapabilityIDs.has(capability.id);
-  const pending = !enabled && desiredCapabilityIDs.has(capability.id);
-  if (pending) {
-    return <Tag className="resource-status status-recorded">{dictionary.restartPending}</Tag>;
+  const state = capabilityRestartState(capability, currentCapabilityIDs, desiredCapabilityIDs);
+  if (state === "enable-pending") {
+    return <Tag className="resource-status status-recorded">{dictionary.capabilityEnableAfterRestart}</Tag>;
   }
-  if (enabled) {
+  if (state === "disable-pending") {
+    return <Tag className="resource-status status-recorded">{dictionary.capabilityDisableAfterRestart}</Tag>;
+  }
+  if (currentCapabilityIDs.has(capability.id)) {
     return <span className="status-dot status-enabled">{dictionary.enabled}</span>;
   }
   return <span className="status-dot status-disabled">{dictionary.notEnabled}</span>;
+}
+
+function capabilityRestartState(
+  capability: CapabilityView,
+  currentCapabilityIDs: Set<string>,
+  desiredCapabilityIDs: Set<string>,
+): CapabilityRestartState {
+  const enabled = currentCapabilityIDs.has(capability.id);
+  const desired = desiredCapabilityIDs.has(capability.id);
+  if (!enabled && desired) return "enable-pending";
+  if (enabled && !desired) return "disable-pending";
+  return "stable";
 }
 
 function kindLabel(dictionary: Dictionary, kind: CapabilityKind) {
@@ -712,6 +786,31 @@ function normalizePluginManagementStatus(status: PluginManagementStatus | null, 
     currentCapabilities,
     desiredCapabilities,
   };
+}
+
+function pluginRestartImpactPreview(status: PluginManagementStatus, capabilities: CapabilityView[], language: Language) {
+  const current = new Set(status.currentCapabilities);
+  const desired = new Set(status.desiredCapabilities);
+  const capabilityByID = new Map(capabilities.map((capability) => [capability.id, capability]));
+  return restartChangeIDs(current, desired).map((id) => {
+    const capability = capabilityByID.get(id);
+    return {
+      id,
+      action: desired.has(id) ? "enable" as const : "disable" as const,
+      label: capability?.label[language] ?? id,
+      menuRoutes: capability?.menuRoutes?.length ?? 0,
+      adminResources: capability?.adminResources?.length ?? 0,
+      configResources: capability?.configResources?.length ?? 0,
+      permissions: capability?.permissions?.length ?? 0,
+      authProviders: capability?.authProviders?.length ?? 0,
+    };
+  });
+}
+
+function restartChangeIDs(current: Set<string>, desired: Set<string>) {
+  return Array.from(new Set([...current, ...desired]))
+    .filter((id) => current.has(id) !== desired.has(id))
+    .sort();
 }
 
 function normalizeLockStatus(value: unknown): PluginManagementStatus["lockStatus"] {

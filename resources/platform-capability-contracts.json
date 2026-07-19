@@ -174,6 +174,31 @@
       "docs": ["docs/platform-auth.md", "docs/platform-capability-development.md"]
     },
     {
+      "id": "credential-auth",
+      "label": { "zh": "本地凭据认证", "en": "Credential Auth" },
+      "classification": "optional-platform",
+      "profilePolicy": "profile-only",
+      "source": { "kind": "platform-extension-manifest", "package": "internal/platform/core" },
+      "ownership": "platform-auth-provider",
+      "boundary": "Local credential authentication for username/password, phone/password, email/password and phone/SMS OTP. It owns dedicated credential stores, challenge/OTP flows, application-layer encrypted secret transport and the settings-center password policy/security configuration resource. It must not store passwords, OTP codes or challenge answers in generic Record.Values.",
+      "replaceability": "replace-through-auth-provider",
+      "includedInProfiles": ["platform-credential-auth-ready"],
+      "excludedFromProfiles": ["minimal-admin", "platform-default", "platform-app-ready", "platform-personnel-ready", "platform-notification-ready", "platform-job-ready", "enterprise-governance", "production-admin-oidc-ready"],
+      "dependencies": ["audit", "identity", "notification", "rbac", "session"],
+      "adminResources": ["credential-auth-settings"],
+      "authProviders": ["email-password", "phone-password", "phone-sms-otp", "username-password"],
+      "productization": {
+        "settingsCenterRoute": "/settings",
+        "settingsAggregation": "dynamic-enabled-capability-config",
+        "settingsConfigResources": ["credential-auth-settings"],
+        "runtimeStatus": "deliverable-v1-settings-runtime-v1.1",
+        "secretTransport": "ECDH-P256-HKDF-SHA256+A256GCM",
+        "passwordCredentialPolicy": "argon2id dedicated password credential repository; no generic Record.Values password hashes",
+        "restartPolicy": "credential-auth settings changes are saved with audit and marked restartRequired/pendingRestart because provider and security policy are process-runtime inputs"
+      },
+      "docs": ["docs/platform-auth.md", "docs/platform-capability-development.md", "resources/platform-credential-auth-v1.json"]
+    },
+    {
       "id": "parameter",
       "label": { "zh": "参数与品牌", "en": "Parameters And Branding" },
       "classification": "foundation-default",
@@ -284,7 +309,7 @@
       "profilePolicy": "profile-only",
       "source": { "kind": "platform-extension-manifest", "package": "internal/platform/core" },
       "ownership": "platform-operations-extension",
-      "boundary": "Reusable message-center workbench, channel configuration, provider accounts, send policies, templates, records, delivery ledgers and sender adapter contracts without binding to one business domain. SMS P0 exposes Aliyun, Tencent Cloud and mock-local configuration entries, email P0 exposes generic SMTP, and WeChat channels expose configuration contracts/product placeholders. Provider credentials must be encrypted, masked or omitted by field policy instead of plain generic values.",
+      "boundary": "Reusable message-center workbench, channel configuration, provider accounts, send policies, templates, records, delivery ledgers and sender adapter contracts without binding to one business domain. SMS P0 exposes Aliyun, Tencent Cloud and mock-local configuration entries, email P0 exposes generic SMTP, and WeChat channels expose configuration contracts/product placeholders with local dry-run receipts. Provider credentials must be encrypted, masked or omitted by field policy instead of plain generic values.",
       "replaceability": "replace-through-notification-adapter",
       "includedInProfiles": ["platform-notification-ready"],
       "excludedFromProfiles": ["minimal-admin", "platform-default"],
@@ -294,6 +319,7 @@
         "workbenchRoute": "/message-center",
         "settingsCenterRoute": "/settings",
         "settingsAggregation": "dynamic-enabled-capability-config",
+        "settingsRuntime": "settings-runtime-v1.1",
         "settingsConfigResources": ["notification-channels", "notification-providers", "notification-send-policies", "notification-templates"],
         "adminEntryPolicy": "single-workbench-plus-settings-center",
         "channels": ["in_app", "sms", "email", "wechat_official", "wechat_miniapp"],
@@ -312,21 +338,22 @@
           {
             "channel": "email",
             "providers": ["smtp"],
-            "runtimeStatus": "generic-smtp-config-contract"
+            "runtimeStatus": "generic-smtp-config-contract-plus-local-dry-run"
           },
           {
             "channel": "wechat_official",
             "providers": ["wechat-official"],
-            "runtimeStatus": "configuration-placeholder"
+            "runtimeStatus": "configuration-placeholder-plus-local-dry-run"
           },
           {
             "channel": "wechat_miniapp",
             "providers": ["wechat-miniapp"],
-            "runtimeStatus": "configuration-placeholder"
+            "runtimeStatus": "configuration-placeholder-plus-local-dry-run"
           }
         ],
         "credentialPolicy": "Provider credentials, app secrets, webhook secrets and raw vendor errors must be encrypted, masked or omitted by field policy.",
-        "runtimeBoundary": "v1 proves the product configuration contract, SMS mock-local sender, non-network SMS dry-run, and official SDK-backed Aliyun/Tencent Cloud live SMS adapters; concrete SMTP and WeChat send adapters remain follow-up runtime slices."
+        "restartPolicy": "Notification provider/channel/template/policy settings save with audit and are marked restartRequired/pendingRestart because sender adapters are process-runtime inputs in v1.1.",
+        "runtimeBoundary": "v1 proves the product configuration contract, SMS mock-local sender, non-network SMS dry-run, official SDK-backed Aliyun/Tencent Cloud live SMS adapters, and local dry-run receipts for in-app, email, WeChat official account and WeChat miniapp test-send flows; concrete SMTP and WeChat send adapters remain follow-up runtime slices for external supplier delivery."
       },
       "docs": ["docs/platform-capability-development.md", "docs/platform-foundation-task-map.md"]
     },

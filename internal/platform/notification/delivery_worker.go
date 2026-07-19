@@ -32,7 +32,9 @@ type DeliveryStore interface {
 
 type DeliveryWorkerOptions struct {
 	SMSSenders          map[string]SMSSender
+	MessageSenders      map[string]MessageSender
 	DefaultSMSProvider  string
+	DefaultProviders    map[string]string
 	MaxBatch            int
 	Now                 func() time.Time
 	Actor               string
@@ -42,7 +44,9 @@ type DeliveryWorkerOptions struct {
 type DeliveryWorker struct {
 	store               DeliveryStore
 	smsSenders          map[string]SMSSender
+	messageSenders      map[string]MessageSender
 	defaultSMSProvider  string
+	defaultProviders    map[string]string
 	maxBatch            int
 	now                 func() time.Time
 	actor               string
@@ -86,10 +90,43 @@ func NewDeliveryWorker(store DeliveryStore, options DeliveryWorkerOptions) *Deli
 		senders[provider] = sender
 	}
 	defaultProvider := CanonicalSMSProvider(options.DefaultSMSProvider)
+	messageSenders := make(map[string]MessageSender, len(options.MessageSenders))
+	for key, sender := range options.MessageSenders {
+		if messageSenderNil(sender) {
+			continue
+		}
+		channel := CanonicalChannel(sender.Channel())
+		provider := CanonicalProvider(sender.Kind())
+		if channel == "" || provider == "" {
+			parts := strings.SplitN(key, ":", 2)
+			if len(parts) == 2 {
+				channel = firstNonBlank(channel, CanonicalChannel(parts[0]))
+				provider = firstNonBlank(provider, CanonicalProvider(parts[1]))
+			}
+		}
+		if channel == "" || provider == "" {
+			continue
+		}
+		messageSenders[senderKey(channel, provider)] = sender
+	}
+	defaultProviders := make(map[string]string, len(options.DefaultProviders)+1)
+	for channel, provider := range options.DefaultProviders {
+		channel = CanonicalChannel(channel)
+		provider = CanonicalProvider(provider)
+		if channel == "" || provider == "" {
+			continue
+		}
+		defaultProviders[channel] = provider
+	}
+	if defaultProvider != "" {
+		defaultProviders[ChannelSMS] = defaultProvider
+	}
 	return &DeliveryWorker{
 		store:               store,
 		smsSenders:          senders,
+		messageSenders:      messageSenders,
 		defaultSMSProvider:  defaultProvider,
+		defaultProviders:    defaultProviders,
 		maxBatch:            maxBatch,
 		now:                 now,
 		actor:               actor,
@@ -123,20 +160,21 @@ func (w *DeliveryWorker) RunOnce(ctx context.Context) (DeliveryWorkerResult, err
 		if result.Attempted >= w.maxBatch {
 			break
 		}
-		if !pendingSMSDelivery(delivery) {
+		channel, ok := pendingNotificationDelivery(delivery)
+		if !ok {
 			result.Skipped++
 			continue
 		}
 		result.Attempted++
 		notice, ok := noticeByCode[strings.TrimSpace(delivery.Values["notificationCode"])]
 		if !ok {
-			if err := w.markDeliveryFailed(delivery, nil, "notification record not found"); err != nil {
+			if err := w.markDeliveryFailed(delivery, channel, nil, "notification record not found"); err != nil {
 				return result, err
 			}
 			result.Failed++
 			continue
 		}
-		delivered, err := w.deliverSMS(ctx, delivery, notice)
+		delivered, err := w.deliver(ctx, channel, delivery, notice)
 		if err != nil {
 			return result, err
 		}
@@ -150,22 +188,35 @@ func (w *DeliveryWorker) RunOnce(ctx context.Context) (DeliveryWorkerResult, err
 }
 
 func pendingSMSDelivery(record adminresource.Record) bool {
+	channel, ok := pendingNotificationDelivery(record)
+	return ok && channel == ChannelSMS
+}
+
+func pendingNotificationDelivery(record adminresource.Record) (string, bool) {
 	if record.Status == "disabled" {
-		return false
+		return "", false
 	}
 	values := record.Values
-	return strings.EqualFold(strings.TrimSpace(values["channel"]), ChannelSMS) &&
+	channel := CanonicalChannel(values["channel"])
+	return channel, IsSupportedChannel(channel) &&
 		strings.EqualFold(strings.TrimSpace(values["deliveryStatus"]), DeliveryStatusPending)
+}
+
+func (w *DeliveryWorker) deliver(ctx context.Context, channel string, delivery adminresource.Record, notice adminresource.Record) (bool, error) {
+	if channel == ChannelSMS {
+		return w.deliverSMS(ctx, delivery, notice)
+	}
+	return w.deliverMessage(ctx, channel, delivery, notice)
 }
 
 func (w *DeliveryWorker) deliverSMS(ctx context.Context, delivery adminresource.Record, notice adminresource.Record) (bool, error) {
 	message, provider, prepareErr := w.smsMessageFromRecords(delivery, notice)
 	if prepareErr != nil {
-		return false, w.markDeliveryFailed(delivery, &provider, "notification delivery failed")
+		return false, w.markDeliveryFailed(delivery, ChannelSMS, &provider, "notification delivery failed")
 	}
 	sender, err := w.smsSender(provider)
 	if err != nil {
-		return false, w.markDeliveryFailed(delivery, &provider, "notification delivery sender unavailable")
+		return false, w.markDeliveryFailed(delivery, ChannelSMS, &provider, "notification delivery sender unavailable")
 	}
 	receipt, sendErr := sender.SendSMS(ctx, message)
 	if sendErr != nil {
@@ -175,7 +226,7 @@ func (w *DeliveryWorker) deliverSMS(ctx context.Context, delivery adminresource.
 		if receipt.RedactedTarget == "" {
 			receipt.RedactedTarget = RedactSMSTarget(message.Recipient)
 		}
-		return false, w.markDeliveryFailed(delivery, &receipt.Provider, "notification delivery failed")
+		return false, w.markDeliveryFailed(delivery, ChannelSMS, &receipt.Provider, "notification delivery failed")
 	}
 	if receipt.Provider == "" {
 		receipt.Provider = sender.Kind()
@@ -183,6 +234,44 @@ func (w *DeliveryWorker) deliverSMS(ctx context.Context, delivery adminresource.
 	if receipt.RedactedTarget == "" {
 		receipt.RedactedTarget = RedactSMSTarget(message.Recipient)
 	}
+	return w.markDeliveryDelivered(delivery, DeliveryReceiptFromSMS(receipt))
+}
+
+func (w *DeliveryWorker) deliverMessage(ctx context.Context, channel string, delivery adminresource.Record, notice adminresource.Record) (bool, error) {
+	message, provider, prepareErr := w.messageFromRecords(channel, delivery, notice)
+	if prepareErr != nil {
+		return false, w.markDeliveryFailed(delivery, channel, &provider, "notification delivery failed")
+	}
+	sender, err := w.messageSender(channel, provider)
+	if err != nil {
+		return false, w.markDeliveryFailed(delivery, channel, &provider, "notification delivery sender unavailable")
+	}
+	receipt, sendErr := sender.SendMessage(ctx, message)
+	if sendErr != nil {
+		if receipt.Channel == "" {
+			receipt.Channel = channel
+		}
+		if receipt.Provider == "" {
+			receipt.Provider = sender.Kind()
+		}
+		if receipt.RedactedTarget == "" {
+			receipt.RedactedTarget = RedactMessageTarget(channel, message.Recipient)
+		}
+		return false, w.markDeliveryFailed(delivery, channel, &receipt.Provider, "notification delivery failed")
+	}
+	if receipt.Channel == "" {
+		receipt.Channel = channel
+	}
+	if receipt.Provider == "" {
+		receipt.Provider = sender.Kind()
+	}
+	if receipt.RedactedTarget == "" {
+		receipt.RedactedTarget = RedactMessageTarget(channel, message.Recipient)
+	}
+	return w.markDeliveryDelivered(delivery, receipt)
+}
+
+func (w *DeliveryWorker) markDeliveryDelivered(delivery adminresource.Record, receipt DeliveryReceipt) (bool, error) {
 	now := w.now().UTC().Format(time.RFC3339)
 	values := cloneSMSDeliveryValues(delivery.Values)
 	values["deliveryStatus"] = DeliveryStatusDelivered
@@ -193,7 +282,7 @@ func (w *DeliveryWorker) deliverSMS(ctx context.Context, delivery adminresource.
 	values["provider"] = receipt.Provider
 	values["providerMessageId"] = receipt.MessageID
 	delete(values, "errorMessage")
-	_, err = w.store.UpdateInternalWithAudit(NotificationDeliveryResource, delivery.ID, adminresource.WriteInput{
+	_, err := w.store.UpdateInternalWithAudit(NotificationDeliveryResource, delivery.ID, adminresource.WriteInput{
 		Code:        delivery.Code,
 		Name:        delivery.Name,
 		Status:      delivery.Status,
@@ -203,15 +292,15 @@ func (w *DeliveryWorker) deliverSMS(ctx context.Context, delivery adminresource.
 	return true, err
 }
 
-func (w *DeliveryWorker) markDeliveryFailed(delivery adminresource.Record, provider *string, errorMessage string) error {
+func (w *DeliveryWorker) markDeliveryFailed(delivery adminresource.Record, channel string, provider *string, errorMessage string) error {
 	now := w.now().UTC().Format(time.RFC3339)
 	values := cloneSMSDeliveryValues(delivery.Values)
 	values["deliveryStatus"] = DeliveryStatusFailed
 	values["attempts"] = strconv.Itoa(deliveryAttempts(delivery) + 1)
 	values["lastAttemptAt"] = now
-	values["target"] = RedactSMSTarget(values["target"])
+	values["target"] = RedactMessageTarget(channel, values["target"])
 	if provider != nil && strings.TrimSpace(*provider) != "" {
-		values["provider"] = CanonicalSMSProvider(*provider)
+		values["provider"] = CanonicalProvider(*provider)
 	}
 	delete(values, "providerMessageId")
 	values["errorMessage"] = strings.TrimSpace(errorMessage)
@@ -226,6 +315,31 @@ func (w *DeliveryWorker) markDeliveryFailed(delivery adminresource.Record, provi
 		Values:      values,
 	}, adminresource.AuditEvent{Actor: w.actor, Action: deliveryWorkerAction, Result: "failed", ReasonCode: DeliveryStatusFailed})
 	return err
+}
+
+func (w *DeliveryWorker) messageFromRecords(channel string, delivery adminresource.Record, notice adminresource.Record) (Message, string, error) {
+	payload := parseNotificationPayload(notice.Values["payload"])
+	provider := CanonicalProvider(delivery.Values["provider"])
+	if provider == "" {
+		provider = w.defaultProvider(channel)
+	}
+	templateID := firstNonBlank(delivery.Values["templateId"], notice.Values["templateId"], payload.TemplateID)
+	recipient := strings.TrimSpace(delivery.Values["target"])
+	if recipient == "" || strings.HasPrefix(recipient, "****") {
+		return Message{}, provider, fmt.Errorf("notification delivery target is required")
+	}
+	params := firstTemplateParams(delivery.Values["templateParams"], notice.Values["templateParams"], payload.TemplateParams)
+	return Message{
+		TenantCode:     firstNonBlank(delivery.Values["tenantCode"], notice.Values["tenantCode"]),
+		Channel:        channel,
+		Recipient:      recipient,
+		TemplateID:     templateID,
+		TemplateParams: params,
+		Title:          notice.Name,
+		Body:           notice.Description,
+		Purpose:        firstNonBlank(notice.Values["category"], payload.Purpose, "notification"),
+		TraceID:        firstNonBlank(delivery.Values["traceId"], notice.Values["traceId"]),
+	}, provider, nil
 }
 
 func (w *DeliveryWorker) smsMessageFromRecords(delivery adminresource.Record, notice adminresource.Record) (SMSMessage, string, error) {
@@ -267,6 +381,42 @@ func (w *DeliveryWorker) smsSender(provider string) (SMSSender, error) {
 		return nil, fmt.Errorf("sms sender %q is not configured", provider)
 	}
 	return NewDryRunSMSSenderForProvider(provider)
+}
+
+func (w *DeliveryWorker) messageSender(channel string, provider string) (MessageSender, error) {
+	channel = CanonicalChannel(channel)
+	provider = CanonicalProvider(provider)
+	if provider == "" && len(w.messageSenders) == 1 {
+		for _, sender := range w.messageSenders {
+			if CanonicalChannel(sender.Channel()) == channel {
+				return sender, nil
+			}
+		}
+	}
+	if provider == "" {
+		provider = w.defaultProvider(channel)
+	}
+	if provider == "" {
+		provider = DefaultProviderForChannel(channel)
+	}
+	if sender := w.messageSenders[senderKey(channel, provider)]; !messageSenderNil(sender) {
+		return sender, nil
+	}
+	if !w.allowDryRunFallback {
+		return nil, fmt.Errorf("notification sender %q for channel %q is not configured", provider, channel)
+	}
+	return NewDryRunMessageSender(channel, provider)
+}
+
+func (w *DeliveryWorker) defaultProvider(channel string) string {
+	channel = CanonicalChannel(channel)
+	if channel == ChannelSMS && w.defaultSMSProvider != "" {
+		return w.defaultSMSProvider
+	}
+	if provider := w.defaultProviders[channel]; provider != "" {
+		return provider
+	}
+	return ""
 }
 
 func parseNotificationPayload(raw string) notificationPayload {
@@ -342,6 +492,13 @@ func firstNonBlank(values ...string) string {
 }
 
 func smsSenderNil(sender SMSSender) bool {
+	if sender == nil {
+		return true
+	}
+	return false
+}
+
+func messageSenderNil(sender MessageSender) bool {
 	if sender == nil {
 		return true
 	}

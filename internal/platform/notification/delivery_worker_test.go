@@ -102,6 +102,86 @@ func TestDeliveryWorkerUsesVendorDryRunSender(t *testing.T) {
 	}
 }
 
+func TestDeliveryWorkerDeliversEmailWithExplicitDryRunFallback(t *testing.T) {
+	store := notificationWorkerTestStore(t)
+	notice := createNotificationWorkerNotice(t, store, map[string]string{
+		"tenantCode": "platform",
+		"category":   "account",
+		"payload":    `{"templateId":"EMAIL_PROFILE","templateParams":{"name":"Admin"}}`,
+	})
+	delivery := createNotificationWorkerDelivery(t, store, map[string]string{
+		"tenantCode":       "platform",
+		"notificationCode": notice.Code,
+		"channel":          ChannelEmail,
+		"deliveryStatus":   "pending",
+		"target":           "owner@example.com",
+		"provider":         EmailProviderSMTP,
+		"attempts":         "0",
+	})
+	now := time.Date(2026, 7, 19, 11, 10, 0, 0, time.UTC)
+	worker := NewDeliveryWorker(store, DeliveryWorkerOptions{
+		AllowDryRunFallback: true,
+		Now:                 func() time.Time { return now },
+	})
+
+	result, err := worker.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if result.Attempted != 1 || result.Delivered != 1 || result.Failed != 0 {
+		t.Fatalf("RunOnce() result = %+v, want one delivered email dry-run attempt", result)
+	}
+	updated, err := store.InternalRecord("notification-deliveries", delivery.ID)
+	if err != nil {
+		t.Fatalf("InternalRecord(notification-deliveries) error = %v", err)
+	}
+	if updated.Values["deliveryStatus"] != "delivered" ||
+		updated.Values["attempts"] != "1" ||
+		updated.Values["provider"] != EmailProviderSMTP ||
+		!strings.HasPrefix(updated.Values["providerMessageId"], "email-dry-run-") ||
+		updated.Values["target"] != "ow***@example.com" ||
+		updated.Values["lastAttemptAt"] != now.Format(time.RFC3339) ||
+		updated.Values["deliveredAt"] != now.Format(time.RFC3339) {
+		t.Fatalf("updated delivery values = %+v, want email dry-run ledger", updated.Values)
+	}
+}
+
+func TestDeliveryWorkerDoesNotAutoDeliverNonSMSWithoutConfiguredSender(t *testing.T) {
+	store := notificationWorkerTestStore(t)
+	notice := createNotificationWorkerNotice(t, store, map[string]string{
+		"tenantCode": "platform",
+		"category":   "account",
+		"payload":    `{"templateId":"WECHAT_NOTICE"}`,
+	})
+	delivery := createNotificationWorkerDelivery(t, store, map[string]string{
+		"tenantCode":       "platform",
+		"notificationCode": notice.Code,
+		"channel":          ChannelWeChatOfficial,
+		"deliveryStatus":   "pending",
+		"target":           "openid-oQ1234567890",
+		"provider":         WeChatProviderOfficial,
+		"attempts":         "0",
+	})
+
+	result, err := NewDeliveryWorker(store, DeliveryWorkerOptions{}).RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if result.Attempted != 1 || result.Delivered != 0 || result.Failed != 1 {
+		t.Fatalf("RunOnce() result = %+v, want one failed unconfigured sender attempt", result)
+	}
+	updated, err := store.InternalRecord("notification-deliveries", delivery.ID)
+	if err != nil {
+		t.Fatalf("InternalRecord(notification-deliveries) error = %v", err)
+	}
+	if updated.Values["deliveryStatus"] != "failed" ||
+		updated.Values["provider"] != WeChatProviderOfficial ||
+		updated.Values["target"] != "****7890" ||
+		updated.Values["errorMessage"] != "notification delivery sender unavailable" {
+		t.Fatalf("updated delivery values = %+v, want failed unconfigured WeChat ledger", updated.Values)
+	}
+}
+
 func TestDeliveryWorkerRequiresConfiguredSenderUnlessDryRunFallbackEnabled(t *testing.T) {
 	store := notificationWorkerTestStore(t)
 	notice := createNotificationWorkerNotice(t, store, map[string]string{

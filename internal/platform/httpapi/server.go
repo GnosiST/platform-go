@@ -151,6 +151,7 @@ type Server struct {
 	debugCodeEnabled         bool
 	tokens                   authTokenService
 	now                      func() time.Time
+	startedAt                time.Time
 	openAPIDocument          []byte
 	capabilityLockFile       string
 	capabilityConfigSource   string
@@ -166,6 +167,8 @@ type Server struct {
 	adminMenuServingMode     AdminMenuServingMode
 	adminMenuResolver        AdminMenuResolver
 	adminMenuComparisonSink  any
+	settingsMu               sync.Mutex
+	settingsPendingRestart   map[string]map[string]struct{}
 }
 
 const (
@@ -291,6 +294,7 @@ func New(options ServerOptions) *Server {
 		debugCodeEnabled:         options.DebugCodeEnabled,
 		tokens:                   tokens,
 		now:                      now,
+		startedAt:                now().UTC(),
 		openAPIDocument:          append([]byte(nil), options.OpenAPIDocument...),
 		capabilityLockFile:       strings.TrimSpace(options.CapabilityLockFile),
 		capabilityConfigSource:   strings.TrimSpace(options.CapabilityConfigSource),
@@ -342,6 +346,8 @@ func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 	api.GET("/admin/menus", s.adminMenus)
 	api.GET("/admin/settings", s.adminSettingsRuntime)
 	api.PUT("/admin/settings/:resource/:id", s.adminSettingsUpdate)
+	api.POST("/admin/settings/:resource/:id/validate-config", s.adminSettingsValidateConfig)
+	api.POST("/admin/settings/:resource/:id/test-connect", s.adminSettingsTestConnection)
 	api.GET("/admin/plugin-management/status", s.adminPluginManagementStatus)
 	api.POST("/admin/message-center/test-send", s.adminMessageCenterTestSend)
 	api.POST("/admin/message-center/deliveries/run", s.adminMessageCenterDeliveriesRun)

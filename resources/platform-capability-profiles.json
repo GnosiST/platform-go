@@ -241,6 +241,57 @@
       ]
     },
     {
+      "id": "platform-credential-auth-ready",
+      "label": {
+        "zh": "凭据认证底座",
+        "en": "Credential Auth-Ready Platform Foundation"
+      },
+      "purpose": "Default platform foundation plus notification and credential-auth for username/password, phone/password, email/password and phone/SMS OTP login with settings-center configuration.",
+      "capabilities": [
+        "tenant",
+        "identity",
+        "session",
+        "rbac",
+        "menu",
+        "api-resource",
+        "audit",
+        "wechat-login",
+        "dictionary",
+        "parameter",
+        "file-storage",
+        "notification",
+        "credential-auth",
+        "admin-shell",
+        "demo-data",
+        "system-admin"
+      ],
+      "mustIncludeCapabilities": [
+        "notification",
+        "credential-auth"
+      ],
+      "mustIncludeResources": [
+        "credential-auth-settings",
+        "message-center",
+        "notification-channels",
+        "notification-providers",
+        "notification-send-policies",
+        "notification-templates",
+        "notifications",
+        "notification-deliveries",
+        "tenants",
+        "users",
+        "audit-logs"
+      ],
+      "mustExcludeCapabilities": [
+        "external-business-capability",
+        "admin-oidc",
+        "policy-review",
+        "personnel",
+        "job",
+        "app-phone"
+      ]
+    },
+    {
       "id": "platform-job-ready",
       "label": {
         "zh": "任务调度底座",

@@ -97,23 +97,44 @@ describe("validate-platform-admin-api-boundary", () => {
     assert.equal(smsData?.properties?.debugCode?.["x-platform-sensitivity"], "secret");
     const settingsRuntime = openAPI.paths?.["/api/admin/settings"]?.get;
     assert.equal(settingsRuntime?.operationId, "getAdminSettingsRuntime");
-    assert.equal(settingsRuntime?.["x-platform-runtime"], "settings-runtime-p0");
+    assert.equal(settingsRuntime?.["x-platform-runtime"], "settings-runtime-v1.1");
     assert.equal(settingsRuntime?.["x-platform-permission"], "admin:settings:read");
     const settingsUpdate = openAPI.paths?.["/api/admin/settings/{resource}/{id}"]?.put;
     assert.equal(settingsUpdate?.operationId, "updateAdminSettingsResource");
-    assert.equal(settingsUpdate?.["x-platform-runtime"], "settings-runtime-p0");
+    assert.equal(settingsUpdate?.["x-platform-runtime"], "settings-runtime-v1.1");
     assert.equal(settingsUpdate?.["x-platform-permission"], "admin:settings:update");
     assert.equal(
       settingsUpdate?.requestBody?.content?.["application/json"]?.schema?.$ref,
       "#/components/schemas/AdminSettingsUpdateRequest",
     );
+    const settingsValidate = openAPI.paths?.["/api/admin/settings/{resource}/{id}/validate-config"]?.post;
+    assert.equal(settingsValidate?.operationId, "validateAdminSettingsResourceConfig");
+    assert.equal(settingsValidate?.["x-platform-runtime"], "settings-runtime-v1.1");
+    assert.equal(settingsValidate?.["x-platform-permission"], "admin:settings:update");
+    assert.equal(
+      settingsValidate?.responses?.["200"]?.content?.["application/json"]?.schema?.properties?.data?.$ref,
+      "#/components/schemas/AdminSettingsValidationData",
+    );
+    const settingsTestConnect = openAPI.paths?.["/api/admin/settings/{resource}/{id}/test-connect"]?.post;
+    assert.equal(settingsTestConnect?.operationId, "testConnectAdminSettingsResource");
+    assert.equal(settingsTestConnect?.["x-platform-runtime"], "settings-runtime-v1.1");
+    assert.equal(settingsTestConnect?.["x-platform-permission"], "admin:settings:update");
+    assert.equal(
+      settingsTestConnect?.responses?.["200"]?.content?.["application/json"]?.schema?.properties?.data?.$ref,
+      "#/components/schemas/AdminSettingsTestConnectionData",
+    );
     assert.equal(
       openAPI.components?.schemas?.AdminSettingsResourceItem?.["x-platform-secret-projection"],
       "response projection must mask or omit protected provider secrets",
     );
+    assert.ok(openAPI.components?.schemas?.AdminSettingsResourceItem?.required?.includes("runtimeApplyMode"));
+    assert.ok(openAPI.components?.schemas?.AdminSettingsResourceItem?.required?.includes("restartRequired"));
+    assert.ok(openAPI.components?.schemas?.AdminSettingsResourceItem?.required?.includes("pendingRestart"));
+    assert.ok(openAPI.components?.schemas?.AdminSettingsMutationData?.required?.includes("restartRequired"));
+    assert.ok(openAPI.components?.schemas?.AdminSettingsMutationData?.required?.includes("pendingRestart"));
     const messageCenterTestSend = openAPI.paths?.["/api/admin/message-center/test-send"]?.post;
     assert.equal(messageCenterTestSend?.operationId, "testSendMessageCenter");
-    assert.equal(messageCenterTestSend?.["x-platform-runtime"], "notification-sms-test-send-p0");
+    assert.equal(messageCenterTestSend?.["x-platform-runtime"], "notification-message-center-test-send-v1");
     assert.equal(messageCenterTestSend?.["x-platform-permission"], "admin:message-center:update");
     assert.equal(
       messageCenterTestSend?.requestBody?.content?.["application/json"]?.schema?.$ref,
@@ -126,9 +147,10 @@ describe("validate-platform-admin-api-boundary", () => {
     assert.equal(messageCenterRequest?.properties?.recipient?.["x-platform-response-policy"], "redacted target only");
     assert.equal(messageCenterRequest?.properties?.templateParams?.writeOnly, true);
     assert.equal(
-      openAPI.components?.schemas?.AdminMessageCenterSMSReceipt?.["x-platform-secret-projection"],
-      "only redacted SMS target and provider receipt metadata are returned",
+      openAPI.components?.schemas?.AdminMessageCenterDeliveryReceipt?.["x-platform-secret-projection"],
+      "only redacted target and provider receipt metadata are returned",
     );
+    assert.ok(openAPI.components?.schemas?.AdminMessageCenterDeliveryReceipt?.required?.includes("channel"));
     assert.deepEqual(
       Object.keys(openAPI.components?.schemas?.AdminAuthProviderStartData?.properties ?? {}).sort(),
       ["authorizationUrl", "expiresAt", "state"],
@@ -177,6 +199,8 @@ describe("validate-platform-admin-api-boundary", () => {
     delete openAPI.paths["/api/auth/credential-secret-key"];
     delete openAPI.paths["/api/admin/settings"];
     delete openAPI.paths["/api/admin/settings/{resource}/{id}"];
+    delete openAPI.paths["/api/admin/settings/{resource}/{id}/validate-config"];
+    delete openAPI.paths["/api/admin/settings/{resource}/{id}/test-connect"];
     delete openAPI.paths["/api/admin/message-center/test-send"];
     openAPI.components.schemas.AdminAuthLoginRequest.properties.secret = { type: "object" };
     openAPI.components.schemas.AdminCredentialAuthSecret.properties.value.writeOnly = false;
@@ -185,10 +209,16 @@ describe("validate-platform-admin-api-boundary", () => {
     openAPI.components.schemas.AdminCredentialAuthSecretKeyData.properties.algorithm.enum = ["none"];
     openAPI.components.schemas.AdminCredentialSMSOTPStartData.properties.debugCode["x-platform-development-only"] = false;
     delete openAPI.components.schemas.AdminSettingsResourceItem["x-platform-secret-projection"];
+    openAPI.components.schemas.AdminSettingsResourceItem.required = openAPI.components.schemas.AdminSettingsResourceItem.required.filter(
+      (field) => field !== "runtimeApplyMode" && field !== "restartRequired" && field !== "pendingRestart",
+    );
+    openAPI.components.schemas.AdminSettingsMutationData.required = openAPI.components.schemas.AdminSettingsMutationData.required.filter(
+      (field) => field !== "restartRequired" && field !== "pendingRestart",
+    );
     openAPI.components.schemas.AdminMessageCenterTestSendRequest.properties.recipient.writeOnly = false;
     delete openAPI.components.schemas.AdminMessageCenterTestSendRequest.properties.recipient["x-platform-response-policy"];
     openAPI.components.schemas.AdminMessageCenterTestSendRequest.properties.templateParams.writeOnly = false;
-    delete openAPI.components.schemas.AdminMessageCenterSMSReceipt["x-platform-secret-projection"];
+    delete openAPI.components.schemas.AdminMessageCenterDeliveryReceipt["x-platform-secret-projection"];
     const openAPIPath = tempJSON("openapi.admin.json", openAPI);
 
     const result = runValidator(["--admin-openapi", openAPIPath]);
@@ -196,16 +226,20 @@ describe("validate-platform-admin-api-boundary", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /credential-auth SMS OTP start operation/);
     assert.match(result.stderr, /credential-auth secret key operation/);
-    assert.match(result.stderr, /settings runtime P0 aggregation operation/);
-    assert.match(result.stderr, /settings runtime P0 update operation/);
-    assert.match(result.stderr, /message-center SMS test-send runtime operation/);
+    assert.match(result.stderr, /settings runtime v1\.1 aggregation operation/);
+    assert.match(result.stderr, /settings runtime v1\.1 update operation/);
+    assert.match(result.stderr, /settings runtime v1\.1 validate-config operation/);
+    assert.match(result.stderr, /settings runtime v1\.1 test-connect operation/);
+    assert.match(result.stderr, /AdminSettingsResourceItem must require runtimeApplyMode/);
+    assert.match(result.stderr, /AdminSettingsMutationData must require restartRequired/);
+    assert.match(result.stderr, /message-center test-send runtime operation/);
     assert.match(result.stderr, /structured credential-auth identifier, secret and challenge fields/);
     assert.match(result.stderr, /AdminCredentialAuthSecret must constrain password and SMS OTP secrets as encrypted write-only request fields/);
     assert.match(result.stderr, /AdminCredentialAuthSecretEnvelope must require client public key and write-only ciphertext/);
     assert.match(result.stderr, /AdminCredentialAuthSecretKeyData must expose ECDH\/AES public key metadata/);
     assert.match(result.stderr, /debugCode development-only secret/);
     assert.match(result.stderr, /AdminMessageCenterTestSendRequest must keep recipient and template params write-only/);
-    assert.match(result.stderr, /AdminMessageCenterSMSReceipt must declare redacted SMS target projection/);
+    assert.match(result.stderr, /AdminMessageCenterDeliveryReceipt must declare redacted target projection/);
   });
 
   it("rejects direct fetch outside the platform API client allowlist", () => {

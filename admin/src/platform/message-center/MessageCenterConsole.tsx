@@ -18,6 +18,7 @@ import {
   testSendMessageCenter,
   type AdminResourceRecord,
   type MessageCenterDeliveriesRunResult,
+  type MessageCenterChannel,
   type MessageCenterTestSendResult,
 } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
@@ -64,12 +65,17 @@ type MessageCenterChannelCard = {
   label: string;
   description: string;
   icon: ReactNode;
+  operationalState: MessageCenterChannelOperationalState;
   statusLabel: string;
   statusTone: string;
+  statusDetail: string;
+  testConnectLabel: string;
+  testConnectEnabled: boolean;
 };
+type MessageCenterChannelOperationalState = "runtime-ready" | "configuration-placeholder" | "configuration-slot";
 
 type MessageCenterTestSendForm = {
-  channel: "sms";
+  channel: MessageCenterChannel;
   tenantCode: string;
   recipient: string;
   templateId: string;
@@ -167,9 +173,9 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
   }, [resourceRoutes]);
 
   const openResource = (config: MessageCenterResourceConfig) => onRouteChange(config.route);
-  const openTestSend = (record?: AdminResourceRecord, config?: MessageCenterResourceConfig) => {
+  const openTestSend = (record?: AdminResourceRecord, config?: MessageCenterResourceConfig, channel?: MessageCenterChannel) => {
     setTestSendResult(null);
-    testSendForm.setFieldsValue(messageCenterTestSendInitialValues(record, config, language));
+    testSendForm.setFieldsValue(messageCenterTestSendInitialValues(record, config, language, channel));
     setTestSendOpen(true);
   };
   const closeTestSend = () => {
@@ -183,7 +189,7 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
     setTestSendSubmitting(true);
     try {
       const result = await testSendMessageCenter({
-        channel: "sms",
+        channel: values.channel,
         tenantCode: values.tenantCode,
         recipient: values.recipient,
         templateId: values.templateId,
@@ -294,13 +300,24 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
       >
         <div className="message-center-channel-strip">
           {channelCards(records, dictionary).map((card) => (
-            <div className="message-center-channel-card" key={card.key}>
+            <div className={`message-center-channel-card channel-state-${card.operationalState}`} key={card.key}>
               <div className="message-center-channel-icon">{card.icon}</div>
               <div>
                 <Typography.Text strong>{card.label}</Typography.Text>
                 <Typography.Paragraph type="secondary">{card.description}</Typography.Paragraph>
               </div>
-              <Tag color={card.statusTone}>{card.statusLabel}</Tag>
+              <Space className="message-center-channel-runtime" direction="vertical" size={6} align="end">
+                <Tag color={card.statusTone}>{card.statusLabel}</Tag>
+                <Typography.Text type="secondary">{card.statusDetail}</Typography.Text>
+                <Button
+                  disabled={!card.testConnectEnabled}
+                  size="small"
+                  type={card.testConnectEnabled ? "default" : "text"}
+                  onClick={() => openTestSend(undefined, undefined, normalizeMessageCenterChannel(card.key))}
+                >
+                  {card.testConnectLabel}
+                </Button>
+              </Space>
             </div>
           ))}
         </div>
@@ -344,9 +361,7 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
         <Form form={testSendForm} layout="vertical" requiredMark={false}>
           <Space className="message-center-test-send-grid" direction="vertical" size={0}>
             <Form.Item label={dictionary.messageCenterChannel} name="channel" rules={[{ required: true }]}>
-              <Select
-                options={[{ value: "sms", label: dictionary.messageCenterChannelSMS }]}
-              />
+              <Select options={messageCenterChannelOptions(dictionary)} />
             </Form.Item>
             <Form.Item label={dictionary.tenant} name="tenantCode">
               <Input />
@@ -658,21 +673,43 @@ function channelCards(records: MessageCenterRecords, dictionary: Dictionary): Me
     ? records.channels.map((record) => valueOf(record, "channel") || record.code)
     : ["in_app", "sms", "email", "wechat_official", "wechat_miniapp"];
   return channels.map((channel) => {
-    const runtimeReady = channel === "in_app" || (channel === "sms" && providersByChannel.has("sms"));
+    const smsRuntimeReady = channel === "sms" && providersByChannel.has("sms");
+    const runtimeReady = channel === "in_app" || smsRuntimeReady;
     const configuredOnly = configuredChannels.has(channel) || providersByChannel.has(channel);
+    const operationalState = channelOperationalState(channel, runtimeReady, configuredOnly);
     return {
       key: channel,
       label: channelLabel(channel, dictionary),
       description: channelDescription(channel, dictionary),
       icon: channelIcon(channel),
+      operationalState,
       statusLabel: runtimeReady
         ? dictionary.messageCenterChannelRuntimeReady
         : configuredOnly
           ? dictionary.messageCenterChannelConfiguredOnly
           : dictionary.messageCenterChannelConfigSlot,
       statusTone: runtimeReady ? "success" : configuredOnly ? "processing" : "default",
+      statusDetail: channelOperationalDetail(channel, operationalState, dictionary),
+      testConnectLabel: channel === "sms"
+        ? dictionary.messageCenterDryRun
+        : dictionary.messageCenterLocalDryRun,
+      testConnectEnabled: true,
     };
   });
+}
+
+function channelOperationalState(channel: string, runtimeReady: boolean, configuredOnly: boolean): MessageCenterChannelOperationalState {
+  if (runtimeReady) return "runtime-ready";
+  if (channel === "email" || channel.startsWith("wechat")) return "configuration-placeholder";
+  return configuredOnly ? "configuration-placeholder" : "configuration-slot";
+}
+
+function channelOperationalDetail(channel: string, state: MessageCenterChannelOperationalState, dictionary: Dictionary) {
+  if (channel === "in_app") return dictionary.messageCenterChannelInAppRuntimeDetail;
+  if (channel === "sms" && state === "runtime-ready") return dictionary.messageCenterChannelSMSRuntimeDetail;
+  if (channel === "sms") return dictionary.messageCenterChannelSMSDryRunDetail;
+  if (channel === "email" || channel.startsWith("wechat")) return dictionary.messageCenterChannelPlaceholderDetail;
+  return dictionary.messageCenterChannelConfigSlotDetail;
 }
 
 function messageCenterClosedLoopSteps(
@@ -801,6 +838,7 @@ function messageCenterTestSendInitialValues(
   record: AdminResourceRecord | undefined,
   config: MessageCenterResourceConfig | undefined,
   language: Language,
+  channel: MessageCenterChannel | undefined,
 ): MessageCenterTestSendForm {
   const templateId = record && config?.key === "templates"
     ? record.code
@@ -808,14 +846,28 @@ function messageCenterTestSendInitialValues(
       ? valueOf(record, "templateCode")
       : "";
   return {
-    channel: "sms",
+    channel: channel ?? normalizeMessageCenterChannel(record ? valueOf(record, "channel") : ""),
     tenantCode: record ? valueOf(record, "tenantCode") || "platform" : "platform",
     recipient: "",
     templateId,
     templateParams: "{}",
-    title: record ? localizedName(record, language) : "Message center SMS test",
+    title: record ? localizedName(record, language) : "Message center test",
     body: record?.description || "",
   };
+}
+
+function messageCenterChannelOptions(dictionary: Dictionary) {
+  return (["in_app", "sms", "email", "wechat_official", "wechat_miniapp"] as MessageCenterChannel[]).map((channel) => ({
+    value: channel,
+    label: channelLabel(channel, dictionary),
+  }));
+}
+
+function normalizeMessageCenterChannel(channel: string): MessageCenterChannel {
+  if (channel === "in_app" || channel === "sms" || channel === "email" || channel === "wechat_official" || channel === "wechat_miniapp") {
+    return channel;
+  }
+  return "sms";
 }
 
 function parseTemplateParams(raw: string | undefined): Record<string, string> | undefined {

@@ -16,6 +16,7 @@ type adminMessageCenterTestSendPayload struct {
 		Notification adminResourceRecordTest `json:"notification"`
 		Delivery     adminResourceRecordTest `json:"delivery"`
 		Receipt      struct {
+			Channel        string `json:"channel"`
 			Provider       string `json:"provider"`
 			MessageID      string `json:"messageId"`
 			Status         string `json:"status"`
@@ -50,6 +51,49 @@ func TestAdminMessageCenterTestSendRequiresConfiguredSMSRuntime(t *testing.T) {
 	}
 	if payload.Error == nil || payload.Error.Code != errorcode.CodeAdminMessageCenterUnavailable {
 		t.Fatalf("error = %+v, want %s", payload.Error, errorcode.CodeAdminMessageCenterUnavailable)
+	}
+}
+
+func TestAdminMessageCenterTestSendSupportsEmailDryRun(t *testing.T) {
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit", "notification"}),
+	})
+	login := loginForTest(t, server, "admin")
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/message-center/test-send", bytes.NewBufferString(`{
+		"channel": "email",
+		"tenantCode": "platform",
+		"recipient": "owner@example.com",
+		"templateId": "EMAIL_TEST",
+		"templateParams": {"name": "Admin"},
+		"title": "邮箱试发送",
+		"body": "这是一条消息中心邮箱 dry-run"
+	}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("POST message-center email test-send status = %d body = %s, want 201", recorder.Code, recorder.Body.String())
+	}
+	var payload adminMessageCenterTestSendPayload
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v body = %s", err, recorder.Body.String())
+	}
+	if payload.Data.Receipt.Channel != notification.ChannelEmail ||
+		payload.Data.Receipt.Provider != notification.EmailProviderSMTP ||
+		payload.Data.Receipt.Status != notification.GenericDeliveryDryRunState ||
+		payload.Data.Receipt.RedactedTarget != "ow***@example.com" {
+		t.Fatalf("receipt = %+v, want email dry-run receipt", payload.Data.Receipt)
+	}
+	if payload.Data.Delivery.Values["notificationCode"] != payload.Data.Notification.Code ||
+		payload.Data.Delivery.Values["channel"] != notification.ChannelEmail ||
+		payload.Data.Delivery.Values["deliveryStatus"] != "delivered" ||
+		payload.Data.Delivery.Values["target"] != "ow***@example.com" ||
+		payload.Data.Delivery.Values["provider"] != notification.EmailProviderSMTP ||
+		payload.Data.Delivery.Values["providerMessageId"] == "" {
+		t.Fatalf("delivery = %+v, want delivered email dry-run ledger linked to notification", payload.Data.Delivery)
 	}
 }
 

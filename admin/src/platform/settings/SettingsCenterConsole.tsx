@@ -1,4 +1,4 @@
-import { ApiOutlined, BellOutlined, BgColorsOutlined, DatabaseOutlined, ReloadOutlined, SettingOutlined } from "@ant-design/icons";
+import { ApiOutlined, BellOutlined, BgColorsOutlined, CheckCircleOutlined, DatabaseOutlined, LockOutlined, ReloadOutlined, SettingOutlined } from "@ant-design/icons";
 import { Button, Empty, Space, Tag, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getAdminSettingsRuntime, type AdminResourceRecord, type AdminSettingsResourceItem } from "../api/client";
@@ -36,6 +36,8 @@ type SettingsResourceConfig = {
   records: AdminResourceRecord[];
   recordCount: number;
   enabledCount: number;
+  writable: boolean;
+  fieldCount: number;
   updatedAt: string;
 };
 
@@ -75,6 +77,14 @@ const knownSettingsResourceCatalog: KnownSettingsResourceConfig[] = [
     icon: <DatabaseOutlined />,
     title: (dictionary) => dictionary.settingsCenterDictionaryParameters,
     description: (dictionary) => dictionary.settingsCenterDictionaryParametersDescription,
+  },
+  {
+    route: "/credential-auth-settings",
+    capability: "credential-auth",
+    group: "core",
+    icon: <LockOutlined />,
+    title: (dictionary) => dictionary.settingsCenterCredentialAuth,
+    description: (dictionary) => dictionary.settingsCenterCredentialAuthDescription,
   },
   {
     route: "/notification-channels",
@@ -119,8 +129,8 @@ export function SettingsCenterConsole({ language, dictionary, resources, onRoute
     [dictionary, language, resources, runtimeItems],
   );
   const rows = useMemo(
-    () => availableConfigs.map((config) => settingsRow(config)),
-    [availableConfigs],
+    () => availableConfigs.map((config) => settingsRow(config, dictionary)),
+    [availableConfigs, dictionary],
   );
   const groups = useMemo(() => groupSettingsResourceConfigs(availableConfigs, dictionary), [availableConfigs, dictionary]);
   const metrics = useMemo(() => {
@@ -129,6 +139,8 @@ export function SettingsCenterConsole({ language, dictionary, resources, onRoute
       resources: availableConfigs.length,
       capabilities: new Set(availableConfigs.map((config) => config.capability)).size,
       records: recordCount,
+      writableResources: availableConfigs.filter((config) => config.writable).length,
+      manifestResources: availableConfigs.filter((config) => config.source === "manifest").length,
       warnings: Object.values(errors).filter(Boolean).length,
     };
   }, [availableConfigs, errors]);
@@ -187,6 +199,7 @@ export function SettingsCenterConsole({ language, dictionary, resources, onRoute
           description={errorMessages.map(([key, message]) => `${settingsResourceLabel(key, availableConfigs)}: ${message}`).join("; ")}
         />
       ) : null}
+      <SettingsCenterRuntimeSummary dictionary={dictionary} metrics={metrics} />
       <AdminListPanel className="settings-center-map" title={dictionary.settingsCenterDynamicMap}>
         {availableConfigs.length === 0 ? (
           <Empty description={dictionary.settingsCenterNoResources} />
@@ -207,9 +220,11 @@ export function SettingsCenterConsole({ language, dictionary, resources, onRoute
                         <span>
                           <Typography.Text strong>{config.title}</Typography.Text>
                           <Typography.Text type="secondary">{config.description}</Typography.Text>
+                          <Typography.Text className="secondary-text" code>{config.resource}</Typography.Text>
                         </span>
                         <Space direction="vertical" size={2} align="end">
                           <Tag>{config.recordCount}</Tag>
+                          <Tag color={config.writable ? "success" : "default"}>{config.writable ? dictionary.writable : dictionary.readOnly}</Tag>
                           <Tag color={config.source === "catalog" ? "blue" : "default"}>{sourceLabel(config.source, dictionary)}</Tag>
                         </Space>
                       </button>
@@ -256,8 +271,66 @@ type SettingsRow = {
   description: string;
   records: number;
   enabled: number;
+  writable: string;
+  source: string;
+  fields: number;
   updatedAt: string;
 };
+
+function SettingsCenterRuntimeSummary({
+  dictionary,
+  metrics,
+}: {
+  dictionary: Dictionary;
+  metrics: {
+    resources: number;
+    capabilities: number;
+    records: number;
+    writableResources: number;
+    manifestResources: number;
+  };
+}) {
+  return (
+    <AdminListPanel
+      className="settings-center-runtime-summary"
+      title={dictionary.settingsCenterSystemSettings}
+      toolbar={<Typography.Text type="secondary">{dictionary.settingsCenterSystemSettingsDescription}</Typography.Text>}
+    >
+      <div className="settings-center-runtime-grid">
+        <div className="settings-center-runtime-card">
+          <span className="settings-center-card-icon"><SettingOutlined /></span>
+          <div>
+            <Typography.Text strong>{dictionary.settingsCenterSystemEntry}</Typography.Text>
+            <Typography.Text type="secondary">{dictionary.settingsCenterSystemEntryDescription}</Typography.Text>
+          </div>
+          <Tag color="success">/settings</Tag>
+        </div>
+        <div className="settings-center-runtime-card">
+          <span className="settings-center-card-icon"><CheckCircleOutlined /></span>
+          <div>
+            <Typography.Text strong>{dictionary.settingsCenterRuntimeProjection}</Typography.Text>
+            <Typography.Text type="secondary">
+              {formatTemplate(dictionary.settingsCenterRuntimeProjectionDescription, {
+                resources: String(metrics.resources),
+                capabilities: String(metrics.capabilities),
+                manifestResources: String(metrics.manifestResources),
+              })}
+            </Typography.Text>
+          </div>
+          <Tag>{formatTemplate(dictionary.settingsCenterWritableCount, { count: String(metrics.writableResources) })}</Tag>
+        </div>
+        <div className="settings-center-runtime-card">
+          <span className="settings-center-card-icon"><BgColorsOutlined /></span>
+          <div>
+            <Typography.Text strong>{dictionary.interfacePreferences}</Typography.Text>
+            <Typography.Text type="secondary">{dictionary.settingsCenterInterfacePreferenceBoundary}</Typography.Text>
+          </div>
+          <Tag color="default">{dictionary.userSettings}</Tag>
+        </div>
+      </div>
+    </AdminListPanel>
+  );
+}
 
 function columns(dictionary: Dictionary, language: Language): PlatformDataTableColumn<SettingsRow>[] {
   return [
@@ -297,6 +370,28 @@ function columns(dictionary: Dictionary, language: Language): PlatformDataTableC
       priority: "standard",
     },
     {
+      title: dictionary.writable,
+      key: "writable",
+      dataIndex: "writable",
+      width: 120,
+      priority: "extended",
+    },
+    {
+      title: dictionary.source,
+      key: "source",
+      dataIndex: "source",
+      width: 120,
+      priority: "extended",
+      render: (_value, row) => <Tag color={row.source === dictionary.settingsCenterCatalogSource ? "blue" : "default"}>{row.source}</Tag>,
+    },
+    {
+      title: dictionary.fields,
+      key: "fields",
+      dataIndex: "fields",
+      width: 100,
+      priority: "extended",
+    },
+    {
       title: dictionary.updatedAt,
       key: "updatedAt",
       dataIndex: "updatedAt",
@@ -307,7 +402,7 @@ function columns(dictionary: Dictionary, language: Language): PlatformDataTableC
   ];
 }
 
-function settingsRow(config: SettingsResourceConfig): SettingsRow {
+function settingsRow(config: SettingsResourceConfig, dictionary: Dictionary): SettingsRow {
   return {
     key: config.key,
     route: config.route,
@@ -316,6 +411,9 @@ function settingsRow(config: SettingsResourceConfig): SettingsRow {
     description: config.description,
     records: config.recordCount,
     enabled: config.enabledCount,
+    writable: config.writable ? dictionary.writable : dictionary.readOnly,
+    source: sourceLabel(config.source, dictionary),
+    fields: config.fieldCount,
     updatedAt: config.updatedAt,
   };
 }
@@ -349,6 +447,8 @@ function projectSettingsResourceConfigs(
       records,
       recordCount: item.recordCount ?? records.length,
       enabledCount: records.filter((record) => record.status === "enabled" || record.status === "active").length,
+      writable: item.writable,
+      fieldCount: item.schema?.fields?.length ?? 0,
       updatedAt: records.map((record) => record.updatedAt).filter(Boolean).sort().at(-1) ?? "",
     }];
   });

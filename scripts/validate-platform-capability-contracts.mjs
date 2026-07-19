@@ -268,6 +268,9 @@ function validateNotificationProductization(contract, errors) {
   if (productization.settingsAggregation !== "dynamic-enabled-capability-config") {
     errors.push(`${prefix}.settingsAggregation must be dynamic-enabled-capability-config`);
   }
+  if (productization.settingsRuntime !== "settings-runtime-v1.1") {
+    errors.push(`${prefix}.settingsRuntime must be settings-runtime-v1.1`);
+  }
   if (productization.adminEntryPolicy !== "single-workbench-plus-settings-center") {
     errors.push(`${prefix}.adminEntryPolicy must be single-workbench-plus-settings-center`);
   }
@@ -299,12 +302,47 @@ function validateNotificationProductization(contract, errors) {
   if (!productization.credentialPolicy?.includes("encrypted") || !productization.credentialPolicy.includes("omitted")) {
     errors.push(`${prefix}.credentialPolicy must require encrypted and omitted provider secrets`);
   }
+  if (!String(productization.restartPolicy ?? "").includes("restartRequired") || !String(productization.restartPolicy ?? "").includes("pendingRestart")) {
+    errors.push(`${prefix}.restartPolicy must document restartRequired and pendingRestart`);
+  }
   const runtimeBoundary = String(productization.runtimeBoundary ?? "");
   if (!runtimeBoundary.includes("official SDK-backed Aliyun/Tencent Cloud live SMS adapters")) {
     errors.push(`${prefix}.runtimeBoundary must document official SDK-backed Aliyun/Tencent Cloud live SMS adapters`);
   }
   if (!runtimeBoundary.includes("concrete SMTP and WeChat send adapters remain follow-up runtime slices")) {
     errors.push(`${prefix}.runtimeBoundary must keep SMTP and WeChat send adapters as follow-up runtime slices`);
+  }
+}
+
+function validateCredentialAuthProductization(contract, errors) {
+  if (contract.id !== "credential-auth") {
+    return;
+  }
+  const productization = contract.productization;
+  const prefix = "capability contract credential-auth.productization";
+  if (!productization) {
+    errors.push(`${prefix} is required`);
+    return;
+  }
+  if (productization.settingsCenterRoute !== "/settings") {
+    errors.push(`${prefix}.settingsCenterRoute must be /settings`);
+  }
+  if (productization.settingsAggregation !== "dynamic-enabled-capability-config") {
+    errors.push(`${prefix}.settingsAggregation must be dynamic-enabled-capability-config`);
+  }
+  requireIncludes(productization.settingsConfigResources, ["credential-auth-settings"], `${prefix}.settingsConfigResources`, errors);
+  requireIncludes(contract.adminResources, ["credential-auth-settings"], "capability contract credential-auth.adminResources", errors);
+  if (productization.runtimeStatus !== "deliverable-v1-settings-runtime-v1.1") {
+    errors.push(`${prefix}.runtimeStatus must be deliverable-v1-settings-runtime-v1.1`);
+  }
+  if (!String(productization.secretTransport ?? "").includes("ECDH") || !String(productization.secretTransport ?? "").includes("A256GCM")) {
+    errors.push(`${prefix}.secretTransport must document ECDH/A256GCM application-layer secret transport`);
+  }
+  if (!String(productization.passwordCredentialPolicy ?? "").includes("argon2id") || !String(productization.passwordCredentialPolicy ?? "").includes("Record.Values")) {
+    errors.push(`${prefix}.passwordCredentialPolicy must require argon2id outside generic Record.Values`);
+  }
+  if (!String(productization.restartPolicy ?? "").includes("restartRequired") || !String(productization.restartPolicy ?? "").includes("pendingRestart")) {
+    errors.push(`${prefix}.restartPolicy must document restartRequired and pendingRestart`);
   }
 }
 
@@ -353,6 +391,7 @@ function validateContract(contract, context) {
     errors.push(`${prefix} external-business-boundary must use business-external-only profilePolicy`);
   }
   validateNotificationProductization(contract, errors);
+  validateCredentialAuthProductization(contract, errors);
   return errors;
 }
 

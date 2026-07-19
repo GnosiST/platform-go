@@ -18,7 +18,7 @@ func DefaultManifests() []capability.Manifest {
 		{ID: "policy-review", Name: "Policy Review", Version: "0.1.0", Dependencies: []capability.ID{"rbac", "audit", "identity"}, Admin: adminSurface(policyReviewAdminResource()), Migrations: lifecycleMigrations("policy-review"), Seeds: lifecycleSeeds("policy-review")},
 		{ID: "wechat-login", Name: "WeChat Login", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "audit"}, AuthProviders: []capability.AuthProvider{authProvider("wechat", "wechat", "微信登录", "WeChat Login", "微信 code 换取登录态。", "WeChat code exchange login.", false, []capability.AuthProviderAudience{capability.AuthProviderAudienceApp}, "PLATFORM_WECHAT_MINIAPP_APP_ID", "PLATFORM_WECHAT_MINIAPP_SECRET", "PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT")}, Migrations: lifecycleMigrations("wechat-login"), Seeds: lifecycleSeeds("wechat-login")},
 		{ID: "admin-oidc", Name: "Admin OIDC", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "audit"}, Admin: adminSurface(adminIdentityAdminResource()), AuthProviders: []capability.AuthProvider{authProvider("oidc", "oidc", "企业单点登录", "Enterprise SSO", "通过 OpenID Connect 登录管理台。", "Sign in to Admin through OpenID Connect.", false, []capability.AuthProviderAudience{capability.AuthProviderAudienceAdmin}, "PLATFORM_ADMIN_OIDC_ISSUER_URL", "PLATFORM_ADMIN_OIDC_CLIENT_ID", "PLATFORM_ADMIN_OIDC_CLIENT_SECRET", "PLATFORM_ADMIN_OIDC_REDIRECT_URL")}, Migrations: lifecycleMigrations("admin-oidc"), Seeds: lifecycleSeeds("admin-oidc")},
-		{ID: "credential-auth", Name: "Credential Auth", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "rbac", "audit", "notification"}, AuthProviders: []capability.AuthProvider{
+		{ID: "credential-auth", Name: "Credential Auth", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "rbac", "audit", "notification"}, Admin: adminSurface(credentialAuthSettingsAdminResource()), AuthProviders: []capability.AuthProvider{
 			authProvider("username-password", "credential-password", "用户名密码", "Username Password", "使用用户名和本地密码登录管理台。", "Sign in to Admin with username and local password.", false, []capability.AuthProviderAudience{capability.AuthProviderAudienceAdmin}, "PLATFORM_CREDENTIAL_AUTH_USERNAME_PASSWORD"),
 			authProvider("phone-password", "credential-password", "手机号密码", "Phone Password", "使用手机号和本地密码登录管理台。", "Sign in to Admin with phone and local password.", false, []capability.AuthProviderAudience{capability.AuthProviderAudienceAdmin}, "PLATFORM_CREDENTIAL_AUTH_PHONE_PASSWORD"),
 			authProvider("email-password", "credential-password", "邮箱密码", "Email Password", "使用邮箱和本地密码登录管理台。", "Sign in to Admin with email and local password.", false, []capability.AuthProviderAudience{capability.AuthProviderAudienceAdmin}, "PLATFORM_CREDENTIAL_AUTH_EMAIL_PASSWORD"),
@@ -54,7 +54,7 @@ func coreDeletionPolicy(resource string) *capability.AdminResourceDeletionPolicy
 	case "api-resources", "area-codes", "dictionaries", "permissions":
 		policy.Mode = capability.AdminDeletionRestrict
 		policy.RestrictReferences = true
-	case "dictionary-parameters", "job-definitions", "menus", "monitoring", "notification-channels", "notification-providers", "notification-send-policies", "notification-templates", "notifications", "org-units", "parameters", "personnel-profiles", "position-assignments", "positions", "role-groups", "roles", "tenants", "users":
+	case "credential-auth-settings", "dictionary-parameters", "job-definitions", "menus", "monitoring", "notification-channels", "notification-providers", "notification-send-policies", "notification-templates", "notifications", "org-units", "parameters", "personnel-profiles", "position-assignments", "positions", "role-groups", "roles", "tenants", "users":
 		policy.Mode = capability.AdminDeletionSoftDelete
 		policy.RestrictReferences = true
 	case "admin-identities", "app-identities", "app-phone-bindings", "sessions":
@@ -571,6 +571,43 @@ func positionAssignmentAdminResource() capability.AdminResource {
 		},
 		SearchFields:   []string{"name", "code", "status", "description", "personnelCode", "positionCode", "tenantCode", "orgUnitCode", "assignmentType", "primary", "startedAt", "endedAt"},
 		DefaultSortKey: "startedAt",
+	}
+}
+
+func credentialAuthSettingsAdminResource() capability.AdminResource {
+	return capability.AdminResource{
+		Resource:         "credential-auth-settings",
+		Title:            capability.Text("认证配置", "Credential Auth Settings"),
+		Description:      capability.Text("本地凭据认证、密码策略、验证码、短信登录和应用层加密传输配置。", "Local credential authentication, password policy, challenge, SMS login, and application-layer secret transport settings."),
+		PermissionPrefix: "admin:credential-auth-setting",
+		Menu:             capability.AdminMenu{Route: "/credential-auth-settings", Parent: "configuration", Group: "security", Icon: "lock", Order: 372, Cache: true},
+		Fields: []capability.AdminField{
+			adminField("code", "配置编码", "Config Code", "text", "record", true, false, true, true, true, true, 180, nil),
+			adminField("name", "配置名称", "Config Name", "text", "record", true, false, true, true, true, true, 180, nil),
+			adminField("usernamePasswordEnabled", "用户名密码", "Username Password", "switch", "values", false, false, true, true, true, true, 130, nil),
+			adminField("phonePasswordEnabled", "手机号密码", "Phone Password", "switch", "values", false, false, true, true, true, true, 130, nil),
+			adminField("emailPasswordEnabled", "邮箱密码", "Email Password", "switch", "values", false, false, true, true, true, true, 130, nil),
+			adminField("phoneSMSOTPEnabled", "短信验证码", "Phone SMS OTP", "switch", "values", false, false, true, true, true, true, 130, nil),
+			adminField("challengeEnabled", "登录验证", "Login Challenge", "switch", "values", false, false, true, true, true, true, 120, nil),
+			adminField("challengeMode", "验证模式", "Challenge Mode", "select", "values", true, false, true, true, true, true, 150, credentialChallengeModeOptions()),
+			adminField("challengeKind", "验证类型", "Challenge Kind", "select", "values", true, false, true, true, true, true, 140, credentialChallengeKindOptions()),
+			adminField("passwordMaxAttempts", "密码最大失败次数", "Password Max Attempts", "number", "values", true, false, true, true, true, true, 150, nil),
+			adminField("lockSeconds", "锁定秒数", "Lock Seconds", "number", "values", true, false, true, true, true, true, 130, nil),
+			adminField("smsOTPTTLSeconds", "短信有效秒数", "SMS OTP TTL Seconds", "number", "values", true, false, true, true, true, true, 140, nil),
+			adminField("smsOTPMaxAttempts", "短信最大尝试", "SMS OTP Max Attempts", "number", "values", true, false, true, true, true, true, 140, nil),
+			adminField("secretTransport", "密钥传输", "Secret Transport", "select", "values", true, false, true, true, true, true, 180, []capability.AdminFieldOption{
+				adminFieldOption("ecdh-a256gcm-v1", "ECDH + A256GCM v1", "ECDH + A256GCM v1"),
+			}),
+			adminField("passwordAlgorithm", "密码算法", "Password Algorithm", "select", "values", true, false, true, true, true, true, 150, []capability.AdminFieldOption{
+				adminFieldOption("argon2id", "Argon2id", "Argon2id"),
+			}),
+			adminField("argon2ParamsVersion", "算法参数版本", "Argon2 Params Version", "text", "values", true, false, true, true, true, true, 160, nil),
+			adminField("status", "状态", "Status", "select", "record", false, false, true, true, true, true, 120, enabledDisabledOptions()),
+			adminField("description", "说明", "Description", "textarea", "record", false, false, false, false, true, true, 260, nil),
+			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
+		},
+		SearchFields:   []string{"name", "code", "status", "description", "challengeMode", "challengeKind", "secretTransport", "passwordAlgorithm", "argon2ParamsVersion"},
+		DefaultSortKey: "updatedAt",
 	}
 }
 
@@ -1368,6 +1405,22 @@ func assignmentTypeOptions() []capability.AdminFieldOption {
 		adminFieldOption("primary", "主岗", "Primary"),
 		adminFieldOption("part_time", "兼职", "Part-time"),
 		adminFieldOption("temporary", "临时", "Temporary"),
+	}
+}
+
+func credentialChallengeModeOptions() []capability.AdminFieldOption {
+	return []capability.AdminFieldOption{
+		adminFieldOption("off", "关闭", "Off"),
+		adminFieldOption("always", "始终", "Always"),
+		adminFieldOption("after-failure", "失败后", "After Failure"),
+		adminFieldOption("risk-based", "风险策略", "Risk Based"),
+	}
+}
+
+func credentialChallengeKindOptions() []capability.AdminFieldOption {
+	return []capability.AdminFieldOption{
+		adminFieldOption("captcha", "图形验证码", "Captcha"),
+		adminFieldOption("slider", "滑块拼图", "Slider"),
 	}
 }
 

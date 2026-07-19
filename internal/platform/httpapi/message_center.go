@@ -37,9 +37,9 @@ type adminMessageCenterTestSendRequest struct {
 }
 
 type adminMessageCenterTestSendResponse struct {
-	Notification adminresource.Record            `json:"notification"`
-	Delivery     adminresource.Record            `json:"delivery"`
-	Receipt      notification.SMSDeliveryReceipt `json:"receipt"`
+	Notification adminresource.Record         `json:"notification"`
+	Delivery     adminresource.Record         `json:"delivery"`
+	Receipt      notification.DeliveryReceipt `json:"receipt"`
 }
 
 type adminMessageCenterDeliveriesRunRequest struct {
@@ -62,7 +62,7 @@ func (s *Server) adminMessageCenterTestSend(ctx *gin.Context) {
 		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
-	if smsSenderNil(s.notificationSMSSender) {
+	if prepared.message.Channel == notification.ChannelSMS && smsSenderNil(s.notificationSMSSender) {
 		writePlatformError(ctx, errorcode.CodeAdminMessageCenterUnavailable)
 		return
 	}
@@ -72,7 +72,7 @@ func (s *Server) adminMessageCenterTestSend(ctx *gin.Context) {
 		return
 	}
 	prepared.message.TraceID = correlationFromGinContext(ctx).TraceID
-	receipt, sendErr := s.notificationSMSSender.SendSMS(ctx.Request.Context(), prepared.message)
+	receipt, sendErr := s.sendMessageCenterTestMessage(ctx, prepared.message)
 	deliveryStatus := "delivered"
 	deliveredAt := prepared.now
 	errorMessage := ""
@@ -80,10 +80,14 @@ func (s *Server) adminMessageCenterTestSend(ctx *gin.Context) {
 		deliveryStatus = "failed"
 		deliveredAt = ""
 		errorMessage = "message center test send failed"
-		receipt = notification.SMSDeliveryReceipt{
-			Provider:       s.notificationSMSSender.Kind(),
+		receipt = notification.DeliveryReceipt{
+			Channel:        prepared.message.Channel,
+			Provider:       notification.DefaultProviderForChannel(prepared.message.Channel),
 			Status:         "failed",
-			RedactedTarget: notification.RedactSMSTarget(prepared.message.Recipient),
+			RedactedTarget: notification.RedactMessageTarget(prepared.message.Channel, prepared.message.Recipient),
+		}
+		if prepared.message.Channel == notification.ChannelSMS && !smsSenderNil(s.notificationSMSSender) {
+			receipt.Provider = s.notificationSMSSender.Kind()
 		}
 	}
 	deliveryInput := prepared.deliveryInput(notificationMutation.Record.Code, receipt, deliveryStatus, deliveredAt, errorMessage)
@@ -104,6 +108,18 @@ func (s *Server) adminMessageCenterTestSend(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusCreated, Response[adminMessageCenterTestSendResponse]{Data: response})
+}
+
+func (s *Server) sendMessageCenterTestMessage(ctx *gin.Context, message notification.Message) (notification.DeliveryReceipt, error) {
+	if message.Channel == notification.ChannelSMS {
+		receipt, err := s.notificationSMSSender.SendSMS(ctx.Request.Context(), notification.SMSMessageFromMessage(message))
+		return notification.DeliveryReceiptFromSMS(receipt), err
+	}
+	sender, err := notification.NewDryRunMessageSender(message.Channel, notification.DefaultProviderForChannel(message.Channel))
+	if err != nil {
+		return notification.DeliveryReceipt{}, err
+	}
+	return sender.SendMessage(ctx.Request.Context(), message)
 }
 
 func (s *Server) adminMessageCenterDeliveriesRun(ctx *gin.Context) {
@@ -149,14 +165,14 @@ func (s *Server) adminMessageCenterDeliveriesRun(ctx *gin.Context) {
 
 type preparedMessageCenterTestSend struct {
 	now               string
-	message           notification.SMSMessage
+	message           notification.Message
 	notificationInput adminresource.WriteInput
 	deliveryCode      string
 	deliveryName      string
 	deliveryBase      map[string]string
 }
 
-func (prepared preparedMessageCenterTestSend) deliveryInput(notificationCode string, receipt notification.SMSDeliveryReceipt, deliveryStatus string, deliveredAt string, errorMessage string) adminresource.WriteInput {
+func (prepared preparedMessageCenterTestSend) deliveryInput(notificationCode string, receipt notification.DeliveryReceipt, deliveryStatus string, deliveredAt string, errorMessage string) adminresource.WriteInput {
 	values := cloneStringMap(prepared.deliveryBase)
 	values["notificationCode"] = notificationCode
 	values["deliveryStatus"] = deliveryStatus
@@ -184,7 +200,7 @@ func (s *Server) prepareMessageCenterTestSend(input adminMessageCenterTestSendRe
 	if channel == "" {
 		channel = notification.ChannelSMS
 	}
-	if channel != notification.ChannelSMS {
+	if !notification.IsSupportedChannel(channel) {
 		return preparedMessageCenterTestSend{}, adminresource.ErrInvalidRecord
 	}
 	recipient := strings.TrimSpace(input.Recipient)
@@ -213,7 +229,7 @@ func (s *Server) prepareMessageCenterTestSend(input adminMessageCenterTestSendRe
 	if err != nil {
 		return preparedMessageCenterTestSend{}, err
 	}
-	payload, err := messageCenterNotificationPayload(channel, notification.RedactSMSTarget(recipient), templateID, input.TemplateParams)
+	payload, err := messageCenterNotificationPayload(channel, notification.RedactMessageTarget(channel, recipient), templateID, input.TemplateParams)
 	if err != nil {
 		return preparedMessageCenterTestSend{}, err
 	}
@@ -227,11 +243,14 @@ func (s *Server) prepareMessageCenterTestSend(input adminMessageCenterTestSendRe
 	}
 	return preparedMessageCenterTestSend{
 		now: now,
-		message: notification.SMSMessage{
+		message: notification.Message{
 			TenantCode:     tenantCode,
+			Channel:        channel,
 			Recipient:      recipient,
 			TemplateID:     templateID,
 			TemplateParams: cloneStringMap(input.TemplateParams),
+			Title:          title,
+			Body:           body,
 			Purpose:        messageCenterTestPurpose,
 		},
 		notificationInput: adminresource.WriteInput{

@@ -793,6 +793,10 @@ func seedRowsForResource(resource string, updatedAt string) []Record {
 		return []Record{
 			seedLocalized("branding-platform", "branding", "品牌配置", "Branding Settings", "enabled", "平台品牌、主题和登录展示配置。", "Platform branding, theme, and login presentation configuration.", updatedAt, brandingResourceSeedValues()),
 		}
+	case "credential-auth-settings":
+		return []Record{
+			seedLocalized("credential-auth-setting-default", "default", "默认认证配置", "Default Credential Auth Settings", "enabled", "本地凭据认证、密码策略、验证码和短信登录默认配置。", "Default local credential authentication, password policy, challenge, and SMS login settings.", updatedAt, credentialAuthSettingsSeedValues()),
+		}
 	case "audit-logs":
 		return []Record{
 			seed("audit-bootstrap", "platform.bootstrap", "Platform Bootstrap", "recorded", "Initial platform bootstrap event.", updatedAt, map[string]string{"actor": "system", "action": "platform.bootstrap", "resource": "platform", "createdAt": updatedAt}),
@@ -830,6 +834,25 @@ func brandingResourceSeedValues() map[string]string {
 	values := brandingSeedValues()
 	delete(values, "capability")
 	return values
+}
+
+func credentialAuthSettingsSeedValues() map[string]string {
+	return map[string]string{
+		"usernamePasswordEnabled": "true",
+		"phonePasswordEnabled":    "true",
+		"emailPasswordEnabled":    "true",
+		"phoneSMSOTPEnabled":      "true",
+		"challengeEnabled":        "true",
+		"challengeMode":           "after-failure",
+		"challengeKind":           "captcha",
+		"passwordMaxAttempts":     "5",
+		"lockSeconds":             "900",
+		"smsOTPTTLSeconds":        "300",
+		"smsOTPMaxAttempts":       "5",
+		"secretTransport":         "ecdh-a256gcm-v1",
+		"passwordAlgorithm":       "argon2id",
+		"argon2ParamsVersion":     "v1",
+	}
 }
 
 func seed(id string, code string, name string, status string, description string, updatedAt string, values map[string]string) Record {

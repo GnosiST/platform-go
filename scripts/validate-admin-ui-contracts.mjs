@@ -530,10 +530,15 @@ requireIncludes(files.settingsCenter, "projectSettingsResourceConfigs(runtimeIte
 requireIncludes(files.settingsCenter, "runtimeItems.flatMap", "Settings center must automatically include configuration resources contributed by enabled capabilities.");
 requireIncludes(files.settingsCenter, "knownSettingsResourceCatalog", "Settings center must keep productized metadata for known platform configuration resources.");
 requireIncludes(files.settingsCenter, 'route: "/dictionary-parameters"', "Settings center must expose dictionary parameters as a system-level configuration entry.");
+requireIncludes(files.settingsCenter, 'route: "/credential-auth-settings"', "Settings center must expose credential-auth settings as a security configuration entry.");
 requireIncludes(files.settingsCenter, 'route: "/notification-templates"', "Settings center must expose notification templates as message configuration.");
 requireIncludes(files.settingsCenter, "groupSettingsResourceConfigs(availableConfigs, dictionary)", "Settings center must group configuration resources into productized system, message, and capability sections.");
 requireIncludes(files.settingsCenter, '"manifest" as const', "Settings center must keep a dynamic manifest-backed configuration path beyond the known platform catalog.");
 requireIncludes(files.settingsCenter, "sourceLabel(config.source, dictionary)", "Settings center must distinguish platform catalog entries from capability-manifest entries.");
+requireIncludes(files.settingsCenter, "SettingsCenterRuntimeSummary", "Settings center must expose the system-level runtime summary instead of only resource cards.");
+requireIncludes(files.settingsCenter, "dictionary.settingsCenterInterfacePreferenceBoundary", "Settings center must keep topbar settings scoped to interface preferences.");
+requireIncludes(files.settingsCenter, "config.writable ? dictionary.writable : dictionary.readOnly", "Settings center must show whether each configuration resource is writable.");
+requireIncludes(files.settingsCenter, "item.schema?.fields?.length ?? 0", "Settings center must surface the schema field footprint for dynamic configuration resources.");
 requireNotIncludes(files.settingsCenter, 'type SettingsResourceKey = "parameters"', "Settings center must not hard-code a closed configuration resource union.");
 requireIncludes(files.messageCenter, 'resource: "notification-channels"', "Message center must expose notification channel configuration.");
 requireIncludes(files.messageCenter, 'resource: "notification-providers"', "Message center must expose notification provider account configuration.");
@@ -547,11 +552,17 @@ requireIncludes(files.messageCenter, "testSendMessageCenter", "Message center mu
 requireIncludes(files.messageCenter, "<MessageCenterClosedLoop", "Message center must render the operating loop instead of only resource tabs.");
 requireIncludes(files.messageCenter, "messageCenterClosedLoopSteps(resourceConfigs, records, resourceRoutes, dictionary)", "Message center runtime loop must be derived from the full notification resource sequence.");
 requireIncludes(files.messageCenter, "dictionary.messageCenterDryRun", "Message center must expose a dry-run entry state.");
-requireIncludes(files.messageCenter, "dictionary.messageCenterTrialReadyTitle", "Message center must explain that SMS test send is connected to the runtime endpoint.");
+requireIncludes(files.messageCenter, "dictionary.messageCenterTrialReadyTitle", "Message center must explain that test send is connected to the runtime endpoint.");
 requireIncludes(files.messageCenter, "workflowStepIcon", "Message center closed-loop cards must distinguish channel, provider, template, policy, notification, and delivery steps.");
 requireIncludes(files.messageCenter, "dictionary.messageCenterChannelRuntimeReady", "Message center channel cards must distinguish runtime-ready channels from configuration slots.");
 requireIncludes(files.messageCenter, "dictionary.messageCenterChannelConfiguredOnly", "Message center channel cards must distinguish configured-only channels from runtime-ready channels.");
 requireIncludes(files.messageCenter, "dictionary.messageCenterChannelConfigSlot", "Message center channel cards must expose future channel configuration slots without claiming runtime readiness.");
+requireIncludes(files.messageCenter, "channelOperationalState(channel, runtimeReady, configuredOnly)", "Message center channel cards must classify runtime-ready, configuration-placeholder, and configuration-slot states explicitly.");
+requireIncludes(files.messageCenter, "dictionary.messageCenterChannelPlaceholderDetail", "Message center must explain that Email and WeChat use dry-run until real adapters exist.");
+requireIncludes(files.messageCenter, "dictionary.messageCenterLocalDryRun", "Message center placeholder channels must use a local dry-run action label instead of real external test-connect copy.");
+requireIncludes(files.messageCenter, "messageCenterChannelOptions(dictionary)", "Message center test-send form must let users select any common channel.");
+requireIncludes(files.messageCenter, "openTestSend(undefined, undefined, normalizeMessageCenterChannel(card.key))", "Message center channel cards must prefill dry-run with the clicked channel.");
+requireIncludes(files.messageCenter, "testConnectEnabled: true", "Message center test-connect must expose the dry-run path for all common channels.");
 requireNotIncludes(files.messageCenter, "card.ready ? dictionary.configured : dictionary.notConfigured", "Message center channel cards must not collapse runtime readiness into a generic configured tag.");
 for (const key of [
   "settingsCenterTitle",
@@ -560,6 +571,8 @@ for (const key of [
   "settingsCenterResourceListDescription",
   "settingsCenterDictionaryParameters",
   "settingsCenterDictionaryParametersDescription",
+  "settingsCenterCredentialAuth",
+  "settingsCenterCredentialAuthDescription",
   "settingsCenterNotificationTemplates",
   "settingsCenterNotificationTemplatesDescription",
   "settingsCenterCoreGroup",
@@ -570,11 +583,20 @@ for (const key of [
   "settingsCenterCapabilityGroupDescription",
   "settingsCenterCatalogSource",
   "settingsCenterManifestSource",
+  "settingsCenterSystemEntry",
+  "settingsCenterSystemEntryDescription",
+  "settingsCenterRuntimeProjection",
+  "settingsCenterRuntimeProjectionDescription",
+  "settingsCenterWritableCount",
+  "settingsCenterInterfacePreferenceBoundary",
   "messageCenterTitle",
   "messageCenterDescription",
   "messageCenterClosedLoopTitle",
   "messageCenterClosedLoopDescription",
   "messageCenterDryRun",
+  "messageCenterTestConnect",
+  "messageCenterLocalDryRun",
+  "messageCenterTestConnectPending",
   "messageCenterTrialReadyTitle",
   "messageCenterTrialReadyDescription",
   "messageCenterTestSendTitle",
@@ -588,6 +610,11 @@ for (const key of [
   "messageCenterChannelRuntimeReady",
   "messageCenterChannelConfiguredOnly",
   "messageCenterChannelConfigSlot",
+  "messageCenterChannelInAppRuntimeDetail",
+  "messageCenterChannelSMSRuntimeDetail",
+  "messageCenterChannelSMSDryRunDetail",
+  "messageCenterChannelPlaceholderDetail",
+  "messageCenterChannelConfigSlotDetail",
   "messageCenterChannelSMSDescription",
   "messageCenterChannelEmailDescription",
   "messageCenterChannelWechatOfficialDescription",
@@ -851,7 +878,27 @@ requireIncludes(files.capabilityConsole, "PlatformDataTable", "Capability consol
 requireIncludes(files.capabilityConsole, 'type CapabilityFilter = "all" | "enabled" | "not-enabled" | "pending-restart" | CapabilityKind;', "Capability console must expose enabled, pending-restart, and not-enabled states in one list filter.");
 requireIncludes(files.capabilityConsole, 'key: "status"', "Capability list filters must include runtime status so enabled and disabled plugins stay in one list.");
 requireIncludes(files.capabilityConsole, "matchesCapabilityStatus", "Capability list must derive enabled, pending-restart, and not-enabled states from current and desired capability sets.");
+requireIncludes(files.capabilityConsole, "capabilityRestartState", "Capability list must derive restart-pending state from both current and desired capability sets.");
+requireIncludes(files.capabilityConsole, "const pendingRestart = enabled !== desired;", "Capability pending-restart filtering must cover both enable and disable pending changes.");
+requireIncludes(files.capabilityConsole, "pluginRestartImpactPreview(status, capabilities, language)", "Plugin management must preview install and disable impact before manual restart.");
+requireIncludes(files.capabilityConsole, "restartChangeIDs(current, desired)", "Plugin restart preview must compare current and desired capability sets.");
+requireIncludes(files.capabilityConsole, "dictionary.pluginManualRestartRequired", "Plugin management must present a manual restart prompt when changes are pending.");
+requireIncludes(files.capabilityConsole, "dictionary.pluginRestartImpactCounts", "Plugin management must summarize menus, resources, permissions, config items, and auth providers affected by restart.");
+requireIncludes(files.capabilityConsole, "dictionary.capabilityDisableAfterRestart", "Capability status must distinguish disable-pending changes, not only install-pending changes.");
 requireIncludes(files.capabilityConsole, "dictionary.pluginManagementListHint", "Plugin management copy must direct users to the unified capability list instead of separate cards.");
+for (const key of [
+  "capabilityEnableAfterRestart",
+  "capabilityDisableAfterRestart",
+  "pluginManualRestartRequired",
+  "pluginManualRestartHint",
+  "pluginRestartImpactPreview",
+  "pluginRestartImpactCounts",
+  "fields",
+  "writable",
+  "readOnly",
+]) {
+  requireCountExactly(files.i18n, `${key}:`, 2, `Capability/settings i18n key ${key} must exist in matching Chinese and English dictionaries.`);
+}
 requireNotIncludes(files.capabilityConsole, "PluginCapabilityList", "Capability console must not restore separate current and desired plugin card lists.");
 requireNotIncludes(files.capabilityConsole, "plugin-capability-state", "Capability console must not render plugin enabled and desired states as separate card sections.");
 requireIncludes(files.capabilityConsole, "openCapabilityDetail", "Capability console must keep a single detail-opening path.");

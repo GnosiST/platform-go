@@ -504,6 +504,36 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /System settings must be a first-class route/);
   });
 
+  it("rejects settings center pages that blur system settings with topbar preferences", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/settings/SettingsCenterConsole.tsx",
+      "dictionary.settingsCenterInterfacePreferenceBoundary",
+      "dictionary.settingsCenterSystemSettingsDescription",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /topbar settings scoped to interface preferences/);
+  });
+
+  it("rejects settings center pages that hide writable and schema footprint state", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/settings/SettingsCenterConsole.tsx",
+      "item.schema?.fields?.length ?? 0",
+      "0",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /schema field footprint/);
+  });
+
   it("rejects message center pages that drop common SMS, email, and WeChat channels", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
@@ -561,7 +591,7 @@ describe("validate-admin-ui-contracts", () => {
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /SMS test send is connected to the runtime endpoint/);
+    assert.match(result.stderr, /test send is connected to the runtime endpoint/);
   });
 
   it("rejects message center channel cards that collapse runtime readiness into generic configured state", () => {
@@ -577,6 +607,51 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /generic configured tag/);
+  });
+
+  it("rejects message center channel cards that hide the multi-channel dry-run path", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/message-center/MessageCenterConsole.tsx",
+      "testConnectEnabled: true",
+      'testConnectEnabled: channel === "sms"',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /dry-run path for all common channels/);
+  });
+
+  it("rejects message center placeholder channels labeled as real external test-connect", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/message-center/MessageCenterConsole.tsx",
+      "dictionary.messageCenterLocalDryRun",
+      "dictionary.messageCenterTestConnect",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /local dry-run action label/);
+  });
+
+  it("rejects message center channel cards that do not prefill the clicked channel", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/message-center/MessageCenterConsole.tsx",
+      "openTestSend(undefined, undefined, normalizeMessageCenterChannel(card.key))",
+      "openTestSend()",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /prefill dry-run with the clicked channel/);
   });
 
   it("rejects capability details that no longer open from the list into a modal", () => {
@@ -607,6 +682,21 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /Capability detail must show contributed configuration resources/);
+  });
+
+  it("rejects capability restart state that only handles install-pending changes", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/capabilities/CapabilityConsole.tsx",
+      "const pendingRestart = enabled !== desired;",
+      "const pendingRestart = !enabled && desired;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /cover both enable and disable pending changes/);
   });
 
   it("rejects optional notification metadata without pre-install impact preview", () => {

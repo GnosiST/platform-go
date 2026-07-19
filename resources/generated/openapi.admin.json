@@ -381,7 +381,7 @@
         ],
         "operationId": "runMessageCenterDeliveries",
         "summary": "Run the message-center delivery worker",
-        "description": "Manual v1 run endpoint for the notification delivery worker contract. It validates SMS provider configuration, uses Aliyun/Tencent live SMS SDK adapters when live sending is enabled, and still supports dry-run/config validation receipts. SMTP/WeChat supplier integration is not claimed until separate adapter evidence exists.",
+        "description": "Manual v1 run endpoint for the notification delivery worker contract. It validates SMS provider configuration, uses Aliyun/Tencent live SMS SDK adapters when live sending is enabled, and supports explicit dry-run/config validation receipts for non-SMS channels. SMTP/WeChat supplier integration is not claimed until separate adapter evidence exists.",
         "security": [
           {
             "bearerAuth": []
@@ -457,7 +457,7 @@
         ],
         "operationId": "testSendMessageCenter",
         "summary": "Send one message-center SMS test notification",
-        "description": "Exercises the notification SMS runtime from the message center. The request accepts a raw recipient only as a write-only send target; notification and delivery records store redacted target metadata and template parameter keys.",
+        "description": "Exercises the notification message-center send loop. SMS uses the configured SMS runtime; Email, WeChat and in-app channels use local dry-run receipts until real adapters are separately promoted. The request accepts a raw recipient only as a write-only send target; notification and delivery records store redacted target metadata and template parameter keys.",
         "security": [
           {
             "bearerAuth": []
@@ -508,7 +508,7 @@
             "$ref": "#/components/responses/InternalError"
           },
           "503": {
-            "description": "Message center SMS runtime is unavailable",
+            "description": "Message center runtime is unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -522,7 +522,7 @@
           }
         },
         "x-platform-permission": "admin:message-center:update",
-        "x-platform-runtime": "notification-sms-test-send-p0",
+        "x-platform-runtime": "notification-message-center-test-send-v1",
         "x-platform-secret-handling": "request recipient and template parameter values are write-only; records and receipts expose redacted target metadata only"
       }
     },
@@ -9250,7 +9250,7 @@
           }
         },
         "x-platform-permission": "admin:settings:read",
-        "x-platform-runtime": "settings-runtime-p0"
+        "x-platform-runtime": "settings-runtime-v1.1"
       }
     },
     "/api/admin/settings/{resource}/{id}": {
@@ -9333,7 +9333,155 @@
         },
         "x-platform-permission": "admin:settings:update",
         "x-platform-resource-permission-source": "target configuration resource update permission",
-        "x-platform-runtime": "settings-runtime-p0"
+        "x-platform-runtime": "settings-runtime-v1.1"
+      }
+    },
+    "/api/admin/settings/{resource}/{id}/test-connect": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "operationId": "testConnectAdminSettingsResource",
+        "summary": "Run one configuration connection preflight",
+        "description": "Runs a local connection preflight for supported configuration records. v1.1 supports SMS provider dry-run checks and reports unsupported SMTP or WeChat provider adapters without contacting external vendors.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Settings connection preflight",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminSettingsTestConnectionData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-permission": "admin:settings:update",
+        "x-platform-resource-permission-source": "target configuration resource update permission",
+        "x-platform-runtime": "settings-runtime-v1.1",
+        "x-platform-secret-projection": "connection preflight checks never include raw protected values"
+      }
+    },
+    "/api/admin/settings/{resource}/{id}/validate-config": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "operationId": "validateAdminSettingsResourceConfig",
+        "summary": "Validate one configuration record",
+        "description": "Validates one enabled capability configuration record without returning protected secrets. The result also reports whether the saved configuration requires a manual runtime restart.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Settings validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminSettingsValidationData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-permission": "admin:settings:update",
+        "x-platform-resource-permission-source": "target configuration resource update permission",
+        "x-platform-runtime": "settings-runtime-v1.1",
+        "x-platform-secret-projection": "config validation checks never include raw protected values"
       }
     },
     "/api/auth/challenges": {
@@ -15771,6 +15919,9 @@
           "description",
           "permissionPrefix",
           "writable",
+          "runtimeApplyMode",
+          "restartRequired",
+          "pendingRestart",
           "schema",
           "recordCount",
           "records"
@@ -15813,6 +15964,25 @@
           "writable": {
             "type": "boolean"
           },
+          "runtimeApplyMode": {
+            "type": "string",
+            "enum": [
+              "dynamic",
+              "restart-required"
+            ]
+          },
+          "restartRequired": {
+            "type": "boolean"
+          },
+          "pendingRestart": {
+            "type": "boolean"
+          },
+          "validationEndpoint": {
+            "type": "string"
+          },
+          "testConnectionEndpoint": {
+            "type": "string"
+          },
           "schema": {
             "type": "object",
             "additionalProperties": true,
@@ -15829,7 +15999,7 @@
             }
           }
         },
-        "x-platform-runtime": "settings-runtime-p0",
+        "x-platform-runtime": "settings-runtime-v1.1",
         "x-platform-secret-projection": "response projection must mask or omit protected provider secrets"
       },
       "AdminSettingsRuntimeData": {
@@ -15893,13 +16063,15 @@
             }
           }
         },
-        "x-platform-write-policy": "Only writable public/plain value fields on enabled configuration resources may be submitted."
+        "x-platform-write-policy": "Only writable public/plain fields and write-only encrypted secret fields on enabled configuration resources may be submitted; protected values are never echoed."
       },
       "AdminSettingsMutationData": {
         "type": "object",
         "required": [
           "resource",
-          "record"
+          "record",
+          "restartRequired",
+          "pendingRestart"
         ],
         "additionalProperties": false,
         "properties": {
@@ -15909,6 +16081,136 @@
           },
           "record": {
             "$ref": "#/components/schemas/AdminSettingsResourceRecord"
+          },
+          "restartRequired": {
+            "type": "boolean"
+          },
+          "pendingRestart": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AdminSettingsConfigCheck": {
+        "type": "object",
+        "required": [
+          "key",
+          "status",
+          "message"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "warning",
+              "invalid"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "AdminSettingsValidationData": {
+        "type": "object",
+        "required": [
+          "resource",
+          "id",
+          "status",
+          "valid",
+          "restartRequired",
+          "pendingRestart",
+          "checks"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "resource": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "valid",
+              "invalid"
+            ]
+          },
+          "valid": {
+            "type": "boolean"
+          },
+          "restartRequired": {
+            "type": "boolean"
+          },
+          "pendingRestart": {
+            "type": "boolean"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminSettingsConfigCheck"
+            }
+          }
+        }
+      },
+      "AdminSettingsTestConnectionData": {
+        "type": "object",
+        "required": [
+          "resource",
+          "id",
+          "status",
+          "supported",
+          "connected",
+          "mode",
+          "restartRequired",
+          "pendingRestart",
+          "checks"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "resource": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "dry-run",
+              "invalid",
+              "unsupported"
+            ]
+          },
+          "supported": {
+            "type": "boolean"
+          },
+          "connected": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "restartRequired": {
+            "type": "boolean"
+          },
+          "pendingRestart": {
+            "type": "boolean"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminSettingsConfigCheck"
+            }
           }
         }
       },
@@ -15924,7 +16226,11 @@
           "channel": {
             "type": "string",
             "enum": [
-              "sms"
+              "in_app",
+              "sms",
+              "email",
+              "wechat_official",
+              "wechat_miniapp"
             ]
           },
           "tenantCode": {
@@ -15956,11 +16262,12 @@
             "type": "string"
           }
         },
-        "x-platform-runtime": "notification-sms-test-send-p0"
+        "x-platform-runtime": "notification-message-center-test-send-v1"
       },
-      "AdminMessageCenterSMSReceipt": {
+      "AdminMessageCenterDeliveryReceipt": {
         "type": "object",
         "required": [
+          "channel",
           "provider",
           "messageId",
           "status",
@@ -15968,6 +16275,9 @@
         ],
         "additionalProperties": false,
         "properties": {
+          "channel": {
+            "type": "string"
+          },
           "provider": {
             "type": "string"
           },
@@ -15981,7 +16291,7 @@
             "type": "string"
           }
         },
-        "x-platform-secret-projection": "only redacted SMS target and provider receipt metadata are returned"
+        "x-platform-secret-projection": "only redacted target and provider receipt metadata are returned"
       },
       "AdminMessageCenterTestSendData": {
         "type": "object",
@@ -15999,7 +16309,7 @@
             "$ref": "#/components/schemas/AdminSettingsResourceRecord"
           },
           "receipt": {
-            "$ref": "#/components/schemas/AdminMessageCenterSMSReceipt"
+            "$ref": "#/components/schemas/AdminMessageCenterDeliveryReceipt"
           }
         }
       },

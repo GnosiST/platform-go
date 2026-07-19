@@ -194,15 +194,15 @@ function validateAdminOIDCOpenAPIContract(errors) {
     errors.push("admin OpenAPI auth operations must declare the missing resolver 501 response");
   }
   const settingsRuntime = openAPI.paths?.["/api/admin/settings"]?.get;
-  if (settingsRuntime?.operationId !== "getAdminSettingsRuntime" || settingsRuntime?.["x-platform-runtime"] !== "settings-runtime-p0") {
-    errors.push("admin OpenAPI must expose the settings runtime P0 aggregation operation");
+  if (settingsRuntime?.operationId !== "getAdminSettingsRuntime" || settingsRuntime?.["x-platform-runtime"] !== "settings-runtime-v1.1") {
+    errors.push("admin OpenAPI must expose the settings runtime v1.1 aggregation operation");
   }
   if (settingsRuntime?.["x-platform-permission"] !== "admin:settings:read") {
     errors.push("settings runtime read operation must require admin:settings:read");
   }
   const settingsUpdate = openAPI.paths?.["/api/admin/settings/{resource}/{id}"]?.put;
-  if (settingsUpdate?.operationId !== "updateAdminSettingsResource" || settingsUpdate?.["x-platform-runtime"] !== "settings-runtime-p0") {
-    errors.push("admin OpenAPI must expose the settings runtime P0 update operation");
+  if (settingsUpdate?.operationId !== "updateAdminSettingsResource" || settingsUpdate?.["x-platform-runtime"] !== "settings-runtime-v1.1") {
+    errors.push("admin OpenAPI must expose the settings runtime v1.1 update operation");
   }
   if (settingsUpdate?.["x-platform-permission"] !== "admin:settings:update") {
     errors.push("settings runtime update operation must require admin:settings:update");
@@ -214,9 +214,41 @@ function validateAdminOIDCOpenAPIContract(errors) {
   if (settingsItem?.["x-platform-secret-projection"] !== "response projection must mask or omit protected provider secrets") {
     errors.push("AdminSettingsResourceItem must declare masked/omitted secret projection");
   }
+  const settingsRequired = settingsItem?.required ?? [];
+  for (const required of ["runtimeApplyMode", "restartRequired", "pendingRestart"]) {
+    if (!Array.isArray(settingsRequired) || !settingsRequired.includes(required)) {
+      errors.push(`AdminSettingsResourceItem must require ${required}`);
+    }
+  }
+  const settingsMutationRequired = openAPI.components?.schemas?.AdminSettingsMutationData?.required ?? [];
+  for (const required of ["restartRequired", "pendingRestart"]) {
+    if (!Array.isArray(settingsMutationRequired) || !settingsMutationRequired.includes(required)) {
+      errors.push(`AdminSettingsMutationData must require ${required}`);
+    }
+  }
+  const settingsValidate = openAPI.paths?.["/api/admin/settings/{resource}/{id}/validate-config"]?.post;
+  if (settingsValidate?.operationId !== "validateAdminSettingsResourceConfig" || settingsValidate?.["x-platform-runtime"] !== "settings-runtime-v1.1") {
+    errors.push("admin OpenAPI must expose the settings runtime v1.1 validate-config operation");
+  }
+  if (settingsValidate?.["x-platform-permission"] !== "admin:settings:update") {
+    errors.push("settings validate-config operation must require admin:settings:update");
+  }
+  if (settingsValidate?.responses?.["200"]?.content?.["application/json"]?.schema?.properties?.data?.$ref !== "#/components/schemas/AdminSettingsValidationData") {
+    errors.push("settings validate-config operation must return AdminSettingsValidationData");
+  }
+  const settingsTestConnect = openAPI.paths?.["/api/admin/settings/{resource}/{id}/test-connect"]?.post;
+  if (settingsTestConnect?.operationId !== "testConnectAdminSettingsResource" || settingsTestConnect?.["x-platform-runtime"] !== "settings-runtime-v1.1") {
+    errors.push("admin OpenAPI must expose the settings runtime v1.1 test-connect operation");
+  }
+  if (settingsTestConnect?.["x-platform-permission"] !== "admin:settings:update") {
+    errors.push("settings test-connect operation must require admin:settings:update");
+  }
+  if (settingsTestConnect?.responses?.["200"]?.content?.["application/json"]?.schema?.properties?.data?.$ref !== "#/components/schemas/AdminSettingsTestConnectionData") {
+    errors.push("settings test-connect operation must return AdminSettingsTestConnectionData");
+  }
   const messageCenterTestSend = openAPI.paths?.["/api/admin/message-center/test-send"]?.post;
-  if (messageCenterTestSend?.operationId !== "testSendMessageCenter" || messageCenterTestSend?.["x-platform-runtime"] !== "notification-sms-test-send-p0") {
-    errors.push("admin OpenAPI must expose the message-center SMS test-send runtime operation");
+  if (messageCenterTestSend?.operationId !== "testSendMessageCenter" || messageCenterTestSend?.["x-platform-runtime"] !== "notification-message-center-test-send-v1") {
+    errors.push("admin OpenAPI must expose the message-center test-send runtime operation");
   }
   if (messageCenterTestSend?.["x-platform-permission"] !== "admin:message-center:update") {
     errors.push("message-center test-send operation must require admin:message-center:update");
@@ -226,7 +258,7 @@ function validateAdminOIDCOpenAPIContract(errors) {
   }
   const unavailableCodes = messageCenterTestSend?.responses?.["503"]?.["x-platform-error-codes"] ?? [];
   if (!Array.isArray(unavailableCodes) || !unavailableCodes.includes("ADMIN_MESSAGE_CENTER_UNAVAILABLE")) {
-    errors.push("message-center test-send operation must declare ADMIN_MESSAGE_CENTER_UNAVAILABLE for unavailable SMS runtime");
+    errors.push("message-center test-send operation must declare ADMIN_MESSAGE_CENTER_UNAVAILABLE for unavailable runtime");
   }
   const messageCenterRequest = openAPI.components?.schemas?.AdminMessageCenterTestSendRequest;
   if (
@@ -236,9 +268,13 @@ function validateAdminOIDCOpenAPIContract(errors) {
   ) {
     errors.push("AdminMessageCenterTestSendRequest must keep recipient and template params write-only with redacted response policy");
   }
-  const messageCenterReceipt = openAPI.components?.schemas?.AdminMessageCenterSMSReceipt;
-  if (messageCenterReceipt?.["x-platform-secret-projection"] !== "only redacted SMS target and provider receipt metadata are returned") {
-    errors.push("AdminMessageCenterSMSReceipt must declare redacted SMS target projection");
+  const messageCenterReceipt = openAPI.components?.schemas?.AdminMessageCenterDeliveryReceipt;
+  if (messageCenterReceipt?.["x-platform-secret-projection"] !== "only redacted target and provider receipt metadata are returned") {
+    errors.push("AdminMessageCenterDeliveryReceipt must declare redacted target projection");
+  }
+  const receiptRequired = messageCenterReceipt?.required ?? [];
+  if (!Array.isArray(receiptRequired) || !receiptRequired.includes("channel")) {
+    errors.push("AdminMessageCenterDeliveryReceipt must include channel in required fields");
   }
   const startRequest = openAPI.components?.schemas?.AdminAuthProviderStartRequest;
   const challenge = startRequest?.properties?.codeChallenge;

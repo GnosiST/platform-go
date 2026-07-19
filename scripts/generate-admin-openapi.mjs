@@ -1331,6 +1331,9 @@ function schemas() {
         "description",
         "permissionPrefix",
         "writable",
+        "runtimeApplyMode",
+        "restartRequired",
+        "pendingRestart",
         "schema",
         "recordCount",
         "records",
@@ -1348,6 +1351,11 @@ function schemas() {
         permissionPrefix: { type: "string", minLength: 1 },
         readOnly: { type: "boolean" },
         writable: { type: "boolean" },
+        runtimeApplyMode: { type: "string", enum: ["dynamic", "restart-required"] },
+        restartRequired: { type: "boolean" },
+        pendingRestart: { type: "boolean" },
+        validationEndpoint: { type: "string" },
+        testConnectionEndpoint: { type: "string" },
         schema: {
           type: "object",
           additionalProperties: true,
@@ -1359,7 +1367,7 @@ function schemas() {
           items: { $ref: "#/components/schemas/AdminSettingsResourceRecord" },
         },
       },
-      "x-platform-runtime": "settings-runtime-p0",
+      "x-platform-runtime": "settings-runtime-v1.1",
       "x-platform-secret-projection": "response projection must mask or omit protected provider secrets",
     },
     AdminSettingsRuntimeData: {
@@ -1396,15 +1404,57 @@ function schemas() {
           },
         },
       },
-      "x-platform-write-policy": "Only writable public/plain value fields on enabled configuration resources may be submitted.",
+      "x-platform-write-policy": "Only writable public/plain fields and write-only encrypted secret fields on enabled configuration resources may be submitted; protected values are never echoed.",
     },
     AdminSettingsMutationData: {
       type: "object",
-      required: ["resource", "record"],
+      required: ["resource", "record", "restartRequired", "pendingRestart"],
       additionalProperties: false,
       properties: {
         resource: { type: "string", minLength: 1 },
         record: { $ref: "#/components/schemas/AdminSettingsResourceRecord" },
+        restartRequired: { type: "boolean" },
+        pendingRestart: { type: "boolean" },
+      },
+    },
+    AdminSettingsConfigCheck: {
+      type: "object",
+      required: ["key", "status", "message"],
+      additionalProperties: false,
+      properties: {
+        key: { type: "string" },
+        status: { type: "string", enum: ["ok", "warning", "invalid"] },
+        message: { type: "string" },
+      },
+    },
+    AdminSettingsValidationData: {
+      type: "object",
+      required: ["resource", "id", "status", "valid", "restartRequired", "pendingRestart", "checks"],
+      additionalProperties: false,
+      properties: {
+        resource: { type: "string", minLength: 1 },
+        id: { type: "string", minLength: 1 },
+        status: { type: "string", enum: ["valid", "invalid"] },
+        valid: { type: "boolean" },
+        restartRequired: { type: "boolean" },
+        pendingRestart: { type: "boolean" },
+        checks: { type: "array", items: { $ref: "#/components/schemas/AdminSettingsConfigCheck" } },
+      },
+    },
+    AdminSettingsTestConnectionData: {
+      type: "object",
+      required: ["resource", "id", "status", "supported", "connected", "mode", "restartRequired", "pendingRestart", "checks"],
+      additionalProperties: false,
+      properties: {
+        resource: { type: "string", minLength: 1 },
+        id: { type: "string", minLength: 1 },
+        status: { type: "string", enum: ["dry-run", "invalid", "unsupported"] },
+        supported: { type: "boolean" },
+        connected: { type: "boolean" },
+        mode: { type: "string" },
+        restartRequired: { type: "boolean" },
+        pendingRestart: { type: "boolean" },
+        checks: { type: "array", items: { $ref: "#/components/schemas/AdminSettingsConfigCheck" } },
       },
     },
     AdminMessageCenterTestSendRequest: {
@@ -1412,7 +1462,7 @@ function schemas() {
       required: ["channel", "recipient", "templateId"],
       additionalProperties: false,
       properties: {
-        channel: { type: "string", enum: ["sms"] },
+        channel: { type: "string", enum: ["in_app", "sms", "email", "wechat_official", "wechat_miniapp"] },
         tenantCode: { type: "string" },
         recipient: {
           type: "string",
@@ -1431,19 +1481,20 @@ function schemas() {
         title: { type: "string" },
         body: { type: "string" },
       },
-      "x-platform-runtime": "notification-sms-test-send-p0",
+      "x-platform-runtime": "notification-message-center-test-send-v1",
     },
-    AdminMessageCenterSMSReceipt: {
+    AdminMessageCenterDeliveryReceipt: {
       type: "object",
-      required: ["provider", "messageId", "status", "redactedTarget"],
+      required: ["channel", "provider", "messageId", "status", "redactedTarget"],
       additionalProperties: false,
       properties: {
+        channel: { type: "string" },
         provider: { type: "string" },
         messageId: { type: "string" },
         status: { type: "string" },
         redactedTarget: { type: "string" },
       },
-      "x-platform-secret-projection": "only redacted SMS target and provider receipt metadata are returned",
+      "x-platform-secret-projection": "only redacted target and provider receipt metadata are returned",
     },
     AdminMessageCenterTestSendData: {
       type: "object",
@@ -1452,7 +1503,7 @@ function schemas() {
       properties: {
         notification: { $ref: "#/components/schemas/AdminSettingsResourceRecord" },
         delivery: { $ref: "#/components/schemas/AdminSettingsResourceRecord" },
-        receipt: { $ref: "#/components/schemas/AdminMessageCenterSMSReceipt" },
+        receipt: { $ref: "#/components/schemas/AdminMessageCenterDeliveryReceipt" },
       },
     },
     AdminMessageCenterDeliveriesRunRequest: {
@@ -1871,7 +1922,7 @@ paths["/api/admin/settings"] = {
       ...errorResponses(),
     },
     "x-platform-permission": "admin:settings:read",
-    "x-platform-runtime": "settings-runtime-p0",
+    "x-platform-runtime": "settings-runtime-v1.1",
   },
 };
 
@@ -1894,7 +1945,47 @@ paths["/api/admin/settings/{resource}/{id}"] = {
     },
     "x-platform-permission": "admin:settings:update",
     "x-platform-resource-permission-source": "target configuration resource update permission",
-    "x-platform-runtime": "settings-runtime-p0",
+    "x-platform-runtime": "settings-runtime-v1.1",
+  },
+};
+
+paths["/api/admin/settings/{resource}/{id}/validate-config"] = {
+  post: {
+    tags: ["settings"],
+    operationId: "validateAdminSettingsResourceConfig",
+    summary: "Validate one configuration record",
+    description:
+      "Validates one enabled capability configuration record without returning protected secrets. The result also reports whether the saved configuration requires a manual runtime restart.",
+    security: [{ bearerAuth: [] }],
+    parameters: [pathParameter("resource"), pathParameter("id")],
+    responses: {
+      "200": successResponse("Settings validation", apiResponse({ $ref: "#/components/schemas/AdminSettingsValidationData" })),
+      ...errorResponses(),
+    },
+    "x-platform-permission": "admin:settings:update",
+    "x-platform-resource-permission-source": "target configuration resource update permission",
+    "x-platform-runtime": "settings-runtime-v1.1",
+    "x-platform-secret-projection": "config validation checks never include raw protected values",
+  },
+};
+
+paths["/api/admin/settings/{resource}/{id}/test-connect"] = {
+  post: {
+    tags: ["settings"],
+    operationId: "testConnectAdminSettingsResource",
+    summary: "Run one configuration connection preflight",
+    description:
+      "Runs a local connection preflight for supported configuration records. v1.1 supports SMS provider dry-run checks and reports unsupported SMTP or WeChat provider adapters without contacting external vendors.",
+    security: [{ bearerAuth: [] }],
+    parameters: [pathParameter("resource"), pathParameter("id")],
+    responses: {
+      "200": successResponse("Settings connection preflight", apiResponse({ $ref: "#/components/schemas/AdminSettingsTestConnectionData" })),
+      ...errorResponses(),
+    },
+    "x-platform-permission": "admin:settings:update",
+    "x-platform-resource-permission-source": "target configuration resource update permission",
+    "x-platform-runtime": "settings-runtime-v1.1",
+    "x-platform-secret-projection": "connection preflight checks never include raw protected values",
   },
 };
 
@@ -1904,7 +1995,7 @@ paths["/api/admin/message-center/test-send"] = {
     operationId: "testSendMessageCenter",
     summary: "Send one message-center SMS test notification",
     description:
-      "Exercises the notification SMS runtime from the message center. The request accepts a raw recipient only as a write-only send target; notification and delivery records store redacted target metadata and template parameter keys.",
+      "Exercises the notification message-center send loop. SMS uses the configured SMS runtime; Email, WeChat and in-app channels use local dry-run receipts until real adapters are separately promoted. The request accepts a raw recipient only as a write-only send target; notification and delivery records store redacted target metadata and template parameter keys.",
     security: [{ bearerAuth: [] }],
     requestBody: {
       required: true,
@@ -1914,12 +2005,12 @@ paths["/api/admin/message-center/test-send"] = {
       "201": successResponse("Message center test-send result", apiResponse({ $ref: "#/components/schemas/AdminMessageCenterTestSendData" })),
       ...errorResponses(),
       "503": {
-        ...platformErrorResponse("Message center SMS runtime is unavailable"),
+        ...platformErrorResponse("Message center runtime is unavailable"),
         "x-platform-error-codes": ["ADMIN_MESSAGE_CENTER_UNAVAILABLE"],
       },
     },
     "x-platform-permission": "admin:message-center:update",
-    "x-platform-runtime": "notification-sms-test-send-p0",
+    "x-platform-runtime": "notification-message-center-test-send-v1",
     "x-platform-secret-handling": "request recipient and template parameter values are write-only; records and receipts expose redacted target metadata only",
   },
 };
@@ -1930,7 +2021,7 @@ paths["/api/admin/message-center/deliveries/run"] = {
     operationId: "runMessageCenterDeliveries",
     summary: "Run the message-center delivery worker",
     description:
-      "Manual v1 run endpoint for the notification delivery worker contract. It validates SMS provider configuration, uses Aliyun/Tencent live SMS SDK adapters when live sending is enabled, and still supports dry-run/config validation receipts. SMTP/WeChat supplier integration is not claimed until separate adapter evidence exists.",
+      "Manual v1 run endpoint for the notification delivery worker contract. It validates SMS provider configuration, uses Aliyun/Tencent live SMS SDK adapters when live sending is enabled, and supports explicit dry-run/config validation receipts for non-SMS channels. SMTP/WeChat supplier integration is not claimed until separate adapter evidence exists.",
     security: [{ bearerAuth: [] }],
     requestBody: {
       required: true,

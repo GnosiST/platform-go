@@ -80,6 +80,14 @@
     },
     {
       "path": "admin/src/platform/api/client.ts",
+      "contains": "export function validateAdminSettingsResourceConfig"
+    },
+    {
+      "path": "admin/src/platform/api/client.ts",
+      "contains": "export function testConnectAdminSettingsResource"
+    },
+    {
+      "path": "admin/src/platform/api/client.ts",
       "contains": "export function testSendMessageCenter"
     },
     {
@@ -95,12 +103,20 @@
       "contains": "s.projectAdminResourceRecords"
     },
     {
+      "path": "internal/platform/httpapi/settings.go",
+      "contains": "func (s *Server) adminSettingsValidateConfig"
+    },
+    {
+      "path": "internal/platform/httpapi/settings.go",
+      "contains": "func (s *Server) adminSettingsTestConnection"
+    },
+    {
       "path": "internal/platform/httpapi/message_center.go",
       "contains": "func (s *Server) adminMessageCenterTestSend"
     },
     {
       "path": "internal/platform/httpapi/message_center.go",
-      "contains": "notification.RedactSMSTarget"
+      "contains": "notification.RedactMessageTarget"
     },
     {
       "path": "admin/src/platform/refine/dataProvider.ts",

@@ -96,6 +96,11 @@ export type AdminSettingsResourceItem = {
   permissionPrefix: string;
   readOnly?: boolean;
   writable: boolean;
+  runtimeApplyMode: "dynamic" | "restart-required" | string;
+  restartRequired: boolean;
+  pendingRestart: boolean;
+  validationEndpoint?: string;
+  testConnectionEndpoint?: string;
   schema: AdminResourceSchema;
   recordCount: number;
   records: AdminResourceRecord[];
@@ -112,6 +117,39 @@ export type AdminSettingsUpdateInput = {
   status?: string;
   description?: string;
   values?: Record<string, unknown>;
+};
+
+export type AdminSettingsMutationResult = AdminResourceMutation & {
+  restartRequired: boolean;
+  pendingRestart: boolean;
+};
+
+export type AdminSettingsConfigCheck = {
+  key: string;
+  status: "ok" | "warning" | "invalid" | string;
+  message: string;
+};
+
+export type AdminSettingsValidationResult = {
+  resource: string;
+  id: string;
+  status: "valid" | "invalid" | string;
+  valid: boolean;
+  restartRequired: boolean;
+  pendingRestart: boolean;
+  checks: AdminSettingsConfigCheck[];
+};
+
+export type AdminSettingsTestConnectionResult = {
+  resource: string;
+  id: string;
+  status: "dry-run" | "invalid" | "unsupported" | string;
+  supported: boolean;
+  connected: boolean;
+  mode: string;
+  restartRequired: boolean;
+  pendingRestart: boolean;
+  checks: AdminSettingsConfigCheck[];
 };
 
 export type BrandingConfig = {
@@ -707,8 +745,10 @@ export type AdminSensitiveRevealValue = {
   copyAllowed: boolean;
 };
 
+export type MessageCenterChannel = "in_app" | "sms" | "email" | "wechat_official" | "wechat_miniapp";
+
 export type MessageCenterTestSendInput = {
-  channel: "sms";
+  channel: MessageCenterChannel;
   tenantCode?: string;
   recipient: string;
   templateId: string;
@@ -721,6 +761,7 @@ export type MessageCenterTestSendResult = {
   notification: AdminResourceRecord;
   delivery: AdminResourceRecord;
   receipt: {
+    channel: string;
     provider: string;
     messageId: string;
     status: string;
@@ -985,9 +1026,21 @@ export function getAdminSettingsRuntime() {
 }
 
 export function updateAdminSettingsResource(resource: string, id: string, input: AdminSettingsUpdateInput) {
-  return request<AdminResourceMutation>(`/admin/settings/${resource}/${id}` as `/${string}`, {
+  return request<AdminSettingsMutationResult>(`/admin/settings/${resource}/${id}` as `/${string}`, {
     method: "PUT",
     body: JSON.stringify(input),
+  });
+}
+
+export function validateAdminSettingsResourceConfig(resource: string, id: string) {
+  return request<AdminSettingsValidationResult>(`/admin/settings/${resource}/${id}/validate-config` as `/${string}`, {
+    method: "POST",
+  });
+}
+
+export function testConnectAdminSettingsResource(resource: string, id: string) {
+  return request<AdminSettingsTestConnectionResult>(`/admin/settings/${resource}/${id}/test-connect` as `/${string}`, {
+    method: "POST",
   });
 }
 

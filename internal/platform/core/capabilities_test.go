@@ -539,6 +539,36 @@ func TestDefaultManifestsExposeAuthProviderDeclarations(t *testing.T) {
 	}
 }
 
+func TestCredentialAuthManifestExposesSettingsResource(t *testing.T) {
+	var credential capability.Manifest
+	for _, manifest := range DefaultManifests() {
+		if manifest.ID == "credential-auth" {
+			credential = manifest
+			break
+		}
+	}
+	if credential.ID == "" {
+		t.Fatalf("DefaultManifests() missing credential-auth capability")
+	}
+	resources := map[string]capability.AdminResource{}
+	for _, resource := range credential.Admin.Resources {
+		resources[resource.Resource] = resource
+	}
+	settings := resources["credential-auth-settings"]
+	if settings.Resource == "" || settings.Menu.Parent != "configuration" || settings.Menu.Group != "security" || settings.PermissionPrefix != "admin:credential-auth-setting" {
+		t.Fatalf("credential-auth settings resource = %+v, want configuration/security settings resource", settings)
+	}
+	for _, fieldKey := range []string{"usernamePasswordEnabled", "phonePasswordEnabled", "emailPasswordEnabled", "phoneSMSOTPEnabled", "challengeMode", "challengeKind", "passwordMaxAttempts", "lockSeconds", "smsOTPTTLSeconds", "smsOTPMaxAttempts", "secretTransport", "passwordAlgorithm", "argon2ParamsVersion"} {
+		if field := adminResourceField(t, settings, fieldKey); field.Source != "values" || !field.InForm {
+			t.Fatalf("credential-auth settings field %q = %+v, want writable values field", fieldKey, field)
+		}
+	}
+	requireFieldOption(t, "credential-auth-settings", adminResourceField(t, settings, "challengeMode"), "after-failure")
+	requireFieldOption(t, "credential-auth-settings", adminResourceField(t, settings, "challengeKind"), "slider")
+	requireFieldOption(t, "credential-auth-settings", adminResourceField(t, settings, "secretTransport"), "ecdh-a256gcm-v1")
+	requireFieldOption(t, "credential-auth-settings", adminResourceField(t, settings, "passwordAlgorithm"), "argon2id")
+}
+
 func TestDefaultManifestsExposeAdminOIDCIdentityResourceWithoutRawIdentifiers(t *testing.T) {
 	var identityResource capability.AdminResource
 	for _, manifest := range DefaultManifests() {
