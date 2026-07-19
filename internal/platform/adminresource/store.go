@@ -797,6 +797,14 @@ func seedRowsForResource(resource string, updatedAt string) []Record {
 		return []Record{
 			seedLocalized("credential-auth-setting-default", "default", "默认认证配置", "Default Credential Auth Settings", "enabled", "本地凭据认证、密码策略、验证码和短信登录默认配置。", "Default local credential authentication, password policy, challenge, and SMS login settings.", updatedAt, credentialAuthSettingsSeedValues()),
 		}
+	case "notification-channels":
+		return notificationChannelSeedRows(updatedAt)
+	case "notification-providers":
+		return notificationProviderSeedRows(updatedAt)
+	case "notification-send-policies":
+		return notificationSendPolicySeedRows(updatedAt)
+	case "notification-templates":
+		return notificationTemplateSeedRows(updatedAt)
 	case "audit-logs":
 		return []Record{
 			seed("audit-bootstrap", "platform.bootstrap", "Platform Bootstrap", "recorded", "Initial platform bootstrap event.", updatedAt, map[string]string{"actor": "system", "action": "platform.bootstrap", "resource": "platform", "createdAt": updatedAt}),
@@ -852,6 +860,49 @@ func credentialAuthSettingsSeedValues() map[string]string {
 		"secretTransport":         "ecdh-a256gcm-v1",
 		"passwordAlgorithm":       "argon2id",
 		"argon2ParamsVersion":     "v1",
+	}
+}
+
+func notificationChannelSeedRows(updatedAt string) []Record {
+	return []Record{
+		seedLocalized("notification-channel-in-app", "in-app", "站内消息", "In-App Notifications", "enabled", "平台内通知和任务提醒默认通道。", "Default channel for in-platform notices and task reminders.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "in_app", "defaultProviderCode": "in-app-local", "enabled": "true", "rateLimitPerMinute": "300", "dailyQuota": "10000"}),
+		seedLocalized("notification-channel-sms", "sms", "短信", "SMS", "enabled", "登录验证码和业务短信通道，可切换阿里云、腾讯云或本地模拟供应商。", "SMS channel for login codes and business messages with Aliyun, Tencent Cloud, or mock-local providers.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "sms", "defaultProviderCode": "sms-mock-local", "enabled": "true", "rateLimitPerMinute": "60", "dailyQuota": "2000"}),
+		seedLocalized("notification-channel-email", "email", "邮箱", "Email", "enabled", "通用 SMTP 邮件通道，用于账号、安全和业务通知。", "Generic SMTP email channel for account, security, and business notifications.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "email", "defaultProviderCode": "email-smtp", "enabled": "true", "rateLimitPerMinute": "120", "dailyQuota": "5000"}),
+		seedLocalized("notification-channel-wechat-official", "wechat-official", "微信公众号", "WeChat Official Account", "enabled", "微信公众号模板消息配置通道，真实发送适配器单独接入。", "WeChat Official Account template-message channel; live sender adapter is connected separately.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "wechat_official", "defaultProviderCode": "wechat-official", "enabled": "false", "rateLimitPerMinute": "120", "dailyQuota": "5000"}),
+		seedLocalized("notification-channel-wechat-miniapp", "wechat-miniapp", "微信小程序", "WeChat Mini Program", "enabled", "微信小程序订阅消息配置通道，真实发送适配器单独接入。", "WeChat Mini Program subscription-message channel; live sender adapter is connected separately.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "wechat_miniapp", "defaultProviderCode": "wechat-miniapp", "enabled": "false", "rateLimitPerMinute": "120", "dailyQuota": "5000"}),
+	}
+}
+
+func notificationProviderSeedRows(updatedAt string) []Record {
+	return []Record{
+		seedLocalized("notification-provider-in-app-local", "in-app-local", "站内本地供应商", "In-App Local", "enabled", "平台内通知本地投递供应商。", "Local provider for in-platform notification delivery.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "in_app", "provider": "local", "accountName": "Platform Local", "endpoint": "local", "region": "local", "senderId": "platform", "templateNamespace": "platform", "credentialStatus": "configured"}),
+		seedLocalized("notification-provider-sms-mock-local", "sms-mock-local", "短信本地模拟", "SMS Mock Local", "enabled", "开发和测试环境短信模拟供应商。", "Development and test SMS mock provider.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "sms", "provider": "mock-local", "accountName": "Mock Local", "endpoint": "local", "region": "local", "senderId": "platform", "templateNamespace": "platform", "credentialStatus": "configured"}),
+		seedLocalized("notification-provider-sms-aliyun", "sms-aliyun", "阿里云短信", "Aliyun SMS", "disabled", "阿里云短信供应商配置项，填入访问凭据和签名后启用。", "Aliyun SMS provider configuration; enable after access credentials and sign name are configured.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "sms", "provider": "aliyun", "accountName": "Aliyun SMS", "endpoint": "dysmsapi.aliyuncs.com", "region": "cn-hangzhou", "senderId": "", "templateNamespace": "aliyun", "credentialStatus": "missing"}),
+		seedLocalized("notification-provider-sms-tencent", "sms-tencent", "腾讯云短信", "Tencent Cloud SMS", "disabled", "腾讯云短信供应商配置项，填入访问凭据、签名和 SDK AppID 后启用。", "Tencent Cloud SMS provider configuration; enable after credentials, sign name, and SDK AppID are configured.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "sms", "provider": "tencent", "accountName": "Tencent Cloud SMS", "endpoint": "sms.tencentcloudapi.com", "region": "ap-guangzhou", "senderId": "", "templateNamespace": "tencent", "credentialStatus": "missing"}),
+		seedLocalized("notification-provider-email-smtp", "email-smtp", "SMTP 邮箱", "SMTP Email", "enabled", "通用 SMTP 邮箱供应商配置项；当前消息中心可先本地 dry-run 验证流程。", "Generic SMTP email provider configuration; message center currently supports local dry-run flow validation.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "email", "provider": "smtp", "accountName": "Default SMTP", "endpoint": "", "region": "global", "senderId": "noreply@example.com", "templateNamespace": "email", "credentialStatus": "missing"}),
+		seedLocalized("notification-provider-wechat-official", "wechat-official", "微信公众号", "WeChat Official Account", "disabled", "微信公众号模板消息供应商配置项；真实发送适配器单独接入。", "WeChat Official Account template-message provider configuration; live sender adapter is connected separately.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "wechat_official", "provider": "wechat-official", "accountName": "WeChat Official Account", "endpoint": "api.weixin.qq.com", "region": "cn", "senderId": "", "templateNamespace": "wechat-official", "credentialStatus": "missing"}),
+		seedLocalized("notification-provider-wechat-miniapp", "wechat-miniapp", "微信小程序", "WeChat Mini Program", "disabled", "微信小程序订阅消息供应商配置项；真实发送适配器单独接入。", "WeChat Mini Program subscription-message provider configuration; live sender adapter is connected separately.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "wechat_miniapp", "provider": "wechat-miniapp", "accountName": "WeChat Mini Program", "endpoint": "api.weixin.qq.com", "region": "cn", "senderId": "", "templateNamespace": "wechat-miniapp", "credentialStatus": "missing"}),
+	}
+}
+
+func notificationSendPolicySeedRows(updatedAt string) []Record {
+	return []Record{
+		seedLocalized("notification-policy-in-app-general", "in-app-general", "站内默认策略", "In-App General Policy", "enabled", "站内通知默认发送策略。", "Default send policy for in-app notifications.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "in_app", "templateCode": "in-app-general", "providerCode": "in-app-local", "selectionMode": "default", "maxAttempts": "1", "retryIntervalSeconds": "0", "rateLimitPerMinute": "300", "quietHours": ""}),
+		seedLocalized("notification-policy-sms-login", "sms-login", "短信登录验证码策略", "SMS Login Code Policy", "enabled", "登录短信验证码默认发送策略。", "Default send policy for login SMS verification codes.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "sms", "templateCode": "sms-login-code", "providerCode": "sms-mock-local", "selectionMode": "fixed", "maxAttempts": "3", "retryIntervalSeconds": "60", "rateLimitPerMinute": "60", "quietHours": ""}),
+		seedLocalized("notification-policy-email-general", "email-general", "邮箱默认策略", "Email General Policy", "enabled", "通用邮件默认发送策略。", "Default send policy for email notifications.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "email", "templateCode": "email-general", "providerCode": "email-smtp", "selectionMode": "default", "maxAttempts": "3", "retryIntervalSeconds": "120", "rateLimitPerMinute": "120", "quietHours": ""}),
+		seedLocalized("notification-policy-wechat-official-general", "wechat-official-general", "微信公众号默认策略", "WeChat Official General Policy", "disabled", "微信公众号模板消息默认策略，等待真实发送适配器接入。", "Default policy for WeChat Official Account template messages, pending live sender adapter.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "wechat_official", "templateCode": "wechat-official-notice", "providerCode": "wechat-official", "selectionMode": "default", "maxAttempts": "3", "retryIntervalSeconds": "120", "rateLimitPerMinute": "120", "quietHours": ""}),
+		seedLocalized("notification-policy-wechat-miniapp-general", "wechat-miniapp-general", "微信小程序默认策略", "WeChat Mini Program General Policy", "disabled", "微信小程序订阅消息默认策略，等待真实发送适配器接入。", "Default policy for WeChat Mini Program subscription messages, pending live sender adapter.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "wechat_miniapp", "templateCode": "wechat-miniapp-notice", "providerCode": "wechat-miniapp", "selectionMode": "default", "maxAttempts": "3", "retryIntervalSeconds": "120", "rateLimitPerMinute": "120", "quietHours": ""}),
+	}
+}
+
+func notificationTemplateSeedRows(updatedAt string) []Record {
+	return []Record{
+		seedLocalized("notification-template-in-app-general", "in-app-general", "站内通知模板", "In-App General Template", "enabled", "站内通知默认模板。", "Default template for in-app notifications.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "in_app", "titleTemplate": "{{title}}", "bodyTemplate": "{{body}}"}),
+		seedLocalized("notification-template-sms-login-code", "sms-login-code", "短信登录验证码", "SMS Login Code", "enabled", "登录短信验证码模板。", "Login SMS verification-code template.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "sms", "titleTemplate": "登录验证码", "bodyTemplate": "您的验证码为 {{code}}，5 分钟内有效。"}),
+		seedLocalized("notification-template-email-login-code", "email-login-code", "邮箱登录验证码", "Email Login Code", "enabled", "邮箱验证码模板。", "Email verification-code template.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "email", "titleTemplate": "登录验证码", "bodyTemplate": "您的验证码为 {{code}}，5 分钟内有效。"}),
+		seedLocalized("notification-template-email-general", "email-general", "通用邮件通知", "General Email Notice", "enabled", "通用邮件通知模板。", "General email notification template.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "email", "titleTemplate": "{{title}}", "bodyTemplate": "{{body}}"}),
+		seedLocalized("notification-template-wechat-official-notice", "wechat-official-notice", "微信公众号通知", "WeChat Official Notice", "disabled", "微信公众号模板消息示例模板。", "Example WeChat Official Account template-message template.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "wechat_official", "titleTemplate": "{{title}}", "bodyTemplate": "{{body}}"}),
+		seedLocalized("notification-template-wechat-miniapp-notice", "wechat-miniapp-notice", "微信小程序通知", "WeChat Mini Program Notice", "disabled", "微信小程序订阅消息示例模板。", "Example WeChat Mini Program subscription-message template.", updatedAt, map[string]string{"tenantCode": "platform", "channel": "wechat_miniapp", "titleTemplate": "{{title}}", "bodyTemplate": "{{body}}"}),
 	}
 }
 

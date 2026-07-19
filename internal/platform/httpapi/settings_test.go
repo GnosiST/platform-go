@@ -57,14 +57,15 @@ func TestAdminSettingsRuntimeAggregatesEnabledCapabilityConfigResources(t *testi
 	if item.CapabilityID != "notification" || item.Resource != "notification-providers" || item.Route != "/notification-providers" {
 		t.Fatalf("settings item = %+v, want notification provider config", item)
 	}
-	if item.RecordCount != 1 || len(item.Records) != 1 {
-		t.Fatalf("settings records = %d %+v, want one current record", item.RecordCount, item.Records)
+	record := settingsRuntimeRecord(item.Records, "aliyun")
+	if item.RecordCount == 0 || record == nil {
+		t.Fatalf("settings records = %d %+v, want test provider record", item.RecordCount, item.Records)
 	}
-	if item.Records[0].Values["apiSecret"] != "" || strings.Contains(recorder.Body.String(), "provider-secret") {
+	if record.Values["apiSecret"] != "" || strings.Contains(recorder.Body.String(), "provider-secret") {
 		t.Fatalf("settings runtime leaked provider secret: %s", recorder.Body.String())
 	}
-	if item.Records[0].Values["region"] != "cn-hangzhou" {
-		t.Fatalf("projected public region = %q, want cn-hangzhou", item.Records[0].Values["region"])
+	if record.Values["region"] != "cn-hangzhou" {
+		t.Fatalf("projected public region = %q, want cn-hangzhou", record.Values["region"])
 	}
 	if field := settingsRuntimeField(item.Schema, "apiSecret"); field == nil || field.ResponseMode != capability.FieldProjectionOmitted {
 		t.Fatalf("schema apiSecret field = %+v, want omitted secret contract", field)
@@ -107,6 +108,26 @@ func TestAdminSettingsRuntimeIncludesCredentialAuthSecurityConfig(t *testing.T) 
 	}
 	if credentialItem.RecordCount != 1 || credentialItem.Records[0].Values["secretTransport"] != "ecdh-a256gcm-v1" || credentialItem.Records[0].Values["passwordAlgorithm"] != "argon2id" {
 		t.Fatalf("credential-auth settings record = %+v, want seeded security defaults", credentialItem.Records)
+	}
+	for _, test := range []struct {
+		resource string
+		minCount int
+		codes    []string
+	}{
+		{resource: "notification-channels", minCount: 5, codes: []string{"sms", "email", "wechat-official", "wechat-miniapp"}},
+		{resource: "notification-providers", minCount: 6, codes: []string{"sms-mock-local", "sms-aliyun", "sms-tencent", "email-smtp", "wechat-official", "wechat-miniapp"}},
+		{resource: "notification-send-policies", minCount: 5, codes: []string{"sms-login", "email-general", "wechat-official-general"}},
+		{resource: "notification-templates", minCount: 5, codes: []string{"sms-login-code", "email-login-code", "wechat-miniapp-notice"}},
+	} {
+		item := settingsRuntimeItem(payload.Data.Items, test.resource)
+		if item.RecordCount < test.minCount {
+			t.Fatalf("settings runtime item %q record count = %d %+v, want at least %d seeded records", test.resource, item.RecordCount, item.Records, test.minCount)
+		}
+		for _, code := range test.codes {
+			if settingsRuntimeRecord(item.Records, code) == nil {
+				t.Fatalf("settings runtime item %q missing seeded record %q: %+v", test.resource, code, item.Records)
+			}
+		}
 	}
 }
 
@@ -243,7 +264,13 @@ func settingsRuntimeTestManifest() capability.Manifest {
 			Fields: []capability.AdminField{
 				{Key: "provider", Label: capability.Text("供应商", "Provider"), Type: "select", Source: "values", Required: true, InTable: true, InForm: true},
 				{Key: "channel", Label: capability.Text("渠道", "Channel"), Type: "select", Source: "values", Required: true, InTable: true, InForm: true},
+				{Key: "tenantCode", Label: capability.Text("租户", "Tenant"), Type: "text", Source: "values", InTable: true, InForm: true},
+				{Key: "accountName", Label: capability.Text("账号", "Account"), Type: "text", Source: "values", InTable: true, InForm: true},
+				{Key: "endpoint", Label: capability.Text("地址", "Endpoint"), Type: "text", Source: "values", InTable: true, InForm: true},
 				{Key: "region", Label: capability.Text("区域", "Region"), Type: "text", Source: "values", InTable: true, InForm: true},
+				{Key: "senderId", Label: capability.Text("发送标识", "Sender ID"), Type: "text", Source: "values", InTable: true, InForm: true},
+				{Key: "templateNamespace", Label: capability.Text("模板命名空间", "Template Namespace"), Type: "text", Source: "values", InTable: true, InForm: true},
+				{Key: "credentialStatus", Label: capability.Text("凭据状态", "Credential Status"), Type: "text", Source: "values", InTable: true, InForm: true},
 				{
 					Key:          "apiSecret",
 					Label:        capability.Text("密钥", "API Secret"),
@@ -317,9 +344,23 @@ func settingsRuntimeProviderRecordID(t *testing.T, server *Server) string {
 		t.Fatalf("list notification providers: %v", err)
 	}
 	if len(records) != 1 {
-		t.Fatalf("notification provider records = %+v, want one", records)
+		for _, record := range records {
+			if record.Code == "aliyun" {
+				return record.ID
+			}
+		}
+		t.Fatalf("notification provider records = %+v, want test record", records)
 	}
 	return records[0].ID
+}
+
+func settingsRuntimeRecord(records []adminresource.Record, code string) *adminresource.Record {
+	for index := range records {
+		if records[index].Code == code {
+			return &records[index]
+		}
+	}
+	return nil
 }
 
 func settingsRuntimeItem(items []adminSettingsResourceItem, resource string) *adminSettingsResourceItem {

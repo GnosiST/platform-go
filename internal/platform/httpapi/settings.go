@@ -682,7 +682,7 @@ func validateNotificationProviderSettingsChecks(record adminresource.Record) []a
 		checks = append(checks, adminSettingsConfigCheck{Key: "channel", Status: adminSettingsCheckInvalid, Message: "Notification channel is not recognized by the platform contract."})
 	}
 	switch provider {
-	case "aliyun", "tencent", "mock-local", "smtp", "wechat-official", "wechat-miniapp":
+	case "local", "aliyun", "tencent", "mock-local", "smtp", "wechat-official", "wechat-miniapp":
 		checks = append(checks, adminSettingsConfigCheck{Key: "provider", Status: adminSettingsCheckOK, Message: "Notification provider is recognized by the platform contract."})
 	default:
 		checks = append(checks, adminSettingsConfigCheck{Key: "provider", Status: adminSettingsCheckInvalid, Message: "Notification provider is not recognized by the platform contract."})

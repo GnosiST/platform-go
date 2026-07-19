@@ -684,7 +684,10 @@ func (s *Store) validateProtectedRecord(ctx context.Context, resource string, re
 		return nil
 	}
 	if s.protection == nil {
-		return fmt.Errorf("%w: encrypted resources require the data protection runtime", ErrInvalidRecord)
+		if recordHasEncryptedFieldValue(schema, record) {
+			return fmt.Errorf("%w: encrypted resources require the data protection runtime", ErrInvalidRecord)
+		}
+		return nil
 	}
 	if _, err := protectedTenantID(schema, record); err != nil {
 		return err
@@ -766,6 +769,16 @@ func validateProtectedTenantImmutable(schema Schema, record Record, existing *Re
 func schemaHasEncryptedFields(schema Schema) bool {
 	for _, field := range schema.Fields {
 		if field.StorageMode == capability.FieldStorageEncrypted {
+			return true
+		}
+	}
+	return false
+}
+
+func recordHasEncryptedFieldValue(schema Schema, record Record) bool {
+	for _, rawField := range schema.Fields {
+		field := defaultFieldPolicy(rawField)
+		if field.StorageMode == capability.FieldStorageEncrypted && strings.TrimSpace(storedFieldValue(record, field)) != "" {
 			return true
 		}
 	}

@@ -766,17 +766,19 @@ export function AdminShell({
         onUIConfigChange={onUIConfigChange}
         onLogout={onLogout}
       />
-      <ProfileEditorModal
-        open={profileEditorOpen}
-        avatarLetter={avatarLetter}
-        avatarUrl={avatarUrl}
-        dictionary={dictionary}
-        displayName={displayName}
-        profile={profileSnapshot}
-        session={session}
-        onClose={() => setProfileEditorOpen(false)}
-        onProfileSaved={setProfileSnapshot}
-      />
+      {profileEditorOpen ? (
+        <ProfileEditorModal
+          open={profileEditorOpen}
+          avatarLetter={avatarLetter}
+          avatarUrl={avatarUrl}
+          dictionary={dictionary}
+          displayName={displayName}
+          profile={profileSnapshot}
+          session={session}
+          onClose={() => setProfileEditorOpen(false)}
+          onProfileSaved={setProfileSnapshot}
+        />
+      ) : null}
     </div>
   );
 }
@@ -988,6 +990,7 @@ function ProfileEditorModal({
       open={open}
       size="xl"
       width={980}
+      forceRender
       footer={[
         <Button key="close" onClick={onClose}>{dictionary.close}</Button>,
         <Button key="save" loading={saving} type="primary" onClick={handleSave}>{dictionary.saveProfile}</Button>,

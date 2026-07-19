@@ -1133,7 +1133,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
           onFinish={submitForm}
         />
       </AdminFormModal>
-      <AdminModal
+      <AdminFormModal
         open={Boolean(passwordResetRecord)}
         preset="form"
         size="md"
@@ -1180,7 +1180,7 @@ export function GenericResourceConsole({ resource, availableResourceRoutes = [],
           </Form.Item>
         </Form>
         <AdminFeedback type="info" message={dictionary.userPasswordResetMustChange} description={dictionary.passwordEncryptedSecretHint} />
-      </AdminModal>
+      </AdminFormModal>
       <AdminModal
         className="one-time-secret-modal"
         title={dictionary.oneTimeSecretTitle}

@@ -25,8 +25,8 @@ import type { Dictionary, Language } from "../i18n";
 import {
   AdminActionButton,
   AdminFeedback,
+  AdminFormModal,
   AdminListPanel,
-  AdminModal,
   AdminMetricStrip,
   AdminPage,
   PlatformDataTable,
@@ -346,8 +346,9 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
           }))}
         />
       )}
-      <AdminModal
+      <AdminFormModal
         open={testSendOpen}
+        destroyOnHidden={false}
         preset="form"
         size="lg"
         title={dictionary.messageCenterTestSendTitle}
@@ -407,7 +408,7 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
             })}
           />
         ) : null}
-      </AdminModal>
+      </AdminFormModal>
     </AdminPage>
   );
 }

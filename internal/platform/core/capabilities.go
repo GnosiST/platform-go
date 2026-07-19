@@ -1436,6 +1436,7 @@ func notificationChannelOptions() []capability.AdminFieldOption {
 
 func notificationProviderOptions() []capability.AdminFieldOption {
 	return []capability.AdminFieldOption{
+		adminFieldOption("local", "站内本地", "In-App Local"),
 		adminFieldOption("aliyun", "阿里云短信", "Aliyun SMS"),
 		adminFieldOption("tencent", "腾讯云短信", "Tencent Cloud SMS"),
 		adminFieldOption("mock-local", "本地模拟", "Mock Local"),
