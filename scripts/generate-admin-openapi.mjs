@@ -909,6 +909,60 @@ function schemas() {
         expiresAt: { type: "string", format: "date-time" },
       },
     },
+    AdminCredentialAuthIdentifier: {
+      type: "object",
+      required: ["type", "value"],
+      additionalProperties: false,
+      properties: {
+        type: { type: "string", enum: ["username", "phone", "email"] },
+        value: { type: "string", minLength: 1 },
+      },
+    },
+    AdminCredentialAuthSecret: {
+      type: "object",
+      required: ["type"],
+      additionalProperties: false,
+      properties: {
+        type: { type: "string", enum: ["password", "sms-otp"] },
+        value: { type: "string", writeOnly: true },
+        transactionId: { type: "string", minLength: 1 },
+        code: { type: "string", writeOnly: true },
+      },
+    },
+    AdminCredentialAuthChallengeProof: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        id: { type: "string", minLength: 1 },
+        kind: { type: "string", enum: ["captcha", "slider"] },
+        proof: { type: "string", writeOnly: true },
+      },
+    },
+    AdminCredentialSMSOTPStartRequest: {
+      type: "object",
+      required: ["provider", "identifier"],
+      additionalProperties: false,
+      properties: {
+        provider: { type: "string", enum: ["phone-sms-otp"] },
+        identifier: { $ref: "#/components/schemas/AdminCredentialAuthIdentifier" },
+      },
+    },
+    AdminCredentialSMSOTPStartData: {
+      type: "object",
+      required: ["transactionId", "maskedIdentifier", "expiresAt"],
+      additionalProperties: false,
+      properties: {
+        transactionId: { type: "string", minLength: 1 },
+        maskedIdentifier: { type: "string", minLength: 1 },
+        expiresAt: { type: "string", format: "date-time" },
+        debugCode: {
+          type: "string",
+          description: "Development/test only debug code returned by mock-local SMS runtime.",
+          "x-platform-development-only": true,
+          "x-platform-sensitivity": "secret",
+        },
+      },
+    },
     AdminAuthLoginRequest: {
       type: "object",
       required: ["provider"],
@@ -919,6 +973,9 @@ function schemas() {
         code: { type: "string", writeOnly: true },
         state: { type: "string", writeOnly: true },
         codeVerifier: { type: "string", writeOnly: true },
+        identifier: { $ref: "#/components/schemas/AdminCredentialAuthIdentifier" },
+        secret: { $ref: "#/components/schemas/AdminCredentialAuthSecret" },
+        challenge: { $ref: "#/components/schemas/AdminCredentialAuthChallengeProof" },
       },
     },
     AdminAuthLoginData: {
@@ -1347,6 +1404,34 @@ paths["/api/auth/login"] = {
       "200": successResponse("Admin login", apiResponse({ $ref: "#/components/schemas/AdminAuthLoginData" })),
       ...publicAuthErrorResponses(),
     },
+  },
+};
+
+paths["/api/auth/sms-otp/start"] = {
+  post: {
+    tags: ["auth"],
+    operationId: "startAdminCredentialSMSOTP",
+    summary: "Start an Admin credential-auth SMS OTP transaction",
+    description:
+      "Development credential-auth slice. Creates a phone SMS OTP transaction through notification.sms for the configured phone-sms-otp provider.",
+    security: [],
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: { $ref: "#/components/schemas/AdminCredentialSMSOTPStartRequest" },
+        },
+      },
+    },
+    responses: {
+      "201": successResponse(
+        "Admin credential SMS OTP transaction",
+        apiResponse({ $ref: "#/components/schemas/AdminCredentialSMSOTPStartData" }),
+      ),
+      ...publicAuthErrorResponses(),
+    },
+    "x-platform-capability": "credential-auth",
+    "x-platform-runtime-status": "dev-http-runtime-memory-bootstrap",
   },
 };
 

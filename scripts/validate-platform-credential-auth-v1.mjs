@@ -74,6 +74,12 @@ const requiredBackendFiles = [
   "internal/platform/credentialauth/service_test.go",
   "internal/platform/credentialauth/argon2id_test.go",
 ];
+const requiredRuntimeFiles = [
+  "internal/platform/httpapi/credential_auth.go",
+  "internal/platform/bootstrap/credential_auth.go",
+  "admin/src/platform/auth/AdminLoginView.tsx",
+  "admin/src/platform/api/client.ts",
+];
 const requiredNotificationSMSFiles = [
   "internal/platform/notification/sms.go",
   "internal/platform/notification/sms_test.go",
@@ -131,8 +137,8 @@ function uniqueErrors(items, label) {
 
 function validateRuntimeBoundary(contract, mainGo, errors) {
   const boundary = contract.runtimeBoundary ?? {};
-  if (boundary.status !== "service-foundation-not-wired") {
-    errors.push("runtimeBoundary.status must stay service-foundation-not-wired until HTTP login is deliberately enabled");
+  if (boundary.status !== "dev-http-runtime-memory-bootstrap") {
+    errors.push("runtimeBoundary.status must be dev-http-runtime-memory-bootstrap until production storage and governance are complete");
   }
   if (boundary.defaultRuntimeMutation !== "forbidden") {
     errors.push("runtimeBoundary.defaultRuntimeMutation must stay forbidden");
@@ -142,6 +148,15 @@ function validateRuntimeBoundary(contract, mainGo, errors) {
   }
   if (boundary.existingPasswordProviderGuardMustRemain !== true) {
     errors.push("existing password provider guard must remain active");
+  }
+  if (boundary.productionComplete !== false) {
+    errors.push("runtimeBoundary.productionComplete must stay false for the current development slice");
+  }
+  if (!String(boundary.devRuntimeStorage ?? "").includes("in-memory credential-auth repository")) {
+    errors.push("runtimeBoundary.devRuntimeStorage must document the in-memory development repository");
+  }
+  if (!String(boundary.productionEnablementGate ?? "").includes("persistent credential repository")) {
+    errors.push("runtimeBoundary.productionEnablementGate must require a persistent credential repository");
   }
   requireIncludes(
     boundary.mustNotChange,
@@ -334,8 +349,8 @@ function validateNotificationSms(contract, errors) {
 
 function validateAPIContract(contract, errors) {
   const api = contract.apiContract ?? {};
-  if (api.status !== "specified-not-implemented") {
-    errors.push("apiContract.status must stay specified-not-implemented for this work package");
+  if (api.status !== "implemented-partial") {
+    errors.push("apiContract.status must be implemented-partial for the current development HTTP/UI slice");
   }
   if (api.providerDriven !== true) {
     errors.push("apiContract.providerDriven must be true");
@@ -349,6 +364,29 @@ function validateAPIContract(contract, errors) {
       errors.push(`apiContract.endpoints must include ${endpoint}`);
     }
   }
+  requireIncludes(
+    api.implementedNow,
+    [
+      "GET /api/auth/providers includes enabled credential-auth provider declarations",
+      "POST /api/auth/sms-otp/start starts phone SMS OTP transactions through notification.sms",
+      "POST /api/auth/login accepts structured credential-password and credential-sms-otp requests while preserving demo/OIDC compatibility",
+      "Admin login UI renders credential provider modes from discovery",
+    ],
+    "apiContract.implementedNow",
+    errors,
+  );
+  requireIncludes(
+    api.notProductionComplete,
+    [
+      "POST /api/auth/challenges CAPTCHA/slider runtime",
+      "persistent file/GORM credential repository",
+      "external Aliyun/Tencent SMS adapters and delivery ledger",
+      "complete OpenAPI/error-code/audit-redaction/rate-limit governance",
+      "production enablement beyond development in-memory bootstrap",
+    ],
+    "apiContract.notProductionComplete",
+    errors,
+  );
   const login = api.loginRequestShape ?? {};
   if (login.provider !== "phone-password" || login.identifier?.type !== "phone" || login.secret?.type !== "password") {
     errors.push("apiContract.loginRequestShape must show structured phone-password identifier and secret");
@@ -371,7 +409,6 @@ function validateConfiguration(contract, errors) {
       "PLATFORM_CREDENTIAL_AUTH_PHONE_PASSWORD",
       "PLATFORM_CREDENTIAL_AUTH_EMAIL_PASSWORD",
       "PLATFORM_CREDENTIAL_AUTH_PHONE_SMS_OTP",
-      "PLATFORM_CREDENTIAL_AUTH_CHALLENGE_ENABLED",
     ],
     "configurationContract.featureFlags",
     errors,
@@ -379,6 +416,11 @@ function validateConfiguration(contract, errors) {
   requireIncludes(
     config.securityKeys,
     [
+      "PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY",
+      "PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_USERNAME",
+      "PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PASSWORD",
+      "PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PHONE",
+      "PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_EMAIL",
       "PLATFORM_CREDENTIAL_AUTH_ARGON2_PARAMS_VERSION",
       "PLATFORM_CREDENTIAL_AUTH_PASSWORD_MAX_ATTEMPTS",
       "PLATFORM_CREDENTIAL_AUTH_LOCK_SECONDS",
@@ -427,6 +469,11 @@ function validateEvidenceWiring(contract, errors) {
       errors.push(`credential-auth backend service foundation file is missing or unsafe: ${filePath}`);
     }
   }
+  for (const filePath of requiredRuntimeFiles) {
+    if (!relativeExistingPath(filePath)) {
+      errors.push(`credential-auth partial runtime file is missing or unsafe: ${filePath}`);
+    }
+  }
   const packageC = packages.get("C-notification-sms-adapters");
   if (!packageC || !["in-progress", "done"].includes(packageC.status)) {
     errors.push("implementationPackages must track C-notification-sms-adapters as in-progress or done after SMS port work starts");
@@ -439,10 +486,23 @@ function validateEvidenceWiring(contract, errors) {
       errors.push(`notification SMS foundation file is missing or unsafe: ${filePath}`);
     }
   }
-  for (const id of ["D-auth-api-compatibility", "E-admin-login-ui", "F-security-governance"]) {
-    if (packages.get(id)?.status !== "remaining") {
-      errors.push(`implementationPackages.${id} must remain remaining until its implementation package starts`);
-    }
+  const packageD = packages.get("D-auth-api-compatibility");
+  if (!packageD || packageD.status !== "in-progress") {
+    errors.push("implementationPackages.D-auth-api-compatibility must be in-progress for the partial HTTP runtime slice");
+  }
+  if (!String(packageD?.scope ?? "").includes("internal/platform/httpapi")) {
+    errors.push("implementationPackages.D-auth-api-compatibility scope must point to internal/platform/httpapi");
+  }
+  const packageE = packages.get("E-admin-login-ui");
+  if (!packageE || packageE.status !== "in-progress") {
+    errors.push("implementationPackages.E-admin-login-ui must be in-progress for the provider-driven Admin login UI slice");
+  }
+  if (!String(packageE?.scope ?? "").includes("provider-discovery driven Admin login form state")) {
+    errors.push("implementationPackages.E-admin-login-ui scope must document provider-discovery driven Admin login form state");
+  }
+  const packageF = packages.get("F-security-governance");
+  if (!packageF || packageF.status !== "remaining") {
+    errors.push("implementationPackages.F-security-governance must remain remaining until security governance starts");
   }
 }
 
@@ -451,9 +511,11 @@ function validateDocs(authDoc, capabilityDoc, errors) {
     ["Credential Auth v1", "docs/platform-auth.md must document credential-auth v1"],
     ["resources/platform-credential-auth-v1.json", "docs/platform-auth.md must point to the credential-auth v1 contract"],
     ["internal/platform/credentialauth", "docs/platform-auth.md must point to the credential-auth service foundation package"],
-    ["does not change the current demo/OIDC runtime", "docs/platform-auth.md must state current demo/OIDC runtime is unchanged"],
+    ["partial development HTTP/UI runtime", "docs/platform-auth.md must document the partial development HTTP/UI runtime"],
+    ["preserves the current demo/OIDC runtime", "docs/platform-auth.md must state current demo/OIDC runtime is preserved"],
     ["password credentials must not be stored in generic `Record.Values`", "docs/platform-auth.md must forbid password credentials in generic Record.Values"],
     ["notification` SMS channel", "docs/platform-auth.md must assign SMS delivery to notification"],
+    ["not a production-complete credential system", "docs/platform-auth.md must state credential-auth is not production-complete"],
   ];
   for (const [snippet, message] of authSnippets) {
     if (!authDoc.includes(snippet)) {
@@ -465,6 +527,7 @@ function validateDocs(authDoc, capabilityDoc, errors) {
     ["credential-auth capability rules", "docs/platform-capability-development.md must document credential-auth capability rules"],
     ["resources/platform-credential-auth-v1.json", "docs/platform-capability-development.md must point to the credential-auth v1 contract"],
     ["internal/platform/credentialauth", "docs/platform-capability-development.md must point to the credential-auth service foundation package"],
+    ["dev-http-runtime-memory-bootstrap", "docs/platform-capability-development.md must document the current development runtime status"],
     ["Do not declare provider kind `password`", "docs/platform-capability-development.md must keep provider kind password blocked until implementation"],
     ["rtk node scripts/validate-platform-credential-auth-v1.mjs", "docs/platform-capability-development.md must document the credential-auth validator"],
   ];

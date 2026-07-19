@@ -12,6 +12,7 @@ import (
 
 const (
 	identifierHashPrefix      = "v1:hmac-sha256:identifier:"
+	smsOTPHashPrefix          = "v1:hmac-sha256:sms-otp:"
 	identifierHashKeyMinBytes = 32
 )
 
@@ -46,6 +47,27 @@ func (h *HMACIdentifierHasher) HashIdentifier(identifierType IdentifierType, nor
 	_, _ = fmt.Fprintf(mac, "\x00%d:", len(normalizedValue))
 	_, _ = mac.Write([]byte(normalizedValue))
 	return identifierHashPrefix + keyID + ":" + hex.EncodeToString(mac.Sum(nil)), nil
+}
+
+func (h *HMACIdentifierHasher) HashSMSOTP(phoneHash string, challengeID string, code string) (string, error) {
+	if h == nil || len(h.key) < identifierHashKeyMinBytes {
+		return "", fmt.Errorf("%w: sms otp hasher is not configured", ErrInvalidInput)
+	}
+	phoneHash = strings.TrimSpace(phoneHash)
+	challengeID = strings.TrimSpace(challengeID)
+	code = strings.TrimSpace(code)
+	if phoneHash == "" || challengeID == "" || code == "" || !utf8.ValidString(code) || strings.IndexFunc(code, unicode.IsControl) >= 0 {
+		return "", fmt.Errorf("%w: sms otp hash input is invalid", ErrInvalidInput)
+	}
+	keyID := sha256Hex("platform-credential-auth-sms-otp-key-id\x00v1\x00", h.key)
+	mac := hmac.New(sha256.New, h.key)
+	_, _ = mac.Write([]byte("platform-credential-auth-sms-otp\x00v1\x00"))
+	_, _ = mac.Write([]byte(phoneHash))
+	_, _ = fmt.Fprintf(mac, "\x00%d:", len(challengeID))
+	_, _ = mac.Write([]byte(challengeID))
+	_, _ = fmt.Fprintf(mac, "\x00%d:", len(code))
+	_, _ = mac.Write([]byte(code))
+	return smsOTPHashPrefix + keyID + ":" + hex.EncodeToString(mac.Sum(nil)), nil
 }
 
 func sha256Hex(domain string, key []byte) string {

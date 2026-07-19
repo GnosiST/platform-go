@@ -27,7 +27,7 @@ title: 能力与扩展
 
 ## Credential Auth v1
 
-`credential-auth` 是规划中的本地凭据认证能力，用于用户名/密码、手机号/密码、邮箱/密码和手机号/短信验证码登录。当前完成了合同、文档、验证门禁和第一批内部 service foundation，不启用 `password` provider，不改变现有 demo/OIDC/App 登录运行时。密码、OTP、验证码答案和挑战证明不能存入 generic `Record.Values`；已落地的内部包覆盖 identifier hash、Argon2id PHC 校验、memory repository 和 SMS OTP 一次性消费语义，HTTP API、持久化仓储和登录 UI 仍待后续包接入。短信发送作为 `notification` 的 SMS channel 扩展，当前已有 SMS sender port、`mock-local` dev/test sender 和生产禁用 mock 的配置门禁。
+`credential-auth` 是本地凭据认证能力，用于用户名/密码、手机号/密码、邮箱/密码和手机号/短信验证码登录。当前完成了合同、文档、验证门禁、provider 声明和第一批开发态 HTTP/UI 切片：`GET /api/auth/providers` 可发现 credential provider，`POST /api/auth/sms-otp/start` 可启动短信验证码事务，`POST /api/auth/login` 可处理结构化 credential-password / credential-sms-otp 登录并继续兼容 demo/OIDC。它仍不启用旧式 `password` provider kind，也不是生产完整能力。密码、OTP、验证码答案和挑战证明不能存入 generic `Record.Values`；已落地的内部包覆盖 identifier hash、Argon2id PHC 校验、memory repository、开发态 bootstrap Admin 凭据和 SMS OTP 一次性消费语义。持久化仓储、CAPTCHA/滑块 challenge、真实短信供应商、OpenAPI/审计/限流治理和生产启用门禁仍待后续补齐。短信发送作为 `notification` 的 SMS channel 扩展，当前已有 SMS sender port、`mock-local` dev/test sender 和生产禁用 mock 的配置门禁。
 
 新业务项目应把具体业务能力放在下游仓库或下游 composition root，只把跨业务复用能力沉淀为平台 profile。
 

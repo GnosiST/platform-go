@@ -199,7 +199,11 @@ requireIncludes(files.app, "if (!getAuthToken() || !session || loading)", "Unaut
 requireIncludes(files.login, 'selectedProvider.kind === "demo"', "The username form must render only for the demo provider.");
 requireIncludes(files.login, 'selectedProvider.kind === "oidc"', "The OIDC action must render only for an OIDC provider.");
 requireIncludes(files.login, 'className="login-oidc-action"', "OIDC providers must expose one full-width login action.");
-requireNotIncludes(files.login, "Input.Password", "OIDC login must not retain the disabled password field.");
+requireIncludes(files.login, 'provider.kind === "credential-password"', "Credential password providers must be detected from provider discovery.");
+requireIncludes(files.login, 'credentialSpec?.mode === "password"', "The password form must render only for credential password providers.");
+requireIncludes(files.login, 'credentialSpec?.mode === "sms-otp"', "The SMS OTP form must render only for credential SMS providers.");
+requireIncludes(files.login, "startCredentialSMSOTP", "Credential SMS providers must start OTP transactions through the API client.");
+requireIncludes(files.login, "Input.Password", "Credential password providers must expose a real password field.");
 requireIncludes(files.login, 'aria-live="polite"', "OIDC callback progress and failure must use a polite live region.");
 requireIncludes(files.login, 'className="login-error-heading"', "OIDC callback failures must expose a stable error heading.");
 requireIncludes(files.login, "tabIndex={-1}", "The OIDC callback error heading must be programmatically focusable.");
@@ -235,6 +239,21 @@ requireIncludes(files.login, "loginHeadingRef.current?.focus({ preventScroll: tr
 requireIncludes(files.login, "setCallbackFailure(callbackFailureReason(nextError))", "OIDC callback failures must store a stable error category instead of localized copy.");
 requireIncludes(files.login, "callbackErrorMessage(dictionary, callbackFailure)", "OIDC callback failure copy must derive from the current dictionary.");
 for (const key of [
+  "loginPhone",
+  "loginPhoneRequired",
+  "loginPhonePlaceholder",
+  "loginEmail",
+  "loginEmailRequired",
+  "loginEmailPlaceholder",
+  "loginPasswordRequired",
+  "loginPasswordCredentialPlaceholder",
+  "loginSMSCode",
+  "loginSMSCodeRequired",
+  "loginSMSCodePlaceholder",
+  "loginSMSSendCode",
+  "loginSMSSending",
+  "loginSMSSentTo",
+  "loginSMSStartFailed",
   "loginOIDCContinue",
   "loginOIDCStarting",
   "loginOIDCCallbackProgress",
@@ -636,7 +655,8 @@ requireIncludes(files.roleGovernance, 'className="role-governance-access-control
 requireIncludes(files.roleGovernance, 'className="role-governance-lifecycle"', "Role lifecycle actions must remain separate from authorization.");
 requireNotIncludes(files.roleGovernance, "role-governance-command-bar", "Role actions must not collapse back into one command row.");
 requireIncludes(files.styles, ".admin-tree-workbench {", "Role governance must define a stable tree/detail layout.");
-requireRegex(files.styles, /\.admin-tree-workbench\s*\{[\s\S]*?grid-template-columns:\s*clamp\(320px,\s*32vw,\s*440px\)\s+minmax\(0,\s*1fr\);/, "Desktop tree workbench navigation must stay wide enough for structured tree nodes.");
+requireRegex(files.styles, /\.admin-tree-workbench\s*\{[\s\S]*?grid-template-columns:\s*clamp\(360px,\s*36vw,\s*520px\)\s+minmax\(0,\s*1fr\);/, "Desktop tree workbench navigation must stay wide enough for structured tree nodes.");
+requireRegex(files.styles, /@media \(max-width:\s*1023px\)[\s\S]*?\.admin-tree-workbench\s*\{[\s\S]*?grid-template-columns:\s*minmax\(320px,\s*0\.95fr\)\s+minmax\(0,\s*1\.05fr\);/, "Tablet tree workbench navigation must stay wide enough for long role, menu and permission codes before collapsing to one column.");
 requireCssRule(files.styles, ".admin-tree-workbench-tree", ["max-height: min(640px, calc(100vh - 280px));", "overflow: auto;", "overscroll-behavior: contain;"], "Tree workbench navigation must scroll internally instead of stretching long trees.");
 requireRegex(files.styles, /\.role-governance-detail-focus-target,[\s\S]*?\.role-governance-detail,[\s\S]*?\.permission-governance-detail\s*\{[\s\S]*?min-height:\s*360px;/, "Role and permission detail states must keep a stable minimum height.");
 requireRegex(files.styles, /\.admin-tree-workbench-node-label,[\s\S]*?overflow-wrap:\s*anywhere;[\s\S]*?white-space:\s*normal;/, "Tree node labels must wrap long names instead of truncating core context.");

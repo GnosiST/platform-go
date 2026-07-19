@@ -1537,7 +1537,7 @@ describe("validate-admin-ui-contracts", () => {
 
   it("rejects unbounded role workbench tracks and collapsing role detail", () => {
     const tempRoot = tempAdminRoot();
-    replaceInTemp(tempRoot, "admin/src/styles.css", "grid-template-columns: clamp(320px, 32vw, 440px) minmax(0, 1fr);", "grid-template-columns: 1fr 1fr;");
+    replaceInTemp(tempRoot, "admin/src/styles.css", "grid-template-columns: clamp(360px, 36vw, 520px) minmax(0, 1fr);", "grid-template-columns: 1fr 1fr;");
     replaceInTemp(tempRoot, "admin/src/styles.css", "min-height: 360px;", "min-height: 0;");
 
     const result = runValidator(["--root", tempRoot]);
@@ -2848,19 +2848,19 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /OIDC callbacks must remove callback values before reading pending transaction state/);
   });
 
-  it("rejects OIDC rendering that restores the disabled password field", () => {
+  it("rejects login views that remove credential password rendering", () => {
     const tempRoot = tempAdminRoot();
     replaceInTempIfPresent(
       tempRoot,
       "admin/src/platform/auth/AdminLoginView.tsx",
-      "</Form>",
-      "<Input.Password disabled /></Form>",
+      'credentialSpec?.mode === "password"',
+      'credentialSpec?.mode === "never"',
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /must not retain the disabled password field/);
+    assert.match(result.stderr, /password form must render only for credential password providers/);
   });
 
   it("rejects unauthenticated route normalization during OIDC callback cleanup", () => {

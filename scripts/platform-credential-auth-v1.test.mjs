@@ -33,11 +33,12 @@ describe("validate-platform-credential-auth-v1", () => {
     assert.match(result.stdout, /Validated platform credential-auth v1 contract/);
   });
 
-  it("rejects runtime enablement or weakening the existing password-provider guard", () => {
+  it("rejects production completion claims or weakening the existing password-provider guard", () => {
     const contract = readJSON("resources/platform-credential-auth-v1.json");
     contract.runtimeBoundary.status = "implemented-runtime";
     contract.runtimeBoundary.defaultRuntimeMutation = "allowed";
     contract.runtimeBoundary.existingPasswordProviderGuardMustRemain = false;
+    contract.runtimeBoundary.productionComplete = true;
     const mainGo = fs.readFileSync(path.join(repoRoot, "cmd/platform-api/main.go"), "utf8").replace("kind == \"password\"", "kind == \"credential-auth\"");
 
     const result = runValidator([
@@ -48,9 +49,10 @@ describe("validate-platform-credential-auth-v1", () => {
     ]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /runtimeBoundary\.status must stay service-foundation-not-wired/);
+    assert.match(result.stderr, /runtimeBoundary\.status must be dev-http-runtime-memory-bootstrap/);
     assert.match(result.stderr, /runtimeBoundary\.defaultRuntimeMutation must stay forbidden/);
     assert.match(result.stderr, /existing password provider guard must remain active/);
+    assert.match(result.stderr, /runtimeBoundary\.productionComplete must stay false/);
     assert.match(result.stderr, /cmd\/platform-api\/main\.go must still reject provider kind password/);
   });
 

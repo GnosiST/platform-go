@@ -18,88 +18,98 @@ import (
 )
 
 type Config struct {
-	RuntimeEnvironment                  string
-	HTTPAddr                            string
-	PublicBaseURL                       string
-	TrustedProxies                      []string
-	EdgeTrustedProxy                    string
-	HTTPMaxBodyBytes                    int64
-	Capabilities                        []string
-	CapabilityLockFile                  string
-	AdminResourceFile                   string
-	AdminResourceDriver                 string
-	AdminResourceDSN                    string
-	OrganizationRBACMode                string
-	AdminMenuServingMode                string
-	AdminRoleMenuWriteEnabled           bool
-	SessionFile                         string
-	SessionDriver                       string
-	SessionDSN                          string
-	LifecycleHistoryFile                string
-	LifecycleHistoryDriver              string
-	LifecycleHistoryDSN                 string
-	RetentionRunnerEnabled              bool
-	RetentionRunnerInterval             time.Duration
-	RetentionRunnerBatchSize            int
-	RetentionRunnerMaxRetries           int
-	DatabaseDriver                      string
-	DatabaseDSN                         string
-	OpenAPIFile                         string
-	JWTSecret                           string
-	CacheDriver                         string
-	CacheDefaultTTL                     time.Duration
-	RedisAddr                           string
-	RedisPassword                       string
-	RedisDB                             int
-	MessageBusEnabled                   bool
-	MessageBusAdapter                   string
-	SearchEnabled                       bool
-	SearchAdapter                       string
-	RateLimitHMACKey                    string
-	SensitiveRevealHMACKey              string
-	DataKeyProvider                     string
-	DataEncryptionActiveKeyID           string
-	DataEncryptionKeyringJSON           string
-	DataBlindIndexActiveKeyID           string
-	DataBlindIndexKeyringJSON           string
-	FileStorageDriver                   string
-	FileStorageLocalDir                 string
-	FileMaxUploadBytes                  int64
-	FileAllowedMIMETypes                []string
-	FileStorageS3Endpoint               string
-	FileStorageS3Region                 string
-	FileStorageS3Bucket                 string
-	FileStorageS3AccessKey              string
-	FileStorageS3SecretKey              string
-	FileStorageS3Prefix                 string
-	FileStorageS3PathStyle              bool
-	FileStorageS3ServerSideEncryption   string
-	FileStorageS3KMSKeyID               string
-	WechatMiniAppID                     string
-	WechatMiniAppSecret                 string
-	WechatMiniAppCode2SessionEndpoint   string
-	AdminOIDCIssuerURL                  string
-	AdminOIDCClientID                   string
-	AdminOIDCClientSecret               string
-	AdminOIDCRedirectURL                string
-	AdminOIDCScopes                     []string
-	DisableDemoAuthProvider             bool
-	PhoneHMACKey                        string
-	PhoneCodeHMACKey                    string
-	PhoneVerificationProvider           string
-	NotificationSMSProvider             string
-	NotificationSMSLoginTemplateID      string
-	AdminStepUpPhoneResource            string
-	AdminStepUpPhoneActorField          string
-	AdminStepUpPhoneField               string
-	AdminStepUpPhoneVerifiedAtField     string
-	AdminStepUpPhoneVerifiedDigestField string
-	filePolicySource                    filePolicySource
-	capabilitySource                    capabilitySource
-	transportPolicySource               transportPolicySource
-	retentionRunnerSource               retentionRunnerSource
-	integrationSource                   integrationSource
-	menuGovernanceSource                menuGovernanceSource
+	RuntimeEnvironment                   string
+	HTTPAddr                             string
+	PublicBaseURL                        string
+	TrustedProxies                       []string
+	EdgeTrustedProxy                     string
+	HTTPMaxBodyBytes                     int64
+	Capabilities                         []string
+	CapabilityLockFile                   string
+	AdminResourceFile                    string
+	AdminResourceDriver                  string
+	AdminResourceDSN                     string
+	OrganizationRBACMode                 string
+	AdminMenuServingMode                 string
+	AdminRoleMenuWriteEnabled            bool
+	SessionFile                          string
+	SessionDriver                        string
+	SessionDSN                           string
+	LifecycleHistoryFile                 string
+	LifecycleHistoryDriver               string
+	LifecycleHistoryDSN                  string
+	RetentionRunnerEnabled               bool
+	RetentionRunnerInterval              time.Duration
+	RetentionRunnerBatchSize             int
+	RetentionRunnerMaxRetries            int
+	DatabaseDriver                       string
+	DatabaseDSN                          string
+	OpenAPIFile                          string
+	JWTSecret                            string
+	CacheDriver                          string
+	CacheDefaultTTL                      time.Duration
+	RedisAddr                            string
+	RedisPassword                        string
+	RedisDB                              int
+	MessageBusEnabled                    bool
+	MessageBusAdapter                    string
+	SearchEnabled                        bool
+	SearchAdapter                        string
+	RateLimitHMACKey                     string
+	SensitiveRevealHMACKey               string
+	DataKeyProvider                      string
+	DataEncryptionActiveKeyID            string
+	DataEncryptionKeyringJSON            string
+	DataBlindIndexActiveKeyID            string
+	DataBlindIndexKeyringJSON            string
+	FileStorageDriver                    string
+	FileStorageLocalDir                  string
+	FileMaxUploadBytes                   int64
+	FileAllowedMIMETypes                 []string
+	FileStorageS3Endpoint                string
+	FileStorageS3Region                  string
+	FileStorageS3Bucket                  string
+	FileStorageS3AccessKey               string
+	FileStorageS3SecretKey               string
+	FileStorageS3Prefix                  string
+	FileStorageS3PathStyle               bool
+	FileStorageS3ServerSideEncryption    string
+	FileStorageS3KMSKeyID                string
+	WechatMiniAppID                      string
+	WechatMiniAppSecret                  string
+	WechatMiniAppCode2SessionEndpoint    string
+	AdminOIDCIssuerURL                   string
+	AdminOIDCClientID                    string
+	AdminOIDCClientSecret                string
+	AdminOIDCRedirectURL                 string
+	AdminOIDCScopes                      []string
+	DisableDemoAuthProvider              bool
+	CredentialAuthUsernamePassword       bool
+	CredentialAuthPhonePassword          bool
+	CredentialAuthEmailPassword          bool
+	CredentialAuthPhoneSMSOTP            bool
+	CredentialAuthIdentifierHMACKey      string
+	CredentialAuthBootstrapAdminUsername string
+	CredentialAuthBootstrapAdminPassword string
+	CredentialAuthBootstrapAdminPhone    string
+	CredentialAuthBootstrapAdminEmail    string
+	PhoneHMACKey                         string
+	PhoneCodeHMACKey                     string
+	PhoneVerificationProvider            string
+	NotificationSMSProvider              string
+	NotificationSMSLoginTemplateID       string
+	AdminStepUpPhoneResource             string
+	AdminStepUpPhoneActorField           string
+	AdminStepUpPhoneField                string
+	AdminStepUpPhoneVerifiedAtField      string
+	AdminStepUpPhoneVerifiedDigestField  string
+	filePolicySource                     filePolicySource
+	capabilitySource                     capabilitySource
+	transportPolicySource                transportPolicySource
+	retentionRunnerSource                retentionRunnerSource
+	integrationSource                    integrationSource
+	menuGovernanceSource                 menuGovernanceSource
+	credentialAuthSource                 credentialAuthSource
 }
 
 type envConfigState uint8
@@ -145,6 +155,13 @@ type integrationSource struct {
 
 type menuGovernanceSource struct {
 	roleMenuWriteEnabled envConfigState
+}
+
+type credentialAuthSource struct {
+	usernamePassword envConfigState
+	phonePassword    envConfigState
+	emailPassword    envConfigState
+	phoneSMSOTP      envConfigState
 }
 
 var defaultCapabilities = []string{
@@ -201,6 +218,10 @@ func Load() Config {
 	messageBusEnabled, messageBusEnabledState := boolEnvWithState("PLATFORM_MESSAGE_BUS_ENABLED", false)
 	searchEnabled, searchEnabledState := boolEnvWithState("PLATFORM_SEARCH_ENABLED", false)
 	adminRoleMenuWriteEnabled, adminRoleMenuWriteEnabledState := boolEnvWithState("PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED", false)
+	credentialAuthUsernamePassword, credentialAuthUsernamePasswordState := boolEnvWithState("PLATFORM_CREDENTIAL_AUTH_USERNAME_PASSWORD", false)
+	credentialAuthPhonePassword, credentialAuthPhonePasswordState := boolEnvWithState("PLATFORM_CREDENTIAL_AUTH_PHONE_PASSWORD", false)
+	credentialAuthEmailPassword, credentialAuthEmailPasswordState := boolEnvWithState("PLATFORM_CREDENTIAL_AUTH_EMAIL_PASSWORD", false)
+	credentialAuthPhoneSMSOTP, credentialAuthPhoneSMSOTPState := boolEnvWithState("PLATFORM_CREDENTIAL_AUTH_PHONE_SMS_OTP", false)
 	capabilities, capabilitiesState := csvEnvWithState("PLATFORM_CAPABILITIES", defaultCapabilities)
 	capabilityLockFile, capabilityLockFileState := envWithState("PLATFORM_CAPABILITY_LOCK_FILE", "")
 	capabilityLoadedFromLock := false
@@ -215,82 +236,91 @@ func Load() Config {
 		}
 	}
 	return Config{
-		RuntimeEnvironment:                  strings.ToLower(env("PLATFORM_RUNTIME_ENV", RuntimeEnvironmentDevelopment)),
-		HTTPAddr:                            env("PLATFORM_HTTP_ADDR", "127.0.0.1:9200"),
-		PublicBaseURL:                       env("PLATFORM_PUBLIC_BASE_URL", ""),
-		TrustedProxies:                      csvEnv("PLATFORM_TRUSTED_PROXIES", nil),
-		EdgeTrustedProxy:                    env("PLATFORM_EDGE_TRUSTED_PROXY", ""),
-		HTTPMaxBodyBytes:                    httpMaxBodyBytes,
-		Capabilities:                        capabilities,
-		CapabilityLockFile:                  capabilityLockFile,
-		AdminResourceFile:                   env("PLATFORM_ADMIN_RESOURCE_FILE", ""),
-		AdminResourceDriver:                 env("PLATFORM_ADMIN_RESOURCE_DRIVER", ""),
-		AdminResourceDSN:                    env("PLATFORM_ADMIN_RESOURCE_DSN", ""),
-		OrganizationRBACMode:                strings.ToLower(env("PLATFORM_ORGANIZATION_RBAC_MODE", OrganizationRBACModeLegacy)),
-		AdminMenuServingMode:                strings.ToLower(env("PLATFORM_ADMIN_MENU_SERVING_MODE", AdminMenuServingModeLegacy)),
-		AdminRoleMenuWriteEnabled:           adminRoleMenuWriteEnabled,
-		SessionFile:                         env("PLATFORM_SESSION_FILE", ""),
-		SessionDriver:                       env("PLATFORM_SESSION_DRIVER", ""),
-		SessionDSN:                          env("PLATFORM_SESSION_DSN", ""),
-		LifecycleHistoryFile:                env("PLATFORM_LIFECYCLE_HISTORY_FILE", ""),
-		LifecycleHistoryDriver:              env("PLATFORM_LIFECYCLE_HISTORY_DRIVER", ""),
-		LifecycleHistoryDSN:                 env("PLATFORM_LIFECYCLE_HISTORY_DSN", ""),
-		RetentionRunnerEnabled:              retentionRunnerEnabled,
-		RetentionRunnerInterval:             retentionRunnerInterval,
-		RetentionRunnerBatchSize:            retentionRunnerBatchSize,
-		RetentionRunnerMaxRetries:           retentionRunnerMaxRetries,
-		DatabaseDriver:                      env("PLATFORM_DATABASE_DRIVER", "mysql"),
-		DatabaseDSN:                         env("PLATFORM_DATABASE_DSN", ""),
-		OpenAPIFile:                         env("PLATFORM_OPENAPI_FILE", "resources/generated/openapi.admin.json"),
-		JWTSecret:                           env("PLATFORM_JWT_SECRET", defaultJWTSecret),
-		CacheDriver:                         env("PLATFORM_CACHE_DRIVER", ""),
-		CacheDefaultTTL:                     durationEnv("PLATFORM_CACHE_DEFAULT_TTL", 5*time.Minute),
-		RedisAddr:                           env("PLATFORM_REDIS_ADDR", "127.0.0.1:6379"),
-		RedisPassword:                       env("PLATFORM_REDIS_PASSWORD", ""),
-		RedisDB:                             intEnv("PLATFORM_REDIS_DB", 0),
-		MessageBusEnabled:                   messageBusEnabled,
-		MessageBusAdapter:                   env("PLATFORM_MESSAGE_BUS_ADAPTER", ""),
-		SearchEnabled:                       searchEnabled,
-		SearchAdapter:                       env("PLATFORM_SEARCH_ADAPTER", ""),
-		RateLimitHMACKey:                    env("PLATFORM_RATE_LIMIT_HMAC_KEY", ""),
-		SensitiveRevealHMACKey:              env("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY", ""),
-		DataKeyProvider:                     env("PLATFORM_DATA_KEY_PROVIDER", ""),
-		DataEncryptionActiveKeyID:           env("PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID", ""),
-		DataEncryptionKeyringJSON:           env("PLATFORM_DATA_ENCRYPTION_KEYRING_JSON", ""),
-		DataBlindIndexActiveKeyID:           env("PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID", ""),
-		DataBlindIndexKeyringJSON:           env("PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON", ""),
-		FileStorageDriver:                   env("PLATFORM_FILE_STORAGE_DRIVER", "local"),
-		FileStorageLocalDir:                 env("PLATFORM_FILE_STORAGE_LOCAL_DIR", ".platform/uploads"),
-		FileMaxUploadBytes:                  fileMaxUploadBytes,
-		FileAllowedMIMETypes:                fileAllowedMIMETypes,
-		FileStorageS3Endpoint:               env("PLATFORM_FILE_STORAGE_S3_ENDPOINT", ""),
-		FileStorageS3Region:                 env("PLATFORM_FILE_STORAGE_S3_REGION", ""),
-		FileStorageS3Bucket:                 env("PLATFORM_FILE_STORAGE_S3_BUCKET", ""),
-		FileStorageS3AccessKey:              env("PLATFORM_FILE_STORAGE_S3_ACCESS_KEY", ""),
-		FileStorageS3SecretKey:              env("PLATFORM_FILE_STORAGE_S3_SECRET_KEY", ""),
-		FileStorageS3Prefix:                 env("PLATFORM_FILE_STORAGE_S3_PREFIX", ""),
-		FileStorageS3PathStyle:              boolEnv("PLATFORM_FILE_STORAGE_S3_FORCE_PATH_STYLE", false),
-		FileStorageS3ServerSideEncryption:   fileS3Encryption,
-		FileStorageS3KMSKeyID:               env("PLATFORM_FILE_STORAGE_S3_KMS_KEY_ID", ""),
-		WechatMiniAppID:                     env("PLATFORM_WECHAT_MINIAPP_APP_ID", ""),
-		WechatMiniAppSecret:                 env("PLATFORM_WECHAT_MINIAPP_SECRET", ""),
-		WechatMiniAppCode2SessionEndpoint:   env("PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT", ""),
-		AdminOIDCIssuerURL:                  env("PLATFORM_ADMIN_OIDC_ISSUER_URL", ""),
-		AdminOIDCClientID:                   env("PLATFORM_ADMIN_OIDC_CLIENT_ID", ""),
-		AdminOIDCClientSecret:               env("PLATFORM_ADMIN_OIDC_CLIENT_SECRET", ""),
-		AdminOIDCRedirectURL:                env("PLATFORM_ADMIN_OIDC_REDIRECT_URL", ""),
-		AdminOIDCScopes:                     csvEnv("PLATFORM_ADMIN_OIDC_SCOPES", []string{"openid", "profile", "email"}),
-		DisableDemoAuthProvider:             boolEnv("PLATFORM_DISABLE_DEMO_AUTH_PROVIDER", false),
-		PhoneHMACKey:                        env("PLATFORM_PHONE_HMAC_KEY", ""),
-		PhoneCodeHMACKey:                    env("PLATFORM_PHONE_CODE_HMAC_KEY", ""),
-		PhoneVerificationProvider:           env("PLATFORM_PHONE_VERIFICATION_PROVIDER", ""),
-		NotificationSMSProvider:             env("PLATFORM_NOTIFICATION_SMS_PROVIDER", ""),
-		NotificationSMSLoginTemplateID:      env("PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID", ""),
-		AdminStepUpPhoneResource:            env("PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE", ""),
-		AdminStepUpPhoneActorField:          env("PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD", ""),
-		AdminStepUpPhoneField:               env("PLATFORM_ADMIN_STEP_UP_PHONE_FIELD", ""),
-		AdminStepUpPhoneVerifiedAtField:     env("PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD", ""),
-		AdminStepUpPhoneVerifiedDigestField: env("PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD", ""),
+		RuntimeEnvironment:                   strings.ToLower(env("PLATFORM_RUNTIME_ENV", RuntimeEnvironmentDevelopment)),
+		HTTPAddr:                             env("PLATFORM_HTTP_ADDR", "127.0.0.1:9200"),
+		PublicBaseURL:                        env("PLATFORM_PUBLIC_BASE_URL", ""),
+		TrustedProxies:                       csvEnv("PLATFORM_TRUSTED_PROXIES", nil),
+		EdgeTrustedProxy:                     env("PLATFORM_EDGE_TRUSTED_PROXY", ""),
+		HTTPMaxBodyBytes:                     httpMaxBodyBytes,
+		Capabilities:                         capabilities,
+		CapabilityLockFile:                   capabilityLockFile,
+		AdminResourceFile:                    env("PLATFORM_ADMIN_RESOURCE_FILE", ""),
+		AdminResourceDriver:                  env("PLATFORM_ADMIN_RESOURCE_DRIVER", ""),
+		AdminResourceDSN:                     env("PLATFORM_ADMIN_RESOURCE_DSN", ""),
+		OrganizationRBACMode:                 strings.ToLower(env("PLATFORM_ORGANIZATION_RBAC_MODE", OrganizationRBACModeLegacy)),
+		AdminMenuServingMode:                 strings.ToLower(env("PLATFORM_ADMIN_MENU_SERVING_MODE", AdminMenuServingModeLegacy)),
+		AdminRoleMenuWriteEnabled:            adminRoleMenuWriteEnabled,
+		SessionFile:                          env("PLATFORM_SESSION_FILE", ""),
+		SessionDriver:                        env("PLATFORM_SESSION_DRIVER", ""),
+		SessionDSN:                           env("PLATFORM_SESSION_DSN", ""),
+		LifecycleHistoryFile:                 env("PLATFORM_LIFECYCLE_HISTORY_FILE", ""),
+		LifecycleHistoryDriver:               env("PLATFORM_LIFECYCLE_HISTORY_DRIVER", ""),
+		LifecycleHistoryDSN:                  env("PLATFORM_LIFECYCLE_HISTORY_DSN", ""),
+		RetentionRunnerEnabled:               retentionRunnerEnabled,
+		RetentionRunnerInterval:              retentionRunnerInterval,
+		RetentionRunnerBatchSize:             retentionRunnerBatchSize,
+		RetentionRunnerMaxRetries:            retentionRunnerMaxRetries,
+		DatabaseDriver:                       env("PLATFORM_DATABASE_DRIVER", "mysql"),
+		DatabaseDSN:                          env("PLATFORM_DATABASE_DSN", ""),
+		OpenAPIFile:                          env("PLATFORM_OPENAPI_FILE", "resources/generated/openapi.admin.json"),
+		JWTSecret:                            env("PLATFORM_JWT_SECRET", defaultJWTSecret),
+		CacheDriver:                          env("PLATFORM_CACHE_DRIVER", ""),
+		CacheDefaultTTL:                      durationEnv("PLATFORM_CACHE_DEFAULT_TTL", 5*time.Minute),
+		RedisAddr:                            env("PLATFORM_REDIS_ADDR", "127.0.0.1:6379"),
+		RedisPassword:                        env("PLATFORM_REDIS_PASSWORD", ""),
+		RedisDB:                              intEnv("PLATFORM_REDIS_DB", 0),
+		MessageBusEnabled:                    messageBusEnabled,
+		MessageBusAdapter:                    env("PLATFORM_MESSAGE_BUS_ADAPTER", ""),
+		SearchEnabled:                        searchEnabled,
+		SearchAdapter:                        env("PLATFORM_SEARCH_ADAPTER", ""),
+		RateLimitHMACKey:                     env("PLATFORM_RATE_LIMIT_HMAC_KEY", ""),
+		SensitiveRevealHMACKey:               env("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY", ""),
+		DataKeyProvider:                      env("PLATFORM_DATA_KEY_PROVIDER", ""),
+		DataEncryptionActiveKeyID:            env("PLATFORM_DATA_ENCRYPTION_ACTIVE_KEY_ID", ""),
+		DataEncryptionKeyringJSON:            env("PLATFORM_DATA_ENCRYPTION_KEYRING_JSON", ""),
+		DataBlindIndexActiveKeyID:            env("PLATFORM_DATA_BLIND_INDEX_ACTIVE_KEY_ID", ""),
+		DataBlindIndexKeyringJSON:            env("PLATFORM_DATA_BLIND_INDEX_KEYRING_JSON", ""),
+		FileStorageDriver:                    env("PLATFORM_FILE_STORAGE_DRIVER", "local"),
+		FileStorageLocalDir:                  env("PLATFORM_FILE_STORAGE_LOCAL_DIR", ".platform/uploads"),
+		FileMaxUploadBytes:                   fileMaxUploadBytes,
+		FileAllowedMIMETypes:                 fileAllowedMIMETypes,
+		FileStorageS3Endpoint:                env("PLATFORM_FILE_STORAGE_S3_ENDPOINT", ""),
+		FileStorageS3Region:                  env("PLATFORM_FILE_STORAGE_S3_REGION", ""),
+		FileStorageS3Bucket:                  env("PLATFORM_FILE_STORAGE_S3_BUCKET", ""),
+		FileStorageS3AccessKey:               env("PLATFORM_FILE_STORAGE_S3_ACCESS_KEY", ""),
+		FileStorageS3SecretKey:               env("PLATFORM_FILE_STORAGE_S3_SECRET_KEY", ""),
+		FileStorageS3Prefix:                  env("PLATFORM_FILE_STORAGE_S3_PREFIX", ""),
+		FileStorageS3PathStyle:               boolEnv("PLATFORM_FILE_STORAGE_S3_FORCE_PATH_STYLE", false),
+		FileStorageS3ServerSideEncryption:    fileS3Encryption,
+		FileStorageS3KMSKeyID:                env("PLATFORM_FILE_STORAGE_S3_KMS_KEY_ID", ""),
+		WechatMiniAppID:                      env("PLATFORM_WECHAT_MINIAPP_APP_ID", ""),
+		WechatMiniAppSecret:                  env("PLATFORM_WECHAT_MINIAPP_SECRET", ""),
+		WechatMiniAppCode2SessionEndpoint:    env("PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT", ""),
+		AdminOIDCIssuerURL:                   env("PLATFORM_ADMIN_OIDC_ISSUER_URL", ""),
+		AdminOIDCClientID:                    env("PLATFORM_ADMIN_OIDC_CLIENT_ID", ""),
+		AdminOIDCClientSecret:                env("PLATFORM_ADMIN_OIDC_CLIENT_SECRET", ""),
+		AdminOIDCRedirectURL:                 env("PLATFORM_ADMIN_OIDC_REDIRECT_URL", ""),
+		AdminOIDCScopes:                      csvEnv("PLATFORM_ADMIN_OIDC_SCOPES", []string{"openid", "profile", "email"}),
+		DisableDemoAuthProvider:              boolEnv("PLATFORM_DISABLE_DEMO_AUTH_PROVIDER", false),
+		CredentialAuthUsernamePassword:       credentialAuthUsernamePassword,
+		CredentialAuthPhonePassword:          credentialAuthPhonePassword,
+		CredentialAuthEmailPassword:          credentialAuthEmailPassword,
+		CredentialAuthPhoneSMSOTP:            credentialAuthPhoneSMSOTP,
+		CredentialAuthIdentifierHMACKey:      env("PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY", ""),
+		CredentialAuthBootstrapAdminUsername: env("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_USERNAME", ""),
+		CredentialAuthBootstrapAdminPassword: env("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PASSWORD", ""),
+		CredentialAuthBootstrapAdminPhone:    env("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PHONE", ""),
+		CredentialAuthBootstrapAdminEmail:    env("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_EMAIL", ""),
+		PhoneHMACKey:                         env("PLATFORM_PHONE_HMAC_KEY", ""),
+		PhoneCodeHMACKey:                     env("PLATFORM_PHONE_CODE_HMAC_KEY", ""),
+		PhoneVerificationProvider:            env("PLATFORM_PHONE_VERIFICATION_PROVIDER", ""),
+		NotificationSMSProvider:              env("PLATFORM_NOTIFICATION_SMS_PROVIDER", ""),
+		NotificationSMSLoginTemplateID:       env("PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID", ""),
+		AdminStepUpPhoneResource:             env("PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE", ""),
+		AdminStepUpPhoneActorField:           env("PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD", ""),
+		AdminStepUpPhoneField:                env("PLATFORM_ADMIN_STEP_UP_PHONE_FIELD", ""),
+		AdminStepUpPhoneVerifiedAtField:      env("PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_AT_FIELD", ""),
+		AdminStepUpPhoneVerifiedDigestField:  env("PLATFORM_ADMIN_STEP_UP_PHONE_VERIFIED_DIGEST_FIELD", ""),
 		filePolicySource: filePolicySource{
 			loadedFromEnvironment: true,
 			maxUploadBytes:        fileMaxUploadBytesState,
@@ -316,6 +346,12 @@ func Load() Config {
 			searchEnabled:     searchEnabledState,
 		},
 		menuGovernanceSource: menuGovernanceSource{roleMenuWriteEnabled: adminRoleMenuWriteEnabledState},
+		credentialAuthSource: credentialAuthSource{
+			usernamePassword: credentialAuthUsernamePasswordState,
+			phonePassword:    credentialAuthPhonePasswordState,
+			emailPassword:    credentialAuthEmailPasswordState,
+			phoneSMSOTP:      credentialAuthPhoneSMSOTPState,
+		},
 	}
 }
 
@@ -332,6 +368,13 @@ func (c Config) AdminStepUpPhoneSourceConfigured() bool {
 		strings.TrimSpace(c.AdminStepUpPhoneField) != "" &&
 		strings.TrimSpace(c.AdminStepUpPhoneVerifiedAtField) != "" &&
 		strings.TrimSpace(c.AdminStepUpPhoneVerifiedDigestField) != ""
+}
+
+func (c Config) CredentialAuthConfigured() bool {
+	return c.CredentialAuthUsernamePassword ||
+		c.CredentialAuthPhonePassword ||
+		c.CredentialAuthEmailPassword ||
+		c.CredentialAuthPhoneSMSOTP
 }
 
 func (c Config) CapabilityConfigSource() string {
@@ -501,6 +544,7 @@ func (c Config) ValidateRuntime() error {
 		errs = append(errs, errors.New("wechat miniapp app id and secret must be configured together"))
 	}
 	errs = append(errs, c.validateAdminOIDC(environment)...)
+	errs = append(errs, c.validateCredentialAuth(environment)...)
 	errs = append(errs, c.validatePhoneVerification(environment)...)
 	errs = append(errs, c.validateNotificationSMS(environment)...)
 	errs = append(errs, c.validateAdminStepUpPhoneSource()...)
@@ -707,6 +751,58 @@ func (c Config) validateNotificationSMS(environment string) []error {
 	}
 	if provider == notification.SMSProviderMockLocal && environment != RuntimeEnvironmentDevelopment && environment != RuntimeEnvironmentTest {
 		errs = append(errs, fmt.Errorf("%s mock-local provider is allowed only in development or test", prefix))
+	}
+	return errs
+}
+
+func (c Config) validateCredentialAuth(environment string) []error {
+	var errs []error
+	for key, state := range map[string]envConfigState{
+		"PLATFORM_CREDENTIAL_AUTH_USERNAME_PASSWORD": c.credentialAuthSource.usernamePassword,
+		"PLATFORM_CREDENTIAL_AUTH_PHONE_PASSWORD":    c.credentialAuthSource.phonePassword,
+		"PLATFORM_CREDENTIAL_AUTH_EMAIL_PASSWORD":    c.credentialAuthSource.emailPassword,
+		"PLATFORM_CREDENTIAL_AUTH_PHONE_SMS_OTP":     c.credentialAuthSource.phoneSMSOTP,
+	} {
+		if state == envConfigInvalid {
+			errs = append(errs, fmt.Errorf("%s is invalid", key))
+		}
+	}
+	if !c.CredentialAuthConfigured() {
+		return errs
+	}
+	prefix := "credential-auth"
+	if environment == RuntimeEnvironmentProduction {
+		prefix = "production credential-auth"
+	}
+	if !hasCapability(c.Capabilities, "credential-auth") {
+		errs = append(errs, fmt.Errorf("%s requires credential-auth capability to be enabled", prefix))
+	}
+	if len([]byte(c.CredentialAuthIdentifierHMACKey)) < 32 {
+		errs = append(errs, fmt.Errorf("%s requires PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY to be at least 32 bytes", prefix))
+	}
+	if environment == RuntimeEnvironmentProduction {
+		errs = append(errs, errors.New("production credential-auth requires a persistent credential repository before enabling local credential providers"))
+	}
+	if c.CredentialAuthUsernamePassword || c.CredentialAuthPhonePassword || c.CredentialAuthEmailPassword {
+		if strings.TrimSpace(c.CredentialAuthBootstrapAdminUsername) == "" || strings.TrimSpace(c.CredentialAuthBootstrapAdminPassword) == "" {
+			errs = append(errs, fmt.Errorf("%s password providers require PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_USERNAME and PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PASSWORD for the stock in-memory runtime", prefix))
+		}
+	}
+	if c.CredentialAuthPhonePassword || c.CredentialAuthPhoneSMSOTP {
+		if strings.TrimSpace(c.CredentialAuthBootstrapAdminPhone) == "" {
+			errs = append(errs, fmt.Errorf("%s phone providers require PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PHONE for the stock in-memory runtime", prefix))
+		}
+	}
+	if c.CredentialAuthEmailPassword && strings.TrimSpace(c.CredentialAuthBootstrapAdminEmail) == "" {
+		errs = append(errs, fmt.Errorf("%s email password provider requires PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_EMAIL for the stock in-memory runtime", prefix))
+	}
+	if c.CredentialAuthPhoneSMSOTP {
+		if !hasCapability(c.Capabilities, "notification") {
+			errs = append(errs, fmt.Errorf("%s phone SMS OTP requires notification capability to be enabled", prefix))
+		}
+		if strings.TrimSpace(c.NotificationSMSProvider) == "" || strings.TrimSpace(c.NotificationSMSLoginTemplateID) == "" {
+			errs = append(errs, fmt.Errorf("%s phone SMS OTP requires PLATFORM_NOTIFICATION_SMS_PROVIDER and PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID", prefix))
+		}
 	}
 	return errs
 }

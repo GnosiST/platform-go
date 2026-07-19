@@ -118,6 +118,10 @@ func main() {
 	if notificationSMS.Sender != nil {
 		log.Printf("notification sms provider=%s mockLocal=%t loginTemplateConfigured=%t", notificationSMS.Sender.Kind(), notificationSMS.MockLocalEnabled, notificationSMS.LoginTemplateID != "")
 	}
+	credentialAuth, err := bootstrap.CredentialAuthRuntimeFromConfig(ctx, cfg, notificationSMS)
+	if err != nil {
+		log.Fatalf("build credential auth runtime: %v", err)
+	}
 	sensitiveReveal, err := bootstrap.SensitiveRevealRuntimeFromConfig(cfg, ordered, phoneVerification)
 	if err != nil {
 		log.Fatalf("build sensitive reveal runtime: %v", err)
@@ -158,6 +162,7 @@ func main() {
 		AppRoutes:                apps.DefaultAppRoutes(resources),
 		AdminIdentityResolver:    adminIdentityResolver,
 		AdminIdentityBindings:    adminIdentityBindings,
+		CredentialAuth:           credentialAuth,
 		AppIdentityResolver:      appIdentityResolver,
 		PhoneProtector:           phoneVerification.Protector,
 		PhoneVerificationSender:  phoneVerification.Sender,

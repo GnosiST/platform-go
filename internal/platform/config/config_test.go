@@ -78,6 +78,15 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_ADMIN_OIDC_CLIENT_SECRET", "")
 	t.Setenv("PLATFORM_ADMIN_OIDC_REDIRECT_URL", "")
 	t.Setenv("PLATFORM_ADMIN_OIDC_SCOPES", "")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_USERNAME_PASSWORD", "")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_PHONE_PASSWORD", "")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_EMAIL_PASSWORD", "")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_PHONE_SMS_OTP", "")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY", "")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_USERNAME", "")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PASSWORD", "")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PHONE", "")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_EMAIL", "")
 	t.Setenv("PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE", "")
 	t.Setenv("PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD", "")
 	t.Setenv("PLATFORM_ADMIN_STEP_UP_PHONE_FIELD", "")
@@ -211,6 +220,9 @@ func TestLoadUsesDefaults(t *testing.T) {
 	}
 	if cfg.DisableDemoAuthProvider {
 		t.Fatalf("DisableDemoAuthProvider = true, want false by default")
+	}
+	if cfg.CredentialAuthConfigured() || cfg.CredentialAuthIdentifierHMACKey != "" || cfg.CredentialAuthBootstrapAdminUsername != "" || cfg.CredentialAuthBootstrapAdminPassword != "" {
+		t.Fatalf("credential auth defaults = configured(%t), key/user/password should be empty", cfg.CredentialAuthConfigured())
 	}
 	if cfg.AdminStepUpPhoneSourceConfigured() {
 		t.Fatal("admin step-up phone source must be disabled by default")
@@ -1560,6 +1572,80 @@ func TestValidateRuntimeRejectsMockNotificationSMSProviderOutsideDevelopmentAndT
 				t.Fatalf("ValidateRuntime() error = %v, want mock-local environment rejection", err)
 			}
 		})
+	}
+}
+
+func TestValidateRuntimeAcceptsDevelopmentCredentialAuthBootstrap(t *testing.T) {
+	cfg := Load()
+	cfg.Capabilities = append(cfg.Capabilities, "notification", "credential-auth")
+	cfg.CredentialAuthUsernamePassword = true
+	cfg.CredentialAuthPhonePassword = true
+	cfg.CredentialAuthEmailPassword = true
+	cfg.CredentialAuthPhoneSMSOTP = true
+	cfg.CredentialAuthIdentifierHMACKey = strings.Repeat("i", 32)
+	cfg.CredentialAuthBootstrapAdminUsername = "admin"
+	cfg.CredentialAuthBootstrapAdminPassword = "correct-password"
+	cfg.CredentialAuthBootstrapAdminPhone = "+8613800138000"
+	cfg.CredentialAuthBootstrapAdminEmail = "admin@example.test"
+	cfg.NotificationSMSProvider = "mock-local"
+	cfg.NotificationSMSLoginTemplateID = "login-template"
+
+	if err := cfg.ValidateRuntime(); err != nil {
+		t.Fatalf("ValidateRuntime() error = %v", err)
+	}
+}
+
+func TestValidateRuntimeRejectsCredentialAuthUnsafeConfiguration(t *testing.T) {
+	tests := []struct {
+		name  string
+		apply func(*Config)
+		want  string
+	}{
+		{name: "missing capability", apply: func(cfg *Config) {
+			cfg.Capabilities = []string{"dictionary", "tenant", "identity", "session", "rbac", "audit"}
+		}, want: "requires credential-auth capability"},
+		{name: "short key", apply: func(cfg *Config) { cfg.CredentialAuthIdentifierHMACKey = "short" }, want: "PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY"},
+		{name: "missing password seed", apply: func(cfg *Config) { cfg.CredentialAuthBootstrapAdminPassword = "" }, want: "password providers require"},
+		{name: "missing phone seed", apply: func(cfg *Config) { cfg.CredentialAuthBootstrapAdminPhone = "" }, want: "phone providers require"},
+		{name: "missing email seed", apply: func(cfg *Config) { cfg.CredentialAuthBootstrapAdminEmail = "" }, want: "email password provider requires"},
+		{name: "missing sms config", apply: func(cfg *Config) { cfg.NotificationSMSProvider = "" }, want: "phone SMS OTP requires"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Load()
+			cfg.Capabilities = append(cfg.Capabilities, "notification", "credential-auth")
+			cfg.CredentialAuthUsernamePassword = true
+			cfg.CredentialAuthPhonePassword = true
+			cfg.CredentialAuthEmailPassword = true
+			cfg.CredentialAuthPhoneSMSOTP = true
+			cfg.CredentialAuthIdentifierHMACKey = strings.Repeat("i", 32)
+			cfg.CredentialAuthBootstrapAdminUsername = "admin"
+			cfg.CredentialAuthBootstrapAdminPassword = "correct-password"
+			cfg.CredentialAuthBootstrapAdminPhone = "+8613800138000"
+			cfg.CredentialAuthBootstrapAdminEmail = "admin@example.test"
+			cfg.NotificationSMSProvider = "mock-local"
+			cfg.NotificationSMSLoginTemplateID = "login-template"
+			tt.apply(&cfg)
+
+			err := cfg.ValidateRuntime()
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("ValidateRuntime() error = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateRuntimeRejectsCredentialAuthInProductionUntilPersistentStoreExists(t *testing.T) {
+	cfg := validProductionRuntimeConfig()
+	cfg.Capabilities = append(cfg.Capabilities, "notification", "credential-auth")
+	cfg.CredentialAuthUsernamePassword = true
+	cfg.CredentialAuthIdentifierHMACKey = strings.Repeat("i", 32)
+	cfg.CredentialAuthBootstrapAdminUsername = "admin"
+	cfg.CredentialAuthBootstrapAdminPassword = "correct-password"
+
+	err := cfg.ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "persistent credential repository") {
+		t.Fatalf("ValidateRuntime() error = %v, want production credential repository gate", err)
 	}
 }
 

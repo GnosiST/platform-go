@@ -103,6 +103,18 @@ func configureAuthProvidersFromConfig(manifest capability.Manifest, cfg config.C
 		if provider.ID == "oidc" && cfg.AdminOIDCConfigured() {
 			provider.Configured = true
 		}
+		if provider.ID == "username-password" && cfg.CredentialAuthUsernamePassword {
+			provider.Configured = true
+		}
+		if provider.ID == "phone-password" && cfg.CredentialAuthPhonePassword {
+			provider.Configured = true
+		}
+		if provider.ID == "email-password" && cfg.CredentialAuthEmailPassword {
+			provider.Configured = true
+		}
+		if provider.ID == "phone-sms-otp" && cfg.CredentialAuthPhoneSMSOTP {
+			provider.Configured = true
+		}
 	}
 	return manifest
 }

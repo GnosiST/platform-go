@@ -56,6 +56,16 @@ describe("validate-platform-admin-api-boundary", () => {
       "#/components/schemas/AdminAuthLoginRequest",
     );
     assert.ok(login?.responses?.["501"]);
+    const smsOTPStart = openAPI.paths?.["/api/auth/sms-otp/start"]?.post;
+    assert.equal(smsOTPStart?.operationId, "startAdminCredentialSMSOTP");
+    assert.deepEqual(smsOTPStart?.security, []);
+    assert.equal(smsOTPStart?.["x-platform-runtime-status"], "dev-http-runtime-memory-bootstrap");
+    assert.equal(
+      smsOTPStart?.requestBody?.content?.["application/json"]?.schema?.$ref,
+      "#/components/schemas/AdminCredentialSMSOTPStartRequest",
+    );
+    assert.ok(smsOTPStart?.responses?.["201"]);
+    assert.ok(smsOTPStart?.responses?.["501"]);
     const challenge = openAPI.components?.schemas?.AdminAuthProviderStartRequest?.properties?.codeChallenge;
     assert.equal(challenge?.minLength, 43);
     assert.equal(challenge?.maxLength, 43);
@@ -64,6 +74,16 @@ describe("validate-platform-admin-api-boundary", () => {
     assert.ok(loginProperties.state);
     assert.ok(loginProperties.codeVerifier);
     assert.equal(loginProperties.codeVerifier.writeOnly, true);
+    assert.equal(loginProperties.identifier?.$ref, "#/components/schemas/AdminCredentialAuthIdentifier");
+    assert.equal(loginProperties.secret?.$ref, "#/components/schemas/AdminCredentialAuthSecret");
+    assert.equal(loginProperties.challenge?.$ref, "#/components/schemas/AdminCredentialAuthChallengeProof");
+    const credentialSecret = openAPI.components?.schemas?.AdminCredentialAuthSecret;
+    assert.deepEqual(credentialSecret?.properties?.type?.enum, ["password", "sms-otp"]);
+    assert.equal(credentialSecret?.properties?.value?.writeOnly, true);
+    assert.equal(credentialSecret?.properties?.code?.writeOnly, true);
+    const smsData = openAPI.components?.schemas?.AdminCredentialSMSOTPStartData;
+    assert.equal(smsData?.properties?.debugCode?.["x-platform-development-only"], true);
+    assert.equal(smsData?.properties?.debugCode?.["x-platform-sensitivity"], "secret");
     assert.deepEqual(
       Object.keys(openAPI.components?.schemas?.AdminAuthProviderStartData?.properties ?? {}).sort(),
       ["authorizationUrl", "expiresAt", "state"],
@@ -104,6 +124,23 @@ describe("validate-platform-admin-api-boundary", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /AdminAuthLoginRequest code must stay writeOnly/);
+  });
+
+  it("rejects missing credential-auth SMS OTP OpenAPI and readable credential secrets", () => {
+    const openAPI = readJSON("resources/generated/openapi.admin.json");
+    delete openAPI.paths["/api/auth/sms-otp/start"];
+    openAPI.components.schemas.AdminAuthLoginRequest.properties.secret = { type: "object" };
+    openAPI.components.schemas.AdminCredentialAuthSecret.properties.value.writeOnly = false;
+    openAPI.components.schemas.AdminCredentialSMSOTPStartData.properties.debugCode["x-platform-development-only"] = false;
+    const openAPIPath = tempJSON("openapi.admin.json", openAPI);
+
+    const result = runValidator(["--admin-openapi", openAPIPath]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /credential-auth SMS OTP start operation/);
+    assert.match(result.stderr, /structured credential-auth identifier, secret and challenge fields/);
+    assert.match(result.stderr, /AdminCredentialAuthSecret must constrain password and SMS OTP secrets/);
+    assert.match(result.stderr, /debugCode development-only secret/);
   });
 
   it("rejects direct fetch outside the platform API client allowlist", () => {

@@ -27,8 +27,10 @@ import (
 	"github.com/GnosiST/platform-go/internal/platform/cache"
 	"github.com/GnosiST/platform-go/internal/platform/capability"
 	"github.com/GnosiST/platform-go/internal/platform/core"
+	"github.com/GnosiST/platform-go/internal/platform/credentialauth"
 	"github.com/GnosiST/platform-go/internal/platform/errorcode"
 	"github.com/GnosiST/platform-go/internal/platform/kernel"
+	"github.com/GnosiST/platform-go/internal/platform/notification"
 	"github.com/GnosiST/platform-go/internal/platform/ratelimit"
 	"github.com/GnosiST/platform-go/internal/platform/session"
 	"github.com/GnosiST/platform-go/internal/platform/storage"
@@ -160,6 +162,15 @@ type authLoginTestPayload struct {
 			Roles       []string `json:"roles"`
 			Permissions []string `json:"permissions"`
 		} `json:"principal"`
+	} `json:"data"`
+}
+
+type credentialAuthSMSOTPStartTestPayload struct {
+	Data struct {
+		TransactionID    string    `json:"transactionId"`
+		MaskedIdentifier string    `json:"maskedIdentifier"`
+		ExpiresAt        time.Time `json:"expiresAt"`
+		DebugCode        string    `json:"debugCode"`
 	} `json:"data"`
 }
 
@@ -941,6 +952,191 @@ func TestDisabledCapabilitiesDoNotLeakAuthProviders(t *testing.T) {
 	if containsString(ids, "wechat") {
 		t.Fatalf("auth provider ids = %+v, want no wechat provider from disabled wechat-login capability", ids)
 	}
+}
+
+func TestCredentialAuthProviderRequiresRuntime(t *testing.T) {
+	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t)})
+	providersRecorder := httptest.NewRecorder()
+	providersRequest := httptest.NewRequest(http.MethodGet, "/api/auth/providers", nil)
+
+	server.Router().ServeHTTP(providersRecorder, providersRequest)
+
+	if providersRecorder.Code != http.StatusOK {
+		t.Fatalf("GET auth providers status = %d body = %s", providersRecorder.Code, providersRecorder.Body.String())
+	}
+	var providers authProviderListTestPayload
+	if err := json.Unmarshal(providersRecorder.Body.Bytes(), &providers); err != nil {
+		t.Fatalf("decode auth providers: %v body = %s", err, providersRecorder.Body.String())
+	}
+	var found bool
+	for _, provider := range providers.Data.Items {
+		if provider.ID == "username-password" && provider.Kind == authProviderKindCredentialPassword && provider.Configured {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("auth providers = %+v, want configured credential provider in discovery", providers.Data.Items)
+	}
+
+	loginBody := bytes.NewBufferString(`{"provider":"username-password","identifier":{"type":"username","value":"admin"},"secret":{"type":"password","value":"password"}}`)
+	loginRecorder := httptest.NewRecorder()
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/auth/login", loginBody)
+	loginRequest.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(loginRecorder, loginRequest)
+
+	if loginRecorder.Code != http.StatusBadRequest {
+		t.Fatalf("POST credential login status = %d body = %s, want 400", loginRecorder.Code, loginRecorder.Body.String())
+	}
+	if !strings.Contains(loginRecorder.Body.String(), "AUTH_PROVIDER_NOT_CONFIGURED") {
+		t.Fatalf("POST credential login body = %s, want provider not configured", loginRecorder.Body.String())
+	}
+}
+
+func TestCredentialAuthPasswordLoginUsesDedicatedRuntime(t *testing.T) {
+	runtime, _ := credentialAuthRuntimeForTest(t)
+	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
+	loginBody := bytes.NewBufferString(`{"provider":"username-password","identifier":{"type":"username","value":"admin"},"secret":{"type":"password","value":"correct-password"}}`)
+	loginRecorder := httptest.NewRecorder()
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/auth/login", loginBody)
+	loginRequest.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(loginRecorder, loginRequest)
+
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("POST credential password login status = %d body = %s", loginRecorder.Code, loginRecorder.Body.String())
+	}
+	var login authLoginTestPayload
+	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &login); err != nil {
+		t.Fatalf("decode credential login: %v body = %s", err, loginRecorder.Body.String())
+	}
+	if login.Data.Principal.User.Username != "admin" || len(login.Data.Principal.Permissions) == 0 {
+		t.Fatalf("credential principal = %+v, want validated admin user", login.Data.Principal)
+	}
+
+	badBody := bytes.NewBufferString(`{"provider":"username-password","identifier":{"type":"username","value":"admin"},"secret":{"type":"password","value":"wrong-password"}}`)
+	badRecorder := httptest.NewRecorder()
+	badRequest := httptest.NewRequest(http.MethodPost, "/api/auth/login", badBody)
+	badRequest.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(badRecorder, badRequest)
+
+	if badRecorder.Code != http.StatusUnauthorized || !strings.Contains(badRecorder.Body.String(), "AUTH_INVALID_CREDENTIALS") {
+		t.Fatalf("POST bad credential login = %d body = %s, want invalid credentials", badRecorder.Code, badRecorder.Body.String())
+	}
+}
+
+func TestCredentialAuthSMSOTPLoginConsumesTransaction(t *testing.T) {
+	runtime, sender := credentialAuthRuntimeForTest(t)
+	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
+	startBody := bytes.NewBufferString(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"+8613800138000"}}`)
+	startRecorder := httptest.NewRecorder()
+	startRequest := httptest.NewRequest(http.MethodPost, "/api/auth/sms-otp/start", startBody)
+	startRequest.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(startRecorder, startRequest)
+
+	if startRecorder.Code != http.StatusCreated {
+		t.Fatalf("POST credential sms otp start status = %d body = %s", startRecorder.Code, startRecorder.Body.String())
+	}
+	var started credentialAuthSMSOTPStartTestPayload
+	if err := json.Unmarshal(startRecorder.Body.Bytes(), &started); err != nil {
+		t.Fatalf("decode sms otp start: %v body = %s", err, startRecorder.Body.String())
+	}
+	if started.Data.TransactionID == "" || started.Data.DebugCode != "123456" || started.Data.MaskedIdentifier == "" {
+		t.Fatalf("sms otp start = %+v, want transaction, debug code and masked identifier", started.Data)
+	}
+	sent := sender.Sent()
+	if len(sent) != 1 || sent[0].Recipient != "+8613800138000" || sent[0].TemplateParams["code"] != "123456" {
+		t.Fatalf("sent sms = %+v, want login code delivery", sent)
+	}
+
+	loginJSON := fmt.Sprintf(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"+8613800138000"},"secret":{"type":"sms-otp","transactionId":%q,"code":"123456"}}`, started.Data.TransactionID)
+	loginRecorder := httptest.NewRecorder()
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(loginJSON))
+	loginRequest.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(loginRecorder, loginRequest)
+
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("POST sms otp login status = %d body = %s", loginRecorder.Code, loginRecorder.Body.String())
+	}
+	var login authLoginTestPayload
+	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &login); err != nil {
+		t.Fatalf("decode sms otp login: %v body = %s", err, loginRecorder.Body.String())
+	}
+	if login.Data.Principal.User.Username != "admin" {
+		t.Fatalf("sms otp principal = %+v, want admin", login.Data.Principal)
+	}
+
+	reuseRecorder := httptest.NewRecorder()
+	reuseRequest := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(loginJSON))
+	reuseRequest.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(reuseRecorder, reuseRequest)
+
+	if reuseRecorder.Code != http.StatusUnauthorized || !strings.Contains(reuseRecorder.Body.String(), "AUTH_INVALID_CREDENTIALS") {
+		t.Fatalf("POST reused sms otp login = %d body = %s, want one-time invalid credentials", reuseRecorder.Code, reuseRecorder.Body.String())
+	}
+}
+
+func TestCredentialAuthSMSOTPRequiresEnabledIdentifier(t *testing.T) {
+	t.Run("start rejects disabled phone identifier", func(t *testing.T) {
+		runtime, sender := credentialAuthRuntimeForTest(t)
+		if _, err := runtime.Service.RegisterIdentifier(context.Background(), credentialauth.RegisterIdentifierInput{
+			Principal:  credentialauth.PrincipalRef{Type: credentialauth.PrincipalTypeAdmin, ID: "admin"},
+			Identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypePhone, Value: "+8613800138000"},
+			Status:     credentialauth.StatusDisabled,
+		}); err != nil {
+			t.Fatalf("disable phone identifier: %v", err)
+		}
+		server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/api/auth/sms-otp/start", bytes.NewBufferString(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"+8613800138000"}}`))
+		request.Header.Set("Content-Type", "application/json")
+
+		server.Router().ServeHTTP(recorder, request)
+
+		if recorder.Code != http.StatusUnauthorized || !strings.Contains(recorder.Body.String(), "AUTH_INVALID_CREDENTIALS") {
+			t.Fatalf("POST sms otp start with disabled identifier = %d body = %s, want invalid credentials", recorder.Code, recorder.Body.String())
+		}
+		if sent := sender.Sent(); len(sent) != 0 {
+			t.Fatalf("sent sms = %+v, want no delivery for disabled identifier", sent)
+		}
+	})
+
+	t.Run("login rejects identifier disabled after transaction start", func(t *testing.T) {
+		runtime, _ := credentialAuthRuntimeForTest(t)
+		server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
+		startRecorder := httptest.NewRecorder()
+		startRequest := httptest.NewRequest(http.MethodPost, "/api/auth/sms-otp/start", bytes.NewBufferString(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"+8613800138000"}}`))
+		startRequest.Header.Set("Content-Type", "application/json")
+		server.Router().ServeHTTP(startRecorder, startRequest)
+		if startRecorder.Code != http.StatusCreated {
+			t.Fatalf("POST sms otp start status = %d body = %s", startRecorder.Code, startRecorder.Body.String())
+		}
+		var started credentialAuthSMSOTPStartTestPayload
+		if err := json.Unmarshal(startRecorder.Body.Bytes(), &started); err != nil {
+			t.Fatalf("decode sms otp start: %v body = %s", err, startRecorder.Body.String())
+		}
+		if _, err := runtime.Service.RegisterIdentifier(context.Background(), credentialauth.RegisterIdentifierInput{
+			Principal:  credentialauth.PrincipalRef{Type: credentialauth.PrincipalTypeAdmin, ID: "admin"},
+			Identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypePhone, Value: "+8613800138000"},
+			Status:     credentialauth.StatusDisabled,
+		}); err != nil {
+			t.Fatalf("disable phone identifier: %v", err)
+		}
+		loginJSON := fmt.Sprintf(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"+8613800138000"},"secret":{"type":"sms-otp","transactionId":%q,"code":"123456"}}`, started.Data.TransactionID)
+		loginRecorder := httptest.NewRecorder()
+		loginRequest := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(loginJSON))
+		loginRequest.Header.Set("Content-Type", "application/json")
+
+		server.Router().ServeHTTP(loginRecorder, loginRequest)
+
+		if loginRecorder.Code != http.StatusUnauthorized || !strings.Contains(loginRecorder.Body.String(), "AUTH_INVALID_CREDENTIALS") {
+			t.Fatalf("POST sms otp login with disabled identifier = %d body = %s, want invalid credentials", loginRecorder.Code, loginRecorder.Body.String())
+		}
+	})
 }
 
 func TestAuthLoginWithDemoProviderReturnsRoleBackedSessionToken(t *testing.T) {
@@ -7220,6 +7416,79 @@ func configuredAdminOIDCPlatformManifests(t *testing.T) []capability.Manifest {
 		}
 	}
 	return manifests
+}
+
+func configuredCredentialAuthManifestsForTest(t *testing.T) []capability.Manifest {
+	t.Helper()
+	manifests := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit", "notification", "credential-auth"})
+	configured := map[string]struct{}{
+		"username-password": {},
+		"phone-password":    {},
+		"email-password":    {},
+		"phone-sms-otp":     {},
+	}
+	for manifestIndex := range manifests {
+		for providerIndex := range manifests[manifestIndex].AuthProviders {
+			if _, ok := configured[manifests[manifestIndex].AuthProviders[providerIndex].ID]; ok {
+				manifests[manifestIndex].AuthProviders[providerIndex].Configured = true
+			}
+		}
+	}
+	return manifests
+}
+
+func credentialAuthRuntimeForTest(t *testing.T) (*CredentialAuthRuntime, *notification.MockLocalSMSSender) {
+	t.Helper()
+	hasher, err := credentialauth.NewHMACIdentifierHasher([]byte(strings.Repeat("k", 32)))
+	if err != nil {
+		t.Fatalf("NewHMACIdentifierHasher() error = %v", err)
+	}
+	params := credentialauth.Argon2idParams{MemoryKiB: 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32}
+	service, err := credentialauth.NewService(credentialauth.Options{
+		Repository:       credentialauth.NewMemoryRepository(),
+		IdentifierHasher: hasher,
+		PasswordVerifier: credentialauth.NewArgon2idVerifier(params),
+		Now:              func() time.Time { return time.Date(2026, 7, 19, 9, 0, 0, 0, time.UTC) },
+	})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	principal := credentialauth.PrincipalRef{Type: credentialauth.PrincipalTypeAdmin, ID: "admin"}
+	for _, identifier := range []credentialauth.Identifier{
+		{Type: credentialauth.IdentifierTypeUsername, Value: "admin"},
+		{Type: credentialauth.IdentifierTypePhone, Value: "+8613800138000"},
+		{Type: credentialauth.IdentifierTypeEmail, Value: "admin@example.test"},
+	} {
+		if _, err := service.RegisterIdentifier(context.Background(), credentialauth.RegisterIdentifierInput{Principal: principal, Identifier: identifier, Status: credentialauth.StatusEnabled}); err != nil {
+			t.Fatalf("RegisterIdentifier(%s) error = %v", identifier.Type, err)
+		}
+	}
+	hash, err := credentialauth.HashPasswordArgon2id("correct-password", params)
+	if err != nil {
+		t.Fatalf("HashPasswordArgon2id() error = %v", err)
+	}
+	if err := service.PutPasswordCredential(context.Background(), credentialauth.PasswordCredential{
+		Principal:     principal,
+		PasswordHash:  hash,
+		Algorithm:     credentialauth.PasswordAlgorithmArgon2id,
+		ParamsVersion: "test-v1",
+		Status:        credentialauth.StatusEnabled,
+	}); err != nil {
+		t.Fatalf("PutPasswordCredential() error = %v", err)
+	}
+	sender := notification.NewMockLocalSMSSender()
+	return &CredentialAuthRuntime{
+		Service:           service,
+		IdentifierHasher:  hasher,
+		SMSOTPHasher:      hasher,
+		SMSSender:         sender,
+		LoginTemplateID:   "login-template",
+		DebugCodeEnabled:  true,
+		CodeGenerator:     func() (string, error) { return "123456", nil },
+		Now:               func() time.Time { return time.Date(2026, 7, 19, 9, 0, 0, 0, time.UTC) },
+		SMSOTPTTL:         5 * time.Minute,
+		MaxSMSOTPAttempts: credentialauth.DefaultMaxSMSOTPAttempts,
+	}, sender
 }
 
 func authProviderByIDForTest(t *testing.T, manifests []capability.Manifest, providerID string) capability.AuthProvider {

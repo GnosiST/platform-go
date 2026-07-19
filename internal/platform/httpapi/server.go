@@ -55,6 +55,7 @@ type ServerOptions struct {
 	AppRoutes                []AppRouteRegistration
 	AdminIdentityResolver    AdminIdentityResolver
 	AdminIdentityBindings    AdminIdentityBindingStore
+	CredentialAuth           *CredentialAuthRuntime
 	AppIdentityResolver      AppIdentityResolver
 	AppIdentityBindings      AppIdentityBindingStore
 	PhoneProtector           PhoneProtector
@@ -135,6 +136,7 @@ type Server struct {
 	appRoutes                map[appRouteKey]gin.HandlerFunc
 	adminIdentityResolver    AdminIdentityResolver
 	adminIdentityBindings    AdminIdentityBindingStore
+	credentialAuth           *CredentialAuthRuntime
 	appIdentityResolver      AppIdentityResolver
 	appIdentityBindings      AppIdentityBindingStore
 	phoneProtector           PhoneProtector
@@ -272,6 +274,7 @@ func New(options ServerOptions) *Server {
 		fileCleanupSink:          fileCleanupSink,
 		adminIdentityResolver:    options.AdminIdentityResolver,
 		adminIdentityBindings:    adminIdentityBindings,
+		credentialAuth:           options.CredentialAuth,
 		appIdentityResolver:      options.AppIdentityResolver,
 		appIdentityBindings:      appIdentityBindings,
 		phoneProtector:           options.PhoneProtector,
@@ -320,6 +323,7 @@ func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 	api.GET("/platform/cache/stats", s.platformCacheStats)
 	api.GET("/auth/providers", s.authProviders)
 	api.POST("/auth/providers/:provider/start", s.authProviderStart)
+	api.POST("/auth/sms-otp/start", s.credentialAuthSMSOTPStart)
 	api.POST("/auth/login", s.authLogin)
 	api.POST("/auth/refresh", s.authRefresh)
 	api.POST("/auth/logout", s.authLogout)
@@ -742,11 +746,14 @@ type authProviderListResponse struct {
 }
 
 type authLoginRequest struct {
-	Provider     string `json:"provider"`
-	Username     string `json:"username"`
-	Code         string `json:"code"`
-	State        string `json:"state"`
-	CodeVerifier string `json:"codeVerifier"`
+	Provider     string                          `json:"provider"`
+	Username     string                          `json:"username"`
+	Code         string                          `json:"code"`
+	State        string                          `json:"state"`
+	CodeVerifier string                          `json:"codeVerifier"`
+	Identifier   credentialAuthIdentifierRequest `json:"identifier"`
+	Secret       credentialAuthSecretRequest     `json:"secret"`
+	Challenge    credentialAuthChallengeRequest  `json:"challenge"`
 }
 
 type authLoginResponse struct {
@@ -933,6 +940,10 @@ func (s *Server) authLogin(ctx *gin.Context) {
 			return
 		}
 		s.issueAdminLogin(ctx, principal, provider)
+	case authProviderKindCredentialPassword:
+		s.credentialAuthPasswordLogin(ctx, provider, input)
+	case authProviderKindCredentialSMSOTP:
+		s.credentialAuthSMSOTPLogin(ctx, provider, input)
 	default:
 		writePlatformError(ctx, errorcode.CodeAuthProviderUnsupported)
 	}

@@ -176,7 +176,14 @@ function validateAdminOIDCOpenAPIContract(errors) {
   if (login?.operationId !== "adminAuthLogin" || !Array.isArray(login?.security) || login.security.length !== 0) {
     errors.push("admin OpenAPI must expose the public Admin login exchange operation");
   }
-  if (!start?.responses?.["501"] || !login?.responses?.["501"]) {
+  const smsOTPStart = openAPI.paths?.["/api/auth/sms-otp/start"]?.post;
+  if (smsOTPStart?.operationId !== "startAdminCredentialSMSOTP" || !Array.isArray(smsOTPStart?.security) || smsOTPStart.security.length !== 0) {
+    errors.push("admin OpenAPI must expose the public credential-auth SMS OTP start operation");
+  }
+  if (smsOTPStart?.["x-platform-runtime-status"] !== "dev-http-runtime-memory-bootstrap") {
+    errors.push("credential-auth SMS OTP OpenAPI operation must declare the development runtime status");
+  }
+  if (!start?.responses?.["501"] || !login?.responses?.["501"] || !smsOTPStart?.responses?.["501"]) {
     errors.push("admin OpenAPI auth operations must declare the missing resolver 501 response");
   }
   const startRequest = openAPI.components?.schemas?.AdminAuthProviderStartRequest;
@@ -203,6 +210,43 @@ function validateAdminOIDCOpenAPIContract(errors) {
   }
   if (loginRequest?.properties?.code?.writeOnly !== true) {
     errors.push("AdminAuthLoginRequest code must stay writeOnly");
+  }
+  if (
+    loginRequest?.properties?.identifier?.$ref !== "#/components/schemas/AdminCredentialAuthIdentifier" ||
+    loginRequest?.properties?.secret?.$ref !== "#/components/schemas/AdminCredentialAuthSecret" ||
+    loginRequest?.properties?.challenge?.$ref !== "#/components/schemas/AdminCredentialAuthChallengeProof"
+  ) {
+    errors.push("AdminAuthLoginRequest must include structured credential-auth identifier, secret and challenge fields");
+  }
+  const credentialSecret = openAPI.components?.schemas?.AdminCredentialAuthSecret;
+  if (
+    credentialSecret?.additionalProperties !== false ||
+    !credentialSecret?.properties?.type?.enum?.includes("password") ||
+    !credentialSecret?.properties?.type?.enum?.includes("sms-otp") ||
+    credentialSecret.properties?.value?.writeOnly !== true ||
+    credentialSecret.properties?.code?.writeOnly !== true
+  ) {
+    errors.push("AdminCredentialAuthSecret must constrain password and SMS OTP secrets as write-only request fields");
+  }
+  const smsStartRequest = openAPI.components?.schemas?.AdminCredentialSMSOTPStartRequest;
+  const smsStartData = openAPI.components?.schemas?.AdminCredentialSMSOTPStartData;
+  if (
+    smsStartRequest?.additionalProperties !== false ||
+    !smsStartRequest?.required?.includes("provider") ||
+    !smsStartRequest?.required?.includes("identifier") ||
+    smsStartRequest?.properties?.identifier?.$ref !== "#/components/schemas/AdminCredentialAuthIdentifier"
+  ) {
+    errors.push("AdminCredentialSMSOTPStartRequest must require provider and structured phone identifier");
+  }
+  if (
+    smsStartData?.additionalProperties !== false ||
+    !smsStartData?.required?.includes("transactionId") ||
+    !smsStartData?.required?.includes("maskedIdentifier") ||
+    !smsStartData?.required?.includes("expiresAt") ||
+    smsStartData?.properties?.debugCode?.["x-platform-development-only"] !== true ||
+    smsStartData?.properties?.debugCode?.["x-platform-sensitivity"] !== "secret"
+  ) {
+    errors.push("AdminCredentialSMSOTPStartData must expose transaction metadata and mark debugCode development-only secret");
   }
   const startData = openAPI.components?.schemas?.AdminAuthProviderStartData;
   const responseFields = Object.keys(startData?.properties ?? {});

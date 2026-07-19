@@ -90,12 +90,37 @@ export type AuthLoginInput = {
   code?: string;
   state?: string;
   codeVerifier?: string;
+  identifier?: {
+    type: "username" | "phone" | "email";
+    value: string;
+  };
+  secret?: {
+    type: "password" | "sms-otp";
+    value?: string;
+    transactionId?: string;
+    code?: string;
+  };
 };
 
 export type AuthProviderStartResult = {
   authorizationUrl: string;
   state: string;
   expiresAt: string;
+};
+
+export type CredentialSMSOTPStartInput = {
+  provider: string;
+  identifier: {
+    type: "phone";
+    value: string;
+  };
+};
+
+export type CredentialSMSOTPStartResult = {
+  transactionId: string;
+  maskedIdentifier: string;
+  expiresAt: string;
+  debugCode?: string;
 };
 
 export type AuthLoginResult = {
@@ -644,6 +669,14 @@ export function startAdminAuthProvider(provider: string, codeChallenge: string) 
     auth: "none",
     method: "POST",
     body: JSON.stringify({ codeChallenge }),
+  });
+}
+
+export function startCredentialSMSOTP(input: CredentialSMSOTPStartInput) {
+  return request<CredentialSMSOTPStartResult>("/auth/sms-otp/start", {
+    auth: "none",
+    method: "POST",
+    body: JSON.stringify(input),
   });
 }
 

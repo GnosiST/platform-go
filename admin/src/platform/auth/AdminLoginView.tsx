@@ -1,8 +1,11 @@
 import {
   CheckCircleOutlined,
   GlobalOutlined,
+  LockOutlined,
   LoadingOutlined,
   LoginOutlined,
+  MailOutlined,
+  PhoneOutlined,
   SafetyCertificateOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -10,9 +13,11 @@ import { Button, Form, Input, Space, Tooltip, Typography } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   loginWithAuthProvider,
+  startCredentialSMSOTP,
   type AdminCurrentSession,
   type AuthProvider,
   type BrandingConfig,
+  type CredentialSMSOTPStartResult,
 } from "../api/client";
 import type { Dictionary, Language } from "../i18n";
 import {
@@ -47,9 +52,19 @@ type AdminLoginViewProps = {
 
 type LoginFormValues = {
   username: string;
+  identifier: string;
+  password: string;
+  smsCode: string;
 };
 
 type CallbackPhase = "idle" | "processing" | "failed";
+type CredentialIdentifierType = "username" | "phone" | "email";
+type CredentialProviderMode = "password" | "sms-otp";
+
+type CredentialProviderSpec = {
+  identifierType: CredentialIdentifierType;
+  mode: CredentialProviderMode;
+};
 
 export function AdminLoginView({
   language,
@@ -66,6 +81,8 @@ export function AdminLoginView({
 }: AdminLoginViewProps) {
   const [selectedProviderID, setSelectedProviderID] = useState("demo");
   const [submitting, setSubmitting] = useState(false);
+  const [sendingSMSOTP, setSendingSMSOTP] = useState(false);
+  const [smsOTPTransaction, setSMSOTPTransaction] = useState<CredentialSMSOTPStartResult | null>(null);
   const [loginError, setLoginError] = useState("");
   const [callbackPhase, setCallbackPhase] = useState<CallbackPhase>("idle");
   const [callbackFailure, setCallbackFailure] = useState<OIDCCallbackFailure | "generic" | null>(null);
@@ -73,6 +90,7 @@ export function AdminLoginView({
   const submissionLockRef = useRef(createSubmissionLock());
   const loginHeadingRef = useRef<HTMLElement>(null);
   const errorHeadingRef = useRef<HTMLElement>(null);
+  const [form] = Form.useForm<LoginFormValues>();
   const adminProviders = useMemo(() => filterAdminAuthProviders(providers), [providers]);
   const selectedProvider = useMemo(
     () => adminProviders.find((provider) => provider.id === selectedProviderID) ?? adminProviders.find((provider) => provider.configured),
@@ -81,6 +99,7 @@ export function AdminLoginView({
   const productName = branding?.productName || "Platform Go";
   const shortName = branding?.shortName || productName;
   const targetLanguage = language === "zh" ? "en" : "zh";
+  const credentialSpec = credentialProviderSpec(selectedProvider);
 
   useEffect(() => {
     if (callbackPhase !== "idle" || !hasOIDCCallbackParams(search)) return;
@@ -109,7 +128,7 @@ export function AdminLoginView({
 
   const submit = async (values: LoginFormValues) => {
     if (!submissionLockRef.current.acquire()) return;
-    if (!selectedProvider?.configured || selectedProvider.kind !== "demo") {
+    if (!selectedProvider?.configured) {
       submissionLockRef.current.release();
       setLoginError(dictionary.loginProviderUnavailable);
       return;
@@ -117,16 +136,55 @@ export function AdminLoginView({
     setSubmitting(true);
     setLoginError("");
     try {
-      const result = await loginWithAuthProvider({
-        provider: selectedProvider.id,
-        username: values.username,
-      });
+      let result;
+      if (selectedProvider.kind === "demo") {
+        result = await loginWithAuthProvider({
+          provider: selectedProvider.id,
+          username: values.username,
+        });
+      } else if (credentialSpec?.mode === "password") {
+        result = await loginWithAuthProvider({
+          provider: selectedProvider.id,
+          identifier: { type: credentialSpec.identifierType, value: values.identifier },
+          secret: { type: "password", value: values.password },
+        });
+      } else if (credentialSpec?.mode === "sms-otp") {
+        if (!smsOTPTransaction?.transactionId) throw new Error(dictionary.loginSMSCodeRequired);
+        result = await loginWithAuthProvider({
+          provider: selectedProvider.id,
+          identifier: { type: "phone", value: values.identifier },
+          secret: { type: "sms-otp", transactionId: smsOTPTransaction.transactionId, code: values.smsCode },
+        });
+      } else {
+        throw new Error(dictionary.loginProviderUnavailable);
+      }
       onLoginSuccess(result.principal);
     } catch (nextError) {
       setLoginError(nextError instanceof Error ? nextError.message : dictionary.loginFailed);
     } finally {
       submissionLockRef.current.release();
       setSubmitting(false);
+    }
+  };
+
+  const sendSMSOTP = async () => {
+    if (!selectedProvider?.configured || credentialSpec?.mode !== "sms-otp") {
+      setLoginError(dictionary.loginProviderUnavailable);
+      return;
+    }
+    try {
+      const values = await form.validateFields(["identifier"]);
+      setSendingSMSOTP(true);
+      setLoginError("");
+      const transaction = await startCredentialSMSOTP({
+        provider: selectedProvider.id,
+        identifier: { type: "phone", value: values.identifier },
+      });
+      setSMSOTPTransaction(transaction);
+    } catch (nextError) {
+      setLoginError(nextError instanceof Error ? nextError.message : dictionary.loginSMSStartFailed);
+    } finally {
+      setSendingSMSOTP(false);
     }
   };
 
@@ -213,6 +271,8 @@ export function AdminLoginView({
                     onClick={() => {
                       clearPendingOIDCLogin();
                       setLoginError("");
+                      setSMSOTPTransaction(null);
+                      form.resetFields();
                       setSelectedProviderID(provider.id);
                     }}
                   >
@@ -228,6 +288,7 @@ export function AdminLoginView({
 
             {selectedProvider && selectedProvider.kind === "demo" ? (
               <Form<LoginFormValues>
+                form={form}
                 layout="vertical"
                 initialValues={{ username: "admin" }}
                 requiredMark={false}
@@ -248,6 +309,89 @@ export function AdminLoginView({
                   loading={submitting}
                   type="primary"
                   disabled={!selectedProvider.configured || loading || submitting}
+                >
+                  {dictionary.login}
+                </Button>
+              </Form>
+            ) : null}
+
+            {selectedProvider && credentialSpec?.mode === "password" ? (
+              <Form<LoginFormValues>
+                form={form}
+                layout="vertical"
+                requiredMark={false}
+                onFinish={submit}
+              >
+                <Form.Item
+                  label={credentialIdentifierLabel(dictionary, credentialSpec.identifierType)}
+                  name="identifier"
+                  rules={[{ required: true, message: credentialIdentifierRequired(dictionary, credentialSpec.identifierType) }]}
+                >
+                  <Input prefix={credentialIdentifierIcon(credentialSpec.identifierType)} autoComplete={credentialIdentifierAutocomplete(credentialSpec.identifierType)} placeholder={credentialIdentifierPlaceholder(dictionary, credentialSpec.identifierType)} />
+                </Form.Item>
+                <Form.Item
+                  label={dictionary.loginPassword}
+                  name="password"
+                  rules={[{ required: true, message: dictionary.loginPasswordRequired }]}
+                >
+                  <Input.Password prefix={<LockOutlined />} autoComplete="current-password" placeholder={dictionary.loginPasswordCredentialPlaceholder} />
+                </Form.Item>
+                <Button
+                  block
+                  className="login-submit"
+                  htmlType="submit"
+                  icon={<LoginOutlined />}
+                  loading={submitting}
+                  type="primary"
+                  disabled={!selectedProvider.configured || loading || submitting}
+                >
+                  {dictionary.login}
+                </Button>
+              </Form>
+            ) : null}
+
+            {selectedProvider && credentialSpec?.mode === "sms-otp" ? (
+              <Form<LoginFormValues>
+                form={form}
+                layout="vertical"
+                requiredMark={false}
+                onFinish={submit}
+              >
+                <Form.Item
+                  label={dictionary.loginPhone}
+                  name="identifier"
+                  rules={[{ required: true, message: dictionary.loginPhoneRequired }]}
+                >
+                  <Input prefix={<PhoneOutlined />} autoComplete="tel" placeholder={dictionary.loginPhonePlaceholder} />
+                </Form.Item>
+                <Form.Item label={dictionary.loginSMSCode} required>
+                  <Space.Compact className="login-sms-code-row">
+                    <Form.Item
+                      noStyle
+                      name="smsCode"
+                      rules={[{ required: true, message: dictionary.loginSMSCodeRequired }]}
+                    >
+                      <Input inputMode="numeric" autoComplete="one-time-code" placeholder={dictionary.loginSMSCodePlaceholder} />
+                    </Form.Item>
+                    <Button loading={sendingSMSOTP} disabled={loading || submitting || sendingSMSOTP} onClick={() => void sendSMSOTP()}>
+                      {sendingSMSOTP ? dictionary.loginSMSSending : dictionary.loginSMSSendCode}
+                    </Button>
+                  </Space.Compact>
+                </Form.Item>
+                {smsOTPTransaction ? (
+                  <Typography.Text className="login-sms-status" type="secondary">
+                    {dictionary.loginSMSSentTo.replace("{destination}", smsOTPTransaction.maskedIdentifier)}
+                    {smsOTPTransaction.debugCode ? ` ${smsOTPTransaction.debugCode}` : ""}
+                  </Typography.Text>
+                ) : null}
+                <Button
+                  block
+                  className="login-submit"
+                  htmlType="submit"
+                  icon={<LoginOutlined />}
+                  loading={submitting}
+                  type="primary"
+                  disabled={!selectedProvider.configured || loading || submitting || !smsOTPTransaction}
                 >
                   {dictionary.login}
                 </Button>
@@ -337,4 +481,47 @@ function themeLabel(dictionary: Dictionary, themeName: ThemeName) {
     warm: dictionary.themeWarm,
   };
   return labels[themeName];
+}
+
+function credentialProviderSpec(provider?: AuthProvider): CredentialProviderSpec | null {
+  if (!provider) return null;
+  if (provider.kind === "credential-password") {
+    if (provider.id === "username-password") return { identifierType: "username", mode: "password" };
+    if (provider.id === "phone-password") return { identifierType: "phone", mode: "password" };
+    if (provider.id === "email-password") return { identifierType: "email", mode: "password" };
+  }
+  if (provider.kind === "credential-sms-otp" && provider.id === "phone-sms-otp") {
+    return { identifierType: "phone", mode: "sms-otp" };
+  }
+  return null;
+}
+
+function credentialIdentifierLabel(dictionary: Dictionary, type: CredentialIdentifierType) {
+  if (type === "phone") return dictionary.loginPhone;
+  if (type === "email") return dictionary.loginEmail;
+  return dictionary.loginUsername;
+}
+
+function credentialIdentifierRequired(dictionary: Dictionary, type: CredentialIdentifierType) {
+  if (type === "phone") return dictionary.loginPhoneRequired;
+  if (type === "email") return dictionary.loginEmailRequired;
+  return dictionary.loginUsernameRequired;
+}
+
+function credentialIdentifierPlaceholder(dictionary: Dictionary, type: CredentialIdentifierType) {
+  if (type === "phone") return dictionary.loginPhonePlaceholder;
+  if (type === "email") return dictionary.loginEmailPlaceholder;
+  return dictionary.loginUsernamePlaceholder;
+}
+
+function credentialIdentifierAutocomplete(type: CredentialIdentifierType) {
+  if (type === "phone") return "tel";
+  if (type === "email") return "email";
+  return "username";
+}
+
+function credentialIdentifierIcon(type: CredentialIdentifierType) {
+  if (type === "phone") return <PhoneOutlined />;
+  if (type === "email") return <MailOutlined />;
+  return <UserOutlined />;
 }
