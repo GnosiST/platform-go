@@ -2,7 +2,9 @@ package credentialauth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -259,8 +261,8 @@ func TestServiceCreatesCredentialChallengeWithDigestAndConsumesProof(t *testing.
 			}
 			return ChallengeMaterial{
 				Prompt:     "Move the slider.",
-				Parameters: map[string]string{"targetOffset": "72", "unit": "px"},
-				Proof:      "72",
+				Parameters: map[string]string{"tileX": "5", "unit": "px"},
+				Proof:      "x=72&y=14",
 			}, nil
 		},
 		Now: func() time.Time { return now },
@@ -278,25 +280,31 @@ func TestServiceCreatesCredentialChallengeWithDigestAndConsumesProof(t *testing.
 	if err != nil {
 		t.Fatalf("CreateCredentialChallenge() error = %v", err)
 	}
-	if created.ChallengeID != "challenge-fixed" || created.Kind != ChallengeKindSlider || created.Proof != "72" || created.Parameters["targetOffset"] != "72" || !created.ExpiresAt.Equal(now.Add(2*time.Minute)) {
+	if _, ok := reflect.TypeOf(CreatedCredentialChallenge{}).FieldByName("Proof"); ok {
+		t.Fatal("CreatedCredentialChallenge must not expose server proof")
+	}
+	if created.ChallengeID != "challenge-fixed" || created.Kind != ChallengeKindSlider || created.Parameters["tileX"] != "5" || created.Parameters["targetOffset"] != "" || !created.ExpiresAt.Equal(now.Add(2*time.Minute)) {
 		t.Fatalf("created challenge = %+v, want fixed slider material", created)
+	}
+	encoded, err := json.Marshal(created)
+	if err != nil {
+		t.Fatalf("marshal created challenge: %v", err)
+	}
+	if strings.Contains(string(encoded), "x=72&y=14") || strings.Contains(string(encoded), "targetOffset") {
+		t.Fatalf("created challenge leaked proof material: %s", encoded)
 	}
 	stored, ok, err := repository.CredentialChallenge(ctx, "challenge-fixed")
 	if err != nil || !ok {
 		t.Fatalf("CredentialChallenge() = %+v, %v, %v; want stored challenge", stored, ok, err)
 	}
-	if stored.AnswerDigest == "72" || !strings.HasPrefix(stored.AnswerDigest, challengeProofHashPrefix) || stored.ClientFingerprintHash != "fingerprint-hash" {
+	if stored.AnswerDigest == "x=72&y=14" || !strings.HasPrefix(stored.AnswerDigest, challengeProofHashPrefix) || stored.ClientFingerprintHash != "fingerprint-hash" {
 		t.Fatalf("stored challenge = %+v, want digest and fingerprint binding", stored)
-	}
-	digest, err := hasher.HashChallengeProof(ChallengeKindSlider, ChallengePurposeLogin, "challenge-fixed", "72")
-	if err != nil {
-		t.Fatalf("HashChallengeProof() error = %v", err)
 	}
 	if err := service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
 		ChallengeID:           "challenge-fixed",
 		Kind:                  ChallengeKindSlider,
 		Purpose:               ChallengePurposeLogin,
-		AnswerDigest:          digest,
+		Proof:                 "x=72&y=14",
 		ClientFingerprintHash: "fingerprint-hash",
 	}); err != nil {
 		t.Fatalf("VerifyCredentialChallenge() error = %v", err)
@@ -305,10 +313,125 @@ func TestServiceCreatesCredentialChallengeWithDigestAndConsumesProof(t *testing.
 		ChallengeID:           "challenge-fixed",
 		Kind:                  ChallengeKindSlider,
 		Purpose:               ChallengePurposeLogin,
-		AnswerDigest:          digest,
+		Proof:                 "x=72&y=14",
 		ClientFingerprintHash: "fingerprint-hash",
 	}); !errors.Is(err, ErrChallengeConsumed) {
 		t.Fatalf("VerifyCredentialChallenge(reuse) error = %v, want ErrChallengeConsumed", err)
+	}
+}
+
+func TestGoCaptchaSlideChallengeDoesNotExposeProofAndRequiresCoordinates(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 7, 19, 10, 0, 0, 0, time.UTC)
+	repository := NewMemoryRepository()
+	hasher, err := NewHMACIdentifierHasher([]byte(strings.Repeat("i", 32)))
+	if err != nil {
+		t.Fatalf("NewHMACIdentifierHasher() error = %v", err)
+	}
+	generator, err := NewGoCaptchaSlideMaterialGenerator(GoCaptchaSlideOptions{
+		ImageWidth:   240,
+		ImageHeight:  160,
+		GraphSizeMin: 42,
+		GraphSizeMax: 48,
+	})
+	if err != nil {
+		t.Fatalf("NewGoCaptchaSlideMaterialGenerator() error = %v", err)
+	}
+	serverProof := ""
+	service, err := NewService(Options{
+		Repository:           repository,
+		ChallengeProofHasher: hasher,
+		ChallengeIDGenerator: func() (string, error) { return "go-captcha-slide-fixed", nil },
+		ChallengeMaterialGenerator: func(kind ChallengeKind) (ChallengeMaterial, error) {
+			material, err := generator(kind)
+			if err == nil {
+				serverProof = material.Proof
+			}
+			return material, err
+		},
+		Now: func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+
+	created, err := service.CreateCredentialChallenge(ctx, CreateCredentialChallengeInput{
+		Kind:    ChallengeKindSlider,
+		Purpose: ChallengePurposeLogin,
+	})
+	if err != nil {
+		t.Fatalf("CreateCredentialChallenge() error = %v", err)
+	}
+	if serverProof == "" {
+		t.Fatal("go-captcha slide generator did not produce a server proof")
+	}
+	if created.Kind != ChallengeKindSlider || created.Prompt == "" || created.Parameters["masterImage"] == "" || created.Parameters["tileImage"] == "" {
+		t.Fatalf("created go-captcha challenge = %+v, want slide display material", created)
+	}
+	if !strings.HasPrefix(created.Parameters["masterImage"], "data:image/jpeg;base64,") || !strings.HasPrefix(created.Parameters["tileImage"], "data:image/png;base64,") {
+		t.Fatalf("created image parameters = %+v, want data URLs", created.Parameters)
+	}
+	if created.Parameters["imageWidth"] != "240" || created.Parameters["imageHeight"] != "160" || created.Parameters["proofFormat"] == "" {
+		t.Fatalf("created slide parameters = %+v, want display metadata", created.Parameters)
+	}
+	for _, forbidden := range []string{"proof", "answer", "targetX", "targetY", "targetOffset"} {
+		if _, ok := created.Parameters[forbidden]; ok {
+			t.Fatalf("created parameters exposed %q: %+v", forbidden, created.Parameters)
+		}
+	}
+	encoded, err := json.Marshal(created)
+	if err != nil {
+		t.Fatalf("marshal go-captcha challenge: %v", err)
+	}
+	if strings.Contains(string(encoded), serverProof) {
+		t.Fatalf("created go-captcha challenge leaked proof %q in %s", serverProof, encoded)
+	}
+
+	if err := service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
+		ChallengeID: "go-captcha-slide-fixed",
+		Kind:        ChallengeKindSlider,
+		Purpose:     ChallengePurposeLogin,
+		Proof:       "x=0&y=0",
+	}); !errors.Is(err, ErrChallengeRejected) {
+		t.Fatalf("VerifyCredentialChallenge(wrong coordinates) error = %v, want ErrChallengeRejected", err)
+	}
+	stored, ok, err := repository.CredentialChallenge(ctx, "go-captcha-slide-fixed")
+	if err != nil || !ok || stored.Attempts != 1 || !stored.UsedAt.IsZero() {
+		t.Fatalf("stored challenge after wrong proof = %+v, %v, %v; want one rejected attempt", stored, ok, err)
+	}
+	if err := service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
+		ChallengeID: "go-captcha-slide-fixed",
+		Kind:        ChallengeKindSlider,
+		Purpose:     ChallengePurposeLogin,
+		Proof:       serverProof,
+	}); err != nil {
+		t.Fatalf("VerifyCredentialChallenge(correct coordinates) error = %v", err)
+	}
+}
+
+func TestDefaultChallengeMaterialDoesNotExposeProof(t *testing.T) {
+	for _, kind := range []ChallengeKind{ChallengeKindCaptcha, ChallengeKindSlider} {
+		t.Run(string(kind), func(t *testing.T) {
+			material, err := defaultChallengeMaterial(kind)
+			if err != nil {
+				t.Fatalf("defaultChallengeMaterial(%q) error = %v", kind, err)
+			}
+			if material.Proof == "" || material.Prompt == "" {
+				t.Fatalf("defaultChallengeMaterial(%q) = %+v, want proof and prompt for server use", kind, material)
+			}
+			for _, forbidden := range []string{"text", "proof", "answer", "targetX", "targetY", "targetOffset"} {
+				if _, ok := material.Parameters[forbidden]; ok {
+					t.Fatalf("defaultChallengeMaterial(%q) exposed %q: %+v", kind, forbidden, material.Parameters)
+				}
+			}
+			encoded, err := json.Marshal(material.Parameters)
+			if err != nil {
+				t.Fatalf("marshal default material parameters: %v", err)
+			}
+			if strings.Contains(string(encoded), material.Proof) {
+				t.Fatalf("defaultChallengeMaterial(%q) leaked proof %q in %s", kind, material.Proof, encoded)
+			}
+		})
 	}
 }
 

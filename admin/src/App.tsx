@@ -32,6 +32,7 @@ import { APIDocsPage } from "./platform/api-docs/APIDocsPage";
 import { DemoDataConsole } from "./platform/demo-data/DemoDataConsole";
 import { DashboardHome } from "./platform/dashboard/DashboardHome";
 import { AdminLoginView } from "./platform/auth/AdminLoginView";
+import { LoggingCenterConsole } from "./platform/logging-center/LoggingCenterConsole";
 import { MessageCenterConsole } from "./platform/message-center/MessageCenterConsole";
 import { PolicyReviewConsole } from "./platform/policy-review/PolicyReviewConsole";
 import { SettingsCenterConsole } from "./platform/settings/SettingsCenterConsole";
@@ -39,7 +40,12 @@ import {
   projectRoleManagementNavigation,
   resolveRoleManagementActiveRoute,
 } from "./platform/resources/roleManagementNavigation";
-import { coreResources, type AdminResourceDefinition } from "./platform/resources/registry";
+import {
+  coreResources,
+  isLoggingCenterResourceRoute,
+  projectLoggingCenterResource,
+  type AdminResourceDefinition,
+} from "./platform/resources/registry";
 import { ResourceRoutePage } from "./platform/refine/ResourceRoutePage";
 import {
   SensitiveRevealOIDCCallbackError,
@@ -70,7 +76,7 @@ export default function App() {
 
 function PlatformApp() {
   const [capabilityItems, setCapabilityItems] = useState<CapabilityItem[]>([]);
-  const [resources, setResources] = useState<AdminResourceDefinition[]>(coreResources);
+  const [resources, setResources] = useState<AdminResourceDefinition[]>(() => projectLoggingCenterResource(coreResources));
   const [permissions, setPermissions] = useState<string[]>(["*"]);
   const [deniedPermissions, setDeniedPermissions] = useState<string[]>([]);
   const [session, setSession] = useState<AdminCurrentSession | null>(null);
@@ -92,6 +98,7 @@ function PlatformApp() {
   const location = useLocation();
   const navigate = useNavigate();
   const activeRoute = routeFromPathname(location.pathname);
+  const hasAuthToken = Boolean(getAuthToken());
 
   const dictionary = dictionaries[language];
   const capabilities = useMemo(() => enrichCapabilities(capabilityItems), [capabilityItems]);
@@ -150,7 +157,7 @@ function PlatformApp() {
       setDeniedPermissions([]);
       setCapabilityItems([]);
       setPluginManagementStatus(null);
-      setResources(coreResources);
+      setResources(projectLoggingCenterResource(coreResources));
       setSessionExpired(true);
       setSensitiveRevealOIDCResume(null);
       clearPendingSensitiveRevealOIDC();
@@ -188,7 +195,7 @@ function PlatformApp() {
     ])
       .then(([items, menus, session, nextBranding, nextPluginManagementStatus]) => {
         setCapabilityItems(items);
-        setResources(menus.items.map(menuItemToResourceDefinition));
+        setResources(projectLoggingCenterResource(menus.items.map(menuItemToResourceDefinition)));
         setPermissions(session.permissions);
         setDeniedPermissions(session.deniedPermissions ?? []);
         setSession(session);
@@ -218,7 +225,7 @@ function PlatformApp() {
       setSession(null);
       setPermissions([]);
       setDeniedPermissions([]);
-      setResources(coreResources);
+      setResources(projectLoggingCenterResource(coreResources));
       setPluginManagementStatus(null);
       setSensitiveRevealOIDCResume(null);
       setSensitiveRevealOIDCCallbackPending(false);
@@ -311,6 +318,16 @@ function PlatformApp() {
   }, [dictionary.sensitiveRevealVerificationFailed, location.hash, location.pathname, location.search, navigate, sensitiveRevealOIDCCallbackPending]);
 
   if (sensitiveRevealOIDCCallbackPending) {
+    return (
+      <PlatformRefineRuntime resources={refineResources} language={language} themeName={themeName} customPrimary={uiConfig.customPrimary}>
+        <div className="loading-panel" aria-live="polite">
+          <Spin />
+        </div>
+      </PlatformRefineRuntime>
+    );
+  }
+
+  if (hasAuthToken && loading && !session) {
     return (
       <PlatformRefineRuntime resources={refineResources} language={language} themeName={themeName} customPrimary={uiConfig.customPrimary}>
         <div className="loading-panel" aria-live="polite">
@@ -426,6 +443,7 @@ function PlatformRoutePages({
 }) {
   const policyReviewResource = resources.find((resource) => resource.route === "/policy-reviews");
   const hasMessageCenter = resources.some((resource) => resource.route === "/message-center" || isMessageCenterResourceRoute(resource.route));
+  const hasLoggingCenter = resources.some((resource) => resource.route === "/logging-center" || isLoggingCenterResourceRoute(resource.route));
   const resourceRoutes = resources.filter((resource) => isInternalResourceRoute(resource) && !isCustomRoute(resource.route) && resource.route !== "/policy-reviews");
 
   return (
@@ -477,6 +495,19 @@ function PlatformRoutePages({
           path="/message-center"
           element={(
             <MessageCenterConsole
+              language={language}
+              dictionary={dictionary}
+              resources={resources}
+              onRouteChange={onRouteChange}
+            />
+          )}
+        />
+      ) : null}
+      {hasLoggingCenter ? (
+        <Route
+          path="/logging-center"
+          element={(
+            <LoggingCenterConsole
               language={language}
               dictionary={dictionary}
               resources={resources}
@@ -639,7 +670,7 @@ function resourceDefinitionToRefineResource(resource: AdminResourceDefinition): 
 }
 
 function isCustomRoute(route: string) {
-  return route === "/overview" || route === "/capabilities" || route === "/demo-data" || route === "/api-docs" || route === "/settings" || route === "/message-center";
+  return route === "/overview" || route === "/capabilities" || route === "/demo-data" || route === "/api-docs" || route === "/settings" || route === "/message-center" || route === "/logging-center";
 }
 
 function isMessageCenterResourceRoute(route: string) {

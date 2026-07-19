@@ -97,7 +97,6 @@ type CreatedCredentialChallenge struct {
 	Purpose     ChallengePurpose
 	Prompt      string
 	Parameters  map[string]string
-	Proof       string
 	ExpiresAt   time.Time
 }
 
@@ -370,7 +369,6 @@ func (s *Service) CreateCredentialChallenge(ctx context.Context, input CreateCre
 		Purpose:     purpose,
 		Prompt:      material.Prompt,
 		Parameters:  cloneStringMap(material.Parameters),
-		Proof:       material.Proof,
 		ExpiresAt:   now.Add(ttl),
 	}, nil
 }
@@ -511,25 +509,13 @@ func samePrincipal(first PrincipalRef, second PrincipalRef) bool {
 func defaultChallengeMaterial(kind ChallengeKind) (ChallengeMaterial, error) {
 	switch kind {
 	case ChallengeKindCaptcha:
-		proof, err := randomChallengeToken(6)
-		if err != nil {
-			return ChallengeMaterial{}, err
-		}
-		return ChallengeMaterial{
-			Prompt:     "Enter the displayed verification text.",
-			Parameters: map[string]string{"text": proof},
-			Proof:      proof,
-		}, nil
+		return defaultTextCaptchaMaterial()
 	case ChallengeKindSlider:
-		offset, err := randomSliderOffset()
+		generator, err := NewGoCaptchaSlideMaterialGenerator(GoCaptchaSlideOptions{})
 		if err != nil {
 			return ChallengeMaterial{}, err
 		}
-		return ChallengeMaterial{
-			Prompt:     "Move the slider to the target offset.",
-			Parameters: map[string]string{"targetOffset": offset, "unit": "px"},
-			Proof:      offset,
-		}, nil
+		return generator(kind)
 	default:
 		return ChallengeMaterial{}, fmt.Errorf("%w: challenge kind is invalid", ErrInvalidInput)
 	}

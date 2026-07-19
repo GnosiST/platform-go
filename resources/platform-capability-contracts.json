@@ -136,11 +136,11 @@
       "profilePolicy": "default-enabled",
       "source": { "kind": "core-manifest", "package": "internal/platform/core" },
       "ownership": "platform-core",
-      "boundary": "Operation, login and error audit records shared across platform capabilities. Business audit extensions must attach explicitly.",
+      "boundary": "Operation, request, login and error audit records shared across platform capabilities. Business audit extensions must attach explicitly.",
       "replaceability": "replace-through-audit-adapter",
       "requiredInProfiles": ["platform-default"],
       "dependencies": ["identity", "tenant"],
-      "adminResources": ["audit-logs", "error-logs", "login-logs"],
+      "adminResources": ["audit-logs", "error-logs", "login-logs", "request-logs"],
       "docs": ["docs/platform-capability-development.md", "docs/platform-foundation-task-map.md"]
     },
     {
@@ -352,6 +352,7 @@
           }
         ],
         "credentialPolicy": "Provider credentials, app secrets, webhook secrets and raw vendor errors must be encrypted, masked or omitted by field policy.",
+        "sendPolicyLimitRuntime": "runtime-active: notification-send-policies.rateLimitPerMinute, notification-channels.rateLimitPerMinute and notification-channels.dailyQuota are enforced through ratelimit.OperationMessageCenterDelivery before message-center test sends and delivery-worker attempts. Rate-limit keys use tenant/channel/provider/template/purpose/actor/client dimensions and must not include raw recipients, OTP codes or template parameter values. Retry backoff, quiet-hour scheduling and per-supplier quota reconciliation remain follow-up runtime slices.",
         "restartPolicy": "Notification provider/channel/template/policy settings save with audit and are marked restartRequired/pendingRestart because sender adapters are process-runtime inputs in v1.1.",
         "runtimeBoundary": "v1 proves the product configuration contract, SMS mock-local sender, non-network SMS dry-run, official SDK-backed Aliyun/Tencent Cloud live SMS adapters, and local dry-run receipts for in-app, email, WeChat official account and WeChat miniapp test-send flows; concrete SMTP and WeChat send adapters remain follow-up runtime slices for external supplier delivery."
       },

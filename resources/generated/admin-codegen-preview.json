@@ -2,7 +2,7 @@
   "generatedBy": "scripts/generate-admin-codegen-preview.mjs",
   "source": "resources/generated/admin-resource-contract.json",
   "sourceVersion": "0.1.0",
-  "resourceCount": 27,
+  "resourceCount": 28,
   "summary": {
     "modes": {
       "custom": [
@@ -15,6 +15,7 @@
         "files",
         "monitoring",
         "overview",
+        "request-logs",
         "settings"
       ],
       "guardedCatalog": [
@@ -70,6 +71,7 @@
       "files",
       "monitoring",
       "overview",
+      "request-logs",
       "settings"
     ],
     "writeResources": [
@@ -87,6 +89,7 @@
       "orgUnits",
       "parameters",
       "permissions",
+      "request-logs",
       "roleGroups",
       "roles",
       "settings",
@@ -180,6 +183,9 @@
       "admin:permission:delete",
       "admin:permission:read",
       "admin:permission:update",
+      "admin:request-log:create",
+      "admin:request-log:read",
+      "admin:request-log:update",
       "admin:role-group:create",
       "admin:role-group:delete",
       "admin:role-group:purge",
@@ -213,8 +219,8 @@
       "admin:version:read",
       "admin:version:update"
     ],
-    "routeCount": 90,
-    "schemaCount": 27
+    "routeCount": 93,
+    "schemaCount": 28
   },
   "guardrails": [
     "This preview is read-only and must not overwrite Go, React or Markdown files.",
@@ -3347,6 +3353,132 @@
           "permission.create",
           "permission.delete",
           "permission.update"
+        ]
+      }
+    },
+    {
+      "resource": "request-logs",
+      "code": "request-logs",
+      "label": {
+        "zh": "请求日志",
+        "en": "Request Logs"
+      },
+      "group": "operations",
+      "codegenMode": "custom",
+      "generationLevel": "manualReview",
+      "backend": {
+        "model": null,
+        "table": null,
+        "apiBase": "/api/admin/request-logs",
+        "routeFile": "internal/platform/httpapi/server.go",
+        "modelPackage": "internal/platform/model",
+        "repositoryPackage": "internal/platform/repository",
+        "routes": [
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/request-logs",
+            "permission": "admin:request-log:create",
+            "operationId": "request-logs.create",
+            "mutates": true,
+            "auditActionCandidate": "request_log.create"
+          },
+          {
+            "method": "POST",
+            "path": "/api/admin/resources/request-logs/query",
+            "permission": "admin:request-log:read",
+            "operationId": "request-logs.query",
+            "mutates": false,
+            "auditActionCandidate": null
+          },
+          {
+            "method": "PUT",
+            "path": "/api/admin/resources/request-logs/:id",
+            "permission": "admin:request-log:update",
+            "operationId": "request-logs.update",
+            "mutates": true,
+            "auditActionCandidate": "request_log.update"
+          }
+        ]
+      },
+      "frontend": {
+        "resourceName": "request-logs",
+        "adminPath": "/request-logs",
+        "component": "ResourceTablePage",
+        "dataProviderFile": "admin/src/platform/refine/dataProvider.ts",
+        "pageComponent": "admin/src/platform/resources/GenericResourceConsole.tsx"
+      },
+      "schema": {
+        "fieldCount": 15,
+        "search": [
+          "actor",
+          "code",
+          "createdAt",
+          "description",
+          "domain",
+          "method",
+          "name",
+          "requestId",
+          "route",
+          "status",
+          "statusCode",
+          "traceId"
+        ],
+        "filter": [
+          "actor",
+          "code",
+          "createdAt",
+          "domain",
+          "latencyMs",
+          "method",
+          "name",
+          "requestId",
+          "route",
+          "status",
+          "statusCode",
+          "traceId",
+          "updatedAt"
+        ],
+        "sort": [
+          "actor",
+          "code",
+          "createdAt",
+          "domain",
+          "latencyMs",
+          "method",
+          "name",
+          "requestId",
+          "route",
+          "status",
+          "statusCode",
+          "traceId",
+          "updatedAt"
+        ],
+        "table": [
+          "code",
+          "name",
+          "domain",
+          "method",
+          "route",
+          "statusCode",
+          "latencyMs",
+          "actor",
+          "requestId",
+          "traceId",
+          "createdAt",
+          "status"
+        ],
+        "form": [],
+        "localizedFields": []
+      },
+      "docs": {
+        "openapi": "resources/generated/openapi.admin.json",
+        "scaffoldDraft": "resources/generated/admin-scaffold-draft.md"
+      },
+      "audit": {
+        "required": true,
+        "actionCandidates": [
+          "request_log.create",
+          "request_log.update"
         ]
       }
     },

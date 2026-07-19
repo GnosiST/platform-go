@@ -132,6 +132,11 @@
       "x-platform-group": "system"
     },
     {
+      "name": "request-logs",
+      "description": "Request Logs / 请求日志",
+      "x-platform-group": "operations"
+    },
+    {
       "name": "roleGroups",
       "description": "Role Groups / 角色组",
       "x-platform-group": "system"
@@ -6703,6 +6708,279 @@
                   "resource",
                   "resourceType",
                   "status"
+                ],
+                "x-platform-localized-fields": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/resources/request-logs": {
+      "post": {
+        "tags": [
+          "request-logs"
+        ],
+        "operationId": "createRequestLogs",
+        "summary": "POST Request Logs",
+        "description": "Resource: request-logs\nPermission: admin:request-log:create\nAudit action: request_log.create",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomOperationData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-resource": "request-logs",
+        "x-platform-resource-code": "request-logs",
+        "x-platform-permission": "admin:request-log:create",
+        "x-platform-codegen-mode": "custom",
+        "x-platform-audit-action": "request_log.create",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestLogsInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/resources/request-logs/{id}": {
+      "put": {
+        "tags": [
+          "request-logs"
+        ],
+        "operationId": "updateRequestLogsById",
+        "summary": "PUT Request Logs",
+        "description": "Resource: request-logs\nPermission: admin:request-log:update\nAudit action: request_log.update",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomOperationData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-resource": "request-logs",
+        "x-platform-resource-code": "request-logs",
+        "x-platform-permission": "admin:request-log:update",
+        "x-platform-codegen-mode": "custom",
+        "x-platform-audit-action": "request_log.update",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestLogsInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/resources/request-logs/query": {
+      "post": {
+        "tags": [
+          "request-logs"
+        ],
+        "operationId": "queryRequestLogs",
+        "summary": "POST Request Logs",
+        "description": "Resource: request-logs\nPermission: admin:request-log:read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomOperationData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-platform-resource": "request-logs",
+        "x-platform-resource-code": "request-logs",
+        "x-platform-permission": "admin:request-log:read",
+        "x-platform-codegen-mode": "custom",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AdminQueryRequest"
+                  }
+                ],
+                "x-platform-resource": "request-logs",
+                "x-platform-allowed-fields": [
+                  "actor",
+                  "code",
+                  "createdAt",
+                  "description",
+                  "domain",
+                  "latencyMs",
+                  "method",
+                  "name",
+                  "requestId",
+                  "route",
+                  "status",
+                  "statusCode",
+                  "traceId",
+                  "updatedAt"
+                ],
+                "x-platform-search-fields": [
+                  "actor",
+                  "code",
+                  "createdAt",
+                  "description",
+                  "domain",
+                  "method",
+                  "name",
+                  "requestId",
+                  "route",
+                  "status",
+                  "statusCode",
+                  "traceId"
+                ],
+                "x-platform-filter-fields": [
+                  "actor",
+                  "code",
+                  "createdAt",
+                  "domain",
+                  "latencyMs",
+                  "method",
+                  "name",
+                  "requestId",
+                  "route",
+                  "status",
+                  "statusCode",
+                  "traceId",
+                  "updatedAt"
+                ],
+                "x-platform-sort-fields": [
+                  "actor",
+                  "code",
+                  "createdAt",
+                  "domain",
+                  "latencyMs",
+                  "method",
+                  "name",
+                  "requestId",
+                  "route",
+                  "status",
+                  "statusCode",
+                  "traceId",
+                  "updatedAt"
                 ],
                 "x-platform-localized-fields": []
               }
@@ -21509,6 +21787,319 @@
           "prefix"
         ],
         "x-platform-resource": "permissions"
+      },
+      "RequestLogsRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "status",
+          "updatedAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "description": "en: Log Code; zh: 日志编码",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "record",
+            "x-platform-label": {
+              "zh": "日志编码",
+              "en": "Log Code"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "name": {
+            "description": "en: Request Summary; zh: 请求摘要",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "record",
+            "x-platform-label": {
+              "zh": "请求摘要",
+              "en": "Request Summary"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "status": {
+            "description": "en: Status; zh: 状态",
+            "x-platform-field-type": "select",
+            "x-platform-field-source": "record",
+            "x-platform-label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled"
+            ]
+          },
+          "description": {
+            "description": "en: Description; zh: 说明",
+            "x-platform-field-type": "textarea",
+            "x-platform-field-source": "record",
+            "x-platform-label": {
+              "zh": "说明",
+              "en": "Description"
+            },
+            "x-platform-searchable": false,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "en: Updated At; zh: 更新时间",
+            "x-platform-field-type": "datetime",
+            "x-platform-field-source": "record",
+            "x-platform-label": {
+              "zh": "更新时间",
+              "en": "Updated At"
+            },
+            "x-platform-searchable": false,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string",
+            "format": "date-time"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Extensible values for plugin or business fields that have not been promoted to first-class columns."
+          },
+          "actor": {
+            "description": "en: Actor; zh: 访问主体",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "访问主体",
+              "en": "Actor"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "clientIpHash": {
+            "description": "en: Client IP Hash; zh: 客户端 IP 哈希",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "客户端 IP 哈希",
+              "en": "Client IP Hash"
+            },
+            "x-platform-searchable": false,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "internal",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "omitted",
+            "type": "string"
+          },
+          "createdAt": {
+            "description": "en: Requested At; zh: 请求时间",
+            "x-platform-field-type": "datetime",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "请求时间",
+              "en": "Requested At"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string",
+            "format": "date-time"
+          },
+          "domain": {
+            "description": "en: Security Domain; zh: 安全域",
+            "x-platform-field-type": "select",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "安全域",
+              "en": "Security Domain"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string",
+            "enum": [
+              "admin",
+              "app",
+              "auth",
+              "platform",
+              "public"
+            ]
+          },
+          "latencyMs": {
+            "description": "en: Latency Ms; zh: 耗时毫秒",
+            "x-platform-field-type": "number",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "耗时毫秒",
+              "en": "Latency Ms"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "number"
+          },
+          "method": {
+            "description": "en: Method; zh: 方法",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "方法",
+              "en": "Method"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "requestId": {
+            "description": "en: Request ID; zh: 请求 ID",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "请求 ID",
+              "en": "Request ID"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "route": {
+            "description": "en: Route; zh: 路由",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "路由",
+              "en": "Route"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          },
+          "statusCode": {
+            "description": "en: Status Code; zh: 状态码",
+            "x-platform-field-type": "number",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "状态码",
+              "en": "Status Code"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "number"
+          },
+          "traceId": {
+            "description": "en: Trace ID; zh: 追踪 ID",
+            "x-platform-field-type": "text",
+            "x-platform-field-source": "values",
+            "x-platform-label": {
+              "zh": "追踪 ID",
+              "en": "Trace ID"
+            },
+            "x-platform-searchable": true,
+            "x-platform-filterable": false,
+            "x-platform-sortable": false,
+            "x-platform-localizable": false,
+            "x-platform-sensitivity": "public",
+            "x-platform-storage-mode": "plain",
+            "x-platform-response-mode": "full",
+            "x-platform-export-mode": "full",
+            "type": "string"
+          }
+        },
+        "x-platform-resource": "request-logs",
+        "x-platform-codegen-mode": "custom"
+      },
+      "RequestLogsInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {},
+        "x-platform-resource": "request-logs"
       },
       "RoleGroupsRecord": {
         "type": "object",

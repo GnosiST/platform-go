@@ -29,7 +29,7 @@
       "role": "ordinary-store-plaintext-rejection",
       "scope": "function",
       "symbol": "(*Store).validateProtectedRecord",
-      "fingerprint": "sha256:a5a39c5d05580b06225927d2941ffb616b51dcfe6e20f9b951712cc64d30c880"
+      "fingerprint": "sha256:ea7bc98cb5761bcd3af658775bab0bded97d24f7ea0394f88b460f43fd158ed3"
     },
     {
       "path": "cmd/platform-admin/main.go",

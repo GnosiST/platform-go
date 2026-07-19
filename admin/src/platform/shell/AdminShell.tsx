@@ -116,6 +116,10 @@ const aggregatedWorkbenchChildRoutes = new Set([
   "/notification-templates",
   "/notifications",
   "/notification-deliveries",
+  "/audit-logs",
+  "/login-logs",
+  "/error-logs",
+  "/request-logs",
 ]);
 
 export function AdminShell({
@@ -822,7 +826,7 @@ function ProfileSummaryPanel({
       title={dictionary.personalProfile}
       description={session.user.username || displayName}
       width={460}
-      maxHeight="min(720px, calc(100vh - 32px))"
+      maxHeight="min(720px, calc(100vh - 72px))"
       footer={(
         <div className="profile-summary-actions">
           <Button block icon={<EditOutlined />} onClick={onEditProfile}>

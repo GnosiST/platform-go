@@ -14,7 +14,7 @@ func DefaultManifests() []capability.Manifest {
 		{ID: "rbac", Name: "RBAC", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity"}, Admin: adminSurface(roleGroupAdminResource(), roleAdminResource(), permissionAdminResource()), Migrations: lifecycleMigrations("rbac"), Seeds: lifecycleSeeds("rbac")},
 		{ID: "menu", Name: "Menu", Version: "0.1.0", Dependencies: []capability.ID{"rbac"}, Admin: adminSurface(adminResource("menus", "菜单", "Menus", "后台菜单和资源入口。", "Admin menus and resource entries.", "admin:menu", "/menus", "foundation", "menus", 60)), Migrations: lifecycleMigrations("menu"), Seeds: lifecycleSeeds("menu")},
 		{ID: "api-resource", Name: "API Resource", Version: "0.1.0", Dependencies: []capability.ID{"rbac"}, Admin: adminSurface(adminResource("api-resources", "API 资源", "API Resources", "接口资源、权限码和调用边界。", "API resources, permission codes, and invocation boundaries.", "admin:api-resource", "/api-resources", "governance", "apiResources", 120), adminResource("api-docs", "API 文档", "API Docs", "OpenAPI 文档、权限码和接口契约。", "OpenAPI docs, permission codes, and API contracts.", "admin:api-docs", "/api-docs", "governance", "book", 125)), Migrations: lifecycleMigrations("api-resource"), Seeds: lifecycleSeeds("api-resource")},
-		{ID: "audit", Name: "Audit", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity"}, Admin: adminSurface(adminResource("audit-logs", "审计日志", "Audit Logs", "操作审计和日志留痕。", "Operation audit and activity trails.", "admin:audit-log", "/audit-logs", "governance", "audit", 110), adminResource("login-logs", "登录日志", "Login Logs", "登录认证记录和安全追踪。", "Login authentication records and security tracing.", "admin:login-log", "/login-logs", "operations", "desktop", 320), adminResource("error-logs", "错误日志", "Error Logs", "运行错误、异常和排查记录。", "Runtime errors, exceptions and troubleshooting records.", "admin:error-log", "/error-logs", "operations", "warning", 330)), Migrations: lifecycleMigrations("audit"), Seeds: lifecycleSeeds("audit")},
+		{ID: "audit", Name: "Audit", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity"}, Admin: adminSurface(adminResource("audit-logs", "审计日志", "Audit Logs", "操作审计和日志留痕。", "Operation audit and activity trails.", "admin:audit-log", "/audit-logs", "governance", "audit", 110), requestLogAdminResource(), adminResource("login-logs", "登录日志", "Login Logs", "登录认证记录和安全追踪。", "Login authentication records and security tracing.", "admin:login-log", "/login-logs", "operations", "desktop", 320), errorLogAdminResource()), Migrations: lifecycleMigrations("audit"), Seeds: lifecycleSeeds("audit")},
 		{ID: "policy-review", Name: "Policy Review", Version: "0.1.0", Dependencies: []capability.ID{"rbac", "audit", "identity"}, Admin: adminSurface(policyReviewAdminResource()), Migrations: lifecycleMigrations("policy-review"), Seeds: lifecycleSeeds("policy-review")},
 		{ID: "wechat-login", Name: "WeChat Login", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "audit"}, AuthProviders: []capability.AuthProvider{authProvider("wechat", "wechat", "微信登录", "WeChat Login", "微信 code 换取登录态。", "WeChat code exchange login.", false, []capability.AuthProviderAudience{capability.AuthProviderAudienceApp}, "PLATFORM_WECHAT_MINIAPP_APP_ID", "PLATFORM_WECHAT_MINIAPP_SECRET", "PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT")}, Migrations: lifecycleMigrations("wechat-login"), Seeds: lifecycleSeeds("wechat-login")},
 		{ID: "admin-oidc", Name: "Admin OIDC", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "audit"}, Admin: adminSurface(adminIdentityAdminResource()), AuthProviders: []capability.AuthProvider{authProvider("oidc", "oidc", "企业单点登录", "Enterprise SSO", "通过 OpenID Connect 登录管理台。", "Sign in to Admin through OpenID Connect.", false, []capability.AuthProviderAudience{capability.AuthProviderAudienceAdmin}, "PLATFORM_ADMIN_OIDC_ISSUER_URL", "PLATFORM_ADMIN_OIDC_CLIENT_ID", "PLATFORM_ADMIN_OIDC_CLIENT_SECRET", "PLATFORM_ADMIN_OIDC_REDIRECT_URL")}, Migrations: lifecycleMigrations("admin-oidc"), Seeds: lifecycleSeeds("admin-oidc")},
@@ -49,7 +49,7 @@ func coreDeletionPolicy(resource string) *capability.AdminResourceDeletionPolicy
 	switch resource {
 	case "api-docs", "branding", "capabilities", "demo-data", "message-center", "overview", "settings":
 		policy.Mode = capability.AdminDeletionDisabled
-	case "app-phone-verifications", "audit-logs", "error-logs", "job-run-attempts", "job-runs", "login-logs", "notification-deliveries", "policy-reviews", "versions":
+	case "app-phone-verifications", "audit-logs", "error-logs", "job-run-attempts", "job-runs", "login-logs", "notification-deliveries", "policy-reviews", "request-logs", "versions":
 		policy.Mode = capability.AdminDeletionAppendOnly
 	case "api-resources", "area-codes", "dictionaries", "permissions":
 		policy.Mode = capability.AdminDeletionRestrict
@@ -298,6 +298,65 @@ func adminResource(resource string, titleZH string, titleEN string, descriptionZ
 			Icon:  icon,
 			Order: order,
 		},
+	}
+}
+
+func requestLogAdminResource() capability.AdminResource {
+	return capability.AdminResource{
+		Resource:         "request-logs",
+		Title:            capability.Text("请求日志", "Request Logs"),
+		Description:      capability.Text("Admin、App 和平台接口访问记录，统一承载请求、状态、耗时和追踪 ID。", "Admin, app, and platform API access records with request, status, latency, and trace IDs."),
+		PermissionPrefix: "admin:request-log",
+		Menu:             capability.AdminMenu{Route: "/request-logs", Parent: "logs", Group: "operations", Icon: "monitoring", Order: 115, Cache: true},
+		Fields: []capability.AdminField{
+			adminField("code", "日志编码", "Log Code", "text", "record", true, true, true, true, false, true, 180, nil),
+			adminField("name", "请求摘要", "Request Summary", "text", "record", true, true, true, true, false, true, 220, nil),
+			adminField("domain", "安全域", "Security Domain", "select", "values", true, true, true, true, false, true, 120, requestLogDomainOptions()),
+			adminField("method", "方法", "Method", "text", "values", true, true, true, true, false, true, 100, nil),
+			adminField("route", "路由", "Route", "text", "values", true, true, true, true, false, true, 220, nil),
+			adminField("statusCode", "状态码", "Status Code", "number", "values", true, true, true, true, false, true, 100, nil),
+			adminField("latencyMs", "耗时毫秒", "Latency Ms", "number", "values", true, true, true, true, false, true, 110, nil),
+			adminField("actor", "访问主体", "Actor", "text", "values", false, true, true, true, false, true, 160, nil),
+			adminField("requestId", "请求 ID", "Request ID", "text", "values", false, true, true, true, false, true, 220, nil),
+			adminField("traceId", "追踪 ID", "Trace ID", "text", "values", false, true, true, true, false, true, 220, nil),
+			secureAdminField(adminField("clientIpHash", "客户端 IP 哈希", "Client IP Hash", "text", "values", false, true, false, false, false, true, 220, nil), capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionFull, capability.FieldProjectionOmitted),
+			adminField("createdAt", "请求时间", "Requested At", "datetime", "values", true, true, true, true, false, true, 180, nil),
+			adminField("status", "状态", "Status", "select", "record", false, true, true, true, false, true, 110, enabledDisabledOptions()),
+			adminField("description", "说明", "Description", "textarea", "record", false, true, false, false, false, true, 260, nil),
+			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, false, false, true, 180, nil),
+		},
+		SearchFields:   []string{"name", "code", "status", "description", "domain", "method", "route", "statusCode", "actor", "requestId", "traceId", "createdAt"},
+		DefaultSortKey: "createdAt",
+	}
+}
+
+func errorLogAdminResource() capability.AdminResource {
+	return capability.AdminResource{
+		Resource:         "error-logs",
+		Title:            capability.Text("错误日志", "Error Logs"),
+		Description:      capability.Text("运行错误、异常和排查记录。", "Runtime errors, exceptions and troubleshooting records."),
+		PermissionPrefix: "admin:error-log",
+		Menu:             capability.AdminMenu{Route: "/error-logs", Parent: "logs", Group: "operations", Icon: "warning", Order: 330, Cache: true},
+		Fields: []capability.AdminField{
+			adminField("code", "日志编码", "Log Code", "text", "record", true, true, true, true, false, true, 180, nil),
+			adminField("name", "错误摘要", "Error Summary", "text", "record", true, true, true, true, false, true, 220, nil),
+			adminField("level", "级别", "Level", "text", "values", false, true, true, true, false, true, 100, nil),
+			adminField("message", "消息", "Message", "text", "values", false, true, true, true, false, true, 220, nil),
+			adminField("errorCode", "错误码", "Error Code", "text", "values", false, true, true, true, false, true, 180, nil),
+			adminField("owner", "负责人", "Owner", "text", "values", false, true, true, true, false, true, 140, nil),
+			adminField("category", "分类", "Category", "text", "values", false, true, true, true, false, true, 140, nil),
+			adminField("retryPolicy", "重试策略", "Retry Policy", "text", "values", false, true, true, true, false, true, 140, nil),
+			adminField("redactionClass", "脱敏等级", "Redaction Class", "text", "values", false, true, true, true, false, true, 140, nil),
+			adminField("eventId", "事件 ID", "Event ID", "text", "values", false, true, true, true, false, true, 260, nil),
+			adminField("requestId", "请求 ID", "Request ID", "text", "values", false, true, true, true, false, true, 220, nil),
+			adminField("traceId", "追踪 ID", "Trace ID", "text", "values", false, true, true, true, false, true, 220, nil),
+			adminField("createdAt", "发生时间", "Occurred At", "datetime", "values", false, true, true, true, false, true, 180, nil),
+			adminField("status", "状态", "Status", "text", "record", false, true, true, true, false, true, 110, nil),
+			adminField("description", "说明", "Description", "textarea", "record", false, true, false, false, false, true, 260, nil),
+			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, false, false, true, 180, nil),
+		},
+		SearchFields:   []string{"name", "code", "status", "description", "level", "message", "errorCode", "owner", "category", "eventId", "requestId", "traceId", "createdAt"},
+		DefaultSortKey: "createdAt",
 	}
 }
 
@@ -775,12 +834,15 @@ func notificationDeliveryAdminResource() capability.AdminResource {
 			adminField("target", "投递目标", "Target", "text", "values", false, false, true, true, true, true, 180, nil),
 			adminField("provider", "供应商", "Provider", "text", "values", false, false, true, true, true, true, 140, nil),
 			adminField("providerMessageId", "厂商消息 ID", "Provider Message ID", "text", "values", false, false, true, true, true, true, 180, nil),
+			notificationDeliveryInternalField(adminField("providerStatus", "厂商状态", "Provider Status", "text", "values", false, true, false, false, false, true, 140, nil)),
 			adminField("channel", "通知渠道", "Channel", "select", "values", true, false, true, true, true, true, 130, notificationChannelOptions()),
 			adminField("deliveryStatus", "投递状态", "Delivery Status", "select", "values", true, false, true, true, true, true, 130, notificationDeliveryStatusOptions()),
 			adminField("attempts", "尝试次数", "Attempts", "number", "values", false, false, true, true, true, true, 110, nil),
 			adminField("lastAttemptAt", "最近尝试", "Last Attempt", "datetime", "values", false, false, true, true, true, true, 180, nil),
 			adminField("deliveredAt", "投递时间", "Delivered At", "datetime", "values", false, false, true, true, true, true, 180, nil),
 			adminField("errorMessage", "错误信息", "Error Message", "textarea", "values", false, false, true, false, true, true, 260, nil),
+			notificationDeliveryCorrelationField(adminField("requestId", "请求 ID", "Request ID", "text", "values", false, true, false, false, false, true, 300, nil), 36, `^req_[0-9a-f]{32}$`),
+			notificationDeliveryCorrelationField(adminField("traceId", "链路 ID", "Trace ID", "text", "values", false, true, false, false, false, true, 280, nil), 32, `^[0-9a-f]{32}$`),
 			adminField("status", "状态", "Status", "select", "record", false, false, true, true, true, true, 120, enabledDisabledOptions()),
 			adminField("description", "说明", "Description", "textarea", "record", false, false, false, false, true, true, 220, nil),
 			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
@@ -1265,6 +1327,16 @@ func secureAdminField(field capability.AdminField, sensitivity string, storageMo
 	return field
 }
 
+func notificationDeliveryInternalField(field capability.AdminField) capability.AdminField {
+	return secureAdminField(field, capability.FieldSensitivityInternal, capability.FieldStoragePlain, capability.FieldProjectionFull, capability.FieldProjectionOmitted)
+}
+
+func notificationDeliveryCorrelationField(field capability.AdminField, length int, pattern string) capability.AdminField {
+	field = notificationDeliveryInternalField(field)
+	field.Validation = capability.AdminFieldValidation{MinLength: length, MaxLength: length, Pattern: pattern}
+	return field
+}
+
 func encryptedSecretAdminField(field capability.AdminField) capability.AdminField {
 	field = secureAdminField(field, capability.FieldSensitivitySecret, capability.FieldStorageEncrypted, capability.FieldProjectionOmitted, capability.FieldProjectionOmitted)
 	field.Protection = &capability.AdminFieldProtection{Format: "aes-256-gcm-v1", Normalization: "raw-v1"}
@@ -1421,6 +1493,16 @@ func credentialChallengeKindOptions() []capability.AdminFieldOption {
 	return []capability.AdminFieldOption{
 		adminFieldOption("captcha", "图形验证码", "Captcha"),
 		adminFieldOption("slider", "滑块拼图", "Slider"),
+	}
+}
+
+func requestLogDomainOptions() []capability.AdminFieldOption {
+	return []capability.AdminFieldOption{
+		adminFieldOption("admin", "管理端", "Admin"),
+		adminFieldOption("app", "应用端", "App"),
+		adminFieldOption("auth", "认证", "Auth"),
+		adminFieldOption("platform", "平台", "Platform"),
+		adminFieldOption("public", "公开", "Public"),
 	}
 }
 

@@ -5,10 +5,10 @@
   "sourceVersion": "0.1.0",
   "status": "pass",
   "capabilityCount": 14,
-  "resourceCount": 27,
+  "resourceCount": 28,
   "routeCount": 5,
   "appRouteHandlerCount": 5,
-  "adminPermissionCount": 115,
+  "adminPermissionCount": 118,
   "appPermissionCount": 0,
   "authProviderCount": 2,
   "demoDataSetCount": 1,
@@ -166,7 +166,8 @@
       "adminResources": [
         "audit-logs",
         "error-logs",
-        "login-logs"
+        "login-logs",
+        "request-logs"
       ],
       "migrations": [
         "core-audit-0001"

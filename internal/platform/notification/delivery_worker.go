@@ -30,11 +30,25 @@ type DeliveryStore interface {
 	UpdateInternalWithAudit(string, string, adminresource.WriteInput, adminresource.AuditEvent) (adminresource.MutationResult, error)
 }
 
+type DeliveryPolicyGate interface {
+	AllowDelivery(context.Context, DeliveryPolicyInput) (bool, error)
+}
+
+type DeliveryPolicyInput struct {
+	TenantCode   string
+	Channel      string
+	Provider     string
+	TemplateCode string
+	TemplateID   string
+	Purpose      string
+}
+
 type DeliveryWorkerOptions struct {
 	SMSSenders          map[string]SMSSender
 	MessageSenders      map[string]MessageSender
 	DefaultSMSProvider  string
 	DefaultProviders    map[string]string
+	PolicyGate          DeliveryPolicyGate
 	MaxBatch            int
 	Now                 func() time.Time
 	Actor               string
@@ -47,6 +61,7 @@ type DeliveryWorker struct {
 	messageSenders      map[string]MessageSender
 	defaultSMSProvider  string
 	defaultProviders    map[string]string
+	policyGate          DeliveryPolicyGate
 	maxBatch            int
 	now                 func() time.Time
 	actor               string
@@ -127,6 +142,7 @@ func NewDeliveryWorker(store DeliveryStore, options DeliveryWorkerOptions) *Deli
 		messageSenders:      messageSenders,
 		defaultSMSProvider:  defaultProvider,
 		defaultProviders:    defaultProviders,
+		policyGate:          options.PolicyGate,
 		maxBatch:            maxBatch,
 		now:                 now,
 		actor:               actor,
@@ -165,15 +181,26 @@ func (w *DeliveryWorker) RunOnce(ctx context.Context) (DeliveryWorkerResult, err
 			result.Skipped++
 			continue
 		}
-		result.Attempted++
 		notice, ok := noticeByCode[strings.TrimSpace(delivery.Values["notificationCode"])]
 		if !ok {
+			result.Attempted++
 			if err := w.markDeliveryFailed(delivery, channel, nil, "notification record not found"); err != nil {
 				return result, err
 			}
 			result.Failed++
 			continue
 		}
+		if w.policyGate != nil {
+			allowed, err := w.policyGate.AllowDelivery(ctx, deliveryPolicyInputFromRecords(channel, delivery, notice))
+			if err != nil {
+				return result, err
+			}
+			if !allowed {
+				result.Skipped++
+				continue
+			}
+		}
+		result.Attempted++
 		delivered, err := w.deliver(ctx, channel, delivery, notice)
 		if err != nil {
 			return result, err
@@ -200,6 +227,18 @@ func pendingNotificationDelivery(record adminresource.Record) (string, bool) {
 	channel := CanonicalChannel(values["channel"])
 	return channel, IsSupportedChannel(channel) &&
 		strings.EqualFold(strings.TrimSpace(values["deliveryStatus"]), DeliveryStatusPending)
+}
+
+func deliveryPolicyInputFromRecords(channel string, delivery adminresource.Record, notice adminresource.Record) DeliveryPolicyInput {
+	payload := parseNotificationPayload(notice.Values["payload"])
+	return DeliveryPolicyInput{
+		TenantCode:   firstNonBlank(delivery.Values["tenantCode"], notice.Values["tenantCode"]),
+		Channel:      channel,
+		Provider:     delivery.Values["provider"],
+		TemplateCode: firstNonBlank(delivery.Values["templateCode"], notice.Values["templateCode"]),
+		TemplateID:   firstNonBlank(delivery.Values["templateId"], notice.Values["templateId"], payload.TemplateID),
+		Purpose:      firstNonBlank(notice.Values["category"], payload.Purpose, "notification"),
+	}
 }
 
 func (w *DeliveryWorker) deliver(ctx context.Context, channel string, delivery adminresource.Record, notice adminresource.Record) (bool, error) {
@@ -272,16 +311,16 @@ func (w *DeliveryWorker) deliverMessage(ctx context.Context, channel string, del
 }
 
 func (w *DeliveryWorker) markDeliveryDelivered(delivery adminresource.Record, receipt DeliveryReceipt) (bool, error) {
-	now := w.now().UTC().Format(time.RFC3339)
-	values := cloneSMSDeliveryValues(delivery.Values)
-	values["deliveryStatus"] = DeliveryStatusDelivered
-	values["attempts"] = strconv.Itoa(deliveryAttempts(delivery) + 1)
-	values["lastAttemptAt"] = now
-	values["deliveredAt"] = now
-	values["target"] = receipt.RedactedTarget
-	values["provider"] = receipt.Provider
-	values["providerMessageId"] = receipt.MessageID
-	delete(values, "errorMessage")
+	now := w.now().UTC()
+	values := BuildDeliveryLedgerValues(DeliveryLedgerInput{
+		BaseValues:     delivery.Values,
+		Channel:        receipt.Channel,
+		Target:         delivery.Values["target"],
+		Receipt:        receipt,
+		DeliveryStatus: DeliveryStatusDelivered,
+		AttemptedAt:    now,
+		DeliveredAt:    now,
+	})
 	_, err := w.store.UpdateInternalWithAudit(NotificationDeliveryResource, delivery.ID, adminresource.WriteInput{
 		Code:        delivery.Code,
 		Name:        delivery.Name,
@@ -293,20 +332,19 @@ func (w *DeliveryWorker) markDeliveryDelivered(delivery adminresource.Record, re
 }
 
 func (w *DeliveryWorker) markDeliveryFailed(delivery adminresource.Record, channel string, provider *string, errorMessage string) error {
-	now := w.now().UTC().Format(time.RFC3339)
-	values := cloneSMSDeliveryValues(delivery.Values)
-	values["deliveryStatus"] = DeliveryStatusFailed
-	values["attempts"] = strconv.Itoa(deliveryAttempts(delivery) + 1)
-	values["lastAttemptAt"] = now
-	values["target"] = RedactMessageTarget(channel, values["target"])
-	if provider != nil && strings.TrimSpace(*provider) != "" {
-		values["provider"] = CanonicalProvider(*provider)
+	providerValue := ""
+	if provider != nil {
+		providerValue = *provider
 	}
-	delete(values, "providerMessageId")
-	values["errorMessage"] = strings.TrimSpace(errorMessage)
-	if values["errorMessage"] == "" {
-		values["errorMessage"] = "notification delivery failed"
-	}
+	values := BuildDeliveryLedgerValues(DeliveryLedgerInput{
+		BaseValues:     delivery.Values,
+		Channel:        channel,
+		Target:         delivery.Values["target"],
+		Receipt:        DeliveryReceipt{Channel: channel, Provider: providerValue, Status: DeliveryStatusFailed},
+		DeliveryStatus: DeliveryStatusFailed,
+		ErrorMessage:   errorMessage,
+		AttemptedAt:    w.now().UTC(),
+	})
 	_, err := w.store.UpdateInternalWithAudit(NotificationDeliveryResource, delivery.ID, adminresource.WriteInput{
 		Code:        delivery.Code,
 		Name:        delivery.Name,

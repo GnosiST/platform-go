@@ -7,12 +7,12 @@ This file is a review artifact for AI-assisted development. It must not be copie
 ## Summary
 
 - Source version: `0.1.0`
-- Resource count: 27
-- Route count: 90
-- Schema count: 27
+- Resource count: 28
+- Route count: 93
+- Schema count: 28
 - Template candidates: `apiResources`, `appIdentities`, `areaCodes`, `auditLogs`, `dictionaries`, `errorLogs`, `loginLogs`, `menus`, `orgUnits`, `parameters`, `permissions`, `roleGroups`, `roles`, `sessions`, `tenants`, `users`, `versions`
-- Manual review: `apiDocs`, `apiTokens`, `branding`, `capabilities`, `demoData`, `dictionary-parameters`, `files`, `monitoring`, `overview`, `settings`
-- Write resources: `apiResources`, `apiTokens`, `appIdentities`, `areaCodes`, `branding`, `demoData`, `dictionaries`, `dictionary-parameters`, `files`, `menus`, `monitoring`, `orgUnits`, `parameters`, `permissions`, `roleGroups`, `roles`, `settings`, `tenants`, `users`, `versions`
+- Manual review: `apiDocs`, `apiTokens`, `branding`, `capabilities`, `demoData`, `dictionary-parameters`, `files`, `monitoring`, `overview`, `request-logs`, `settings`
+- Write resources: `apiResources`, `apiTokens`, `appIdentities`, `areaCodes`, `branding`, `demoData`, `dictionaries`, `dictionary-parameters`, `files`, `menus`, `monitoring`, `orgUnits`, `parameters`, `permissions`, `request-logs`, `roleGroups`, `roles`, `settings`, `tenants`, `users`, `versions`
 
 ## Dry-run Safety Plan
 
@@ -1005,6 +1005,52 @@ Audit candidates: `permission.create`, `permission.delete`, `permission.update`
 - `resources/generated/scaffold/admin/permissions/backend/permissions-routes.go.txt` -> role: `routeDraft`, target: `internal/platform/httpapi/server.go`, status: `regeneratable`, generated marker present
 - `resources/generated/scaffold/admin/permissions/frontend/permissionsResource.tsx.txt` -> role: `refinePageDraft`, target: `admin/src/platform/resources/GenericResourceConsole.tsx`, status: `regeneratable`, generated marker present
 - `resources/generated/scaffold/admin/permissions/tests/permissions-resource-contract.test.go.txt` -> role: `contractTestDraft`, target: `internal/platform/adminresource/permissions_test.go`, status: `regeneratable`, generated marker present
+
+## request-logs (请求日志)
+
+- Code: `request-logs`
+- Group: `operations`
+- Codegen mode: `custom`
+- Generation level: `manualReview`
+- Dry-run status: `manualReviewOnly`
+- Source writing: `disabled`
+
+### Backend
+
+- Model: `-`
+- Table: `-`
+- API base: `/api/admin/request-logs`
+- Route file: `internal/platform/httpapi/server.go`
+- Repository package: `internal/platform/repository`
+
+Routes:
+
+- `POST /api/admin/resources/request-logs` -> permission: `admin:request-log:create`, operation: `request-logs.create`, audit: `request_log.create`
+- `POST /api/admin/resources/request-logs/query` -> permission: `admin:request-log:read`, operation: `request-logs.query`
+- `PUT /api/admin/resources/request-logs/:id` -> permission: `admin:request-log:update`, operation: `request-logs.update`, audit: `request_log.update`
+
+Audit candidates: `request_log.create`, `request_log.update`
+
+### Frontend
+
+- Refine resource: `request-logs`
+- Admin path: `/request-logs`
+- Component: `ResourceTablePage`
+- Data provider file: `admin/src/platform/refine/dataProvider.ts`
+
+### Schema
+
+- Field count: 15
+- Search: `actor`, `code`, `createdAt`, `description`, `domain`, `method`, `name`, `requestId`, `route`, `status`, `statusCode`, `traceId`
+- Filter: `actor`, `code`, `createdAt`, `domain`, `latencyMs`, `method`, `name`, `requestId`, `route`, `status`, `statusCode`, `traceId`, `updatedAt`
+- Sort: `actor`, `code`, `createdAt`, `domain`, `latencyMs`, `method`, `name`, `requestId`, `route`, `status`, `statusCode`, `traceId`, `updatedAt`
+- Table: `code`, `name`, `domain`, `method`, `route`, `statusCode`, `latencyMs`, `actor`, `requestId`, `traceId`, `createdAt`, `status`
+- Form: -
+- Localized fields: -
+
+### Dry-run Candidate Files
+
+-
 
 ## roleGroups (角色组)
 

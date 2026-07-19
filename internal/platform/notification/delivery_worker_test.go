@@ -26,6 +26,8 @@ func TestDeliveryWorkerDeliversPendingSMSWithMockLocal(t *testing.T) {
 		"target":           "+8613800000000",
 		"provider":         SMSProviderMockLocal,
 		"attempts":         "0",
+		"requestId":        "req_0123456789abcdef0123456789abcdef",
+		"traceId":          "4bf92f3577b34da6a3ce929d0e0e4736",
 	})
 	sender := NewMockLocalSMSSender()
 	now := time.Date(2026, 7, 19, 10, 30, 0, 0, time.UTC)
@@ -57,10 +59,64 @@ func TestDeliveryWorkerDeliversPendingSMSWithMockLocal(t *testing.T) {
 		updated.Values["target"] != "****0000" ||
 		updated.Values["provider"] != SMSProviderMockLocal ||
 		!strings.HasPrefix(updated.Values["providerMessageId"], "mock-local-") ||
+		updated.Values["providerStatus"] != SMSDeliveryAccepted ||
+		updated.Values["requestId"] != "req_0123456789abcdef0123456789abcdef" ||
+		updated.Values["traceId"] != "4bf92f3577b34da6a3ce929d0e0e4736" ||
 		updated.Values["lastAttemptAt"] != now.Format(time.RFC3339) ||
 		updated.Values["deliveredAt"] != now.Format(time.RFC3339) ||
 		updated.Values["errorMessage"] != "" {
 		t.Fatalf("updated delivery values = %+v, want delivered redacted ledger", updated.Values)
+	}
+	assertDeliveryLedgerValuesDoNotLeak(t, updated.Values, "+8613800000000", "123456")
+}
+
+func TestDeliveryWorkerSkipsPendingDeliveryWhenPolicyGateDenies(t *testing.T) {
+	store := notificationWorkerTestStore(t)
+	notice := createNotificationWorkerNotice(t, store, map[string]string{
+		"tenantCode": "platform",
+		"category":   "login",
+		"payload":    `{"templateId":"SMS_LOGIN","templateParams":{"code":"123456"}}`,
+	})
+	delivery := createNotificationWorkerDelivery(t, store, map[string]string{
+		"tenantCode":       "platform",
+		"notificationCode": notice.Code,
+		"channel":          ChannelSMS,
+		"deliveryStatus":   "pending",
+		"target":           "+8613800000000",
+		"provider":         SMSProviderMockLocal,
+		"attempts":         "0",
+	})
+	sender := NewMockLocalSMSSender()
+	gate := &deliveryPolicyGateTestStub{allow: false}
+	worker := NewDeliveryWorker(store, DeliveryWorkerOptions{
+		SMSSenders: map[string]SMSSender{SMSProviderMockLocal: sender},
+		PolicyGate: gate,
+	})
+
+	result, err := worker.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if result.Attempted != 0 || result.Delivered != 0 || result.Failed != 0 || result.Skipped != 1 {
+		t.Fatalf("RunOnce() result = %+v, want one policy-skipped pending delivery", result)
+	}
+	if len(sender.Sent()) != 0 {
+		t.Fatalf("sent messages = %+v, want no SMS when policy gate denies", sender.Sent())
+	}
+	if len(gate.inputs) != 1 ||
+		gate.inputs[0].TenantCode != "platform" ||
+		gate.inputs[0].Channel != ChannelSMS ||
+		gate.inputs[0].Provider != SMSProviderMockLocal ||
+		gate.inputs[0].TemplateID != "SMS_LOGIN" ||
+		gate.inputs[0].Purpose != "login" {
+		t.Fatalf("policy inputs = %+v, want hydrated policy dimensions", gate.inputs)
+	}
+	updated, err := store.InternalRecord("notification-deliveries", delivery.ID)
+	if err != nil {
+		t.Fatalf("InternalRecord(notification-deliveries) error = %v", err)
+	}
+	if updated.Values["deliveryStatus"] != "pending" || updated.Values["attempts"] != "0" || updated.Values["target"] != "+8613800000000" {
+		t.Fatalf("updated delivery values = %+v, want untouched pending delivery", updated.Values)
 	}
 }
 
@@ -100,6 +156,16 @@ func TestDeliveryWorkerUsesVendorDryRunSender(t *testing.T) {
 		updated.Values["target"] != "****0000" {
 		t.Fatalf("updated delivery values = %+v, want aliyun dry-run ledger", updated.Values)
 	}
+}
+
+type deliveryPolicyGateTestStub struct {
+	allow  bool
+	inputs []DeliveryPolicyInput
+}
+
+func (gate *deliveryPolicyGateTestStub) AllowDelivery(_ context.Context, input DeliveryPolicyInput) (bool, error) {
+	gate.inputs = append(gate.inputs, input)
+	return gate.allow, nil
 }
 
 func TestDeliveryWorkerDeliversEmailWithExplicitDryRunFallback(t *testing.T) {
@@ -233,6 +299,8 @@ func TestDeliveryWorkerMarksFailedDeliveryWithRedactedTarget(t *testing.T) {
 		"target":           "+8613800000000",
 		"provider":         SMSProviderTencent,
 		"attempts":         "0",
+		"requestId":        "req_fedcba98765432100123456789abcdef",
+		"traceId":          "5bf92f3577b34da6a3ce929d0e0e4737",
 	})
 	worker := NewDeliveryWorker(store, DeliveryWorkerOptions{
 		SMSSenders: map[string]SMSSender{SMSProviderTencent: failingSMSSender{provider: SMSProviderTencent}},
@@ -253,13 +321,14 @@ func TestDeliveryWorkerMarksFailedDeliveryWithRedactedTarget(t *testing.T) {
 		updated.Values["attempts"] != "1" ||
 		updated.Values["target"] != "****0000" ||
 		updated.Values["provider"] != SMSProviderTencent ||
+		updated.Values["providerStatus"] != DeliveryStatusFailed ||
+		updated.Values["requestId"] != "req_fedcba98765432100123456789abcdef" ||
+		updated.Values["traceId"] != "5bf92f3577b34da6a3ce929d0e0e4737" ||
 		updated.Values["providerMessageId"] != "" ||
 		updated.Values["errorMessage"] != "notification delivery failed" {
 		t.Fatalf("updated delivery values = %+v, want failed redacted ledger", updated.Values)
 	}
-	if strings.Contains(updated.Values["errorMessage"], "+8613800000000") {
-		t.Fatalf("errorMessage leaked recipient: %+v", updated.Values)
-	}
+	assertDeliveryLedgerValuesDoNotLeak(t, updated.Values, "+8613800000000", "123456", "provider rejected")
 }
 
 type failingSMSSender struct {
@@ -271,7 +340,7 @@ func (s failingSMSSender) Kind() string {
 }
 
 func (s failingSMSSender) SendSMS(context.Context, SMSMessage) (SMSDeliveryReceipt, error) {
-	return SMSDeliveryReceipt{}, errors.New("provider rejected +8613800000000")
+	return SMSDeliveryReceipt{}, errors.New("provider rejected +8613800000000 with code 123456")
 }
 
 func notificationWorkerTestStore(t *testing.T) *adminresource.Store {

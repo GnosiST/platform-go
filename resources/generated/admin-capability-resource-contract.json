@@ -3,7 +3,7 @@
   "source": "capability.Manifest.Admin.Resources",
   "sourceMode": "go-manifest",
   "sourceVersion": "0.1.0",
-  "resourceCount": 27,
+  "resourceCount": 28,
   "capabilities": [
     "admin-shell",
     "api-resource",
@@ -104,6 +104,9 @@
     "admin:permission:delete",
     "admin:permission:read",
     "admin:permission:update",
+    "admin:request-log:create",
+    "admin:request-log:read",
+    "admin:request-log:update",
     "admin:role-group:create",
     "admin:role-group:delete",
     "admin:role-group:purge",
@@ -2108,10 +2111,396 @@
       },
       "menu": {
         "route": "/error-logs",
+        "parent": "logs",
         "group": "operations",
         "icon": "warning",
-        "order": 330
+        "order": 330,
+        "cache": true
       },
+      "fields": [
+        {
+          "key": "code",
+          "label": {
+            "zh": "日志编码",
+            "en": "Log Code"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "name",
+          "label": {
+            "zh": "错误摘要",
+            "en": "Error Summary"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "level",
+          "label": {
+            "zh": "级别",
+            "en": "Level"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 100,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "message",
+          "label": {
+            "zh": "消息",
+            "en": "Message"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "errorCode",
+          "label": {
+            "zh": "错误码",
+            "en": "Error Code"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "owner",
+          "label": {
+            "zh": "负责人",
+            "en": "Owner"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 140,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "category",
+          "label": {
+            "zh": "分类",
+            "en": "Category"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 140,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "retryPolicy",
+          "label": {
+            "zh": "重试策略",
+            "en": "Retry Policy"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 140,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "redactionClass",
+          "label": {
+            "zh": "脱敏等级",
+            "en": "Redaction Class"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 140,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "eventId",
+          "label": {
+            "zh": "事件 ID",
+            "en": "Event ID"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 260,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "requestId",
+          "label": {
+            "zh": "请求 ID",
+            "en": "Request ID"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "traceId",
+          "label": {
+            "zh": "追踪 ID",
+            "en": "Trace ID"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "createdAt",
+          "label": {
+            "zh": "发生时间",
+            "en": "Occurred At"
+          },
+          "type": "datetime",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 110,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "description",
+          "label": {
+            "zh": "说明",
+            "en": "Description"
+          },
+          "type": "textarea",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inDetail": true,
+          "width": 260,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "updatedAt",
+          "label": {
+            "zh": "更新时间",
+            "en": "Updated At"
+          },
+          "type": "datetime",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "status",
+        "description",
+        "level",
+        "message",
+        "errorCode",
+        "owner",
+        "category",
+        "eventId",
+        "requestId",
+        "traceId",
+        "createdAt"
+      ],
+      "defaultSortKey": "createdAt",
       "deletion": {
         "mode": "append-only",
         "policyVersion": 1
@@ -3908,6 +4297,453 @@
         "mode": "restrict",
         "policyVersion": 1,
         "restrictReferences": true
+      }
+    },
+    {
+      "capabilityId": "audit",
+      "resource": "request-logs",
+      "title": {
+        "zh": "请求日志",
+        "en": "Request Logs"
+      },
+      "description": {
+        "zh": "Admin、App 和平台接口访问记录，统一承载请求、状态、耗时和追踪 ID。",
+        "en": "Admin, app, and platform API access records with request, status, latency, and trace IDs."
+      },
+      "permissionPrefix": "admin:request-log",
+      "permissions": {
+        "create": "admin:request-log:create",
+        "read": "admin:request-log:read",
+        "update": "admin:request-log:update"
+      },
+      "menu": {
+        "route": "/request-logs",
+        "parent": "logs",
+        "group": "operations",
+        "icon": "monitoring",
+        "order": 115,
+        "cache": true
+      },
+      "fields": [
+        {
+          "key": "code",
+          "label": {
+            "zh": "日志编码",
+            "en": "Log Code"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "name",
+          "label": {
+            "zh": "请求摘要",
+            "en": "Request Summary"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "domain",
+          "label": {
+            "zh": "安全域",
+            "en": "Security Domain"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 120,
+          "options": [
+            {
+              "value": "admin",
+              "label": {
+                "zh": "管理端",
+                "en": "Admin"
+              }
+            },
+            {
+              "value": "app",
+              "label": {
+                "zh": "应用端",
+                "en": "App"
+              }
+            },
+            {
+              "value": "auth",
+              "label": {
+                "zh": "认证",
+                "en": "Auth"
+              }
+            },
+            {
+              "value": "platform",
+              "label": {
+                "zh": "平台",
+                "en": "Platform"
+              }
+            },
+            {
+              "value": "public",
+              "label": {
+                "zh": "公开",
+                "en": "Public"
+              }
+            }
+          ],
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "method",
+          "label": {
+            "zh": "方法",
+            "en": "Method"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 100,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "route",
+          "label": {
+            "zh": "路由",
+            "en": "Route"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "statusCode",
+          "label": {
+            "zh": "状态码",
+            "en": "Status Code"
+          },
+          "type": "number",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 100,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "latencyMs",
+          "label": {
+            "zh": "耗时毫秒",
+            "en": "Latency Ms"
+          },
+          "type": "number",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 110,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "actor",
+          "label": {
+            "zh": "访问主体",
+            "en": "Actor"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 160,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "requestId",
+          "label": {
+            "zh": "请求 ID",
+            "en": "Request ID"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "traceId",
+          "label": {
+            "zh": "追踪 ID",
+            "en": "Trace ID"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "clientIpHash",
+          "label": {
+            "zh": "客户端 IP 哈希",
+            "en": "Client IP Hash"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inDetail": true,
+          "width": 220,
+          "validation": {},
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "omitted"
+        },
+        {
+          "key": "createdAt",
+          "label": {
+            "zh": "请求时间",
+            "en": "Requested At"
+          },
+          "type": "datetime",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "searchable": true,
+          "inTable": true,
+          "inDetail": true,
+          "width": 110,
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ],
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "description",
+          "label": {
+            "zh": "说明",
+            "en": "Description"
+          },
+          "type": "textarea",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inDetail": true,
+          "width": 260,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "updatedAt",
+          "label": {
+            "zh": "更新时间",
+            "en": "Updated At"
+          },
+          "type": "datetime",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "readOnly": true,
+          "inDetail": true,
+          "width": 180,
+          "validation": {},
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        }
+      ],
+      "searchFields": [
+        "name",
+        "code",
+        "status",
+        "description",
+        "domain",
+        "method",
+        "route",
+        "statusCode",
+        "actor",
+        "requestId",
+        "traceId",
+        "createdAt"
+      ],
+      "defaultSortKey": "createdAt",
+      "deletion": {
+        "mode": "append-only",
+        "policyVersion": 1
       }
     },
     {

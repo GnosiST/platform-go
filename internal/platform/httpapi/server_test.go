@@ -575,6 +575,54 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 }
 
+func TestRequestLoggingMiddlewarePersistsSafeRequestLog(t *testing.T) {
+	now := time.Date(2026, 7, 19, 13, 10, 0, 0, time.UTC)
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit"}),
+		Now:          func() time.Time { return now },
+	})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/health?phone=%2B8613800138000&password=secret-password&otp=123456&email=admin%40example.test", nil)
+	request.Header.Set("Authorization", "Bearer private-token")
+	request.Header.Set("X-Request-ID", "email@example.test/private")
+	request.RemoteAddr = "203.0.113.25:4567"
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET /api/health status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	logs, err := server.resources.List("request-logs")
+	if err != nil {
+		t.Fatalf("List(request-logs) error = %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("request logs = %d, want 1", len(logs))
+	}
+	log := logs[0]
+	traceParts := strings.Split(recorder.Header().Get("traceparent"), "-")
+	if len(traceParts) != 4 {
+		t.Fatalf("traceparent = %q, want W3C trace context", recorder.Header().Get("traceparent"))
+	}
+	if log.Status != "success" ||
+		log.Values["domain"] != "platform" ||
+		log.Values["method"] != http.MethodGet ||
+		log.Values["route"] != "/api/health" ||
+		log.Values["statusCode"] != "200" ||
+		log.Values["actor"] != "bearer" ||
+		log.Values["requestId"] != recorder.Header().Get("X-Request-ID") ||
+		log.Values["traceId"] != traceParts[1] ||
+		!strings.HasPrefix(log.Values["clientIpHash"], "v1:sha256:client-ip:") ||
+		log.Values["createdAt"] != now.Format(time.RFC3339) {
+		t.Fatalf("request log = %+v, want safe platform request record", log)
+	}
+	for _, forbidden := range []string{"203.0.113.25", "private-token", "email@example.test/private", "+8613800138000", "secret-password", "123456", "admin@example.test"} {
+		if strings.Contains(fmt.Sprintf("%+v", log), forbidden) {
+			t.Fatalf("request log leaked %q: %+v", forbidden, log)
+		}
+	}
+}
+
 func TestCapabilitiesEndpoint(t *testing.T) {
 	server := newTestServer(ServerOptions{Capabilities: []capability.Manifest{
 		{ID: "tenant"},
@@ -1155,12 +1203,12 @@ func TestCredentialAuthChallengeStartAndPasswordLoginConsumesProof(t *testing.T)
 	if err := json.Unmarshal(startRecorder.Body.Bytes(), &started); err != nil {
 		t.Fatalf("decode credential challenge start: %v body = %s", err, startRecorder.Body.String())
 	}
-	if started.Data.ID == "" || started.Data.Kind != "slider" || started.Data.Purpose != "login" || started.Data.DebugProof == "" || started.Data.Prompt == "" || started.Data.Parameters["targetOffset"] == "" || started.Data.ExpiresAt.IsZero() {
-		t.Fatalf("credential challenge start = %+v, want slider material and debug proof", started.Data)
+	if started.Data.ID == "" || started.Data.Kind != "slider" || started.Data.Purpose != "login" || started.Data.DebugProof != "" || started.Data.Prompt == "" || started.Data.Parameters["tileX"] == "" || started.Data.Parameters["targetOffset"] != "" || started.Data.ExpiresAt.IsZero() {
+		t.Fatalf("credential challenge start = %+v, want non-leaking slider material", started.Data)
 	}
 
 	loginRecorder := httptest.NewRecorder()
-	loginRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", credentialAuthPasswordLoginBodyWithChallengeForTest(t, runtime, "correct-password", started.Data.ID, "slider", started.Data.DebugProof, "browser-1"))
+	loginRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", credentialAuthPasswordLoginBodyWithChallengeForTest(t, runtime, "correct-password", started.Data.ID, "slider", credentialAuthChallengeProofForTest, "browser-1"))
 	loginRequest.Header.Set("Content-Type", "application/json")
 
 	server.Router().ServeHTTP(loginRecorder, loginRequest)
@@ -1170,7 +1218,7 @@ func TestCredentialAuthChallengeStartAndPasswordLoginConsumesProof(t *testing.T)
 	}
 
 	reuseRecorder := httptest.NewRecorder()
-	reuseRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", credentialAuthPasswordLoginBodyWithChallengeForTest(t, runtime, "correct-password", started.Data.ID, "slider", started.Data.DebugProof, "browser-1"))
+	reuseRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", credentialAuthPasswordLoginBodyWithChallengeForTest(t, runtime, "correct-password", started.Data.ID, "slider", credentialAuthChallengeProofForTest, "browser-1"))
 	reuseRequest.Header.Set("Content-Type", "application/json")
 
 	server.Router().ServeHTTP(reuseRecorder, reuseRequest)
@@ -1336,6 +1384,40 @@ func TestCredentialAuthSMSOTPLoginConsumesTransaction(t *testing.T) {
 	sent := sender.Sent()
 	if len(sent) != 1 || sent[0].Recipient != "+8613800138000" || sent[0].TemplateParams["code"] != "123456" {
 		t.Fatalf("sent sms = %+v, want login code delivery", sent)
+	}
+	deliveries, err := server.resources.List("notification-deliveries")
+	if err != nil {
+		t.Fatalf("List(notification-deliveries) error = %v", err)
+	}
+	if len(deliveries) != 1 {
+		t.Fatalf("notification deliveries = %d, want 1 credential SMS delivery ledger", len(deliveries))
+	}
+	traceParts := strings.Split(startRecorder.Header().Get("traceparent"), "-")
+	if len(traceParts) != 4 {
+		t.Fatalf("traceparent = %q, want W3C trace context", startRecorder.Header().Get("traceparent"))
+	}
+	delivery := deliveries[0]
+	if delivery.Values["channel"] != notification.ChannelSMS ||
+		delivery.Values["deliveryStatus"] != notification.DeliveryStatusDelivered ||
+		delivery.Values["target"] != "****8000" ||
+		delivery.Values["provider"] != notification.SMSProviderMockLocal ||
+		delivery.Values["providerStatus"] != notification.SMSDeliveryAccepted ||
+		delivery.Values["providerMessageId"] == "" ||
+		delivery.Values["requestId"] != startRecorder.Header().Get("X-Request-ID") ||
+		delivery.Values["traceId"] != traceParts[1] {
+		t.Fatalf("credential SMS delivery = %+v, want delivered redacted ledger with correlation", delivery)
+	}
+	notifications, err := server.resources.List("notifications")
+	if err != nil {
+		t.Fatalf("List(notifications) error = %v", err)
+	}
+	if len(notifications) != 1 {
+		t.Fatalf("notifications = %d, want 1 credential SMS notification record", len(notifications))
+	}
+	for _, forbidden := range []string{"+8613800138000", "123456"} {
+		if strings.Contains(fmt.Sprintf("%+v", delivery), forbidden) || strings.Contains(fmt.Sprintf("%+v", notifications[0]), forbidden) {
+			t.Fatalf("credential SMS ledger leaked %q: delivery=%+v notification=%+v", forbidden, delivery, notifications[0])
+		}
 	}
 
 	loginRecorder := httptest.NewRecorder()
@@ -3397,6 +3479,49 @@ func TestCredentialEndpointsApplyRateLimitPolicies(t *testing.T) {
 	}
 }
 
+func TestCredentialAuthSMSOTPStartRateLimitUsesNormalizedPhoneHash(t *testing.T) {
+	builder, err := ratelimit.NewKeyBuilder([]byte(strings.Repeat("r", 32)))
+	if err != nil {
+		t.Fatalf("NewKeyBuilder() error = %v", err)
+	}
+	runtime, _ := credentialAuthRuntimeForTest(t)
+	limiter := &rateLimitTestStub{}
+	server := newTestServer(ServerOptions{
+		Capabilities:        configuredCredentialAuthManifestsForTest(t),
+		CredentialAuth:      runtime,
+		RateLimiter:         limiter,
+		RateLimitKeyBuilder: builder,
+	})
+
+	post := func(phone string) {
+		t.Helper()
+		body := bytes.NewBufferString(`{"provider":"phone-sms-otp","identifier":{"type":"phone","value":"` + phone + `"}}`)
+		recorder := httptest.NewRecorder()
+		request := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/sms-otp/start", body)
+		request.Header.Set("Content-Type", "application/json")
+		server.Router().ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusCreated {
+			t.Fatalf("POST sms otp start phone=%q status = %d body = %s", phone, recorder.Code, recorder.Body.String())
+		}
+	}
+
+	post("+8613800138000")
+	post("+86 138-0013-8000")
+
+	keys := limiter.keyHistory[ratelimit.OperationPhoneVerificationRequest]
+	if len(keys) != 2 {
+		t.Fatalf("phone verification rate limit keys = %+v, want two calls", keys)
+	}
+	if keys[0] != keys[1] {
+		t.Fatalf("sms otp rate limit keys differ for equivalent phone input: %q vs %q", keys[0], keys[1])
+	}
+	for _, marker := range []string{"+8613800138000", "+86 138-0013-8000", "13800138000"} {
+		if strings.Contains(keys[0], marker) || strings.Contains(keys[1], marker) {
+			t.Fatalf("sms otp rate limit key leaked raw phone marker %q: %+v", marker, keys)
+		}
+	}
+}
+
 func TestAdminMessageCenterDeliveryRunRequiresBearerSession(t *testing.T) {
 	server := newTestServer(ServerOptions{
 		Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit", "notification"}),
@@ -3460,8 +3585,8 @@ func TestAdminMessageCenterDeliveryRunRunsWorkerForAuthorizedSession(t *testing.
 	if payload.Data.Attempted != 1 || payload.Data.Delivered != 1 || payload.Data.Failed != 0 {
 		t.Fatalf("delivery run payload = %+v, want one delivered attempt", payload.Data)
 	}
-	if limiter.calls[ratelimit.OperationMessageCenterDelivery] != 1 {
-		t.Fatalf("message-center delivery rate limit calls = %d, want 1", limiter.calls[ratelimit.OperationMessageCenterDelivery])
+	if limiter.calls[ratelimit.OperationMessageCenterDelivery] != 4 {
+		t.Fatalf("message-center delivery rate limit calls = %d, want static run limit plus runtime channel, policy and daily checks", limiter.calls[ratelimit.OperationMessageCenterDelivery])
 	}
 	sent := sender.Sent()
 	if len(sent) != 1 || sent[0].Recipient != "+8613800000000" || sent[0].TemplateID != "SMS_OPS" || sent[0].TemplateParams["ticket"] != "T-100" {
@@ -3546,6 +3671,53 @@ func TestRateLimitBackendErrorsReturnStableServiceUnavailable(t *testing.T) {
 	}
 	if strings.Contains(recorder.Body.String(), "Sensitive.Redis.Detail") || strings.Contains(recorder.Body.String(), "Sensitive.User") {
 		t.Fatalf("backend error response leaked sensitive detail: %s", recorder.Body.String())
+	}
+}
+
+func TestDefaultPlatformErrorSinkPersistsSafeErrorLog(t *testing.T) {
+	builder, err := ratelimit.NewKeyBuilder([]byte(strings.Repeat("r", 32)))
+	if err != nil {
+		t.Fatalf("NewKeyBuilder() error = %v", err)
+	}
+	now := time.Date(2026, 7, 19, 13, 20, 0, 0, time.UTC)
+	capabilities := capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit"})
+	server := newTestServer(ServerOptions{
+		Capabilities:        capabilities,
+		RateLimiter:         &rateLimitTestStub{deny: ratelimit.OperationAdminLogin, err: errors.New("Sensitive.Redis.Detail phone=+8613800138000")},
+		RateLimitKeyBuilder: builder,
+		Now:                 func() time.Time { return now },
+	})
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"provider":"demo","username":"Sensitive.User"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Request-ID", "private-request@example.test/path")
+	recorder := httptest.NewRecorder()
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusServiceUnavailable || !strings.Contains(recorder.Body.String(), "RATE_LIMIT_UNAVAILABLE") {
+		t.Fatalf("backend error response = %d body=%s, want stable 503", recorder.Code, recorder.Body.String())
+	}
+	logs, err := server.resources.List("error-logs")
+	if err != nil {
+		t.Fatalf("List(error-logs) error = %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("error logs = %d, want 1", len(logs))
+	}
+	log := logs[0]
+	if log.Status != "open" ||
+		log.Values["level"] != "error" ||
+		log.Values["errorCode"] != string(errorcode.CodeRateLimitUnavailable) ||
+		log.Values["owner"] == "" ||
+		log.Values["category"] == "" ||
+		log.Values["requestId"] != recorder.Header().Get("X-Request-ID") ||
+		log.Values["createdAt"] != now.Format(time.RFC3339) {
+		t.Fatalf("error log = %+v, want registry-owned safe error log", log)
+	}
+	for _, forbidden := range []string{"Sensitive.Redis.Detail", "+8613800138000", "Sensitive.User", "private-request@example.test/path"} {
+		if strings.Contains(fmt.Sprintf("%+v", log), forbidden) || strings.Contains(recorder.Body.String(), forbidden) {
+			t.Fatalf("error path leaked %q: log=%+v body=%s", forbidden, log, recorder.Body.String())
+		}
 	}
 }
 
@@ -7918,6 +8090,8 @@ func configuredCredentialAuthManifestsForTest(t *testing.T) []capability.Manifes
 	return manifests
 }
 
+const credentialAuthChallengeProofForTest = "x=72&y=14"
+
 func credentialAuthRuntimeForTest(t *testing.T) (*CredentialAuthRuntime, *notification.MockLocalSMSSender) {
 	t.Helper()
 	hasher, err := credentialauth.NewHMACIdentifierHasher([]byte(strings.Repeat("k", 32)))
@@ -7930,7 +8104,14 @@ func credentialAuthRuntimeForTest(t *testing.T) (*CredentialAuthRuntime, *notifi
 		IdentifierHasher:     hasher,
 		PasswordVerifier:     credentialauth.NewArgon2idVerifier(params),
 		ChallengeProofHasher: hasher,
-		Now:                  func() time.Time { return time.Date(2026, 7, 19, 9, 0, 0, 0, time.UTC) },
+		ChallengeMaterialGenerator: func(kind credentialauth.ChallengeKind) (credentialauth.ChallengeMaterial, error) {
+			return credentialauth.ChallengeMaterial{
+				Prompt:     "Complete the test challenge.",
+				Parameters: map[string]string{"tileX": "5", "tileY": "12", "unit": "px"},
+				Proof:      credentialAuthChallengeProofForTest,
+			}, nil
+		},
+		Now: func() time.Time { return time.Date(2026, 7, 19, 9, 0, 0, 0, time.UTC) },
 	})
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)

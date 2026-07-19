@@ -274,8 +274,9 @@ export type CredentialChallengeStartResult = {
   kind: string;
   purpose: string;
   prompt: string;
-  parameters?: Record<string, string>;
+  parameters?: Record<string, unknown>;
   expiresAt: string;
+  debugVisible?: boolean;
   debugProof?: string;
 };
 

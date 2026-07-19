@@ -36,7 +36,7 @@ func TestDefaultManifestsResolve(t *testing.T) {
 
 func TestDefaultManifestsExposeAdminSurface(t *testing.T) {
 	manifests := DefaultManifests()
-	var tenantFound, orgUnitFound, roleGroupFound, areaCodeFound, dictionaryFound, parameterFound, brandingFound, settingsFound, appPhoneVerificationFound, appPhoneBindingFound, capabilityFound, apiDocsFound, filesFound, sessionFound, loginLogFound, errorLogFound, versionFound, apiTokenFound, policyReviewFound bool
+	var tenantFound, orgUnitFound, roleGroupFound, areaCodeFound, dictionaryFound, parameterFound, brandingFound, settingsFound, appPhoneVerificationFound, appPhoneBindingFound, capabilityFound, apiDocsFound, filesFound, sessionFound, loginLogFound, errorLogFound, requestLogFound, versionFound, apiTokenFound, policyReviewFound bool
 	for _, manifest := range manifests {
 		for _, resource := range manifest.Admin.Resources {
 			if resource.Resource == "tenants" && resource.Menu.Route == "/tenants" && resource.PermissionPrefix == "admin:tenant" {
@@ -86,6 +86,9 @@ func TestDefaultManifestsExposeAdminSurface(t *testing.T) {
 			}
 			if manifest.ID == "audit" && resource.Resource == "error-logs" && resource.Menu.Route == "/error-logs" && resource.PermissionPrefix == "admin:error-log" {
 				errorLogFound = true
+			}
+			if manifest.ID == "audit" && resource.Resource == "request-logs" && resource.Menu.Route == "/request-logs" && resource.PermissionPrefix == "admin:request-log" {
+				requestLogFound = true
 			}
 			if manifest.ID == "system-admin" && resource.Resource == "versions" && resource.Menu.Route == "/versions" && resource.PermissionPrefix == "admin:version" {
 				versionFound = true
@@ -145,6 +148,14 @@ func TestDefaultManifestsExposeAdminSurface(t *testing.T) {
 	}
 	if !errorLogFound {
 		t.Fatalf("DefaultManifests() missing error log admin surface")
+	}
+	if !requestLogFound {
+		t.Fatalf("DefaultManifests() missing request log admin surface")
+	}
+	requestLogs := adminResourceByID(t, manifests, "audit", "request-logs")
+	clientIPHash := adminResourceField(t, requestLogs, "clientIpHash")
+	if !clientIPHash.ReadOnly || clientIPHash.InTable || clientIPHash.InForm || !clientIPHash.InDetail || clientIPHash.Sensitivity != capability.FieldSensitivityInternal || clientIPHash.ExportMode != capability.FieldProjectionOmitted {
+		t.Fatalf("request-logs.clientIpHash = %+v, want internal read-only detail field omitted from export", clientIPHash)
 	}
 	if !versionFound {
 		t.Fatalf("DefaultManifests() missing version admin surface")
@@ -341,6 +352,12 @@ func TestNotificationManifestIsOptionalAndBusinessNeutral(t *testing.T) {
 	requireFieldRelation(t, resources["notification-deliveries"], "tenantCode", "tenants")
 	requireFieldRelation(t, resources["notification-deliveries"], "notificationCode", "notifications")
 	requireFieldRelation(t, resources["notification-deliveries"], "recipientUserCode", "users")
+	for _, fieldKey := range []string{"providerStatus", "requestId", "traceId"} {
+		field := adminResourceField(t, resources["notification-deliveries"], fieldKey)
+		if !field.ReadOnly || field.InTable || field.InForm || !field.InDetail || field.Sensitivity != capability.FieldSensitivityInternal || field.ExportMode != capability.FieldProjectionOmitted {
+			t.Fatalf("notification-deliveries field %q = %+v, want internal read-only detail field omitted from export", fieldKey, field)
+		}
+	}
 
 	for _, resource := range []capability.AdminResource{resources["notification-channels"], resources["notification-providers"], resources["notification-send-policies"], resources["notification-templates"], resources["notification-deliveries"]} {
 		channelField := adminResourceField(t, resource, "channel")
@@ -451,6 +468,23 @@ func TestDefaultManifestsExposeLifecycleDeclarations(t *testing.T) {
 	if seedCount == 0 {
 		t.Fatalf("DefaultManifests() expose no seeds")
 	}
+}
+
+func adminResourceByID(t *testing.T, manifests []capability.Manifest, capabilityID capability.ID, resourceID string) capability.AdminResource {
+	t.Helper()
+	for _, manifest := range manifests {
+		if manifest.ID != capabilityID {
+			continue
+		}
+		for _, resource := range manifest.Admin.Resources {
+			if resource.Resource == resourceID {
+				return resource
+			}
+		}
+		t.Fatalf("capability %q missing admin resource %q", capabilityID, resourceID)
+	}
+	t.Fatalf("missing capability %q", capabilityID)
+	return capability.AdminResource{}
 }
 
 func requireFieldRelation(t *testing.T, resource capability.AdminResource, fieldKey string, relationResource string) {

@@ -236,6 +236,21 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /Profile summary body must remain scrollable/);
   });
 
+  it("rejects profile dropdown height that can push account actions below the viewport", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/shell/AdminShell.tsx",
+      'maxHeight="min(720px, calc(100vh - 72px))"',
+      'maxHeight="min(720px, calc(100vh - 32px))"',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Profile summary dropdown must reserve enough viewport height/);
+  });
+
   it("rejects profile editor modals that can grow past the viewport", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
@@ -656,6 +671,81 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /prefill dry-run with the clicked channel/);
+  });
+
+  it("rejects logging center pages that drop an existing log resource", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/logging-center/LoggingCenterConsole.tsx",
+      'resource: "login-logs"',
+      'resource: "login-events"',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Logging center must read existing login-logs resources/);
+  });
+
+  it("rejects logging center pages that omit request logs", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/logging-center/LoggingCenterConsole.tsx",
+      'resource: "request-logs"',
+      'resource: "request-events"',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Logging center must read existing request-logs resources/);
+  });
+
+  it("rejects logging center routing that requires a backend workbench menu", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/App.tsx",
+      "projectLoggingCenterResource(menus.items.map(menuItemToResourceDefinition))",
+      "menus.items.map(menuItemToResourceDefinition)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must project the logging-center workbench from authorized log resources/);
+  });
+
+  it("rejects credential challenge debug proof shown without explicit visibility", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      "if (!challengeDebugVisible(challenge)) {\n    return null;\n  }",
+      "if (!challenge.debugProof) {\n    return null;\n  }",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /debug proof display must be controlled by an explicit response field/);
+  });
+
+  it("rejects credential challenge text answers as the production prompt", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      'const displayText = challengeStringParameter(challenge, "displayText") || challengeStringParameter(challenge, "display");',
+      'const displayText = challenge.parameters?.text || challengeStringParameter(challenge, "displayText") || challengeStringParameter(challenge, "display");',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must not read text answers directly as the production prompt path/);
   });
 
   it("rejects capability details that no longer open from the list into a modal", () => {

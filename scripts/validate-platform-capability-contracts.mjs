@@ -15,6 +15,7 @@ function argValue(name, fallback) {
 const contractsPath = path.resolve(repoRoot, argValue("--contracts", "resources/platform-capability-contracts.json"));
 const profilesPath = path.resolve(repoRoot, argValue("--profiles", "resources/platform-capability-profiles.json"));
 const configPath = path.resolve(repoRoot, argValue("--config", "internal/platform/config/config.go"));
+const capabilityDevelopmentDocPath = path.resolve(repoRoot, "docs/platform-capability-development.md");
 
 const allowedProfilePolicies = new Set(["default-enabled", "default-development-only", "profile-only", "business-external-only"]);
 const allowedClassifications = new Set([
@@ -304,6 +305,35 @@ function validateNotificationProductization(contract, errors) {
   }
   if (!String(productization.restartPolicy ?? "").includes("restartRequired") || !String(productization.restartPolicy ?? "").includes("pendingRestart")) {
     errors.push(`${prefix}.restartPolicy must document restartRequired and pendingRestart`);
+  }
+  const sendPolicyLimitRuntime = String(productization.sendPolicyLimitRuntime ?? "");
+  for (const required of [
+    "runtime-active",
+    "notification-send-policies.rateLimitPerMinute",
+    "notification-channels.rateLimitPerMinute",
+    "notification-channels.dailyQuota",
+    "message-center test sends",
+    "delivery-worker attempts",
+    "ratelimit.OperationMessageCenterDelivery",
+    "must not include raw recipients, OTP codes or template parameter values",
+  ]) {
+    if (!sendPolicyLimitRuntime.includes(required)) {
+      errors.push(`${prefix}.sendPolicyLimitRuntime must document ${required}`);
+    }
+  }
+  const capabilityDevelopmentDoc = fs.readFileSync(capabilityDevelopmentDocPath, "utf8");
+  for (const required of [
+    "runtime-active",
+    "notification-send-policies.rateLimitPerMinute",
+    "notification-channels.rateLimitPerMinute",
+    "notification-channels.dailyQuota",
+    "message-center test sends",
+    "delivery-worker attempts",
+    "must not include raw recipients, OTP codes or template parameter values",
+  ]) {
+    if (!capabilityDevelopmentDoc.includes(required)) {
+      errors.push(`docs/platform-capability-development.md must document notification send-policy runtime enforcement: ${required}`);
+    }
   }
   const runtimeBoundary = String(productization.runtimeBoundary ?? "");
   if (!runtimeBoundary.includes("official SDK-backed Aliyun/Tencent Cloud live SMS adapters")) {

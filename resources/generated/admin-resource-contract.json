@@ -24,7 +24,7 @@
     ],
     "testDriver": "sqlite"
   },
-  "resourceCount": 27,
+  "resourceCount": 28,
   "groups": [
     "foundation",
     "governance",
@@ -117,6 +117,9 @@
     "admin:permission:delete",
     "admin:permission:read",
     "admin:permission:update",
+    "admin:request-log:create",
+    "admin:request-log:read",
+    "admin:request-log:update",
     "admin:role-group:create",
     "admin:role-group:delete",
     "admin:role-group:purge",
@@ -184,6 +187,23 @@
       "external": false,
       "keepAlive": true,
       "permission": "admin:tenant:read"
+    },
+    {
+      "resource": "request-logs",
+      "code": "request-logs",
+      "label": {
+        "zh": "请求日志",
+        "en": "Request Logs"
+      },
+      "parentCode": "logs",
+      "path": "/request-logs",
+      "icon": "monitoring",
+      "sortOrder": 115,
+      "visible": true,
+      "hidden": false,
+      "external": false,
+      "keepAlive": true,
+      "permission": "admin:request-log:read"
     },
     {
       "resource": "users",
@@ -996,6 +1016,19 @@
       "permission": "admin:permission:read"
     },
     {
+      "resource": "request-logs",
+      "method": "POST",
+      "path": "/api/admin/resources/request-logs",
+      "permission": "admin:request-log:create",
+      "auditAction": "request_log.create"
+    },
+    {
+      "resource": "request-logs",
+      "method": "POST",
+      "path": "/api/admin/resources/request-logs/query",
+      "permission": "admin:request-log:read"
+    },
+    {
       "resource": "roleGroups",
       "method": "POST",
       "path": "/api/admin/resources/role-groups",
@@ -1170,6 +1203,13 @@
       "path": "/api/admin/resources/permissions/:id",
       "permission": "admin:permission:update",
       "auditAction": "permission.update"
+    },
+    {
+      "resource": "request-logs",
+      "method": "PUT",
+      "path": "/api/admin/resources/request-logs/:id",
+      "permission": "admin:request-log:update",
+      "auditAction": "request_log.update"
     },
     {
       "resource": "roleGroups",
@@ -1454,6 +1494,18 @@
       },
       "group": "system",
       "permission": "admin:permission:read"
+    },
+    {
+      "resource": "request-logs",
+      "name": "request-logs",
+      "route": "/request-logs",
+      "component": "ResourceTablePage",
+      "label": {
+        "zh": "请求日志",
+        "en": "Request Logs"
+      },
+      "group": "operations",
+      "permission": "admin:request-log:read"
     },
     {
       "resource": "roleGroups",
@@ -5166,6 +5218,531 @@
       "actions": [],
       "panels": []
     },
+    "request-logs": {
+      "formGroups": [],
+      "fields": [
+        {
+          "key": "actor",
+          "label": {
+            "zh": "访问主体",
+            "en": "Actor"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": false,
+          "readOnly": true,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": false,
+          "detail": true,
+          "width": 160,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "clientIpHash",
+          "label": {
+            "zh": "客户端 IP 哈希",
+            "en": "Client IP Hash"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": false,
+          "readOnly": true,
+          "search": false,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": false,
+          "form": false,
+          "detail": true,
+          "width": 220,
+          "sensitivity": "internal",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "omitted"
+        },
+        {
+          "key": "code",
+          "label": {
+            "zh": "日志编码",
+            "en": "Log Code"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": false,
+          "detail": true,
+          "width": 180,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "createdAt",
+          "label": {
+            "zh": "请求时间",
+            "en": "Requested At"
+          },
+          "type": "datetime",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": false,
+          "detail": true,
+          "width": 180,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "description",
+          "label": {
+            "zh": "说明",
+            "en": "Description"
+          },
+          "type": "textarea",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": false,
+          "readOnly": true,
+          "search": false,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": false,
+          "form": false,
+          "detail": true,
+          "width": 260,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "domain",
+          "label": {
+            "zh": "安全域",
+            "en": "Security Domain"
+          },
+          "type": "select",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": false,
+          "detail": true,
+          "width": 120,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full",
+          "options": [
+            {
+              "value": "admin",
+              "label": {
+                "zh": "管理端",
+                "en": "Admin"
+              }
+            },
+            {
+              "value": "app",
+              "label": {
+                "zh": "应用端",
+                "en": "App"
+              }
+            },
+            {
+              "value": "auth",
+              "label": {
+                "zh": "认证",
+                "en": "Auth"
+              }
+            },
+            {
+              "value": "platform",
+              "label": {
+                "zh": "平台",
+                "en": "Platform"
+              }
+            },
+            {
+              "value": "public",
+              "label": {
+                "zh": "公开",
+                "en": "Public"
+              }
+            }
+          ]
+        },
+        {
+          "key": "latencyMs",
+          "label": {
+            "zh": "耗时毫秒",
+            "en": "Latency Ms"
+          },
+          "type": "number",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": false,
+          "detail": true,
+          "width": 110,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "method",
+          "label": {
+            "zh": "方法",
+            "en": "Method"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": false,
+          "detail": true,
+          "width": 100,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "name",
+          "label": {
+            "zh": "请求摘要",
+            "en": "Request Summary"
+          },
+          "type": "text",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": false,
+          "detail": true,
+          "width": 220,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "requestId",
+          "label": {
+            "zh": "请求 ID",
+            "en": "Request ID"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": false,
+          "readOnly": true,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": false,
+          "detail": true,
+          "width": 220,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "route",
+          "label": {
+            "zh": "路由",
+            "en": "Route"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": false,
+          "detail": true,
+          "width": 220,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "status",
+          "label": {
+            "zh": "状态",
+            "en": "Status"
+          },
+          "type": "select",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": false,
+          "readOnly": true,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": false,
+          "detail": true,
+          "width": 110,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full",
+          "options": [
+            {
+              "value": "enabled",
+              "label": {
+                "zh": "已启用",
+                "en": "Enabled"
+              }
+            },
+            {
+              "value": "disabled",
+              "label": {
+                "zh": "已停用",
+                "en": "Disabled"
+              }
+            }
+          ]
+        },
+        {
+          "key": "statusCode",
+          "label": {
+            "zh": "状态码",
+            "en": "Status Code"
+          },
+          "type": "number",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": true,
+          "readOnly": true,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": false,
+          "detail": true,
+          "width": 100,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "traceId",
+          "label": {
+            "zh": "追踪 ID",
+            "en": "Trace ID"
+          },
+          "type": "text",
+          "source": "values",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": false,
+          "readOnly": true,
+          "search": true,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": true,
+          "form": false,
+          "detail": true,
+          "width": 220,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        },
+        {
+          "key": "updatedAt",
+          "label": {
+            "zh": "更新时间",
+            "en": "Updated At"
+          },
+          "type": "datetime",
+          "source": "record",
+          "help": {
+            "zh": "",
+            "en": ""
+          },
+          "required": false,
+          "readOnly": true,
+          "search": false,
+          "filter": false,
+          "sort": false,
+          "localize": false,
+          "table": false,
+          "form": false,
+          "detail": true,
+          "width": 180,
+          "sensitivity": "public",
+          "storageMode": "plain",
+          "responseMode": "full",
+          "exportMode": "full"
+        }
+      ],
+      "search": [
+        "actor",
+        "code",
+        "createdAt",
+        "description",
+        "domain",
+        "method",
+        "name",
+        "requestId",
+        "route",
+        "status",
+        "statusCode",
+        "traceId"
+      ],
+      "filter": [
+        "actor",
+        "code",
+        "createdAt",
+        "domain",
+        "latencyMs",
+        "method",
+        "name",
+        "requestId",
+        "route",
+        "status",
+        "statusCode",
+        "traceId",
+        "updatedAt"
+      ],
+      "sort": [
+        "actor",
+        "code",
+        "createdAt",
+        "domain",
+        "latencyMs",
+        "method",
+        "name",
+        "requestId",
+        "route",
+        "status",
+        "statusCode",
+        "traceId",
+        "updatedAt"
+      ],
+      "table": [
+        "code",
+        "name",
+        "domain",
+        "method",
+        "route",
+        "statusCode",
+        "latencyMs",
+        "actor",
+        "requestId",
+        "traceId",
+        "createdAt",
+        "status"
+      ],
+      "form": [],
+      "localizedFields": [],
+      "actions": [],
+      "panels": []
+    },
     "roleGroups": {
       "formGroups": [],
       "fields": [
@@ -6314,6 +6891,7 @@
       "files",
       "monitoring",
       "overview",
+      "request-logs",
       "settings"
     ],
     "guardedCatalog": [
@@ -11326,6 +11904,595 @@
         "mode": "guardedCatalog",
         "model": "Permission",
         "table": "platform_permissions"
+      }
+    },
+    {
+      "name": "request-logs",
+      "code": "request-logs",
+      "label": {
+        "zh": "请求日志",
+        "en": "Request Logs"
+      },
+      "group": "operations",
+      "menu": {
+        "parentCode": "logs",
+        "path": "/request-logs",
+        "icon": "monitoring",
+        "sortOrder": 115,
+        "visible": true,
+        "hidden": false,
+        "external": false,
+        "keepAlive": true
+      },
+      "refine": {
+        "resource": "request-logs",
+        "list": "/request-logs",
+        "component": "ResourceTablePage"
+      },
+      "apiBase": "/api/admin/request-logs",
+      "permissions": {
+        "create": "admin:request-log:create",
+        "read": "admin:request-log:read",
+        "update": "admin:request-log:update"
+      },
+      "deletion": {
+        "mode": "append-only",
+        "policyVersion": 1
+      },
+      "permissionCodes": [
+        "admin:request-log:create",
+        "admin:request-log:read",
+        "admin:request-log:update"
+      ],
+      "actions": [],
+      "panels": [],
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/admin/resources/request-logs",
+          "permission": "admin:request-log:create",
+          "auditAction": "request_log.create"
+        },
+        {
+          "method": "POST",
+          "path": "/api/admin/resources/request-logs/query",
+          "permission": "admin:request-log:read"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/admin/resources/request-logs/:id",
+          "permission": "admin:request-log:update",
+          "auditAction": "request_log.update"
+        }
+      ],
+      "schema": {
+        "formGroups": [],
+        "formLayout": "grouped-sections",
+        "fields": [
+          {
+            "key": "actor",
+            "label": {
+              "zh": "访问主体",
+              "en": "Actor"
+            },
+            "type": "text",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": false,
+            "readOnly": true,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": false,
+            "detail": true,
+            "width": 160,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "clientIpHash",
+            "label": {
+              "zh": "客户端 IP 哈希",
+              "en": "Client IP Hash"
+            },
+            "type": "text",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": false,
+            "readOnly": true,
+            "search": false,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": false,
+            "form": false,
+            "detail": true,
+            "width": 220,
+            "sensitivity": "internal",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "omitted"
+          },
+          {
+            "key": "code",
+            "label": {
+              "zh": "日志编码",
+              "en": "Log Code"
+            },
+            "type": "text",
+            "source": "record",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": true,
+            "readOnly": true,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": false,
+            "detail": true,
+            "width": 180,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "createdAt",
+            "label": {
+              "zh": "请求时间",
+              "en": "Requested At"
+            },
+            "type": "datetime",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": true,
+            "readOnly": true,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": false,
+            "detail": true,
+            "width": 180,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "description",
+            "label": {
+              "zh": "说明",
+              "en": "Description"
+            },
+            "type": "textarea",
+            "source": "record",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": false,
+            "readOnly": true,
+            "search": false,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": false,
+            "form": false,
+            "detail": true,
+            "width": 260,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "domain",
+            "label": {
+              "zh": "安全域",
+              "en": "Security Domain"
+            },
+            "type": "select",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": true,
+            "readOnly": true,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": false,
+            "detail": true,
+            "width": 120,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full",
+            "options": [
+              {
+                "value": "admin",
+                "label": {
+                  "zh": "管理端",
+                  "en": "Admin"
+                }
+              },
+              {
+                "value": "app",
+                "label": {
+                  "zh": "应用端",
+                  "en": "App"
+                }
+              },
+              {
+                "value": "auth",
+                "label": {
+                  "zh": "认证",
+                  "en": "Auth"
+                }
+              },
+              {
+                "value": "platform",
+                "label": {
+                  "zh": "平台",
+                  "en": "Platform"
+                }
+              },
+              {
+                "value": "public",
+                "label": {
+                  "zh": "公开",
+                  "en": "Public"
+                }
+              }
+            ]
+          },
+          {
+            "key": "latencyMs",
+            "label": {
+              "zh": "耗时毫秒",
+              "en": "Latency Ms"
+            },
+            "type": "number",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": true,
+            "readOnly": true,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": false,
+            "detail": true,
+            "width": 110,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "method",
+            "label": {
+              "zh": "方法",
+              "en": "Method"
+            },
+            "type": "text",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": true,
+            "readOnly": true,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": false,
+            "detail": true,
+            "width": 100,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "name",
+            "label": {
+              "zh": "请求摘要",
+              "en": "Request Summary"
+            },
+            "type": "text",
+            "source": "record",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": true,
+            "readOnly": true,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": false,
+            "detail": true,
+            "width": 220,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "requestId",
+            "label": {
+              "zh": "请求 ID",
+              "en": "Request ID"
+            },
+            "type": "text",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": false,
+            "readOnly": true,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": false,
+            "detail": true,
+            "width": 220,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "route",
+            "label": {
+              "zh": "路由",
+              "en": "Route"
+            },
+            "type": "text",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": true,
+            "readOnly": true,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": false,
+            "detail": true,
+            "width": 220,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "status",
+            "label": {
+              "zh": "状态",
+              "en": "Status"
+            },
+            "type": "select",
+            "source": "record",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": false,
+            "readOnly": true,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": false,
+            "detail": true,
+            "width": 110,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full",
+            "options": [
+              {
+                "value": "enabled",
+                "label": {
+                  "zh": "已启用",
+                  "en": "Enabled"
+                }
+              },
+              {
+                "value": "disabled",
+                "label": {
+                  "zh": "已停用",
+                  "en": "Disabled"
+                }
+              }
+            ]
+          },
+          {
+            "key": "statusCode",
+            "label": {
+              "zh": "状态码",
+              "en": "Status Code"
+            },
+            "type": "number",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": true,
+            "readOnly": true,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": false,
+            "detail": true,
+            "width": 100,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "traceId",
+            "label": {
+              "zh": "追踪 ID",
+              "en": "Trace ID"
+            },
+            "type": "text",
+            "source": "values",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": false,
+            "readOnly": true,
+            "search": true,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": true,
+            "form": false,
+            "detail": true,
+            "width": 220,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          },
+          {
+            "key": "updatedAt",
+            "label": {
+              "zh": "更新时间",
+              "en": "Updated At"
+            },
+            "type": "datetime",
+            "source": "record",
+            "help": {
+              "zh": "",
+              "en": ""
+            },
+            "required": false,
+            "readOnly": true,
+            "search": false,
+            "filter": false,
+            "sort": false,
+            "localize": false,
+            "table": false,
+            "form": false,
+            "detail": true,
+            "width": 180,
+            "sensitivity": "public",
+            "storageMode": "plain",
+            "responseMode": "full",
+            "exportMode": "full"
+          }
+        ],
+        "search": [
+          "actor",
+          "code",
+          "createdAt",
+          "description",
+          "domain",
+          "method",
+          "name",
+          "requestId",
+          "route",
+          "status",
+          "statusCode",
+          "traceId"
+        ],
+        "filter": [
+          "actor",
+          "code",
+          "createdAt",
+          "domain",
+          "latencyMs",
+          "method",
+          "name",
+          "requestId",
+          "route",
+          "status",
+          "statusCode",
+          "traceId",
+          "updatedAt"
+        ],
+        "sort": [
+          "actor",
+          "code",
+          "createdAt",
+          "domain",
+          "latencyMs",
+          "method",
+          "name",
+          "requestId",
+          "route",
+          "status",
+          "statusCode",
+          "traceId",
+          "updatedAt"
+        ],
+        "table": [
+          "code",
+          "name",
+          "domain",
+          "method",
+          "route",
+          "statusCode",
+          "latencyMs",
+          "actor",
+          "requestId",
+          "traceId",
+          "createdAt",
+          "status"
+        ],
+        "form": [],
+        "localizedFields": []
+      },
+      "codegen": {
+        "mode": "custom",
+        "reason": "Capability resource runs through the generic admin resource engine; source-writing scaffold is disabled.",
+        "capabilityId": "audit"
       }
     },
     {

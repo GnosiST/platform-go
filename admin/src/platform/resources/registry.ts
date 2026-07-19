@@ -15,6 +15,18 @@ export type AdminResourceDefinition = {
   icon: string;
 };
 
+const loggingCenterResource: AdminResourceDefinition = {
+  name: "loggingCenter",
+  route: "/logging-center",
+  parent: "logs",
+  cacheEnabled: true,
+  title: { zh: "日志中心", en: "Logging Center" },
+  description: { zh: "聚合审计、登录、错误和请求日志入口。", en: "Aggregated entry for audit, login, error, and request logs." },
+  permission: "admin:audit-log:read",
+  group: "operations",
+  icon: "audit",
+};
+
 export const coreResources: AdminResourceDefinition[] = [
   {
     name: "overview",
@@ -137,6 +149,7 @@ export const coreResources: AdminResourceDefinition[] = [
     group: "foundation",
     icon: "capabilities",
   },
+  loggingCenterResource,
   {
     name: "auditLogs",
     route: "/audit-logs",
@@ -147,6 +160,39 @@ export const coreResources: AdminResourceDefinition[] = [
     permission: "admin:audit-log:read",
     group: "governance",
     icon: "audit",
+  },
+  {
+    name: "loginLogs",
+    route: "/login-logs",
+    parent: "logs",
+    cacheEnabled: true,
+    title: { zh: "登录日志", en: "Login Logs" },
+    description: { zh: "登录认证记录和安全追踪。", en: "Login authentication records and security tracing." },
+    permission: "admin:login-log:read",
+    group: "operations",
+    icon: "audit",
+  },
+  {
+    name: "errorLogs",
+    route: "/error-logs",
+    parent: "logs",
+    cacheEnabled: true,
+    title: { zh: "错误日志", en: "Error Logs" },
+    description: { zh: "运行错误、异常和排查记录。", en: "Runtime errors, exceptions, and troubleshooting records." },
+    permission: "admin:error-log:read",
+    group: "operations",
+    icon: "audit",
+  },
+  {
+    name: "requestLogs",
+    route: "/request-logs",
+    parent: "logs",
+    cacheEnabled: true,
+    title: { zh: "请求日志", en: "Request Logs" },
+    description: { zh: "HTTP 请求、状态、耗时和调用主体追踪。", en: "HTTP requests, status, latency, and actor tracing." },
+    permission: "admin:request-log:read",
+    group: "operations",
+    icon: "apiResources",
   },
   {
     name: "sessions",
@@ -215,3 +261,29 @@ export const coreResources: AdminResourceDefinition[] = [
     icon: "settings",
   },
 ];
+
+export function isLoggingCenterResourceRoute(route: string) {
+  return [
+    "/audit-logs",
+    "/login-logs",
+    "/error-logs",
+    "/request-logs",
+  ].includes(route);
+}
+
+export function projectLoggingCenterResource(resources: AdminResourceDefinition[]) {
+  if (resources.some((resource) => resource.route === loggingCenterResource.route)) {
+    return resources;
+  }
+  const loggingResources = resources.filter((resource) => isLoggingCenterResourceRoute(resource.route));
+  if (loggingResources.length === 0) {
+    return resources;
+  }
+  return [
+    ...resources,
+    {
+      ...loggingCenterResource,
+      permission: loggingResources[0].permission,
+    },
+  ];
+}

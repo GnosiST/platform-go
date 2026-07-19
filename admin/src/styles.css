@@ -2437,7 +2437,7 @@ select {
 
 .login-challenge-prompt {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
   min-height: 28px;
@@ -2445,6 +2445,35 @@ select {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--row-hover);
+}
+
+.login-challenge-payload,
+.login-challenge-debug {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.login-challenge-debug {
+  justify-items: end;
+}
+
+.login-challenge-payload .ant-typography,
+.login-challenge-debug .ant-typography {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.login-challenge-image {
+  display: block;
+  width: min(100%, 220px);
+  min-height: 44px;
+  max-height: 88px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
 }
 
 .login-challenge-row {
@@ -4781,7 +4810,8 @@ select {
 }
 
 .settings-center-card-grid,
-.message-center-channel-strip {
+.message-center-channel-strip,
+.logging-center-resource-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 10px;
@@ -4795,6 +4825,7 @@ select {
 
 .settings-center-card,
 .message-center-channel-card,
+.logging-center-resource-card,
 .settings-center-runtime-card {
   display: grid;
   min-width: 0;
@@ -4818,15 +4849,26 @@ select {
   cursor: pointer;
 }
 
+.logging-center-resource-card {
+  width: 100%;
+}
+
+.logging-center-resource-card.interactive {
+  cursor: pointer;
+}
+
 .settings-center-card:hover,
-.settings-center-card:focus-visible {
+.settings-center-card:focus-visible,
+.logging-center-resource-card.interactive:hover,
+.logging-center-resource-card.interactive:focus-visible {
   border-color: color-mix(in srgb, var(--primary) 56%, var(--border) 44%);
   background: color-mix(in srgb, var(--primary-weak) 38%, var(--surface) 62%);
   outline: none;
 }
 
 .settings-center-card-icon,
-.message-center-channel-icon {
+.message-center-channel-icon,
+.logging-center-resource-icon {
   display: grid;
   width: 36px;
   height: 36px;
@@ -4839,6 +4881,7 @@ select {
 
 .settings-center-card > span:nth-child(2),
 .message-center-channel-card > div:nth-child(2),
+.logging-center-resource-card > div:nth-child(2),
 .settings-center-config-cell,
 .settings-center-runtime-card > div:nth-child(2) {
   display: grid;
@@ -4849,6 +4892,7 @@ select {
 .settings-center-card .ant-typography,
 .settings-center-config-cell .ant-typography,
 .message-center-channel-card .ant-typography,
+.logging-center-resource-card .ant-typography,
 .settings-center-runtime-card .ant-typography {
   min-width: 0;
   margin: 0;
@@ -6200,6 +6244,14 @@ select {
     min-height: 44px;
   }
 
+  .login-challenge-prompt {
+    flex-wrap: wrap;
+  }
+
+  .login-challenge-debug {
+    justify-items: start;
+  }
+
   .login-panel-toolbar .topbar-icon-button,
   .login-theme-swatch {
     min-width: 44px;
@@ -6375,6 +6427,7 @@ select {
   .capability-impact-row,
   .settings-center-card,
   .message-center-channel-card,
+  .logging-center-resource-card,
   .settings-center-runtime-card {
     grid-template-columns: minmax(0, 1fr);
   }

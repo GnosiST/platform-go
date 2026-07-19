@@ -580,12 +580,7 @@ function CredentialChallengeField({
   return (
     <Form.Item label={dictionary.loginChallenge} required>
       <div className="login-challenge-card">
-        <div className="login-challenge-prompt">
-          <Typography.Text strong>{challengePrompt(challenge, dictionary)}</Typography.Text>
-          {challenge?.debugProof ? (
-            <Typography.Text code>{dictionary.loginChallengeDebugProof.replace("{proof}", challenge.debugProof)}</Typography.Text>
-          ) : null}
-        </div>
+        <CredentialChallengePayload challenge={challenge} dictionary={dictionary} />
         <Space.Compact className="login-challenge-row">
           <Form.Item noStyle name="challengeProof" rules={[{ required: true, message: dictionary.loginChallengeRequired }]}>
             <Input
@@ -604,6 +599,96 @@ function CredentialChallengeField({
   );
 }
 
+function CredentialChallengePayload({
+  challenge,
+  dictionary,
+}: {
+  challenge: CredentialChallengeStartResult | null;
+  dictionary: Dictionary;
+}) {
+  if (!challenge) {
+    return (
+      <div className="login-challenge-prompt">
+        <Typography.Text strong>{dictionary.loginChallengeLoading}</Typography.Text>
+      </div>
+    );
+  }
+  if (challenge.kind === "captcha") {
+    return <CaptchaChallengePayload challenge={challenge} dictionary={dictionary} />;
+  }
+  return <ProviderSpecificChallengePayload challenge={challenge} dictionary={dictionary} />;
+}
+
+function CaptchaChallengePayload({
+  challenge,
+  dictionary,
+}: {
+  challenge: CredentialChallengeStartResult;
+  dictionary: Dictionary;
+}) {
+  const imageSource = challengeStringParameter(challenge, "imageUrl") || challengeStringParameter(challenge, "imageData");
+  const displayText = challengeStringParameter(challenge, "displayText") || challengeStringParameter(challenge, "display");
+  return (
+    <div className="login-challenge-prompt">
+      <div className="login-challenge-payload">
+        <Typography.Text strong>{challenge.prompt || dictionary.loginChallengePrompt}</Typography.Text>
+        {imageSource ? <img alt={dictionary.loginChallengeImageAlt} className="login-challenge-image" src={imageSource} /> : null}
+        {!imageSource && displayText ? <Typography.Text type="secondary">{displayText}</Typography.Text> : null}
+      </div>
+      <CredentialChallengeDebug challenge={challenge} dictionary={dictionary} />
+    </div>
+  );
+}
+
+function ProviderSpecificChallengePayload({
+  challenge,
+  dictionary,
+}: {
+  challenge: CredentialChallengeStartResult;
+  dictionary: Dictionary;
+}) {
+  const provider = challengeStringParameter(challenge, "provider");
+  const component = challengeStringParameter(challenge, "component");
+  const displayText = challengeStringParameter(challenge, "displayText") || challengeStringParameter(challenge, "display");
+  return (
+    <div className="login-challenge-prompt">
+      <div className="login-challenge-payload">
+        <Typography.Text strong>{challenge.prompt || dictionary.loginChallengeProviderPrompt.replace("{kind}", challenge.kind)}</Typography.Text>
+        {provider || component ? (
+          <Typography.Text type="secondary">
+            {dictionary.loginChallengeProviderPayload
+              .replace("{provider}", provider || challenge.kind)
+              .replace("{component}", component || challenge.kind)}
+          </Typography.Text>
+        ) : null}
+        {displayText ? <Typography.Text type="secondary">{displayText}</Typography.Text> : null}
+      </div>
+      <CredentialChallengeDebug challenge={challenge} dictionary={dictionary} />
+    </div>
+  );
+}
+
+function CredentialChallengeDebug({
+  challenge,
+  dictionary,
+}: {
+  challenge: CredentialChallengeStartResult;
+  dictionary: Dictionary;
+}) {
+  if (!challengeDebugVisible(challenge)) {
+    return null;
+  }
+  const debugText = challengeStringParameter(challenge, "text");
+  return (
+    <div className="login-challenge-debug">
+      {debugText ? <Typography.Text code>{dictionary.loginChallengeDebugText.replace("{text}", debugText)}</Typography.Text> : null}
+      {challenge.debugProof ? (
+        <Typography.Text code>{dictionary.loginChallengeDebugProof.replace("{proof}", challenge.debugProof)}</Typography.Text>
+      ) : null}
+    </div>
+  );
+}
+
 function credentialChallengeRequest(challenge: CredentialChallengeStartResult | null, proof: string | undefined) {
   const normalizedProof = String(proof ?? "").trim();
   if (!challenge || normalizedProof === "") return undefined;
@@ -614,11 +699,15 @@ function credentialChallengeRequest(challenge: CredentialChallengeStartResult | 
   };
 }
 
-function challengePrompt(challenge: CredentialChallengeStartResult | null, dictionary: Dictionary) {
-  if (!challenge) return dictionary.loginChallengeLoading;
-  const text = challenge.parameters?.text;
-  if (text) return dictionary.loginChallengeText.replace("{text}", text);
-  return challenge.prompt || dictionary.loginChallengePlaceholder;
+function challengeStringParameter(challenge: CredentialChallengeStartResult, key: string) {
+  const value = challenge.parameters?.[key];
+  return typeof value === "string" && value.trim() !== "" ? value : "";
+}
+
+function challengeDebugVisible(challenge: CredentialChallengeStartResult) {
+  if (challenge.debugVisible === true) return true;
+  const value = challenge.parameters?.debugVisible ?? challenge.parameters?.showDebugProof ?? challenge.parameters?.debugProofVisible;
+  return value === true || value === "true";
 }
 
 function callbackFailureReason(error: unknown): OIDCCallbackFailure | "generic" {

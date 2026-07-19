@@ -15,9 +15,9 @@
   "summary": {
     "targetFamilyCount": 5,
     "scaffoldRoleCount": 5,
-    "resourceCount": 27,
+    "resourceCount": 28,
     "candidateResourceCount": 17,
-    "manualReviewResourceCount": 10,
+    "manualReviewResourceCount": 11,
     "candidateFileCount": 85,
     "generatedFileCount": 85,
     "conflictCount": 0,
@@ -1594,6 +1594,15 @@
         "contract-tests",
         "repositories"
       ]
+    },
+    {
+      "resource": "request-logs",
+      "code": "request-logs",
+      "generationLevel": "manualReview",
+      "dryRunStatus": "manualReviewOnly",
+      "manualReviewReason": "Resource uses custom codegen mode and must be implemented by a capability-specific adapter.",
+      "candidateFileCount": 0,
+      "targetFamilies": []
     },
     {
       "resource": "roleGroups",

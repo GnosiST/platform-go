@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -66,19 +67,39 @@ func (s *Server) adminMessageCenterTestSend(ctx *gin.Context) {
 		writePlatformError(ctx, errorcode.CodeAdminMessageCenterUnavailable)
 		return
 	}
+	decision, err := s.messageCenterDeliveryPolicyDecision(ctx.Request.Context(), notification.DeliveryPolicyInput{
+		TenantCode: prepared.message.TenantCode,
+		Channel:    prepared.message.Channel,
+		Provider:   s.messageCenterRuntimeProvider(prepared.message.Channel),
+		TemplateID: prepared.message.TemplateID,
+		Purpose:    prepared.message.Purpose,
+	}, s.auditActorID(ctx), rateLimitClientIP(ctx))
+	if err != nil {
+		writeRateLimitDependencyError(ctx, s.internalErrorSink, err)
+		return
+	}
+	if decision.Disabled {
+		writePlatformError(ctx, errorcode.CodeAdminMessageCenterUnavailable)
+		return
+	}
+	if !decision.Allowed {
+		writeMessageCenterRateLimited(ctx, decision.RetryAfter)
+		return
+	}
 	notificationMutation, err := s.resources.CreateInternalWithAudit(messageCenterNotifications, prepared.notificationInput, s.mutationAuditEvent(ctx, messageCenterNotificationEvent, messageCenterNotifications, "test-send"))
 	if err != nil {
 		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
-	prepared.message.TraceID = correlationFromGinContext(ctx).TraceID
+	correlation := correlationFromGinContext(ctx)
+	prepared.message.TraceID = correlation.TraceID
 	receipt, sendErr := s.sendMessageCenterTestMessage(ctx, prepared.message)
 	deliveryStatus := "delivered"
 	deliveredAt := prepared.now
 	errorMessage := ""
 	if sendErr != nil {
 		deliveryStatus = "failed"
-		deliveredAt = ""
+		deliveredAt = time.Time{}
 		errorMessage = "message center test send failed"
 		receipt = notification.DeliveryReceipt{
 			Channel:        prepared.message.Channel,
@@ -90,7 +111,15 @@ func (s *Server) adminMessageCenterTestSend(ctx *gin.Context) {
 			receipt.Provider = s.notificationSMSSender.Kind()
 		}
 	}
-	deliveryInput := prepared.deliveryInput(notificationMutation.Record.Code, receipt, deliveryStatus, deliveredAt, errorMessage)
+	deliveryInput := prepared.deliveryInput(notificationMutation.Record.Code, notification.DeliveryLedgerInput{
+		Receipt:        receipt,
+		DeliveryStatus: deliveryStatus,
+		ErrorMessage:   errorMessage,
+		AttemptedAt:    prepared.now,
+		DeliveredAt:    deliveredAt,
+		RequestID:      correlation.RequestID,
+		TraceID:        correlation.TraceID,
+	})
 	deliveryMutation, err := s.resources.CreateInternalWithAudit(messageCenterDeliveries, deliveryInput, s.mutationAuditEvent(ctx, messageCenterDeliveryEvent, messageCenterDeliveries, "test-send"))
 	if err != nil {
 		writeAdminResourceError(ctx, s.internalErrorSink, err)
@@ -152,6 +181,11 @@ func (s *Server) adminMessageCenterDeliveriesRun(ctx *gin.Context) {
 		options.DefaultSMSProvider = provider
 		options.SMSSenders = map[string]notification.SMSSender{provider: s.notificationSMSSender}
 	}
+	options.PolicyGate = messageCenterDeliveryPolicyGate{
+		server:   s,
+		actor:    principal.User.Username,
+		clientIP: rateLimitClientIP(ctx),
+	}
 	result, err := notification.NewDeliveryWorker(s.resources, options).RunOnce(ctx.Request.Context())
 	if err != nil {
 		writeAdminResourceError(ctx, s.internalErrorSink, err)
@@ -163,8 +197,25 @@ func (s *Server) adminMessageCenterDeliveriesRun(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, Response[notification.DeliveryWorkerResult]{Data: result})
 }
 
+func (s *Server) messageCenterRuntimeProvider(channel string) string {
+	channel = notification.CanonicalChannel(channel)
+	if channel == notification.ChannelSMS && !smsSenderNil(s.notificationSMSSender) {
+		return s.notificationSMSSender.Kind()
+	}
+	return notification.DefaultProviderForChannel(channel)
+}
+
+func writeMessageCenterRateLimited(ctx *gin.Context, retryAfter time.Duration) {
+	retryAfterSeconds := int64((retryAfter + time.Second - 1) / time.Second)
+	if retryAfterSeconds < 1 {
+		retryAfterSeconds = 1
+	}
+	ctx.Header("Retry-After", strconv.FormatInt(retryAfterSeconds, 10))
+	writePlatformError(ctx, errorcode.CodeRateLimited)
+}
+
 type preparedMessageCenterTestSend struct {
-	now               string
+	now               time.Time
 	message           notification.Message
 	notificationInput adminresource.WriteInput
 	deliveryCode      string
@@ -172,20 +223,16 @@ type preparedMessageCenterTestSend struct {
 	deliveryBase      map[string]string
 }
 
-func (prepared preparedMessageCenterTestSend) deliveryInput(notificationCode string, receipt notification.DeliveryReceipt, deliveryStatus string, deliveredAt string, errorMessage string) adminresource.WriteInput {
+func (prepared preparedMessageCenterTestSend) deliveryInput(notificationCode string, ledger notification.DeliveryLedgerInput) adminresource.WriteInput {
 	values := cloneStringMap(prepared.deliveryBase)
 	values["notificationCode"] = notificationCode
-	values["deliveryStatus"] = deliveryStatus
-	values["lastAttemptAt"] = prepared.now
-	values["target"] = receipt.RedactedTarget
-	values["provider"] = receipt.Provider
-	values["providerMessageId"] = receipt.MessageID
-	if deliveredAt != "" {
-		values["deliveredAt"] = deliveredAt
+	ledger.BaseValues = values
+	ledger.Channel = prepared.message.Channel
+	ledger.Target = prepared.message.Recipient
+	if ledger.AttemptedAt.IsZero() {
+		ledger.AttemptedAt = prepared.now
 	}
-	if errorMessage != "" {
-		values["errorMessage"] = errorMessage
-	}
+	values = notification.BuildDeliveryLedgerValues(ledger)
 	return adminresource.WriteInput{
 		Code:        prepared.deliveryCode,
 		Name:        prepared.deliveryName,
@@ -220,7 +267,7 @@ func (s *Server) prepareMessageCenterTestSend(input adminMessageCenterTestSendRe
 	if tenantCode == "" {
 		tenantCode = platformTenant
 	}
-	now := s.now().UTC().Format(time.RFC3339)
+	now := s.now().UTC()
 	notificationCode, err := messageCenterGeneratedCode("notice-test")
 	if err != nil {
 		return preparedMessageCenterTestSend{}, err
@@ -239,7 +286,7 @@ func (s *Server) prepareMessageCenterTestSend(input adminMessageCenterTestSendRe
 		"priority":   "normal",
 		"readStatus": "unread",
 		"payload":    payload,
-		"sentAt":     now,
+		"sentAt":     now.Format(time.RFC3339),
 	}
 	return preparedMessageCenterTestSend{
 		now: now,
@@ -265,12 +312,15 @@ func (s *Server) prepareMessageCenterTestSend(input adminMessageCenterTestSendRe
 		deliveryBase: map[string]string{
 			"tenantCode": tenantCode,
 			"channel":    channel,
-			"attempts":   "1",
 		},
 	}, nil
 }
 
 func messageCenterNotificationPayload(channel string, redactedTarget string, templateID string, templateParams map[string]string) (string, error) {
+	return messageCenterNotificationPayloadForPurpose(channel, redactedTarget, templateID, templateParams, messageCenterTestPurpose)
+}
+
+func messageCenterNotificationPayloadForPurpose(channel string, redactedTarget string, templateID string, templateParams map[string]string, purpose string) (string, error) {
 	paramKeys := make([]string, 0, len(templateParams))
 	for key := range templateParams {
 		key = strings.TrimSpace(key)
@@ -290,7 +340,7 @@ func messageCenterNotificationPayload(channel string, redactedTarget string, tem
 		RedactedTarget:    redactedTarget,
 		TemplateID:        templateID,
 		TemplateParamKeys: paramKeys,
-		Purpose:           messageCenterTestPurpose,
+		Purpose:           purpose,
 	}
 	encoded, err := json.Marshal(payload)
 	if err != nil {

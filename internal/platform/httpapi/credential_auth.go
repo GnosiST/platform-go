@@ -62,7 +62,6 @@ type credentialAuthChallengeStartResponse struct {
 	Prompt     string            `json:"prompt"`
 	Parameters map[string]string `json:"parameters,omitempty"`
 	ExpiresAt  time.Time         `json:"expiresAt"`
-	DebugProof string            `json:"debugProof,omitempty"`
 }
 
 type credentialAuthSMSOTPStartRequest struct {
@@ -204,17 +203,6 @@ func (s *Server) credentialAuthSMSOTPStart(ctx *gin.Context) {
 		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
 		return
 	}
-	providerDimension := strings.ToLower(strings.TrimSpace(input.Provider))
-	if providerDimension == "" {
-		providerDimension = "unknown"
-	}
-	identifierDimension := strings.TrimSpace(input.Identifier.Value)
-	if identifierDimension == "" {
-		identifierDimension = "missing"
-	}
-	if !s.enforceRateLimit(ctx, ratelimit.OperationPhoneVerificationRequest, rateLimitClientIP(ctx), providerDimension, identifierDimension, credentialAuthLoginPurpose) {
-		return
-	}
 	provider, ok := s.findAuthProvider(input.Provider, capability.AuthProviderAudienceAdmin)
 	if !ok {
 		writePlatformError(ctx, errorcode.CodeAuthProviderNotFound)
@@ -261,6 +249,9 @@ func (s *Server) credentialAuthSMSOTPStart(ctx *gin.Context) {
 		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthProviderResolveFailed, err)
 		return
 	}
+	if !s.enforceRateLimit(ctx, ratelimit.OperationPhoneVerificationRequest, rateLimitClientIP(ctx), strings.ToLower(strings.TrimSpace(provider.ID)), phoneHash, credentialAuthLoginPurpose) {
+		return
+	}
 	challengeID, err := newCredentialAuthTransactionID()
 	if err != nil {
 		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthProviderResolveFailed, err)
@@ -296,9 +287,15 @@ func (s *Server) credentialAuthSMSOTPStart(ctx *gin.Context) {
 		TraceID: correlationFromGinContext(ctx).TraceID,
 	})
 	if err != nil {
+		s.recordCredentialAuthSMSOTPDelivery(ctx, normalized.Value, notification.SMSDeliveryReceipt{
+			Provider:       runtime.SMSSender.Kind(),
+			Status:         "failed",
+			RedactedTarget: notification.RedactSMSTarget(normalized.Value),
+		}, "failed", notification.DeliveryLedgerErrorFailed, now)
 		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthProviderResolveFailed, err)
 		return
 	}
+	s.recordCredentialAuthSMSOTPDelivery(ctx, normalized.Value, receipt, notification.DeliveryStatusDelivered, "", now)
 	if err := runtime.Service.PutSMSOTPChallenge(ctx.Request.Context(), credentialauth.SMSOTPChallenge{
 		ChallengeID: challengeID,
 		PhoneHash:   phoneHash,
@@ -319,6 +316,89 @@ func (s *Server) credentialAuthSMSOTPStart(ctx *gin.Context) {
 		response.DebugCode = code
 	}
 	ctx.JSON(http.StatusCreated, Response[credentialAuthSMSOTPStartResponse]{Data: response})
+}
+
+func (s *Server) recordCredentialAuthSMSOTPDelivery(ctx *gin.Context, recipient string, receipt notification.SMSDeliveryReceipt, deliveryStatus string, errorMessage string, attemptedAt time.Time) {
+	runtime := s.credentialAuth
+	if runtime == nil || s.resources == nil {
+		return
+	}
+	templateID := strings.TrimSpace(runtime.LoginTemplateID)
+	if templateID == "" {
+		return
+	}
+	if receipt.Provider == "" && runtime.SMSSender != nil {
+		receipt.Provider = runtime.SMSSender.Kind()
+	}
+	if receipt.RedactedTarget == "" {
+		receipt.RedactedTarget = notification.RedactSMSTarget(recipient)
+	}
+	correlation := correlationFromGinContext(ctx)
+	notificationCode, err := messageCenterGeneratedCode("notice-auth-sms")
+	if err != nil {
+		s.recordInternalError(ctx, errorcode.CodeAuthProviderResolveFailed, err)
+		return
+	}
+	deliveryCode, err := messageCenterGeneratedCode("delivery-auth-sms")
+	if err != nil {
+		s.recordInternalError(ctx, errorcode.CodeAuthProviderResolveFailed, err)
+		return
+	}
+	payload, err := messageCenterNotificationPayloadForPurpose(notification.ChannelSMS, receipt.RedactedTarget, templateID, map[string]string{"code": ""}, credentialAuthLoginPurpose)
+	if err != nil {
+		s.recordInternalError(ctx, errorcode.CodeAuthProviderResolveFailed, err)
+		return
+	}
+	createdAt := attemptedAt.UTC().Format(time.RFC3339)
+	notificationRecord, err := s.resources.CreateInternal(messageCenterNotifications, adminresource.WriteInput{
+		Code:        notificationCode,
+		Name:        "Credential Login SMS OTP",
+		Status:      "sent",
+		Description: "Credential authentication SMS OTP notification.",
+		Values: map[string]string{
+			"tenantCode": platformTenant,
+			"category":   credentialAuthLoginPurpose,
+			"priority":   "high",
+			"readStatus": "unread",
+			"payload":    payload,
+			"sentAt":     createdAt,
+		},
+	})
+	if err != nil {
+		if !errors.Is(err, adminresource.ErrUnknownResource) {
+			s.recordInternalError(ctx, errorcode.CodeAuthProviderResolveFailed, err)
+		}
+		return
+	}
+	values := notification.BuildDeliveryLedgerValues(notification.DeliveryLedgerInput{
+		BaseValues: map[string]string{
+			"tenantCode":       platformTenant,
+			"notificationCode": notificationRecord.Code,
+			"channel":          notification.ChannelSMS,
+			"target":           recipient,
+			"provider":         receipt.Provider,
+			"attempts":         "0",
+		},
+		Channel:        notification.ChannelSMS,
+		Target:         recipient,
+		Receipt:        notification.DeliveryReceiptFromSMS(receipt),
+		DeliveryStatus: deliveryStatus,
+		ErrorMessage:   errorMessage,
+		AttemptedAt:    attemptedAt,
+		DeliveredAt:    attemptedAt,
+		RequestID:      correlation.RequestID,
+		TraceID:        correlation.TraceID,
+	})
+	_, err = s.resources.CreateInternal(messageCenterDeliveries, adminresource.WriteInput{
+		Code:        deliveryCode,
+		Name:        "Credential Login SMS OTP Delivery",
+		Status:      "enabled",
+		Description: "Credential authentication SMS OTP delivery ledger.",
+		Values:      values,
+	})
+	if err != nil && !errors.Is(err, adminresource.ErrUnknownResource) {
+		s.recordInternalError(ctx, errorcode.CodeAuthProviderResolveFailed, err)
+	}
 }
 
 func (s *Server) credentialAuthSMSOTPLogin(ctx *gin.Context, provider capability.AuthProvider, input authLoginRequest) {
@@ -456,9 +536,6 @@ func (s *Server) credentialAuthChallengeStart(ctx *gin.Context) {
 		Prompt:     created.Prompt,
 		Parameters: created.Parameters,
 		ExpiresAt:  created.ExpiresAt,
-	}
-	if runtime.DebugCodeEnabled {
-		response.DebugProof = created.Proof
 	}
 	ctx.JSON(http.StatusCreated, Response[credentialAuthChallengeStartResponse]{Data: response})
 }

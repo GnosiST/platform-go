@@ -45,7 +45,9 @@ const files = {
   sensitiveRevealOIDC: readSource("admin/src/platform/security/sensitiveRevealOIDC.ts"),
   shell: readSource("admin/src/platform/shell/AdminShell.tsx"),
   settingsCenter: readSource("admin/src/platform/settings/SettingsCenterConsole.tsx"),
+  loggingCenter: readSource("admin/src/platform/logging-center/LoggingCenterConsole.tsx"),
   messageCenter: readSource("admin/src/platform/message-center/MessageCenterConsole.tsx"),
+  registry: readSource("admin/src/platform/resources/registry.ts"),
   settings: readSource("admin/src/platform/ui/SystemSettingsDrawer.tsx"),
   table: readSource("admin/src/platform/ui/PlatformDataTable.tsx"),
   pagination: readSource("admin/src/platform/ui/PlatformPaginationBar.tsx"),
@@ -132,6 +134,14 @@ requireIncludes(files.app, 'path="/settings"', "System settings must be a first-
 requireIncludes(files.app, 'path="/message-center"', "Message center must be a first-class workbench route when notification resources are projected.");
 requireIncludes(files.app, "const hasMessageCenter = resources.some", "App must derive message-center availability from authorized capability resources.");
 requireIncludes(files.app, "isMessageCenterResourceRoute(resource.route)", "Message center must appear when notification child resources are projected by a capability.");
+requireIncludes(files.app, "LoggingCenterConsole", "App must mount the logging-center custom operations console when log resources are enabled.");
+requireIncludes(files.app, 'path="/logging-center"', "Logging center must be a first-class workbench route when log resources are projected.");
+requireIncludes(files.app, "projectLoggingCenterResource(menus.items.map(menuItemToResourceDefinition))", "App must project the logging-center workbench from authorized log resources instead of requiring a new backend API.");
+requireIncludes(files.app, "isLoggingCenterResourceRoute(resource.route)", "Logging center must appear when audit, login, or error log resources are projected.");
+requireIncludes(files.shell, '"/audit-logs"', "Logging child resources must collapse behind the logging-center navigation entry.");
+requireIncludes(files.shell, '"/login-logs"', "Login logs must collapse behind the logging-center navigation entry.");
+requireIncludes(files.shell, '"/error-logs"', "Error logs must collapse behind the logging-center navigation entry.");
+requireIncludes(files.shell, '"/request-logs"', "Request logs must collapse behind the logging-center navigation entry.");
 requireCountExactly(files.i18n, "roleManagement:", 2, "Role management navigation must declare matching Chinese and English dictionary keys.");
 requireIncludes(files.i18n, 'roleManagement: "角色"', "Role navigation must declare the concise Chinese label.");
 requireIncludes(files.i18n, 'roleManagement: "Roles"', "Role navigation must declare the concise English label.");
@@ -232,6 +242,12 @@ requireIncludes(files.login, 'credentialSpec?.mode === "password"', "The passwor
 requireIncludes(files.login, 'credentialSpec?.mode === "sms-otp"', "The SMS OTP form must render only for credential SMS providers.");
 requireIncludes(files.login, "startCredentialSMSOTP", "Credential SMS providers must start OTP transactions through the API client.");
 requireIncludes(files.login, "Input.Password", "Credential password providers must expose a real password field.");
+requireIncludes(files.login, "CredentialChallengePayload", "Credential login must render challenge responses through a dedicated payload slot.");
+requireIncludes(files.login, "ProviderSpecificChallengePayload", "Credential challenge UI must reserve a provider-specific payload renderer.");
+requireIncludes(files.login, "challengeDebugVisible(challenge)", "Credential challenge debug proof display must be controlled by an explicit response field.");
+requireIncludes(files.login, "debugVisible", "Credential challenge payloads must support explicit debug visibility control.");
+requireNotIncludes(files.login, "dictionary.loginChallengeText.replace", "Credential challenge UI must not use text answers as the production prompt path.");
+requireNotIncludes(files.login, "challenge.parameters?.text", "Credential challenge UI must not read text answers directly as the production prompt path.");
 requireIncludes(files.login, 'aria-live="polite"', "OIDC callback progress and failure must use a polite live region.");
 requireIncludes(files.login, 'className="login-error-heading"', "OIDC callback failures must expose a stable error heading.");
 requireIncludes(files.login, "tabIndex={-1}", "The OIDC callback error heading must be programmatically focusable.");
@@ -282,6 +298,11 @@ for (const key of [
   "loginSMSSending",
   "loginSMSSentTo",
   "loginSMSStartFailed",
+  "loginChallengePrompt",
+  "loginChallengeImageAlt",
+  "loginChallengeProviderPrompt",
+  "loginChallengeProviderPayload",
+  "loginChallengeDebugText",
   "loginOIDCContinue",
   "loginOIDCStarting",
   "loginOIDCCallbackProgress",
@@ -548,6 +569,18 @@ requireIncludes(files.settingsCenter, "dictionary.settingsCenterInterfacePrefere
 requireIncludes(files.settingsCenter, "config.writable ? dictionary.writable : dictionary.readOnly", "Settings center must show whether each configuration resource is writable.");
 requireIncludes(files.settingsCenter, "item.schema?.fields?.length ?? 0", "Settings center must surface the schema field footprint for dynamic configuration resources.");
 requireNotIncludes(files.settingsCenter, 'type SettingsResourceKey = "parameters"', "Settings center must not hard-code a closed configuration resource union.");
+requireIncludes(files.registry, 'route: "/logging-center"', "Core resources must include a logging-center fallback entry.");
+requireIncludes(files.registry, 'route: "/login-logs"', "Core resources must include login logs as a fallback resource.");
+requireIncludes(files.registry, 'route: "/error-logs"', "Core resources must include error logs as a fallback resource.");
+requireIncludes(files.registry, 'route: "/request-logs"', "Core resources must include request logs as a fallback resource.");
+requireIncludes(files.loggingCenter, 'resource: "audit-logs"', "Logging center must read existing audit-logs resources.");
+requireIncludes(files.loggingCenter, 'resource: "login-logs"', "Logging center must read existing login-logs resources.");
+requireIncludes(files.loggingCenter, 'resource: "error-logs"', "Logging center must read existing error-logs resources.");
+requireIncludes(files.loggingCenter, 'resource: "request-logs"', "Logging center must read existing request-logs resources.");
+requireIncludes(files.loggingCenter, "queryAdminResource", "Logging center must use the existing generic resource query API.");
+requireIncludes(files.loggingCenter, "resourceRoutes.has(config.route)", "Logging center must load only currently authorized log resources.");
+requireIncludes(files.loggingCenter, "dictionary.loggingCenterContractDescription", "Logging center must state the existing-resource contract instead of implying a new runtime API.");
+requireNotIncludes(files.loggingCenter, "testSendMessageCenter", "Logging center must not reuse unrelated message-center runtime endpoints.");
 requireIncludes(files.messageCenter, 'resource: "notification-channels"', "Message center must expose notification channel configuration.");
 requireIncludes(files.messageCenter, 'resource: "notification-providers"', "Message center must expose notification provider account configuration.");
 requireIncludes(files.messageCenter, 'resource: "notification-templates"', "Message center must expose reusable notification templates.");
@@ -597,6 +630,37 @@ for (const key of [
   "settingsCenterRuntimeProjectionDescription",
   "settingsCenterWritableCount",
   "settingsCenterInterfacePreferenceBoundary",
+  "loggingCenterTitle",
+  "loggingCenterDescription",
+  "loggingCenterAuditLogs",
+  "loggingCenterAuditLogsDescription",
+  "loggingCenterLoginLogs",
+  "loggingCenterLoginLogsDescription",
+  "loggingCenterErrorLogs",
+  "loggingCenterErrorLogsDescription",
+  "loggingCenterRequestLogs",
+  "loggingCenterRequestLogsDescription",
+  "loggingCenterMetricResources",
+  "loggingCenterMetricAudits",
+  "loggingCenterMetricLogins",
+  "loggingCenterMetricErrors",
+  "loggingCenterMetricRequests",
+  "loggingCenterPartialLoadFailed",
+  "loggingCenterContractTitle",
+  "loggingCenterContractDescription",
+  "loggingCenterResourceEntryTitle",
+  "loggingCenterResourceEntryDescription",
+  "loggingCenterNoResources",
+  "loggingCenterResourceAvailable",
+  "loggingCenterResourceMissing",
+  "loggingCenterRecordCount",
+  "loggingCenterLatestEvents",
+  "loggingCenterLatestEventsDescription",
+  "loggingCenterEvent",
+  "loggingCenterActor",
+  "loggingCenterCorrelation",
+  "loggingCenterTime",
+  "loggingCenterOpenResource",
   "messageCenterTitle",
   "messageCenterDescription",
   "messageCenterClosedLoopTitle",
@@ -953,7 +1017,7 @@ requireIncludes(files.shell, "normalizeProfileRoleLabels", "Profile summary must
 requireCssRule(files.styles, ".profile-editor-modal .ant-modal-body", ["max-height: min(720px, calc(100vh - 260px));", "overflow-y: auto;", "overscroll-behavior: contain;"], "Profile editor modal body must stay scrollable within the viewport.");
 requireIncludes(files.shell, "roles.map((role) => <Tag key={role}>{role}</Tag>)", "Profile summary must display role names instead of a role count.");
 requireIncludes(files.shell, 'bodyClassName="profile-summary-body"', "Profile summary dropdown must scroll its body instead of clipping fields.");
-requireIncludes(files.shell, 'maxHeight="min(720px, calc(100vh - 32px))"', "Profile summary dropdown must reserve enough viewport height.");
+requireIncludes(files.shell, 'maxHeight="min(720px, calc(100vh - 72px))"', "Profile summary dropdown must reserve enough viewport height.");
 requireNotIncludes(files.shell, 'openContext === "mobile-runtime"', "AdminShell must not restore a second visible runtime context block in the topbar.");
 requireNotIncludes(settingsDrawerCall, "session={session}", "Interface settings drawer must not receive session data from AdminShell.");
 requireNotIncludes(settingsDrawerCall, "branding={branding}", "Interface settings drawer must not receive platform branding from AdminShell.");

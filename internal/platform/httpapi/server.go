@@ -72,6 +72,7 @@ type ServerOptions struct {
 	CapabilityLockFile       string
 	CapabilityConfigSource   string
 	TokenService             *authjwt.Service
+	RequestLogSink           RequestLogSink
 	Now                      func() time.Time
 	Authorizer               Authorizer
 	AllowInsecureHeaderAuth  bool
@@ -134,6 +135,7 @@ type Server struct {
 	fileStorage              storage.ObjectStore
 	uploadPolicy             UploadPolicy
 	internalErrorSink        InternalErrorSink
+	requestLogSink           RequestLogSink
 	fileCleanupSink          FileCleanupSink
 	appRoutes                map[appRouteKey]gin.HandlerFunc
 	adminIdentityResolver    AdminIdentityResolver
@@ -194,10 +196,6 @@ func New(options ServerOptions) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	configureTrustedProxies(router, options.Security.TrustedProxies)
-	router.Use(requestCorrelation())
-	router.Use(recoveryMiddleware(options.InternalErrorSink))
-	router.Use(securityHeaders(options.Security))
-	router.Use(jsonRequestBodyLimit(options.Security.MaxBodyBytes))
 	resources := options.Resources
 	if resources == nil {
 		var err error
@@ -251,6 +249,14 @@ func New(options ServerOptions) *Server {
 	if fileCleanupSink == nil {
 		fileCleanupSink = resourceFileCleanupSink{resources: resources}
 	}
+	internalErrorSink := options.InternalErrorSink
+	if internalErrorSink == nil {
+		internalErrorSink = resourcePlatformLogSink{resources: resources, now: now}
+	}
+	requestLogSink := options.RequestLogSink
+	if requestLogSink == nil {
+		requestLogSink = resourcePlatformLogSink{resources: resources, now: now}
+	}
 	adminIdentityBindings := options.AdminIdentityBindings
 	if adminIdentityBindings == nil {
 		adminIdentityBindings = NewResourceAdminIdentityBindingStore(resources, now)
@@ -278,7 +284,8 @@ func New(options ServerOptions) *Server {
 		cacheTTL:                 cacheTTL,
 		fileStorage:              fileStorage,
 		uploadPolicy:             normalizeUploadPolicy(options.UploadPolicy),
-		internalErrorSink:        options.InternalErrorSink,
+		internalErrorSink:        internalErrorSink,
+		requestLogSink:           requestLogSink,
 		fileCleanupSink:          fileCleanupSink,
 		adminIdentityResolver:    options.AdminIdentityResolver,
 		adminIdentityBindings:    adminIdentityBindings,
@@ -311,6 +318,11 @@ func New(options ServerOptions) *Server {
 	if options.ServiceObjects != nil {
 		server.serviceObjects = options.ServiceObjects.WithAuthorizer(adminServiceObjectAuthorizer{server: server})
 	}
+	router.Use(requestCorrelation())
+	router.Use(requestLoggingMiddleware(server))
+	router.Use(recoveryMiddleware(internalErrorSink))
+	router.Use(securityHeaders(options.Security))
+	router.Use(jsonRequestBodyLimit(options.Security.MaxBodyBytes))
 	server.appRoutes = server.defaultAppRouteHandlers(options.AppRoutes)
 	server.subscribeInvalidations()
 	server.routes(options.AdminRoutes)
