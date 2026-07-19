@@ -48,7 +48,7 @@ describe("validate-platform-credential-auth-v1", () => {
     ]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /runtimeBoundary\.status must stay contract-only/);
+    assert.match(result.stderr, /runtimeBoundary\.status must stay service-foundation-not-wired/);
     assert.match(result.stderr, /runtimeBoundary\.defaultRuntimeMutation must stay forbidden/);
     assert.match(result.stderr, /existing password provider guard must remain active/);
     assert.match(result.stderr, /cmd\/platform-api\/main\.go must still reject provider kind password/);

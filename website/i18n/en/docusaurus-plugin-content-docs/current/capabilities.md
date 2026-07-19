@@ -18,7 +18,7 @@ Plugin management v1 uses a restart-required desired-state model. Declare the de
 
 ## Credential Auth v1
 
-`credential-auth` is the planned local credential authentication capability for username/password, phone/password, email/password and phone/SMS OTP login. The current package is contract, docs and validation only: it does not enable the `password` provider kind and does not change the current demo/OIDC/App login runtime. Passwords, OTPs, challenge answers and proofs must not be stored in generic `Record.Values`; the future implementation must use dedicated credential stores and treat SMS delivery as a `notification` SMS channel extension.
+`credential-auth` is the planned local credential authentication capability for username/password, phone/password, email/password and phone/SMS OTP login. The current package has contract, docs, validation and the first internal service foundation: it does not enable the `password` provider kind and does not change the current demo/OIDC/App login runtime. Passwords, OTPs, challenge answers and proofs must not be stored in generic `Record.Values`; the internal package now covers identifier hashes, Argon2id PHC verification, a memory repository and SMS OTP one-time consumption semantics, while HTTP APIs, persistent repositories and login UI wiring remain pending. SMS delivery stays a `notification` SMS channel extension, with an SMS sender port, `mock-local` dev/test sender and production mock-provider rejection already in place.
 
 New business projects should keep concrete business capabilities in a downstream repository or composition root. Only cross-domain reusable behavior should become a platform profile.
 

@@ -64,6 +64,20 @@ const requiredDocs = [
 
 const requiredValidators = ["scripts/validate-platform-credential-auth-v1.mjs"];
 const requiredTests = ["scripts/platform-credential-auth-v1.test.mjs"];
+const requiredBackendFiles = [
+  "internal/platform/credentialauth/types.go",
+  "internal/platform/credentialauth/normalizer.go",
+  "internal/platform/credentialauth/hmac_identifier.go",
+  "internal/platform/credentialauth/memory_repository.go",
+  "internal/platform/credentialauth/service.go",
+  "internal/platform/credentialauth/argon2id.go",
+  "internal/platform/credentialauth/service_test.go",
+  "internal/platform/credentialauth/argon2id_test.go",
+];
+const requiredNotificationSMSFiles = [
+  "internal/platform/notification/sms.go",
+  "internal/platform/notification/sms_test.go",
+];
 const requiredAcceptanceCommands = [
   "rtk node scripts/validate-platform-credential-auth-v1.mjs",
   "rtk node --test scripts/platform-credential-auth-v1.test.mjs",
@@ -117,8 +131,8 @@ function uniqueErrors(items, label) {
 
 function validateRuntimeBoundary(contract, mainGo, errors) {
   const boundary = contract.runtimeBoundary ?? {};
-  if (boundary.status !== "contract-only") {
-    errors.push("runtimeBoundary.status must stay contract-only");
+  if (boundary.status !== "service-foundation-not-wired") {
+    errors.push("runtimeBoundary.status must stay service-foundation-not-wired until HTTP login is deliberately enabled");
   }
   if (boundary.defaultRuntimeMutation !== "forbidden") {
     errors.push("runtimeBoundary.defaultRuntimeMutation must stay forbidden");
@@ -401,9 +415,33 @@ function validateEvidenceWiring(contract, errors) {
   if (!packageA || !["in-progress", "done"].includes(packageA.status)) {
     errors.push("implementationPackages must keep A-contract-docs-validator tracked as in-progress or done");
   }
-  for (const id of ["B-backend-repositories-services", "C-notification-sms-adapters", "D-auth-api-compatibility", "E-admin-login-ui", "F-security-governance"]) {
+  const packageB = packages.get("B-backend-repositories-services");
+  if (!packageB || !["in-progress", "done"].includes(packageB.status)) {
+    errors.push("implementationPackages must track B-backend-repositories-services as in-progress or done after service foundation work starts");
+  }
+  if (!String(packageB?.scope ?? "").includes("internal/platform/credentialauth")) {
+    errors.push("implementationPackages.B-backend-repositories-services scope must point to internal/platform/credentialauth");
+  }
+  for (const filePath of requiredBackendFiles) {
+    if (!relativeExistingPath(filePath)) {
+      errors.push(`credential-auth backend service foundation file is missing or unsafe: ${filePath}`);
+    }
+  }
+  const packageC = packages.get("C-notification-sms-adapters");
+  if (!packageC || !["in-progress", "done"].includes(packageC.status)) {
+    errors.push("implementationPackages must track C-notification-sms-adapters as in-progress or done after SMS port work starts");
+  }
+  if (!String(packageC?.scope ?? "").includes("internal/platform/notification")) {
+    errors.push("implementationPackages.C-notification-sms-adapters scope must point to internal/platform/notification");
+  }
+  for (const filePath of requiredNotificationSMSFiles) {
+    if (!relativeExistingPath(filePath)) {
+      errors.push(`notification SMS foundation file is missing or unsafe: ${filePath}`);
+    }
+  }
+  for (const id of ["D-auth-api-compatibility", "E-admin-login-ui", "F-security-governance"]) {
     if (packages.get(id)?.status !== "remaining") {
-      errors.push(`implementationPackages.${id} must remain remaining in this first work package`);
+      errors.push(`implementationPackages.${id} must remain remaining until its implementation package starts`);
     }
   }
 }
@@ -412,6 +450,7 @@ function validateDocs(authDoc, capabilityDoc, errors) {
   const authSnippets = [
     ["Credential Auth v1", "docs/platform-auth.md must document credential-auth v1"],
     ["resources/platform-credential-auth-v1.json", "docs/platform-auth.md must point to the credential-auth v1 contract"],
+    ["internal/platform/credentialauth", "docs/platform-auth.md must point to the credential-auth service foundation package"],
     ["does not change the current demo/OIDC runtime", "docs/platform-auth.md must state current demo/OIDC runtime is unchanged"],
     ["password credentials must not be stored in generic `Record.Values`", "docs/platform-auth.md must forbid password credentials in generic Record.Values"],
     ["notification` SMS channel", "docs/platform-auth.md must assign SMS delivery to notification"],
@@ -425,6 +464,7 @@ function validateDocs(authDoc, capabilityDoc, errors) {
   const capabilitySnippets = [
     ["credential-auth capability rules", "docs/platform-capability-development.md must document credential-auth capability rules"],
     ["resources/platform-credential-auth-v1.json", "docs/platform-capability-development.md must point to the credential-auth v1 contract"],
+    ["internal/platform/credentialauth", "docs/platform-capability-development.md must point to the credential-auth service foundation package"],
     ["Do not declare provider kind `password`", "docs/platform-capability-development.md must keep provider kind password blocked until implementation"],
     ["rtk node scripts/validate-platform-credential-auth-v1.mjs", "docs/platform-capability-development.md must document the credential-auth validator"],
   ];

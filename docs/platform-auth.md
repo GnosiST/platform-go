@@ -32,13 +32,13 @@ The current browser login flows send demo usernames or provider authorization co
 
 ## Credential Auth v1
 
-`credential-auth` is the planned local credential authentication capability. The first work package is contract-only and is tracked in `resources/platform-credential-auth-v1.json`, with the gate `rtk node scripts/validate-platform-credential-auth-v1.mjs`. It does not change the current demo/OIDC runtime, does not enable provider kind `password` in `cmd/platform-api`, and does not replace the current provider discovery, demo login, Admin OIDC exchange, app login or server-side session issuance flows.
+`credential-auth` is the planned local credential authentication capability. The current package has the contract, documentation, validation gate and first internal service foundation in `internal/platform/credentialauth`, tracked by `resources/platform-credential-auth-v1.json` and `rtk node scripts/validate-platform-credential-auth-v1.mjs`. It does not change the current demo/OIDC runtime, does not enable provider kind `password` in `cmd/platform-api`, and does not replace the current provider discovery, demo login, Admin OIDC exchange, app login or server-side session issuance flows.
 
 The capability is business-neutral. It may later declare provider modes for `username-password`, `phone-password`, `email-password` and `phone-sms-otp`, but the login UI must stay provider-discovery driven rather than hard-coding those four modes. A successful credential login still delegates JWT signing, session persistence, renewal and revocation to the existing `session` boundary, then RBAC and Casbin calculate authorization after login.
 
-The storage boundary is deliberately separate from generic Admin resources: password credentials must not be stored in generic `Record.Values`. The planned dedicated stores are `auth_identifiers`, `password_credentials`, `credential_challenges` and `sms_otp_challenges`. They store normalized hashes, masked identifiers, Argon2id verifier metadata, digests, expiry, attempt and one-time consumption state, not raw passwords, raw OTP codes, raw challenge answers or raw phone/email values.
+The storage boundary is deliberately separate from generic Admin resources: password credentials must not be stored in generic `Record.Values`. The first service foundation implements normalized identifier hashes, an in-memory repository, Argon2id PHC verification and SMS OTP one-time consumption semantics; file/GORM persistence and HTTP wiring are still pending. The dedicated stores remain `auth_identifiers`, `password_credentials`, `credential_challenges` and `sms_otp_challenges`. They store normalized hashes, masked identifiers, Argon2id verifier metadata, digests, expiry, attempt and one-time consumption state, not raw passwords, raw OTP codes, raw challenge answers or raw phone/email values.
 
-Challenge support is scoped to login for v1: `off`, `always`, `after-failure` or `risk-based`, with `captcha` or `slider` as implementation choices. SMS OTP login belongs to `credential-auth` as a secret type, while SMS delivery itself belongs to the `notification` SMS channel so delivery ledgers, provider adapters, templates, rate limits and production provider validation stay reusable outside authentication. Production must reject mock SMS providers.
+Challenge support is scoped to login for v1: `off`, `always`, `after-failure` or `risk-based`, with `captcha` or `slider` as implementation choices. SMS OTP login belongs to `credential-auth` as a secret type, while SMS delivery itself belongs to the `notification` SMS channel so delivery ledgers, provider adapters, templates, rate limits and production provider validation stay reusable outside authentication. The first notification SMS foundation defines the SMS sender port, `mock-local` development/test sender, provider canonicalization and production fail-closed config validation; external Aliyun/Tencent adapters remain downstream/vendor work. Production must reject mock SMS providers.
 
 The future structured API shape is:
 
@@ -91,7 +91,7 @@ PLATFORM_AUTH_SMS_OTP_TTL_SECONDS=300
 PLATFORM_AUTH_SMS_OTP_MAX_ATTEMPTS=5
 ```
 
-The remaining implementation packages are dedicated backend repositories/services, notification SMS adapters, structured auth APIs with compatibility for demo/OIDC, Admin login UI provider rendering, and security governance for OpenAPI, error codes, audit redaction, rate limits and production environment validation.
+The remaining implementation packages are dedicated backend repositories/services, external notification SMS vendor adapters, structured auth APIs with compatibility for demo/OIDC, Admin login UI provider rendering, and security governance for OpenAPI, error codes, audit redaction and rate limits.
 
 ## APIs
 
