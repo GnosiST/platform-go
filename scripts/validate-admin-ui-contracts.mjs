@@ -406,7 +406,17 @@ requireIncludes(files.permissionGovernance, "isCustomAPIPermission(record)", "Pe
 requireIncludes(files.permissionGovernance, "if (!canCreate) {", "Permission governance must fail closed before opening custom permission creation without create access.");
 requireIncludes(files.permissionGovernance, "if (!canUpdate) {", "Permission governance must fail closed before opening custom permission editing without update access.");
 requireIncludes(files.permissionGovernance, "if ((editor.record && !canUpdate) || (!editor.record && !canCreate)) {", "Permission governance must guard the custom permission submit path against stale unauthorized states.");
+requireIncludes(files.permissionGovernance, "onValuesChange={syncPermissionCode}", "Permission governance creation must keep custom permission code generation tied to resource and action input.");
+requireIncludes(files.permissionGovernance, "resourceMatchesPermissionCodeRule(form, dictionary.permissionCustomCodeResourceMismatch)", "Permission governance must validate that custom permission codes match the declared resource.");
+requireIncludes(files.permissionGovernance, "if (parts.resource !== resource) {", "Permission governance submit must reject custom permission resource/code mismatches.");
 requireIncludes(files.permissionGovernance, "dictionary.permissionSystemLockedDescription", "Permission governance must explain why system-generated permission records cannot be edited directly.");
+requireIncludes(files.treeWorkbench, "summary?: ReactNode;", "Tree workbench must expose a shared summary slot for role, menu, and permission classifications.");
+requireIncludes(files.treeWorkbench, 'summary ? <div className="admin-tree-workbench-summary">{summary}</div> : null', "Tree workbench must render the shared classification summary before the tree.");
+requireIncludes(files.treeWorkbench, "expandedKeys={expandedKeys}", "Tree workbench must use controlled expansion so filtered hierarchies stay understandable.");
+requireIncludes(files.treeWorkbench, "onExpand={(keys) => setExpandedKeys(keys)}", "Tree workbench must preserve user expansion changes while remaining controlled.");
+requireIncludes(files.roleGovernance, "summary={(", "Role governance must show classification counts in the shared tree workbench.");
+requireIncludes(files.menuGovernance, "summary={(", "Menu governance must show classification counts in the shared tree workbench.");
+requireIncludes(files.permissionGovernance, "permissionTreeSummary", "Permission governance must show API/page-button/custom/system classification counts.");
 requireIncludes(files.menuGovernance, "const menuListRequest = useRef(0);", "Menu governance must track the latest tree search request.");
 requireIncludes(files.menuGovernance, "const definitionRequest = useRef(0);", "Menu governance must track the latest selected-definition request.");
 requireIncludes(files.menuGovernance, "const editorSession = useRef(0);", "Menu saves must ignore stale mutation completions from a closed or replaced editor session.");
@@ -427,6 +437,8 @@ requireIncludes(files.menuGovernance, "duplicateButtonPermission(form, index, di
 requireRegex(files.styles, /\.menu-governance-detail \.admin-list-actions \.ant-btn,[\s\S]*?min-height:\s*44px;/, "Menu governance actions must expose 44px targets.");
 requireRegex(files.styles, /\.menu-governance-modal \.ant-modal-close,[\s\S]*?\.menu-governance-modal \.ant-modal-footer \.ant-btn,[\s\S]*?\.menu-governance-modal \.ant-checkbox-wrapper,[\s\S]*?min-height:\s*44px;/, "Menu governance modal controls must expose 44px targets.");
 requireRegex(files.styles, /\.admin-tree-workbench-tree \.ant-tree-switcher\s*\{[\s\S]*?min-width:\s*44px;[\s\S]*?min-height:\s*44px;/, "Tree workbench expanders must expose a 44px pointer target.");
+requireRegex(files.styles, /\.admin-tree-workbench-summary\s*\{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?overflow-wrap:\s*anywhere;/, "Tree workbench summaries must wrap instead of clipping classification text.");
+requireRegex(files.styles, /\.admin-tree-workbench-node-meta \.ant-tag\s*\{[\s\S]*?white-space:\s*normal;[\s\S]*?overflow-wrap:\s*anywhere;/, "Tree workbench node tags must wrap instead of truncating labels.");
 requireRegex(files.styles, /\.menu-governance-form-list-row\s*\{[\s\S]*?grid-template-columns:/, "Menu parameter and button rows must use a stable responsive grid.");
 requireRegex(files.styles, /@media screen and \(max-width:\s*767px\)[\s\S]*?\.menu-governance-form-list-row\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);/, "Menu parameter and button rows must stack without horizontal overflow on mobile.");
 requireCssRule(
@@ -454,6 +466,7 @@ for (const key of [
   "permissionSeededGuardTitle",
   "permissionAddCustomAPI",
   "permissionEditCustomAPI",
+  "permissionCustomCodeResourceMismatch",
   "permissionSystemLockedDescription",
   "permissionResourceType",
   "permissionGroupTotal",
@@ -702,6 +715,12 @@ requireIncludes(files.capabilityMetadata, 'label: { zh: "身份与组织", en: "
 requireIncludes(files.capabilityMetadata, 'makeOptional("personnel", { zh: "人员与岗位", en: "Personnel & Positions" }', "Optional personnel capability must not be labeled as the organization capability.");
 requireIncludes(files.capabilityMetadata, "默认平台底座已提供组织机构", "Optional personnel copy must state that organization units are part of the default foundation.");
 requireIncludes(files.capabilityConsole, "PlatformDataTable", "Capability console must render capabilities through the shared list/table surface.");
+requireIncludes(files.capabilityConsole, 'type CapabilityFilter = "all" | "enabled" | "not-enabled" | "pending-restart" | CapabilityKind;', "Capability console must expose enabled, pending-restart, and not-enabled states in one list filter.");
+requireIncludes(files.capabilityConsole, 'key: "status"', "Capability list filters must include runtime status so enabled and disabled plugins stay in one list.");
+requireIncludes(files.capabilityConsole, "matchesCapabilityStatus", "Capability list must derive enabled, pending-restart, and not-enabled states from current and desired capability sets.");
+requireIncludes(files.capabilityConsole, "dictionary.pluginManagementListHint", "Plugin management copy must direct users to the unified capability list instead of separate cards.");
+requireNotIncludes(files.capabilityConsole, "PluginCapabilityList", "Capability console must not restore separate current and desired plugin card lists.");
+requireNotIncludes(files.capabilityConsole, "plugin-capability-state", "Capability console must not render plugin enabled and desired states as separate card sections.");
 requireIncludes(files.capabilityConsole, "openCapabilityDetail", "Capability console must keep a single detail-opening path.");
 requireIncludes(files.capabilityConsole, "onRowClick={(record) => openCapabilityDetail(record.id)}", "Capability list rows must open the detail modal.");
 requireIncludes(files.capabilityConsole, "mobileCards={(items) =>", "Capability console must keep mobile cards as direct detail entry points.");
@@ -722,10 +741,13 @@ requireIncludes(files.shell, 'document.addEventListener("pointerdown", handlePro
 requireIncludes(files.shell, "ProfileEditorModal", "AdminShell must expose a full profile editor modal from the profile panel.");
 requireIncludes(files.shell, "dictionary.changePassword", "Profile editor modal must expose a change-password action slot.");
 requireIncludes(files.shell, "dictionary.resetPassword", "Profile editor modal must expose a reset-password action slot.");
+requireIncludes(files.shell, "normalizeProfileRoleLabels", "Profile summary must normalize role labels instead of displaying counts or raw numeric role identifiers.");
 requireCssRule(files.styles, ".profile-editor-modal .ant-modal-body", ["max-height: min(720px, calc(100vh - 260px));", "overflow-y: auto;", "overscroll-behavior: contain;"], "Profile editor modal body must stay scrollable within the viewport.");
 requireIncludes(files.shell, "roles.map((role) => <Tag key={role}>{role}</Tag>)", "Profile summary must display role names instead of a role count.");
 requireIncludes(files.shell, 'bodyClassName="profile-summary-body"', "Profile summary dropdown must scroll its body instead of clipping fields.");
-requireIncludes(files.shell, 'maxHeight="min(640px, calc(100vh - 72px))"', "Profile summary dropdown must reserve enough viewport height.");
+requireIncludes(files.shell, 'maxHeight="min(720px, calc(100vh - 32px))"', "Profile summary dropdown must reserve enough viewport height.");
+requireNotIncludes(files.shell, 'openContext === "mobile-runtime"', "AdminShell must keep runtime and tenant context inside the settings drawer instead of a second visible mobile context block.");
+requireIncludes(files.settings, "dictionary.runtimeContext", "System settings must remain the place where runtime and tenant context are displayed.");
 requireCssRule(files.styles, ".platform-dropdown-panel", ["display: flex;", "flex-direction: column;", "overflow: hidden;"], "Platform dropdown panel must keep header/body/footer in a scroll-safe column.");
 requireCssRule(files.styles, ".platform-dropdown-panel-body", ["flex: 1 1 auto;", "min-height: 0;", "overflow: auto;"], "Platform dropdown body must own overflow scrolling.");
 requireCssRule(files.styles, ".profile-summary-body", ["overflow-y: auto;", "overscroll-behavior: contain;"], "Profile summary body must remain scrollable.");

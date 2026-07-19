@@ -29,7 +29,7 @@ type CapabilityConsoleProps = {
   pluginManagementStatus: PluginManagementStatus | null;
 };
 
-type CapabilityFilter = "all" | CapabilityKind;
+type CapabilityFilter = "all" | "enabled" | "not-enabled" | "pending-restart" | CapabilityKind;
 
 export function CapabilityConsole({
   capabilities,
@@ -69,7 +69,7 @@ export function CapabilityConsole({
   const filteredCapabilities = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return catalogCapabilities.filter((capability) => {
-      const matchesFilter = matchesCapabilitySegmentFilter(capability, filter, currentCapabilityIDs);
+      const matchesFilter = matchesCapabilitySegmentFilter(capability, filter, currentCapabilityIDs, desiredCapabilityIDs);
       const haystack = [
         capability.id,
         capability.name,
@@ -82,9 +82,9 @@ export function CapabilityConsole({
       ]
         .join(" ")
         .toLowerCase();
-      return matchesFilter && matchesCapabilityFilters(capability, tableFilters, language) && (!normalizedQuery || haystack.includes(normalizedQuery));
+      return matchesFilter && matchesCapabilityFilters(capability, tableFilters, language, currentCapabilityIDs, desiredCapabilityIDs) && (!normalizedQuery || haystack.includes(normalizedQuery));
     });
-  }, [catalogCapabilities, currentCapabilityIDs, filter, language, query, tableFilters]);
+  }, [catalogCapabilities, currentCapabilityIDs, desiredCapabilityIDs, filter, language, query, tableFilters]);
 
   const selectedCapability = useMemo(() => {
     return (
@@ -124,6 +124,16 @@ export function CapabilityConsole({
           { value: "plugin", label: dictionary.plugin },
           { value: "optional", label: dictionary.optionalTab },
           { value: "disabled", label: dictionary.disabledTab },
+        ],
+      },
+      {
+        key: "status",
+        label: dictionary.status,
+        type: "select",
+        options: [
+          { value: "enabled", label: dictionary.enabled },
+          { value: "pending-restart", label: dictionary.restartPending },
+          { value: "not-enabled", label: dictionary.notEnabled },
         ],
       },
       {
@@ -267,10 +277,11 @@ export function CapabilityConsole({
                 onChange={(value) => setFilter(value as CapabilityFilter)}
                 options={[
                   { value: "all", label: dictionary.all },
+                  { value: "enabled", label: dictionary.enabled },
+                  { value: "pending-restart", label: dictionary.restartPending },
+                  { value: "not-enabled", label: dictionary.notEnabled },
                   { value: "core", label: dictionary.core },
                   { value: "plugin", label: dictionary.plugin },
-                  { value: "optional", label: dictionary.optionalTab },
-                  { value: "disabled", label: dictionary.disabledTab },
                 ]}
               />
             }
@@ -389,90 +400,34 @@ function PluginManagementPanel({
   dictionary: Dictionary;
 }) {
   const restartRequired = status.restartRequiredForChanges;
+  const facts = [
+    { label: dictionary.operationMode, value: status.operationMode },
+    { label: dictionary.activation, value: status.activation },
+    { label: dictionary.lockStatus, value: formatLockStatus(status.lockStatus, dictionary) },
+    { label: dictionary.source, value: status.source },
+  ];
   return (
     <section className={status.pendingRestart ? "plugin-management-panel pending" : "plugin-management-panel"}>
-      <div className="plugin-management-header">
-        <div>
+      <div className="plugin-management-copy">
+        <div className="plugin-management-title-row">
           <Typography.Text strong>{dictionary.pluginManagementV1Title}</Typography.Text>
-          <Typography.Paragraph>{dictionary.pluginManagementV1Description}</Typography.Paragraph>
-        </div>
-        <Space wrap>
           <Tag className={status.pendingRestart ? "resource-status status-recorded" : "resource-status status-healthy"}>
             {status.pendingRestart ? dictionary.restartPending : dictionary.noPendingRestart}
           </Tag>
           <Tag>{restartRequired ? dictionary.pluginV1RestartRequired : dictionary.no}</Tag>
-        </Space>
+        </div>
+        <Typography.Text type="secondary">{dictionary.pluginManagementListHint}</Typography.Text>
       </div>
 
-      <dl className="plugin-management-grid">
-        <div>
-          <dt>{dictionary.operationMode}</dt>
-          <dd>{status.operationMode}</dd>
-        </div>
-        <div>
-          <dt>{dictionary.activation}</dt>
-          <dd>{status.activation}</dd>
-        </div>
-        <div>
-          <dt>{dictionary.progressTransport}</dt>
-          <dd>{status.progressTransport}</dd>
-        </div>
-        <div>
-          <dt>{dictionary.runtimeHotInstall}</dt>
-          <dd>{status.runtimeHotInstall ? dictionary.yes : dictionary.no}</dd>
-        </div>
-        <div>
-          <dt>{dictionary.runtimeHotUninstall}</dt>
-          <dd>{status.runtimeHotUninstall ? dictionary.yes : dictionary.no}</dd>
-        </div>
-        <div>
-          <dt>{dictionary.remoteRepositoryPull}</dt>
-          <dd>{status.remoteRepositoryPull ? dictionary.yes : dictionary.no}</dd>
-        </div>
-        <div>
-          <dt>{dictionary.restartRequired}</dt>
-          <dd>{restartRequired ? dictionary.yes : dictionary.no}</dd>
-        </div>
-        <div>
-          <dt>{dictionary.pendingRestart}</dt>
-          <dd>{status.pendingRestart ? dictionary.yes : dictionary.no}</dd>
-        </div>
-        <div>
-          <dt>{dictionary.lockStatus}</dt>
-          <dd>{formatLockStatus(status.lockStatus, dictionary)}</dd>
-        </div>
-        <div>
-          <dt>{dictionary.source}</dt>
-          <dd>{status.source}</dd>
-        </div>
+      <dl className="plugin-management-facts">
+        {facts.map((fact) => (
+          <div key={fact.label}>
+            <dt>{fact.label}</dt>
+            <dd>{fact.value}</dd>
+          </div>
+        ))}
       </dl>
-
-      <div className="plugin-capability-state">
-        <PluginCapabilityList label={dictionary.currentCapabilities} ids={status.currentCapabilities} emptyText={dictionary.noDependency} />
-        <PluginCapabilityList label={dictionary.desiredCapabilities} ids={status.desiredCapabilities} emptyText={dictionary.noDependency} />
-      </div>
     </section>
-  );
-}
-
-function PluginCapabilityList({
-  label,
-  ids,
-  emptyText,
-}: {
-  label: string;
-  ids: string[];
-  emptyText: string;
-}) {
-  const visibleIDs = ids.slice(0, 18);
-  return (
-    <div className="plugin-capability-list">
-      <Typography.Text strong>{label}</Typography.Text>
-      <div className="plugin-capability-tags">
-        {visibleIDs.length > 0 ? visibleIDs.map((id) => <Tag key={id}>{id}</Tag>) : <Typography.Text className="secondary-text">{emptyText}</Typography.Text>}
-        {ids.length > visibleIDs.length ? <Tag>{`+${ids.length - visibleIDs.length}`}</Tag> : null}
-      </div>
-    </div>
   );
 }
 
@@ -562,6 +517,8 @@ function matchesCapabilityFilters(
   capability: CapabilityView,
   filters: Record<string, PlatformDataTableFilterValue>,
   language: Language,
+  currentCapabilityIDs: Set<string>,
+  desiredCapabilityIDs: Set<string>,
 ) {
   return Object.entries(filters).every(([key, value]) => {
     if (!filterValueActive(value)) {
@@ -573,6 +530,8 @@ function matchesCapabilityFilters(
     switch (key) {
     case "kind":
       return capability.kind === value;
+    case "status":
+      return matchesCapabilityStatus(capability, value, currentCapabilityIDs, desiredCapabilityIDs);
     case "health":
       return capability.health === value;
     case "domain":
@@ -590,16 +549,45 @@ function filterValueActive(value: PlatformDataTableFilterValue) {
   return Boolean(value.from || value.to);
 }
 
-function matchesCapabilitySegmentFilter(capability: CapabilityView, filter: CapabilityFilter, currentCapabilityIDs: Set<string>) {
+function matchesCapabilitySegmentFilter(
+  capability: CapabilityView,
+  filter: CapabilityFilter,
+  currentCapabilityIDs: Set<string>,
+  desiredCapabilityIDs: Set<string>,
+) {
   switch (filter) {
   case "all":
     return true;
+  case "enabled":
+  case "not-enabled":
+  case "pending-restart":
+    return matchesCapabilityStatus(capability, filter, currentCapabilityIDs, desiredCapabilityIDs);
   case "plugin":
     return capability.kind === "plugin" || capability.kind === "optional";
   case "optional":
     return !currentCapabilityIDs.has(capability.id);
   default:
     return capability.kind === filter;
+  }
+}
+
+function matchesCapabilityStatus(
+  capability: CapabilityView,
+  status: string,
+  currentCapabilityIDs: Set<string>,
+  desiredCapabilityIDs: Set<string>,
+) {
+  const enabled = currentCapabilityIDs.has(capability.id);
+  const pendingRestart = !enabled && desiredCapabilityIDs.has(capability.id);
+  switch (status) {
+  case "enabled":
+    return enabled;
+  case "pending-restart":
+    return pendingRestart;
+  case "not-enabled":
+    return !enabled && !pendingRestart;
+  default:
+    return true;
   }
 }
 

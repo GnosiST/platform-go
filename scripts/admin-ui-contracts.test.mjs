@@ -364,6 +364,39 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /must guard the custom permission submit path/);
   });
 
+  it("rejects custom permission forms that do not validate resource/code mismatches", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/PermissionGovernanceConsole.tsx",
+      "resourceMatchesPermissionCodeRule(form, dictionary.permissionCustomCodeResourceMismatch),",
+      "",
+    );
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/PermissionGovernanceConsole.tsx",
+      "if (parts.resource !== resource) {\n    throw new Error(dictionary.permissionCustomCodeResourceMismatch);\n  }\n  ",
+      "",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must validate that custom permission codes match the declared resource/);
+  });
+
+  it("rejects tree workbenches without shared summaries and controlled expansion", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(tempRoot, "admin/src/platform/ui/AdminTreeWorkbench.tsx", "summary?: ReactNode;", "");
+    replaceInTemp(tempRoot, "admin/src/platform/ui/AdminTreeWorkbench.tsx", "expandedKeys={expandedKeys}", "defaultExpandedKeys={expandedKeys}");
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must expose a shared summary slot/);
+    assert.match(result.stderr, /must use controlled expansion/);
+  });
+
   it("rejects permission tree sorting that infers hierarchy from colon-delimited permission codes", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(

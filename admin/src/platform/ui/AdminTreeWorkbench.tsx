@@ -1,6 +1,6 @@
 import { SearchOutlined } from "@ant-design/icons";
 import { Empty, Input, Spin, Tag, Tree, Typography, type TreeDataNode, type TreeProps } from "antd";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type Key, type ReactNode } from "react";
 import { AdminListPanel } from "./AdminPrimitives";
 
 export type AdminTreeWorkbenchNode = {
@@ -30,6 +30,7 @@ type AdminTreeWorkbenchProps = {
   searchValue: string;
   loading?: boolean;
   actions?: ReactNode;
+  summary?: ReactNode;
   detail: ReactNode;
   onSearchChange: (value: string) => void;
   onSelect: (key: string) => void;
@@ -47,6 +48,7 @@ export function AdminTreeWorkbench({
   searchValue,
   loading = false,
   actions,
+  summary,
   detail,
   onSearchChange,
   onSelect,
@@ -54,7 +56,8 @@ export function AdminTreeWorkbench({
 }: AdminTreeWorkbenchProps) {
   const nodeByKey = useMemo(() => new Map(nodes.map((node) => [node.key, node])), [nodes]);
   const treeData = useMemo(() => workbenchTreeData(nodes, selectedKey), [nodes, selectedKey]);
-  const expandedKeys = useMemo(() => treeData.map((node) => String(node.key)), [treeData]);
+  const allExpandableKeys = useMemo(() => treeExpandableKeys(treeData), [treeData]);
+  const [expandedKeys, setExpandedKeys] = useState<Key[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const virtual = nodes.length >= 50;
   const loadData: TreeProps["loadData"] = onLoadChildren
@@ -69,6 +72,10 @@ export function AdminTreeWorkbench({
   useEffect(() => {
     setActiveKey(selectedKey || firstTreeKey(treeData));
   }, [selectedKey, treeData]);
+
+  useEffect(() => {
+    setExpandedKeys(allExpandableKeys);
+  }, [allExpandableKeys, searchValue]);
 
   return (
     <section className="admin-tree-workbench" aria-label={ariaLabel}>
@@ -87,6 +94,7 @@ export function AdminTreeWorkbench({
           />
         )}
       >
+        {summary ? <div className="admin-tree-workbench-summary">{summary}</div> : null}
         <div className="admin-tree-workbench-tree" data-virtualized={virtual ? "true" : "false"}>
           {loading ? (
             <div className="loading-panel" aria-live="polite"><Spin size="small" /></div>
@@ -97,7 +105,7 @@ export function AdminTreeWorkbench({
               activeKey={activeKey}
               aria-label={ariaLabel}
               blockNode
-              defaultExpandedKeys={expandedKeys}
+              expandedKeys={expandedKeys}
               height={virtual ? 520 : undefined}
               loadData={loadData}
               selectedKeys={selectedKey ? [selectedKey] : []}
@@ -105,6 +113,7 @@ export function AdminTreeWorkbench({
               treeData={treeData}
               virtual={virtual}
               onActiveChange={(key) => setActiveKey(String(key))}
+              onExpand={(keys) => setExpandedKeys(keys)}
               onSelect={(keys) => {
                 const key = keys[0];
                 if (key !== undefined) {
@@ -118,6 +127,18 @@ export function AdminTreeWorkbench({
       <div className="admin-tree-workbench-detail">{detail}</div>
     </section>
   );
+}
+
+function treeExpandableKeys(treeData: TreeDataNode[]): Key[] {
+  const keys: Key[] = [];
+  const visit = (node: TreeDataNode) => {
+    if (node.children && node.children.length > 0) {
+      keys.push(node.key);
+      node.children.forEach(visit);
+    }
+  };
+  treeData.forEach(visit);
+  return keys;
 }
 
 function firstTreeKey(treeData: TreeDataNode[]) {

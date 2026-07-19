@@ -226,6 +226,11 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
   const selected = useMemo(() => selectedRecord(selectedKey, groups, roles), [groups, roles, selectedKey]);
   const invalidGroups = useMemo(() => groups.filter((group) => valueOf(group, "parentCode")), [groups]);
   const invalidRoles = useMemo(() => roles.filter((role) => !valueOf(role, "groupCode") || canReadGroups && !groupByCode.has(valueOf(role, "groupCode"))), [canReadGroups, groupByCode, roles]);
+  const roleTreeSummary = useMemo(() => ({
+    groups: groups.length,
+    roles: roles.length,
+    invalid: invalidGroups.length + invalidRoles.length,
+  }), [groups.length, invalidGroups.length, invalidRoles.length, roles.length]);
   const nodes = useMemo(
     () => projectRoleGovernanceTree(groups, roles, search, language, dictionary),
     [dictionary, groups, language, roles, search],
@@ -492,6 +497,13 @@ export function RoleGovernanceConsole({ resource, language, dictionary, permissi
         searchPlaceholder={dictionary.roleTreeSearchPlaceholder}
         searchValue={search}
         selectedKey={selectedKey}
+        summary={(
+          <Space size={[6, 6]} wrap>
+            <Tag>{dictionary.roleGroupMetadata}: {roleTreeSummary.groups}</Tag>
+            <Tag>{dictionary.roles}: {roleTreeSummary.roles}</Tag>
+            <Tag color={roleTreeSummary.invalid > 0 ? "error" : "default"}>{dictionary.error}: {roleTreeSummary.invalid}</Tag>
+          </Space>
+        )}
         title={dictionary.roleTreeTitle}
         onSearchChange={setSearch}
         onSelect={setSelectedKey}

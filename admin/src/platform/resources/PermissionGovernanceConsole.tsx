@@ -83,6 +83,7 @@ export function PermissionGovernanceConsole({ resource, language, dictionary, pe
   const requestRef = useRef(0);
   const editorSessionRef = useRef(0);
   const savingRef = useRef(false);
+  const generatedPermissionCodeRef = useRef("");
   const canRead = hasPermission(permissions, "admin:permission:read", deniedPermissions);
   const canCreate = hasPermission(permissions, "admin:permission:create", deniedPermissions);
   const canUpdate = hasPermission(permissions, "admin:permission:update", deniedPermissions);
@@ -125,6 +126,12 @@ export function PermissionGovernanceConsole({ resource, language, dictionary, pe
     () => projectPermissionTree(records, search, dictionary, language),
     [dictionary, language, records, search],
   );
+  const permissionTreeSummary = useMemo(() => ({
+    api: records.filter((record) => (valueOf(record, "resourceType") || "api") === "api").length,
+    pageButton: records.filter((record) => valueOf(record, "resourceType") === "page-button").length,
+    custom: records.filter(isCustomAPIPermission).length,
+    system: records.filter((record) => !isCustomAPIPermission(record)).length,
+  }), [records]);
 
   useEffect(() => {
     if (loading) return;
@@ -145,6 +152,7 @@ export function PermissionGovernanceConsole({ resource, language, dictionary, pe
     }
     setError("");
     setNotice("");
+    generatedPermissionCodeRef.current = "";
     setEditor({ sessionID: ++editorSessionRef.current });
   };
 
@@ -165,10 +173,23 @@ export function PermissionGovernanceConsole({ resource, language, dictionary, pe
   const closeEditor = () => {
     editorSessionRef.current += 1;
     savingRef.current = false;
+    generatedPermissionCodeRef.current = "";
     setSaving(false);
     setEditor(null);
     form.resetFields();
   };
+
+  const syncPermissionCode = useCallback((changedValues: Partial<PermissionEditorValues>, values: PermissionEditorValues) => {
+    if (editor?.record || (!("resource" in changedValues) && !("action" in changedValues))) return;
+    const resourceCode = values.resource?.trim() ?? "";
+    const actionCode = values.action?.trim() ?? "";
+    if (!CUSTOM_PERMISSION_SEGMENT.test(resourceCode) || !CUSTOM_PERMISSION_SEGMENT.test(actionCode)) return;
+    const nextCode = `admin:${resourceCode}:${actionCode}`;
+    const currentCode = values.code?.trim() ?? "";
+    if (currentCode && currentCode !== generatedPermissionCodeRef.current) return;
+    generatedPermissionCodeRef.current = nextCode;
+    form.setFieldValue("code", nextCode);
+  }, [editor?.record, form]);
 
   const savePermission = async (values: PermissionEditorValues) => {
     if (!editor || savingRef.current) return;
@@ -246,6 +267,14 @@ export function PermissionGovernanceConsole({ resource, language, dictionary, pe
         searchPlaceholder={dictionary.permissionTreeSearchPlaceholder}
         searchValue={search}
         selectedKey={selectedKey}
+        summary={(
+          <Space size={[6, 6]} wrap>
+            <Tag>{dictionary.permissionTypeAPI}: {permissionTreeSummary.api}</Tag>
+            <Tag>{dictionary.permissionTypePageButton}: {permissionTreeSummary.pageButton}</Tag>
+            <Tag color="processing">{dictionary.permissionCustomManagedTag}: {permissionTreeSummary.custom}</Tag>
+            <Tag>{dictionary.permissionSystemManagedTag}: {permissionTreeSummary.system}</Tag>
+          </Space>
+        )}
         title={dictionary.permissionTreeTitle}
         onSearchChange={setSearch}
         onSelect={setSelectedKey}
@@ -266,7 +295,7 @@ export function PermissionGovernanceConsole({ resource, language, dictionary, pe
         onCancel={() => { if (!saving) closeEditor(); }}
         onOk={() => form.submit()}
       >
-        <Form<PermissionEditorValues> form={form} layout="vertical" onFinish={(values) => void savePermission(values)}>
+        <Form<PermissionEditorValues> form={form} layout="vertical" onFinish={(values) => void savePermission(values)} onValuesChange={syncPermissionCode}>
           <div className="permission-governance-form-grid">
             <Form.Item
               name="code"
@@ -278,7 +307,11 @@ export function PermissionGovernanceConsole({ resource, language, dictionary, pe
             <Form.Item
               name="resource"
               label={dictionary.permissionResource}
-              rules={[requiredRule(dictionary.requiredField, dictionary.permissionResource), permissionSegmentRule(dictionary.permissionCustomResourceInvalid)]}
+              rules={[
+                requiredRule(dictionary.requiredField, dictionary.permissionResource),
+                permissionSegmentRule(dictionary.permissionCustomResourceInvalid),
+                resourceMatchesPermissionCodeRule(form, dictionary.permissionCustomCodeResourceMismatch),
+              ]}
             >
               <Input autoComplete="off" placeholder="orders" />
             </Form.Item>
@@ -541,8 +574,12 @@ async function loadAllPermissions() {
 
 function buildPermissionInput(values: PermissionEditorValues, dictionary: Dictionary): AdminResourceInput {
   const code = values.code.trim();
+  const resource = values.resource.trim();
   const action = values.action.trim();
   const parts = permissionPartsFromCode(code);
+  if (parts.resource !== resource) {
+    throw new Error(dictionary.permissionCustomCodeResourceMismatch);
+  }
   if (parts.action !== action) {
     throw new Error(dictionary.permissionCustomCodeActionMismatch);
   }
@@ -554,7 +591,7 @@ function buildPermissionInput(values: PermissionEditorValues, dictionary: Dictio
     values: cleanValues({
       resourceType: "api",
       capability: CUSTOM_API_PERMISSION_CAPABILITY,
-      resource: values.resource.trim(),
+      resource,
       action,
       prefix: parts.prefix,
       nameZh: values.nameZh?.trim() ?? "",
@@ -586,8 +623,9 @@ function isCustomAPIPermission(record: AdminResourceRecord) {
 
 function permissionPartsFromCode(code: string) {
   const segments = code.split(":");
+  const resource = segments[1] ?? "";
   const action = segments.at(-1) ?? "";
-  return { prefix: segments.slice(0, -1).join(":"), action };
+  return { prefix: segments.slice(0, -1).join(":"), resource, action };
 }
 
 function permissionNodeKey(code: string) {
@@ -627,6 +665,14 @@ function actionMatchesPermissionCodeRule(form: ReturnType<typeof Form.useForm<Pe
   return { validator: async (_: unknown, value?: string) => {
     const code = String(form.getFieldValue("code") ?? "").trim();
     if (!code || !value || permissionPartsFromCode(code).action === value.trim()) return;
+    throw new Error(message);
+  } };
+}
+
+function resourceMatchesPermissionCodeRule(form: ReturnType<typeof Form.useForm<PermissionEditorValues>>[0], message: string) {
+  return { validator: async (_: unknown, value?: string) => {
+    const code = String(form.getFieldValue("code") ?? "").trim();
+    if (!code || !value || permissionPartsFromCode(code).resource === value.trim()) return;
     throw new Error(message);
   } };
 }

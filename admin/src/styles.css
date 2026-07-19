@@ -80,6 +80,22 @@
   overscroll-behavior: contain;
 }
 
+.admin-tree-workbench-summary {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 8px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-tree-workbench-summary .ant-tag {
+  max-width: 100%;
+  margin: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .admin-tree-workbench-tree .ant-tree-node-content-wrapper,
 .platform-tree-transfer-pane .ant-tree-node-content-wrapper {
   flex: 1;
@@ -109,6 +125,10 @@
 .platform-tree-transfer-pane .ant-tree-title {
   display: block;
   width: 100%;
+  min-width: 0;
+}
+
+.admin-tree-workbench-tree .ant-tree-list-holder-inner {
   min-width: 0;
 }
 
@@ -196,8 +216,10 @@
 .admin-tree-workbench-node-meta .ant-tag {
   max-width: 100%;
   margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .admin-tree-workbench-node-count {
@@ -241,6 +263,13 @@
 
 .role-governance-detail-heading .ant-typography {
   max-width: 100%;
+}
+
+.role-governance-detail .ant-typography code,
+.menu-governance-detail .ant-typography code,
+.permission-governance-detail .ant-typography code {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .role-governance-identity {
@@ -1761,8 +1790,7 @@ select {
   font-size: 10px;
 }
 
-.mobile-work-context-list,
-.mobile-runtime-context-list {
+.mobile-work-context-list {
   display: grid;
   gap: 6px;
 }
@@ -1810,15 +1838,6 @@ select {
   width: 44px;
   flex: 0 0 44px;
   color: var(--muted);
-}
-
-.mobile-runtime-context-list > div {
-  display: grid;
-  gap: 4px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-elevated);
 }
 
 .context-dropdown-panel {
@@ -2471,14 +2490,16 @@ select {
 }
 
 .plugin-management-panel {
-  display: grid;
-  gap: 14px;
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: var(--space-panel);
-  padding: 16px;
+  padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--shadow-subtle);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-elevated) 86%, var(--page) 14%);
 }
 
 .plugin-management-panel.pending {
@@ -2488,72 +2509,63 @@ select {
     var(--surface);
 }
 
-.plugin-management-header {
+.plugin-management-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.plugin-management-title-row {
   display: flex;
   min-width: 0;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
-.plugin-management-header .ant-typography {
+.plugin-management-title-row .ant-tag {
   margin: 0;
 }
 
-.plugin-management-header .ant-typography + .ant-typography {
-  margin-top: 6px;
+.plugin-management-copy .ant-typography-secondary {
   color: var(--muted);
-  line-height: 1.55;
+  line-height: 1.45;
 }
 
-.plugin-management-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+.plugin-management-facts {
+  display: flex;
+  max-width: min(680px, 58%);
+  min-width: 320px;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
   margin: 0;
 }
 
-.plugin-management-grid div {
+.plugin-management-facts div {
   display: grid;
-  min-width: 0;
-  gap: 5px;
-  padding: 10px;
-  border: 1px solid var(--border);
+  min-width: 132px;
+  max-width: 220px;
+  gap: 3px;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
   border-radius: var(--radius-sm);
-  background: var(--surface-elevated);
+  background: var(--surface);
 }
 
-.plugin-management-grid dt {
+.plugin-management-facts dt {
   color: var(--muted);
   font-size: 12px;
 }
 
-.plugin-management-grid dd {
+.plugin-management-facts dd {
   min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;
   color: var(--text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
-}
-
-.plugin-capability-state {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.plugin-capability-list {
-  display: grid;
-  min-width: 0;
-  gap: 8px;
-}
-
-.plugin-capability-tags {
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  gap: 6px;
 }
 
 .resource-grid {
@@ -2790,7 +2802,7 @@ select {
 }
 
 .profile-summary-panel {
-  width: min(420px, calc(100vw - 32px));
+  width: min(460px, calc(100vw - 32px));
 }
 
 .profile-summary-body {
@@ -5602,7 +5614,7 @@ select {
   .platform-mobile-contextbar {
     display: grid;
     min-height: 44px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     border-bottom: 1px solid var(--border);
     background: var(--surface);
   }
@@ -5619,10 +5631,6 @@ select {
     border-radius: 0;
     background: transparent;
     text-align: left;
-  }
-
-  .platform-mobile-context-button + .platform-mobile-context-button {
-    border-left: 1px solid var(--border);
   }
 
   .platform-mobile-context-button span,
@@ -5789,13 +5797,18 @@ select {
     margin-bottom: 10px;
   }
 
-  .plugin-management-header {
+  .plugin-management-panel {
     flex-direction: column;
   }
 
-  .plugin-management-grid,
-  .plugin-capability-state {
-    grid-template-columns: minmax(0, 1fr);
+  .plugin-management-facts {
+    max-width: none;
+    min-width: 0;
+    justify-content: flex-start;
+  }
+
+  .plugin-management-facts div {
+    min-width: min(180px, 100%);
   }
 
   .resource-summary-band {

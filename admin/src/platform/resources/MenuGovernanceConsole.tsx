@@ -253,6 +253,11 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
 
   const directoryRecords = useMemo(() => records.filter((record) => nodeType(record) === "directory"), [records]);
   const nodes = useMemo(() => menuTreeNodes(filterMenuRecords(records, search), language, dictionary), [dictionary, language, records, search]);
+  const menuTreeSummary = useMemo(() => ({
+    directories: records.filter((record) => nodeType(record) === "directory").length,
+    pages: records.filter((record) => nodeType(record) === "page").length,
+    disabled: records.filter((record) => record.status === "disabled").length,
+  }), [records]);
   const componentOptions = useMemo(
     () => availableResourceRoutes.map((route) => ({ label: route, value: route.replace(/^\/+/, "") })).filter((option) => option.value),
     [availableResourceRoutes],
@@ -408,6 +413,13 @@ export function MenuGovernanceConsole({ resource, availableResourceRoutes, langu
         selectedKey={selectedKey}
         searchValue={search}
         loading={loading}
+        summary={(
+          <Space size={[6, 6]} wrap>
+            <Tag>{dictionary.menuDirectory}: {menuTreeSummary.directories}</Tag>
+            <Tag>{dictionary.menuPage}: {menuTreeSummary.pages}</Tag>
+            <Tag color={menuTreeSummary.disabled > 0 ? "default" : "success"}>{dictionary.disabled}: {menuTreeSummary.disabled}</Tag>
+          </Space>
+        )}
         detail={(
           <div ref={detailFocusRef} className="menu-governance-detail-focus-target" tabIndex={-1} aria-label={dictionary.menuDetailTitle}>
             {detail}

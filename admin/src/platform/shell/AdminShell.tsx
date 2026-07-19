@@ -120,7 +120,7 @@ export function AdminShell({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
-  const [openContext, setOpenContext] = useState<"mobile-work" | "mobile-runtime" | null>(null);
+  const [openContext, setOpenContext] = useState<"mobile-work" | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
   const workTabsRef = useRef<HTMLElement | null>(null);
   const [workTabsScroll, setWorkTabsScroll] = useState({ left: false, right: false });
@@ -599,37 +599,6 @@ export function AdminShell({
               <DownOutlined />
             </Button>
           </PlatformDropdownPlugin>
-          <PlatformDropdownPlugin
-            open={openContext === "mobile-runtime"}
-            content={(
-              <PlatformDropdownPanel
-                className="mobile-context-panel"
-                title={dictionary.mobileRuntimeContext}
-                description={`${dictionary.environment}: ${dictionary.production} · ${dictionary.tenant}: ${dictionary.platformTenant}`}
-                width={320}
-                footer={<Tag>{dictionary.readOnlyContext}</Tag>}
-              >
-                <div className="mobile-runtime-context-list">
-                  <div>
-                    <Typography.Text type="secondary">{dictionary.environment}</Typography.Text>
-                    <strong>{dictionary.production}</strong>
-                  </div>
-                  <div>
-                    <Typography.Text type="secondary">{dictionary.tenant}</Typography.Text>
-                    <strong>{`${dictionary.platformTenant} (platform)`}</strong>
-                  </div>
-                </div>
-              </PlatformDropdownPanel>
-            )}
-            placement="bottomRight"
-            onOpenChange={(open) => setOpenContext(open ? "mobile-runtime" : null)}
-          >
-            <div className="platform-mobile-context-button context-readonly" aria-label={dictionary.mobileRuntimeContext}>
-              <span>{dictionary.environment}</span>
-              <strong>{`${dictionary.production} · ${dictionary.platformTenant}`}</strong>
-              <Tag>{dictionary.readOnlyContext}</Tag>
-            </div>
-          </PlatformDropdownPlugin>
         </section>
 
         {uiConfig.showWorkTabs ? (
@@ -793,7 +762,7 @@ function ProfileSummaryPanel({
   const tenantCode = session.user.tenantCode || "platform";
   const tenantDisplay = tenantCode === "platform" ? `${dictionary.platformTenant} (platform)` : tenantCode;
   const organizationDisplay = session.user.orgUnitCode || dictionary.notConfigured;
-  const roles = session.roles.filter(Boolean);
+  const roles = normalizeProfileRoleLabels(session.roles);
   const profileFields = [
     { label: dictionary.avatar, value: dictionary.notConfigured },
     { label: dictionary.nickname, value: session.user.name || dictionary.notConfigured },
@@ -808,8 +777,8 @@ function ProfileSummaryPanel({
       bodyClassName="profile-summary-body"
       title={dictionary.personalProfile}
       description={session.user.username || displayName}
-      width={420}
-      maxHeight="min(640px, calc(100vh - 72px))"
+      width={460}
+      maxHeight="min(720px, calc(100vh - 32px))"
       footer={(
         <Button block icon={<EditOutlined />} onClick={onEditProfile}>
           {dictionary.editProfile}
@@ -874,7 +843,7 @@ function ProfileEditorModal({
   const tenantCode = session.user.tenantCode || "platform";
   const tenantDisplay = tenantCode === "platform" ? `${dictionary.platformTenant} (platform)` : tenantCode;
   const organizationDisplay = session.user.orgUnitCode || dictionary.notConfigured;
-  const roles = session.roles.filter(Boolean);
+  const roles = normalizeProfileRoleLabels(session.roles);
   const profileFields = [
     { label: dictionary.username, value: session.user.username || dictionary.notConfigured },
     { label: dictionary.nickname, value: session.user.name || dictionary.notConfigured },
@@ -888,7 +857,7 @@ function ProfileEditorModal({
       className="profile-editor-modal"
       title={dictionary.editProfile}
       open={open}
-      width={760}
+      width={880}
       footer={[
         <Button key="close" onClick={onClose}>{dictionary.close}</Button>,
         <Button key="save" disabled type="primary">{dictionary.saveProfile}</Button>,
@@ -962,6 +931,31 @@ function ProfileEditorModal({
       </div>
     </Modal>
   );
+}
+
+function normalizeProfileRoleLabels(rawRoles: unknown) {
+  if (!Array.isArray(rawRoles)) {
+    return [];
+  }
+  return rawRoles
+    .map((role) => {
+      if (typeof role === "string") {
+        const value = role.trim();
+        return /^\d+$/.test(value) ? "" : value;
+      }
+      if (!role || typeof role !== "object") {
+        return "";
+      }
+      const record = role as Record<string, unknown>;
+      for (const key of ["name", "label", "code", "id"]) {
+        const value = record[key];
+        if (typeof value === "string" && value.trim() && !/^\d+$/.test(value.trim())) {
+          return value.trim();
+        }
+      }
+      return "";
+    })
+    .filter(Boolean);
 }
 
 function ProfileContextItem({ label, value }: { label: string; value: string }) {
