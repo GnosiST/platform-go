@@ -168,7 +168,12 @@ requireRegex(
 requireIncludes(files.client, "audiences: string[];", "AuthProvider must expose its declared audiences to the Admin client.");
 requireIncludes(files.login, "filterAdminAuthProviders(providers)", "Admin login must consume provider audiences before selection and rendering.");
 requireIncludes(files.login, "adminProviders.filter((provider) => provider.enabled && provider.configured)", "Admin login must render only enabled and configured providers.");
-requireIncludes(files.login, 'className="login-provider-tabs"', "Admin login providers must render as tabs instead of disabled option cards.");
+requireIncludes(files.login, "loginProviderOptionsClassName(availableProviders.length)", "Admin login providers must render through the adaptive provider option selector.");
+requireIncludes(files.login, 'role="listbox"', "Admin login provider options must expose an accessible selection container.");
+requireIncludes(files.login, 'className={`login-provider-option${selected ? " selected" : ""}`}', "Admin login provider options must expose selected state styling.");
+requireCssRule(files.styles, ".login-provider-count-3", ["grid-template-columns: repeat(3, minmax(0, 1fr));"], "Admin login must lay out up to three login methods as equal-width choices.");
+requireCssRule(files.styles, ".login-provider-count-many", ["grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));"], "Admin login must gracefully wrap when more than three methods are enabled.");
+requireCssRule(mobileStyles, ".login-provider-options", ["grid-template-columns: minmax(0, 1fr);"], "Mobile Admin login methods must stack to avoid horizontal overflow.");
 requireNotIncludes(files.login, "dictionary.notConfigured", "Admin login must not show unconfigured providers in the login selector.");
 requireNotIncludes(files.login, "disabled={!provider.configured || loading || submitting}", "Admin login must not render unconfigured providers as disabled selector options.");
 requireIncludes(files.client, "type AuthLoginRequest = Omit<AuthLoginInput, \"secret\">", "Credential login requests must separate form input from encrypted transport payloads.");

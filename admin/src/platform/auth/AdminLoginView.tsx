@@ -9,8 +9,8 @@ import {
   SafetyCertificateOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Button, Form, Input, Space, Tabs, Tooltip, Typography } from "antd";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Button, Form, Input, Space, Tooltip, Typography } from "antd";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   loginWithAuthProvider,
   startCredentialChallenge,
@@ -105,13 +105,9 @@ export function AdminLoginView({
     () => availableProviders.find((provider) => provider.id === selectedProviderID) ?? availableProviders[0],
     [availableProviders, selectedProviderID],
   );
-  const providerTabs = useMemo(
-    () =>
-      availableProviders.map((provider) => ({
-        key: provider.id,
-        label: provider.title[language] || provider.id,
-      })),
-    [availableProviders, language],
+  const providerOptionsClassName = useMemo(
+    () => loginProviderOptionsClassName(availableProviders.length),
+    [availableProviders.length],
   );
   const productName = branding?.productName || "Platform Go";
   const shortName = branding?.shortName || productName;
@@ -270,6 +266,20 @@ export function AdminLoginView({
     loginHeadingRef.current?.focus({ preventScroll: true });
   };
 
+  const selectProvider = (providerID: string) => {
+    if (providerID === selectedProviderID || submitting) return;
+    const provider = availableProviders.find((item) => item.id === providerID);
+    clearPendingOIDCLogin();
+    setLoginError("");
+    setSMSOTPTransaction(null);
+    setCredentialChallenge(null);
+    form.resetFields();
+    if (provider?.kind === "demo") {
+      form.setFieldValue("username", "admin");
+    }
+    setSelectedProviderID(providerID);
+  };
+
   return (
     <main className="login-page" data-theme={themeName}>
       <section className="login-hero">
@@ -312,20 +322,33 @@ export function AdminLoginView({
           <>
             {loginError ? <AdminFeedback className="login-feedback" type="error" message={loginError} /> : null}
             {availableProviders.length ? (
-              <Tabs
-                activeKey={selectedProvider?.id}
+              <div
                 aria-label={dictionary.loginProvider}
-                className="login-provider-tabs"
-                items={providerTabs}
-                size="small"
-                onChange={(providerID) => {
-                  clearPendingOIDCLogin();
-                  setLoginError("");
-                  setSMSOTPTransaction(null);
-                  form.resetFields();
-                  setSelectedProviderID(providerID);
-                }}
-              />
+                className={providerOptionsClassName}
+                role="listbox"
+              >
+                {availableProviders.map((provider) => {
+                  const providerSpec = credentialProviderSpec(provider);
+                  const selected = selectedProvider?.id === provider.id;
+                  return (
+                    <button
+                      aria-selected={selected}
+                      className={`login-provider-option${selected ? " selected" : ""}`}
+                      disabled={submitting}
+                      key={provider.id}
+                      role="option"
+                      type="button"
+                      onClick={() => selectProvider(provider.id)}
+                    >
+                      <span aria-hidden className="login-provider-option-icon">{loginProviderIcon(provider, providerSpec)}</span>
+                      <span className="login-provider-option-copy">
+                        <span className="login-provider-option-title">{provider.title[language] || provider.id}</span>
+                        <span className="login-provider-option-description">{loginProviderDescription(dictionary, provider, providerSpec)}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             ) : (
               <AdminFeedback
                 className="login-feedback"
@@ -334,129 +357,122 @@ export function AdminLoginView({
               />
             )}
 
-            {selectedProvider && selectedProvider.kind === "demo" ? (
-              <Form<LoginFormValues>
-                form={form}
-                layout="vertical"
-                initialValues={{ username: "admin" }}
-                requiredMark={false}
-                onFinish={submit}
-              >
-                <Form.Item
-                  label={dictionary.loginUsername}
-                  name="username"
-                  rules={[{ required: true, message: dictionary.loginUsernameRequired }]}
-                >
-                  <Input prefix={<UserOutlined />} autoComplete="username" placeholder={dictionary.loginUsernamePlaceholder} />
-                </Form.Item>
-                <Button
-                  block
-                  className="login-submit"
-                  htmlType="submit"
-                  icon={<LoginOutlined />}
-                  loading={submitting}
-                  type="primary"
-                  disabled={!selectedProvider.configured || loading || submitting}
-                >
-                  {dictionary.login}
-                </Button>
-              </Form>
-            ) : null}
+            <Form<LoginFormValues>
+              className="login-form-shell"
+              form={form}
+              layout="vertical"
+              initialValues={{ username: "admin" }}
+              requiredMark={false}
+              onFinish={submit}
+            >
+              {selectedProvider && selectedProvider.kind === "demo" ? (
+                <>
+                  <Form.Item
+                    label={dictionary.loginUsername}
+                    name="username"
+                    rules={[{ required: true, message: dictionary.loginUsernameRequired }]}
+                  >
+                    <Input prefix={<UserOutlined />} autoComplete="username" placeholder={dictionary.loginUsernamePlaceholder} />
+                  </Form.Item>
+                  <Button
+                    block
+                    className="login-submit"
+                    htmlType="submit"
+                    icon={<LoginOutlined />}
+                    loading={submitting}
+                    type="primary"
+                    disabled={!selectedProvider.configured || loading || submitting}
+                  >
+                    {dictionary.login}
+                  </Button>
+                </>
+              ) : null}
 
-            {selectedProvider && credentialSpec?.mode === "password" ? (
-              <Form<LoginFormValues>
-                form={form}
-                layout="vertical"
-                requiredMark={false}
-                onFinish={submit}
-              >
-                <Form.Item
-                  label={credentialIdentifierLabel(dictionary, credentialSpec.identifierType)}
-                  name="identifier"
-                  rules={[{ required: true, message: credentialIdentifierRequired(dictionary, credentialSpec.identifierType) }]}
-                >
-                  <Input prefix={credentialIdentifierIcon(credentialSpec.identifierType)} autoComplete={credentialIdentifierAutocomplete(credentialSpec.identifierType)} placeholder={credentialIdentifierPlaceholder(dictionary, credentialSpec.identifierType)} />
-                </Form.Item>
-                <Form.Item
-                  label={dictionary.loginPassword}
-                  name="password"
-                  rules={[{ required: true, message: dictionary.loginPasswordRequired }]}
-                >
-                  <Input.Password prefix={<LockOutlined />} autoComplete="current-password" placeholder={dictionary.loginPasswordCredentialPlaceholder} />
-                </Form.Item>
-                <CredentialChallengeField
-                  challenge={credentialChallenge}
-                  dictionary={dictionary}
-                  loading={credentialChallengeLoading}
-                  onRefresh={() => void refreshCredentialChallenge()}
-                />
-                <Button
-                  block
-                  className="login-submit"
-                  htmlType="submit"
-                  icon={<LoginOutlined />}
-                  loading={submitting}
-                  type="primary"
-                  disabled={!selectedProvider.configured || loading || submitting || !credentialChallenge}
-                >
-                  {dictionary.login}
-                </Button>
-              </Form>
-            ) : null}
+              {selectedProvider && credentialSpec?.mode === "password" ? (
+                <>
+                  <Form.Item
+                    label={credentialIdentifierLabel(dictionary, credentialSpec.identifierType)}
+                    name="identifier"
+                    rules={[{ required: true, message: credentialIdentifierRequired(dictionary, credentialSpec.identifierType) }]}
+                  >
+                    <Input prefix={credentialIdentifierIcon(credentialSpec.identifierType)} autoComplete={credentialIdentifierAutocomplete(credentialSpec.identifierType)} placeholder={credentialIdentifierPlaceholder(dictionary, credentialSpec.identifierType)} />
+                  </Form.Item>
+                  <Form.Item
+                    label={dictionary.loginPassword}
+                    name="password"
+                    rules={[{ required: true, message: dictionary.loginPasswordRequired }]}
+                  >
+                    <Input.Password prefix={<LockOutlined />} autoComplete="current-password" placeholder={dictionary.loginPasswordCredentialPlaceholder} />
+                  </Form.Item>
+                  <CredentialChallengeField
+                    challenge={credentialChallenge}
+                    dictionary={dictionary}
+                    loading={credentialChallengeLoading}
+                    onRefresh={() => void refreshCredentialChallenge()}
+                  />
+                  <Button
+                    block
+                    className="login-submit"
+                    htmlType="submit"
+                    icon={<LoginOutlined />}
+                    loading={submitting}
+                    type="primary"
+                    disabled={!selectedProvider.configured || loading || submitting || !credentialChallenge}
+                  >
+                    {dictionary.login}
+                  </Button>
+                </>
+              ) : null}
 
-            {selectedProvider && credentialSpec?.mode === "sms-otp" ? (
-              <Form<LoginFormValues>
-                form={form}
-                layout="vertical"
-                requiredMark={false}
-                onFinish={submit}
-              >
-                <Form.Item
-                  label={dictionary.loginPhone}
-                  name="identifier"
-                  rules={[{ required: true, message: dictionary.loginPhoneRequired }]}
-                >
-                  <Input prefix={<PhoneOutlined />} autoComplete="tel" placeholder={dictionary.loginPhonePlaceholder} />
-                </Form.Item>
-                <Form.Item label={dictionary.loginSMSCode} required>
-                  <Space.Compact className="login-sms-code-row">
-                    <Form.Item
-                      noStyle
-                      name="smsCode"
-                      rules={[{ required: true, message: dictionary.loginSMSCodeRequired }]}
-                    >
-                      <Input inputMode="numeric" autoComplete="one-time-code" placeholder={dictionary.loginSMSCodePlaceholder} />
-                    </Form.Item>
-                    <Button loading={sendingSMSOTP} disabled={loading || submitting || sendingSMSOTP} onClick={() => void sendSMSOTP()}>
-                      {sendingSMSOTP ? dictionary.loginSMSSending : dictionary.loginSMSSendCode}
-                    </Button>
-                  </Space.Compact>
-                </Form.Item>
-                {smsOTPTransaction ? (
-                  <Typography.Text className="login-sms-status" type="secondary">
-                    {dictionary.loginSMSSentTo.replace("{destination}", smsOTPTransaction.maskedIdentifier)}
-                    {smsOTPTransaction.debugCode ? ` ${smsOTPTransaction.debugCode}` : ""}
-                  </Typography.Text>
-                ) : null}
-                <CredentialChallengeField
-                  challenge={credentialChallenge}
-                  dictionary={dictionary}
-                  loading={credentialChallengeLoading}
-                  onRefresh={() => void refreshCredentialChallenge()}
-                />
-                <Button
-                  block
-                  className="login-submit"
-                  htmlType="submit"
-                  icon={<LoginOutlined />}
-                  loading={submitting}
-                  type="primary"
-                  disabled={!selectedProvider.configured || loading || submitting || !smsOTPTransaction || !credentialChallenge}
-                >
-                  {dictionary.login}
-                </Button>
-              </Form>
-            ) : null}
+              {selectedProvider && credentialSpec?.mode === "sms-otp" ? (
+                <>
+                  <Form.Item
+                    label={dictionary.loginPhone}
+                    name="identifier"
+                    rules={[{ required: true, message: dictionary.loginPhoneRequired }]}
+                  >
+                    <Input prefix={<PhoneOutlined />} autoComplete="tel" placeholder={dictionary.loginPhonePlaceholder} />
+                  </Form.Item>
+                  <Form.Item label={dictionary.loginSMSCode} required>
+                    <Space.Compact className="login-sms-code-row">
+                      <Form.Item
+                        noStyle
+                        name="smsCode"
+                        rules={[{ required: true, message: dictionary.loginSMSCodeRequired }]}
+                      >
+                        <Input inputMode="numeric" autoComplete="one-time-code" placeholder={dictionary.loginSMSCodePlaceholder} />
+                      </Form.Item>
+                      <Button loading={sendingSMSOTP} disabled={loading || submitting || sendingSMSOTP} onClick={() => void sendSMSOTP()}>
+                        {sendingSMSOTP ? dictionary.loginSMSSending : dictionary.loginSMSSendCode}
+                      </Button>
+                    </Space.Compact>
+                  </Form.Item>
+                  {smsOTPTransaction ? (
+                    <Typography.Text className="login-sms-status" type="secondary">
+                      {dictionary.loginSMSSentTo.replace("{destination}", smsOTPTransaction.maskedIdentifier)}
+                      {smsOTPTransaction.debugCode ? ` ${smsOTPTransaction.debugCode}` : ""}
+                    </Typography.Text>
+                  ) : null}
+                  <CredentialChallengeField
+                    challenge={credentialChallenge}
+                    dictionary={dictionary}
+                    loading={credentialChallengeLoading}
+                    onRefresh={() => void refreshCredentialChallenge()}
+                  />
+                  <Button
+                    block
+                    className="login-submit"
+                    htmlType="submit"
+                    icon={<LoginOutlined />}
+                    loading={submitting}
+                    type="primary"
+                    disabled={!selectedProvider.configured || loading || submitting || !smsOTPTransaction || !credentialChallenge}
+                  >
+                    {dictionary.login}
+                  </Button>
+                </>
+              ) : null}
+            </Form>
 
             {selectedProvider && selectedProvider.kind === "oidc" ? (
               <Button
@@ -521,6 +537,33 @@ export function AdminLoginView({
       </section>
     </main>
   );
+}
+
+function loginProviderOptionsClassName(count: number) {
+  if (count <= 1) return "login-provider-options login-provider-count-1";
+  if (count === 2) return "login-provider-options login-provider-count-2";
+  if (count === 3) return "login-provider-options login-provider-count-3";
+  return "login-provider-options login-provider-count-many";
+}
+
+function loginProviderIcon(provider: AuthProvider, spec: CredentialProviderSpec | null): ReactNode {
+  if (provider.kind === "demo") return <UserOutlined />;
+  if (provider.kind === "oidc") return <SafetyCertificateOutlined />;
+  if (spec?.mode === "sms-otp") return <PhoneOutlined />;
+  if (spec?.identifierType === "phone") return <PhoneOutlined />;
+  if (spec?.identifierType === "email") return <MailOutlined />;
+  if (spec?.identifierType === "username") return <LockOutlined />;
+  return <SafetyCertificateOutlined />;
+}
+
+function loginProviderDescription(dictionary: Dictionary, provider: AuthProvider, spec: CredentialProviderSpec | null) {
+  if (provider.kind === "demo") return dictionary.loginProviderDemoDescription;
+  if (provider.kind === "oidc") return dictionary.loginProviderOIDCDescription;
+  if (spec?.mode === "sms-otp") return dictionary.loginProviderSMSOTPDescription;
+  if (spec?.identifierType === "phone") return dictionary.loginProviderPhonePasswordDescription;
+  if (spec?.identifierType === "email") return dictionary.loginProviderEmailPasswordDescription;
+  if (spec?.identifierType === "username") return dictionary.loginProviderUsernamePasswordDescription;
+  return dictionary.loginProviderFallbackDescription;
 }
 
 function CredentialChallengeField({
