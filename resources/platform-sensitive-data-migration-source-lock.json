@@ -43,7 +43,7 @@
       "role": "api-startup",
       "scope": "function",
       "symbol": "main",
-      "fingerprint": "sha256:27627f572247a8c86f53cb4d754c41411025c5043afbdd9187f247f4a703fa64"
+      "fingerprint": "sha256:0b4501c79b8e24675b33266c1bbe1c3a063f71ad04ba13c20a4d699690fba9c7"
     }
   ]
 }
