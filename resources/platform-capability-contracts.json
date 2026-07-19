@@ -284,7 +284,7 @@
       "profilePolicy": "profile-only",
       "source": { "kind": "platform-extension-manifest", "package": "internal/platform/core" },
       "ownership": "platform-operations-extension",
-      "boundary": "Reusable notification templates, records and delivery ledgers without binding to one business domain.",
+      "boundary": "Reusable notification templates, records, delivery ledgers and SMS sender adapter contracts without binding to one business domain. The stock process only bundles mock-local for development/test; production must use a configured provider adapter.",
       "replaceability": "replace-through-notification-adapter",
       "includedInProfiles": ["platform-notification-ready"],
       "excludedFromProfiles": ["minimal-admin", "platform-default"],

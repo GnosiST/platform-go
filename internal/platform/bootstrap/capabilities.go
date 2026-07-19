@@ -9,6 +9,7 @@ import (
 	"github.com/GnosiST/platform-go/internal/platform/config"
 	"github.com/GnosiST/platform-go/internal/platform/core"
 	"github.com/GnosiST/platform-go/internal/platform/httpapi"
+	"github.com/GnosiST/platform-go/internal/platform/notification"
 	"github.com/GnosiST/platform-go/internal/platform/ratelimit"
 )
 
@@ -16,6 +17,12 @@ type PhoneVerificationRuntime struct {
 	Protector        httpapi.PhoneProtector
 	Sender           httpapi.PhoneVerificationSender
 	DebugCodeEnabled bool
+}
+
+type NotificationSMSRuntime struct {
+	Sender           notification.SMSSender
+	LoginTemplateID  string
+	MockLocalEnabled bool
 }
 
 type RateLimitRuntime struct {
@@ -152,7 +159,72 @@ func PhoneVerificationRuntimeFromConfig(cfg config.Config, sender httpapi.PhoneV
 	return PhoneVerificationRuntime{Protector: protector, Sender: sender, DebugCodeEnabled: debugCodeEnabled}, nil
 }
 
+func NotificationSMSRuntimeFromConfig(cfg config.Config, sender notification.SMSSender) (NotificationSMSRuntime, error) {
+	rawProvider := cfg.NotificationSMSProvider
+	provider := notification.CanonicalSMSProvider(rawProvider)
+	loginTemplateID := strings.TrimSpace(cfg.NotificationSMSLoginTemplateID)
+	if provider == "" && loginTemplateID == "" {
+		return NotificationSMSRuntime{}, nil
+	}
+	environment := strings.ToLower(strings.TrimSpace(cfg.RuntimeEnvironment))
+	if environment == "" {
+		environment = config.RuntimeEnvironmentDevelopment
+	}
+	if !configuredCapability(cfg.Capabilities, "notification") {
+		return NotificationSMSRuntime{}, fmt.Errorf("notification SMS requires notification capability to be enabled")
+	}
+	if rawProvider != provider {
+		return NotificationSMSRuntime{}, fmt.Errorf("notification SMS provider must be canonical trimmed lowercase")
+	}
+	if provider == "" {
+		return NotificationSMSRuntime{}, fmt.Errorf("notification SMS provider is required")
+	}
+	if !notification.IsSupportedSMSProvider(provider) {
+		return NotificationSMSRuntime{}, fmt.Errorf("unsupported notification SMS provider %q", provider)
+	}
+	if loginTemplateID == "" {
+		return NotificationSMSRuntime{}, fmt.Errorf("notification SMS login template id is required")
+	}
+	if cfg.NotificationSMSLoginTemplateID != loginTemplateID {
+		return NotificationSMSRuntime{}, fmt.Errorf("notification SMS login template id must be trimmed")
+	}
+	if provider == notification.SMSProviderMockLocal && environment != config.RuntimeEnvironmentDevelopment && environment != config.RuntimeEnvironmentTest {
+		return NotificationSMSRuntime{}, fmt.Errorf("notification SMS mock-local provider is not allowed in %s", environment)
+	}
+	if notificationSMSSenderNil(sender) {
+		return NotificationSMSRuntime{}, fmt.Errorf("unsupported notification SMS provider %q: no sender is registered", provider)
+	}
+	if provider == notification.SMSProviderMockLocal {
+		mockSender, ok := sender.(*notification.MockLocalSMSSender)
+		if !ok || mockSender == nil {
+			return NotificationSMSRuntime{}, fmt.Errorf("notification SMS mock-local provider requires the built-in mock sender")
+		}
+	}
+	actualProvider := sender.Kind()
+	if actualProvider != provider {
+		return NotificationSMSRuntime{}, fmt.Errorf("notification SMS sender %q does not match configured provider %q", actualProvider, provider)
+	}
+	return NotificationSMSRuntime{
+		Sender:           sender,
+		LoginTemplateID:  loginTemplateID,
+		MockLocalEnabled: provider == notification.SMSProviderMockLocal,
+	}, nil
+}
+
 func phoneVerificationSenderNil(sender httpapi.PhoneVerificationSender) bool {
+	if sender == nil {
+		return true
+	}
+	value := reflect.ValueOf(sender)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
+}
+
+func notificationSMSSenderNil(sender notification.SMSSender) bool {
 	if sender == nil {
 		return true
 	}

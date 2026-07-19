@@ -48,6 +48,8 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_MESSAGE_BUS_ADAPTER", "")
 	t.Setenv("PLATFORM_SEARCH_ENABLED", "")
 	t.Setenv("PLATFORM_SEARCH_ADAPTER", "")
+	t.Setenv("PLATFORM_NOTIFICATION_SMS_PROVIDER", "")
+	t.Setenv("PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID", "")
 	t.Setenv("PLATFORM_RATE_LIMIT_HMAC_KEY", "")
 	t.Setenv("PLATFORM_SENSITIVE_REVEAL_HMAC_KEY", "")
 	t.Setenv("PLATFORM_DATA_KEY_PROVIDER", "")
@@ -1043,6 +1045,16 @@ func TestLoadParsesPhoneVerificationConfiguration(t *testing.T) {
 	}
 }
 
+func TestLoadParsesNotificationSMSConfiguration(t *testing.T) {
+	t.Setenv("PLATFORM_NOTIFICATION_SMS_PROVIDER", "MOCK-LOCAL")
+	t.Setenv("PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID", "login-template")
+
+	cfg := Load()
+	if cfg.NotificationSMSProvider != "MOCK-LOCAL" || cfg.NotificationSMSLoginTemplateID != "login-template" {
+		t.Fatalf("notification SMS config = %+v", cfg)
+	}
+}
+
 func TestLoadParsesAdminStepUpPhoneSource(t *testing.T) {
 	t.Setenv("PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE", "staff-profiles")
 	t.Setenv("PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD", "accountCode")
@@ -1471,6 +1483,83 @@ func TestValidateRuntimeAcceptsProductionAppPhoneProtectionConfig(t *testing.T) 
 
 	if err := cfg.ValidateRuntime(); err != nil {
 		t.Fatalf("ValidateRuntime() error = %v", err)
+	}
+}
+
+func TestValidateRuntimeAcceptsDevelopmentNotificationSMSMockProvider(t *testing.T) {
+	cfg := Load()
+	cfg.Capabilities = append(cfg.Capabilities, "notification")
+	cfg.NotificationSMSProvider = "mock-local"
+	cfg.NotificationSMSLoginTemplateID = "login-template"
+
+	if err := cfg.ValidateRuntime(); err != nil {
+		t.Fatalf("ValidateRuntime() error = %v", err)
+	}
+}
+
+func TestValidateRuntimeAcceptsProductionNotificationSMSVendorProvider(t *testing.T) {
+	cfg := validProductionRuntimeConfig()
+	cfg.Capabilities = append(cfg.Capabilities, "notification")
+	cfg.NotificationSMSProvider = "aliyun"
+	cfg.NotificationSMSLoginTemplateID = "login-template"
+
+	if err := cfg.ValidateRuntime(); err != nil {
+		t.Fatalf("ValidateRuntime() error = %v", err)
+	}
+}
+
+func TestValidateRuntimeRejectsNotificationSMSWithoutNotificationCapability(t *testing.T) {
+	cfg := Load()
+	cfg.NotificationSMSProvider = "mock-local"
+	cfg.NotificationSMSLoginTemplateID = "login-template"
+
+	err := cfg.ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "notification SMS requires notification capability to be enabled") {
+		t.Fatalf("ValidateRuntime() error = %v, want capability requirement", err)
+	}
+}
+
+func TestValidateRuntimeRejectsUnsafeNotificationSMSConfig(t *testing.T) {
+	tests := []struct {
+		name  string
+		apply func(*Config)
+		want  string
+	}{
+		{name: "non canonical provider", apply: func(cfg *Config) { cfg.NotificationSMSProvider = " Mock-Local " }, want: "PLATFORM_NOTIFICATION_SMS_PROVIDER to be canonical trimmed lowercase"},
+		{name: "unsupported provider", apply: func(cfg *Config) { cfg.NotificationSMSProvider = "debug" }, want: "provider \"debug\" is unsupported"},
+		{name: "missing template", apply: func(cfg *Config) { cfg.NotificationSMSLoginTemplateID = "" }, want: "requires PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID"},
+		{name: "untrimmed template", apply: func(cfg *Config) { cfg.NotificationSMSLoginTemplateID = " login-template " }, want: "PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID to be trimmed"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Load()
+			cfg.Capabilities = append(cfg.Capabilities, "notification")
+			cfg.NotificationSMSProvider = "mock-local"
+			cfg.NotificationSMSLoginTemplateID = "login-template"
+			tt.apply(&cfg)
+
+			err := cfg.ValidateRuntime()
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("ValidateRuntime() error = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateRuntimeRejectsMockNotificationSMSProviderOutsideDevelopmentAndTest(t *testing.T) {
+	for _, environment := range []string{RuntimeEnvironmentStaging, RuntimeEnvironmentProduction} {
+		t.Run(environment, func(t *testing.T) {
+			cfg := validProductionRuntimeConfig()
+			cfg.RuntimeEnvironment = environment
+			cfg.Capabilities = append(cfg.Capabilities, "notification")
+			cfg.NotificationSMSProvider = "mock-local"
+			cfg.NotificationSMSLoginTemplateID = "login-template"
+
+			err := cfg.ValidateRuntime()
+			if err == nil || !strings.Contains(err.Error(), "notification SMS mock-local provider is allowed only in development or test") {
+				t.Fatalf("ValidateRuntime() error = %v, want mock-local environment rejection", err)
+			}
+		})
 	}
 }
 

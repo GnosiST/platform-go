@@ -19,7 +19,7 @@ func DefaultManifests() []capability.Manifest {
 		{ID: "wechat-login", Name: "WeChat Login", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "audit"}, AuthProviders: []capability.AuthProvider{authProvider("wechat", "wechat", "微信登录", "WeChat Login", "微信 code 换取登录态。", "WeChat code exchange login.", false, []capability.AuthProviderAudience{capability.AuthProviderAudienceApp}, "PLATFORM_WECHAT_MINIAPP_APP_ID", "PLATFORM_WECHAT_MINIAPP_SECRET", "PLATFORM_WECHAT_MINIAPP_CODE2SESSION_ENDPOINT")}, Migrations: lifecycleMigrations("wechat-login"), Seeds: lifecycleSeeds("wechat-login")},
 		{ID: "admin-oidc", Name: "Admin OIDC", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "audit"}, Admin: adminSurface(adminIdentityAdminResource()), AuthProviders: []capability.AuthProvider{authProvider("oidc", "oidc", "企业单点登录", "Enterprise SSO", "通过 OpenID Connect 登录管理台。", "Sign in to Admin through OpenID Connect.", false, []capability.AuthProviderAudience{capability.AuthProviderAudienceAdmin}, "PLATFORM_ADMIN_OIDC_ISSUER_URL", "PLATFORM_ADMIN_OIDC_CLIENT_ID", "PLATFORM_ADMIN_OIDC_CLIENT_SECRET", "PLATFORM_ADMIN_OIDC_REDIRECT_URL")}, Migrations: lifecycleMigrations("admin-oidc"), Seeds: lifecycleSeeds("admin-oidc")},
 		{ID: "app-phone", Name: "App Phone", Version: "0.1.0", Dependencies: []capability.ID{"identity", "session", "audit"}, Admin: adminSurface(appPhoneVerificationAdminResource(), appPhoneBindingAdminResource()), App: appSurface(appRoute("POST", "/api/app/identity/phone-verifications", capability.AppRouteAuthSession, "", "创建 App 手机验证码。", "Create app phone verification."), appRoute("POST", "/api/app/identity/phone-bindings", capability.AppRouteAuthSession, "", "绑定 App 手机号。", "Bind app phone number.")), Migrations: lifecycleMigrations("app-phone"), Seeds: lifecycleSeeds("app-phone")},
-		{ID: "notification", Name: "Notification", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity", "audit"}, Admin: adminSurface(notificationTemplateAdminResource(), notificationAdminResource(), notificationDeliveryAdminResource()), Migrations: lifecycleMigrations("notification"), Seeds: lifecycleSeeds("notification")},
+		{ID: "notification", Name: "Notification", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity", "audit"}, Admin: adminSurface(notificationTemplateAdminResource(), notificationAdminResource(), notificationDeliveryAdminResource()), Service: notificationServiceSurface(), Migrations: lifecycleMigrations("notification"), Seeds: lifecycleSeeds("notification")},
 		{ID: "job", Name: "Job", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity", "audit"}, Admin: adminSurface(jobDefinitionAdminResource(), jobRunAdminResource(), jobRunAttemptAdminResource()), Migrations: lifecycleMigrations("job"), Seeds: lifecycleSeeds("job")},
 		{ID: "personnel", Name: "Personnel", Version: "0.1.0", Dependencies: []capability.ID{"tenant", "identity", "dictionary"}, Admin: adminSurface(personnelProfileAdminResource(), positionAdminResource(), positionAssignmentAdminResource()), Migrations: lifecycleMigrations("personnel"), Seeds: lifecycleSeeds("personnel")},
 		{ID: "dictionary", Name: "Dictionary", Version: "0.1.0", Admin: adminSurface(dictionaryAdminResource(), dictionaryParameterAdminResource(), areaCodeAdminResource()), Migrations: lifecycleMigrations("dictionary"), Seeds: lifecycleSeeds("dictionary")},
@@ -166,6 +166,45 @@ func fileStorageServiceSurface() capability.ServiceSurface {
 			ContractExecution:    "external upload and content read are HTTP-bound; admin, service, and control operations are contract-only",
 			IdentityProtocols:    "app-session is bound for external operations; admin-session and workload-jwt are declaration-only",
 			EventDelivery:        "contract-only; no event broker or outbox delivery is implemented",
+			DatasourceRouting:    "single configured datasource; client physical routing is forbidden",
+			RuntimeSourceWriting: "disabled",
+		},
+	}
+}
+
+func notificationServiceSurface() capability.ServiceSurface {
+	compatibility := capability.ServiceCompatibility{Mode: "semver"}
+	tenantScopes := []string{"tenant"}
+	return capability.ServiceSurface{
+		ID:            "notification",
+		Owner:         "platform-operations-extension",
+		Audiences:     []capability.ServiceAudience{capability.ServiceAudienceInternal, capability.ServiceAudiencePartner},
+		Stability:     capability.ServiceStabilityExperimental,
+		Version:       "0.1.0",
+		IdentityModes: []capability.ServiceIdentityMode{capability.ServiceIdentityWorkload},
+		AuthModes:     []capability.ServiceAuthMode{capability.ServiceAuthWorkloadJWT},
+		TenantContext: capability.DefaultTrustedTenantContext(),
+		Operations: []capability.ServiceOperation{
+			{
+				ID: "send-sms", Kind: capability.ServiceOperationCommand, Plane: capability.ServicePlaneData, RuntimeStatus: capability.ServiceRuntimeContractOnly,
+				IdentityMode: capability.ServiceIdentityWorkload, AuthModes: []capability.ServiceAuthMode{capability.ServiceAuthWorkloadJWT}, TenantMode: capability.ServiceTenantRequired,
+				DataScopes:     tenantScopes,
+				RequestSchema:  capability.ServicePayloadSchema{Ref: "#/schemas/SendSMSRequest", RequiredFields: []string{"recipient", "templateId", "templateParams"}, PII: capability.ServicePIISecret},
+				ResponseSchema: capability.ServicePayloadSchema{Ref: "#/schemas/SMSDeliveryReceipt", RequiredFields: []string{"provider", "messageId", "status", "redactedTarget"}, PII: capability.ServicePIIPersonal},
+				Reliability: capability.ServiceReliability{
+					Idempotency: "required-key", OptimisticConcurrency: "none", TimeoutMilliseconds: 5000,
+					MaxRetries: 0, RateLimitPerMinute: 60, CostLimit: 20,
+				},
+				Compatibility: compatibility,
+				Description:   capability.Text("通过已配置的通知 SMS 适配器发送模板短信。", "Send a templated SMS through the configured notification SMS adapter."),
+			},
+		},
+		SLA:           capability.ServiceSLA{AvailabilityTarget: "99.0%", LatencyP95MS: 3000},
+		Compatibility: compatibility,
+		RuntimeBoundary: capability.ServiceRuntimeBoundary{
+			ContractExecution:    "contract-only; downstream composition must inject a provider adapter before sending",
+			IdentityProtocols:    "workload-jwt declaration only for trusted platform services",
+			EventDelivery:        "delivery ledger is required by the capability contract; no outbox, retry worker, or broker is bundled",
 			DatasourceRouting:    "single configured datasource; client physical routing is forbidden",
 			RuntimeSourceWriting: "disabled",
 		},
@@ -1208,6 +1247,7 @@ func assignmentTypeOptions() []capability.AdminFieldOption {
 func notificationChannelOptions() []capability.AdminFieldOption {
 	return []capability.AdminFieldOption{
 		adminFieldOption("in_app", "站内", "In-App"),
+		adminFieldOption("sms", "短信", "SMS"),
 	}
 }
 

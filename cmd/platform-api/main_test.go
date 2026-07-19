@@ -10,6 +10,7 @@ import (
 	"github.com/GnosiST/platform-go/internal/platform/capability"
 	"github.com/GnosiST/platform-go/internal/platform/config"
 	"github.com/GnosiST/platform-go/internal/platform/httpapi"
+	"github.com/GnosiST/platform-go/internal/platform/notification"
 )
 
 func TestStartRetentionRuntimeDisabledHasZeroSideEffects(t *testing.T) {
@@ -43,6 +44,18 @@ func TestPhoneVerificationSenderFromConfigCreatesOnlyCanonicalDebugSender(t *tes
 	for _, provider := range []string{"sms-vendor", " DEBUG ", "", "unknown"} {
 		if sender := phoneVerificationSenderFromConfig(config.Config{PhoneVerificationProvider: provider}); sender != nil {
 			t.Fatalf("phoneVerificationSenderFromConfig(%q) = %T, want nil", provider, sender)
+		}
+	}
+}
+
+func TestNotificationSMSSenderFromConfigCreatesOnlyCanonicalMockLocalSender(t *testing.T) {
+	mock := notificationSMSSenderFromConfig(config.Config{NotificationSMSProvider: notification.SMSProviderMockLocal})
+	if _, ok := mock.(*notification.MockLocalSMSSender); !ok {
+		t.Fatalf("notificationSMSSenderFromConfig(mock-local) = %T, want built-in mock sender", mock)
+	}
+	for _, provider := range []string{"aliyun", " MOCK-LOCAL ", "", "debug"} {
+		if sender := notificationSMSSenderFromConfig(config.Config{NotificationSMSProvider: provider}); sender != nil {
+			t.Fatalf("notificationSMSSenderFromConfig(%q) = %T, want nil", provider, sender)
 		}
 	}
 }

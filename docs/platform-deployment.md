@@ -152,6 +152,8 @@ PLATFORM_ADMIN_OIDC_CLIENT_ID=platform-admin
 PLATFORM_ADMIN_OIDC_CLIENT_SECRET=<redacted-secret>
 PLATFORM_ADMIN_OIDC_REDIRECT_URL=https://admin.example/login
 PLATFORM_ADMIN_OIDC_SCOPES=openid,profile,email
+PLATFORM_NOTIFICATION_SMS_PROVIDER=
+PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID=
 ```
 
 Data-protection settings are initialization-time compatibility contracts. `PLATFORM_DATA_KEY_PROVIDER` must be `env-aes256` in production. Both keyrings are JSON objects keyed by canonical version IDs, and every value is a standard-base64-encoded 32-byte key. Encryption and blind-index key material must be distinct. The active IDs select new writes only; startup still requires every historical key referenced by stored envelopes. To rotate, add the new material under a new ID, deploy with the old and new entries present, change the active ID, verify reads and backups, and retire an old entry only after a separately approved migration proves no envelope references it. Replacing material under an existing ID fails startup.
@@ -165,6 +167,8 @@ Retention maintenance is also an explicit production operation. Leave `PLATFORM_
 Organization RBAC production composition uses `PLATFORM_ORGANIZATION_RBAC_MODE=target`, while Admin navigation remains on `PLATFORM_ADMIN_MENU_SERVING_MODE=legacy` and `PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=false`. The latter two cutover gates are intentionally closed by the accepted production defaults: `dual-read`, `target` serving or role-menu writes require reviewed promotion evidence, principal equivalence, bounded observation, rollback evidence and explicit rollout approval before they can be enabled.
 
 External message and search integrations are also explicit production choices. Keep `PLATFORM_MESSAGE_BUS_ENABLED=false` and `PLATFORM_SEARCH_ENABLED=false` unless a downstream composition registers the named adapters. The stock API process includes only disabled implementations and fails startup if either switch is enabled without a complete matching adapter; see `docs/platform-integration-ports.md`.
+
+Notification SMS is optional and remains empty in the stock production template. Enable it only together with the `notification` capability and a downstream sender adapter whose canonical provider is `aliyun` or `tencent`; `mock-local` is development/test only and production validation rejects it. `PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID` must be configured with the provider so credential-auth or other consumers never send an untemplated login code.
 
 Production `PLATFORM_CAPABILITIES` must not be empty and must not include `demo-data`. Capability IDs are trimmed, must use lowercase letters, numbers and hyphens, and must not contain empty or duplicate comma-separated entries. Use `minimal-admin` for the smallest supported admin foundation, or include `admin-oidc` with complete OIDC configuration when OIDC is the Admin provider. The OIDC subject must enter only through `platform-admin bind-admin-oidc --subject-stdin`; API startup does not provision accounts or authorization relationships.
 

@@ -516,4 +516,90 @@ describe("validate-platform-production-env", () => {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  it("accepts production notification SMS with an explicit vendor provider", () => {
+    const source = validStrictEnv
+      .replace("system-admin", "system-admin,notification")
+      .replace(
+        "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+        [
+          "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+          "PLATFORM_NOTIFICATION_SMS_PROVIDER=aliyun",
+          "PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID=login-template-v1",
+        ].join("\n"),
+      );
+    const { tempDir, filePath } = tempEnv(source);
+    try {
+      const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+      assert.equal(result.status, 0, result.stderr);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects unsafe production notification SMS configuration", () => {
+    const cases = [
+      [
+        validStrictEnv.replace(
+          "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+          [
+            "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+            "PLATFORM_NOTIFICATION_SMS_PROVIDER=mock-local",
+            "PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID=login-template-v1",
+          ].join("\n"),
+        ),
+        /PLATFORM_NOTIFICATION_SMS_PROVIDER requires notification capability/,
+      ],
+      [
+        validStrictEnv
+          .replace("system-admin", "system-admin,notification")
+          .replace(
+            "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+            [
+              "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+              "PLATFORM_NOTIFICATION_SMS_PROVIDER=mock-local",
+              "PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID=login-template-v1",
+            ].join("\n"),
+          ),
+        /PLATFORM_NOTIFICATION_SMS_PROVIDER must not be mock-local in production/,
+      ],
+      [
+        validStrictEnv
+          .replace("system-admin", "system-admin,notification")
+          .replace(
+            "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+            [
+              "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+              "PLATFORM_NOTIFICATION_SMS_PROVIDER=aliyun",
+              "PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID=",
+            ].join("\n"),
+          ),
+        /PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID must not be empty/,
+      ],
+      [
+        validStrictEnv
+          .replace("system-admin", "system-admin,notification")
+          .replace(
+            "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+            [
+              "PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true",
+              "PLATFORM_NOTIFICATION_SMS_PROVIDER=DEBUG",
+              "PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID=login-template-v1",
+            ].join("\n"),
+          ),
+        /PLATFORM_NOTIFICATION_SMS_PROVIDER must be canonical trimmed lowercase/,
+      ],
+    ];
+
+    for (const [source, expected] of cases) {
+      const { tempDir, filePath } = tempEnv(source);
+      try {
+        const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+        assert.notEqual(result.status, 0, result.stdout);
+        assert.match(result.stderr, expected);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
 });

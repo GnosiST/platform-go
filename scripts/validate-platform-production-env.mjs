@@ -70,6 +70,36 @@ function splitCapabilities(value) {
     .filter(Boolean);
 }
 
+function validateNotificationSMS(env, capabilities, errors) {
+  const rawProvider = env.get("PLATFORM_NOTIFICATION_SMS_PROVIDER") ?? "";
+  const provider = rawProvider.trim().toLowerCase();
+  const rawLoginTemplate = env.get("PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID") ?? "";
+  const loginTemplate = rawLoginTemplate.trim();
+  if (provider === "" && loginTemplate === "") {
+    return;
+  }
+  if (!capabilities.includes("notification")) {
+    errors.push("PLATFORM_NOTIFICATION_SMS_PROVIDER requires notification capability");
+  }
+  if (rawProvider !== provider) {
+    errors.push("PLATFORM_NOTIFICATION_SMS_PROVIDER must be canonical trimmed lowercase");
+  }
+  if (provider === "") {
+    errors.push("PLATFORM_NOTIFICATION_SMS_PROVIDER must not be empty when notification SMS is configured");
+  } else if (!["aliyun", "tencent", "mock-local"].includes(provider)) {
+    errors.push("PLATFORM_NOTIFICATION_SMS_PROVIDER must be aliyun, tencent, or mock-local");
+  }
+  if (provider === "mock-local") {
+    errors.push("PLATFORM_NOTIFICATION_SMS_PROVIDER must not be mock-local in production");
+  }
+  if (loginTemplate === "") {
+    errors.push("PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID must not be empty when notification SMS is configured");
+  }
+  if (rawLoginTemplate !== loginTemplate) {
+    errors.push("PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID must be trimmed");
+  }
+}
+
 function isPlaceholderSecret(value) {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "") {
@@ -515,6 +545,7 @@ function validatePlatformEnv(env, errors) {
   if (capabilities.includes("demo-data")) {
     errors.push("PLATFORM_CAPABILITIES must not include demo-data in production");
   }
+  validateNotificationSMS(env, capabilities, errors);
   const adminStepUpPhoneKeys = [
     "PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE",
     "PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD",

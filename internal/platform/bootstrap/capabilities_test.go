@@ -10,6 +10,7 @@ import (
 	"github.com/GnosiST/platform-go/internal/platform/capability"
 	"github.com/GnosiST/platform-go/internal/platform/config"
 	"github.com/GnosiST/platform-go/internal/platform/httpapi"
+	"github.com/GnosiST/platform-go/internal/platform/notification"
 	"github.com/GnosiST/platform-go/internal/platform/ratelimit"
 )
 
@@ -23,6 +24,34 @@ func (s phoneVerificationSenderStub) Send(context.Context, string, string, strin
 }
 
 func (s phoneVerificationSenderStub) Kind() string {
+	return s.kind
+}
+
+type notificationSMSSenderStub struct {
+	kind string
+	err  error
+}
+
+func (s notificationSMSSenderStub) SendSMS(context.Context, notification.SMSMessage) (notification.SMSDeliveryReceipt, error) {
+	return notification.SMSDeliveryReceipt{}, s.err
+}
+
+func (s notificationSMSSenderStub) Kind() string {
+	return s.kind
+}
+
+type pointerNotificationSMSSenderStub struct {
+	kind string
+}
+
+func (*pointerNotificationSMSSenderStub) SendSMS(context.Context, notification.SMSMessage) (notification.SMSDeliveryReceipt, error) {
+	return notification.SMSDeliveryReceipt{}, nil
+}
+
+func (s *pointerNotificationSMSSenderStub) Kind() string {
+	if s == nil {
+		return "aliyun"
+	}
 	return s.kind
 }
 
@@ -316,6 +345,132 @@ func TestPhoneVerificationRuntimeFromConfigRejectsFailingSenderKind(t *testing.T
 	}, phoneVerificationSenderStub{kind: "sms-vendor", err: errors.New("delivery unavailable")})
 	if err != nil {
 		t.Fatalf("PhoneVerificationRuntimeFromConfig() error = %v, sender delivery is not a bootstrap probe", err)
+	}
+}
+
+func TestNotificationSMSRuntimeFromConfigComposesDevelopmentMockSender(t *testing.T) {
+	runtime, err := NotificationSMSRuntimeFromConfig(config.Config{
+		RuntimeEnvironment:             config.RuntimeEnvironmentDevelopment,
+		Capabilities:                   []string{"notification"},
+		NotificationSMSProvider:        "mock-local",
+		NotificationSMSLoginTemplateID: "login-template",
+	}, notification.NewMockLocalSMSSender())
+	if err != nil {
+		t.Fatalf("NotificationSMSRuntimeFromConfig() error = %v", err)
+	}
+	if runtime.Sender == nil || runtime.Sender.Kind() != notification.SMSProviderMockLocal || runtime.LoginTemplateID != "login-template" || !runtime.MockLocalEnabled {
+		t.Fatalf("notification SMS runtime = %+v, want mock-local runtime with login template", runtime)
+	}
+}
+
+func TestNotificationSMSRuntimeFromConfigRejectsMockSenderOutsideDevelopmentAndTest(t *testing.T) {
+	for _, environment := range []string{config.RuntimeEnvironmentStaging, config.RuntimeEnvironmentProduction} {
+		t.Run(environment, func(t *testing.T) {
+			_, err := NotificationSMSRuntimeFromConfig(config.Config{
+				RuntimeEnvironment:             environment,
+				Capabilities:                   []string{"notification"},
+				NotificationSMSProvider:        "mock-local",
+				NotificationSMSLoginTemplateID: "login-template",
+			}, notification.NewMockLocalSMSSender())
+			if err == nil || !strings.Contains(err.Error(), "mock-local provider is not allowed") {
+				t.Fatalf("NotificationSMSRuntimeFromConfig() error = %v, want mock-local environment rejection", err)
+			}
+		})
+	}
+}
+
+func TestNotificationSMSRuntimeFromConfigRequiresNotificationCapability(t *testing.T) {
+	_, err := NotificationSMSRuntimeFromConfig(config.Config{
+		RuntimeEnvironment:             config.RuntimeEnvironmentDevelopment,
+		Capabilities:                   []string{"tenant"},
+		NotificationSMSProvider:        "mock-local",
+		NotificationSMSLoginTemplateID: "login-template",
+	}, notification.NewMockLocalSMSSender())
+	if err == nil || !strings.Contains(err.Error(), "requires notification capability") {
+		t.Fatalf("NotificationSMSRuntimeFromConfig() error = %v, want capability requirement", err)
+	}
+}
+
+func TestNotificationSMSRuntimeFromConfigRequiresMatchingInjectedSender(t *testing.T) {
+	cfg := config.Config{
+		RuntimeEnvironment:             config.RuntimeEnvironmentProduction,
+		Capabilities:                   []string{"notification"},
+		NotificationSMSProvider:        "aliyun",
+		NotificationSMSLoginTemplateID: "login-template",
+	}
+	if _, err := NotificationSMSRuntimeFromConfig(cfg, nil); err == nil || !strings.Contains(err.Error(), "no sender is registered") {
+		t.Fatalf("NotificationSMSRuntimeFromConfig(nil) error = %v, want sender requirement", err)
+	}
+	if _, err := NotificationSMSRuntimeFromConfig(cfg, notificationSMSSenderStub{kind: "tencent"}); err == nil || !strings.Contains(err.Error(), "does not match configured provider") {
+		t.Fatalf("NotificationSMSRuntimeFromConfig(mismatch) error = %v, want exact provider match", err)
+	}
+	if _, err := NotificationSMSRuntimeFromConfig(cfg, notificationSMSSenderStub{kind: "aliyun", err: errors.New("vendor unavailable")}); err != nil {
+		t.Fatalf("NotificationSMSRuntimeFromConfig(match) error = %v, sender delivery is not a bootstrap probe", err)
+	}
+	var typedNil *pointerNotificationSMSSenderStub
+	if _, err := NotificationSMSRuntimeFromConfig(cfg, typedNil); err == nil || !strings.Contains(err.Error(), "no sender is registered") {
+		t.Fatalf("NotificationSMSRuntimeFromConfig(typed nil) error = %v, want sender requirement", err)
+	}
+}
+
+func TestNotificationSMSRuntimeFromConfigRejectsUnsafeProviderContract(t *testing.T) {
+	tests := []struct {
+		name   string
+		cfg    config.Config
+		want   string
+		sender notification.SMSSender
+	}{
+		{
+			name: "non canonical provider",
+			cfg: config.Config{
+				RuntimeEnvironment:             config.RuntimeEnvironmentDevelopment,
+				Capabilities:                   []string{"notification"},
+				NotificationSMSProvider:        " Mock-Local ",
+				NotificationSMSLoginTemplateID: "login-template",
+			},
+			want:   "canonical trimmed lowercase",
+			sender: notification.NewMockLocalSMSSender(),
+		},
+		{
+			name: "unsupported provider",
+			cfg: config.Config{
+				RuntimeEnvironment:             config.RuntimeEnvironmentDevelopment,
+				Capabilities:                   []string{"notification"},
+				NotificationSMSProvider:        "debug",
+				NotificationSMSLoginTemplateID: "login-template",
+			},
+			want:   "unsupported notification SMS provider",
+			sender: notificationSMSSenderStub{kind: "debug"},
+		},
+		{
+			name: "missing template",
+			cfg: config.Config{
+				RuntimeEnvironment:      config.RuntimeEnvironmentDevelopment,
+				Capabilities:            []string{"notification"},
+				NotificationSMSProvider: "mock-local",
+			},
+			want:   "login template id is required",
+			sender: notification.NewMockLocalSMSSender(),
+		},
+		{
+			name: "mock requires built in sender",
+			cfg: config.Config{
+				RuntimeEnvironment:             config.RuntimeEnvironmentDevelopment,
+				Capabilities:                   []string{"notification"},
+				NotificationSMSProvider:        "mock-local",
+				NotificationSMSLoginTemplateID: "login-template",
+			},
+			want:   "requires the built-in mock sender",
+			sender: notificationSMSSenderStub{kind: "mock-local"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NotificationSMSRuntimeFromConfig(tt.cfg, tt.sender)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("NotificationSMSRuntimeFromConfig() error = %v, want %q", err, tt.want)
+			}
+		})
 	}
 }
 

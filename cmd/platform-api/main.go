@@ -17,6 +17,7 @@ import (
 	"github.com/GnosiST/platform-go/internal/platform/capability"
 	"github.com/GnosiST/platform-go/internal/platform/config"
 	"github.com/GnosiST/platform-go/internal/platform/httpapi"
+	"github.com/GnosiST/platform-go/internal/platform/notification"
 	"github.com/GnosiST/platform-go/internal/platform/rbac"
 	"github.com/GnosiST/platform-go/internal/platform/serviceobject"
 )
@@ -108,6 +109,14 @@ func main() {
 	}
 	if err := httpapi.ValidatePhoneProtectionHistory(resources, phoneVerification.Protector); err != nil {
 		log.Fatalf("validate phone protection history: %v", err)
+	}
+	notificationSMSSender := notificationSMSSenderFromConfig(cfg)
+	notificationSMS, err := bootstrap.NotificationSMSRuntimeFromConfig(cfg, notificationSMSSender)
+	if err != nil {
+		log.Fatalf("build notification SMS runtime: %v", err)
+	}
+	if notificationSMS.Sender != nil {
+		log.Printf("notification sms provider=%s mockLocal=%t loginTemplateConfigured=%t", notificationSMS.Sender.Kind(), notificationSMS.MockLocalEnabled, notificationSMS.LoginTemplateID != "")
 	}
 	sensitiveReveal, err := bootstrap.SensitiveRevealRuntimeFromConfig(cfg, ordered, phoneVerification)
 	if err != nil {
@@ -266,6 +275,13 @@ func securityOptionsFromConfig(cfg config.Config) httpapi.SecurityOptions {
 func phoneVerificationSenderFromConfig(cfg config.Config) httpapi.PhoneVerificationSender {
 	if cfg.PhoneVerificationProvider == httpapi.PhoneVerificationProviderDebug {
 		return httpapi.NewDebugPhoneVerificationSender()
+	}
+	return nil
+}
+
+func notificationSMSSenderFromConfig(cfg config.Config) notification.SMSSender {
+	if cfg.NotificationSMSProvider == notification.SMSProviderMockLocal {
+		return notification.NewMockLocalSMSSender()
 	}
 	return nil
 }

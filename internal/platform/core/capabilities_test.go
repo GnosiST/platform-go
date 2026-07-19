@@ -332,6 +332,46 @@ func TestNotificationManifestIsOptionalAndBusinessNeutral(t *testing.T) {
 	requireFieldRelation(t, resources["notification-deliveries"], "tenantCode", "tenants")
 	requireFieldRelation(t, resources["notification-deliveries"], "notificationCode", "notifications")
 	requireFieldRelation(t, resources["notification-deliveries"], "recipientUserCode", "users")
+
+	for _, resource := range []capability.AdminResource{resources["notification-templates"], resources["notification-deliveries"]} {
+		channelField := adminResourceField(t, resource, "channel")
+		var smsOptionFound bool
+		for _, option := range channelField.Options {
+			if option.Value == "sms" && option.Label.ZH != "" && option.Label.EN == "SMS" {
+				smsOptionFound = true
+			}
+		}
+		if !smsOptionFound {
+			t.Fatalf("resource %q channel options missing sms: %+v", resource.Resource, channelField.Options)
+		}
+	}
+
+	if notification.Service.ID != "notification" {
+		t.Fatalf("notification service = %+v, want canonical notification service surface", notification.Service)
+	}
+	if notification.Service.Stability != capability.ServiceStabilityExperimental || notification.Service.Version != "0.1.0" {
+		t.Fatalf("notification service baseline = %q/%q, want experimental 0.1.0", notification.Service.Stability, notification.Service.Version)
+	}
+	if err := capability.ValidateServiceContracts([]capability.Manifest{notification}); err != nil {
+		t.Fatalf("ValidateServiceContracts(notification) error = %v", err)
+	}
+	operations := map[string]capability.ServiceOperation{}
+	for _, operation := range notification.Service.Operations {
+		operations[operation.ID] = operation
+		if operation.RuntimeStatus != capability.ServiceRuntimeContractOnly {
+			t.Fatalf("notification operation %q runtime status = %q, want contract-only", operation.ID, operation.RuntimeStatus)
+		}
+		if operation.Method != "" || operation.Path != "" {
+			t.Fatalf("notification operation %q must not claim HTTP binding", operation.ID)
+		}
+	}
+	sendSMS := operations["send-sms"]
+	if sendSMS.Kind != capability.ServiceOperationCommand || sendSMS.Plane != capability.ServicePlaneData || sendSMS.TenantMode != capability.ServiceTenantRequired {
+		t.Fatalf("send-sms operation = %+v, want tenant-required service command", sendSMS)
+	}
+	if !slices.Equal(sendSMS.RequestSchema.RequiredFields, []string{"recipient", "templateId", "templateParams"}) || sendSMS.RequestSchema.PII != capability.ServicePIISecret {
+		t.Fatalf("send-sms request schema = %+v, want secret templated SMS payload", sendSMS.RequestSchema)
+	}
 }
 
 func TestJobManifestIsOptionalAndBusinessNeutral(t *testing.T) {
@@ -418,6 +458,17 @@ func requireFieldRelation(t *testing.T, resource capability.AdminResource, field
 		return
 	}
 	t.Fatalf("resource %q missing field %q", resource.Resource, fieldKey)
+}
+
+func adminResourceField(t *testing.T, resource capability.AdminResource, fieldKey string) capability.AdminField {
+	t.Helper()
+	for _, field := range resource.Fields {
+		if field.Key == fieldKey {
+			return field
+		}
+	}
+	t.Fatalf("resource %q missing field %q", resource.Resource, fieldKey)
+	return capability.AdminField{}
 }
 
 func TestDefaultManifestsExposeDemoDataDeclarations(t *testing.T) {

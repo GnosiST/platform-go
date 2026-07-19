@@ -14,6 +14,7 @@ import (
 
 	"github.com/GnosiST/platform-go/internal/platform/capability"
 	"github.com/GnosiST/platform-go/internal/platform/dataprotection"
+	"github.com/GnosiST/platform-go/internal/platform/notification"
 )
 
 type Config struct {
@@ -86,6 +87,8 @@ type Config struct {
 	PhoneHMACKey                        string
 	PhoneCodeHMACKey                    string
 	PhoneVerificationProvider           string
+	NotificationSMSProvider             string
+	NotificationSMSLoginTemplateID      string
 	AdminStepUpPhoneResource            string
 	AdminStepUpPhoneActorField          string
 	AdminStepUpPhoneField               string
@@ -281,6 +284,8 @@ func Load() Config {
 		PhoneHMACKey:                        env("PLATFORM_PHONE_HMAC_KEY", ""),
 		PhoneCodeHMACKey:                    env("PLATFORM_PHONE_CODE_HMAC_KEY", ""),
 		PhoneVerificationProvider:           env("PLATFORM_PHONE_VERIFICATION_PROVIDER", ""),
+		NotificationSMSProvider:             env("PLATFORM_NOTIFICATION_SMS_PROVIDER", ""),
+		NotificationSMSLoginTemplateID:      env("PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID", ""),
 		AdminStepUpPhoneResource:            env("PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE", ""),
 		AdminStepUpPhoneActorField:          env("PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD", ""),
 		AdminStepUpPhoneField:               env("PLATFORM_ADMIN_STEP_UP_PHONE_FIELD", ""),
@@ -497,6 +502,7 @@ func (c Config) ValidateRuntime() error {
 	}
 	errs = append(errs, c.validateAdminOIDC(environment)...)
 	errs = append(errs, c.validatePhoneVerification(environment)...)
+	errs = append(errs, c.validateNotificationSMS(environment)...)
 	errs = append(errs, c.validateAdminStepUpPhoneSource()...)
 	errs = append(errs, c.validateDataProtection(environment)...)
 
@@ -666,6 +672,41 @@ func (c Config) validatePhoneVerification(environment string) []error {
 	}
 	if provider == "debug" && environment != RuntimeEnvironmentDevelopment && environment != RuntimeEnvironmentTest {
 		errs = append(errs, fmt.Errorf("%s debug provider is allowed only in development or test", prefix))
+	}
+	return errs
+}
+
+func (c Config) validateNotificationSMS(environment string) []error {
+	rawProvider := c.NotificationSMSProvider
+	provider := notification.CanonicalSMSProvider(rawProvider)
+	templateID := strings.TrimSpace(c.NotificationSMSLoginTemplateID)
+	if provider == "" && templateID == "" {
+		return nil
+	}
+	var errs []error
+	prefix := "notification SMS"
+	if environment == RuntimeEnvironmentProduction {
+		prefix = "production notification SMS"
+	}
+	if !hasCapability(c.Capabilities, "notification") {
+		errs = append(errs, fmt.Errorf("%s requires notification capability to be enabled", prefix))
+	}
+	if rawProvider != provider {
+		errs = append(errs, fmt.Errorf("%s requires PLATFORM_NOTIFICATION_SMS_PROVIDER to be canonical trimmed lowercase", prefix))
+	}
+	if provider == "" {
+		errs = append(errs, fmt.Errorf("%s requires PLATFORM_NOTIFICATION_SMS_PROVIDER", prefix))
+	} else if !notification.IsSupportedSMSProvider(provider) {
+		errs = append(errs, fmt.Errorf("%s provider %q is unsupported", prefix, provider))
+	}
+	if templateID == "" {
+		errs = append(errs, fmt.Errorf("%s requires PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID", prefix))
+	}
+	if c.NotificationSMSLoginTemplateID != templateID {
+		errs = append(errs, fmt.Errorf("%s requires PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID to be trimmed", prefix))
+	}
+	if provider == notification.SMSProviderMockLocal && environment != RuntimeEnvironmentDevelopment && environment != RuntimeEnvironmentTest {
+		errs = append(errs, fmt.Errorf("%s mock-local provider is allowed only in development or test", prefix))
 	}
 	return errs
 }
