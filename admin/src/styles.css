@@ -2279,49 +2279,51 @@ select {
   margin-bottom: 12px;
 }
 
-.login-provider-list {
-  display: grid;
-  gap: 8px;
+.login-provider-tabs {
   margin-bottom: 18px;
 }
 
-.login-provider {
-  display: flex;
-  min-height: 52px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
+.login-provider-tabs .ant-tabs-nav {
+  margin-bottom: 0;
+}
+
+.login-provider-tabs .ant-tabs-nav-list {
+  width: 100%;
+}
+
+.login-provider-tabs .ant-tabs-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  justify-content: center;
+  margin: 0;
+  padding: 0 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
 }
 
-.login-provider:disabled {
-  cursor: not-allowed;
-  opacity: 0.58;
+.login-provider-tabs .ant-tabs-tab + .ant-tabs-tab {
+  margin-left: 8px;
 }
 
-.login-provider.active {
+.login-provider-tabs .ant-tabs-tab-active {
   border-color: color-mix(in srgb, var(--primary) 56%, var(--border) 44%);
   background: var(--selected);
 }
 
-.login-provider span {
-  display: grid;
-  gap: 2px;
-}
-
-.login-provider strong {
-  font-size: 14px;
+.login-provider-tabs .ant-tabs-tab-btn {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
   line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.login-provider small {
-  color: var(--muted);
-  font-size: 12px;
+.login-provider-tabs .ant-tabs-ink-bar {
+  display: none;
 }
 
 .login-submit {

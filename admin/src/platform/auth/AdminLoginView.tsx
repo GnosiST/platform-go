@@ -9,7 +9,7 @@ import {
   SafetyCertificateOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Button, Form, Input, Space, Tooltip, Typography } from "antd";
+import { Button, Form, Input, Space, Tabs, Tooltip, Typography } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   loginWithAuthProvider,
@@ -92,14 +92,34 @@ export function AdminLoginView({
   const errorHeadingRef = useRef<HTMLElement>(null);
   const [form] = Form.useForm<LoginFormValues>();
   const adminProviders = useMemo(() => filterAdminAuthProviders(providers), [providers]);
+  const availableProviders = useMemo(
+    () => adminProviders.filter((provider) => provider.enabled && provider.configured),
+    [adminProviders],
+  );
   const selectedProvider = useMemo(
-    () => adminProviders.find((provider) => provider.id === selectedProviderID) ?? adminProviders.find((provider) => provider.configured),
-    [adminProviders, selectedProviderID],
+    () => availableProviders.find((provider) => provider.id === selectedProviderID) ?? availableProviders[0],
+    [availableProviders, selectedProviderID],
+  );
+  const providerTabs = useMemo(
+    () =>
+      availableProviders.map((provider) => ({
+        key: provider.id,
+        label: provider.title[language] || provider.id,
+      })),
+    [availableProviders, language],
   );
   const productName = branding?.productName || "Platform Go";
   const shortName = branding?.shortName || productName;
   const targetLanguage = language === "zh" ? "en" : "zh";
   const credentialSpec = credentialProviderSpec(selectedProvider);
+
+  useEffect(() => {
+    if (!availableProviders.length) return;
+    if (availableProviders.some((provider) => provider.id === selectedProviderID)) return;
+    setSelectedProviderID(availableProviders[0].id);
+    setSMSOTPTransaction(null);
+    form.resetFields();
+  }, [availableProviders, form, selectedProviderID]);
 
   useEffect(() => {
     if (callbackPhase !== "idle" || !hasOIDCCallbackParams(search)) return;
@@ -257,34 +277,28 @@ export function AdminLoginView({
         {callbackPhase === "idle" ? (
           <>
             {loginError ? <AdminFeedback className="login-feedback" type="error" message={loginError} /> : null}
-            <div className="login-provider-list" aria-label={dictionary.loginProvider}>
-              {adminProviders.map((provider) => {
-                const providerTitle = provider.title[language] || provider.id;
-                const providerStatus = provider.configured ? dictionary.configured : dictionary.notConfigured;
-                return (
-                  <button
-                    aria-label={`${providerTitle}, ${providerStatus}`}
-                    className={provider.id === selectedProvider?.id ? "login-provider active" : "login-provider"}
-                    disabled={!provider.configured || loading || submitting}
-                    key={provider.id}
-                    type="button"
-                    onClick={() => {
-                      clearPendingOIDCLogin();
-                      setLoginError("");
-                      setSMSOTPTransaction(null);
-                      form.resetFields();
-                      setSelectedProviderID(provider.id);
-                    }}
-                  >
-                    <span>
-                      <strong>{providerTitle}</strong>
-                      <small>{providerStatus}</small>
-                    </span>
-                    {provider.id === selectedProvider?.id ? <CheckCircleOutlined aria-hidden /> : null}
-                  </button>
-                );
-              })}
-            </div>
+            {availableProviders.length ? (
+              <Tabs
+                activeKey={selectedProvider?.id}
+                aria-label={dictionary.loginProvider}
+                className="login-provider-tabs"
+                items={providerTabs}
+                size="small"
+                onChange={(providerID) => {
+                  clearPendingOIDCLogin();
+                  setLoginError("");
+                  setSMSOTPTransaction(null);
+                  form.resetFields();
+                  setSelectedProviderID(providerID);
+                }}
+              />
+            ) : (
+              <AdminFeedback
+                className="login-feedback"
+                type={loading ? "info" : "error"}
+                message={loading ? dictionary.loginProvidersLoading : dictionary.loginNoAvailableProviders}
+              />
+            )}
 
             {selectedProvider && selectedProvider.kind === "demo" ? (
               <Form<LoginFormValues>

@@ -167,6 +167,10 @@ requireRegex(
 );
 requireIncludes(files.client, "audiences: string[];", "AuthProvider must expose its declared audiences to the Admin client.");
 requireIncludes(files.login, "filterAdminAuthProviders(providers)", "Admin login must consume provider audiences before selection and rendering.");
+requireIncludes(files.login, "adminProviders.filter((provider) => provider.enabled && provider.configured)", "Admin login must render only enabled and configured providers.");
+requireIncludes(files.login, 'className="login-provider-tabs"', "Admin login providers must render as tabs instead of disabled option cards.");
+requireNotIncludes(files.login, "dictionary.notConfigured", "Admin login must not show unconfigured providers in the login selector.");
+requireNotIncludes(files.login, "disabled={!provider.configured || loading || submitting}", "Admin login must not render unconfigured providers as disabled selector options.");
 requireIncludes(files.oidcPolicy, "assertAdminAuthProvider(provider);", "OIDC start must reject providers without the Admin audience.");
 requireIncludes(files.client, "export function startAdminAuthProvider", "The Admin client must expose provider-start support.");
 requireRegex(

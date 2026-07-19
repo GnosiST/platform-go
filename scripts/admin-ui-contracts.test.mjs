@@ -2792,6 +2792,8 @@ describe("validate-admin-ui-contracts", () => {
 
   for (const [name, relativePath, from, to, message] of [
     ["provider audiences", "admin/src/platform/api/client.ts", "audiences: string[];", "audienceList: string[];", "AuthProvider must expose its declared audiences"],
+    ["configured provider filtering", "admin/src/platform/auth/AdminLoginView.tsx", "adminProviders.filter((provider) => provider.enabled && provider.configured)", "adminProviders", "Admin login must render only enabled and configured providers"],
+    ["provider tabs", "admin/src/platform/auth/AdminLoginView.tsx", 'className="login-provider-tabs"', 'className="login-provider-list"', "Admin login providers must render as tabs instead of disabled option cards"],
     ["Web Crypto verifier", "admin/src/platform/refine/authProvider.ts", "crypto.getRandomValues(new Uint8Array(size))", "new Uint8Array(size)", "generate verifier bytes with Web Crypto"],
     ["S256 challenge", "admin/src/platform/refine/authProvider.ts", 'crypto.subtle.digest("SHA-256"', 'legacyDigest("SHA-256"', "derive an S256 challenge with Web Crypto"],
     ["tab-scoped transaction", "admin/src/platform/refine/authProvider.ts", "window.sessionStorage.setItem", "window.localStorage.setItem", "tab-scoped sessionStorage"],
@@ -2983,6 +2985,7 @@ describe("validate-admin-ui-contracts", () => {
 
   for (const [name, relativePath, from, to, message] of [
     ["Admin audience filtering", "admin/src/platform/auth/AdminLoginView.tsx", "filterAdminAuthProviders(providers)", "providers", "Admin login must consume provider audiences before selection and rendering"],
+    ["configured-provider-only login selector", "admin/src/platform/auth/AdminLoginView.tsx", "adminProviders.filter((provider) => provider.enabled && provider.configured)", "adminProviders", "Admin login must render only enabled and configured providers"],
     ["Admin audience start guard", "admin/src/platform/auth/oidcPolicy.ts", "assertAdminAuthProvider(provider);", "void provider;", "OIDC start must reject providers without the Admin audience"],
     ["demo synchronous lock", "admin/src/platform/auth/AdminLoginView.tsx", "if (!submissionLockRef.current.acquire()) return;", "if (submitting) return;", "Demo login must acquire the synchronous submission lock"],
     ["OIDC synchronous lock", "admin/src/platform/auth/AdminLoginView.tsx", "if (!submissionLockRef.current.acquire()) return;", "if (submitting) return;", "OIDC start must acquire the synchronous submission lock"],
@@ -3044,6 +3047,21 @@ describe("validate-admin-ui-contracts", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /password form must render only for credential password providers/);
+  });
+
+  it("rejects login views that expose unconfigured providers as selector options", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTempIfPresent(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      'className="login-provider-tabs"',
+      'className="login-provider-tabs" data-regression={dictionary.notConfigured}',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Admin login must not show unconfigured providers in the login selector/);
   });
 
   it("rejects unauthenticated route normalization during OIDC callback cleanup", () => {
