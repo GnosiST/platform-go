@@ -415,6 +415,8 @@ function PluginManagementPanel({
 }) {
   const restartRequired = status.restartRequiredForChanges;
   const changes = pluginRestartImpactPreview(status, capabilities, language);
+  const currentProjection = pluginEntrypointProjection(status.currentCapabilities, capabilities);
+  const desiredProjection = pluginEntrypointProjection(status.desiredCapabilities, capabilities);
   const facts = [
     { label: dictionary.operationMode, value: status.operationMode },
     { label: dictionary.activation, value: status.activation },
@@ -444,6 +446,11 @@ function PluginManagementPanel({
           </div>
         ))}
       </dl>
+      <PluginEntrypointProjectionPanel
+        current={currentProjection}
+        desired={desiredProjection}
+        dictionary={dictionary}
+      />
       {status.pendingRestart ? (
         <div className="plugin-restart-callout">
           <Typography.Text strong>{dictionary.pluginManualRestartRequired}</Typography.Text>
@@ -466,15 +473,87 @@ function PluginManagementPanel({
                     resources: String(change.adminResources),
                     configResources: String(change.configResources),
                     permissions: String(change.permissions),
+                    serviceOperations: String(change.serviceOperations),
                     authProviders: String(change.authProviders),
                   })}
                 </Typography.Text>
+                <CapabilityImpactSurfaceList change={change} dictionary={dictionary} />
               </div>
             ))}
           </div>
         </div>
       ) : null}
     </section>
+  );
+}
+
+type CapabilityEntrypointProjection = {
+  capabilities: number;
+  menuRoutes: number;
+  adminResources: number;
+  configResources: number;
+  permissions: number;
+  serviceOperations: number;
+  authProviders: number;
+};
+
+type CapabilityRestartImpact = ReturnType<typeof pluginRestartImpactPreview>[number];
+
+function PluginEntrypointProjectionPanel({
+  current,
+  desired,
+  dictionary,
+}: {
+  current: CapabilityEntrypointProjection;
+  desired: CapabilityEntrypointProjection;
+  dictionary: Dictionary;
+}) {
+  return (
+    <div className="plugin-entrypoint-projection" aria-label={dictionary.pluginEntrypointProjection}>
+      <div className="plugin-entrypoint-copy">
+        <Typography.Text strong>{dictionary.pluginEntrypointProjection}</Typography.Text>
+        <Typography.Text type="secondary">{dictionary.pluginEntrypointProjectionHint}</Typography.Text>
+      </div>
+      <div className="plugin-entrypoint-grid">
+        <PluginEntrypointProjectionCell
+          title={dictionary.pluginCurrentEntrypoints}
+          projection={current}
+          dictionary={dictionary}
+        />
+        <PluginEntrypointProjectionCell
+          title={dictionary.pluginDesiredEntrypoints}
+          projection={desired}
+          dictionary={dictionary}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PluginEntrypointProjectionCell({
+  title,
+  projection,
+  dictionary,
+}: {
+  title: string;
+  projection: CapabilityEntrypointProjection;
+  dictionary: Dictionary;
+}) {
+  return (
+    <div className="plugin-entrypoint-cell">
+      <Typography.Text strong>{title}</Typography.Text>
+      <Typography.Text type="secondary">
+        {formatTemplate(dictionary.pluginEntrypointCounts, {
+          capabilities: String(projection.capabilities),
+          menus: String(projection.menuRoutes),
+          resources: String(projection.adminResources),
+          configResources: String(projection.configResources),
+          permissions: String(projection.permissions),
+          serviceOperations: String(projection.serviceOperations),
+          authProviders: String(projection.authProviders),
+        })}
+      </Typography.Text>
+    </div>
   );
 }
 
@@ -619,6 +698,43 @@ function CapabilityInspector({
         </div>
       </section>
 
+    </div>
+  );
+}
+
+function CapabilityImpactSurfaceList({
+  change,
+  dictionary,
+}: {
+  change: CapabilityRestartImpact;
+  dictionary: Dictionary;
+}) {
+  const surfaces = [
+    { key: "menus", title: dictionary.capabilityMenus, values: change.menuRouteLabels },
+    { key: "resources", title: dictionary.capabilityResources, values: change.adminResourceLabels },
+    { key: "configResources", title: dictionary.capabilityConfigResources, values: change.configResourceLabels },
+    { key: "permissions", title: dictionary.capabilityPermissions, values: change.permissionLabels },
+    { key: "serviceOperations", title: dictionary.capabilityServiceOperations, values: change.serviceOperationLabels },
+    { key: "authProviders", title: dictionary.capabilityAuthProviders, values: change.authProviderLabels },
+  ].filter((surface) => surface.values.length > 0);
+
+  if (surfaces.length === 0) {
+    return <Typography.Text className="secondary-text">{dictionary.capabilityNoContributions}</Typography.Text>;
+  }
+
+  return (
+    <div className="plugin-restart-surface-list">
+      {surfaces.map((surface) => (
+        <div className="plugin-restart-surface" key={surface.key}>
+          <Typography.Text type="secondary">{surface.title}</Typography.Text>
+          <span>
+            {surface.values.slice(0, 4).map((value) => (
+              <Tag key={value}>{value}</Tag>
+            ))}
+            {surface.values.length > 4 ? <Tag>+{surface.values.length - 4}</Tag> : null}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -802,9 +918,42 @@ function pluginRestartImpactPreview(status: PluginManagementStatus, capabilities
       adminResources: capability?.adminResources?.length ?? 0,
       configResources: capability?.configResources?.length ?? 0,
       permissions: capability?.permissions?.length ?? 0,
+      serviceOperations: capability?.serviceOperations?.length ?? 0,
       authProviders: capability?.authProviders?.length ?? 0,
+      menuRouteLabels: (capability?.menuRoutes ?? []).map((route) => menuImpactLabel(route, language)),
+      adminResourceLabels: (capability?.adminResources ?? []).map((resource) => resourceImpactLabel(resource, language)),
+      configResourceLabels: (capability?.configResources ?? []).map((resource) => resourceImpactLabel(resource, language)),
+      permissionLabels: capability?.permissions ?? [],
+      serviceOperationLabels: capability?.serviceOperations ?? [],
+      authProviderLabels: capability?.authProviders ?? [],
     };
   });
+}
+
+function pluginEntrypointProjection(capabilityIDs: string[], capabilities: CapabilityView[]): CapabilityEntrypointProjection {
+  const selected = new Set(capabilityIDs);
+  const projected = capabilities.filter((capability) => selected.has(capability.id));
+  return {
+    capabilities: projected.length,
+    menuRoutes: uniqueCount(projected.flatMap((capability) => (capability.menuRoutes ?? []).map((route) => route.route))),
+    adminResources: uniqueCount(projected.flatMap((capability) => (capability.adminResources ?? []).map((resource) => resource.resource))),
+    configResources: uniqueCount(projected.flatMap((capability) => (capability.configResources ?? []).map((resource) => resource.resource))),
+    permissions: uniqueCount(projected.flatMap((capability) => capability.permissions ?? [])),
+    serviceOperations: uniqueCount(projected.flatMap((capability) => capability.serviceOperations ?? [])),
+    authProviders: uniqueCount(projected.flatMap((capability) => capability.authProviders ?? [])),
+  };
+}
+
+function menuImpactLabel(route: NonNullable<CapabilityView["menuRoutes"]>[number], language: Language) {
+  return `${route.title[language]} (${route.route})`;
+}
+
+function resourceImpactLabel(resource: NonNullable<CapabilityView["adminResources"]>[number], language: Language) {
+  return `${resource.title[language]} (${resource.route || resource.resource})`;
+}
+
+function uniqueCount(values: string[]) {
+  return new Set(values.filter(Boolean)).size;
 }
 
 function restartChangeIDs(current: Set<string>, desired: Set<string>) {

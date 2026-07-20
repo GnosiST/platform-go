@@ -1403,6 +1403,7 @@ func (s *Server) adminResourceList(ctx *gin.Context) {
 			writeAdminResourceError(ctx, s.internalErrorSink, err)
 			return
 		}
+		items = sanitizeMessageCenterResourceRecords(resource, items)
 		ctx.JSON(http.StatusOK, Response[adminResourceListResponse]{
 			Data: adminResourceListResponse{Resource: resource, Items: items},
 		})
@@ -1426,6 +1427,7 @@ func (s *Server) adminResourceList(ctx *gin.Context) {
 		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
+	items = sanitizeMessageCenterResourceRecords(resource, items)
 	ctx.JSON(http.StatusOK, Response[adminResourceListResponse]{
 		Data: adminResourceListResponse{Resource: resource, Items: items},
 	})
@@ -1455,6 +1457,7 @@ func (s *Server) adminResourceQuery(ctx *gin.Context) {
 		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
+	result.Items = sanitizeMessageCenterResourceRecords(resource, result.Items)
 	ctx.JSON(http.StatusOK, Response[adminResourceQueryResponse]{
 		Data: adminResourceQueryResponse{
 			Resource: result.Resource,
@@ -1567,6 +1570,7 @@ func (s *Server) adminResourceCreate(ctx *gin.Context) {
 		return
 	}
 	record := mutation.Record
+	record = sanitizeMessageCenterResourceRecord(resource, record)
 	s.invalidateCachesForResource(ctx.Request.Context(), resource)
 	ctx.JSON(http.StatusCreated, Response[adminResourceRecordResponse]{
 		Data: adminResourceRecordResponse{Resource: resource, Record: record},
@@ -1607,6 +1611,7 @@ func (s *Server) adminResourceUpdate(ctx *gin.Context) {
 		return
 	}
 	record := mutation.Record
+	record = sanitizeMessageCenterResourceRecord(resource, record)
 	s.invalidateCachesForResource(ctx.Request.Context(), resource)
 	ctx.JSON(http.StatusOK, Response[adminResourceRecordResponse]{
 		Data: adminResourceRecordResponse{Resource: resource, Record: record},
@@ -2333,7 +2338,7 @@ func (s *Server) projectAdminResourceRecords(resource string, records []adminres
 		}
 		items = append(items, projected)
 	}
-	return items, nil
+	return sanitizeMessageCenterResourceRecords(resource, items), nil
 }
 
 func splitAPITokenScopes(scopeValue string) []string {

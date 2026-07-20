@@ -1,11 +1,14 @@
 import {
   ApiOutlined,
   AuditOutlined,
+  CopyOutlined,
+  EyeOutlined,
+  LinkOutlined,
   LoginOutlined,
   ReloadOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
-import { Button, Empty, Space, Tag, Tooltip, Typography } from "antd";
+import { App, Button, Descriptions, Empty, Space, Tag, Tooltip, Typography } from "antd";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   queryAdminResource,
@@ -19,10 +22,13 @@ import {
   AdminFeedback,
   AdminListPanel,
   AdminMetricStrip,
+  AdminModal,
   AdminPage,
   PlatformDataTable,
   PlatformOverflowText,
   type PlatformDataTableColumn,
+  type PlatformDataTableFilterField,
+  type PlatformDataTableFilterValue,
 } from "../ui";
 
 type LoggingCenterConsoleProps = {
@@ -57,7 +63,23 @@ type LoggingCenterTimelineItem = {
   record: AdminResourceRecord;
 };
 
+type LoggingCorrelationKey = "requestId" | "traceId";
+
+type LoggingCorrelationEntry = {
+  key: LoggingCorrelationKey;
+  label: string;
+  value: string;
+};
+
+type LoggingDetailEntry = {
+  key: string;
+  label: string;
+  value: string;
+};
+
 const PAGE_SIZE = 50;
+
+const loggingSensitiveFieldPattern = /(?:authorization|credential|password|passwd|pwd|otp|secret|token|phone|mobile|email|mail|recipient|clientIp|ipAddress|^ip$)/iu;
 
 const loggingResourceConfigs: LoggingResourceConfig[] = [
   {
@@ -95,15 +117,27 @@ const loggingResourceConfigs: LoggingResourceConfig[] = [
 ];
 
 export function LoggingCenterConsole({ language, dictionary, resources, onRouteChange }: LoggingCenterConsoleProps) {
+  const { message: toast } = App.useApp();
   const [records, setRecords] = useState<LoggingCenterRecords>(() => emptyLoggingCenterRecords());
   const [errors, setErrors] = useState<LoggingCenterErrors>({});
   const [loading, setLoading] = useState(true);
+  const [selectedItem, setSelectedItem] = useState<LoggingCenterTimelineItem | null>(null);
+  const [searchValue, setSearchValue] = useState("");
+  const [filterValues, setFilterValues] = useState<Record<string, PlatformDataTableFilterValue>>({});
   const resourceRoutes = useMemo(() => new Set(resources.map((resource) => resource.route)), [resources]);
   const availableConfigs = useMemo(
     () => loggingResourceConfigs.filter((config) => resourceRoutes.has(config.route)),
     [resourceRoutes],
   );
   const timelineItems = useMemo(() => latestLoggingTimelineItems(records), [records]);
+  const filteredTimelineItems = useMemo(
+    () => filterLoggingTimelineItems(timelineItems, filterValues, searchValue),
+    [filterValues, searchValue, timelineItems],
+  );
+  const filterFields = useMemo(
+    () => loggingFilterFields(availableConfigs, timelineItems, dictionary),
+    [availableConfigs, dictionary, timelineItems],
+  );
 
   const load = async () => {
     setLoading(true);
@@ -128,6 +162,26 @@ export function LoggingCenterConsole({ language, dictionary, resources, onRouteC
     void load();
   }, [resourceRoutes]);
 
+  const updateFilter = (key: string, value: PlatformDataTableFilterValue) => {
+    setFilterValues((current) => ({ ...current, [key]: value }));
+  };
+  const copyCorrelation = async (label: string, value: string) => {
+    if (!value || value === "-") {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(formatTemplate(dictionary.loggingCenterCorrelationCopied, { field: label }));
+    } catch {
+      toast.error(dictionary.loggingCenterCorrelationCopyFailed);
+    }
+  };
+  const focusCorrelation = (key: LoggingCorrelationKey, value: string) => {
+    setFilterValues((current) => ({ ...current, [key]: value }));
+    setSearchValue("");
+    setSelectedItem(null);
+    toast.success(formatTemplate(dictionary.loggingCenterCorrelationFocused, { value }));
+  };
   const errorMessages = Object.entries(errors).filter(([, message]) => Boolean(message));
 
   return (
@@ -188,19 +242,37 @@ export function LoggingCenterConsole({ language, dictionary, resources, onRouteC
       </AdminListPanel>
       <AdminListPanel
         className="logging-center-timeline"
-        title={dictionary.loggingCenterLatestEvents}
-        toolbar={<Typography.Text type="secondary">{dictionary.loggingCenterLatestEventsDescription}</Typography.Text>}
+        title={dictionary.loggingCenterUnifiedEvents}
+        toolbar={<Typography.Text type="secondary">{dictionary.loggingCenterUnifiedEventsDescription}</Typography.Text>}
       >
         <PlatformDataTable
-          columns={loggingTimelineColumns(dictionary, language, onRouteChange)}
-          dataSource={timelineItems}
+          columns={loggingTimelineColumns(dictionary, language, onRouteChange, setSelectedItem, copyCorrelation, focusCorrelation)}
+          dataSource={filteredTimelineItems}
           rowKey="key"
           loading={loading}
           labels={tableLabels(dictionary)}
-          pagination={{ pageSize: 10, total: timelineItems.length }}
+          searchValue={searchValue}
+          searchPlaceholder={dictionary.loggingCenterSearchPlaceholder}
+          filterFields={filterFields}
+          filterValues={filterValues}
+          pagination={{ pageSize: 10, total: filteredTimelineItems.length }}
           emptyState={<Empty description={dictionary.emptyData} />}
+          onClearFilters={() => setFilterValues({})}
+          onFilterChange={updateFilter}
+          onRefresh={() => void load()}
+          onRowClick={setSelectedItem}
+          onSearchChange={setSearchValue}
         />
       </AdminListPanel>
+      <LoggingRecordDetailModal
+        item={selectedItem}
+        dictionary={dictionary}
+        language={language}
+        onClose={() => setSelectedItem(null)}
+        onCopyCorrelation={copyCorrelation}
+        onFocusCorrelation={focusCorrelation}
+        onOpenResource={(route) => onRouteChange(route)}
+      />
     </AdminPage>
   );
 }
@@ -273,14 +345,16 @@ function latestLoggingTimelineItems(records: LoggingCenterRecords) {
       config,
       record,
     })))
-    .sort((left, right) => timestampOf(right.record) - timestampOf(left.record))
-    .slice(0, 20);
+    .sort((left, right) => timestampOf(right.record) - timestampOf(left.record));
 }
 
 function loggingTimelineColumns(
   dictionary: Dictionary,
   language: Language,
   onRouteChange: (route: string, mode?: "push" | "replace") => void,
+  onOpenDetail: (item: LoggingCenterTimelineItem) => void,
+  onCopyCorrelation: (label: string, value: string) => Promise<void>,
+  onFocusCorrelation: (key: LoggingCorrelationKey, value: string) => void,
 ): PlatformDataTableColumn<LoggingCenterTimelineItem>[] {
   return [
     {
@@ -317,9 +391,16 @@ function loggingTimelineColumns(
     {
       title: dictionary.loggingCenterCorrelation,
       key: "correlation",
-      width: 220,
+      width: 280,
       priority: "extended",
-      render: (_value, item) => <PlatformOverflowText code value={correlationSummary(item.record)} />,
+      render: (_value, item) => (
+        <LoggingCorrelationActions
+          dictionary={dictionary}
+          record={item.record}
+          onCopy={onCopyCorrelation}
+          onFocus={onFocusCorrelation}
+        />
+      ),
     },
     {
       title: dictionary.loggingCenterTime,
@@ -331,17 +412,225 @@ function loggingTimelineColumns(
     {
       title: dictionary.actions,
       key: "actions",
-      width: 116,
+      width: 112,
       lockVisible: true,
       render: (_value, item) => (
-        <Tooltip title={dictionary.loggingCenterOpenResource}>
-          <Button size="small" type="text" onClick={() => onRouteChange(item.config.route)}>
-            {dictionary.viewRecord}
-          </Button>
-        </Tooltip>
+        <Space size={2}>
+          <Tooltip title={dictionary.loggingCenterOpenDetail}>
+            <Button
+              aria-label={dictionary.loggingCenterOpenDetail}
+              icon={<EyeOutlined />}
+              size="small"
+              type="text"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenDetail(item);
+              }}
+            />
+          </Tooltip>
+          <Tooltip title={dictionary.loggingCenterOpenResource}>
+            <Button
+              aria-label={dictionary.loggingCenterOpenResource}
+              icon={<ApiOutlined />}
+              size="small"
+              type="text"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRouteChange(item.config.route);
+              }}
+            />
+          </Tooltip>
+        </Space>
       ),
     },
   ];
+}
+
+function LoggingCorrelationActions({
+  record,
+  dictionary,
+  onCopy,
+  onFocus,
+}: {
+  record: AdminResourceRecord;
+  dictionary: Dictionary;
+  onCopy: (label: string, value: string) => Promise<void>;
+  onFocus: (key: LoggingCorrelationKey, value: string) => void;
+}) {
+  const entries = correlationEntries(record, dictionary);
+  if (entries.length === 0) {
+    return <Typography.Text type="secondary">-</Typography.Text>;
+  }
+  return (
+    <Space className="logging-center-correlation-cell" size={4} wrap>
+      {entries.map((entry) => (
+        <span className="logging-center-correlation-chip" key={entry.key}>
+          <Typography.Text className="logging-center-correlation-value" code title={entry.value}>
+            {entry.value}
+          </Typography.Text>
+          <Tooltip title={formatTemplate(dictionary.loggingCenterCopyCorrelation, { field: entry.label })}>
+            <Button
+              aria-label={formatTemplate(dictionary.loggingCenterCopyCorrelation, { field: entry.label })}
+              icon={<CopyOutlined />}
+              size="small"
+              type="text"
+              onClick={(event) => {
+                event.stopPropagation();
+                void onCopy(entry.label, entry.value);
+              }}
+            />
+          </Tooltip>
+          <Tooltip title={formatTemplate(dictionary.loggingCenterFocusCorrelation, { field: entry.label })}>
+            <Button
+              aria-label={formatTemplate(dictionary.loggingCenterFocusCorrelation, { field: entry.label })}
+              icon={<LinkOutlined />}
+              size="small"
+              type="text"
+              onClick={(event) => {
+                event.stopPropagation();
+                onFocus(entry.key, entry.value);
+              }}
+            />
+          </Tooltip>
+        </span>
+      ))}
+    </Space>
+  );
+}
+
+function LoggingRecordDetailModal({
+  item,
+  dictionary,
+  language,
+  onClose,
+  onCopyCorrelation,
+  onFocusCorrelation,
+  onOpenResource,
+}: {
+  item: LoggingCenterTimelineItem | null;
+  dictionary: Dictionary;
+  language: Language;
+  onClose: () => void;
+  onCopyCorrelation: (label: string, value: string) => Promise<void>;
+  onFocusCorrelation: (key: LoggingCorrelationKey, value: string) => void;
+  onOpenResource: (route: string) => void;
+}) {
+  if (!item) {
+    return null;
+  }
+  const status = statusSummary(item.record);
+  const details = safeLoggingDetailEntries(item.record, dictionary);
+  return (
+    <AdminModal
+      className="logging-center-detail-modal"
+      destroyOnHidden
+      footer={[
+        <Button key="close" onClick={onClose}>
+          {dictionary.close}
+        </Button>,
+        <Button key="resource" icon={<ApiOutlined />} onClick={() => onOpenResource(item.config.route)}>
+          {dictionary.loggingCenterOpenResource}
+        </Button>,
+      ]}
+      open={Boolean(item)}
+      preset="detail"
+      title={dictionary.loggingCenterDetailTitle}
+      onCancel={onClose}
+    >
+      <Space className="logging-center-detail-stack" direction="vertical" size={12}>
+        <div className="logging-center-detail-heading">
+          <Space size={6} wrap>
+            <Tag>{item.config.title(dictionary)}</Tag>
+            <Tag color={statusTone(status)}>{status || "-"}</Tag>
+          </Space>
+          <Typography.Title level={5}>{eventSummary(item.record)}</Typography.Title>
+        </div>
+        <Descriptions bordered column={1} size="small">
+          <Descriptions.Item label={dictionary.resource}>{item.config.title(dictionary)}</Descriptions.Item>
+          <Descriptions.Item label={dictionary.loggingCenterEvent}>{eventSummary(item.record)}</Descriptions.Item>
+          <Descriptions.Item label={dictionary.loggingCenterActor}>{actorSummary(item.record)}</Descriptions.Item>
+          <Descriptions.Item label={dictionary.status}>{status || "-"}</Descriptions.Item>
+          <Descriptions.Item label={dictionary.loggingCenterTime}>{formatDateTime(timeSummary(item.record), language)}</Descriptions.Item>
+          <Descriptions.Item label={dictionary.loggingCenterCorrelation}>
+            <LoggingCorrelationActions
+              dictionary={dictionary}
+              record={item.record}
+              onCopy={onCopyCorrelation}
+              onFocus={onFocusCorrelation}
+            />
+          </Descriptions.Item>
+        </Descriptions>
+        <Typography.Text strong>{dictionary.loggingCenterDetailFields}</Typography.Text>
+        {details.length > 0 ? (
+          <div className="logging-center-detail-fields">
+            {details.map((entry) => (
+              <div className="logging-center-detail-field" key={entry.key}>
+                <Typography.Text type="secondary">{entry.label}</Typography.Text>
+                <Typography.Text code={looksLikeIdentifier(entry.key)}>{entry.value}</Typography.Text>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Empty description={dictionary.loggingCenterNoSafeDetails} image={Empty.PRESENTED_IMAGE_SIMPLE} />
+        )}
+      </Space>
+    </AdminModal>
+  );
+}
+
+function loggingFilterFields(
+  availableConfigs: LoggingResourceConfig[],
+  items: LoggingCenterTimelineItem[],
+  dictionary: Dictionary,
+): PlatformDataTableFilterField[] {
+  return [
+    {
+      key: "resource",
+      label: dictionary.resource,
+      type: "select",
+      options: availableConfigs.map((config) => ({ value: config.key, label: config.title(dictionary) })),
+    },
+    {
+      key: "status",
+      label: dictionary.status,
+      type: "select",
+      options: uniqueOptions(items.map((item) => statusSummary(item.record))),
+    },
+    {
+      key: "actor",
+      label: dictionary.loggingCenterActor,
+      type: "text",
+      placeholder: dictionary.loggingCenterActorFilterPlaceholder,
+    },
+    {
+      key: "requestId",
+      label: dictionary.loggingCenterRequestId,
+      type: "text",
+      placeholder: dictionary.loggingCenterRequestId,
+    },
+    {
+      key: "traceId",
+      label: dictionary.loggingCenterTraceId,
+      type: "text",
+      placeholder: dictionary.loggingCenterTraceId,
+    },
+  ];
+}
+
+function filterLoggingTimelineItems(
+  items: LoggingCenterTimelineItem[],
+  filters: Record<string, PlatformDataTableFilterValue>,
+  searchValue: string,
+) {
+  const search = normalizeForMatch(searchValue);
+  return items.filter((item) => {
+    if (!matchesFilter(item.config.key, filters.resource)) return false;
+    if (!matchesFilter(statusSummary(item.record), filters.status)) return false;
+    if (!matchesFilter(actorSummary(item.record), filters.actor)) return false;
+    if (!matchesFilter(valueOf(item.record, "requestId"), filters.requestId)) return false;
+    if (!matchesFilter(valueOf(item.record, "traceId"), filters.traceId)) return false;
+    return search === "" || normalizeForMatch(loggingSearchText(item)).includes(search);
+  });
 }
 
 function eventSummary(record: AdminResourceRecord) {
@@ -356,17 +645,13 @@ function statusSummary(record: AdminResourceRecord) {
   return firstValue(record, ["statusCode", "outcome", "result", "status", "reasonCode", "errorType"]);
 }
 
-function correlationSummary(record: AdminResourceRecord) {
-  return firstValue(record, ["requestId", "traceId", "eventId", "targetId"]);
-}
-
 function timeSummary(record: AdminResourceRecord) {
   return firstValue(record, ["createdAt", "occurredAt", "timestamp", "lastAttemptAt", "updatedAt"]);
 }
 
 function firstValue(record: AdminResourceRecord, keys: string[]) {
   for (const key of keys) {
-    const value = valueOf(record, key);
+    const value = safeLoggingValue(key, valueOf(record, key));
     if (value) {
       return value;
     }
@@ -381,6 +666,115 @@ function valueOf(record: AdminResourceRecord, key: string) {
   }
   const nested = record.values?.[key];
   return typeof nested === "string" ? nested : "";
+}
+
+function correlationEntries(record: AdminResourceRecord, dictionary: Dictionary): LoggingCorrelationEntry[] {
+  return [
+    { key: "requestId" as const, label: dictionary.loggingCenterRequestId, value: valueOf(record, "requestId").trim() },
+    { key: "traceId" as const, label: dictionary.loggingCenterTraceId, value: valueOf(record, "traceId").trim() },
+  ].filter((entry) => entry.value !== "");
+}
+
+function safeLoggingDetailEntries(record: AdminResourceRecord, dictionary: Dictionary): LoggingDetailEntry[] {
+  const entries: LoggingDetailEntry[] = [];
+  const seen = new Set<string>();
+  for (const key of ["id", "code", "name", "status", "description", "updatedAt"]) {
+    appendLoggingDetail(entries, seen, dictionary, key, record[key as keyof AdminResourceRecord]);
+  }
+  for (const [key, value] of Object.entries(record.values ?? {})) {
+    appendLoggingDetail(entries, seen, dictionary, key, value);
+  }
+  return entries;
+}
+
+function appendLoggingDetail(
+  entries: LoggingDetailEntry[],
+  seen: Set<string>,
+  dictionary: Dictionary,
+  key: string,
+  rawValue: unknown,
+) {
+  const value = safeLoggingValue(key, rawValue);
+  if (!value || seen.has(key)) {
+    return;
+  }
+  seen.add(key);
+  entries.push({
+    key,
+    label: loggingFieldLabel(key, dictionary),
+    value,
+  });
+}
+
+function safeLoggingValue(key: string, rawValue: unknown) {
+  if (loggingSensitiveFieldPattern.test(key)) {
+    return "";
+  }
+  const value = typeof rawValue === "string" ? rawValue.trim() : "";
+  if (!value) {
+    return "";
+  }
+  return redactSensitiveValue(value);
+}
+
+function redactSensitiveValue(value: string) {
+  return value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/giu, "[redacted]")
+    .replace(/((?:password|passwd|pwd|otp|phone|mobile|email)\s*[:=]\s*)[^\s,;&}]+/giu, "$1[redacted]")
+    .replace(/(?:\+?86[-\s]?)?1[3-9]\d{9}/gu, "[redacted]");
+}
+
+function loggingSearchText(item: LoggingCenterTimelineItem) {
+  const detailValues = [
+    ...["id", "code", "name", "status", "description", "updatedAt"].map((key) =>
+      safeLoggingValue(key, item.record[key as keyof AdminResourceRecord]),
+    ),
+    ...Object.entries(item.record.values ?? {}).map(([key, value]) => safeLoggingValue(key, value)),
+  ].filter(Boolean);
+  return [
+    item.config.resource,
+    item.config.key,
+    eventSummary(item.record),
+    actorSummary(item.record),
+    statusSummary(item.record),
+    valueOf(item.record, "requestId"),
+    valueOf(item.record, "traceId"),
+    ...detailValues,
+  ].join(" ");
+}
+
+function loggingFieldLabel(key: string, dictionary: Dictionary) {
+  const labels: Record<string, string> = {
+    code: dictionary.code,
+    status: dictionary.status,
+    description: dictionary.description,
+    updatedAt: dictionary.updatedAt,
+    actor: dictionary.loggingCenterActor,
+    requestId: dictionary.loggingCenterRequestId,
+    traceId: dictionary.loggingCenterTraceId,
+  };
+  return labels[key] ?? key.replace(/([a-z])([A-Z])/g, "$1 $2");
+}
+
+function matchesFilter(value: string, filter: PlatformDataTableFilterValue | undefined) {
+  if (typeof filter !== "string" || filter.trim() === "") {
+    return true;
+  }
+  return normalizeForMatch(value).includes(normalizeForMatch(filter));
+}
+
+function normalizeForMatch(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function uniqueOptions(values: string[]) {
+  return Array.from(new Set(values.filter((value) => value && value !== "-")))
+    .sort((left, right) => left.localeCompare(right))
+    .map((value) => ({ value, label: value }));
+}
+
+function looksLikeIdentifier(key: string) {
+  return /(?:id|code|route|method|event)/iu.test(key);
 }
 
 function timestampOf(record: AdminResourceRecord) {
@@ -403,6 +797,12 @@ function formatDateTime(value: string, language: Language) {
 
 function statusTone(status: string) {
   const normalized = status.toLowerCase();
+  const numericStatus = Number(normalized);
+  if (Number.isFinite(numericStatus)) {
+    if (numericStatus >= 500) return "error";
+    if (numericStatus >= 400) return "warning";
+    if (numericStatus >= 200 && numericStatus < 400) return "success";
+  }
   if (/(error|fail|denied|blocked|exception)/u.test(normalized)) return "error";
   if (/(warn|retry|pending)/u.test(normalized)) return "warning";
   if (/(success|ok|pass|enabled)/u.test(normalized)) return "success";
@@ -421,6 +821,10 @@ function emptyLoggingCenterRecords(): LoggingCenterRecords {
 function resourceLabel(key: LoggingResourceKey, dictionary: Dictionary) {
   const config = loggingResourceConfigs.find((item) => item.key === key);
   return config?.title(dictionary) ?? key;
+}
+
+function formatTemplate(template: string, values: Record<string, string>) {
+  return Object.entries(values).reduce((result, [key, value]) => result.replaceAll(`{${key}}`, value), template);
 }
 
 function tableLabels(dictionary: Dictionary) {

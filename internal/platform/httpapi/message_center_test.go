@@ -164,6 +164,70 @@ func TestAdminMessageCenterTestSendCreatesNotificationAndDelivery(t *testing.T) 
 	}
 }
 
+func TestAdminMessageCenterResourceQueriesRedactPayloadAndDeliveryTarget(t *testing.T) {
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit", "notification"}),
+	})
+	login := loginForTest(t, server, "admin")
+	notice := createHTTPMessageCenterWorkerNotice(t, server.resources, map[string]string{
+		"tenantCode": "platform",
+		"category":   "response-redaction",
+		"payload":    `{"channel":"sms","redactedTarget":"+8613800000000","templateId":"SMS_SECRET","templateParams":{"code":"123456"}}`,
+	})
+	createHTTPMessageCenterWorkerDelivery(t, server.resources, map[string]string{
+		"tenantCode":       "platform",
+		"notificationCode": notice.Code,
+		"channel":          notification.ChannelSMS,
+		"deliveryStatus":   notification.DeliveryStatusPending,
+		"target":           "+8613800000000",
+		"provider":         notification.SMSProviderMockLocal,
+		"attempts":         "0",
+		"errorMessage":     "vendor rejected +8613800000000 with code 123456",
+	})
+
+	notificationRecorder := httptest.NewRecorder()
+	notificationRequest := httptest.NewRequest(http.MethodPost, "/api/admin/resources/notifications/query", bytes.NewBufferString(`{"page":1,"pageSize":10}`))
+	notificationRequest.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	notificationRequest.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(notificationRecorder, notificationRequest)
+
+	if notificationRecorder.Code != http.StatusOK {
+		t.Fatalf("POST notifications query status = %d body = %s, want 200", notificationRecorder.Code, notificationRecorder.Body.String())
+	}
+	var notificationPayload adminResourceQueryTestPayload
+	if err := json.Unmarshal(notificationRecorder.Body.Bytes(), &notificationPayload); err != nil {
+		t.Fatalf("decode notifications query: %v body = %s", err, notificationRecorder.Body.String())
+	}
+	if len(notificationPayload.Data.Items) != 1 {
+		t.Fatalf("notifications query items = %+v, want one notice", notificationPayload.Data.Items)
+	}
+	safePayload := notificationPayload.Data.Items[0].Values["payload"]
+	if !strings.Contains(safePayload, `"templateParamKeys":["code"]`) || strings.Contains(safePayload, "templateParams") || strings.Contains(notificationRecorder.Body.String(), "123456") || strings.Contains(notificationRecorder.Body.String(), "+8613800000000") {
+		t.Fatalf("notifications query leaked sensitive payload: record=%+v body=%s", notificationPayload.Data.Items[0], notificationRecorder.Body.String())
+	}
+
+	deliveryRecorder := httptest.NewRecorder()
+	deliveryRequest := httptest.NewRequest(http.MethodPost, "/api/admin/resources/notification-deliveries/query", bytes.NewBufferString(`{"page":1,"pageSize":10}`))
+	deliveryRequest.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	deliveryRequest.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(deliveryRecorder, deliveryRequest)
+
+	if deliveryRecorder.Code != http.StatusOK {
+		t.Fatalf("POST notification-deliveries query status = %d body = %s, want 200", deliveryRecorder.Code, deliveryRecorder.Body.String())
+	}
+	var deliveryPayload adminResourceQueryTestPayload
+	if err := json.Unmarshal(deliveryRecorder.Body.Bytes(), &deliveryPayload); err != nil {
+		t.Fatalf("decode deliveries query: %v body = %s", err, deliveryRecorder.Body.String())
+	}
+	if len(deliveryPayload.Data.Items) != 1 ||
+		deliveryPayload.Data.Items[0].Values["target"] != "****0000" ||
+		deliveryPayload.Data.Items[0].Values["errorMessage"] != notification.DeliveryLedgerErrorFailed ||
+		strings.Contains(deliveryRecorder.Body.String(), "+8613800000000") ||
+		strings.Contains(deliveryRecorder.Body.String(), "123456") {
+		t.Fatalf("deliveries query leaked raw target: payload=%+v body=%s", deliveryPayload, deliveryRecorder.Body.String())
+	}
+}
+
 func TestAdminMessageCenterTestSendAppliesRuntimeSendPolicyLimit(t *testing.T) {
 	builder, err := ratelimit.NewKeyBuilder([]byte(strings.Repeat("r", 32)))
 	if err != nil {

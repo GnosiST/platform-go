@@ -2476,6 +2476,117 @@ select {
   background: var(--surface);
 }
 
+.login-slider-challenge {
+  display: block;
+}
+
+.login-slider-challenge .login-challenge-payload {
+  gap: 10px;
+}
+
+.login-slider-stage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.login-slider-background,
+.login-slider-tile {
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.login-slider-background {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.login-slider-tile {
+  position: absolute;
+  z-index: 1;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 5px 12px rgb(15 23 42 / 20%));
+}
+
+.login-slider-track {
+  position: relative;
+  display: flex;
+  width: 100%;
+  max-width: 300px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.login-slider-track.dragging {
+  cursor: grabbing;
+}
+
+.login-slider-track:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 58%, transparent);
+  outline-offset: 2px;
+}
+
+.login-slider-track-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 0;
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.login-slider-track.ready .login-slider-track-fill {
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+}
+
+.login-slider-handle {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 36%, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  box-shadow: 0 7px 16px rgb(15 23 42 / 16%);
+  color: var(--primary);
+  transform: translateX(-50%);
+}
+
+.login-slider-track.ready .login-slider-handle {
+  border-color: color-mix(in srgb, var(--success) 44%, var(--border));
+  color: var(--success);
+}
+
+.login-slider-track-label {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  padding: 0 46px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.login-challenge-refresh {
+  justify-self: start;
+}
+
 .login-challenge-row {
   width: 100%;
 }
@@ -2736,7 +2847,8 @@ select {
 }
 
 .plugin-restart-callout,
-.plugin-restart-preview {
+.plugin-restart-preview,
+.plugin-entrypoint-projection {
   grid-column: 1 / -1;
   display: grid;
   min-width: 0;
@@ -2754,6 +2866,39 @@ select {
 .plugin-restart-preview {
   border-color: var(--border);
   background: var(--surface);
+}
+
+.plugin-entrypoint-projection {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--surface-elevated) 86%, var(--page) 14%);
+}
+
+.plugin-entrypoint-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.plugin-entrypoint-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.plugin-entrypoint-cell {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.plugin-entrypoint-cell .ant-typography-secondary {
+  overflow-wrap: anywhere;
+  font-size: 12px;
 }
 
 .plugin-restart-preview-list {
@@ -2781,6 +2926,31 @@ select {
 .plugin-restart-preview-row .ant-typography-secondary {
   overflow-wrap: anywhere;
   font-size: 12px;
+}
+
+.plugin-restart-surface-list {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.plugin-restart-surface {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.plugin-restart-surface span {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.plugin-restart-surface .ant-tag {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .resource-grid {
@@ -4823,6 +4993,12 @@ select {
   gap: 10px;
 }
 
+.message-center-runtime-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+}
+
 .settings-center-card,
 .message-center-channel-card,
 .logging-center-resource-card,
@@ -4842,6 +5018,28 @@ select {
 
 .settings-center-runtime-card {
   grid-template-columns: 36px minmax(0, 1fr) minmax(78px, auto);
+}
+
+.message-center-runtime-row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.message-center-runtime-row > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.message-center-runtime-row > .ant-space {
+  grid-column: 1 / -1;
 }
 
 .settings-center-card {
@@ -4898,6 +5096,61 @@ select {
   margin: 0;
 }
 
+.logging-center-correlation-cell {
+  max-width: 100%;
+}
+
+.logging-center-correlation-chip {
+  display: inline-grid;
+  max-width: 100%;
+  grid-template-columns: minmax(72px, 1fr) 24px 24px;
+  gap: 2px;
+  align-items: center;
+  padding: 1px 3px 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.logging-center-correlation-chip .ant-btn {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+}
+
+.logging-center-correlation-value {
+  min-width: 0;
+  max-width: 138px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logging-center-detail-stack {
+  width: 100%;
+}
+
+.logging-center-detail-heading h5.ant-typography {
+  margin: 6px 0 0;
+}
+
+.logging-center-detail-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.logging-center-detail-field {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.logging-center-detail-field .ant-typography {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .message-center-channel-runtime {
   min-width: 118px;
 }
@@ -4921,6 +5174,15 @@ select {
 .message-center-tabs .admin-list-panel,
 .settings-center-resource-table {
   margin-top: 10px;
+}
+
+.message-center-delivery-detail {
+  width: 100%;
+}
+
+.message-center-detail-section {
+  display: grid;
+  gap: 8px;
 }
 
 .inspector-actions {
@@ -6108,8 +6370,13 @@ select {
     grid-template-columns: 116px minmax(0, 1fr);
   }
 
-  .plugin-restart-preview-row .ant-typography-secondary {
+  .plugin-restart-preview-row > .ant-typography-secondary,
+  .plugin-restart-preview-row > .plugin-restart-surface-list {
     grid-column: 1 / -1;
+  }
+
+  .plugin-entrypoint-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .resource-summary-band {
@@ -6240,7 +6507,8 @@ select {
   }
 
   .login-sms-code-row .ant-btn,
-  .login-challenge-row .ant-btn {
+  .login-challenge-row .ant-btn,
+  .login-challenge-refresh {
     min-height: 44px;
   }
 
@@ -6434,6 +6702,28 @@ select {
 
   .settings-center-runtime-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .message-center-runtime-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .logging-center-detail-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .logging-center-correlation-chip {
+    grid-template-columns: minmax(0, 1fr) 32px 32px;
+  }
+
+  .logging-center-correlation-chip .ant-btn {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+  }
+
+  .logging-center-correlation-value {
+    max-width: none;
   }
 
   .message-center-channel-runtime {

@@ -1001,13 +1001,6 @@ function schemas() {
           additionalProperties: { type: "string" },
         },
         expiresAt: { type: "string", format: "date-time" },
-        debugProof: {
-          type: "string",
-          writeOnly: true,
-          description: "Development/test only proof returned when credential-auth debug mode is enabled.",
-          "x-platform-development-only": true,
-          "x-platform-sensitivity": "secret",
-        },
       },
     },
     AdminCredentialSMSOTPStartRequest: {

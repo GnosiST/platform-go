@@ -376,6 +376,37 @@ function validateCredentialAuthProductization(contract, errors) {
   }
 }
 
+function validateParameterProductization(contract, errors) {
+  if (contract.id !== "parameter") {
+    return;
+  }
+  const productization = contract.productization;
+  const prefix = "capability contract parameter.productization";
+  if (!productization) {
+    errors.push(`${prefix} is required`);
+    return;
+  }
+  if (productization.settingsCenterRoute !== "/settings") {
+    errors.push(`${prefix}.settingsCenterRoute must be /settings`);
+  }
+  if (productization.settingsAggregation !== "dynamic-enabled-capability-config") {
+    errors.push(`${prefix}.settingsAggregation must be dynamic-enabled-capability-config`);
+  }
+  if (productization.systemEntryPolicy !== "first-class-route") {
+    errors.push(`${prefix}.systemEntryPolicy must keep system settings as a first-class route`);
+  }
+  if (productization.topbarSettingsBoundary !== "interface-preferences-only") {
+    errors.push(`${prefix}.topbarSettingsBoundary must keep topbar settings scoped to interface preferences`);
+  }
+  requireIncludes(productization.topbarSettingsScope, ["theme", "layout", "watermark"], `${prefix}.topbarSettingsScope`, errors);
+  const restartPolicy = String(productization.restartPolicy ?? "");
+  for (const required of ["manual restart", "disabled capabilities", "restartRequired", "pendingRestart"]) {
+    if (!restartPolicy.includes(required)) {
+      errors.push(`${prefix}.restartPolicy must document ${required}`);
+    }
+  }
+}
+
 function validateContract(contract, context) {
   const errors = [];
   const prefix = `capability contract ${contract.id ?? "<missing>"}`;
@@ -422,6 +453,7 @@ function validateContract(contract, context) {
   }
   validateNotificationProductization(contract, errors);
   validateCredentialAuthProductization(contract, errors);
+  validateParameterProductization(contract, errors);
   return errors;
 }
 

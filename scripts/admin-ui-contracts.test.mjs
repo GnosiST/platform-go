@@ -673,6 +673,36 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /prefill dry-run with the clicked channel/);
   });
 
+  it("rejects message center pages that hide runtime capability boundaries", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/message-center/MessageCenterConsole.tsx",
+      "messageCenterRuntimeRows(records, dictionary)",
+      "[]",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /runtime capability matrix/);
+  });
+
+  it("rejects message center delivery details that stop redacting targets", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/message-center/MessageCenterConsole.tsx",
+      "sanitizeMessageCenterTarget",
+      "rawMessageCenterTarget",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /defensively redact targets/);
+  });
+
   it("rejects logging center pages that drop an existing log resource", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
@@ -718,19 +748,49 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /must project the logging-center workbench from authorized log resources/);
   });
 
-  it("rejects credential challenge debug proof shown without explicit visibility", () => {
+  it("rejects credential challenge debug proof rendering", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
       tempRoot,
       "admin/src/platform/auth/AdminLoginView.tsx",
-      "if (!challengeDebugVisible(challenge)) {\n    return null;\n  }",
-      "if (!challenge.debugProof) {\n    return null;\n  }",
+      'const debugText = challengeStringParameter(challenge, "text");',
+      'const debugText = challengeStringParameter(challenge, "text");\n  const leakedProof = challenge.debugProof;',
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /debug proof display must be controlled by an explicit response field/);
+    assert.match(result.stderr, /Credential login must not read or render server debugProof values/);
+  });
+
+  it("rejects removing credential slider challenge rendering", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      "function SliderChallengePayload({",
+      "function RemovedSliderChallengePayload({",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Credential slider challenges must render through a dedicated slider payload/);
+  });
+
+  it("rejects removing credential captcha fallback", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      'return await startCredentialChallenge({ kind: "captcha", purpose: "login" });',
+      "throw sliderError;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Credential login must preserve a captcha challenge fallback/);
   });
 
   it("rejects credential challenge text answers as the production prompt", () => {

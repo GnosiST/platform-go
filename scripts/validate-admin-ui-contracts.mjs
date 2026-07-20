@@ -142,6 +142,16 @@ requireIncludes(files.shell, '"/audit-logs"', "Logging child resources must coll
 requireIncludes(files.shell, '"/login-logs"', "Login logs must collapse behind the logging-center navigation entry.");
 requireIncludes(files.shell, '"/error-logs"', "Error logs must collapse behind the logging-center navigation entry.");
 requireIncludes(files.shell, '"/request-logs"', "Request logs must collapse behind the logging-center navigation entry.");
+requireIncludes(files.loggingCenter, 'resource: "request-logs"', "Logging center must keep request logs in the unified platform log source list.");
+requireIncludes(files.loggingCenter, "records.request.total", "Logging center metrics must keep request logs visible instead of only audit/login/error logs.");
+requireIncludes(files.loggingCenter, "filterFields={filterFields}", "Logging center must expose unified filters through PlatformDataTable.");
+requireIncludes(files.loggingCenter, 'key: "requestId"', "Logging center filters must include request ID.");
+requireIncludes(files.loggingCenter, 'key: "traceId"', "Logging center filters must include trace ID.");
+requireIncludes(files.loggingCenter, "LoggingRecordDetailModal", "Logging center must render a unified safe detail modal.");
+requireIncludes(files.loggingCenter, "loggingSensitiveFieldPattern", "Logging center details must keep an explicit sensitive-field denylist.");
+requireIncludes(files.loggingCenter, "redactSensitiveValue", "Logging center detail rendering must keep a value redaction fallback.");
+requireIncludes(files.loggingCenter, "navigator.clipboard.writeText(value)", "Logging center must only copy explicit correlation values.");
+requireNotIncludes(files.loggingCenter, "JSON.stringify(item.record", "Logging center must not stringify and expose raw log records in the detail modal.");
 requireCountExactly(files.i18n, "roleManagement:", 2, "Role management navigation must declare matching Chinese and English dictionary keys.");
 requireIncludes(files.i18n, 'roleManagement: "角色"', "Role navigation must declare the concise Chinese label.");
 requireIncludes(files.i18n, 'roleManagement: "Roles"', "Role navigation must declare the concise English label.");
@@ -243,11 +253,23 @@ requireIncludes(files.login, 'credentialSpec?.mode === "sms-otp"', "The SMS OTP 
 requireIncludes(files.login, "startCredentialSMSOTP", "Credential SMS providers must start OTP transactions through the API client.");
 requireIncludes(files.login, "Input.Password", "Credential password providers must expose a real password field.");
 requireIncludes(files.login, "CredentialChallengePayload", "Credential login must render challenge responses through a dedicated payload slot.");
+requireIncludes(files.login, "function SliderChallengePayload", "Credential slider challenges must render through a dedicated slider payload.");
 requireIncludes(files.login, "ProviderSpecificChallengePayload", "Credential challenge UI must reserve a provider-specific payload renderer.");
-requireIncludes(files.login, "challengeDebugVisible(challenge)", "Credential challenge debug proof display must be controlled by an explicit response field.");
+requireIncludes(files.login, 'startCredentialChallenge({ kind: "slider", purpose: "login" })', "Credential login must request slider challenges before falling back.");
+requireIncludes(files.login, 'startCredentialChallenge({ kind: "captcha", purpose: "login" })', "Credential login must preserve a captcha challenge fallback.");
+requireIncludes(files.login, "challengeNeedsCaptchaFallback", "Credential login must fall back when slider material is incomplete.");
+requireIncludes(files.login, "sliderChallengeMaterial(challenge)", "Credential login must derive slider rendering from returned challenge material.");
+requireIncludes(files.login, "formatSliderChallengeProof(proofX, proofY)", "Credential slider proof must be generated from client drag coordinates.");
+requireIncludes(files.login, 'role="slider"', "Credential slider track must expose slider semantics for keyboard and assistive input.");
+requireIncludes(files.login, "challengeDebugVisible(challenge)", "Credential challenge debug text display must be controlled by an explicit response field.");
 requireIncludes(files.login, "debugVisible", "Credential challenge payloads must support explicit debug visibility control.");
+requireNotIncludes(files.login, "debugProof", "Credential login must not read or render server debugProof values.");
+requireNotIncludes(files.client, "debugProof", "Admin API challenge types must not expose debugProof to the login UI.");
 requireNotIncludes(files.login, "dictionary.loginChallengeText.replace", "Credential challenge UI must not use text answers as the production prompt path.");
 requireNotIncludes(files.login, "challenge.parameters?.text", "Credential challenge UI must not read text answers directly as the production prompt path.");
+requireCssRule(files.styles, ".login-slider-stage", ["position: relative;", "overflow: hidden;"], "Credential slider challenge must frame the returned puzzle images.");
+requireCssRule(files.styles, ".login-slider-track", ["touch-action: none;", "cursor: grab;"], "Credential slider track must support direct drag gestures.");
+requireCssRule(files.styles, ".login-slider-handle", ["transform: translateX(-50%);"], "Credential slider handle must align with the generated proof coordinate.");
 requireIncludes(files.login, 'aria-live="polite"', "OIDC callback progress and failure must use a polite live region.");
 requireIncludes(files.login, 'className="login-error-heading"', "OIDC callback failures must expose a stable error heading.");
 requireIncludes(files.login, "tabIndex={-1}", "The OIDC callback error heading must be programmatically focusable.");
@@ -300,6 +322,12 @@ for (const key of [
   "loginSMSStartFailed",
   "loginChallengePrompt",
   "loginChallengeImageAlt",
+  "loginChallengeSliderRequired",
+  "loginChallengeSliderImageAlt",
+  "loginChallengeSliderTileAlt",
+  "loginChallengeSliderTrackLabel",
+  "loginChallengeSliderInstruction",
+  "loginChallengeSliderComplete",
   "loginChallengeProviderPrompt",
   "loginChallengeProviderPayload",
   "loginChallengeDebugText",
@@ -567,6 +595,8 @@ requireIncludes(files.settingsCenter, "sourceLabel(config.source, dictionary)", 
 requireIncludes(files.settingsCenter, "SettingsCenterRuntimeSummary", "Settings center must expose the system-level runtime summary instead of only resource cards.");
 requireIncludes(files.settingsCenter, "dictionary.settingsCenterInterfacePreferenceBoundary", "Settings center must keep topbar settings scoped to interface preferences.");
 requireIncludes(files.settingsCenter, "config.writable ? dictionary.writable : dictionary.readOnly", "Settings center must show whether each configuration resource is writable.");
+requireIncludes(files.settingsCenter, "item.pendingRestart", "Settings center must consume runtime pending-restart state for configuration resources.");
+requireIncludes(files.settingsCenter, "settingsApplyModeLabel(config, dictionary)", "Settings center must show whether configuration changes are dynamic, restart-required, or restart-pending.");
 requireIncludes(files.settingsCenter, "item.schema?.fields?.length ?? 0", "Settings center must surface the schema field footprint for dynamic configuration resources.");
 requireNotIncludes(files.settingsCenter, 'type SettingsResourceKey = "parameters"', "Settings center must not hard-code a closed configuration resource union.");
 requireIncludes(files.registry, 'route: "/logging-center"', "Core resources must include a logging-center fallback entry.");
@@ -604,6 +634,11 @@ requireIncludes(files.messageCenter, "dictionary.messageCenterLocalDryRun", "Mes
 requireIncludes(files.messageCenter, "messageCenterChannelOptions(dictionary)", "Message center test-send form must let users select any common channel.");
 requireIncludes(files.messageCenter, "openTestSend(undefined, undefined, normalizeMessageCenterChannel(card.key))", "Message center channel cards must prefill dry-run with the clicked channel.");
 requireIncludes(files.messageCenter, "testConnectEnabled: true", "Message center test-connect must expose the dry-run path for all common channels.");
+requireIncludes(files.messageCenter, "<MessageCenterRuntimeMatrix", "Message center must expose a runtime capability matrix that separates test-send, worker, and supplier boundaries.");
+requireIncludes(files.messageCenter, "messageCenterRuntimeRows(records, dictionary)", "Message center runtime capability matrix must be derived from current configuration records.");
+requireIncludes(files.messageCenter, "<MessageCenterDeliveryDetailModal", "Message center delivery ledgers must expose an operator detail panel.");
+requireIncludes(files.messageCenter, "sanitizeMessageCenterTarget", "Message center delivery details must defensively redact targets before display.");
+requireIncludes(files.messageCenter, "matchedPoliciesForDelivery", "Message center delivery details must show send-policy matches instead of hiding policy state.");
 requireNotIncludes(files.messageCenter, "card.ready ? dictionary.configured : dictionary.notConfigured", "Message center channel cards must not collapse runtime readiness into a generic configured tag.");
 for (const key of [
   "settingsCenterTitle",
@@ -629,6 +664,11 @@ for (const key of [
   "settingsCenterRuntimeProjection",
   "settingsCenterRuntimeProjectionDescription",
   "settingsCenterWritableCount",
+  "settingsCenterRestartRequiredCount",
+  "settingsCenterPendingRestartCount",
+  "settingsCenterApplyMode",
+  "settingsCenterDynamicApplyMode",
+  "settingsCenterRestartApplyMode",
   "settingsCenterInterfacePreferenceBoundary",
   "loggingCenterTitle",
   "loggingCenterDescription",
@@ -661,6 +701,21 @@ for (const key of [
   "loggingCenterCorrelation",
   "loggingCenterTime",
   "loggingCenterOpenResource",
+  "loggingCenterUnifiedEvents",
+  "loggingCenterUnifiedEventsDescription",
+  "loggingCenterSearchPlaceholder",
+  "loggingCenterOpenDetail",
+  "loggingCenterDetailTitle",
+  "loggingCenterDetailFields",
+  "loggingCenterNoSafeDetails",
+  "loggingCenterRequestId",
+  "loggingCenterTraceId",
+  "loggingCenterActorFilterPlaceholder",
+  "loggingCenterCopyCorrelation",
+  "loggingCenterFocusCorrelation",
+  "loggingCenterCorrelationCopied",
+  "loggingCenterCorrelationCopyFailed",
+  "loggingCenterCorrelationFocused",
   "messageCenterTitle",
   "messageCenterDescription",
   "messageCenterClosedLoopTitle",
@@ -682,6 +737,13 @@ for (const key of [
   "messageCenterChannelRuntimeReady",
   "messageCenterChannelConfiguredOnly",
   "messageCenterChannelConfigSlot",
+  "messageCenterRuntimeMatrixTitle",
+  "messageCenterRuntimeMatrixDescription",
+  "messageCenterDeliveryDetailTitle",
+  "messageCenterPolicyHits",
+  "messageCenterNoTemplateParamValues",
+  "messageCenterSupplierLiveRequired",
+  "messageCenterDeliveryFailedReason",
   "messageCenterChannelInAppRuntimeDetail",
   "messageCenterChannelSMSRuntimeDetail",
   "messageCenterChannelSMSDryRunDetail",
@@ -955,7 +1017,11 @@ requireIncludes(files.capabilityConsole, "const pendingRestart = enabled !== des
 requireIncludes(files.capabilityConsole, "pluginRestartImpactPreview(status, capabilities, language)", "Plugin management must preview install and disable impact before manual restart.");
 requireIncludes(files.capabilityConsole, "restartChangeIDs(current, desired)", "Plugin restart preview must compare current and desired capability sets.");
 requireIncludes(files.capabilityConsole, "dictionary.pluginManualRestartRequired", "Plugin management must present a manual restart prompt when changes are pending.");
-requireIncludes(files.capabilityConsole, "dictionary.pluginRestartImpactCounts", "Plugin management must summarize menus, resources, permissions, config items, and auth providers affected by restart.");
+requireIncludes(files.capabilityConsole, "dictionary.pluginRestartImpactCounts", "Plugin management must summarize menus, resources, permissions, config items, service operations, and auth providers affected by restart.");
+requireIncludes(files.capabilityConsole, "PluginEntrypointProjectionPanel", "Plugin management must explain current versus desired entrypoint projection.");
+requireIncludes(files.capabilityConsole, "pluginEntrypointProjection(status.currentCapabilities", "Plugin management must derive currently available entrypoints from currentCapabilities.");
+requireIncludes(files.capabilityConsole, "pluginEntrypointProjection(status.desiredCapabilities", "Plugin management must derive restart-after entrypoints from desiredCapabilities.");
+requireIncludes(files.capabilityConsole, "serviceOperations: String(change.serviceOperations)", "Plugin restart preview must include service operation impact counts.");
 requireIncludes(files.capabilityConsole, "dictionary.capabilityDisableAfterRestart", "Capability status must distinguish disable-pending changes, not only install-pending changes.");
 requireIncludes(files.capabilityConsole, "dictionary.pluginManagementListHint", "Plugin management copy must direct users to the unified capability list instead of separate cards.");
 for (const key of [
@@ -965,6 +1031,11 @@ for (const key of [
   "pluginManualRestartHint",
   "pluginRestartImpactPreview",
   "pluginRestartImpactCounts",
+  "pluginEntrypointProjection",
+  "pluginEntrypointProjectionHint",
+  "pluginCurrentEntrypoints",
+  "pluginDesiredEntrypoints",
+  "pluginEntrypointCounts",
   "fields",
   "writable",
   "readOnly",

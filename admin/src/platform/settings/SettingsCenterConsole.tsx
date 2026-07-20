@@ -37,6 +37,9 @@ type SettingsResourceConfig = {
   recordCount: number;
   enabledCount: number;
   writable: boolean;
+  runtimeApplyMode: string;
+  restartRequired: boolean;
+  pendingRestart: boolean;
   fieldCount: number;
   updatedAt: string;
 };
@@ -141,6 +144,8 @@ export function SettingsCenterConsole({ language, dictionary, resources, onRoute
       records: recordCount,
       writableResources: availableConfigs.filter((config) => config.writable).length,
       manifestResources: availableConfigs.filter((config) => config.source === "manifest").length,
+      restartRequiredResources: availableConfigs.filter((config) => config.restartRequired).length,
+      pendingRestartResources: availableConfigs.filter((config) => config.pendingRestart).length,
       warnings: Object.values(errors).filter(Boolean).length,
     };
   }, [availableConfigs, errors]);
@@ -225,6 +230,9 @@ export function SettingsCenterConsole({ language, dictionary, resources, onRoute
                         <Space direction="vertical" size={2} align="end">
                           <Tag>{config.recordCount}</Tag>
                           <Tag color={config.writable ? "success" : "default"}>{config.writable ? dictionary.writable : dictionary.readOnly}</Tag>
+                          <Tag color={config.pendingRestart ? "warning" : config.restartRequired ? "default" : "success"}>
+                            {settingsApplyModeLabel(config, dictionary)}
+                          </Tag>
                           <Tag color={config.source === "catalog" ? "blue" : "default"}>{sourceLabel(config.source, dictionary)}</Tag>
                         </Space>
                       </button>
@@ -273,6 +281,8 @@ type SettingsRow = {
   enabled: number;
   writable: string;
   source: string;
+  applyMode: string;
+  applyModeTone: "default" | "success" | "warning";
   fields: number;
   updatedAt: string;
 };
@@ -288,6 +298,8 @@ function SettingsCenterRuntimeSummary({
     records: number;
     writableResources: number;
     manifestResources: number;
+    restartRequiredResources: number;
+    pendingRestartResources: number;
   };
 }) {
   return (
@@ -317,7 +329,13 @@ function SettingsCenterRuntimeSummary({
               })}
             </Typography.Text>
           </div>
-          <Tag>{formatTemplate(dictionary.settingsCenterWritableCount, { count: String(metrics.writableResources) })}</Tag>
+          <Space size={6} wrap>
+            <Tag>{formatTemplate(dictionary.settingsCenterWritableCount, { count: String(metrics.writableResources) })}</Tag>
+            <Tag>{formatTemplate(dictionary.settingsCenterRestartRequiredCount, { count: String(metrics.restartRequiredResources) })}</Tag>
+            <Tag color={metrics.pendingRestartResources > 0 ? "warning" : "default"}>
+              {formatTemplate(dictionary.settingsCenterPendingRestartCount, { count: String(metrics.pendingRestartResources) })}
+            </Tag>
+          </Space>
         </div>
         <div className="settings-center-runtime-card">
           <span className="settings-center-card-icon"><BgColorsOutlined /></span>
@@ -385,6 +403,14 @@ function columns(dictionary: Dictionary, language: Language): PlatformDataTableC
       render: (_value, row) => <Tag color={row.source === dictionary.settingsCenterCatalogSource ? "blue" : "default"}>{row.source}</Tag>,
     },
     {
+      title: dictionary.settingsCenterApplyMode,
+      key: "applyMode",
+      dataIndex: "applyMode",
+      width: 130,
+      priority: "extended",
+      render: (_value, row) => <Tag color={row.applyModeTone === "warning" ? "warning" : row.applyModeTone === "success" ? "success" : "default"}>{row.applyMode}</Tag>,
+    },
+    {
       title: dictionary.fields,
       key: "fields",
       dataIndex: "fields",
@@ -413,6 +439,8 @@ function settingsRow(config: SettingsResourceConfig, dictionary: Dictionary): Se
     enabled: config.enabledCount,
     writable: config.writable ? dictionary.writable : dictionary.readOnly,
     source: sourceLabel(config.source, dictionary),
+    applyMode: settingsApplyModeLabel(config, dictionary),
+    applyModeTone: config.pendingRestart ? "warning" : config.restartRequired ? "default" : "success",
     fields: config.fieldCount,
     updatedAt: config.updatedAt,
   };
@@ -448,6 +476,9 @@ function projectSettingsResourceConfigs(
       recordCount: item.recordCount ?? records.length,
       enabledCount: records.filter((record) => record.status === "enabled" || record.status === "active").length,
       writable: item.writable,
+      runtimeApplyMode: item.runtimeApplyMode,
+      restartRequired: item.restartRequired,
+      pendingRestart: item.pendingRestart,
       fieldCount: item.schema?.fields?.length ?? 0,
       updatedAt: records.map((record) => record.updatedAt).filter(Boolean).sort().at(-1) ?? "",
     }];
@@ -496,6 +527,16 @@ function groupSettingsResourceConfigs(configs: SettingsResourceConfig[], diction
 
 function sourceLabel(source: SettingsResourceConfig["source"], dictionary: Dictionary) {
   return source === "catalog" ? dictionary.settingsCenterCatalogSource : dictionary.settingsCenterManifestSource;
+}
+
+function settingsApplyModeLabel(config: Pick<SettingsResourceConfig, "runtimeApplyMode" | "restartRequired" | "pendingRestart">, dictionary: Dictionary) {
+  if (config.pendingRestart) {
+    return dictionary.restartPending;
+  }
+  if (config.restartRequired || config.runtimeApplyMode.includes("restart")) {
+    return dictionary.settingsCenterRestartApplyMode;
+  }
+  return dictionary.settingsCenterDynamicApplyMode;
 }
 
 function iconForRuntimeSettingsResource(item: AdminSettingsResourceItem) {

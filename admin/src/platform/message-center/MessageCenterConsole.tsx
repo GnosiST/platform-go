@@ -9,7 +9,7 @@ import {
   SettingOutlined,
   WechatOutlined,
 } from "@ant-design/icons";
-import { App, Button, Empty, Form, Input, Select, Space, Tabs, Tag, Tooltip, Typography } from "antd";
+import { App, Button, Descriptions, Empty, Form, Input, Select, Space, Tabs, Tag, Tooltip, Typography } from "antd";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AdminAPIError,
@@ -28,6 +28,7 @@ import {
   AdminFormModal,
   AdminListPanel,
   AdminMetricStrip,
+  AdminModal,
   AdminPage,
   PlatformDataTable,
   PlatformOverflowText,
@@ -73,6 +74,24 @@ type MessageCenterChannelCard = {
   testConnectEnabled: boolean;
 };
 type MessageCenterChannelOperationalState = "runtime-ready" | "configuration-placeholder" | "configuration-slot";
+type MessageCenterRuntimeRow = {
+  channel: string;
+  label: string;
+  icon: ReactNode;
+  configStatus: string;
+  testSendStatus: string;
+  workerStatus: string;
+  supplierBoundary: string;
+  tone: string;
+};
+type MessageCenterNotificationPayload = {
+  channel?: string;
+  redactedTarget?: string;
+  templateId?: string;
+  templateParamKeys?: string[];
+  purpose?: string;
+  templateParams?: Record<string, unknown>;
+};
 
 type MessageCenterTestSendForm = {
   channel: MessageCenterChannel;
@@ -142,6 +161,7 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
   const [testSendResult, setTestSendResult] = useState<MessageCenterTestSendResult | null>(null);
   const [deliveryRunSubmitting, setDeliveryRunSubmitting] = useState(false);
   const [deliveryRunResult, setDeliveryRunResult] = useState<MessageCenterDeliveriesRunResult | null>(null);
+  const [deliveryDetailRecord, setDeliveryDetailRecord] = useState<AdminResourceRecord | null>(null);
   const resourceRoutes = useMemo(() => new Set(resources.map((resource) => resource.route)), [resources]);
   const availableConfigs = useMemo(
     () => resourceConfigs.filter((config) => resourceRoutes.has(config.route)),
@@ -278,6 +298,7 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
           })}
         />
       ) : null}
+      <MessageCenterRuntimeMatrix dictionary={dictionary} records={records} />
       <MessageCenterClosedLoop
         dictionary={dictionary}
         records={records}
@@ -341,6 +362,7 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
                 records={records[config.key]}
                 onOpen={() => openResource(config)}
                 onTestSend={(record) => openTestSend(record, config)}
+                onInspectDelivery={(record) => setDeliveryDetailRecord(record)}
               />
             ),
           }))}
@@ -409,6 +431,13 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
           />
         ) : null}
       </AdminFormModal>
+      <MessageCenterDeliveryDetailModal
+        dictionary={dictionary}
+        language={language}
+        record={deliveryDetailRecord}
+        records={records}
+        onClose={() => setDeliveryDetailRecord(null)}
+      />
     </AdminPage>
   );
 }
@@ -421,6 +450,7 @@ function MessageCenterTab({
   records,
   onOpen,
   onTestSend,
+  onInspectDelivery,
 }: {
   config: MessageCenterResourceConfig;
   dictionary: Dictionary;
@@ -429,6 +459,7 @@ function MessageCenterTab({
   records: AdminResourceRecord[];
   onOpen: () => void;
   onTestSend: (record: AdminResourceRecord) => void;
+  onInspectDelivery: (record: AdminResourceRecord) => void;
 }) {
   return (
     <AdminListPanel
@@ -454,6 +485,11 @@ function MessageCenterTab({
                 {dictionary.viewRecord}
               </Button>
             </Tooltip>
+            {config.key === "deliveries" ? (
+              <Button size="small" type="text" onClick={() => onInspectDelivery(record)}>
+                {dictionary.messageCenterDeliveryDetail}
+              </Button>
+            ) : null}
             {config.key === "providers" ? (
               <Button icon={<SendOutlined />} size="small" type="text" onClick={() => onTestSend(record)}>
                 {dictionary.messageCenterTestSend}
@@ -466,10 +502,113 @@ function MessageCenterTab({
             ) : null}
           </Space>
         )}
-        rowActionsColumnWidth={supportsTrialEntry(config.key) || config.key === "providers" ? 220 : 112}
+        rowActionsColumnWidth={messageCenterRowActionsWidth(config.key)}
         emptyState={<Empty description={dictionary.emptyData} />}
       />
     </AdminListPanel>
+  );
+}
+
+function MessageCenterRuntimeMatrix({ dictionary, records }: { dictionary: Dictionary; records: MessageCenterRecords }) {
+  const rows = messageCenterRuntimeRows(records, dictionary);
+  return (
+    <AdminListPanel
+      className="message-center-runtime-matrix"
+      title={dictionary.messageCenterRuntimeMatrixTitle}
+      toolbar={<Typography.Text type="secondary">{dictionary.messageCenterRuntimeMatrixDescription}</Typography.Text>}
+    >
+      <div className="message-center-runtime-grid">
+        {rows.map((row) => (
+          <div className="message-center-runtime-row" key={row.channel}>
+            <span className="message-center-channel-icon">{row.icon}</span>
+            <div>
+              <Typography.Text strong>{row.label}</Typography.Text>
+              <Typography.Text type="secondary">{row.configStatus}</Typography.Text>
+            </div>
+            <Space size={6} wrap>
+              <Tag color={row.tone}>{row.testSendStatus}</Tag>
+              <Tag>{row.workerStatus}</Tag>
+              <Tag color={row.supplierBoundary === dictionary.messageCenterSupplierLiveRequired ? "warning" : "default"}>
+                {row.supplierBoundary}
+              </Tag>
+            </Space>
+          </div>
+        ))}
+      </div>
+    </AdminListPanel>
+  );
+}
+
+function MessageCenterDeliveryDetailModal({
+  dictionary,
+  language,
+  record,
+  records,
+  onClose,
+}: {
+  dictionary: Dictionary;
+  language: Language;
+  record: AdminResourceRecord | null;
+  records: MessageCenterRecords;
+  onClose: () => void;
+}) {
+  const notice = record ? notificationForDelivery(record, records.notifications) : undefined;
+  const payload = notice ? safeNotificationPayload(notice) : undefined;
+  const policies = record ? matchedPoliciesForDelivery(record, notice, records) : [];
+  const templateParamKeys = payloadTemplateParamKeys(payload);
+  return (
+    <AdminModal
+      open={Boolean(record)}
+      preset="detail"
+      size="lg"
+      title={dictionary.messageCenterDeliveryDetailTitle}
+      footer={<Button onClick={onClose}>{dictionary.close}</Button>}
+      onCancel={onClose}
+    >
+      {record ? (
+        <Space className="message-center-delivery-detail" direction="vertical" size={12}>
+          <Descriptions bordered column={{ xs: 1, md: 2 }} size="small">
+            <Descriptions.Item label={dictionary.code}>{record.code}</Descriptions.Item>
+            <Descriptions.Item label={dictionary.messageCenterDeliveryStatus}>
+              <Tag color={deliveryStatusTone(valueOf(record, "deliveryStatus"))}>{valueOf(record, "deliveryStatus") || "-"}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label={dictionary.messageCenterChannel}>{channelLabel(valueOf(record, "channel"), dictionary)}</Descriptions.Item>
+            <Descriptions.Item label={dictionary.messageCenterProvider}>{valueOf(record, "provider") || "-"}</Descriptions.Item>
+            <Descriptions.Item label={dictionary.messageCenterDeliveryTarget}>{sanitizeMessageCenterTarget(valueOf(record, "channel"), valueOf(record, "target"))}</Descriptions.Item>
+            <Descriptions.Item label={dictionary.messageCenterAttempts}>{valueOf(record, "attempts") || "0"}</Descriptions.Item>
+            <Descriptions.Item label={dictionary.messageCenterLastAttempt}>{valueOf(record, "lastAttemptAt") || "-"}</Descriptions.Item>
+            <Descriptions.Item label={dictionary.messageCenterProviderMessageId}>{valueOf(record, "providerMessageId") || "-"}</Descriptions.Item>
+            <Descriptions.Item label={dictionary.messageCenterRuntimeCapability}>
+              {deliveryRuntimeCapability(record, records, dictionary)}
+            </Descriptions.Item>
+            <Descriptions.Item label={dictionary.messageCenterSafeFailureReason}>
+              {safeFailureReason(valueOf(record, "errorMessage"), dictionary)}
+            </Descriptions.Item>
+            <Descriptions.Item label={dictionary.messageCenterLinkedNotification}>
+              {notice ? localizedName(notice, language) : valueOf(record, "notificationCode") || "-"}
+            </Descriptions.Item>
+            <Descriptions.Item label={dictionary.messageCenterTemplateId}>
+              {valueOf(record, "templateId") || payload?.templateId || (notice ? valueOf(notice, "templateCode") : "") || "-"}
+            </Descriptions.Item>
+          </Descriptions>
+          <div className="message-center-detail-section">
+            <Typography.Text strong>{dictionary.messageCenterPolicyHits}</Typography.Text>
+            <Space size={6} wrap>
+              {policies.length > 0 ? policies.map((policy) => (
+                <Tag key={policy.id || policy.code}>{localizedName(policy, language)} · {policyLimitLabel(policy, dictionary)}</Tag>
+              )) : <Tag>{dictionary.messageCenterNoPolicyHit}</Tag>}
+            </Space>
+          </div>
+          <div className="message-center-detail-section">
+            <Typography.Text strong>{dictionary.messageCenterTemplateParamKeys}</Typography.Text>
+            <Space size={6} wrap>
+              {templateParamKeys.length > 0 ? templateParamKeys.map((key) => <Tag key={key}>{key}</Tag>) : <Tag>-</Tag>}
+              <Typography.Text type="secondary">{dictionary.messageCenterNoTemplateParamValues}</Typography.Text>
+            </Space>
+          </div>
+        </Space>
+      ) : null}
+    </AdminModal>
   );
 }
 
@@ -659,14 +798,12 @@ function tableLabels(dictionary: Dictionary) {
 
 function channelCards(records: MessageCenterRecords, dictionary: Dictionary): MessageCenterChannelCard[] {
   const providersByChannel = new Set(
-    records.providers
-      .filter((record) => ["enabled", "active"].includes(record.status))
+    activeRecords(records.providers)
       .map((record) => valueOf(record, "channel"))
       .filter(Boolean),
   );
   const configuredChannels = new Set(
-    records.channels
-      .filter((record) => ["enabled", "active"].includes(record.status))
+    activeRecords(records.channels)
       .map((record) => valueOf(record, "channel") || record.code)
       .filter(Boolean),
   );
@@ -741,6 +878,203 @@ function workflowStepIcon(key: MessageCenterResourceKey) {
 
 function supportsTrialEntry(key: MessageCenterResourceKey) {
   return key === "templates" || key === "policies";
+}
+
+function messageCenterRowActionsWidth(key: MessageCenterResourceKey) {
+  if (key === "deliveries") return 190;
+  return supportsTrialEntry(key) || key === "providers" ? 220 : 112;
+}
+
+function messageCenterRuntimeRows(records: MessageCenterRecords, dictionary: Dictionary): MessageCenterRuntimeRow[] {
+  const enabledChannels = new Set(activeRecords(records.channels).map((record) => valueOf(record, "channel") || record.code));
+  const providersByChannel = activeRecords(records.providers).reduce<Record<string, AdminResourceRecord[]>>((grouped, record) => {
+    const channel = valueOf(record, "channel");
+    if (!channel) return grouped;
+    grouped[channel] = [...(grouped[channel] ?? []), record];
+    return grouped;
+  }, {});
+  const policiesByChannel = activeRecords(records.policies).reduce<Record<string, AdminResourceRecord[]>>((grouped, record) => {
+    const channel = valueOf(record, "channel");
+    if (!channel) return grouped;
+    grouped[channel] = [...(grouped[channel] ?? []), record];
+    return grouped;
+  }, {});
+  return (["in_app", "sms", "email", "wechat_official", "wechat_miniapp"] as const).map((channel) => {
+    const providers = providersByChannel[channel] ?? [];
+    const policies = policiesByChannel[channel] ?? [];
+    const hasChannelConfig = enabledChannels.has(channel);
+    const configStatus = hasChannelConfig
+      ? formatTemplate(dictionary.messageCenterConfigSummary, {
+        providers: String(providers.length),
+        policies: String(policies.length),
+      })
+      : dictionary.messageCenterNoChannelConfig;
+    if (channel === "in_app") {
+      return {
+        channel,
+        label: channelLabel(channel, dictionary),
+        icon: channelIcon(channel),
+        configStatus,
+        testSendStatus: dictionary.messageCenterDryRunAvailable,
+        workerStatus: dictionary.messageCenterWorkerRecordsOnly,
+        supplierBoundary: dictionary.messageCenterSupplierNone,
+        tone: "success",
+      };
+    }
+    if (channel === "sms") {
+      const hasConfiguredProvider = providers.some((record) => valueOf(record, "credentialStatus") === "configured");
+      const hasMockLocal = providers.some((record) => valueOf(record, "provider") === "mock-local");
+      return {
+        channel,
+        label: channelLabel(channel, dictionary),
+        icon: channelIcon(channel),
+        configStatus,
+        testSendStatus: hasConfiguredProvider ? dictionary.messageCenterSMSTestReady : dictionary.messageCenterSMSProviderRequired,
+        workerStatus: hasConfiguredProvider ? dictionary.messageCenterWorkerReady : dictionary.messageCenterWorkerNeedsProvider,
+        supplierBoundary: hasMockLocal ? dictionary.messageCenterSupplierNone : dictionary.messageCenterSupplierLiveRequired,
+        tone: hasConfiguredProvider ? "success" : "warning",
+      };
+    }
+    return {
+      channel,
+      label: channelLabel(channel, dictionary),
+      icon: channelIcon(channel),
+      configStatus,
+      testSendStatus: dictionary.messageCenterDryRunAvailable,
+      workerStatus: dictionary.messageCenterAdapterRequired,
+      supplierBoundary: dictionary.messageCenterSupplierLiveRequired,
+      tone: providers.length > 0 ? "processing" : "default",
+    };
+  });
+}
+
+function notificationForDelivery(delivery: AdminResourceRecord, notifications: AdminResourceRecord[]) {
+  const notificationCode = valueOf(delivery, "notificationCode");
+  return notifications.find((record) => record.code === notificationCode || record.id === notificationCode);
+}
+
+function safeNotificationPayload(record: AdminResourceRecord): MessageCenterNotificationPayload {
+  const raw = valueOf(record, "payload");
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as MessageCenterNotificationPayload
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function payloadTemplateParamKeys(payload: MessageCenterNotificationPayload | undefined) {
+  const keys = new Set<string>();
+  for (const key of payload?.templateParamKeys ?? []) {
+    if (key.trim()) keys.add(key.trim());
+  }
+  for (const key of Object.keys(payload?.templateParams ?? {})) {
+    if (key.trim()) keys.add(key.trim());
+  }
+  return [...keys].sort((left, right) => left.localeCompare(right));
+}
+
+function matchedPoliciesForDelivery(delivery: AdminResourceRecord, notice: AdminResourceRecord | undefined, records: MessageCenterRecords) {
+  const channel = valueOf(delivery, "channel");
+  const provider = valueOf(delivery, "provider");
+  const noticePayload = notice ? safeNotificationPayload(notice) : {};
+  const templateCandidates = new Set([
+    valueOf(delivery, "templateCode"),
+    valueOf(delivery, "templateId"),
+    notice ? valueOf(notice, "templateCode") : "",
+    notice ? valueOf(notice, "templateId") : "",
+    noticePayload.templateId ?? "",
+  ].filter(Boolean));
+  const providerCodes = new Set(
+    records.providers
+      .filter((record) => valueOf(record, "channel") === channel && valueOf(record, "provider") === provider)
+      .map((record) => record.code),
+  );
+  if (provider) providerCodes.add(provider);
+  return activeRecords(records.policies).filter((policy) => {
+    if (valueOf(policy, "channel") !== channel) return false;
+    const policyTemplate = valueOf(policy, "templateCode");
+    if (policyTemplate && !templateCandidates.has(policyTemplate)) return false;
+    const policyProvider = valueOf(policy, "providerCode");
+    return !policyProvider || providerCodes.has(policyProvider);
+  });
+}
+
+function activeRecords(records: AdminResourceRecord[]) {
+  return records.filter(recordOperationallyEnabled);
+}
+
+function recordOperationallyEnabled(record: AdminResourceRecord) {
+  const enabledValue = valueOf(record, "enabled").trim().toLowerCase();
+  return ["enabled", "active"].includes(record.status) && !["0", "false", "no", "disabled", "off"].includes(enabledValue);
+}
+
+function policyLimitLabel(policy: AdminResourceRecord, dictionary: Dictionary) {
+  return formatTemplate(dictionary.messageCenterPolicyLimitSummary, {
+    attempts: valueOf(policy, "maxAttempts") || "-",
+    rate: valueOf(policy, "rateLimitPerMinute") || "-",
+  });
+}
+
+function deliveryRuntimeCapability(record: AdminResourceRecord, records: MessageCenterRecords, dictionary: Dictionary) {
+  const channel = valueOf(record, "channel");
+  const provider = valueOf(record, "provider");
+  const errorMessage = valueOf(record, "errorMessage");
+  if (errorMessage === "notification delivery sender unavailable") {
+    return dictionary.messageCenterAdapterRequired;
+  }
+  if (channel === "in_app") {
+    return dictionary.messageCenterWorkerRecordsOnly;
+  }
+  if (channel === "sms") {
+    const providerRecord = records.providers.find((item) => valueOf(item, "channel") === channel && valueOf(item, "provider") === provider);
+    if (provider === "mock-local" || providerRecord?.code === "sms-mock-local") {
+      return dictionary.messageCenterSupplierNone;
+    }
+    return valueOf(providerRecord ?? emptyAdminResourceRecord(), "credentialStatus") === "configured"
+      ? dictionary.messageCenterWorkerReady
+      : dictionary.messageCenterSupplierLiveRequired;
+  }
+  if (valueOf(record, "providerMessageId").includes("dry-run")) {
+    return dictionary.messageCenterDryRunAvailable;
+  }
+  return dictionary.messageCenterAdapterRequired;
+}
+
+function emptyAdminResourceRecord(): AdminResourceRecord {
+  return { id: "", code: "", name: "", status: "", description: "", updatedAt: "", values: {} };
+}
+
+function safeFailureReason(value: string, dictionary: Dictionary) {
+  const safe = value.trim();
+  if (!safe) return "-";
+  if (safe === "notification delivery sender unavailable") return dictionary.messageCenterAdapterRequired;
+  if (safe === "message center test send failed") return dictionary.messageCenterTestSendFailedReason;
+  return dictionary.messageCenterDeliveryFailedReason;
+}
+
+function deliveryStatusTone(status: string) {
+  if (status === "delivered") return "success";
+  if (status === "failed") return "error";
+  if (status === "pending") return "processing";
+  return "default";
+}
+
+function sanitizeMessageCenterTarget(channel: string, target: string) {
+  const trimmed = target.trim();
+  if (!trimmed) return "-";
+  if (channel === "email") {
+    const at = trimmed.lastIndexOf("@");
+    if (at > 0 && at < trimmed.length - 1) {
+      return `${trimmed.slice(0, Math.min(2, at))}***${trimmed.slice(at)}`;
+    }
+  }
+  const runes = [...trimmed];
+  if (runes.length <= 4) return "****";
+  return `****${runes.slice(-4).join("")}`;
 }
 
 function channelIcon(channel: string) {

@@ -210,6 +210,15 @@
       "requiredInProfiles": ["platform-default"],
       "dependencies": ["audit", "tenant"],
       "adminResources": ["branding", "parameters", "settings"],
+      "productization": {
+        "settingsCenterRoute": "/settings",
+        "settingsAggregation": "dynamic-enabled-capability-config",
+        "systemEntryPolicy": "first-class-route",
+        "topbarSettingsBoundary": "interface-preferences-only",
+        "topbarSettingsScope": ["theme", "layout", "watermark", "density"],
+        "runtimeStatus": "settings-runtime-v1.1",
+        "restartPolicy": "Enabled capability configuration resources load through /settings at startup or after manual restart; disabled capabilities' configuration resources disappear after restart. Individual configuration resources may mark restartRequired/pendingRestart when process-runtime inputs change."
+      },
       "docs": ["docs/platform-branding.md", "docs/platform-capability-development.md"]
     },
     {

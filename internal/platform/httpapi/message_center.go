@@ -47,6 +47,149 @@ type adminMessageCenterDeliveriesRunRequest struct {
 	Limit int `json:"limit,omitempty"`
 }
 
+func sanitizeMessageCenterResourceRecord(resource string, record adminresource.Record) adminresource.Record {
+	if resource != messageCenterNotifications && resource != messageCenterDeliveries {
+		return record
+	}
+	if len(record.Values) == 0 {
+		return record
+	}
+	record.Values = cloneStringMap(record.Values)
+	if resource == messageCenterNotifications {
+		if payload := sanitizeMessageCenterNotificationPayload(record.Values["payload"]); payload != "" {
+			record.Values["payload"] = payload
+		} else {
+			delete(record.Values, "payload")
+		}
+	}
+	if resource == messageCenterDeliveries {
+		if target := strings.TrimSpace(record.Values["target"]); target != "" {
+			record.Values["target"] = notification.RedactMessageTarget(record.Values["channel"], target)
+		}
+		if errorMessage := safeMessageCenterDeliveryError(record.Values["errorMessage"]); errorMessage != "" {
+			record.Values["errorMessage"] = errorMessage
+		} else {
+			delete(record.Values, "errorMessage")
+		}
+	}
+	deleteMessageCenterResponseSensitiveValues(record.Values, resource == messageCenterNotifications)
+	if len(record.Values) == 0 {
+		record.Values = nil
+	}
+	return record
+}
+
+func sanitizeMessageCenterResourceRecords(resource string, records []adminresource.Record) []adminresource.Record {
+	if resource != messageCenterNotifications && resource != messageCenterDeliveries {
+		return records
+	}
+	sanitized := make([]adminresource.Record, 0, len(records))
+	for _, record := range records {
+		sanitized = append(sanitized, sanitizeMessageCenterResourceRecord(resource, record))
+	}
+	return sanitized
+}
+
+func sanitizeMessageCenterNotificationPayload(raw string) string {
+	if strings.TrimSpace(raw) == "" {
+		return ""
+	}
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	decoder.UseNumber()
+	var source map[string]any
+	if err := decoder.Decode(&source); err != nil {
+		return ""
+	}
+	channel := messageCenterStringValue(source["channel"])
+	redactedTarget := messageCenterStringValue(source["redactedTarget"])
+	if redactedTarget != "" {
+		redactedTarget = notification.RedactMessageTarget(channel, redactedTarget)
+	}
+	templateID := messageCenterStringValue(source["templateId"])
+	purpose := messageCenterStringValue(source["purpose"])
+	paramKeys := messageCenterTemplateParamKeysFromPayload(source)
+	payload := struct {
+		Channel           string   `json:"channel,omitempty"`
+		RedactedTarget    string   `json:"redactedTarget,omitempty"`
+		TemplateID        string   `json:"templateId,omitempty"`
+		TemplateParamKeys []string `json:"templateParamKeys,omitempty"`
+		Purpose           string   `json:"purpose,omitempty"`
+	}{
+		Channel:           channel,
+		RedactedTarget:    redactedTarget,
+		TemplateID:        templateID,
+		TemplateParamKeys: paramKeys,
+		Purpose:           purpose,
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return ""
+	}
+	return string(encoded)
+}
+
+func messageCenterTemplateParamKeysFromPayload(source map[string]any) []string {
+	keys := map[string]struct{}{}
+	switch values := source["templateParamKeys"].(type) {
+	case []any:
+		for _, value := range values {
+			if key := strings.TrimSpace(messageCenterStringValue(value)); key != "" {
+				keys[key] = struct{}{}
+			}
+		}
+	}
+	switch params := source["templateParams"].(type) {
+	case map[string]any:
+		for key := range params {
+			if key = strings.TrimSpace(key); key != "" {
+				keys[key] = struct{}{}
+			}
+		}
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(keys))
+	for key := range keys {
+		result = append(result, key)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func messageCenterStringValue(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case json.Number:
+		return typed.String()
+	default:
+		return ""
+	}
+}
+
+func deleteMessageCenterResponseSensitiveValues(values map[string]string, keepPayload bool) {
+	for _, key := range []string{"templateParams", "templateParam", "recipient", "phone", "otp", "smsOtp", "verificationCode"} {
+		delete(values, key)
+	}
+	if !keepPayload {
+		delete(values, "payload")
+	}
+}
+
+func safeMessageCenterDeliveryError(message string) string {
+	switch strings.TrimSpace(message) {
+	case "":
+		return ""
+	case notification.DeliveryLedgerErrorSenderUnavailable:
+		return notification.DeliveryLedgerErrorSenderUnavailable
+	case notification.DeliveryLedgerErrorMessageCenterTestSend:
+		return notification.DeliveryLedgerErrorMessageCenterTestSend
+	default:
+		return notification.DeliveryLedgerErrorFailed
+	}
+}
+
 func (s *Server) adminMessageCenterTestSend(ctx *gin.Context) {
 	if !s.authorize(ctx, "admin:message-center:update") {
 		return

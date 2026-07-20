@@ -277,7 +277,6 @@ export type CredentialChallengeStartResult = {
   parameters?: Record<string, unknown>;
   expiresAt: string;
   debugVisible?: boolean;
-  debugProof?: string;
 };
 
 export type CredentialEncryptedPasswordSecret = {

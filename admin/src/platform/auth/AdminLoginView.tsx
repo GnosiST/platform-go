@@ -10,7 +10,17 @@ import {
   UserOutlined,
 } from "@ant-design/icons";
 import { Button, Form, Input, Space, Tooltip, Typography } from "antd";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import {
   loginWithAuthProvider,
   startCredentialChallenge,
@@ -67,6 +77,17 @@ type CredentialProviderMode = "password" | "sms-otp";
 type CredentialProviderSpec = {
   identifierType: CredentialIdentifierType;
   mode: CredentialProviderMode;
+};
+
+type SliderChallengeMaterial = {
+  masterImage: string;
+  tileImage: string;
+  imageWidth: number;
+  imageHeight: number;
+  tileWidth: number;
+  tileHeight: number;
+  initialX: number;
+  tileY: number;
 };
 
 export function AdminLoginView({
@@ -227,7 +248,7 @@ export function AdminLoginView({
   const refreshCredentialChallenge = async () => {
     setCredentialChallengeLoading(true);
     try {
-      const nextChallenge = await startCredentialChallenge({ kind: "captcha", purpose: "login" });
+      const nextChallenge = await startLoginCredentialChallenge();
       setCredentialChallenge(nextChallenge);
       form.setFieldValue("challengeProof", "");
     } catch (nextError) {
@@ -577,23 +598,51 @@ function CredentialChallengeField({
   loading: boolean;
   onRefresh: () => void;
 }) {
+  const form = Form.useFormInstance<LoginFormValues>();
+  const sliderMaterial = sliderChallengeMaterial(challenge);
+  const setChallengeProof = useCallback(
+    (proof: string) => {
+      form.setFieldValue("challengeProof", proof);
+    },
+    [form],
+  );
+
   return (
     <Form.Item label={dictionary.loginChallenge} required>
       <div className="login-challenge-card">
-        <CredentialChallengePayload challenge={challenge} dictionary={dictionary} />
-        <Space.Compact className="login-challenge-row">
-          <Form.Item noStyle name="challengeProof" rules={[{ required: true, message: dictionary.loginChallengeRequired }]}>
-            <Input
-              prefix={<SafetyCertificateOutlined />}
-              autoComplete="off"
-              disabled={!challenge || loading}
-              placeholder={dictionary.loginChallengePlaceholder}
-            />
-          </Form.Item>
-          <Button loading={loading} onClick={onRefresh}>
+        <CredentialChallengePayload challenge={challenge} dictionary={dictionary} onProofChange={setChallengeProof} />
+        {sliderMaterial ? (
+          <>
+            <Form.Item
+              hidden
+              name="challengeProof"
+              rules={[{ required: true, message: dictionary.loginChallengeSliderRequired }]}
+            >
+              <Input />
+            </Form.Item>
+            <Button className="login-challenge-refresh" loading={loading} onClick={onRefresh}>
+              {dictionary.loginChallengeRefresh}
+            </Button>
+          </>
+        ) : challenge ? (
+          <Space.Compact className="login-challenge-row">
+            <Form.Item noStyle name="challengeProof" rules={[{ required: true, message: dictionary.loginChallengeRequired }]}>
+              <Input
+                prefix={<SafetyCertificateOutlined />}
+                autoComplete="off"
+                disabled={!challenge || loading}
+                placeholder={dictionary.loginChallengePlaceholder}
+              />
+            </Form.Item>
+            <Button loading={loading} onClick={onRefresh}>
+              {dictionary.loginChallengeRefresh}
+            </Button>
+          </Space.Compact>
+        ) : (
+          <Button className="login-challenge-refresh" loading={loading} onClick={onRefresh}>
             {dictionary.loginChallengeRefresh}
           </Button>
-        </Space.Compact>
+        )}
       </div>
     </Form.Item>
   );
@@ -602,9 +651,11 @@ function CredentialChallengeField({
 function CredentialChallengePayload({
   challenge,
   dictionary,
+  onProofChange,
 }: {
   challenge: CredentialChallengeStartResult | null;
   dictionary: Dictionary;
+  onProofChange: (proof: string) => void;
 }) {
   if (!challenge) {
     return (
@@ -613,10 +664,175 @@ function CredentialChallengePayload({
       </div>
     );
   }
+  const sliderMaterial = sliderChallengeMaterial(challenge);
+  if (sliderMaterial) {
+    return (
+      <SliderChallengePayload
+        challenge={challenge}
+        dictionary={dictionary}
+        material={sliderMaterial}
+        onProofChange={onProofChange}
+      />
+    );
+  }
   if (challenge.kind === "captcha") {
     return <CaptchaChallengePayload challenge={challenge} dictionary={dictionary} />;
   }
   return <ProviderSpecificChallengePayload challenge={challenge} dictionary={dictionary} />;
+}
+
+function SliderChallengePayload({
+  challenge,
+  dictionary,
+  material,
+  onProofChange,
+}: {
+  challenge: CredentialChallengeStartResult;
+  dictionary: Dictionary;
+  material: SliderChallengeMaterial;
+  onProofChange: (proof: string) => void;
+}) {
+  const stageRef = useRef<HTMLDivElement>(null);
+  const activePointerRef = useRef<number | null>(null);
+  const maxX = Math.max(0, material.imageWidth - material.tileWidth);
+  const [tileX, setTileX] = useState(() => clampNumber(material.initialX, 0, maxX));
+  const [proofReady, setProofReady] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const boundedTileX = clampNumber(tileX, 0, maxX);
+  const handlePercent = ((boundedTileX + material.tileWidth / 2) / material.imageWidth) * 100;
+  const stageStyle: CSSProperties = {
+    aspectRatio: `${material.imageWidth} / ${material.imageHeight}`,
+    maxWidth: material.imageWidth,
+  };
+  const tileStyle: CSSProperties = {
+    height: `${(material.tileHeight / material.imageHeight) * 100}%`,
+    left: `${(boundedTileX / material.imageWidth) * 100}%`,
+    top: `${(material.tileY / material.imageHeight) * 100}%`,
+    width: `${(material.tileWidth / material.imageWidth) * 100}%`,
+  };
+  const trackFillStyle: CSSProperties = {
+    width: `${handlePercent}%`,
+  };
+  const trackStyle: CSSProperties = {
+    maxWidth: material.imageWidth,
+  };
+  const handleStyle: CSSProperties = {
+    left: `${handlePercent}%`,
+  };
+
+  useEffect(() => {
+    activePointerRef.current = null;
+    setDragging(false);
+    setProofReady(false);
+    setTileX(clampNumber(material.initialX, 0, maxX));
+    onProofChange("");
+  }, [challenge.id, material.initialX, maxX, onProofChange]);
+
+  const updateDraftFromPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const nextX = pointerTileX(event.clientX, stageRef.current, material, maxX);
+    setTileX(nextX);
+    setProofReady(false);
+    onProofChange("");
+    return nextX;
+  };
+
+  const commitProof = (nextX: number) => {
+    const proofX = Math.round(clampNumber(nextX, 0, maxX));
+    const proofY = Math.round(material.tileY);
+    setTileX(proofX);
+    setProofReady(true);
+    onProofChange(formatSliderChallengeProof(proofX, proofY));
+  };
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    activePointerRef.current = event.pointerId;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragging(true);
+    updateDraftFromPointer(event);
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (activePointerRef.current !== event.pointerId) return;
+    event.preventDefault();
+    updateDraftFromPointer(event);
+  };
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (activePointerRef.current !== event.pointerId) return;
+    event.preventDefault();
+    const nextX = updateDraftFromPointer(event);
+    activePointerRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setDragging(false);
+    commitProof(nextX);
+  };
+
+  const handlePointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (activePointerRef.current !== event.pointerId) return;
+    activePointerRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setDragging(false);
+    setProofReady(false);
+    onProofChange("");
+  };
+
+  const handleTrackKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const smallStep = event.shiftKey ? 10 : 1;
+    const largeStep = event.shiftKey ? 24 : 12;
+    let nextX: number | null = null;
+    if (event.key === "ArrowLeft") nextX = boundedTileX - smallStep;
+    if (event.key === "ArrowRight") nextX = boundedTileX + smallStep;
+    if (event.key === "PageDown") nextX = boundedTileX - largeStep;
+    if (event.key === "PageUp") nextX = boundedTileX + largeStep;
+    if (event.key === "Home") nextX = 0;
+    if (event.key === "End") nextX = maxX;
+    if (event.key === "Enter" || event.key === " ") nextX = boundedTileX;
+    if (nextX === null) return;
+    event.preventDefault();
+    commitProof(nextX);
+  };
+
+  return (
+    <div className="login-challenge-prompt login-slider-challenge">
+      <div className="login-challenge-payload">
+        <Typography.Text strong>{challenge.prompt || dictionary.loginChallengeProviderPrompt.replace("{kind}", challenge.kind)}</Typography.Text>
+        <div className="login-slider-stage" ref={stageRef} style={stageStyle}>
+          <img alt={dictionary.loginChallengeSliderImageAlt} className="login-slider-background" src={material.masterImage} />
+          <img alt={dictionary.loginChallengeSliderTileAlt} className="login-slider-tile" src={material.tileImage} style={tileStyle} />
+        </div>
+        <div
+          aria-label={dictionary.loginChallengeSliderTrackLabel}
+          aria-valuemax={Math.round(maxX)}
+          aria-valuemin={0}
+          aria-valuenow={Math.round(boundedTileX)}
+          className={`login-slider-track${dragging ? " dragging" : ""}${proofReady ? " ready" : ""}`}
+          role="slider"
+          style={trackStyle}
+          tabIndex={0}
+          onKeyDown={handleTrackKeyDown}
+          onPointerCancel={handlePointerCancel}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+        >
+          <span aria-hidden className="login-slider-track-fill" style={trackFillStyle} />
+          <span aria-hidden className="login-slider-handle" style={handleStyle}>
+            <LoginOutlined />
+          </span>
+          <span className="login-slider-track-label">
+            {proofReady ? dictionary.loginChallengeSliderComplete : dictionary.loginChallengeSliderInstruction}
+          </span>
+        </div>
+      </div>
+      <CredentialChallengeDebug challenge={challenge} dictionary={dictionary} />
+    </div>
+  );
 }
 
 function CaptchaChallengePayload({
@@ -626,7 +842,10 @@ function CaptchaChallengePayload({
   challenge: CredentialChallengeStartResult;
   dictionary: Dictionary;
 }) {
-  const imageSource = challengeStringParameter(challenge, "imageUrl") || challengeStringParameter(challenge, "imageData");
+  const imageSource =
+    challengeStringParameter(challenge, "imageUrl") ||
+    challengeStringParameter(challenge, "imageData") ||
+    challengeStringParameter(challenge, "image");
   const displayText = challengeStringParameter(challenge, "displayText") || challengeStringParameter(challenge, "display");
   return (
     <div className="login-challenge-prompt">
@@ -679,14 +898,31 @@ function CredentialChallengeDebug({
     return null;
   }
   const debugText = challengeStringParameter(challenge, "text");
+  if (!debugText) {
+    return null;
+  }
   return (
     <div className="login-challenge-debug">
-      {debugText ? <Typography.Text code>{dictionary.loginChallengeDebugText.replace("{text}", debugText)}</Typography.Text> : null}
-      {challenge.debugProof ? (
-        <Typography.Text code>{dictionary.loginChallengeDebugProof.replace("{proof}", challenge.debugProof)}</Typography.Text>
-      ) : null}
+      <Typography.Text code>{dictionary.loginChallengeDebugText.replace("{text}", debugText)}</Typography.Text>
     </div>
   );
+}
+
+async function startLoginCredentialChallenge() {
+  let sliderError: unknown;
+  try {
+    const sliderChallenge = await startCredentialChallenge({ kind: "slider", purpose: "login" });
+    if (!challengeNeedsCaptchaFallback(sliderChallenge)) {
+      return sliderChallenge;
+    }
+  } catch (nextError) {
+    sliderError = nextError;
+  }
+  try {
+    return await startCredentialChallenge({ kind: "captcha", purpose: "login" });
+  } catch (captchaError) {
+    throw captchaError instanceof Error ? captchaError : sliderError ?? captchaError;
+  }
 }
 
 function credentialChallengeRequest(challenge: CredentialChallengeStartResult | null, proof: string | undefined) {
@@ -704,9 +940,62 @@ function challengeStringParameter(challenge: CredentialChallengeStartResult, key
   return typeof value === "string" && value.trim() !== "" ? value : "";
 }
 
+function challengeNumberParameter(challenge: CredentialChallengeStartResult, key: string) {
+  const value = challenge.parameters?.[key];
+  const numberValue = typeof value === "number" ? value : Number(String(value ?? "").trim());
+  return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
+function challengeNeedsCaptchaFallback(challenge: CredentialChallengeStartResult) {
+  return challenge.kind === "slider" && !sliderChallengeMaterial(challenge);
+}
+
+function sliderChallengeMaterial(challenge: CredentialChallengeStartResult | null): SliderChallengeMaterial | null {
+  if (!challenge || challenge.kind !== "slider") return null;
+  const masterImage = challengeStringParameter(challenge, "masterImage");
+  const tileImage = challengeStringParameter(challenge, "tileImage");
+  const imageWidth = Math.round(challengeNumberParameter(challenge, "imageWidth"));
+  const imageHeight = Math.round(challengeNumberParameter(challenge, "imageHeight"));
+  const tileWidth = Math.round(challengeNumberParameter(challenge, "tileWidth"));
+  const tileHeight = Math.round(challengeNumberParameter(challenge, "tileHeight"));
+  if (!masterImage || !tileImage || imageWidth <= 0 || imageHeight <= 0 || tileWidth <= 0 || tileHeight <= 0) {
+    return null;
+  }
+  if (tileWidth > imageWidth || tileHeight > imageHeight) {
+    return null;
+  }
+  return {
+    masterImage,
+    tileImage,
+    imageWidth,
+    imageHeight,
+    tileWidth,
+    tileHeight,
+    initialX: clampNumber(challengeNumberParameter(challenge, "tileX"), 0, imageWidth - tileWidth),
+    tileY: clampNumber(challengeNumberParameter(challenge, "tileY"), 0, imageHeight - tileHeight),
+  };
+}
+
+function pointerTileX(clientX: number, stage: HTMLDivElement | null, material: SliderChallengeMaterial, maxX: number) {
+  if (!stage) return 0;
+  const rect = stage.getBoundingClientRect();
+  if (rect.width <= 0) return 0;
+  const imageX = (clientX - rect.left) * (material.imageWidth / rect.width);
+  return clampNumber(imageX - material.tileWidth / 2, 0, maxX);
+}
+
+function formatSliderChallengeProof(proofX: number, proofY: number) {
+  return `x=${proofX}&y=${proofY}`;
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(Math.max(value, min), max);
+}
+
 function challengeDebugVisible(challenge: CredentialChallengeStartResult) {
   if (challenge.debugVisible === true) return true;
-  const value = challenge.parameters?.debugVisible ?? challenge.parameters?.showDebugProof ?? challenge.parameters?.debugProofVisible;
+  const value = challenge.parameters?.debugVisible;
   return value === true || value === "true";
 }
 
