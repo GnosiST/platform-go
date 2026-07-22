@@ -15,5 +15,9 @@
     "prism-react-renderer": "^2.4.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
+  },
+  "overrides": {
+    "fast-uri": "3.1.4",
+    "serialize-javascript": "7.0.5"
   }
 }

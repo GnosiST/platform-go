@@ -152,7 +152,7 @@ describe("role workbench redesign contracts", () => {
     const transfer = source("admin/src/platform/ui/PlatformTreeTransfer.tsx");
 
     assert.match(primitives, /export function AdminModal/);
-    assert.match(primitives, /return <AdminModal className=\{cx\("admin-form-modal"/);
+    assert.match(primitives, /return \(\s*<AdminModal\s+className=\{cx\("admin-form-modal"/);
     assert.match(role, /<AdminModal/);
     assert.doesNotMatch(role, /<Modal/);
     assert.doesNotMatch(transfer, /visibleCheckedKeys/);
@@ -161,7 +161,7 @@ describe("role workbench redesign contracts", () => {
   it("keeps desktop tracks readable and mobile transfer controls stable", () => {
     const styles = source("admin/src/styles.css");
 
-    assert.match(styles, /grid-template-columns: clamp\(320px, 32vw, 440px\) minmax\(0, 1fr\);/);
+    assert.match(styles, /grid-template-columns: clamp\(360px, 36vw, 520px\) minmax\(0, 1fr\);/);
     assert.match(styles, /\.role-governance-detail-focus-target,[\s\S]*?min-height: 360px;/);
     assert.match(styles, /\.admin-tree-workbench-node-label,[\s\S]*?overflow-wrap: anywhere;[\s\S]*?white-space: normal;/);
     assert.match(styles, /@media \(min-width: 1024px\)[\s\S]*?\.admin-tree-workbench-detail[\s\S]*?position: sticky;/);

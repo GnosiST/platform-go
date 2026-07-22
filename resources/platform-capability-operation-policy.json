@@ -252,6 +252,14 @@
       "reason": "Job ledgers are optional platform records; worker engines attach separately."
     },
     {
+      "id": "credential-auth",
+      "installMode": "profile-only",
+      "disableMode": "config-remove-retain-data",
+      "uninstallMode": "disable-only-retain-data",
+      "dataAfterDisable": "retained-unreachable",
+      "reason": "Local credential providers, challenges and settings are enabled only by the credential-auth profile; disabling removes their routes, providers and resources after restart while retained credential records stay unreachable."
+    },
+    {
       "id": "policy-review",
       "installMode": "profile-only",
       "disableMode": "config-remove-retain-data",

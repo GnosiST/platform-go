@@ -32,8 +32,8 @@ describe("role management navigation integration", () => {
 
   it("keeps every shell-owned visible navigation surface on its projected resources prop", () => {
     assert.match(shell, /new Map\(resources\.map/);
-    assert.match(shell, /resources\.filter\(\(resource\) => resource\.group === group\)/);
-    assert.match(shell, /return resources\.filter\(\(resource\) =>/);
+    assert.match(shell, /navigationResources\.filter\(\(resource\) => resource\.group === group\)/);
+    assert.match(shell, /return navigationResources\.filter\(\(resource\) =>/);
     assert.match(shell, /buildNavigationTree\(group\.resources,/);
   });
 
