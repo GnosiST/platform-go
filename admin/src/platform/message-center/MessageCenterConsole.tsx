@@ -9,11 +9,12 @@ import {
   SettingOutlined,
   WechatOutlined,
 } from "@ant-design/icons";
-import { App, Button, Descriptions, Empty, Form, Input, Select, Space, Tabs, Tag, Tooltip, Typography } from "antd";
+import { App, Button, Descriptions, Empty, Form, Input, Select, Space, Tabs, Tag, Timeline, Tooltip, Typography } from "antd";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AdminAPIError,
   queryAdminResource,
+  retryMessageCenterDelivery,
   runMessageCenterDeliveries,
   testSendMessageCenter,
   type AdminResourceRecord,
@@ -103,6 +104,10 @@ type MessageCenterTestSendForm = {
   body: string;
 };
 
+type MessageCenterRetryForm = {
+  recipient: string;
+};
+
 const PAGE_SIZE = 200;
 
 const resourceConfigs: MessageCenterResourceConfig[] = [
@@ -153,6 +158,7 @@ const resourceConfigs: MessageCenterResourceConfig[] = [
 export function MessageCenterConsole({ language, dictionary, resources, onRouteChange }: MessageCenterConsoleProps) {
   const { message: toast } = App.useApp();
   const [testSendForm] = Form.useForm<MessageCenterTestSendForm>();
+  const [retryForm] = Form.useForm<MessageCenterRetryForm>();
   const [records, setRecords] = useState<MessageCenterRecords>(() => emptyMessageCenterRecords());
   const [errors, setErrors] = useState<MessageCenterErrors>({});
   const [loading, setLoading] = useState(true);
@@ -162,6 +168,8 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
   const [deliveryRunSubmitting, setDeliveryRunSubmitting] = useState(false);
   const [deliveryRunResult, setDeliveryRunResult] = useState<MessageCenterDeliveriesRunResult | null>(null);
   const [deliveryDetailRecord, setDeliveryDetailRecord] = useState<AdminResourceRecord | null>(null);
+  const [retryRecord, setRetryRecord] = useState<AdminResourceRecord | null>(null);
+  const [retrySubmitting, setRetrySubmitting] = useState(false);
   const resourceRoutes = useMemo(() => new Set(resources.map((resource) => resource.route)), [resources]);
   const availableConfigs = useMemo(
     () => resourceConfigs.filter((config) => resourceRoutes.has(config.route)),
@@ -237,6 +245,33 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
       setDeliveryRunSubmitting(false);
     }
   };
+  const openRetryDelivery = (record: AdminResourceRecord) => {
+    setRetryRecord(record);
+    retryForm.setFieldsValue({ recipient: "" });
+  };
+  const closeRetryDelivery = () => {
+    if (retrySubmitting) {
+      return;
+    }
+    setRetryRecord(null);
+  };
+  const submitRetryDelivery = async () => {
+    if (!retryRecord) {
+      return;
+    }
+    const values = await retryForm.validateFields();
+    setRetrySubmitting(true);
+    try {
+      await retryMessageCenterDelivery(retryRecord.id, { recipient: values.recipient });
+      toast.success(dictionary.messageCenterRetryQueued);
+      setRetryRecord(null);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : dictionary.messageCenterRetryFailed);
+    } finally {
+      setRetrySubmitting(false);
+    }
+  };
   const errorMessages = Object.entries(errors).filter(([, message]) => Boolean(message));
 
   return (
@@ -294,6 +329,7 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
             attempted: String(deliveryRunResult.attempted),
             delivered: String(deliveryRunResult.delivered),
             failed: String(deliveryRunResult.failed),
+            deferred: String(deliveryRunResult.deferred ?? 0),
             skipped: String(deliveryRunResult.skipped),
           })}
         />
@@ -363,6 +399,7 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
                 onOpen={() => openResource(config)}
                 onTestSend={(record) => openTestSend(record, config)}
                 onInspectDelivery={(record) => setDeliveryDetailRecord(record)}
+                onRetryDelivery={openRetryDelivery}
               />
             ),
           }))}
@@ -431,6 +468,28 @@ export function MessageCenterConsole({ language, dictionary, resources, onRouteC
           />
         ) : null}
       </AdminFormModal>
+      <AdminFormModal
+        open={Boolean(retryRecord)}
+        destroyOnHidden={false}
+        preset="form"
+        title={dictionary.messageCenterRetryDeliveryTitle}
+        okText={dictionary.messageCenterRetryDelivery}
+        cancelText={dictionary.cancel}
+        confirmLoading={retrySubmitting}
+        onCancel={closeRetryDelivery}
+        onOk={() => void submitRetryDelivery()}
+      >
+        <AdminFeedback
+          type="info"
+          message={dictionary.messageCenterRetryRecipientRequired}
+          description={dictionary.messageCenterRetryRecipientDescription}
+        />
+        <Form form={retryForm} layout="vertical" requiredMark={false}>
+          <Form.Item label={dictionary.messageCenterRecipient} name="recipient" rules={[{ required: true }]}>
+            <Input placeholder={dictionary.messageCenterRecipientPlaceholder} />
+          </Form.Item>
+        </Form>
+      </AdminFormModal>
       <MessageCenterDeliveryDetailModal
         dictionary={dictionary}
         language={language}
@@ -451,6 +510,7 @@ function MessageCenterTab({
   onOpen,
   onTestSend,
   onInspectDelivery,
+  onRetryDelivery,
 }: {
   config: MessageCenterResourceConfig;
   dictionary: Dictionary;
@@ -460,6 +520,7 @@ function MessageCenterTab({
   onOpen: () => void;
   onTestSend: (record: AdminResourceRecord) => void;
   onInspectDelivery: (record: AdminResourceRecord) => void;
+  onRetryDelivery: (record: AdminResourceRecord) => void;
 }) {
   return (
     <AdminListPanel
@@ -488,6 +549,11 @@ function MessageCenterTab({
             {config.key === "deliveries" ? (
               <Button size="small" type="text" onClick={() => onInspectDelivery(record)}>
                 {dictionary.messageCenterDeliveryDetail}
+              </Button>
+            ) : null}
+            {config.key === "deliveries" && canRetryDelivery(record) ? (
+              <Button icon={<ReloadOutlined />} size="small" type="text" onClick={() => onRetryDelivery(record)}>
+                {dictionary.messageCenterRetryDelivery}
               </Button>
             ) : null}
             {config.key === "providers" ? (
@@ -578,6 +644,10 @@ function MessageCenterDeliveryDetailModal({
             <Descriptions.Item label={dictionary.messageCenterAttempts}>{valueOf(record, "attempts") || "0"}</Descriptions.Item>
             <Descriptions.Item label={dictionary.messageCenterLastAttempt}>{valueOf(record, "lastAttemptAt") || "-"}</Descriptions.Item>
             <Descriptions.Item label={dictionary.messageCenterProviderMessageId}>{valueOf(record, "providerMessageId") || "-"}</Descriptions.Item>
+            <Descriptions.Item label={dictionary.messageCenterNextRetry}>{valueOf(record, "nextRetryAt") || "-"}</Descriptions.Item>
+            <Descriptions.Item label={dictionary.messageCenterRetryBackoff}>
+              {retryBackoffLabel(valueOf(record, "retryBackoffSeconds"), dictionary)}
+            </Descriptions.Item>
             <Descriptions.Item label={dictionary.messageCenterRuntimeCapability}>
               {deliveryRuntimeCapability(record, records, dictionary)}
             </Descriptions.Item>
@@ -593,11 +663,35 @@ function MessageCenterDeliveryDetailModal({
           </Descriptions>
           <div className="message-center-detail-section">
             <Typography.Text strong>{dictionary.messageCenterPolicyHits}</Typography.Text>
+            <Typography.Text type="secondary">{dictionary.messageCenterPolicyHitDescription}</Typography.Text>
             <Space size={6} wrap>
               {policies.length > 0 ? policies.map((policy) => (
                 <Tag key={policy.id || policy.code}>{localizedName(policy, language)} · {policyLimitLabel(policy, dictionary)}</Tag>
               )) : <Tag>{dictionary.messageCenterNoPolicyHit}</Tag>}
             </Space>
+          </div>
+          <div className="message-center-detail-section">
+            <Typography.Text strong>{dictionary.messageCenterSendLog}</Typography.Text>
+            <Descriptions bordered column={{ xs: 1, md: 2 }} size="small">
+              <Descriptions.Item label={dictionary.messageCenterProviderStatus}>{valueOf(record, "providerStatus") || "-"}</Descriptions.Item>
+              <Descriptions.Item label={dictionary.messageCenterRetryRequestedAt}>{valueOf(record, "retryRequestedAt") || "-"}</Descriptions.Item>
+              <Descriptions.Item label={dictionary.loggingCenterRequestId}>{valueOf(record, "requestId") || "-"}</Descriptions.Item>
+              <Descriptions.Item label={dictionary.loggingCenterTraceId}>{valueOf(record, "traceId") || "-"}</Descriptions.Item>
+            </Descriptions>
+          </div>
+          <div className="message-center-detail-section">
+            <Typography.Text strong>{dictionary.messageCenterDeliveryTimeline}</Typography.Text>
+            <Timeline
+              items={deliveryTimelineItems(record, dictionary).map((item) => ({
+                color: item.color,
+                children: (
+                  <Space size={8} wrap>
+                    <Typography.Text>{item.label}</Typography.Text>
+                    <Typography.Text type="secondary">{item.value}</Typography.Text>
+                  </Space>
+                ),
+              }))}
+            />
           </div>
           <div className="message-center-detail-section">
             <Typography.Text strong>{dictionary.messageCenterTemplateParamKeys}</Typography.Text>
@@ -740,6 +834,14 @@ function columnsFor(key: MessageCenterResourceKey, dictionary: Dictionary, langu
       valueColumn("channel", dictionary.messageCenterChannel, 130),
       valueColumn("deliveryStatus", dictionary.messageCenterDeliveryStatus, 150),
       valueColumn("lastAttemptAt", dictionary.messageCenterLastAttempt, 180),
+      valueColumn("nextRetryAt", dictionary.messageCenterNextRetry, 180),
+      {
+        title: dictionary.messageCenterRetryBackoff,
+        key: "retryBackoffSeconds",
+        width: 150,
+        priority: "standard",
+        render: (_value, record) => retryBackoffLabel(valueOf(record, "retryBackoffSeconds"), dictionary),
+      },
       valueColumn("errorMessage", dictionary.messageCenterErrorMessage, 260),
     ];
   }
@@ -881,7 +983,7 @@ function supportsTrialEntry(key: MessageCenterResourceKey) {
 }
 
 function messageCenterRowActionsWidth(key: MessageCenterResourceKey) {
-  if (key === "deliveries") return 190;
+  if (key === "deliveries") return 250;
   return supportsTrialEntry(key) || key === "providers" ? 220 : 112;
 }
 
@@ -1016,7 +1118,64 @@ function policyLimitLabel(policy: AdminResourceRecord, dictionary: Dictionary) {
   return formatTemplate(dictionary.messageCenterPolicyLimitSummary, {
     attempts: valueOf(policy, "maxAttempts") || "-",
     rate: valueOf(policy, "rateLimitPerMinute") || "-",
+    retry: retryBackoffLabel(valueOf(policy, "retryIntervalSeconds"), dictionary),
+    quiet: valueOf(policy, "quietHours") || dictionary.no,
   });
+}
+
+function canRetryDelivery(record: AdminResourceRecord) {
+  return valueOf(record, "deliveryStatus") === "failed";
+}
+
+function retryBackoffLabel(rawSeconds: string, dictionary: Dictionary) {
+  const seconds = Number.parseInt(rawSeconds.trim(), 10);
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return "-";
+  }
+  if (seconds < 60) {
+    return formatTemplate(dictionary.messageCenterRetryBackoffSeconds, { seconds: String(seconds) });
+  }
+  const minutes = Math.round(seconds / 60);
+  return formatTemplate(dictionary.messageCenterRetryBackoffMinutes, { minutes: String(minutes) });
+}
+
+function deliveryTimelineItems(record: AdminResourceRecord, dictionary: Dictionary) {
+  const items: Array<{ key: string; label: string; value: string; color: string }> = [
+    {
+      key: "created",
+      label: dictionary.messageCenterTimelineCreated,
+      value: record.updatedAt || "-",
+      color: "blue",
+    },
+    {
+      key: "lastAttempt",
+      label: dictionary.messageCenterTimelineAttempted,
+      value: valueOf(record, "lastAttemptAt") || "-",
+      color: valueOf(record, "lastAttemptAt") ? "blue" : "gray",
+    },
+    {
+      key: "nextRetry",
+      label: dictionary.messageCenterTimelineNextRetry,
+      value: valueOf(record, "nextRetryAt") || "-",
+      color: valueOf(record, "nextRetryAt") ? "orange" : "gray",
+    },
+    {
+      key: "delivered",
+      label: dictionary.messageCenterTimelineDelivered,
+      value: valueOf(record, "deliveredAt") || "-",
+      color: valueOf(record, "deliveredAt") ? "green" : "gray",
+    },
+  ];
+  const retryRequestedAt = valueOf(record, "retryRequestedAt");
+  if (retryRequestedAt) {
+    items.splice(2, 0, {
+      key: "retryRequested",
+      label: dictionary.messageCenterTimelineRetryRequested,
+      value: retryRequestedAt,
+      color: "blue",
+    });
+  }
+  return items;
 }
 
 function deliveryRuntimeCapability(record: AdminResourceRecord, records: MessageCenterRecords, dictionary: Dictionary) {

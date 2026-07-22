@@ -120,6 +120,49 @@ func TestDeliveryWorkerSkipsPendingDeliveryWhenPolicyGateDenies(t *testing.T) {
 	}
 }
 
+func TestDeliveryWorkerDefersPendingDeliveryUntilNextRetry(t *testing.T) {
+	store := notificationWorkerTestStore(t)
+	notice := createNotificationWorkerNotice(t, store, map[string]string{
+		"tenantCode": "platform",
+		"category":   "login",
+		"payload":    `{"templateId":"SMS_LOGIN"}`,
+	})
+	nextRetryAt := time.Date(2026, 7, 19, 12, 3, 0, 0, time.UTC)
+	delivery := createNotificationWorkerDelivery(t, store, map[string]string{
+		"tenantCode":       "platform",
+		"notificationCode": notice.Code,
+		"channel":          ChannelSMS,
+		"deliveryStatus":   DeliveryStatusPending,
+		"target":           "+8613800000000",
+		"provider":         SMSProviderMockLocal,
+		"attempts":         "1",
+		"nextRetryAt":      nextRetryAt.Format(time.RFC3339),
+	})
+	sender := NewMockLocalSMSSender()
+	worker := NewDeliveryWorker(store, DeliveryWorkerOptions{
+		SMSSenders: map[string]SMSSender{SMSProviderMockLocal: sender},
+		Now:        func() time.Time { return nextRetryAt.Add(-time.Minute) },
+	})
+
+	result, err := worker.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if result.Attempted != 0 || result.Delivered != 0 || result.Failed != 0 || result.Deferred != 1 {
+		t.Fatalf("RunOnce() result = %+v, want one deferred pending delivery", result)
+	}
+	if len(sender.Sent()) != 0 {
+		t.Fatalf("sent messages = %+v, want no SMS before next retry", sender.Sent())
+	}
+	updated, err := store.InternalRecord("notification-deliveries", delivery.ID)
+	if err != nil {
+		t.Fatalf("InternalRecord(notification-deliveries) error = %v", err)
+	}
+	if updated.Values["deliveryStatus"] != DeliveryStatusPending || updated.Values["attempts"] != "1" || updated.Values["nextRetryAt"] != nextRetryAt.Format(time.RFC3339) {
+		t.Fatalf("updated delivery values = %+v, want untouched deferred delivery", updated.Values)
+	}
+}
+
 func TestDeliveryWorkerUsesVendorDryRunSender(t *testing.T) {
 	store := notificationWorkerTestStore(t)
 	notice := createNotificationWorkerNotice(t, store, map[string]string{
@@ -325,7 +368,9 @@ func TestDeliveryWorkerMarksFailedDeliveryWithRedactedTarget(t *testing.T) {
 		updated.Values["requestId"] != "req_fedcba98765432100123456789abcdef" ||
 		updated.Values["traceId"] != "5bf92f3577b34da6a3ce929d0e0e4737" ||
 		updated.Values["providerMessageId"] != "" ||
-		updated.Values["errorMessage"] != "notification delivery failed" {
+		updated.Values["errorMessage"] != "notification delivery failed" ||
+		updated.Values["retryBackoffSeconds"] != "60" ||
+		updated.Values["nextRetryAt"] == "" {
 		t.Fatalf("updated delivery values = %+v, want failed redacted ledger", updated.Values)
 	}
 	assertDeliveryLedgerValuesDoNotLeak(t, updated.Values, "+8613800000000", "123456", "provider rejected")

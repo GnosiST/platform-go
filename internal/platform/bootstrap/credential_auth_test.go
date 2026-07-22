@@ -2,9 +2,11 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/GnosiST/platform-go/internal/platform/adminresource"
 	"github.com/GnosiST/platform-go/internal/platform/config"
@@ -78,6 +80,37 @@ func TestCredentialAuthRuntimeFromConfigKeepsUsernamePrincipalWithoutResources(t
 	}
 	if login.Principal.Type != credentialauth.PrincipalTypeAdmin || login.Principal.ID != "admin" {
 		t.Fatalf("VerifyPassword principal = %+v, want username fallback principal", login.Principal)
+	}
+}
+
+func TestCredentialAuthRuntimeFromConfigAppliesDesiredStateLimits(t *testing.T) {
+	cfg := config.Load()
+	cfg.Capabilities = append(cfg.Capabilities, "notification", "credential-auth")
+	cfg.CredentialAuthUsernamePassword = true
+	cfg.CredentialAuthIdentifierHMACKey = strings.Repeat("i", 32)
+	cfg.CredentialAuthBootstrapAdminUsername = "admin"
+	cfg.CredentialAuthBootstrapAdminPassword = "correct-password"
+	cfg.CredentialAuthPasswordMaxAttempts = 2
+	cfg.CredentialAuthPasswordLock = 90 * time.Second
+	cfg.CredentialAuthSMSOTPTTL = 2 * time.Minute
+	cfg.CredentialAuthSMSOTPMaxAttempts = 3
+	cfg.CredentialAuthChallengeKind = "slider"
+
+	runtime, err := CredentialAuthRuntimeFromConfig(context.Background(), cfg, NotificationSMSRuntime{})
+	if err != nil {
+		t.Fatalf("CredentialAuthRuntimeFromConfig() error = %v", err)
+	}
+	if runtime.SMSOTPTTL != 2*time.Minute || runtime.MaxSMSOTPAttempts != 3 || runtime.LoginChallengeKind != credentialauth.ChallengeKindSlider {
+		t.Fatalf("credential auth runtime policy = %+v, want desired SMS and challenge settings", runtime)
+	}
+	identifier := credentialauth.Identifier{Type: credentialauth.IdentifierTypeUsername, Value: "admin"}
+	for attempt := 0; attempt < 2; attempt++ {
+		if _, err := runtime.Service.VerifyPassword(context.Background(), credentialauth.PasswordLoginInput{Identifier: identifier, Secret: "wrong"}); !errors.Is(err, credentialauth.ErrCredentialRejected) {
+			t.Fatalf("failed attempt %d error = %v, want credential rejection", attempt+1, err)
+		}
+	}
+	if _, err := runtime.Service.VerifyPassword(context.Background(), credentialauth.PasswordLoginInput{Identifier: identifier, Secret: "correct-password"}); !errors.Is(err, credentialauth.ErrCredentialLocked) {
+		t.Fatalf("locked credential error = %v, want configured lock", err)
 	}
 }
 

@@ -32,9 +32,9 @@ func securityHeaders(options SecurityOptions) gin.HandlerFunc {
 		ctx.Header("X-Frame-Options", "DENY")
 		ctx.Header("Referrer-Policy", "no-referrer")
 
-		loopbackHealth := isLoopbackHealthRequest(ctx.Request)
-		secure := !loopbackHealth && requestUsesHTTPS(ctx.Request, trusted)
-		if options.RequireHTTPS && !secure && !loopbackHealth {
+		loopbackProbe := isLoopbackProbeRequest(ctx.Request)
+		secure := !loopbackProbe && requestUsesHTTPS(ctx.Request, trusted)
+		if options.RequireHTTPS && !secure && !loopbackProbe {
 			ctx.Redirect(http.StatusPermanentRedirect, publicBaseURL+ctx.Request.URL.RequestURI())
 			ctx.Abort()
 			return
@@ -95,8 +95,8 @@ func requestHasBody(request *http.Request) bool {
 	return request.Body != nil && request.Body != http.NoBody && request.ContentLength != 0
 }
 
-func isLoopbackHealthRequest(request *http.Request) bool {
-	if request.TLS != nil || request.Method != http.MethodGet || request.URL.Path != "/api/health" {
+func isLoopbackProbeRequest(request *http.Request) bool {
+	if request.TLS != nil || request.Method != http.MethodGet || (request.URL.Path != "/api/health" && request.URL.Path != "/api/ready") {
 		return false
 	}
 	peer, ok := directPeerAddress(request.RemoteAddr)

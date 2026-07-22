@@ -1,12 +1,28 @@
 import { ApiOutlined, BellOutlined, BgColorsOutlined, CheckCircleOutlined, DatabaseOutlined, LockOutlined, ReloadOutlined, SettingOutlined } from "@ant-design/icons";
-import { Button, Empty, Space, Tag, Typography } from "antd";
+import { Button, Empty, Form, Input, InputNumber, Select, Space, Switch, Tag, Typography } from "antd";
+import type { FormInstance } from "antd";
+import type { Rule } from "antd/es/form";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { getAdminSettingsRuntime, type AdminResourceRecord, type AdminSettingsResourceItem } from "../api/client";
+import {
+  getAdminSettingsRuntime,
+  testConnectAdminSettingsResource,
+  updateAdminSettingsResource,
+  validateAdminSettingsResourceConfig,
+  type AdminResourceField,
+  type AdminResourceRecord,
+  type AdminResourceSchema,
+  type AdminSettingsConfigCheck,
+  type AdminSettingsUpdateInput,
+  type AdminSettingsResourceItem,
+  type AdminSettingsTestConnectionResult,
+  type AdminSettingsValidationResult,
+} from "../api/client";
 import type { Dictionary, Language } from "../i18n";
 import {
   AdminActionButton,
   AdminFeedback,
   AdminListPanel,
+  AdminModal,
   AdminMetricStrip,
   AdminPage,
   PlatformDataTable,
@@ -34,6 +50,7 @@ type SettingsResourceConfig = {
   source: "catalog" | "manifest";
   order: number;
   records: AdminResourceRecord[];
+  schema: AdminResourceSchema;
   recordCount: number;
   enabledCount: number;
   writable: boolean;
@@ -46,6 +63,12 @@ type SettingsResourceConfig = {
 
 type SettingsResourceGroup = "core" | "message" | "capability";
 type SettingsErrorState = Partial<Record<string, string>>;
+type SettingsFormValue = string | number | boolean | string[] | undefined;
+type SettingsFormValues = Record<string, SettingsFormValue>;
+type SettingsOperationResult =
+  | { kind: "save"; message: string; restartRequired: boolean; pendingRestart: boolean; checks?: AdminSettingsConfigCheck[] }
+  | { kind: "validate"; result: AdminSettingsValidationResult }
+  | { kind: "test"; result: AdminSettingsTestConnectionResult };
 
 type KnownSettingsResourceConfig = {
   route: string;
@@ -124,12 +147,28 @@ const knownSettingsResourceCatalog: KnownSettingsResourceConfig[] = [
 ];
 
 export function SettingsCenterConsole({ language, dictionary, resources, onRouteChange }: SettingsCenterConsoleProps) {
+  const [form] = Form.useForm<SettingsFormValues>();
   const [runtimeItems, setRuntimeItems] = useState<AdminSettingsResourceItem[]>([]);
   const [errors, setErrors] = useState<SettingsErrorState>({});
   const [loading, setLoading] = useState(true);
+  const [activeConfigKey, setActiveConfigKey] = useState<string | null>(null);
+  const [activeRecordID, setActiveRecordID] = useState<string | null>(null);
+  const [modalError, setModalError] = useState("");
+  const [operationResult, setOperationResult] = useState<SettingsOperationResult | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
   const availableConfigs = useMemo(
     () => projectSettingsResourceConfigs(runtimeItems, resources, dictionary, language),
     [dictionary, language, resources, runtimeItems],
+  );
+  const activeConfig = useMemo(
+    () => availableConfigs.find((config) => config.key === activeConfigKey) ?? null,
+    [activeConfigKey, availableConfigs],
+  );
+  const activeRecord = useMemo(
+    () => activeConfig?.records.find((record) => record.id === activeRecordID) ?? activeConfig?.records[0] ?? null,
+    [activeConfig, activeRecordID],
   );
   const rows = useMemo(
     () => availableConfigs.map((config) => settingsRow(config, dictionary)),
@@ -167,6 +206,85 @@ export function SettingsCenterConsole({ language, dictionary, resources, onRoute
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!activeConfig || !activeRecord) return;
+    setActiveRecordID(activeRecord.id);
+    form.setFieldsValue(settingsFormInitialValues(activeRecord, activeConfig.schema?.fields ?? []));
+    setModalError("");
+    setOperationResult(null);
+  }, [activeConfig, activeRecord, form]);
+
+  const openConfig = useCallback((config: SettingsResourceConfig) => {
+    const firstRecord = config.records[0] ?? null;
+    setActiveConfigKey(config.key);
+    setActiveRecordID(firstRecord?.id ?? null);
+    setModalError("");
+    setOperationResult(null);
+  }, []);
+
+  const closeConfig = useCallback(() => {
+    setActiveConfigKey(null);
+    setActiveRecordID(null);
+    setModalError("");
+    setOperationResult(null);
+    form.resetFields();
+  }, [form]);
+
+  const saveActiveConfig = useCallback(async () => {
+    if (!activeConfig || !activeRecord) return;
+    setSaving(true);
+    setModalError("");
+    try {
+      const values = await form.validateFields();
+      const result = await updateAdminSettingsResource(
+        activeConfig.resource,
+        activeRecord.id,
+        settingsUpdateInputFromForm(values, activeRecord, activeConfig.schema?.fields ?? []),
+      );
+      setOperationResult({
+        kind: "save",
+        message: dictionary.settingsCenterSaveSucceeded,
+        restartRequired: result.restartRequired,
+        pendingRestart: result.pendingRestart,
+      });
+      await load();
+      setActiveConfigKey(activeConfig.key);
+      setActiveRecordID(result.record.id);
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : dictionary.saveFailed);
+    } finally {
+      setSaving(false);
+    }
+  }, [activeConfig, activeRecord, dictionary.saveFailed, dictionary.settingsCenterSaveSucceeded, form, load]);
+
+  const validateActiveConfig = useCallback(async () => {
+    if (!activeConfig || !activeRecord) return;
+    setValidating(true);
+    setModalError("");
+    try {
+      const result = await validateAdminSettingsResourceConfig(activeConfig.resource, activeRecord.id);
+      setOperationResult({ kind: "validate", result });
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : dictionary.settingsCenterValidateFailed);
+    } finally {
+      setValidating(false);
+    }
+  }, [activeConfig, activeRecord, dictionary.settingsCenterValidateFailed]);
+
+  const testActiveConfigConnection = useCallback(async () => {
+    if (!activeConfig || !activeRecord) return;
+    setTestingConnection(true);
+    setModalError("");
+    try {
+      const result = await testConnectAdminSettingsResource(activeConfig.resource, activeRecord.id);
+      setOperationResult({ kind: "test", result });
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : dictionary.settingsCenterTestConnectFailed);
+    } finally {
+      setTestingConnection(false);
+    }
+  }, [activeConfig, activeRecord, dictionary.settingsCenterTestConnectFailed]);
 
   const errorMessages = Object.entries(errors).filter(([, message]) => Boolean(message));
 
@@ -220,7 +338,7 @@ export function SettingsCenterConsole({ language, dictionary, resources, onRoute
                   </Space>
                   <div className="settings-center-card-grid">
                     {group.configs.map((config) => (
-                      <button className="settings-center-card" key={config.key} type="button" onClick={() => onRouteChange(config.route)}>
+                      <button className="settings-center-card" key={config.key} type="button" onClick={() => openConfig(config)}>
                         <span className="settings-center-card-icon">{config.icon}</span>
                         <span>
                           <Typography.Text strong>{config.title}</Typography.Text>
@@ -258,16 +376,199 @@ export function SettingsCenterConsole({ language, dictionary, resources, onRoute
           pagination={{ pageSize: 10, total: rows.length }}
           rowActions={(row) => (
             <Space size={6}>
+              <Button size="small" type="text" onClick={() => {
+                const config = availableConfigs.find((item) => item.key === row.key);
+                if (config) openConfig(config);
+              }}>
+                {dictionary.settingsCenterConfigure}
+              </Button>
               <Button size="small" type="text" onClick={() => onRouteChange(row.route)}>
                 {dictionary.settingsCenterManage}
               </Button>
             </Space>
           )}
-          rowActionsColumnWidth={128}
+          rowActionsColumnWidth={168}
           emptyState={<Empty description={dictionary.emptyData} />}
         />
       </AdminListPanel>
+      <SettingsConfigModal
+        activeConfig={activeConfig}
+        activeRecord={activeRecord}
+        dictionary={dictionary}
+        form={form}
+        language={language}
+        modalError={modalError}
+        operationResult={operationResult}
+        saving={saving}
+        validating={validating}
+        testingConnection={testingConnection}
+        onClose={closeConfig}
+        onManage={() => {
+          if (activeConfig) onRouteChange(activeConfig.route);
+        }}
+        onRecordChange={(id) => setActiveRecordID(id)}
+        onSave={() => void saveActiveConfig()}
+        onTestConnection={() => void testActiveConfigConnection()}
+        onValidate={() => void validateActiveConfig()}
+      />
     </AdminPage>
+  );
+}
+
+function SettingsConfigModal({
+  activeConfig,
+  activeRecord,
+  dictionary,
+  form,
+  language,
+  modalError,
+  operationResult,
+  saving,
+  validating,
+  testingConnection,
+  onClose,
+  onManage,
+  onRecordChange,
+  onSave,
+  onTestConnection,
+  onValidate,
+}: {
+  activeConfig: SettingsResourceConfig | null;
+  activeRecord: AdminResourceRecord | null;
+  dictionary: Dictionary;
+  form: FormInstance<SettingsFormValues>;
+  language: Language;
+  modalError: string;
+  operationResult: SettingsOperationResult | null;
+  saving: boolean;
+  validating: boolean;
+  testingConnection: boolean;
+  onClose: () => void;
+  onManage: () => void;
+  onRecordChange: (id: string) => void;
+  onSave: () => void;
+  onTestConnection: () => void;
+  onValidate: () => void;
+}) {
+  const fields = useMemo(() => settingsFormFields(activeConfig), [activeConfig]);
+  const open = Boolean(activeConfig);
+  return (
+    <AdminModal
+      className="settings-config-modal"
+      footer={(
+        <Space size={8} wrap>
+          <Button onClick={onClose}>{dictionary.cancel}</Button>
+          <Button onClick={onManage}>{dictionary.settingsCenterManage}</Button>
+          <Button disabled={!activeRecord} loading={validating} onClick={onValidate}>
+            {dictionary.settingsCenterValidate}
+          </Button>
+          <Button disabled={!activeRecord} loading={testingConnection} onClick={onTestConnection}>
+            {dictionary.settingsCenterTestConnect}
+          </Button>
+          <Button disabled={!activeConfig?.writable || !activeRecord} loading={saving} type="primary" onClick={onSave}>
+            {dictionary.save}
+          </Button>
+        </Space>
+      )}
+      open={open}
+      preset="form"
+      size="xl"
+      title={activeConfig?.title ?? dictionary.settingsCenterConfigure}
+      onCancel={onClose}
+    >
+      {!activeConfig ? null : (
+        <Space className="settings-config-modal-stack" direction="vertical" size={12}>
+          <div className="settings-config-modal-summary">
+            <span className="settings-center-card-icon">{activeConfig.icon}</span>
+            <div>
+              <Typography.Text strong>{activeConfig.title}</Typography.Text>
+              <Typography.Text type="secondary">{activeConfig.description}</Typography.Text>
+              <Typography.Text className="secondary-text" code>{activeConfig.resource}</Typography.Text>
+            </div>
+            <Space size={6} wrap>
+              <Tag>{activeConfig.capability}</Tag>
+              <Tag color={activeConfig.writable ? "success" : "default"}>{activeConfig.writable ? dictionary.writable : dictionary.readOnly}</Tag>
+              <Tag color={activeConfig.pendingRestart ? "warning" : activeConfig.restartRequired ? "default" : "success"}>
+                {settingsApplyModeLabel(activeConfig, dictionary)}
+              </Tag>
+            </Space>
+          </div>
+          {activeConfig.records.length > 1 ? (
+            <div className="settings-config-record-selector">
+              <Typography.Text type="secondary">{dictionary.settingsCenterRecord}</Typography.Text>
+              <Select
+                value={activeRecord?.id}
+                options={activeConfig.records.map((record) => ({
+                  value: record.id,
+                  label: `${record.name || record.code || record.id} (${record.status})`,
+                }))}
+                onChange={onRecordChange}
+              />
+            </div>
+          ) : null}
+          {modalError ? <AdminFeedback type="error" message={dictionary.settingsCenterOperationFailed} description={modalError} /> : null}
+          {operationResult ? <SettingsOperationResultPanel dictionary={dictionary} result={operationResult} /> : null}
+          {activeRecord && fields.length > 0 ? (
+            <Form className="settings-config-form" form={form} layout="vertical">
+              <div className="settings-config-form-grid">
+                {fields.map((field) => (
+                  <Form.Item
+                    extra={localizedText(field.help, language, "")}
+                    key={field.key}
+                    label={localizedText(field.label, language, field.key)}
+                    name={field.key}
+                    rules={settingsFieldRules(field, dictionary, language)}
+                    valuePropName={field.type === "switch" ? "checked" : undefined}
+                  >
+                    {settingsFieldControl(field, dictionary, language)}
+                  </Form.Item>
+                ))}
+              </div>
+            </Form>
+          ) : (
+            <Empty description={activeRecord ? dictionary.settingsCenterNoEditableFields : dictionary.settingsCenterNoRecords} />
+          )}
+        </Space>
+      )}
+    </AdminModal>
+  );
+}
+
+function SettingsOperationResultPanel({ dictionary, result }: { dictionary: Dictionary; result: SettingsOperationResult }) {
+  if (result.kind === "save") {
+    return (
+      <AdminFeedback
+        type="success"
+        message={result.message}
+        description={result.pendingRestart ? dictionary.restartPending : result.restartRequired ? dictionary.settingsCenterRestartApplyMode : dictionary.settingsCenterDynamicApplyMode}
+      />
+    );
+  }
+  const payload = result.result;
+  return (
+    <AdminFeedback
+      type={payload.status === "invalid" ? "warning" : "success"}
+      message={result.kind === "validate" ? dictionary.settingsCenterValidationResult : dictionary.settingsCenterTestConnectResult}
+      description={(
+        <div className="settings-config-checks">
+          <Space size={6} wrap>
+            <Tag color={payload.status === "invalid" ? "warning" : payload.status === "unsupported" ? "default" : "success"}>{payload.status}</Tag>
+            {"connected" in payload ? <Tag color={payload.connected ? "success" : "default"}>{payload.mode}</Tag> : null}
+            <Tag color={payload.pendingRestart ? "warning" : "default"}>{payload.pendingRestart ? dictionary.restartPending : dictionary.settingsCenterApplyMode}</Tag>
+          </Space>
+          {payload.checks.length > 0 ? (
+            <div className="settings-config-check-list">
+              {payload.checks.map((check) => (
+                <div className="settings-config-check" key={`${check.key}-${check.message}`}>
+                  <Tag color={check.status === "invalid" ? "warning" : check.status === "ok" ? "success" : "default"}>{check.key}</Tag>
+                  <Typography.Text>{check.message}</Typography.Text>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      )}
+    />
   );
 }
 
@@ -446,6 +747,120 @@ function settingsRow(config: SettingsResourceConfig, dictionary: Dictionary): Se
   };
 }
 
+function settingsFormFields(config: SettingsResourceConfig | null) {
+  return (config?.schema?.fields ?? []).filter((field) => field.inForm !== false && (field.source === "record" || field.source === "values"));
+}
+
+function settingsFormInitialValues(record: AdminResourceRecord, fields: AdminResourceField[]): SettingsFormValues {
+  const values: SettingsFormValues = {};
+  for (const field of fields) {
+    const raw = settingsRecordFieldValue(record, field);
+    values[field.key] = settingsFieldInitialValue(field, raw);
+  }
+  return values;
+}
+
+function settingsUpdateInputFromForm(values: SettingsFormValues, record: AdminResourceRecord, fields: AdminResourceField[]): AdminSettingsUpdateInput {
+  const input: AdminSettingsUpdateInput = {};
+  const nextValues: Record<string, unknown> = {};
+  for (const field of fields) {
+    if (field.readOnly || field.inForm === false) continue;
+    const value = values[field.key];
+    if (field.source === "record") {
+      if (field.key === "code") input.code = stringFormValue(value);
+      if (field.key === "name") input.name = stringFormValue(value);
+      if (field.key === "status") input.status = stringFormValue(value);
+      if (field.key === "description") input.description = stringFormValue(value);
+      continue;
+    }
+    if (field.source !== "values") continue;
+    if (settingsSecretField(field) && stringFormValue(value) === "" && !record.values?.[field.key]) {
+      continue;
+    }
+    nextValues[field.key] = settingsSubmitValue(field, value);
+  }
+  if (Object.keys(nextValues).length > 0) {
+    input.values = nextValues;
+  }
+  return input;
+}
+
+function settingsRecordFieldValue(record: AdminResourceRecord, field: AdminResourceField) {
+  if (field.source === "record") {
+    return String(record[field.key as keyof AdminResourceRecord] ?? "");
+  }
+  return record.values?.[field.key] ?? "";
+}
+
+function settingsFieldInitialValue(field: AdminResourceField, raw: string) {
+  if (field.type === "switch") return raw === "true" || raw === "enabled" || raw === "1";
+  if (field.type === "number") {
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  if (field.type === "multiselect") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map(String);
+    } catch {
+      // fall through to comma-separated legacy values
+    }
+    return raw ? raw.split(",").map((item) => item.trim()).filter(Boolean) : [];
+  }
+  return raw;
+}
+
+function settingsSubmitValue(field: AdminResourceField, value: unknown) {
+  if (field.type === "switch") return Boolean(value);
+  if (field.type === "number") return value === undefined || value === null || value === "" ? "" : Number(value);
+  if (field.type === "multiselect") return Array.isArray(value) ? value : [];
+  return stringFormValue(value);
+}
+
+function stringFormValue(value: unknown) {
+  if (value === undefined || value === null) return "";
+  return String(value).trim();
+}
+
+function settingsSecretField(field: AdminResourceField) {
+  return field.sensitivity === "secret" || field.storageMode === "encrypted" || field.responseMode === "omitted";
+}
+
+function settingsFieldRules(field: AdminResourceField, dictionary: Dictionary, language: Language): Rule[] | undefined {
+  const rules: Rule[] = [];
+  const label = localizedText(field.label, language, field.key);
+  if (field.required && !settingsSecretField(field)) {
+    rules.push({ required: true, message: formatTemplate(dictionary.requiredField, { label }) });
+  }
+  if (field.validation?.minLength) {
+    rules.push({ min: field.validation.minLength, message: formatTemplate(dictionary.requiredField, { label }) });
+  }
+  if (field.validation?.maxLength) {
+    rules.push({ max: field.validation.maxLength, message: formatTemplate(dictionary.requiredField, { label }) });
+  }
+  return rules.length > 0 ? rules : undefined;
+}
+
+function settingsFieldControl(field: AdminResourceField, dictionary: Dictionary, language: Language) {
+  const disabled = field.readOnly;
+  if (field.type === "switch") return <Switch disabled={disabled} />;
+  if (field.type === "number") return <InputNumber disabled={disabled} style={{ width: "100%" }} />;
+  if (field.type === "textarea") return <Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} disabled={disabled} />;
+  if (field.type === "select" || field.type === "multiselect") {
+    return (
+      <Select
+        disabled={disabled}
+        mode={field.type === "multiselect" ? "multiple" : undefined}
+        options={(field.options ?? []).map((option) => ({ value: option.value, label: localizedText(option.label, language, option.value) }))}
+      />
+    );
+  }
+  if (settingsSecretField(field)) {
+    return <Input.Password autoComplete="new-password" disabled={disabled} placeholder={dictionary.settingsCenterSecretPreserveHint} />;
+  }
+  return <Input disabled={disabled} />;
+}
+
 function projectSettingsResourceConfigs(
   runtimeItems: AdminSettingsResourceItem[],
   resources: AdminResourceDefinition[],
@@ -473,6 +888,7 @@ function projectSettingsResourceConfigs(
       source: catalogMatch ? "catalog" as const : "manifest" as const,
       order: itemOrder(item, catalogMatch?.index, index),
       records,
+      schema: item.schema,
       recordCount: item.recordCount ?? records.length,
       enabledCount: records.filter((record) => record.status === "enabled" || record.status === "active").length,
       writable: item.writable,

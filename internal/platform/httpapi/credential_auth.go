@@ -67,6 +67,7 @@ type credentialAuthChallengeStartResponse struct {
 type credentialAuthSMSOTPStartRequest struct {
 	Provider   string                          `json:"provider"`
 	Identifier credentialAuthIdentifierRequest `json:"identifier"`
+	Challenge  credentialAuthChallengeRequest  `json:"challenge"`
 }
 
 type credentialAuthSMSOTPStartResponse struct {
@@ -110,8 +111,10 @@ type CredentialAuthRuntime struct {
 	MaxSMSOTPAttempts       int
 	MaxChallengeAttempts    int
 	ChallengeTTL            time.Duration
+	LoginChallengeKind      credentialauth.ChallengeKind
 	PasswordHashParams      credentialauth.Argon2idParams
 	PasswordParamsVersion   string
+	RequireLoginChallenge   bool
 	RequireEncryptedSecrets bool
 }
 
@@ -155,7 +158,8 @@ func (s *Server) credentialAuthPasswordLogin(ctx *gin.Context, provider capabili
 		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
 		return
 	}
-	if !s.verifyCredentialAuthLoginChallenge(ctx, input.Challenge) {
+	if ok, err := s.verifyCredentialAuthLoginChallenge(ctx, input.Challenge); !ok {
+		s.recordCredentialAuthLoginFailure(ctx, provider, err)
 		return
 	}
 	if runtime.RequireEncryptedSecrets {
@@ -186,11 +190,13 @@ func (s *Server) credentialAuthPasswordLogin(ctx *gin.Context, provider capabili
 		Secret:     input.Secret.Value,
 	})
 	if err != nil {
+		s.recordCredentialAuthLoginFailure(ctx, provider, err)
 		writeCredentialAuthLoginError(ctx, s.internalErrorSink, err)
 		return
 	}
 	principal, err := s.adminPrincipalFromCredential(ctx.Request.Context(), result.Principal)
 	if err != nil {
+		s.recordCredentialAuthLoginFailure(ctx, provider, err)
 		writePlatformError(ctx, errorcode.CodeAuthInvalidCredentials)
 		return
 	}
@@ -218,6 +224,14 @@ func (s *Server) credentialAuthSMSOTPStart(ctx *gin.Context) {
 		return
 	}
 	if !s.requireCredentialAuthSecureTransport(ctx) {
+		return
+	}
+	providerDimension := strings.ToLower(strings.TrimSpace(provider.ID))
+	if !s.enforceRateLimit(ctx, ratelimit.OperationAdminLogin, rateLimitClientIP(ctx), providerDimension, "sms-otp-start") {
+		return
+	}
+	if ok, err := s.verifyCredentialAuthLoginChallenge(ctx, input.Challenge); !ok {
+		s.recordCredentialAuthLoginFailure(ctx, provider, err)
 		return
 	}
 	runtime := s.credentialAuth
@@ -276,6 +290,17 @@ func (s *Server) credentialAuthSMSOTPStart(ctx *gin.Context) {
 	if ttl <= 0 {
 		ttl = defaultCredentialAuthSMSOTPTTL
 	}
+	otpChallenge := credentialauth.SMSOTPChallenge{
+		ChallengeID: challengeID,
+		PhoneHash:   phoneHash,
+		CodeDigest:  codeDigest,
+		ExpiresAt:   now.Add(ttl),
+		Status:      credentialauth.StatusEnabled,
+	}
+	if err := runtime.Service.PutSMSOTPChallenge(ctx.Request.Context(), otpChallenge); err != nil {
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthProviderResolveFailed, err)
+		return
+	}
 	receipt, err := runtime.SMSSender.SendSMS(ctx.Request.Context(), notification.SMSMessage{
 		TenantCode: platformTenant,
 		Recipient:  normalized.Value,
@@ -287,6 +312,10 @@ func (s *Server) credentialAuthSMSOTPStart(ctx *gin.Context) {
 		TraceID: correlationFromGinContext(ctx).TraceID,
 	})
 	if err != nil {
+		otpChallenge.Status = credentialauth.StatusDisabled
+		if disableErr := runtime.Service.PutSMSOTPChallenge(ctx.Request.Context(), otpChallenge); disableErr != nil {
+			s.recordInternalError(ctx, errorcode.CodeAuthProviderResolveFailed, disableErr)
+		}
 		s.recordCredentialAuthSMSOTPDelivery(ctx, normalized.Value, notification.SMSDeliveryReceipt{
 			Provider:       runtime.SMSSender.Kind(),
 			Status:         "failed",
@@ -296,16 +325,9 @@ func (s *Server) credentialAuthSMSOTPStart(ctx *gin.Context) {
 		return
 	}
 	s.recordCredentialAuthSMSOTPDelivery(ctx, normalized.Value, receipt, notification.DeliveryStatusDelivered, "", now)
-	if err := runtime.Service.PutSMSOTPChallenge(ctx.Request.Context(), credentialauth.SMSOTPChallenge{
-		ChallengeID: challengeID,
-		PhoneHash:   phoneHash,
-		CodeDigest:  codeDigest,
-		ExpiresAt:   now.Add(ttl),
-		MessageID:   receipt.MessageID,
-		Status:      credentialauth.StatusEnabled,
-	}); err != nil {
-		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthProviderResolveFailed, err)
-		return
+	otpChallenge.MessageID = receipt.MessageID
+	if err := runtime.Service.PutSMSOTPChallenge(ctx.Request.Context(), otpChallenge); err != nil {
+		s.recordInternalError(ctx, errorcode.CodeAuthProviderResolveFailed, err)
 	}
 	response := credentialAuthSMSOTPStartResponse{
 		TransactionID:    challengeID,
@@ -426,7 +448,8 @@ func (s *Server) credentialAuthSMSOTPLogin(ctx *gin.Context, provider capability
 		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
 		return
 	}
-	if !s.verifyCredentialAuthLoginChallenge(ctx, input.Challenge) {
+	if ok, err := s.verifyCredentialAuthLoginChallenge(ctx, input.Challenge); !ok {
+		s.recordCredentialAuthLoginFailure(ctx, provider, err)
 		return
 	}
 	code := strings.TrimSpace(input.Secret.Code)
@@ -474,6 +497,7 @@ func (s *Server) credentialAuthSMSOTPLogin(ctx *gin.Context, provider capability
 		CodeDigest:  codeDigest,
 		MaxAttempts: runtime.MaxSMSOTPAttempts,
 	}); err != nil {
+		s.recordCredentialAuthLoginFailure(ctx, provider, err)
 		writeCredentialAuthLoginError(ctx, s.internalErrorSink, err)
 		return
 	}
@@ -483,11 +507,13 @@ func (s *Server) credentialAuthSMSOTPLogin(ctx *gin.Context, provider capability
 		return
 	}
 	if !found || credentialauth.RecordStatus(strings.TrimSpace(string(resolved.Status))) != credentialauth.StatusEnabled {
+		s.recordCredentialAuthLoginFailure(ctx, provider, credentialauth.ErrCredentialRejected)
 		writePlatformError(ctx, errorcode.CodeAuthInvalidCredentials)
 		return
 	}
 	principal, err := s.adminPrincipalFromCredential(ctx.Request.Context(), resolved.Principal)
 	if err != nil {
+		s.recordCredentialAuthLoginFailure(ctx, provider, err)
 		writePlatformError(ctx, errorcode.CodeAuthInvalidCredentials)
 		return
 	}
@@ -512,6 +538,9 @@ func (s *Server) credentialAuthChallengeStart(ctx *gin.Context) {
 		return
 	}
 	kind := credentialauth.ChallengeKind(strings.TrimSpace(input.Kind))
+	if runtime.LoginChallengeKind != "" {
+		kind = runtime.LoginChallengeKind
+	}
 	if kind == "" {
 		kind = credentialauth.ChallengeKindCaptcha
 	}
@@ -540,39 +569,38 @@ func (s *Server) credentialAuthChallengeStart(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, Response[credentialAuthChallengeStartResponse]{Data: response})
 }
 
-func (s *Server) verifyCredentialAuthLoginChallenge(ctx *gin.Context, input credentialAuthChallengeRequest) bool {
+func (s *Server) verifyCredentialAuthLoginChallenge(ctx *gin.Context, input credentialAuthChallengeRequest) (bool, error) {
 	challengeID := strings.TrimSpace(input.ID)
 	kind := credentialauth.ChallengeKind(strings.TrimSpace(input.Kind))
 	proof := strings.TrimSpace(input.Proof)
 	if challengeID == "" && kind == "" && proof == "" && strings.TrimSpace(input.ClientFingerprint) == "" {
-		return true
+		if runtime := s.credentialAuth; runtime != nil && runtime.RequireLoginChallenge {
+			writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
+			return false, credentialauth.ErrInvalidInput
+		}
+		return true, nil
 	}
 	runtime := s.credentialAuth
 	if runtime == nil || runtime.Service == nil || runtime.ChallengeProofHasher == nil {
 		writePlatformError(ctx, errorcode.CodeAuthProviderNotConfigured)
-		return false
+		return false, credentialauth.ErrRepositoryInvariant
 	}
 	if challengeID == "" || kind == "" || proof == "" {
 		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
-		return false
-	}
-	answerDigest, err := runtime.ChallengeProofHasher.HashChallengeProof(kind, credentialauth.ChallengePurposeLogin, challengeID, proof)
-	if err != nil {
-		writeCredentialAuthLoginError(ctx, s.internalErrorSink, err)
-		return false
+		return false, credentialauth.ErrInvalidInput
 	}
 	if err := runtime.Service.VerifyCredentialChallenge(ctx.Request.Context(), credentialauth.CredentialChallengeProof{
 		ChallengeID:           challengeID,
 		Kind:                  kind,
 		Purpose:               credentialauth.ChallengePurposeLogin,
-		AnswerDigest:          answerDigest,
+		Proof:                 proof,
 		ClientFingerprintHash: credentialAuthClientFingerprintHash(input.ClientFingerprint),
 		MaxAttempts:           runtime.MaxChallengeAttempts,
 	}); err != nil {
 		writeCredentialAuthLoginError(ctx, s.internalErrorSink, err)
-		return false
+		return false, err
 	}
-	return true
+	return true, nil
 }
 
 func credentialAuthProviderSpecFor(provider capability.AuthProvider) (credentialAuthProviderSpec, bool) {
@@ -687,6 +715,37 @@ func writeCredentialAuthLoginError(ctx *gin.Context, sink InternalErrorSink, err
 		writePlatformError(ctx, errorcode.CodeAuthInvalidCredentials)
 	default:
 		writePlatformErrorWithCause(ctx, sink, errorcode.CodeAuthProviderResolveFailed, err)
+	}
+}
+
+func (s *Server) recordCredentialAuthLoginFailure(ctx *gin.Context, provider capability.AuthProvider, err error) {
+	reasonCode := credentialAuthLoginFailureReason(err)
+	if reasonCode == "" || s == nil || s.resources == nil {
+		return
+	}
+	targetID := "credential-auth"
+	if providerID := strings.TrimSpace(provider.ID); providerID != "" {
+		targetID += ":" + providerID
+	}
+	if auditErr := s.recordAudit(ctx, "auth.login", systemActorID, targetID, "failure", reasonCode); auditErr != nil {
+		s.recordInternalError(ctx, errorcode.CodeAuthAuditFailed, auditErr)
+	}
+}
+
+func credentialAuthLoginFailureReason(err error) string {
+	switch {
+	case errors.Is(err, credentialauth.ErrCredentialLocked):
+		return "credential-locked"
+	case errors.Is(err, credentialauth.ErrChallengeExpired):
+		return "challenge-expired"
+	case errors.Is(err, credentialauth.ErrChallengeConsumed):
+		return "challenge-consumed"
+	case errors.Is(err, credentialauth.ErrChallengeRejected):
+		return "challenge-rejected"
+	case errors.Is(err, credentialauth.ErrCredentialRejected):
+		return "credential-rejected"
+	default:
+		return ""
 	}
 }
 

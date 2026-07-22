@@ -23,6 +23,9 @@ const (
 	deliveryWorkerDefaultBatch = 20
 	deliveryWorkerActor        = "notification-delivery-worker"
 	deliveryWorkerAction       = "notification.delivery.attempt"
+
+	deliveryWorkerDefaultRetryBackoff = time.Minute
+	deliveryWorkerMaxRetryBackoff     = 30 * time.Minute
 )
 
 type DeliveryStore interface {
@@ -34,6 +37,14 @@ type DeliveryPolicyGate interface {
 	AllowDelivery(context.Context, DeliveryPolicyInput) (bool, error)
 }
 
+type DeliveryTargetResolver interface {
+	ResolveDeliveryTarget(context.Context, adminresource.Record) (string, bool, error)
+}
+
+type DeliveryTargetCompletion interface {
+	DeliveryTargetDelivered(context.Context, adminresource.Record)
+}
+
 type DeliveryPolicyInput struct {
 	TenantCode   string
 	Channel      string
@@ -41,6 +52,8 @@ type DeliveryPolicyInput struct {
 	TemplateCode string
 	TemplateID   string
 	Purpose      string
+	Attempts     int
+	NextRetryAt  time.Time
 }
 
 type DeliveryWorkerOptions struct {
@@ -49,6 +62,7 @@ type DeliveryWorkerOptions struct {
 	DefaultSMSProvider  string
 	DefaultProviders    map[string]string
 	PolicyGate          DeliveryPolicyGate
+	TargetResolver      DeliveryTargetResolver
 	MaxBatch            int
 	Now                 func() time.Time
 	Actor               string
@@ -62,6 +76,7 @@ type DeliveryWorker struct {
 	defaultSMSProvider  string
 	defaultProviders    map[string]string
 	policyGate          DeliveryPolicyGate
+	targetResolver      DeliveryTargetResolver
 	maxBatch            int
 	now                 func() time.Time
 	actor               string
@@ -73,6 +88,7 @@ type DeliveryWorkerResult struct {
 	Attempted int `json:"attempted"`
 	Delivered int `json:"delivered"`
 	Failed    int `json:"failed"`
+	Deferred  int `json:"deferred"`
 	Skipped   int `json:"skipped"`
 }
 
@@ -143,6 +159,7 @@ func NewDeliveryWorker(store DeliveryStore, options DeliveryWorkerOptions) *Deli
 		defaultSMSProvider:  defaultProvider,
 		defaultProviders:    defaultProviders,
 		policyGate:          options.PolicyGate,
+		targetResolver:      options.TargetResolver,
 		maxBatch:            maxBatch,
 		now:                 now,
 		actor:               actor,
@@ -172,6 +189,7 @@ func (w *DeliveryWorker) RunOnce(ctx context.Context) (DeliveryWorkerResult, err
 		return left < right
 	})
 	result := DeliveryWorkerResult{Scanned: len(deliveries)}
+	now := w.now().UTC()
 	for _, delivery := range deliveries {
 		if result.Attempted >= w.maxBatch {
 			break
@@ -179,6 +197,10 @@ func (w *DeliveryWorker) RunOnce(ctx context.Context) (DeliveryWorkerResult, err
 		channel, ok := pendingNotificationDelivery(delivery)
 		if !ok {
 			result.Skipped++
+			continue
+		}
+		if deliveryBackoffPending(delivery, now) {
+			result.Deferred++
 			continue
 		}
 		notice, ok := noticeByCode[strings.TrimSpace(delivery.Values["notificationCode"])]
@@ -238,6 +260,8 @@ func deliveryPolicyInputFromRecords(channel string, delivery adminresource.Recor
 		TemplateCode: firstNonBlank(delivery.Values["templateCode"], notice.Values["templateCode"]),
 		TemplateID:   firstNonBlank(delivery.Values["templateId"], notice.Values["templateId"], payload.TemplateID),
 		Purpose:      firstNonBlank(notice.Values["category"], payload.Purpose, "notification"),
+		Attempts:     deliveryAttempts(delivery),
+		NextRetryAt:  deliveryLedgerTime(delivery.Values["nextRetryAt"]),
 	}
 }
 
@@ -249,7 +273,7 @@ func (w *DeliveryWorker) deliver(ctx context.Context, channel string, delivery a
 }
 
 func (w *DeliveryWorker) deliverSMS(ctx context.Context, delivery adminresource.Record, notice adminresource.Record) (bool, error) {
-	message, provider, prepareErr := w.smsMessageFromRecords(delivery, notice)
+	message, provider, prepareErr := w.smsMessageFromRecords(ctx, delivery, notice)
 	if prepareErr != nil {
 		return false, w.markDeliveryFailed(delivery, ChannelSMS, &provider, "notification delivery failed")
 	}
@@ -273,11 +297,11 @@ func (w *DeliveryWorker) deliverSMS(ctx context.Context, delivery adminresource.
 	if receipt.RedactedTarget == "" {
 		receipt.RedactedTarget = RedactSMSTarget(message.Recipient)
 	}
-	return w.markDeliveryDelivered(delivery, DeliveryReceiptFromSMS(receipt))
+	return w.markDeliveryDelivered(ctx, delivery, DeliveryReceiptFromSMS(receipt))
 }
 
 func (w *DeliveryWorker) deliverMessage(ctx context.Context, channel string, delivery adminresource.Record, notice adminresource.Record) (bool, error) {
-	message, provider, prepareErr := w.messageFromRecords(channel, delivery, notice)
+	message, provider, prepareErr := w.messageFromRecords(ctx, channel, delivery, notice)
 	if prepareErr != nil {
 		return false, w.markDeliveryFailed(delivery, channel, &provider, "notification delivery failed")
 	}
@@ -307,10 +331,10 @@ func (w *DeliveryWorker) deliverMessage(ctx context.Context, channel string, del
 	if receipt.RedactedTarget == "" {
 		receipt.RedactedTarget = RedactMessageTarget(channel, message.Recipient)
 	}
-	return w.markDeliveryDelivered(delivery, receipt)
+	return w.markDeliveryDelivered(ctx, delivery, receipt)
 }
 
-func (w *DeliveryWorker) markDeliveryDelivered(delivery adminresource.Record, receipt DeliveryReceipt) (bool, error) {
+func (w *DeliveryWorker) markDeliveryDelivered(ctx context.Context, delivery adminresource.Record, receipt DeliveryReceipt) (bool, error) {
 	now := w.now().UTC()
 	values := BuildDeliveryLedgerValues(DeliveryLedgerInput{
 		BaseValues:     delivery.Values,
@@ -328,6 +352,9 @@ func (w *DeliveryWorker) markDeliveryDelivered(delivery adminresource.Record, re
 		Description: delivery.Description,
 		Values:      values,
 	}, adminresource.AuditEvent{Actor: w.actor, Action: deliveryWorkerAction, Result: "success", ReasonCode: DeliveryStatusDelivered})
+	if err == nil {
+		w.completeDeliveryTarget(ctx, delivery)
+	}
 	return true, err
 }
 
@@ -336,6 +363,8 @@ func (w *DeliveryWorker) markDeliveryFailed(delivery adminresource.Record, chann
 	if provider != nil {
 		providerValue = *provider
 	}
+	now := w.now().UTC()
+	retryBackoff := DeliveryRetryBackoff(deliveryAttempts(delivery) + 1)
 	values := BuildDeliveryLedgerValues(DeliveryLedgerInput{
 		BaseValues:     delivery.Values,
 		Channel:        channel,
@@ -343,7 +372,8 @@ func (w *DeliveryWorker) markDeliveryFailed(delivery adminresource.Record, chann
 		Receipt:        DeliveryReceipt{Channel: channel, Provider: providerValue, Status: DeliveryStatusFailed},
 		DeliveryStatus: DeliveryStatusFailed,
 		ErrorMessage:   errorMessage,
-		AttemptedAt:    w.now().UTC(),
+		AttemptedAt:    now,
+		RetryBackoff:   retryBackoff,
 	})
 	_, err := w.store.UpdateInternalWithAudit(NotificationDeliveryResource, delivery.ID, adminresource.WriteInput{
 		Code:        delivery.Code,
@@ -355,7 +385,21 @@ func (w *DeliveryWorker) markDeliveryFailed(delivery adminresource.Record, chann
 	return err
 }
 
-func (w *DeliveryWorker) messageFromRecords(channel string, delivery adminresource.Record, notice adminresource.Record) (Message, string, error) {
+func DeliveryRetryBackoff(attempts int) time.Duration {
+	if attempts <= 1 {
+		return deliveryWorkerDefaultRetryBackoff
+	}
+	backoff := deliveryWorkerDefaultRetryBackoff
+	for i := 1; i < attempts; i++ {
+		backoff *= 2
+		if backoff >= deliveryWorkerMaxRetryBackoff {
+			return deliveryWorkerMaxRetryBackoff
+		}
+	}
+	return backoff
+}
+
+func (w *DeliveryWorker) messageFromRecords(ctx context.Context, channel string, delivery adminresource.Record, notice adminresource.Record) (Message, string, error) {
 	payload := parseNotificationPayload(notice.Values["payload"])
 	provider := CanonicalProvider(delivery.Values["provider"])
 	if provider == "" {
@@ -363,6 +407,15 @@ func (w *DeliveryWorker) messageFromRecords(channel string, delivery adminresour
 	}
 	templateID := firstNonBlank(delivery.Values["templateId"], notice.Values["templateId"], payload.TemplateID)
 	recipient := strings.TrimSpace(delivery.Values["target"])
+	if recipient == "" || strings.HasPrefix(recipient, "****") {
+		resolved, ok, err := w.resolveDeliveryTarget(ctx, delivery)
+		if err != nil {
+			return Message{}, provider, err
+		}
+		if ok {
+			recipient = resolved
+		}
+	}
 	if recipient == "" || strings.HasPrefix(recipient, "****") {
 		return Message{}, provider, fmt.Errorf("notification delivery target is required")
 	}
@@ -380,7 +433,7 @@ func (w *DeliveryWorker) messageFromRecords(channel string, delivery adminresour
 	}, provider, nil
 }
 
-func (w *DeliveryWorker) smsMessageFromRecords(delivery adminresource.Record, notice adminresource.Record) (SMSMessage, string, error) {
+func (w *DeliveryWorker) smsMessageFromRecords(ctx context.Context, delivery adminresource.Record, notice adminresource.Record) (SMSMessage, string, error) {
 	payload := parseNotificationPayload(notice.Values["payload"])
 	provider := CanonicalSMSProvider(delivery.Values["provider"])
 	if provider == "" {
@@ -388,6 +441,15 @@ func (w *DeliveryWorker) smsMessageFromRecords(delivery adminresource.Record, no
 	}
 	templateID := firstNonBlank(delivery.Values["templateId"], notice.Values["templateId"], payload.TemplateID)
 	recipient := strings.TrimSpace(delivery.Values["target"])
+	if recipient == "" || strings.HasPrefix(recipient, "****") {
+		resolved, ok, err := w.resolveDeliveryTarget(ctx, delivery)
+		if err != nil {
+			return SMSMessage{}, provider, err
+		}
+		if ok {
+			recipient = resolved
+		}
+	}
 	if recipient == "" || strings.HasPrefix(recipient, "****") {
 		return SMSMessage{}, provider, fmt.Errorf("sms delivery target is required")
 	}
@@ -400,6 +462,30 @@ func (w *DeliveryWorker) smsMessageFromRecords(delivery adminresource.Record, no
 		Purpose:        firstNonBlank(notice.Values["category"], payload.Purpose, "notification"),
 		TraceID:        firstNonBlank(delivery.Values["traceId"], notice.Values["traceId"]),
 	}, provider, nil
+}
+
+func (w *DeliveryWorker) resolveDeliveryTarget(ctx context.Context, delivery adminresource.Record) (string, bool, error) {
+	if w == nil || w.targetResolver == nil {
+		return "", false, nil
+	}
+	target, ok, err := w.targetResolver.ResolveDeliveryTarget(ctx, delivery)
+	if err != nil || !ok {
+		return "", ok, err
+	}
+	target = strings.TrimSpace(target)
+	if target == "" || strings.HasPrefix(target, "****") {
+		return "", false, nil
+	}
+	return target, true, nil
+}
+
+func (w *DeliveryWorker) completeDeliveryTarget(ctx context.Context, delivery adminresource.Record) {
+	if w == nil || w.targetResolver == nil {
+		return
+	}
+	if completion, ok := w.targetResolver.(DeliveryTargetCompletion); ok {
+		completion.DeliveryTargetDelivered(ctx, delivery)
+	}
 }
 
 func (w *DeliveryWorker) smsSender(provider string) (SMSSender, error) {
@@ -499,6 +585,11 @@ func deliveryAttempts(record adminresource.Record) int {
 		return 0
 	}
 	return attempts
+}
+
+func deliveryBackoffPending(record adminresource.Record, now time.Time) bool {
+	nextRetryAt := deliveryLedgerTime(record.Values["nextRetryAt"])
+	return !nextRetryAt.IsZero() && now.Before(nextRetryAt)
 }
 
 func cloneSMSDeliveryValues(values map[string]string) map[string]string {

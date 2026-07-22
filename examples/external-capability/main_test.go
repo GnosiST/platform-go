@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/GnosiST/platform-go/pkg/platform/app"
 	"github.com/GnosiST/platform-go/pkg/platform/capability"
 )
 
@@ -85,5 +88,28 @@ func TestLifecycleRunsThroughPublicRuntime(t *testing.T) {
 	want := "example-catalog:catalog-0001:migration,example-catalog:catalog-seed-0001:seed"
 	if strings.Join(got, ",") != want {
 		t.Fatalf("lifecycle records = %v, want %s", got, want)
+	}
+}
+
+func TestExampleMountsRunnableAppHandlerThroughPublicRuntime(t *testing.T) {
+	router, err := NewExampleAppRouter()
+	if err != nil {
+		t.Fatalf("NewExampleAppRouter() error = %v", err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/app/catalog/items", nil)
+	request = request.WithContext(app.WithIdentity(request.Context(), app.Identity{
+		SubjectID:   "catalog-user",
+		TenantID:    "demo-tenant",
+		Permissions: []string{"app:catalog-item:read"},
+	}))
+	recorder := httptest.NewRecorder()
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET example catalog route status = %d body = %s, want %d", recorder.Code, recorder.Body.String(), http.StatusOK)
+	}
+	if !strings.Contains(recorder.Body.String(), `"tenantId":"demo-tenant"`) {
+		t.Fatalf("example handler body = %s, want typed tenant identity", recorder.Body.String())
 	}
 }

@@ -590,7 +590,7 @@ function validateDeploymentPackage(contract, errors) {
         }
       }
       const healthcheck = Array.isArray(apiService?.healthcheck?.test) ? apiService.healthcheck.test : [];
-      if (!healthcheck.includes("http://127.0.0.1:9200/api/health")) {
+      if (!healthcheck.includes("http://127.0.0.1:9200/api/ready")) {
         errors.push("platform-api healthcheck must use the direct loopback HTTP exception");
       }
       const defaultSubnet = compose.networks?.default?.ipam?.config?.[0]?.subnet;

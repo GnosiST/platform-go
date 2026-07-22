@@ -23,6 +23,8 @@ type DeliveryLedgerInput struct {
 	ErrorMessage   string
 	AttemptedAt    time.Time
 	DeliveredAt    time.Time
+	RetryBackoff   time.Duration
+	NextRetryAt    time.Time
 	RequestID      string
 	TraceID        string
 }
@@ -40,7 +42,8 @@ func BuildDeliveryLedgerValues(input DeliveryLedgerInput) map[string]string {
 		deliveryStatus = DeliveryStatusDelivered
 	}
 	values["deliveryStatus"] = deliveryStatus
-	values["attempts"] = strconv.Itoa(deliveryLedgerAttempts(values) + 1)
+	attempts := deliveryLedgerAttempts(values) + 1
+	values["attempts"] = strconv.Itoa(attempts)
 
 	if attemptedAt := deliveryLedgerTimestamp(input.AttemptedAt); attemptedAt != "" {
 		values["lastAttemptAt"] = attemptedAt
@@ -54,9 +57,26 @@ func BuildDeliveryLedgerValues(input DeliveryLedgerInput) map[string]string {
 			values["deliveredAt"] = formatted
 		}
 		delete(values, "errorMessage")
+		values["nextRetryAt"] = ""
+		values["retryBackoffSeconds"] = ""
 	} else {
 		delete(values, "deliveredAt")
 		values["errorMessage"] = safeDeliveryLedgerErrorMessage(input.ErrorMessage)
+		if input.RetryBackoff > 0 {
+			values["retryBackoffSeconds"] = strconv.FormatInt(int64(input.RetryBackoff/time.Second), 10)
+			nextRetryAt := input.NextRetryAt
+			if nextRetryAt.IsZero() && !input.AttemptedAt.IsZero() {
+				nextRetryAt = input.AttemptedAt.Add(input.RetryBackoff)
+			}
+			if formatted := deliveryLedgerTimestamp(nextRetryAt); formatted != "" {
+				values["nextRetryAt"] = formatted
+			}
+		} else if formatted := deliveryLedgerTimestamp(input.NextRetryAt); formatted != "" {
+			values["nextRetryAt"] = formatted
+		} else {
+			values["nextRetryAt"] = ""
+			values["retryBackoffSeconds"] = ""
+		}
 	}
 
 	target := strings.TrimSpace(input.Receipt.RedactedTarget)
@@ -134,6 +154,14 @@ func deliveryLedgerTimestamp(value time.Time) string {
 		return ""
 	}
 	return value.UTC().Format(time.RFC3339)
+}
+
+func deliveryLedgerTime(value string) time.Time {
+	parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(value))
+	if err != nil {
+		return time.Time{}
+	}
+	return parsed.UTC()
 }
 
 func deliveryLedgerAttempts(values map[string]string) int {

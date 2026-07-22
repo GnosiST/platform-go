@@ -142,6 +142,14 @@ requireIncludes(files.shell, '"/audit-logs"', "Logging child resources must coll
 requireIncludes(files.shell, '"/login-logs"', "Login logs must collapse behind the logging-center navigation entry.");
 requireIncludes(files.shell, '"/error-logs"', "Error logs must collapse behind the logging-center navigation entry.");
 requireIncludes(files.shell, '"/request-logs"', "Request logs must collapse behind the logging-center navigation entry.");
+requireCountExactly(files.i18n, "navigationSearch:", 2, "Navigation search must declare matching Chinese and English dictionary keys.");
+requireIncludes(files.i18n, 'navigationSearch: "导航搜索"', "Navigation search must use the concise Chinese label.");
+requireIncludes(files.i18n, 'navigationSearch: "Navigation search"', "Navigation search must use the concise English label.");
+requireCountExactly(files.shell, "value={globalSearchQuery}", 2, "Navigation search must bind both desktop and mobile inputs to the shared query.");
+requireCountExactly(files.shell, "onPressEnter={openFirstNavigationSearchResult}", 2, "Navigation search must open the first matching authorized route from either layout.");
+requireIncludes(files.shell, 'const notificationResource = resources.find((resource) => resource.route === "/notifications");', "Notification entry must resolve the authorized notification resource.");
+requireIncludes(files.shell, "disabled={!notificationResource}", "Notification entry must stay unavailable when the notification resource is not authorized.");
+requireIncludes(files.shell, "if (notificationResource) openResource(notificationResource);", "Notification entry must open the authorized notification resource.");
 requireIncludes(files.loggingCenter, 'resource: "request-logs"', "Logging center must keep request logs in the unified platform log source list.");
 requireIncludes(files.loggingCenter, "records.request.total", "Logging center metrics must keep request logs visible instead of only audit/login/error logs.");
 requireIncludes(files.loggingCenter, "filterFields={filterFields}", "Logging center must expose unified filters through PlatformDataTable.");
@@ -255,8 +263,9 @@ requireIncludes(files.login, "Input.Password", "Credential password providers mu
 requireIncludes(files.login, "CredentialChallengePayload", "Credential login must render challenge responses through a dedicated payload slot.");
 requireIncludes(files.login, "function SliderChallengePayload", "Credential slider challenges must render through a dedicated slider payload.");
 requireIncludes(files.login, "ProviderSpecificChallengePayload", "Credential challenge UI must reserve a provider-specific payload renderer.");
-requireIncludes(files.login, 'startCredentialChallenge({ kind: "slider", purpose: "login" })', "Credential login must request slider challenges before falling back.");
-requireIncludes(files.login, 'startCredentialChallenge({ kind: "captcha", purpose: "login" })', "Credential login must preserve a captcha challenge fallback.");
+requireIncludes(files.login, 'startCredentialChallenge({ kind: "slider", purpose: "login", clientFingerprint })', "Credential login must request slider challenges before falling back.");
+requireIncludes(files.login, 'startCredentialChallenge({ kind: "captcha", purpose: "login", clientFingerprint })', "Credential login must preserve a captcha challenge fallback.");
+requireIncludes(files.login, "clientFingerprintRef", "Credential login must bind challenge start and proof submission with a per-page client fingerprint.");
 requireIncludes(files.login, "challengeNeedsCaptchaFallback", "Credential login must fall back when slider material is incomplete.");
 requireIncludes(files.login, "sliderChallengeMaterial(challenge)", "Credential login must derive slider rendering from returned challenge material.");
 requireIncludes(files.login, "formatSliderChallengeProof(proofX, proofY)", "Credential slider proof must be generated from client drag coordinates.");
@@ -619,7 +628,9 @@ requireIncludes(files.messageCenter, 'resource: "notifications"', "Message cente
 requireIncludes(files.messageCenter, 'resource: "notification-deliveries"', "Message center must expose delivery ledgers.");
 requireIncludes(files.messageCenter, '["in_app", "sms", "email", "wechat_official", "wechat_miniapp"]', "Message center must expose the common in-app, SMS, email, and WeChat channel set even before records exist.");
 requireIncludes(files.client, "testSendMessageCenter", "Admin API client must expose the message-center test-send runtime endpoint.");
+requireIncludes(files.client, "retryMessageCenterDelivery", "Admin API client must expose the message-center delivery retry runtime endpoint.");
 requireIncludes(files.messageCenter, "testSendMessageCenter", "Message center must call the backend test-send endpoint instead of showing a disabled placeholder.");
+requireIncludes(files.messageCenter, "retryMessageCenterDelivery", "Message center must call the backend retry endpoint for failed delivery requeue.");
 requireIncludes(files.messageCenter, "<MessageCenterClosedLoop", "Message center must render the operating loop instead of only resource tabs.");
 requireIncludes(files.messageCenter, "messageCenterClosedLoopSteps(resourceConfigs, records, resourceRoutes, dictionary)", "Message center runtime loop must be derived from the full notification resource sequence.");
 requireIncludes(files.messageCenter, "dictionary.messageCenterDryRun", "Message center must expose a dry-run entry state.");
@@ -638,6 +649,9 @@ requireIncludes(files.messageCenter, "<MessageCenterRuntimeMatrix", "Message cen
 requireIncludes(files.messageCenter, "messageCenterRuntimeRows(records, dictionary)", "Message center runtime capability matrix must be derived from current configuration records.");
 requireIncludes(files.messageCenter, "<MessageCenterDeliveryDetailModal", "Message center delivery ledgers must expose an operator detail panel.");
 requireIncludes(files.messageCenter, "sanitizeMessageCenterTarget", "Message center delivery details must defensively redact targets before display.");
+requireIncludes(files.messageCenter, "dictionary.messageCenterDeliveryTimeline", "Message center delivery details must expose a delivery timeline.");
+requireIncludes(files.messageCenter, "dictionary.messageCenterRetryBackoff", "Message center delivery tables/details must expose retry backoff state.");
+requireIncludes(files.messageCenter, "dictionary.messageCenterRetryRecipientRequired", "Message center retry must explain why a failed redacted delivery needs a new recipient.");
 requireIncludes(files.messageCenter, "matchedPoliciesForDelivery", "Message center delivery details must show send-policy matches instead of hiding policy state.");
 requireNotIncludes(files.messageCenter, "card.ready ? dictionary.configured : dictionary.notConfigured", "Message center channel cards must not collapse runtime readiness into a generic configured tag.");
 for (const key of [
@@ -1021,6 +1035,8 @@ requireIncludes(files.capabilityConsole, "dictionary.pluginRestartImpactCounts",
 requireIncludes(files.capabilityConsole, "PluginEntrypointProjectionPanel", "Plugin management must explain current versus desired entrypoint projection.");
 requireIncludes(files.capabilityConsole, "pluginEntrypointProjection(status.currentCapabilities", "Plugin management must derive currently available entrypoints from currentCapabilities.");
 requireIncludes(files.capabilityConsole, "pluginEntrypointProjection(status.desiredCapabilities", "Plugin management must derive restart-after entrypoints from desiredCapabilities.");
+requireIncludes(files.capabilityConsole, "PluginRestartChecklistModal", "Plugin management must expose an explicit restart confirmation checklist.");
+requireIncludes(files.capabilityConsole, "dictionary.pluginRestartChecklistStepVerify", "Plugin restart checklist must include a post-restart functional verification step.");
 requireIncludes(files.capabilityConsole, "serviceOperations: String(change.serviceOperations)", "Plugin restart preview must include service operation impact counts.");
 requireIncludes(files.capabilityConsole, "dictionary.capabilityDisableAfterRestart", "Capability status must distinguish disable-pending changes, not only install-pending changes.");
 requireIncludes(files.capabilityConsole, "dictionary.pluginManagementListHint", "Plugin management copy must direct users to the unified capability list instead of separate cards.");
@@ -1036,6 +1052,13 @@ for (const key of [
   "pluginCurrentEntrypoints",
   "pluginDesiredEntrypoints",
   "pluginEntrypointCounts",
+  "pluginRestartChecklist",
+  "pluginRestartChecklistHint",
+  "pluginRestartChecklistStepLock",
+  "pluginRestartChecklistStepContracts",
+  "pluginRestartChecklistStepRestart",
+  "pluginRestartChecklistStepVerify",
+  "pluginRestartNoImpact",
   "fields",
   "writable",
   "readOnly",
@@ -1149,7 +1172,7 @@ requireIncludes(files.shell, "if (pendingDrawerRouteFocusRef.current)", "Route f
 requireIncludes(files.shell, "pendingDrawerRouteFocusRef.current = !resource.isExternal && resource.route !== activeRoute", "Mobile navigation must mark only actual internal route changes for deferred focus.");
 requireIncludes(files.shell, "afterOpenChange={handleMobileDrawerOpenChange}", "Mobile navigation must focus main through the Drawer close lifecycle.");
 requireIncludes(files.shell, "dictionary.openMobileNavigation", "Mobile navigation must use an explicit localized accessible name.");
-requireIncludes(files.shell, "dictionary.alerts", "The alert icon control must use an explicit localized accessible name.");
+requireIncludes(files.shell, "dictionary.messageCenterNotifications", "The notification icon control must use an explicit localized accessible name.");
 requireIncludes(files.shell, "platform-mobile-contextbar", "AdminShell must provide the approved compact mobile context bar.");
 requireRegex(
   files.shell,

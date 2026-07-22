@@ -78,7 +78,7 @@ services:
     volumes:
       - platform_uploads:/app/.platform/uploads
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9200/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9200/api/ready"]
       interval: 10s
       timeout: 3s
       retries: 12

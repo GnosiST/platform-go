@@ -972,6 +972,11 @@ function schemas() {
         id: { type: "string", minLength: 1 },
         kind: { type: "string", enum: ["captcha", "slider"] },
         proof: { type: "string", writeOnly: true },
+        clientFingerprint: {
+          type: "string",
+          writeOnly: true,
+          description: "Optional client-side challenge nonce; only a digest may be persisted by credential-auth.",
+        },
       },
     },
     AdminCredentialAuthChallengeStartRequest: {
@@ -1005,11 +1010,12 @@ function schemas() {
     },
     AdminCredentialSMSOTPStartRequest: {
       type: "object",
-      required: ["provider", "identifier"],
+      required: ["provider", "identifier", "challenge"],
       additionalProperties: false,
       properties: {
         provider: { type: "string", enum: ["phone-sms-otp"] },
         identifier: { $ref: "#/components/schemas/AdminCredentialAuthIdentifier" },
+        challenge: { $ref: "#/components/schemas/AdminCredentialAuthChallengeProof" },
       },
     },
     AdminCredentialSMSOTPStartData: {
@@ -1509,16 +1515,40 @@ function schemas() {
     },
     AdminMessageCenterDeliveriesRunData: {
       type: "object",
-      required: ["scanned", "attempted", "delivered", "failed", "skipped"],
+      required: ["scanned", "attempted", "delivered", "failed", "deferred", "skipped"],
       additionalProperties: false,
       properties: {
         scanned: { type: "integer", minimum: 0 },
         attempted: { type: "integer", minimum: 0 },
         delivered: { type: "integer", minimum: 0 },
         failed: { type: "integer", minimum: 0 },
+        deferred: { type: "integer", minimum: 0 },
         skipped: { type: "integer", minimum: 0 },
       },
       "x-platform-secret-projection": "worker result exposes aggregate counts only; delivery records retain redacted target metadata",
+    },
+    AdminMessageCenterDeliveryRetryRequest: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        recipient: {
+          type: "string",
+          minLength: 1,
+          writeOnly: true,
+          "x-platform-sensitivity": "personal",
+          "x-platform-response-policy": "required when the stored delivery target is already redacted",
+        },
+      },
+      "x-platform-runtime": "notification-delivery-retry-v1",
+    },
+    AdminMessageCenterDeliveryRetryData: {
+      type: "object",
+      required: ["delivery"],
+      additionalProperties: false,
+      properties: {
+        delivery: { $ref: "#/components/schemas/AdminSettingsResourceRecord" },
+      },
+      "x-platform-secret-projection": "retry response returns a sanitized delivery record with redacted target metadata only",
     },
     PluginManagementLockStatus: {
       type: "object",
@@ -1756,7 +1786,7 @@ paths["/api/auth/challenges"] = {
     operationId: "startAdminCredentialChallenge",
     summary: "Start an Admin credential-auth login challenge",
     description:
-      "Credential-auth v1 runtime. Creates a digest-only CAPTCHA or slider challenge transaction for login; Admin login currently closes the CAPTCHA flow, while slider presentation and risk strategy can continue to evolve without changing the secret transport contract.",
+      "Credential-auth v1 runtime. Creates a digest-only CAPTCHA or go-captcha slider challenge transaction for login; Admin login renders both text CAPTCHA and slider material, binds optional client challenge nonce by digest, and keeps risk strategy configurable without changing the secret transport contract.",
     security: [],
     requestBody: {
       required: true,
@@ -2014,10 +2044,9 @@ paths["/api/admin/message-center/deliveries/run"] = {
     operationId: "runMessageCenterDeliveries",
     summary: "Run the message-center delivery worker",
     description:
-      "Manual v1 run endpoint for the notification delivery worker contract. It validates SMS provider configuration, uses Aliyun/Tencent live SMS SDK adapters when live sending is enabled, and supports explicit dry-run/config validation receipts for non-SMS channels. SMTP/WeChat supplier integration is not claimed until separate adapter evidence exists.",
+      "Manual v1 run endpoint for the notification delivery worker contract. It validates SMS provider configuration and uses the configured SMS runtime: Aliyun/Tencent live SMS SDK adapters plus dry-run/config validation are implemented for SMS. In-app, Email and WeChat worker paths use local dry-run receipts. SMTP/WeChat supplier integration is not claimed.",
     security: [{ bearerAuth: [] }],
     requestBody: {
-      required: true,
       content: { "application/json": { schema: { $ref: "#/components/schemas/AdminMessageCenterDeliveriesRunRequest" } } },
     },
     responses: {
@@ -2033,7 +2062,33 @@ paths["/api/admin/message-center/deliveries/run"] = {
     },
     "x-platform-permission": "admin:message-center:update",
     "x-platform-runtime": "notification-delivery-worker-v1",
-    "x-platform-provider-truth": "Aliyun/Tencent live SMS SDK adapters plus dry-run/config validation; SMTP/WeChat supplier integration not claimed",
+    "x-platform-provider-truth": "Aliyun/Tencent live SMS SDK adapters plus dry-run/config validation are implemented for SMS; in-app, Email and WeChat worker paths use local dry-run receipts; SMTP/WeChat supplier integration is not claimed",
+  },
+};
+
+paths["/api/admin/message-center/deliveries/{id}/retry"] = {
+  post: {
+    tags: ["message-center"],
+    operationId: "retryMessageCenterDelivery",
+    summary: "Requeue one failed message-center delivery",
+    description:
+      "Safe retry endpoint for failed notification delivery ledgers. It requeues the delivery as pending, clears sanitized failure/backoff metadata, and keeps the stored target redacted. A supplied recipient is write-only and is held in a one-time runtime resolver for the next worker run; it is not persisted in generic delivery values.",
+    security: [{ bearerAuth: [] }],
+    parameters: [pathParameter("id", "Delivery record ID")],
+    requestBody: {
+      required: true,
+      content: { "application/json": { schema: { $ref: "#/components/schemas/AdminMessageCenterDeliveryRetryRequest" } } },
+    },
+    responses: {
+      "200": successResponse(
+        "Message center delivery retry",
+        apiResponse({ $ref: "#/components/schemas/AdminMessageCenterDeliveryRetryData" }),
+      ),
+      ...errorResponses(),
+    },
+    "x-platform-permission": "admin:message-center:update",
+    "x-platform-runtime": "notification-delivery-retry-v1",
+    "x-platform-secret-handling": "retry recipient is write-only; response exposes redacted target metadata only",
   },
 };
 

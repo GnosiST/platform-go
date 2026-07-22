@@ -27,7 +27,7 @@ title: 能力与扩展
 
 ## Credential Auth v1
 
-`credential-auth` 是本地凭据认证能力，用于用户名/密码、手机号/密码、邮箱/密码和手机号/短信验证码登录。当前完成了合同、文档、验证门禁、provider 声明和第一批开发态 HTTP/UI 切片：`GET /api/auth/providers` 可发现 credential provider，`POST /api/auth/sms-otp/start` 可启动短信验证码事务，`POST /api/auth/login` 可处理结构化 credential-password / credential-sms-otp 登录并继续兼容 demo/OIDC。它仍不启用旧式 `password` provider kind，也不是生产完整能力。密码、OTP、验证码答案和挑战证明不能存入 generic `Record.Values`；已落地的内部包覆盖 identifier hash、Argon2id PHC 校验、memory repository、开发态 bootstrap Admin 凭据和 SMS OTP 一次性消费语义。持久化仓储、CAPTCHA/滑块 challenge、真实短信供应商、OpenAPI/审计/限流治理和生产启用门禁仍待后续补齐。短信发送作为 `notification` 的 SMS channel 扩展，当前已有 SMS sender port、`mock-local` dev/test sender 和生产禁用 mock 的配置门禁。
+`credential-auth` 是本地凭据认证能力，用于用户名/密码、手机号/密码、邮箱/密码和手机号/短信验证码登录。当前 deliverable v1 已提供 provider discovery、GORM 持久化仓储、Argon2id、应用层加密密钥传输、digest-only CAPTCHA/滑块 challenge、密码变更/重置、审计和限流门禁；`GET /api/auth/providers`、`POST /api/auth/challenges`、`POST /api/auth/sms-otp/start` 与 `POST /api/auth/login` 保持 demo/OIDC 兼容。它仍不启用旧式 `password` provider kind，也不是生产完整能力，密码、OTP、挑战答案和证明不能存入 generic `Record.Values`。短信发送属于 `notification` SMS channel：Aliyun/Tencent 可做 dry-run 或受显式开关约束的 SDK live send，`mock-local` 仅限开发/测试；生产还需要已批准账号的真实投递证据和独立推广审批，SMTP/WeChat 外部供应商适配器尚未实现。
 
 新业务项目应把具体业务能力放在下游仓库或下游 composition root，只把跨业务复用能力沉淀为平台 profile。
 

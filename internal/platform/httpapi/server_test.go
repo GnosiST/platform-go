@@ -51,6 +51,25 @@ type adminResourceListTestPayload struct {
 	} `json:"data"`
 }
 
+type readinessCheckerFunc func(context.Context) error
+
+func (f readinessCheckerFunc) CheckReadiness(ctx context.Context) error {
+	return f(ctx)
+}
+
+type lifecycleInvalidationBus struct {
+	context context.Context
+}
+
+func (b *lifecycleInvalidationBus) PublishInvalidation(context.Context, cache.InvalidationEvent) error {
+	return nil
+}
+
+func (b *lifecycleInvalidationBus) SubscribeInvalidations(ctx context.Context, _ cache.InvalidationHandler) error {
+	b.context = ctx
+	return nil
+}
+
 type adminResourceQueryTestPayload struct {
 	Data struct {
 		Resource string                    `json:"resource"`
@@ -572,6 +591,60 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 	if !strings.Contains(recorder.Body.String(), `"ok":true`) {
 		t.Fatalf("GET /api/health body = %s", recorder.Body.String())
+	}
+}
+
+func TestReadinessEndpointReportsAvailableWithoutConfiguredChecker(t *testing.T) {
+	server := newTestServer(ServerOptions{Capabilities: []capability.Manifest{{ID: "tenant"}}})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/ready", nil)
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET /api/ready status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"ok":true`) {
+		t.Fatalf("GET /api/ready body = %s", recorder.Body.String())
+	}
+}
+
+func TestReadinessEndpointDoesNotLeakDependencyFailure(t *testing.T) {
+	dependencyFailure := errors.New("redis password=private unavailable")
+	server := newTestServer(ServerOptions{
+		Capabilities: []capability.Manifest{{ID: "tenant"}},
+		ReadinessChecker: readinessCheckerFunc(func(context.Context) error {
+			return dependencyFailure
+		}),
+	})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/ready", nil)
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("GET /api/ready status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), dependencyFailure.Error()) || strings.Contains(recorder.Body.String(), "password") {
+		t.Fatalf("GET /api/ready leaked dependency failure: %s", recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"ok":false`) {
+		t.Fatalf("GET /api/ready body = %s", recorder.Body.String())
+	}
+}
+
+func TestServerSubscribesInvalidationsWithLifecycleContext(t *testing.T) {
+	lifecycleContext, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	bus := &lifecycleInvalidationBus{}
+	newTestServer(ServerOptions{
+		Capabilities:     []capability.Manifest{{ID: "tenant"}},
+		InvalidationBus:  bus,
+		LifecycleContext: lifecycleContext,
+	})
+
+	if bus.context != lifecycleContext {
+		t.Fatal("SubscribeInvalidations() did not receive the configured lifecycle context")
 	}
 }
 
@@ -1187,6 +1260,25 @@ func TestCredentialAuthPasswordLoginUsesDedicatedRuntime(t *testing.T) {
 	}
 }
 
+func TestCredentialAuthPasswordLoginRequiresChallengeWhenRuntimePolicyRequiresIt(t *testing.T) {
+	runtime, _ := credentialAuthRuntimeForTest(t)
+	runtime.RequireLoginChallenge = true
+	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
+	loginRecorder := httptest.NewRecorder()
+	loginRequest := newCredentialAuthHTTPTestRequest(
+		http.MethodPost,
+		"/api/auth/login",
+		credentialAuthPasswordLoginBodyForTest(t, runtime, "correct-password"),
+	)
+	loginRequest.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(loginRecorder, loginRequest)
+
+	if loginRecorder.Code != http.StatusBadRequest || !strings.Contains(loginRecorder.Body.String(), "AUTH_INVALID_REQUEST") {
+		t.Fatalf("POST credential password login without required challenge = %d body = %s, want invalid request", loginRecorder.Code, loginRecorder.Body.String())
+	}
+}
+
 func TestCredentialAuthChallengeStartAndPasswordLoginConsumesProof(t *testing.T) {
 	runtime, _ := credentialAuthRuntimeForTest(t)
 	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
@@ -1208,7 +1300,7 @@ func TestCredentialAuthChallengeStartAndPasswordLoginConsumesProof(t *testing.T)
 	}
 
 	loginRecorder := httptest.NewRecorder()
-	loginRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", credentialAuthPasswordLoginBodyWithChallengeForTest(t, runtime, "correct-password", started.Data.ID, "slider", credentialAuthChallengeProofForTest, "browser-1"))
+	loginRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", credentialAuthPasswordLoginBodyWithChallengeForTest(t, runtime, "correct-password", started.Data.ID, "slider", "y=14&x=74.4", "browser-1"))
 	loginRequest.Header.Set("Content-Type", "application/json")
 
 	server.Router().ServeHTTP(loginRecorder, loginRequest)

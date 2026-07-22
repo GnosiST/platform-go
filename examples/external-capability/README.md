@@ -1,7 +1,9 @@
 # External Business Capability Template
 
 This is a standalone downstream-style business module. It imports only the public
-capability contracts from `github.com/GnosiST/platform-go/pkg/platform/capability`
+capability contracts from `github.com/GnosiST/platform-go/pkg/platform/capability` and
+the public App handler composition contract from
+`github.com/GnosiST/platform-go/pkg/platform/app`
 and is not imported by the default API or Admin process.
 
 Use this template when a product asks whether to start from the generic base by
@@ -14,7 +16,22 @@ creating a business service/package or by editing platform source:
 - do not add business menus, resources or permission prefixes to platform
   defaults.
 
-Run it from this directory:
+## No External Configuration Quick Start
+
+This slice runs without a database, secrets or an external service. Lifecycle
+steps are no-op functions recorded by the public lifecycle executor, the auth
+provider is disabled metadata, and the service surface is contract-only.
+
+Run it from the repository root:
+
+```bash
+rtk node scripts/validate-external-capability-example.mjs
+rtk node --test scripts/validate-external-capability-example.test.mjs
+rtk go -C examples/external-capability test ./...
+rtk go -C examples/external-capability run .
+```
+
+Or run the Go package from this directory:
 
 ```bash
 rtk go test ./...
@@ -22,8 +39,13 @@ rtk go run .
 ```
 
 `go run .` validates the manifest through the public registry and prints a
-JSON-safe contract preview. It intentionally does not marshal
+JSON-safe contract preview. `NewExampleAppRouter()` also binds the declared
+catalog route to a runnable standard-library handler; its test passes a typed
+identity through the public runtime. It intentionally does not marshal
 `capability.Manifest` directly because manifests may contain lifecycle hooks.
+Because this directory is a standalone nested Go module, use `go -C` from the
+repository root or run inside this directory; do not use
+`go test ./examples/external-capability/...` from the root module.
 
 From the repository root, the maintained regression gate is:
 
@@ -39,7 +61,7 @@ The example covers the minimum external-business onboarding shape:
   fields, action, panel and runtime slot declarations;
 - a capability-owned settings resource, `catalog-settings`, under the
   `configuration` menu parent so `/settings` can aggregate it dynamically;
-- App route declaration under `/api/app/**`;
+- App route declaration and runnable handler under `/api/app/**`;
 - service contract metadata with trusted tenant context and no client-selected
   physical routing;
 - auth provider, migration, seed and demo-data declarations;
@@ -47,11 +69,42 @@ The example covers the minimum external-business onboarding shape:
   lifecycle history contracts;
 - public-contract validation without importing `internal/platform/**`.
 
+## Template Files
+
+- `main.go` contains the sample manifest, runnable App handler composition and contract-preview command.
+- `main_test.go` proves the manifest resolves, emits JSON-safe output and runs
+  lifecycle steps through public runtime contracts.
+- `business-project-template.json` is the static machine-checkable onboarding
+  slice for new downstream projects.
+- `README.md` is the human tutorial that mirrors the validator contract.
+
 `business-project-template.json` is the static machine-checkable project slice.
 The validator checks that it points to the public package import, declares the
 business manifest, includes both the operational resource and settings resource,
 keeps the settings resource under `configuration`, declares permission prefixes,
-and rejects platform-internal imports.
+records demo data, lifecycle, route, service-contract and no-external-config
+tutorial metadata, and rejects platform-internal imports.
+
+## Turn This Into A Real Business Project
+
+1. Create a downstream Go module and require
+   `github.com/GnosiST/platform-go` at a released version.
+2. Copy the manifest pattern into a business package such as
+   `internal/catalog/manifest.go`.
+3. Rename the capability ID, package path, resource keys, routes, permission
+   prefixes, config keys and demo records for the real business domain.
+4. Keep platform imports limited to
+   `github.com/GnosiST/platform-go/pkg/platform/capability` and
+   `github.com/GnosiST/platform-go/pkg/platform/app`.
+5. Register the manifest and bind each declared App route in the downstream
+   composition root before starting its HTTP server.
+6. Keep handlers, repositories, real migration bodies, custom Admin renderers,
+   state machines and deployment wiring in the downstream project.
+7. Regenerate contracts for the target capability set, rebuild the downstream
+   API/service artifact and restart.
+
+`catalog` is only a replaceable example domain. Do not promote it, or any
+single product's resources, into platform defaults.
 
 Replace the local `replace` directive with the released module version when
 consuming the platform from another repository. A real capability should add its
@@ -82,9 +135,10 @@ to ship one product's business model.
 4. Put system-level business configuration in a normal Admin resource whose menu
    parent is `configuration`; `/settings` discovers it through
    `GET /api/capabilities`.
-5. Register the manifest in the downstream composition root before resolving the
-   enabled capability list. Keep business handlers, stores, state machines and
-   custom renderers downstream.
+5. Register the manifest, then use `app.NewRouter` to bind each declared App
+   route. Authentication middleware must attach a verified `app.Identity` with
+   `app.WithIdentity`; keep business handlers, stores, state machines and custom
+   renderers downstream.
 6. Run the validators, regenerate contracts for the target capability set, build
    the downstream API/service artifact and restart the process.
 7. Upgrade by bumping platform and capability versions separately. Keep resource

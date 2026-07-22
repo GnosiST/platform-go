@@ -90,6 +90,12 @@ type Config struct {
 	CredentialAuthPhonePassword          bool
 	CredentialAuthEmailPassword          bool
 	CredentialAuthPhoneSMSOTP            bool
+	CredentialAuthChallengeMode          string
+	CredentialAuthChallengeKind          string
+	CredentialAuthPasswordMaxAttempts    int
+	CredentialAuthPasswordLock           time.Duration
+	CredentialAuthSMSOTPTTL              time.Duration
+	CredentialAuthSMSOTPMaxAttempts      int
 	CredentialAuthRepositoryDriver       string
 	CredentialAuthRepositoryDSN          string
 	CredentialAuthIdentifierHMACKey      string
@@ -779,6 +785,24 @@ func (c Config) validateCredentialAuth(environment string) []error {
 	}
 	if !c.CredentialAuthConfigured() {
 		return errs
+	}
+	if mode := strings.TrimSpace(c.CredentialAuthChallengeMode); mode != "" && mode != "always" {
+		errs = append(errs, fmt.Errorf("credential-auth challenge mode %q is unsupported", mode))
+	}
+	if kind := strings.TrimSpace(c.CredentialAuthChallengeKind); kind != "" && kind != "captcha" && kind != "slider" {
+		errs = append(errs, fmt.Errorf("credential-auth challenge kind %q is unsupported", kind))
+	}
+	if c.CredentialAuthPasswordMaxAttempts < 0 {
+		errs = append(errs, errors.New("credential-auth password max attempts must not be negative"))
+	}
+	if c.CredentialAuthPasswordLock < 0 {
+		errs = append(errs, errors.New("credential-auth password lock duration must not be negative"))
+	}
+	if c.CredentialAuthSMSOTPTTL < 0 {
+		errs = append(errs, errors.New("credential-auth SMS OTP TTL must not be negative"))
+	}
+	if c.CredentialAuthSMSOTPMaxAttempts < 0 {
+		errs = append(errs, errors.New("credential-auth SMS OTP max attempts must not be negative"))
 	}
 	prefix := "credential-auth"
 	if environment == RuntimeEnvironmentProduction {

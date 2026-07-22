@@ -26,7 +26,7 @@ func RuntimeFromConfig(cfg config.Config) (capability.Runtime, error) {
 			return capability.Runtime{}, err
 		}
 		executor := capability.NewRecordedLifecycleExecutor(history)
-		return capability.Runtime{MigrationExecutor: executor, SeedExecutor: executor}, nil
+		return capability.Runtime{MigrationExecutor: executor, SeedExecutor: executor, Closer: history}, nil
 	}
 	if cfg.LifecycleHistoryFile == "" {
 		return capability.Runtime{}, nil

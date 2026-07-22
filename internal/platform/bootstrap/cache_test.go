@@ -41,3 +41,16 @@ func TestCacheFromConfigRejectsUnknownDriver(t *testing.T) {
 		t.Fatalf("CacheFromConfig() error = nil, want unsupported driver")
 	}
 }
+
+func TestCacheRuntimeFromConfigOwnsStoreAndInvalidationBus(t *testing.T) {
+	runtime, err := CacheRuntimeFromConfig(config.Config{CacheDriver: "memory"})
+	if err != nil {
+		t.Fatalf("CacheRuntimeFromConfig() error = %v", err)
+	}
+	if runtime.Store == nil || runtime.InvalidationBus == nil {
+		t.Fatalf("runtime = %#v, want store and invalidation bus", runtime)
+	}
+	if err := runtime.Close(); err != nil {
+		t.Fatalf("runtime.Close() error = %v", err)
+	}
+}

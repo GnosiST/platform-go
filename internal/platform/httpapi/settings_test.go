@@ -78,6 +78,20 @@ func TestAdminSettingsRuntimeAggregatesEnabledCapabilityConfigResources(t *testi
 	}
 }
 
+func TestCredentialAuthSettingsRejectNonMandatoryChallengeMode(t *testing.T) {
+	checks := validateCredentialAuthSettingsChecks(adminresource.Record{Values: map[string]string{
+		"challengeMode":     "risk-based",
+		"secretTransport":   "ecdh-a256gcm-v1",
+		"passwordAlgorithm": "argon2id",
+	}})
+	for _, check := range checks {
+		if check.Key == "challengeMode" && check.Status == adminSettingsCheckInvalid {
+			return
+		}
+	}
+	t.Fatalf("validateCredentialAuthSettingsChecks() = %+v, want invalid non-mandatory challenge mode", checks)
+}
+
 func TestAdminSettingsRuntimeIncludesCredentialAuthSecurityConfig(t *testing.T) {
 	server := newSettingsRuntimeDefaultServer(t, core.DefaultManifests())
 
@@ -176,6 +190,31 @@ func TestAdminSettingsRuntimeUpdatesWritableConfigRecord(t *testing.T) {
 	}
 }
 
+func TestAdminSettingsRuntimeUsesAppliedRevisionInsteadOfRecordTimestamp(t *testing.T) {
+	manifests := []capability.Manifest{settingsRuntimeTestManifest()}
+	server := newSettingsRuntimeTestServer(t, manifests)
+	recordID := settingsRuntimeProviderRecordID(t, server)
+	if _, err := server.resources.UpdateInternal("notification-providers", recordID, adminresource.WriteInput{
+		Code: "aliyun", Name: "Aliyun SMS", Status: "enabled", Description: "SMS provider account.",
+		Values: map[string]string{"provider": "mock-local", "channel": "sms", "region": "ap-shanghai"},
+	}); err != nil {
+		t.Fatalf("update settings record: %v", err)
+	}
+	updated, err := server.resources.InternalRecord("notification-providers", recordID)
+	if err != nil {
+		t.Fatalf("read updated settings record: %v", err)
+	}
+	server.markSettingsPendingRestart("notification-providers", recordID, server.resources.Revision())
+	if !server.settingsRecordPendingRestart("notification-providers", recordID, updated, true) {
+		t.Fatal("current process pending restart = false, want revision after applied baseline")
+	}
+
+	restarted := newTestServer(ServerOptions{Capabilities: manifests, Resources: server.resources})
+	if restarted.settingsRecordPendingRestart("notification-providers", recordID, updated, true) {
+		t.Fatalf("restarted process pending restart = true, want applied revision %d to clear persisted desired state", server.resources.Revision())
+	}
+}
+
 func TestAdminSettingsRuntimeValidatesAndDryRunTestsConfigWithoutLeakingSecrets(t *testing.T) {
 	server := newSettingsRuntimeTestServer(t, []capability.Manifest{settingsRuntimeTestManifest()})
 	recordID := settingsRuntimeProviderRecordID(t, server)
@@ -214,6 +253,40 @@ func TestAdminSettingsRuntimeValidatesAndDryRunTestsConfigWithoutLeakingSecrets(
 	}
 	if strings.Contains(testRecorder.Body.String(), "provider-secret") {
 		t.Fatalf("test-connect leaked provider secret: %s", testRecorder.Body.String())
+	}
+}
+
+func TestAdminSettingsRuntimeDryRunTestsEmailAndWeChatProviderConfigs(t *testing.T) {
+	server := newSettingsRuntimeDefaultServer(t, core.DefaultManifests())
+	records, err := server.resources.List("notification-providers")
+	if err != nil {
+		t.Fatalf("list notification providers: %v", err)
+	}
+	for _, test := range []struct {
+		code string
+	}{
+		{code: "email-smtp"},
+		{code: "wechat-official"},
+		{code: "wechat-miniapp"},
+	} {
+		record := settingsRuntimeRecord(records, test.code)
+		if record == nil {
+			t.Fatalf("notification provider %q not found: %+v", test.code, records)
+		}
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/api/admin/settings/notification-providers/"+record.ID+"/test-connect", nil)
+		request.Header.Set("X-Platform-User", "admin")
+		server.Router().ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("POST test-connect %q status = %d body = %s, want 200", test.code, recorder.Code, recorder.Body.String())
+		}
+		var connection Response[adminSettingsTestConnectionResponse]
+		if err := json.Unmarshal(recorder.Body.Bytes(), &connection); err != nil {
+			t.Fatalf("decode test-connect %q: %v body = %s", test.code, err, recorder.Body.String())
+		}
+		if !connection.Data.Supported || !connection.Data.Connected || connection.Data.Status != adminSettingsStatusDryRun || connection.Data.Mode != "local-dry-run" {
+			t.Fatalf("test-connect %q data = %+v, want local dry-run support", test.code, connection.Data)
+		}
 	}
 }
 

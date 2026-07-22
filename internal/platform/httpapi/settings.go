@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -211,7 +210,7 @@ func (s *Server) adminSettingsUpdate(ctx *gin.Context) {
 	}
 	restartRequired := settingsResourceRestartRequired(contribution.manifest, contribution.resource)
 	if restartRequired {
-		s.markSettingsPendingRestart(resource, mutation.Record.ID)
+		s.markSettingsPendingRestart(resource, mutation.Record.ID, s.resources.Revision())
 	}
 	projected, err := s.resources.ProjectRecord(resource, mutation.Record, adminresource.ProjectionResponse)
 	if err != nil {
@@ -282,18 +281,31 @@ func (s *Server) adminSettingsTestConnection(ctx *gin.Context) {
 	}
 	channel := strings.TrimSpace(target.record.Values["channel"])
 	provider := strings.TrimSpace(target.record.Values["provider"])
-	if channel != "sms" {
-		response.Checks = append(response.Checks, adminSettingsConfigCheck{Key: "adapter", Status: adminSettingsCheckWarning, Message: "Only SMS provider connection preflight is available in v1.1; email and WeChat adapters remain configuration contracts."})
-		ctx.JSON(http.StatusOK, Response[adminSettingsTestConnectionResponse]{Data: response})
-		return
-	}
-	switch provider {
-	case "aliyun", "tencent", "mock-local":
+	switch {
+	case channel == "sms" && (provider == "aliyun" || provider == "tencent" || provider == "mock-local"):
 		response.Status = adminSettingsStatusDryRun
 		response.Supported = true
 		response.Connected = true
 		response.Mode = "dry-run"
 		response.Checks = append(response.Checks, adminSettingsConfigCheck{Key: "adapter", Status: adminSettingsCheckOK, Message: "SMS provider configuration passed local adapter preflight without contacting the external vendor."})
+	case channel == "email" && provider == "smtp":
+		response.Status = adminSettingsStatusDryRun
+		response.Supported = true
+		response.Connected = true
+		response.Mode = "local-dry-run"
+		response.Checks = append(response.Checks, adminSettingsConfigCheck{Key: "adapter", Status: adminSettingsCheckOK, Message: "SMTP provider configuration supports message-center local dry-run receipts; no external mail server is contacted."})
+	case channel == "wechat_official" && provider == "wechat-official":
+		response.Status = adminSettingsStatusDryRun
+		response.Supported = true
+		response.Connected = true
+		response.Mode = "local-dry-run"
+		response.Checks = append(response.Checks, adminSettingsConfigCheck{Key: "adapter", Status: adminSettingsCheckOK, Message: "WeChat official account configuration supports message-center local dry-run receipts; no WeChat API is contacted."})
+	case channel == "wechat_miniapp" && provider == "wechat-miniapp":
+		response.Status = adminSettingsStatusDryRun
+		response.Supported = true
+		response.Connected = true
+		response.Mode = "local-dry-run"
+		response.Checks = append(response.Checks, adminSettingsConfigCheck{Key: "adapter", Status: adminSettingsCheckOK, Message: "WeChat miniapp configuration supports message-center local dry-run receipts; no WeChat API is contacted."})
 	default:
 		response.Checks = append(response.Checks, adminSettingsConfigCheck{Key: "adapter", Status: adminSettingsCheckWarning, Message: "The selected notification provider does not have a v1.1 runtime adapter preflight."})
 	}
@@ -564,21 +576,21 @@ func settingsTestConnectionEndpoint(resource string) string {
 	return "/api/admin/settings/" + resource + "/:id/test-connect"
 }
 
-func (s *Server) markSettingsPendingRestart(resource string, id string) {
+func (s *Server) markSettingsPendingRestart(resource string, id string, revision uint64) {
 	resource = strings.TrimSpace(resource)
 	id = strings.TrimSpace(id)
-	if resource == "" || id == "" {
+	if resource == "" || id == "" || revision == 0 {
 		return
 	}
 	s.settingsMu.Lock()
 	defer s.settingsMu.Unlock()
 	if s.settingsPendingRestart == nil {
-		s.settingsPendingRestart = map[string]map[string]struct{}{}
+		s.settingsPendingRestart = map[string]map[string]uint64{}
 	}
 	if s.settingsPendingRestart[resource] == nil {
-		s.settingsPendingRestart[resource] = map[string]struct{}{}
+		s.settingsPendingRestart[resource] = map[string]uint64{}
 	}
-	s.settingsPendingRestart[resource][id] = struct{}{}
+	s.settingsPendingRestart[resource][id] = revision
 }
 
 func (s *Server) settingsResourcePendingRestart(resource string, records []adminresource.Record, restartRequired bool) bool {
@@ -600,16 +612,9 @@ func (s *Server) settingsRecordPendingRestart(resource string, id string, record
 	resource = strings.TrimSpace(resource)
 	id = strings.TrimSpace(id)
 	s.settingsMu.Lock()
-	_, pending := s.settingsPendingRestart[resource][id]
+	revision := s.settingsPendingRestart[resource][id]
 	s.settingsMu.Unlock()
-	if pending {
-		return true
-	}
-	updatedAt, err := time.Parse(time.RFC3339, strings.TrimSpace(record.UpdatedAt))
-	if err != nil {
-		return false
-	}
-	return updatedAt.After(s.startedAt)
+	return revision > s.settingsAppliedRevision
 }
 
 func validateSettingsConfigChecks(schema adminresource.Schema, record adminresource.Record) []adminSettingsConfigCheck {
@@ -693,18 +698,18 @@ func validateNotificationProviderSettingsChecks(record adminresource.Record) []a
 		}
 	}
 	if channel == "email" || provider == "smtp" {
-		checks = append(checks, adminSettingsConfigCheck{Key: "adapter", Status: adminSettingsCheckWarning, Message: "SMTP is a v1.1 configuration contract; a real sending adapter remains a follow-up runtime slice."})
+		checks = append(checks, adminSettingsConfigCheck{Key: "adapter", Status: adminSettingsCheckWarning, Message: "SMTP is a v1.1 configuration contract with message-center local dry-run/test-connect; a real sending adapter remains a follow-up runtime slice."})
 	}
 	if strings.HasPrefix(channel, "wechat") || strings.HasPrefix(provider, "wechat") {
-		checks = append(checks, adminSettingsConfigCheck{Key: "adapter", Status: adminSettingsCheckWarning, Message: "WeChat message providers are v1.1 configuration contracts; real sending adapters remain follow-up runtime slices."})
+		checks = append(checks, adminSettingsConfigCheck{Key: "adapter", Status: adminSettingsCheckWarning, Message: "WeChat message providers are v1.1 configuration contracts with message-center local dry-run/test-connect; real sending adapters remain follow-up runtime slices."})
 	}
 	return checks
 }
 
 func validateCredentialAuthSettingsChecks(record adminresource.Record) []adminSettingsConfigCheck {
 	checks := make([]adminSettingsConfigCheck, 0, 4)
-	if strings.TrimSpace(record.Values["challengeMode"]) == "risk-based" {
-		checks = append(checks, adminSettingsConfigCheck{Key: "challengeMode", Status: adminSettingsCheckWarning, Message: "Risk-based challenge mode requires a future risk signal adapter before it can be stronger than after-failure mode."})
+	if strings.TrimSpace(record.Values["challengeMode"]) != "always" {
+		checks = append(checks, adminSettingsConfigCheck{Key: "challengeMode", Status: adminSettingsCheckInvalid, Message: "Credential-auth v1 requires an always-on login challenge; risk-based challenge routing needs a separately approved runtime adapter."})
 	}
 	if strings.TrimSpace(record.Values["secretTransport"]) != "ecdh-a256gcm-v1" {
 		checks = append(checks, adminSettingsConfigCheck{Key: "secretTransport", Status: adminSettingsCheckInvalid, Message: "Credential-auth v1 requires ecdh-a256gcm-v1 application-layer secret transport."})

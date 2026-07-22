@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -20,12 +21,19 @@ import (
 )
 
 const (
-	messageCenterTestPurpose       = "message_center_test"
-	messageCenterNotifications     = "notifications"
-	messageCenterDeliveries        = "notification-deliveries"
-	messageCenterNotificationEvent = "message_center.test_send.notification"
-	messageCenterDeliveryEvent     = "message_center.test_send.delivery"
+	messageCenterTestPurpose        = "message_center_test"
+	messageCenterNotifications      = "notifications"
+	messageCenterDeliveries         = "notification-deliveries"
+	messageCenterNotificationEvent  = "message_center.test_send.notification"
+	messageCenterDeliveryEvent      = "message_center.test_send.delivery"
+	messageCenterDeliveryRetryEvent = "message_center.delivery.retry"
+	messageCenterRetryTargetTTL     = 2 * time.Hour
 )
+
+type messageCenterRetryTarget struct {
+	value     string
+	expiresAt time.Time
+}
 
 type adminMessageCenterTestSendRequest struct {
 	Channel        string            `json:"channel"`
@@ -45,6 +53,14 @@ type adminMessageCenterTestSendResponse struct {
 
 type adminMessageCenterDeliveriesRunRequest struct {
 	Limit int `json:"limit,omitempty"`
+}
+
+type adminMessageCenterDeliveryRetryRequest struct {
+	Recipient string `json:"recipient,omitempty"`
+}
+
+type adminMessageCenterDeliveryRetryResponse struct {
+	Delivery adminresource.Record `json:"delivery"`
 }
 
 func sanitizeMessageCenterResourceRecord(resource string, record adminresource.Record) adminresource.Record {
@@ -324,11 +340,15 @@ func (s *Server) adminMessageCenterDeliveriesRun(ctx *gin.Context) {
 		options.DefaultSMSProvider = provider
 		options.SMSSenders = map[string]notification.SMSSender{provider: s.notificationSMSSender}
 	}
+	messageSenders, defaultProviders := messageCenterDryRunMessageSenders()
+	options.MessageSenders = messageSenders
+	options.DefaultProviders = defaultProviders
 	options.PolicyGate = messageCenterDeliveryPolicyGate{
 		server:   s,
 		actor:    principal.User.Username,
 		clientIP: rateLimitClientIP(ctx),
 	}
+	options.TargetResolver = s
 	result, err := notification.NewDeliveryWorker(s.resources, options).RunOnce(ctx.Request.Context())
 	if err != nil {
 		writeAdminResourceError(ctx, s.internalErrorSink, err)
@@ -340,12 +360,158 @@ func (s *Server) adminMessageCenterDeliveriesRun(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, Response[notification.DeliveryWorkerResult]{Data: result})
 }
 
+func (s *Server) adminMessageCenterDeliveryRetry(ctx *gin.Context) {
+	principal, ok := s.authorizeAdminBearerSession(ctx, "admin:message-center:update")
+	if !ok {
+		return
+	}
+	if !s.enforceAdminRateLimit(ctx, ratelimit.OperationMessageCenterDelivery, principal.User.Username, rateLimitClientIP(ctx), "retry") {
+		return
+	}
+	var input adminMessageCenterDeliveryRetryRequest
+	if ctx.Request.Body != nil && ctx.Request.ContentLength != 0 {
+		decoder := json.NewDecoder(ctx.Request.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&input); err != nil {
+			writePlatformError(ctx, errorcode.CodeRequestBodyInvalid)
+			return
+		}
+	}
+	record, err := s.resources.InternalRecord(messageCenterDeliveries, strings.TrimSpace(ctx.Param("id")))
+	if err != nil {
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
+		return
+	}
+	values, retryTarget, err := messageCenterRetryDeliveryValues(record, input, s.now().UTC())
+	if err != nil {
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
+		return
+	}
+	mutation, err := s.resources.UpdateInternalWithAudit(messageCenterDeliveries, record.ID, adminresource.WriteInput{
+		Code:        record.Code,
+		Name:        record.Name,
+		Status:      record.Status,
+		Description: record.Description,
+		Values:      values,
+	}, s.mutationAuditEvent(ctx, messageCenterDeliveryRetryEvent, messageCenterDeliveries, "retry-queued"))
+	if err != nil {
+		writeAdminResourceError(ctx, s.internalErrorSink, err)
+		return
+	}
+	s.storeMessageCenterRetryTarget(record.ID, retryTarget)
+	s.invalidateCachesForResource(ctx.Request.Context(), messageCenterDeliveries)
+	ctx.JSON(http.StatusOK, Response[adminMessageCenterDeliveryRetryResponse]{
+		Data: adminMessageCenterDeliveryRetryResponse{
+			Delivery: sanitizeMessageCenterResourceRecord(messageCenterDeliveries, mutation.Record),
+		},
+	})
+}
+
+func messageCenterRetryDeliveryValues(record adminresource.Record, input adminMessageCenterDeliveryRetryRequest, now time.Time) (map[string]string, string, error) {
+	values := cloneStringMap(record.Values)
+	channel := notification.CanonicalChannel(values["channel"])
+	if !notification.IsSupportedChannel(channel) || strings.TrimSpace(values["deliveryStatus"]) != notification.DeliveryStatusFailed {
+		return nil, "", adminresource.ErrInvalidRecord
+	}
+	recipient := strings.TrimSpace(input.Recipient)
+	if recipient == "" {
+		recipient = strings.TrimSpace(values["target"])
+	}
+	if recipient == "" || messageCenterTargetIsRedacted(recipient) {
+		return nil, "", adminresource.ErrInvalidRecord
+	}
+	values["channel"] = channel
+	values["target"] = notification.RedactMessageTarget(channel, recipient)
+	values["deliveryStatus"] = notification.DeliveryStatusPending
+	values["retryRequestedAt"] = now.Format(time.RFC3339)
+	delete(values, "deliveredAt")
+	delete(values, "errorMessage")
+	values["nextRetryAt"] = ""
+	values["providerMessageId"] = ""
+	values["providerStatus"] = ""
+	values["retryBackoffSeconds"] = ""
+	return values, recipient, nil
+}
+
+func messageCenterTargetIsRedacted(value string) bool {
+	return strings.HasPrefix(strings.TrimSpace(value), "****")
+}
+
+func (s *Server) storeMessageCenterRetryTarget(deliveryID string, target string) {
+	deliveryID = strings.TrimSpace(deliveryID)
+	target = strings.TrimSpace(target)
+	if s == nil || deliveryID == "" || target == "" || messageCenterTargetIsRedacted(target) {
+		return
+	}
+	s.messageCenterRetryMu.Lock()
+	defer s.messageCenterRetryMu.Unlock()
+	if s.messageCenterRetryTargets == nil {
+		s.messageCenterRetryTargets = make(map[string]messageCenterRetryTarget)
+	}
+	s.messageCenterRetryTargets[deliveryID] = messageCenterRetryTarget{value: target, expiresAt: s.messageCenterRetryTargetExpiry()}
+}
+
+func (s *Server) ResolveDeliveryTarget(_ context.Context, delivery adminresource.Record) (string, bool, error) {
+	if s == nil || strings.TrimSpace(delivery.ID) == "" {
+		return "", false, nil
+	}
+	s.messageCenterRetryMu.Lock()
+	defer s.messageCenterRetryMu.Unlock()
+	target, ok := s.messageCenterRetryTargets[delivery.ID]
+	if !ok || !target.expiresAt.After(s.messageCenterRetryTargetNow()) {
+		delete(s.messageCenterRetryTargets, delivery.ID)
+		return "", false, nil
+	}
+	return target.value, true, nil
+}
+
+func (s *Server) DeliveryTargetDelivered(_ context.Context, delivery adminresource.Record) {
+	if s == nil || strings.TrimSpace(delivery.ID) == "" {
+		return
+	}
+	s.messageCenterRetryMu.Lock()
+	defer s.messageCenterRetryMu.Unlock()
+	delete(s.messageCenterRetryTargets, delivery.ID)
+}
+
+func (s *Server) messageCenterRetryTargetNow() time.Time {
+	if s != nil && s.now != nil {
+		return s.now().UTC()
+	}
+	return time.Now().UTC()
+}
+
+func (s *Server) messageCenterRetryTargetExpiry() time.Time {
+	return s.messageCenterRetryTargetNow().Add(messageCenterRetryTargetTTL)
+}
+
 func (s *Server) messageCenterRuntimeProvider(channel string) string {
 	channel = notification.CanonicalChannel(channel)
 	if channel == notification.ChannelSMS && !smsSenderNil(s.notificationSMSSender) {
 		return s.notificationSMSSender.Kind()
 	}
 	return notification.DefaultProviderForChannel(channel)
+}
+
+func messageCenterDryRunMessageSenders() (map[string]notification.MessageSender, map[string]string) {
+	channels := []string{
+		notification.ChannelInApp,
+		notification.ChannelEmail,
+		notification.ChannelWeChatOfficial,
+		notification.ChannelWeChatMiniapp,
+	}
+	senders := make(map[string]notification.MessageSender, len(channels))
+	defaultProviders := make(map[string]string, len(channels))
+	for _, channel := range channels {
+		provider := notification.DefaultProviderForChannel(channel)
+		sender, err := notification.NewDryRunMessageSender(channel, provider)
+		if err != nil {
+			continue
+		}
+		senders[channel+":"+provider] = sender
+		defaultProviders[channel] = provider
+	}
+	return senders, defaultProviders
 }
 
 func writeMessageCenterRateLimited(ctx *gin.Context, retryAfter time.Duration) {

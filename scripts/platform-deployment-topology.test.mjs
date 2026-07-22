@@ -273,7 +273,7 @@ describe("validate-platform-deployment-topology", () => {
 
   it("rejects a production API healthcheck outside the loopback exception", () => {
     const current = fs.readFileSync(path.join(repoRoot, "deploy/compose/docker-compose.prod.yml"), "utf8");
-    const unsafe = current.replace("http://127.0.0.1:9200/api/health", "http://platform-api:9200/api/health");
+    const unsafe = current.replace("http://127.0.0.1:9200/api/ready", "http://platform-api:9200/api/ready");
     const composePath = tempText("docker-compose.prod.yml", unsafe);
 
     const result = runValidator(["--compose", composePath]);

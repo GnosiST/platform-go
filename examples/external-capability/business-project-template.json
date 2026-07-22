@@ -21,7 +21,75 @@
     "module": "github.com/GnosiST/platform-go/examples/external-capability",
     "manifestFunction": "CatalogManifest",
     "publicCapabilityImport": "github.com/GnosiST/platform-go/pkg/platform/capability",
-    "registration": "append CatalogManifest() in the downstream composition root before resolving enabled capabilities"
+    "registration": "append CatalogManifest() in the downstream composition root before resolving enabled capabilities",
+    "replaceableExampleDomain": "catalog is a placeholder domain; rename the capability, resources, routes, permissions, demo records and package path for a real business project",
+    "mustStayOutsidePlatformDefaults": true
+  },
+  "localTutorial": {
+    "requiresExternalConfiguration": false,
+    "requiresDatabase": false,
+    "requiresNetworkService": false,
+    "notes": [
+      "The example lifecycle steps are no-op functions recorded through the public lifecycle executor.",
+      "The auth provider is declared but disabled; its config keys are contract metadata, not required local secrets.",
+      "The service surface is contract-only; downstream packages own handlers, persistence and event delivery."
+    ],
+    "commands": [
+      {
+        "cwd": ".",
+        "command": "rtk node scripts/validate-external-capability-example.mjs",
+        "proves": "static template, docs, Go manifest shape, go test and JSON preview"
+      },
+      {
+        "cwd": ".",
+        "command": "rtk node --test scripts/validate-external-capability-example.test.mjs",
+        "proves": "negative coverage for missing template, internal imports and incomplete tutorial metadata"
+      },
+      {
+        "cwd": ".",
+        "command": "rtk go -C examples/external-capability test ./...",
+        "proves": "standalone downstream Go module tests pass from the repository root"
+      },
+      {
+        "cwd": ".",
+        "command": "rtk go -C examples/external-capability run .",
+        "proves": "the manifest can produce a JSON-safe contract preview without external config"
+      }
+    ],
+    "moduleBoundary": "examples/external-capability is a standalone nested Go module. From the repository root use go -C or run inside the example directory instead of go test ./examples/external-capability/..."
+  },
+  "manifestSurface": {
+    "declares": [
+      "capability ID and semver version",
+      "admin resources with schema fields, menus, permission prefixes, actions, panels and runtime slots",
+      "app routes with auth mode and app permission",
+      "auth providers and configuration keys",
+      "migrations, seeds and demo data",
+      "service operation and event contracts"
+    ],
+    "adminResources": [
+      {
+        "resource": "catalog-items",
+        "purpose": "operational business resource example",
+        "fields": ["code", "name", "tenantCode", "category", "status", "price", "description", "updatedAt"],
+        "actions": ["publish"],
+        "panels": ["audit"],
+        "runtimeSlots": ["catalog-validation-hint"]
+      },
+      {
+        "resource": "catalog-settings",
+        "purpose": "capability-owned settings/configuration resource",
+        "fields": ["code", "name", "tenantCode", "defaultVisibility", "approvalRequired", "partnerProvider", "updatedAt"],
+        "settingsEntry": true
+      }
+    ],
+    "appRoutes": ["/api/app/catalog/items"],
+    "authProviders": ["catalog-partner"],
+    "migrations": ["catalog-0001"],
+    "seeds": ["catalog-seed-0001"],
+    "demoDataSets": ["catalog-demo-items"],
+    "serviceOperations": ["catalog-list-items"],
+    "serviceEvents": ["catalog-item-published"]
   },
   "adminSurface": {
     "projection": "capability.Manifest.Admin.Resources -> admin resource contract -> menu, permissions, schema and settings aggregation",
@@ -56,10 +124,22 @@
   "configuration": {
     "settingsCenter": "/settings",
     "settingsResource": "catalog-settings",
+    "configResourceDiscovery": "GET /api/capabilities exposes catalog-settings in configResources after the downstream manifest is enabled and the service restarts",
     "authProviderConfigKeys": [
       "CATALOG_PARTNER_CLIENT_ID",
       "CATALOG_PARTNER_CLIENT_SECRET"
     ]
+  },
+  "demoData": {
+    "capability": "example-catalog",
+    "dataSets": [
+      {
+        "id": "catalog-demo-items",
+        "resource": "catalog-items",
+        "records": ["catalog-item-demo"]
+      }
+    ],
+    "productionRule": "demo data remains declarative and optional; production deployments must not rely on demo-data capability defaults"
   },
   "validationCommands": [
     {
@@ -71,13 +151,21 @@
       "command": "rtk node --test scripts/validate-external-capability-example.test.mjs"
     },
     {
-      "cwd": "examples/external-capability",
-      "command": "rtk go test ./..."
+      "cwd": ".",
+      "command": "rtk go -C examples/external-capability test ./..."
     },
     {
-      "cwd": "examples/external-capability",
-      "command": "rtk go run ."
+      "cwd": ".",
+      "command": "rtk go -C examples/external-capability run ."
     }
+  ],
+  "copyChecklist": [
+    "Create a downstream Go module and require github.com/GnosiST/platform-go at a released version.",
+    "Copy the manifest pattern, then rename capability ID, package path, resource keys, routes, permission prefixes, config keys and demo data.",
+    "Keep imports limited to github.com/GnosiST/platform-go/pkg/platform/capability for manifest contracts.",
+    "Register the manifest in the downstream composition root before resolving enabled capabilities.",
+    "Keep handlers, repositories, migrations with side effects, custom Admin renderers and deployment wiring in the downstream project.",
+    "Regenerate contracts for the target capability set, rebuild the downstream artifact and restart the service."
   ],
   "deployment": {
     "package": "build a downstream API binary or service image that includes the business capability manifest",
@@ -88,5 +176,10 @@
     "platform": "upgrade the platform module version, run contract validators, then rebuild the downstream composition root",
     "business": "bump the capability semver, keep resource keys and permission prefixes stable, add idempotent migrations for data changes",
     "rollback": "roll back the downstream binary and desired capability set; persisted business data remains owned by the business package"
+  },
+  "mainlineIntegrationNotes": {
+    "doNotAddBusinessCapabilityTo": ["platform-default", "minimal-admin", "internal/platform/core", "resources/admin-resources.json"],
+    "promoteToPlatformOnlyWhen": "the behavior is proven reusable across products and has its own public contract, profile policy, validators, docs and migration evidence",
+    "businessNeutrality": "example-catalog is not a built-in platform capability and must remain replaceable sample material"
   }
 }

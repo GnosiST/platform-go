@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createECDH } from "node:crypto";
 import { isIP } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -97,6 +98,107 @@ function validateNotificationSMS(env, capabilities, errors) {
   }
   if (rawLoginTemplate !== loginTemplate) {
     errors.push("PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID must be trimmed");
+  }
+}
+
+function credentialAuthProviderEnabled(env) {
+  return [
+    "PLATFORM_CREDENTIAL_AUTH_USERNAME_PASSWORD",
+    "PLATFORM_CREDENTIAL_AUTH_PHONE_PASSWORD",
+    "PLATFORM_CREDENTIAL_AUTH_EMAIL_PASSWORD",
+    "PLATFORM_CREDENTIAL_AUTH_PHONE_SMS_OTP",
+  ].some((key) => isTruthy(env.get(key)));
+}
+
+function decodeCredentialAuthPrivateKey(value) {
+  if (/^[A-Za-z0-9_-]+$/.test(value)) {
+    const decoded = Buffer.from(value, "base64url");
+    if (decoded.toString("base64url") === value) {
+      return decoded;
+    }
+  }
+  if (/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
+    const decoded = Buffer.from(value, "base64");
+    if (decoded.toString("base64") === value) {
+      return decoded;
+    }
+  }
+  throw new Error("invalid base64 encoding");
+}
+
+function validateCredentialAuth(env, capabilities, errors) {
+  const usernamePasswordEnabled = isTruthy(env.get("PLATFORM_CREDENTIAL_AUTH_USERNAME_PASSWORD"));
+  const phonePasswordEnabled = isTruthy(env.get("PLATFORM_CREDENTIAL_AUTH_PHONE_PASSWORD"));
+  const emailPasswordEnabled = isTruthy(env.get("PLATFORM_CREDENTIAL_AUTH_EMAIL_PASSWORD"));
+  const phoneSMSOTPEnabled = isTruthy(env.get("PLATFORM_CREDENTIAL_AUTH_PHONE_SMS_OTP"));
+  if (!credentialAuthProviderEnabled(env)) {
+    return;
+  }
+  if (!capabilities.includes("credential-auth")) {
+    errors.push("credential-auth provider configuration requires credential-auth capability");
+  }
+  const driver = env.get("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER")?.trim() ?? "";
+  const dsn = env.get("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN")?.trim() ?? "";
+  if (driver === "") {
+    errors.push("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER is required when credential-auth is enabled");
+  } else if (!["mysql", "postgres", "sqlite"].includes(driver)) {
+    errors.push("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER must be mysql, postgres, or sqlite");
+  }
+  if (dsn === "") {
+    errors.push("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN is required when credential-auth is enabled");
+  } else if (strictSecrets && isPlaceholderSecret(dsn)) {
+    errors.push("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN must not contain placeholder credentials when --strict-secrets is used");
+  }
+  const identifierHMACKey = env.get("PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY") ?? "";
+  if (identifierHMACKey.trim() === "") {
+    errors.push("PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY is required when credential-auth is enabled");
+  } else if (Buffer.byteLength(identifierHMACKey, "utf8") < 32) {
+    errors.push("PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY must be at least 32 bytes");
+  } else if (strictSecrets && isPlaceholderSecret(identifierHMACKey)) {
+    errors.push("PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY must not be a placeholder when --strict-secrets is used");
+  }
+  const keyID = env.get("PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_KEY_ID")?.trim() ?? "";
+  if (keyID === "") {
+    errors.push("PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_KEY_ID is required when credential-auth is enabled");
+  }
+  const privateKey = env.get("PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY")?.trim() ?? "";
+  if (privateKey === "") {
+    errors.push("PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY is required when credential-auth is enabled");
+  } else {
+    try {
+      const decoded = decodeCredentialAuthPrivateKey(privateKey);
+      if (decoded.length !== 32) {
+        throw new Error("invalid length");
+      }
+      createECDH("prime256v1").setPrivateKey(decoded);
+    } catch {
+      errors.push("PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY must be a valid base64-encoded 32-byte P-256 private key");
+    }
+  }
+  if (usernamePasswordEnabled || phonePasswordEnabled || emailPasswordEnabled) {
+    if ((env.get("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_USERNAME") ?? "").trim() === "") {
+      errors.push("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_USERNAME is required for credential password providers");
+    }
+    if ((env.get("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PASSWORD") ?? "").trim() === "") {
+      errors.push("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PASSWORD is required for credential password providers");
+    }
+  }
+  if ((phonePasswordEnabled || phoneSMSOTPEnabled) && (env.get("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PHONE") ?? "").trim() === "") {
+    errors.push("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PHONE is required for credential phone providers");
+  }
+  if (emailPasswordEnabled && (env.get("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_EMAIL") ?? "").trim() === "") {
+    errors.push("PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_EMAIL is required for credential email password providers");
+  }
+  if (phoneSMSOTPEnabled) {
+    if (!capabilities.includes("notification")) {
+      errors.push("credential-auth phone SMS OTP requires notification capability");
+    }
+    if ((env.get("PLATFORM_NOTIFICATION_SMS_PROVIDER") ?? "").trim() === "") {
+      errors.push("PLATFORM_NOTIFICATION_SMS_PROVIDER is required for credential-auth phone SMS OTP");
+    }
+    if ((env.get("PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID") ?? "").trim() === "") {
+      errors.push("PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID is required for credential-auth phone SMS OTP");
+    }
   }
 }
 
@@ -546,6 +648,7 @@ function validatePlatformEnv(env, errors) {
     errors.push("PLATFORM_CAPABILITIES must not include demo-data in production");
   }
   validateNotificationSMS(env, capabilities, errors);
+  validateCredentialAuth(env, capabilities, errors);
   const adminStepUpPhoneKeys = [
     "PLATFORM_ADMIN_STEP_UP_PHONE_RESOURCE",
     "PLATFORM_ADMIN_STEP_UP_PHONE_ACTOR_FIELD",

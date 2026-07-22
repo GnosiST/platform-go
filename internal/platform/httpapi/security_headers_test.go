@@ -241,6 +241,7 @@ func TestProductionLoopbackHealthCheckBypassesHTTPSRedirect(t *testing.T) {
 		TrustedProxies: []string{"127.0.0.1"},
 	}))
 	router.GET("/api/health", func(ctx *gin.Context) { ctx.Status(http.StatusNoContent) })
+	router.GET("/api/ready", func(ctx *gin.Context) { ctx.Status(http.StatusNoContent) })
 	router.GET("/api/private", func(ctx *gin.Context) { ctx.Status(http.StatusNoContent) })
 
 	loopbackHealth := httptest.NewRequest(http.MethodGet, "/api/health", nil)
@@ -253,6 +254,14 @@ func TestProductionLoopbackHealthCheckBypassesHTTPSRedirect(t *testing.T) {
 	}
 	if got := loopbackRecorder.Header().Get("Strict-Transport-Security"); got != "" {
 		t.Fatalf("loopback health HSTS = %q, want empty", got)
+	}
+
+	loopbackReady := httptest.NewRequest(http.MethodGet, "/api/ready", nil)
+	loopbackReady.RemoteAddr = "127.0.0.1:43210"
+	loopbackReadyRecorder := httptest.NewRecorder()
+	router.ServeHTTP(loopbackReadyRecorder, loopbackReady)
+	if loopbackReadyRecorder.Code != http.StatusNoContent {
+		t.Fatalf("loopback readiness status = %d, want 204", loopbackReadyRecorder.Code)
 	}
 
 	for _, request := range []*http.Request{

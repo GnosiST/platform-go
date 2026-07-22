@@ -32,8 +32,9 @@ type ProtectedFieldAuthorizer interface {
 type ProtectedFieldPurpose string
 
 const (
-	ProtectedFieldPurposeSensitiveReveal ProtectedFieldPurpose = "sensitive-reveal"
-	ProtectedFieldPurposeStepUpDelivery  ProtectedFieldPurpose = "step-up-delivery"
+	ProtectedFieldPurposeSensitiveReveal  ProtectedFieldPurpose = "sensitive-reveal"
+	ProtectedFieldPurposeStepUpDelivery   ProtectedFieldPurpose = "step-up-delivery"
+	ProtectedFieldPurposeRuntimeBootstrap ProtectedFieldPurpose = "runtime-bootstrap"
 )
 
 type ProtectedFieldRevealRequest struct {
@@ -557,7 +558,7 @@ func (s *Store) RevealProtectedField(ctx context.Context, request ProtectedField
 	request.RecordID = strings.TrimSpace(request.RecordID)
 	request.Field = strings.TrimSpace(request.Field)
 	if request.Resource == "" || request.RecordID == "" || request.Field == "" ||
-		(request.Purpose != ProtectedFieldPurposeSensitiveReveal && request.Purpose != ProtectedFieldPurposeStepUpDelivery) {
+		(request.Purpose != ProtectedFieldPurposeSensitiveReveal && request.Purpose != ProtectedFieldPurposeStepUpDelivery && request.Purpose != ProtectedFieldPurposeRuntimeBootstrap) {
 		return "", errors.Join(ErrInvalidRecord, ErrProtectedFieldUnavailable)
 	}
 	s.mu.Lock()

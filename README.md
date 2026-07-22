@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/GnosiST/platform-go/actions/workflows/ci.yml/badge.svg)](https://github.com/GnosiST/platform-go/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f6f9f.svg)](LICENSE)
-[![Go](https://img.shields.io/badge/Go-1.22%2B-00ADD8.svg)](go.mod)
+[![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8.svg)](go.mod)
 [![在线文档](https://img.shields.io/badge/文档-GitHub%20Pages-0b7285.svg)](https://gnosist.github.io/platform-go/)
 
 [简体中文](README.md) · [English](README.en.md) · [文档站 / Documentation](https://gnosist.github.io/platform-go/)
@@ -71,6 +71,10 @@ go run ./cmd/platform-api
 ```
 
 API 默认地址为 `http://127.0.0.1:9200`，管理端开发服务器为 `http://127.0.0.1:9202`。
+
+### 业务接入基线
+
+保持 `0.1.0` 包版本不等于移动已发布的 `v0.1.0` tag。下游业务仓库应固定一个通过本仓库合同与测试门禁的 Git commit SHA，再通过 `pkg/platform/capability` 和 `pkg/platform/app` 接入业务 manifest 与 App handler；不要依赖可变的 `main` 分支，也不要修改 `internal/platform/**`。
 
 ### 开发环境角色菜单目标态
 

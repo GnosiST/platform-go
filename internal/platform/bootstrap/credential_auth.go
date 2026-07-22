@@ -38,6 +38,8 @@ func CredentialAuthRuntimeFromConfig(ctx context.Context, cfg config.Config, sms
 		IdentifierHasher:     hasher,
 		PasswordVerifier:     credentialauth.NewArgon2idVerifier(credentialauth.DefaultArgon2idParams()),
 		ChallengeProofHasher: hasher,
+		MaxPasswordAttempts:  cfg.CredentialAuthPasswordMaxAttempts,
+		PasswordLock:         cfg.CredentialAuthPasswordLock,
 		Now:                  time.Now,
 	})
 	if err != nil {
@@ -59,14 +61,30 @@ func CredentialAuthRuntimeFromConfig(ctx context.Context, cfg config.Config, sms
 		LoginTemplateID:         sms.LoginTemplateID,
 		DebugCodeEnabled:        sms.MockLocalEnabled && (environment == config.RuntimeEnvironmentDevelopment || environment == config.RuntimeEnvironmentTest),
 		Now:                     time.Now,
-		SMSOTPTTL:               5 * time.Minute,
-		MaxSMSOTPAttempts:       credentialauth.DefaultMaxSMSOTPAttempts,
+		SMSOTPTTL:               credentialAuthSMSOTPTTL(cfg),
+		MaxSMSOTPAttempts:       credentialAuthSMSOTPMaxAttempts(cfg),
 		MaxChallengeAttempts:    credentialauth.DefaultMaxChallengeAttempts,
 		ChallengeTTL:            credentialauth.DefaultCredentialChallengeTTL,
+		LoginChallengeKind:      credentialauth.ChallengeKind(cfg.CredentialAuthChallengeKind),
 		PasswordHashParams:      credentialauth.DefaultArgon2idParams(),
 		PasswordParamsVersion:   "argon2id-default",
+		RequireLoginChallenge:   true,
 		RequireEncryptedSecrets: true,
 	}, nil
+}
+
+func credentialAuthSMSOTPTTL(cfg config.Config) time.Duration {
+	if cfg.CredentialAuthSMSOTPTTL > 0 {
+		return cfg.CredentialAuthSMSOTPTTL
+	}
+	return 5 * time.Minute
+}
+
+func credentialAuthSMSOTPMaxAttempts(cfg config.Config) int {
+	if cfg.CredentialAuthSMSOTPMaxAttempts > 0 {
+		return cfg.CredentialAuthSMSOTPMaxAttempts
+	}
+	return credentialauth.DefaultMaxSMSOTPAttempts
 }
 
 func credentialAuthRepositoryFromConfig(ctx context.Context, cfg config.Config, environment string) (credentialauth.Repository, error) {

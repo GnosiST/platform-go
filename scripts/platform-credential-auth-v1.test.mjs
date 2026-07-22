@@ -76,6 +76,7 @@ describe("validate-platform-credential-auth-v1", () => {
     contract.challengeContract.modes = ["off"];
     contract.notificationSmsBoundary.productionMockProviderAllowed = true;
     contract.notificationSmsBoundary.adapterContract = "SMTP live supplier integration is claimed";
+    contract.implementationPackages.find((item) => item.id === "C-notification-sms-adapters").scope = "internal/platform/notification";
     contract.messageCenterContract.runtimeEndpoints = ["POST /api/admin/message-center/test-send"];
     contract.messageCenterContract.deliveryWorker.providerRuntimeTruth = "SMTP live supplier integration is claimed";
     contract.apiContract.implementedNow = contract.apiContract.implementedNow.filter((item) => !item.includes("POST /api/auth/challenges"));
@@ -85,13 +86,34 @@ describe("validate-platform-credential-auth-v1", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /providerModes must include phone-sms-otp/);
-    assert.match(result.stderr, /challengeContract\.modes must include after-failure/);
+    assert.match(result.stderr, /challengeContract\.modes must be the mandatory always baseline/);
     assert.match(result.stderr, /notificationSmsBoundary\.productionMockProviderAllowed must stay false/);
     assert.match(result.stderr, /notificationSmsBoundary\.adapterContract must describe official SDK live adapters plus dry-run\/config validation/);
+    assert.match(result.stderr, /C-notification-sms-adapters scope must document Aliyun\/Tencent official SDK-backed live adapters/);
+    assert.match(result.stderr, /C-notification-sms-adapters scope must document approved-account delivery evidence/);
     assert.match(result.stderr, /messageCenterContract\.runtimeEndpoints must include POST \/api\/admin\/message-center\/deliveries\/run/);
     assert.match(result.stderr, /messageCenterContract\.deliveryWorker\.providerRuntimeTruth must describe Aliyun\/Tencent live SMS SDK adapters plus dry-run\/config validation/);
     assert.match(result.stderr, /apiContract\.implementedNow must include POST \/api\/auth\/challenges creates digest-only CAPTCHA\/slider challenge transactions for login/);
     assert.match(result.stderr, /apiContract\.endpoints must include POST \/api\/auth\/sms-otp\/start/);
+  });
+
+  it("rejects weakened credential governance and retry-target retention contracts", () => {
+    const contract = readJSON("resources/platform-credential-auth-v1.json");
+    contract.challengeContract.defaultMode = "off";
+    contract.challengeContract.mandatoryBaseline = false;
+    contract.passwordPolicy.rotationAndIncidentGovernance.privilegedResetSetsMustChange = false;
+    contract.passwordPolicy.rotationAndIncidentGovernance.migration = "generic Record.Values are allowed";
+    contract.messageCenterContract.secureRetryTarget.leaseTTLSeconds = 0;
+    contract.messageCenterContract.secureRetryTarget.genericRecordValuesRawTargetAllowed = true;
+
+    const result = runValidator(["--contract", tempFile("platform-credential-auth-v1-", "contract.json", contract)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /challengeContract\.defaultMode must be always/);
+    assert.match(result.stderr, /challengeContract must keep the mandatory baseline/);
+    assert.match(result.stderr, /passwordPolicy\.rotationAndIncidentGovernance must require rehash-on-success and MustChange on privileged reset/);
+    assert.match(result.stderr, /passwordPolicy\.rotationAndIncidentGovernance\.migration is incomplete/);
+    assert.match(result.stderr, /messageCenterContract\.secureRetryTarget must retain a bounded write-only target lease/);
   });
 
   it("rejects missing OpenAPI coverage for credential auth and message-center v1 endpoints", () => {

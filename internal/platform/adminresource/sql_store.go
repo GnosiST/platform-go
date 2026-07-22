@@ -26,6 +26,13 @@ func NewSQLAdminResourceRepository(ctx context.Context, db *sql.DB) (*SQLAdminRe
 	return repository, nil
 }
 
+func (r *SQLAdminResourceRepository) Close() error {
+	if r == nil || r.db == nil {
+		return nil
+	}
+	return r.db.Close()
+}
+
 func (r *SQLAdminResourceRepository) Load(ctx context.Context) (ResourceSnapshot, error) {
 	snapshot := ResourceSnapshot{Resources: map[string][]Record{}}
 	revision, err := r.loadStateValue(ctx, "revision")

@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 
+	"github.com/GnosiST/platform-go/pkg/platform/app"
 	"github.com/GnosiST/platform-go/pkg/platform/capability"
 )
 
@@ -97,6 +99,27 @@ func ResolveExampleManifests() ([]capability.Manifest, error) {
 		enabled = append(enabled, manifest.ID)
 	}
 	return registry.ResolveEnabled(enabled)
+}
+
+// NewExampleAppRouter is a downstream composition root that binds the
+// manifest-declared catalog route to a runnable HTTP handler using public APIs.
+func NewExampleAppRouter() (*app.Router, error) {
+	manifests, err := ResolveExampleManifests()
+	if err != nil {
+		return nil, err
+	}
+	return app.NewRouter(manifests, []app.Registration{{
+		Method: http.MethodGet,
+		Path:   "/api/app/catalog/items",
+		Handler: func(_ context.Context, identity app.Identity, writer http.ResponseWriter, _ *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(writer).Encode(map[string]any{
+				"items":     []string{"demo-catalog-item"},
+				"subjectId": identity.SubjectID,
+				"tenantId":  identity.TenantID,
+			})
+		},
+	}})
 }
 
 func Manifests() []capability.Manifest {

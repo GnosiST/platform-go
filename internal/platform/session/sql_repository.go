@@ -27,6 +27,13 @@ func NewSQLRepository(ctx context.Context, db *sql.DB) (*SQLRepository, error) {
 	return repository, nil
 }
 
+func (r *SQLRepository) Close() error {
+	if r == nil || r.db == nil {
+		return nil
+	}
+	return r.db.Close()
+}
+
 func (r *SQLRepository) Load(ctx context.Context) (Snapshot, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT token_digest, username, issued_at, expires_at, revoked_at FROM `+sessionsTable+` ORDER BY token_digest`)
 	if err != nil {

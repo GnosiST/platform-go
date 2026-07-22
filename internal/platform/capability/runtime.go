@@ -1,10 +1,21 @@
 package capability
 
-import "context"
+import (
+	"context"
+	"io"
+)
 
 type Runtime struct {
 	MigrationExecutor MigrationExecutor
 	SeedExecutor      SeedExecutor
+	Closer            io.Closer
+}
+
+func (r Runtime) Close() error {
+	if r.Closer == nil {
+		return nil
+	}
+	return r.Closer.Close()
 }
 
 type MigrationExecution struct {

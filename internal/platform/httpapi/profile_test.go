@@ -164,6 +164,53 @@ func TestAdminProfileUpdatesCurrentUserResourceRecord(t *testing.T) {
 	}
 }
 
+func TestAdminProfileUpdateSyncsCredentialAuthPhoneAndEmailIdentifiers(t *testing.T) {
+	server, resources, runtime := newAdminProfileCredentialTestServer(t)
+	login := loginForTest(t, server, "ops")
+	seedAdminProfileContactForTest(t, resources, "user-ops", "+8613900000000", "old-ops@example.test")
+	for _, identifier := range []credentialauth.Identifier{
+		{Type: credentialauth.IdentifierTypePhone, Value: "+8613900000000"},
+		{Type: credentialauth.IdentifierTypeEmail, Value: "old-ops@example.test"},
+	} {
+		if _, err := runtime.Service.RegisterIdentifier(context.Background(), credentialauth.RegisterIdentifierInput{
+			Principal:  credentialauth.PrincipalRef{Type: credentialauth.PrincipalTypeAdmin, ID: "user-ops"},
+			Identifier: identifier,
+			Status:     credentialauth.StatusEnabled,
+		}); err != nil {
+			t.Fatalf("RegisterIdentifier(%s) error = %v", identifier.Type, err)
+		}
+	}
+
+	recorder := putAdminProfileForTest(server, login.Data.Token, "/api/admin/profile/current", `{
+		"phone":"+86 (138) 0013-8000",
+		"email":"OPS@EXAMPLE.TEST"
+	}`)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("PUT profile status = %d body = %s, want 200", recorder.Code, recorder.Body.String())
+	}
+	for _, test := range []struct {
+		name       string
+		identifier credentialauth.Identifier
+		wantStatus credentialauth.RecordStatus
+	}{
+		{name: "new phone", identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypePhone, Value: "+8613800138000"}, wantStatus: credentialauth.StatusEnabled},
+		{name: "new email", identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypeEmail, Value: "ops@example.test"}, wantStatus: credentialauth.StatusEnabled},
+		{name: "old phone", identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypePhone, Value: "+8613900000000"}, wantStatus: credentialauth.StatusDisabled},
+		{name: "old email", identifier: credentialauth.Identifier{Type: credentialauth.IdentifierTypeEmail, Value: "old-ops@example.test"}, wantStatus: credentialauth.StatusDisabled},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			record, ok, err := runtime.Service.ResolveIdentifier(context.Background(), test.identifier)
+			if err != nil || !ok {
+				t.Fatalf("ResolveIdentifier(%s) = %+v/%t/%v, want record", test.name, record, ok, err)
+			}
+			if record.Principal.Type != credentialauth.PrincipalTypeAdmin || record.Principal.ID != "user-ops" || record.Status != test.wantStatus {
+				t.Fatalf("identifier %s record = %+v, want user-ops status %s", test.name, record, test.wantStatus)
+			}
+		})
+	}
+}
+
 func TestAdminProfilePasswordChangeUpdatesCredentialAuthPassword(t *testing.T) {
 	server, _, runtime := newAdminProfileCredentialTestServer(t)
 	login := loginForTest(t, server, "ops")
@@ -429,6 +476,29 @@ func registerProfilePasswordCredentialForTest(t *testing.T, service *credentiala
 		Status:        credentialauth.StatusEnabled,
 	}); err != nil {
 		t.Fatalf("PutPasswordCredential(%s) error = %v", username, err)
+	}
+}
+
+func seedAdminProfileContactForTest(t *testing.T, resources *adminresource.Store, userID string, phone string, email string) {
+	t.Helper()
+	record, err := resources.InternalRecord("users", userID)
+	if err != nil {
+		t.Fatalf("InternalRecord(%s) error = %v", userID, err)
+	}
+	values := map[string]string{}
+	for key, value := range record.Values {
+		values[key] = value
+	}
+	values["phone"] = phone
+	values["email"] = email
+	if _, err := resources.UpdateInternal("users", record.ID, adminresource.WriteInput{
+		Code:        record.Code,
+		Name:        record.Name,
+		Status:      record.Status,
+		Description: record.Description,
+		Values:      values,
+	}); err != nil {
+		t.Fatalf("UpdateInternal(%s contact) error = %v", userID, err)
 	}
 }
 

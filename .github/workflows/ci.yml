@@ -15,9 +15,13 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      - run: go vet ./...
       - run: go test ./...
       - run: go test ./...
         working-directory: examples/external-capability
+      - uses: golang/govulncheck-action@v1
+        with:
+          go-package: ./...
   governance:
     runs-on: ubuntu-latest
     steps:
@@ -31,9 +35,11 @@ jobs:
           cache: npm
           cache-dependency-path: admin/package-lock.json
       - run: npm ci --prefix admin
+      - run: npm audit --prefix admin --omit=dev --audit-level=high
       - run: node scripts/validate-open-source-portability.mjs --strict --expect-module github.com/GnosiST/platform-go
       - run: node scripts/validate-external-capability-example.mjs
       - run: node --test scripts/*.test.mjs
+      - run: git diff --check
   admin:
     runs-on: ubuntu-latest
     steps:
@@ -44,6 +50,7 @@ jobs:
           cache: npm
           cache-dependency-path: admin/package-lock.json
       - run: npm ci --prefix admin
+      - run: npm audit --prefix admin --omit=dev --audit-level=high
       - run: npm run build --prefix admin
   website:
     runs-on: ubuntu-latest
@@ -55,4 +62,5 @@ jobs:
           cache: npm
           cache-dependency-path: website/package-lock.json
       - run: npm ci --prefix website
+      - run: npm audit --prefix website --omit=dev --audit-level=high
       - run: npm run build --prefix website

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -297,7 +298,7 @@ func TestServiceCreatesCredentialChallengeWithDigestAndConsumesProof(t *testing.
 	if err != nil || !ok {
 		t.Fatalf("CredentialChallenge() = %+v, %v, %v; want stored challenge", stored, ok, err)
 	}
-	if stored.AnswerDigest == "x=72&y=14" || !strings.HasPrefix(stored.AnswerDigest, challengeProofHashPrefix) || stored.ClientFingerprintHash != "fingerprint-hash" {
+	if stored.AnswerDigest == "x=72&y=14" || (!strings.HasPrefix(stored.AnswerDigest, challengeProofHashPrefix) && !strings.HasPrefix(stored.AnswerDigest, challengeProofDigestSetPrefix)) || strings.Contains(stored.AnswerDigest, "x=72") || stored.ClientFingerprintHash != "fingerprint-hash" {
 		t.Fatalf("stored challenge = %+v, want digest and fingerprint binding", stored)
 	}
 	if err := service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
@@ -317,6 +318,219 @@ func TestServiceCreatesCredentialChallengeWithDigestAndConsumesProof(t *testing.
 		ClientFingerprintHash: "fingerprint-hash",
 	}); !errors.Is(err, ErrChallengeConsumed) {
 		t.Fatalf("VerifyCredentialChallenge(reuse) error = %v, want ErrChallengeConsumed", err)
+	}
+}
+
+func TestServiceAcceptsNormalizedSliderChallengeProofWithinTolerance(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 7, 19, 10, 0, 0, 0, time.UTC)
+	repository := NewMemoryRepository()
+	hasher, err := NewHMACIdentifierHasher([]byte(strings.Repeat("i", 32)))
+	if err != nil {
+		t.Fatalf("NewHMACIdentifierHasher() error = %v", err)
+	}
+	nextChallenge := 0
+	service, err := NewService(Options{
+		Repository:           repository,
+		ChallengeProofHasher: hasher,
+		ChallengeIDGenerator: func() (string, error) {
+			nextChallenge++
+			return "slider-normalized-" + strconv.Itoa(nextChallenge), nil
+		},
+		ChallengeMaterialGenerator: func(kind ChallengeKind) (ChallengeMaterial, error) {
+			return ChallengeMaterial{
+				Prompt:     "Move the slider.",
+				Parameters: map[string]string{"tileX": "5", "tileY": "14", "unit": "px"},
+				Proof:      "x=72&y=14",
+			}, nil
+		},
+		Now: func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+
+	created, err := service.CreateCredentialChallenge(ctx, CreateCredentialChallengeInput{
+		Kind:    ChallengeKindSlider,
+		Purpose: ChallengePurposeLogin,
+	})
+	if err != nil {
+		t.Fatalf("CreateCredentialChallenge() error = %v", err)
+	}
+	if err := service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
+		ChallengeID: created.ChallengeID,
+		Kind:        ChallengeKindSlider,
+		Purpose:     ChallengePurposeLogin,
+		Proof:       " y = 14 & x = 74.4 ",
+	}); err != nil {
+		t.Fatalf("VerifyCredentialChallenge(normalized in-tolerance proof) error = %v", err)
+	}
+
+	created, err = service.CreateCredentialChallenge(ctx, CreateCredentialChallengeInput{
+		Kind:    ChallengeKindSlider,
+		Purpose: ChallengePurposeLogin,
+	})
+	if err != nil {
+		t.Fatalf("CreateCredentialChallenge(second) error = %v", err)
+	}
+	if err := service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
+		ChallengeID: created.ChallengeID,
+		Kind:        ChallengeKindSlider,
+		Purpose:     ChallengePurposeLogin,
+		Proof:       `{"x":76.1,"y":14}`,
+	}); !errors.Is(err, ErrChallengeRejected) {
+		t.Fatalf("VerifyCredentialChallenge(out-of-tolerance proof) error = %v, want ErrChallengeRejected", err)
+	}
+}
+
+func TestServiceCountsMalformedSliderChallengeProofAsAttempt(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 7, 19, 10, 0, 0, 0, time.UTC)
+	repository := NewMemoryRepository()
+	hasher, err := NewHMACIdentifierHasher([]byte(strings.Repeat("i", 32)))
+	if err != nil {
+		t.Fatalf("NewHMACIdentifierHasher() error = %v", err)
+	}
+	service, err := NewService(Options{
+		Repository:           repository,
+		ChallengeProofHasher: hasher,
+		ChallengeIDGenerator: func() (string, error) { return "slider-malformed", nil },
+		ChallengeMaterialGenerator: func(kind ChallengeKind) (ChallengeMaterial, error) {
+			return ChallengeMaterial{
+				Prompt:     "Complete the test challenge.",
+				Parameters: map[string]string{"tileX": "5", "tileY": "14", "unit": "px"},
+				Proof:      "x=72&y=14",
+			}, nil
+		},
+		Now: func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	created, err := service.CreateCredentialChallenge(ctx, CreateCredentialChallengeInput{
+		Kind:    ChallengeKindSlider,
+		Purpose: ChallengePurposeLogin,
+	})
+	if err != nil {
+		t.Fatalf("CreateCredentialChallenge() error = %v", err)
+	}
+
+	if err := service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
+		ChallengeID: created.ChallengeID,
+		Kind:        ChallengeKindSlider,
+		Purpose:     ChallengePurposeLogin,
+		Proof:       "not-a-coordinate",
+		MaxAttempts: 2,
+	}); !errors.Is(err, ErrChallengeRejected) {
+		t.Fatalf("VerifyCredentialChallenge(malformed proof) error = %v, want ErrChallengeRejected", err)
+	}
+	stored, ok, err := repository.CredentialChallenge(ctx, created.ChallengeID)
+	if err != nil || !ok {
+		t.Fatalf("CredentialChallenge() = %+v, %v, %v; want stored challenge", stored, ok, err)
+	}
+	if stored.Attempts != 1 || !stored.UsedAt.IsZero() {
+		t.Fatalf("stored challenge after malformed proof = %+v, want one rejected attempt and unused", stored)
+	}
+
+	if err := service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
+		ChallengeID: created.ChallengeID,
+		Kind:        ChallengeKindSlider,
+		Purpose:     ChallengePurposeLogin,
+		Proof:       "x=72&y=14",
+		MaxAttempts: 2,
+	}); err != nil {
+		t.Fatalf("VerifyCredentialChallenge(correct proof after malformed) error = %v", err)
+	}
+}
+
+func TestServiceDisablesCredentialChallengeAtMaxAttempts(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 7, 19, 10, 0, 0, 0, time.UTC)
+	repository := NewMemoryRepository()
+	service, err := NewService(Options{Repository: repository, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	if err := service.PutCredentialChallenge(ctx, CredentialChallenge{
+		ChallengeID:  "captcha-max",
+		Kind:         ChallengeKindCaptcha,
+		Purpose:      ChallengePurposeLogin,
+		AnswerDigest: "digest:answer",
+		ExpiresAt:    now.Add(time.Minute),
+	}); err != nil {
+		t.Fatalf("PutCredentialChallenge() error = %v", err)
+	}
+
+	for attempt := 1; attempt <= 2; attempt++ {
+		if err := service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
+			ChallengeID:  "captcha-max",
+			Kind:         ChallengeKindCaptcha,
+			Purpose:      ChallengePurposeLogin,
+			AnswerDigest: "digest:wrong",
+			MaxAttempts:  2,
+		}); !errors.Is(err, ErrChallengeRejected) {
+			t.Fatalf("VerifyCredentialChallenge(wrong attempt %d) error = %v, want ErrChallengeRejected", attempt, err)
+		}
+	}
+	stored, ok, err := repository.CredentialChallenge(ctx, "captcha-max")
+	if err != nil || !ok {
+		t.Fatalf("CredentialChallenge() = %+v, %v, %v; want stored challenge", stored, ok, err)
+	}
+	if stored.Attempts != 2 || stored.Status != StatusDisabled || !stored.UsedAt.IsZero() {
+		t.Fatalf("stored challenge after max attempts = %+v, want disabled at exactly two attempts", stored)
+	}
+	if err := service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
+		ChallengeID:  "captcha-max",
+		Kind:         ChallengeKindCaptcha,
+		Purpose:      ChallengePurposeLogin,
+		AnswerDigest: "digest:answer",
+		MaxAttempts:  2,
+	}); !errors.Is(err, ErrChallengeRejected) {
+		t.Fatalf("VerifyCredentialChallenge(correct after max attempts) error = %v, want ErrChallengeRejected", err)
+	}
+}
+
+func TestServiceDisablesSMSOTPAtMaxAttempts(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 7, 19, 10, 0, 0, 0, time.UTC)
+	repository := NewMemoryRepository()
+	service, err := NewService(Options{Repository: repository, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	if err := service.PutSMSOTPChallenge(ctx, SMSOTPChallenge{
+		ChallengeID: "otp-max",
+		PhoneHash:   "phone-hash",
+		CodeDigest:  "code-digest",
+		ExpiresAt:   now.Add(time.Minute),
+	}); err != nil {
+		t.Fatalf("PutSMSOTPChallenge() error = %v", err)
+	}
+
+	for attempt := 1; attempt <= 2; attempt++ {
+		if err := service.VerifySMSOTP(ctx, SMSOTPProof{
+			ChallengeID: "otp-max",
+			PhoneHash:   "phone-hash",
+			CodeDigest:  "wrong-code-digest",
+			MaxAttempts: 2,
+		}); !errors.Is(err, ErrChallengeRejected) {
+			t.Fatalf("VerifySMSOTP(wrong attempt %d) error = %v, want ErrChallengeRejected", attempt, err)
+		}
+	}
+	stored, ok, err := repository.SMSOTPChallenge(ctx, "otp-max")
+	if err != nil || !ok {
+		t.Fatalf("SMSOTPChallenge() = %+v, %v, %v; want stored challenge", stored, ok, err)
+	}
+	if stored.Attempts != 2 || stored.Status != StatusDisabled || !stored.UsedAt.IsZero() {
+		t.Fatalf("stored otp after max attempts = %+v, want disabled at exactly two attempts", stored)
+	}
+	if err := service.VerifySMSOTP(ctx, SMSOTPProof{
+		ChallengeID: "otp-max",
+		PhoneHash:   "phone-hash",
+		CodeDigest:  "code-digest",
+		MaxAttempts: 2,
+	}); !errors.Is(err, ErrChallengeRejected) {
+		t.Fatalf("VerifySMSOTP(correct after max attempts) error = %v, want ErrChallengeRejected", err)
 	}
 }
 

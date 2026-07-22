@@ -92,6 +92,63 @@ describe("validate-platform-production-env", () => {
     }
   });
 
+  it("requires credential-auth production storage and secret transport material when the capability is enabled", () => {
+    const source = validStrictEnv.replace(
+      "PLATFORM_CAPABILITIES=tenant,identity,session,rbac,menu,api-resource,audit,wechat-login,dictionary,parameter,file-storage,admin-shell,system-admin",
+      [
+        "PLATFORM_CAPABILITIES=tenant,identity,session,rbac,menu,api-resource,audit,wechat-login,dictionary,parameter,file-storage,admin-shell,system-admin,notification,credential-auth",
+        "PLATFORM_CREDENTIAL_AUTH_USERNAME_PASSWORD=true",
+      ].join("\n"),
+    );
+    const { tempDir, filePath } = tempEnv(source);
+    try {
+      const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER is required when credential-auth is enabled/);
+      assert.match(result.stderr, /PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN is required when credential-auth is enabled/);
+      assert.match(result.stderr, /PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY is required when credential-auth is enabled/);
+      assert.match(result.stderr, /PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_KEY_ID is required when credential-auth is enabled/);
+      assert.match(result.stderr, /PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY is required when credential-auth is enabled/);
+      assert.match(result.stderr, /PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_USERNAME is required for credential password providers/);
+      assert.match(result.stderr, /PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PASSWORD is required for credential password providers/);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("accepts complete credential-auth production configuration and rejects an invalid transport private key", () => {
+    const configured = validStrictEnv.replace(
+      "PLATFORM_CAPABILITIES=tenant,identity,session,rbac,menu,api-resource,audit,wechat-login,dictionary,parameter,file-storage,admin-shell,system-admin",
+      [
+        "PLATFORM_CAPABILITIES=tenant,identity,session,rbac,menu,api-resource,audit,wechat-login,dictionary,parameter,file-storage,admin-shell,system-admin,credential-auth",
+        "PLATFORM_CREDENTIAL_AUTH_USERNAME_PASSWORD=true",
+        "PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER=postgres",
+        "PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN=postgres://platform:strong-db-pass@platform-postgres:5432/credential_auth",
+        "PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY=credential-auth-identifier-hmac-key-01",
+        "PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_KEY_ID=auth-transport-v1",
+        "PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY=ZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGQ",
+        "PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_USERNAME=admin",
+        "PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PASSWORD=strong-bootstrap-password-value",
+      ].join("\n"),
+    );
+    const privateKey = "ZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGQ";
+    for (const source of [configured, configured.replace(privateKey, "not-a-p256-private-key"), configured.replace(privateKey, `${privateKey}!`)]) {
+      const { tempDir, filePath } = tempEnv(source);
+      try {
+        const result = runValidator(["--env-file", filePath, "--strict-secrets"]);
+        if (source === configured) {
+          assert.equal(result.status, 0, result.stderr);
+        } else {
+          assert.notEqual(result.status, 0, result.stdout);
+          assert.match(result.stderr, /PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY must be a valid base64-encoded 32-byte P-256 private key/);
+        }
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
   it("rejects missing or unsupported data protection configuration", () => {
     const source = validStrictEnv
       .replace("PLATFORM_DATA_KEY_PROVIDER=env-aes256\n", "")

@@ -110,3 +110,17 @@ func (s *MeteredStore) Stats() Stats {
 	defer s.mu.Unlock()
 	return s.stats
 }
+
+func (s *MeteredStore) Close() error {
+	if closer, ok := s.inner.(interface{ Close() error }); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
+func (s *MeteredStore) CheckReadiness(ctx context.Context) error {
+	if checker, ok := s.inner.(ReadinessChecker); ok {
+		return checker.CheckReadiness(ctx)
+	}
+	return nil
+}

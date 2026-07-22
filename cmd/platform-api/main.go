@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/GnosiST/platform-go/internal/apps"
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
 	"github.com/GnosiST/platform-go/internal/platform/authprovider"
 	"github.com/GnosiST/platform-go/internal/platform/bootstrap"
 	"github.com/GnosiST/platform-go/internal/platform/capability"
@@ -30,9 +31,34 @@ func main() {
 	if err := cfg.ValidateRuntime(); err != nil {
 		log.Fatalf("invalid configuration: %v", err)
 	}
-	ordered, err := bootstrap.CapabilitiesFromConfig(cfg, apps.DefaultManifests()...)
+	initialCapabilities, err := bootstrap.CapabilitiesFromConfig(cfg, apps.DefaultManifests()...)
 	if err != nil {
 		log.Fatalf("resolve capabilities: %v", err)
+	}
+	dataProtection, err := bootstrap.DataProtectionRuntimeFromConfig(cfg)
+	if err != nil {
+		log.Fatalf("build data protection runtime: %v", err)
+	}
+	resources, err := bootstrap.AdminResourcesFromConfig(cfg, initialCapabilities, dataProtection)
+	if err != nil {
+		log.Fatalf("build admin resources: %v", err)
+	}
+	defer func() {
+		if err := resources.Close(); err != nil {
+			log.Printf("close admin resources: %v", err)
+		}
+	}()
+	settingsProjection, err := bootstrap.RuntimeSettingsFromAdminResources(ctx, cfg, resources)
+	if err != nil {
+		log.Fatalf("project runtime settings: %v", err)
+	}
+	cfg = settingsProjection.Config
+	if err := cfg.ValidateRuntime(); err != nil {
+		log.Fatalf("invalid projected configuration: %v", err)
+	}
+	ordered, err := bootstrap.CapabilitiesFromConfig(cfg, apps.DefaultManifests()...)
+	if err != nil {
+		log.Fatalf("resolve projected capabilities: %v", err)
 	}
 	if err := validateCredentialBoundary(ordered); err != nil {
 		log.Fatalf("validate credential boundary: %v", err)
@@ -48,16 +74,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("build platform runtime: %v", err)
 	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			log.Printf("close platform runtime: %v", err)
+		}
+	}()
 	if err := capability.RunLifecycle(context.Background(), ordered, runtime); err != nil {
 		log.Fatalf("run capability lifecycle: %v", err)
-	}
-	dataProtection, err := bootstrap.DataProtectionRuntimeFromConfig(cfg)
-	if err != nil {
-		log.Fatalf("build data protection runtime: %v", err)
-	}
-	resources, err := bootstrap.AdminResourcesFromConfig(cfg, ordered, dataProtection)
-	if err != nil {
-		log.Fatalf("build admin resources: %v", err)
 	}
 	if err := resources.ValidateProtectedData(context.Background()); err != nil {
 		log.Fatalf("validate protected admin resources: %v", err)
@@ -82,11 +105,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("build sessions: %v", err)
 	}
-	cacheStore, err := bootstrap.CacheFromConfig(cfg)
+	defer func() {
+		if err := sessions.Close(); err != nil {
+			log.Printf("close sessions: %v", err)
+		}
+	}()
+	cacheRuntime, err := bootstrap.CacheRuntimeFromConfig(cfg)
 	if err != nil {
 		log.Fatalf("build cache: %v", err)
 	}
-	invalidationBus := bootstrap.CacheInvalidationBusFromConfig(cfg)
+	lifecycleCtx, cancelLifecycle := context.WithCancel(ctx)
+	defer func() {
+		cancelLifecycle()
+		_ = cacheRuntime.Close()
+	}()
 	fileStorage, err := bootstrap.FileStorageFromConfig(cfg)
 	if err != nil {
 		log.Fatalf("build file storage: %v", err)
@@ -111,7 +143,7 @@ func main() {
 	if err := httpapi.ValidatePhoneProtectionHistory(resources, phoneVerification.Protector); err != nil {
 		log.Fatalf("validate phone protection history: %v", err)
 	}
-	notificationSMSSender, err := notificationSMSSenderFromConfig(cfg)
+	notificationSMSSender, err := notificationSMSSenderFromRuntimeSettings(ctx, cfg, resources)
 	if err != nil {
 		log.Fatalf("build notification SMS sender: %v", err)
 	}
@@ -125,6 +157,13 @@ func main() {
 	credentialAuth, err := bootstrap.CredentialAuthRuntimeFromConfig(ctx, cfg, notificationSMS, resources)
 	if err != nil {
 		log.Fatalf("build credential auth runtime: %v", err)
+	}
+	if credentialAuth != nil && credentialAuth.Service != nil {
+		defer func() {
+			if err := credentialAuth.Service.Close(); err != nil {
+				log.Printf("close credential auth: %v", err)
+			}
+		}()
 	}
 	sensitiveReveal, err := bootstrap.SensitiveRevealRuntimeFromConfig(cfg, ordered, phoneVerification)
 	if err != nil {
@@ -157,8 +196,10 @@ func main() {
 		Capabilities:             ordered,
 		Resources:                resources,
 		Sessions:                 sessions,
-		Cache:                    cacheStore,
-		InvalidationBus:          invalidationBus,
+		Cache:                    cacheRuntime.Store,
+		InvalidationBus:          cacheRuntime.InvalidationBus,
+		ReadinessChecker:         cacheRuntime,
+		LifecycleContext:         lifecycleCtx,
 		CacheTTL:                 cfg.CacheDefaultTTL,
 		FileStorage:              fileStorage,
 		UploadPolicy:             uploadPolicy,
@@ -186,6 +227,7 @@ func main() {
 		AdminMenuServingMode:     httpapi.AdminMenuServingMode(cfg.AdminMenuServingMode),
 		AdminMenuResolver:        adminMenuResolver,
 		AdminMenuComparisonSink:  adminMenuComparisonSink,
+		SettingsAppliedRevision:  settingsProjection.AppliedRevision,
 	})
 	dataLifecycle, scheduler, err := startRetentionRuntime(ctx, cfg, apps.DefaultManifests(), bootstrap.OpenDataLifecycle)
 	if err != nil {
@@ -289,6 +331,31 @@ func phoneVerificationSenderFromConfig(cfg config.Config) httpapi.PhoneVerificat
 	return nil
 }
 
+func notificationSMSSenderFromRuntimeSettings(ctx context.Context, cfg config.Config, resources *adminresource.Store) (notification.SMSSender, error) {
+	if !cfg.CredentialAuthPhoneSMSOTP {
+		return notificationSMSSenderFromConfig(cfg)
+	}
+	rawProvider := cfg.NotificationSMSProvider
+	provider := notification.CanonicalSMSProvider(rawProvider)
+	if rawProvider != provider {
+		return nil, nil
+	}
+	switch provider {
+	case "":
+		return nil, nil
+	case notification.SMSProviderMockLocal:
+		return notification.NewMockLocalSMSSender(), nil
+	case notification.SMSProviderAliyun, notification.SMSProviderTencent:
+		safety, err := notificationSMSProviderConfigFromEnv(provider)
+		if err != nil {
+			return nil, err
+		}
+		return bootstrap.NotificationSMSSenderFromAdminResources(ctx, cfg, resources, safety)
+	default:
+		return nil, nil
+	}
+}
+
 func notificationSMSSenderFromConfig(cfg config.Config) (notification.SMSSender, error) {
 	rawProvider := cfg.NotificationSMSProvider
 	provider := notification.CanonicalSMSProvider(rawProvider)
@@ -301,11 +368,11 @@ func notificationSMSSenderFromConfig(cfg config.Config) (notification.SMSSender,
 	case notification.SMSProviderMockLocal:
 		return notification.NewMockLocalSMSSender(), nil
 	case notification.SMSProviderAliyun, notification.SMSProviderTencent:
-		config, err := notificationSMSProviderConfigFromEnv(provider)
+		providerConfig, err := notificationSMSProviderConfigFromEnv(provider)
 		if err != nil {
 			return nil, err
 		}
-		return notification.NewVendorSMSSender(config)
+		return notification.NewVendorSMSSender(providerConfig)
 	default:
 		return nil, nil
 	}

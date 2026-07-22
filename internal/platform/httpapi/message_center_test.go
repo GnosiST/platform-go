@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/GnosiST/platform-go/internal/platform/adminresource"
 	"github.com/GnosiST/platform-go/internal/platform/errorcode"
 	"github.com/GnosiST/platform-go/internal/platform/kernel"
 	"github.com/GnosiST/platform-go/internal/platform/notification"
@@ -345,6 +347,273 @@ func TestAdminMessageCenterDeliveryRunSkipsPendingWhenRuntimePolicyLimited(t *te
 				t.Fatalf("message-center worker rate limit leaked marker %q in key=%q", marker, key)
 			}
 		}
+	}
+}
+
+func TestAdminMessageCenterDeliveryRunSupportsEmailDryRunWithoutConfiguredSender(t *testing.T) {
+	now := time.Date(2026, 7, 19, 11, 35, 0, 0, time.UTC)
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit", "notification"}),
+		Now:          func() time.Time { return now },
+	})
+	login := loginForTest(t, server, "admin")
+	notice := createHTTPMessageCenterWorkerNotice(t, server.resources, map[string]string{
+		"tenantCode": "platform",
+		"category":   "email-dry-run",
+		"payload":    `{"templateId":"EMAIL_OPS","templateParams":{"ticket":"T-EMAIL-100"}}`,
+	})
+	delivery := createHTTPMessageCenterWorkerDelivery(t, server.resources, map[string]string{
+		"tenantCode":       "platform",
+		"notificationCode": notice.Code,
+		"channel":          notification.ChannelEmail,
+		"deliveryStatus":   notification.DeliveryStatusPending,
+		"target":           "owner@example.com",
+		"provider":         notification.EmailProviderSMTP,
+		"attempts":         "0",
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/message-center/deliveries/run", nil)
+	request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("POST message-center deliveries run email dry-run status = %d body = %s, want 200", recorder.Code, recorder.Body.String())
+	}
+	var payload adminMessageCenterDeliveryRunTestPayload
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode delivery run response: %v body = %s", err, recorder.Body.String())
+	}
+	if payload.Data.Attempted != 1 || payload.Data.Delivered != 1 || payload.Data.Failed != 0 {
+		t.Fatalf("delivery run payload = %+v, want one delivered email dry-run attempt", payload.Data)
+	}
+	updated, err := server.resources.InternalRecord("notification-deliveries", delivery.ID)
+	if err != nil {
+		t.Fatalf("InternalRecord(notification-deliveries) error = %v", err)
+	}
+	if updated.Values["deliveryStatus"] != notification.DeliveryStatusDelivered ||
+		updated.Values["attempts"] != "1" ||
+		updated.Values["target"] != "ow***@example.com" ||
+		updated.Values["provider"] != notification.EmailProviderSMTP ||
+		!strings.HasPrefix(updated.Values["providerMessageId"], "email-dry-run-") ||
+		updated.Values["providerStatus"] != notification.GenericDeliveryDryRunState ||
+		updated.Values["lastAttemptAt"] != now.Format(time.RFC3339) ||
+		updated.Values["deliveredAt"] != now.Format(time.RFC3339) {
+		t.Fatalf("updated delivery values = %+v, want delivered email dry-run ledger", updated.Values)
+	}
+	if strings.Contains(fmt.Sprintf("%+v", updated), "owner@example.com") || strings.Contains(fmt.Sprintf("%+v", updated), "T-EMAIL-100") {
+		t.Fatalf("email dry-run delivery leaked sensitive values: %+v", updated)
+	}
+}
+
+func TestAdminMessageCenterDeliveryRunSupportsInAppDryRunWithoutConfiguredSender(t *testing.T) {
+	now := time.Date(2026, 7, 19, 11, 40, 0, 0, time.UTC)
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit", "notification"}),
+		Now:          func() time.Time { return now },
+	})
+	login := loginForTest(t, server, "admin")
+	notice := createHTTPMessageCenterWorkerNotice(t, server.resources, map[string]string{
+		"tenantCode": "platform",
+		"category":   "in-app-dry-run",
+		"payload":    `{"templateId":"IN_APP_OPS","templateParams":{"ticket":"T-INAPP-100"}}`,
+	})
+	delivery := createHTTPMessageCenterWorkerDelivery(t, server.resources, map[string]string{
+		"tenantCode":       "platform",
+		"notificationCode": notice.Code,
+		"channel":          notification.ChannelInApp,
+		"deliveryStatus":   notification.DeliveryStatusPending,
+		"target":           "admin-user-1",
+		"provider":         notification.InAppProviderLocal,
+		"attempts":         "0",
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/message-center/deliveries/run", nil)
+	request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("POST message-center deliveries run in-app dry-run status = %d body = %s, want 200", recorder.Code, recorder.Body.String())
+	}
+	var payload adminMessageCenterDeliveryRunTestPayload
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode delivery run response: %v body = %s", err, recorder.Body.String())
+	}
+	if payload.Data.Attempted != 1 || payload.Data.Delivered != 1 || payload.Data.Failed != 0 {
+		t.Fatalf("delivery run payload = %+v, want one delivered in-app dry-run attempt", payload.Data)
+	}
+	updated, err := server.resources.InternalRecord("notification-deliveries", delivery.ID)
+	if err != nil {
+		t.Fatalf("InternalRecord(notification-deliveries) error = %v", err)
+	}
+	if updated.Values["deliveryStatus"] != notification.DeliveryStatusDelivered ||
+		updated.Values["attempts"] != "1" ||
+		updated.Values["target"] != "****er-1" ||
+		updated.Values["provider"] != notification.InAppProviderLocal ||
+		!strings.HasPrefix(updated.Values["providerMessageId"], "in_app-dry-run-") ||
+		updated.Values["providerStatus"] != notification.GenericDeliveryDryRunState ||
+		updated.Values["lastAttemptAt"] != now.Format(time.RFC3339) ||
+		updated.Values["deliveredAt"] != now.Format(time.RFC3339) {
+		t.Fatalf("updated delivery values = %+v, want delivered in-app dry-run ledger", updated.Values)
+	}
+	if strings.Contains(fmt.Sprintf("%+v", updated), "admin-user-1") || strings.Contains(fmt.Sprintf("%+v", updated), "T-INAPP-100") {
+		t.Fatalf("in-app dry-run delivery leaked sensitive values: %+v", updated)
+	}
+}
+
+func TestAdminMessageCenterDeliveryRetryQueuesFailedDeliveryWithWriteOnlyRecipient(t *testing.T) {
+	now := time.Date(2026, 7, 19, 11, 45, 0, 0, time.UTC)
+	sender := notification.NewMockLocalSMSSender()
+	server := newTestServer(ServerOptions{
+		Capabilities:          capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit", "notification"}),
+		NotificationSMSSender: sender,
+		Now:                   func() time.Time { return now },
+	})
+	login := loginForTest(t, server, "admin")
+	notice := createHTTPMessageCenterWorkerNotice(t, server.resources, map[string]string{
+		"tenantCode": "platform",
+		"category":   "retry",
+		"payload":    `{"templateId":"SMS_RETRY","templateParams":{"ticket":"T-200"}}`,
+	})
+	delivery := createHTTPMessageCenterWorkerDelivery(t, server.resources, map[string]string{
+		"tenantCode":          "platform",
+		"notificationCode":    notice.Code,
+		"channel":             notification.ChannelSMS,
+		"deliveryStatus":      notification.DeliveryStatusFailed,
+		"target":              "****0000",
+		"provider":            notification.SMSProviderMockLocal,
+		"attempts":            "1",
+		"errorMessage":        notification.DeliveryLedgerErrorFailed,
+		"nextRetryAt":         now.Add(time.Minute).Format(time.RFC3339),
+		"retryBackoffSeconds": "60",
+		"providerStatus":      notification.DeliveryStatusFailed,
+		"providerMessageId":   "failed-message",
+	})
+
+	retryRecorder := httptest.NewRecorder()
+	retryRequest := httptest.NewRequest(http.MethodPost, "/api/admin/message-center/deliveries/"+delivery.ID+"/retry", bytes.NewBufferString(`{"recipient":"+8613800000000"}`))
+	retryRequest.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	retryRequest.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(retryRecorder, retryRequest)
+
+	if retryRecorder.Code != http.StatusOK {
+		t.Fatalf("POST message-center delivery retry status = %d body = %s, want 200", retryRecorder.Code, retryRecorder.Body.String())
+	}
+	var retryPayload Response[adminMessageCenterDeliveryRetryResponse]
+	if err := json.Unmarshal(retryRecorder.Body.Bytes(), &retryPayload); err != nil {
+		t.Fatalf("decode retry response: %v body = %s", err, retryRecorder.Body.String())
+	}
+	if retryPayload.Data.Delivery.Values["deliveryStatus"] != notification.DeliveryStatusPending ||
+		retryPayload.Data.Delivery.Values["target"] != "****0000" ||
+		retryPayload.Data.Delivery.Values["errorMessage"] != "" ||
+		strings.Contains(retryRecorder.Body.String(), "+8613800000000") {
+		t.Fatalf("retry response = %+v body=%s, want pending redacted delivery without raw recipient", retryPayload.Data.Delivery, retryRecorder.Body.String())
+	}
+	queued, err := server.resources.InternalRecord("notification-deliveries", delivery.ID)
+	if err != nil {
+		t.Fatalf("InternalRecord(notification-deliveries) after retry error = %v", err)
+	}
+	if queued.Values["deliveryStatus"] != notification.DeliveryStatusPending ||
+		queued.Values["target"] != "****0000" ||
+		queued.Values["attempts"] != "1" ||
+		queued.Values["retryRequestedAt"] != now.Format(time.RFC3339) ||
+		queued.Values["nextRetryAt"] != "" ||
+		queued.Values["providerMessageId"] != "" ||
+		queued.Values["providerStatus"] != "" ||
+		queued.Values["retryBackoffSeconds"] != "" {
+		t.Fatalf("queued delivery values = %+v, want retry-ready redacted internal delivery", queued.Values)
+	}
+	if strings.Contains(fmt.Sprintf("%+v", queued), "+8613800000000") {
+		t.Fatalf("queued delivery leaked raw retry recipient: %+v", queued)
+	}
+
+	runRecorder := httptest.NewRecorder()
+	runRequest := httptest.NewRequest(http.MethodPost, "/api/admin/message-center/deliveries/run", nil)
+	runRequest.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	server.Router().ServeHTTP(runRecorder, runRequest)
+
+	if runRecorder.Code != http.StatusOK {
+		t.Fatalf("POST message-center deliveries run after retry status = %d body = %s, want 200", runRecorder.Code, runRecorder.Body.String())
+	}
+	var runPayload adminMessageCenterDeliveryRunTestPayload
+	if err := json.Unmarshal(runRecorder.Body.Bytes(), &runPayload); err != nil {
+		t.Fatalf("decode run response: %v body = %s", err, runRecorder.Body.String())
+	}
+	if runPayload.Data.Attempted != 1 || runPayload.Data.Delivered != 1 || runPayload.Data.Failed != 0 {
+		t.Fatalf("delivery run after retry = %+v, want one delivered retry", runPayload.Data)
+	}
+	if sent := sender.Sent(); len(sent) != 1 || sent[0].Recipient != "+8613800000000" || sent[0].TemplateID != "SMS_RETRY" {
+		t.Fatalf("sent after retry = %+v, want one rehydrated SMS", sent)
+	}
+	delivered, err := server.resources.InternalRecord("notification-deliveries", delivery.ID)
+	if err != nil {
+		t.Fatalf("InternalRecord(notification-deliveries) after run error = %v", err)
+	}
+	if delivered.Values["deliveryStatus"] != notification.DeliveryStatusDelivered ||
+		delivered.Values["target"] != "****0000" ||
+		strings.Contains(fmt.Sprintf("%+v", delivered), "+8613800000000") {
+		t.Fatalf("delivered retry values = %+v, want delivered redacted ledger without raw recipient", delivered.Values)
+	}
+}
+
+func TestAdminMessageCenterDeliveryRetryRequiresRecipientForRedactedTarget(t *testing.T) {
+	now := time.Date(2026, 7, 19, 11, 50, 0, 0, time.UTC)
+	server := newTestServer(ServerOptions{
+		Capabilities: capabilitiesFromConfigForTest(t, []string{"dictionary", "tenant", "identity", "session", "rbac", "audit", "notification"}),
+		Now:          func() time.Time { return now },
+	})
+	login := loginForTest(t, server, "admin")
+	notice := createHTTPMessageCenterWorkerNotice(t, server.resources, map[string]string{
+		"tenantCode": "platform",
+		"category":   "retry-required",
+		"payload":    `{"templateId":"SMS_RETRY"}`,
+	})
+	delivery := createHTTPMessageCenterWorkerDelivery(t, server.resources, map[string]string{
+		"tenantCode":       "platform",
+		"notificationCode": notice.Code,
+		"channel":          notification.ChannelSMS,
+		"deliveryStatus":   notification.DeliveryStatusFailed,
+		"target":           "****0000",
+		"provider":         notification.SMSProviderMockLocal,
+		"attempts":         "1",
+		"errorMessage":     notification.DeliveryLedgerErrorFailed,
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/message-center/deliveries/"+delivery.ID+"/retry", bytes.NewBufferString(`{}`))
+	request.Header.Set("Authorization", "Bearer "+login.Data.Token)
+	request.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("POST message-center delivery retry without recipient status = %d body = %s, want 400", recorder.Code, recorder.Body.String())
+	}
+	unchanged, err := server.resources.InternalRecord("notification-deliveries", delivery.ID)
+	if err != nil {
+		t.Fatalf("InternalRecord(notification-deliveries) error = %v", err)
+	}
+	if unchanged.Values["deliveryStatus"] != notification.DeliveryStatusFailed || unchanged.Values["target"] != "****0000" || unchanged.Values["errorMessage"] == "" {
+		t.Fatalf("delivery values = %+v, want failed record unchanged", unchanged.Values)
+	}
+}
+
+func TestMessageCenterRetryTargetSurvivesTransientResolutionUntilDeliveryCompletes(t *testing.T) {
+	server := newTestServer(ServerOptions{Now: func() time.Time { return time.Date(2026, 7, 22, 10, 0, 0, 0, time.UTC) }})
+	delivery := adminresource.Record{ID: "delivery-retry-target"}
+	server.storeMessageCenterRetryTarget(delivery.ID, "+8613800000000")
+
+	first, ok, err := server.ResolveDeliveryTarget(context.Background(), delivery)
+	if err != nil || !ok || first != "+8613800000000" {
+		t.Fatalf("first ResolveDeliveryTarget() = %q, %t, %v; want unredacted target", first, ok, err)
+	}
+	second, ok, err := server.ResolveDeliveryTarget(context.Background(), delivery)
+	if err != nil || !ok || second != "+8613800000000" {
+		t.Fatalf("second ResolveDeliveryTarget() = %q, %t, %v; want target retained for a transient retry", second, ok, err)
+	}
+	server.DeliveryTargetDelivered(context.Background(), delivery)
+	if target, ok, err := server.ResolveDeliveryTarget(context.Background(), delivery); err != nil || ok || target != "" {
+		t.Fatalf("ResolveDeliveryTarget(after delivery) = %q, %t, %v; want released target", target, ok, err)
 	}
 }
 

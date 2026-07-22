@@ -48,7 +48,7 @@ type gormCredentialChallenge struct {
 	ChallengeID           string     `gorm:"column:challenge_id;size:80;primaryKey"`
 	Kind                  string     `gorm:"column:kind;size:32;not null"`
 	Purpose               string     `gorm:"column:purpose;size:64;not null;index"`
-	AnswerDigest          string     `gorm:"column:answer_digest;size:191;not null"`
+	AnswerDigest          string     `gorm:"column:answer_digest;type:text;not null"`
 	ExpiresAt             time.Time  `gorm:"column:expires_at;not null;index"`
 	Attempts              int        `gorm:"column:attempts;not null"`
 	UsedAt                *time.Time `gorm:"column:used_at;index"`
@@ -80,6 +80,17 @@ func NewGORMRepository(ctx context.Context, db *gorm.DB) (*GORMRepository, error
 		return nil, fmt.Errorf("%w: migrate credential-auth repository", ErrRepositoryInvariant)
 	}
 	return OpenGORMRepository(ctx, db)
+}
+
+func (r *GORMRepository) Close() error {
+	if r == nil || r.db == nil {
+		return nil
+	}
+	db, err := r.db.DB()
+	if err != nil {
+		return err
+	}
+	return db.Close()
 }
 
 func OpenGORMRepository(ctx context.Context, db *gorm.DB) (*GORMRepository, error) {

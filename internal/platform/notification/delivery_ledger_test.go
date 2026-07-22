@@ -51,6 +51,7 @@ func TestBuildDeliveryLedgerValuesRedactsSMSAndKeepsCorrelation(t *testing.T) {
 }
 
 func TestBuildDeliveryLedgerValuesNormalizesFailedProviderError(t *testing.T) {
+	now := time.Date(2026, 7, 19, 12, 5, 0, 0, time.UTC)
 	values := BuildDeliveryLedgerValues(DeliveryLedgerInput{
 		BaseValues: map[string]string{
 			"channel":  ChannelSMS,
@@ -62,7 +63,8 @@ func TestBuildDeliveryLedgerValuesNormalizesFailedProviderError(t *testing.T) {
 		Receipt:        DeliveryReceipt{Provider: SMSProviderAliyun, Status: "failed"},
 		DeliveryStatus: DeliveryStatusFailed,
 		ErrorMessage:   "aliyun raw error: code 123456 for +8613800000000",
-		AttemptedAt:    time.Date(2026, 7, 19, 12, 5, 0, 0, time.UTC),
+		AttemptedAt:    now,
+		RetryBackoff:   2 * time.Minute,
 	})
 
 	if values["deliveryStatus"] != DeliveryStatusFailed ||
@@ -72,6 +74,8 @@ func TestBuildDeliveryLedgerValuesNormalizesFailedProviderError(t *testing.T) {
 		values["attempts"] != "3" ||
 		values["providerMessageId"] != "" ||
 		values["errorMessage"] != DeliveryLedgerErrorFailed ||
+		values["retryBackoffSeconds"] != "120" ||
+		values["nextRetryAt"] != now.Add(2*time.Minute).Format(time.RFC3339) ||
 		values["deliveredAt"] != "" {
 		t.Fatalf("ledger values = %+v, want safe failed SMS ledger", values)
 	}

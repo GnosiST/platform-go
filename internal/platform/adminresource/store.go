@@ -74,6 +74,17 @@ func NewStore() *Store {
 	return newStore(seedResources(), seedResourceSchemas())
 }
 
+// Close releases an optional repository connection owned by the store.
+func (s *Store) Close() error {
+	s.mu.Lock()
+	repository := s.repository
+	s.mu.Unlock()
+	if closer, ok := repository.(interface{ Close() error }); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
 func (s *Store) persistLocked() error {
 	return s.persistContextLocked(context.Background())
 }
@@ -84,6 +95,7 @@ func (s *Store) persistContextLocked(ctx context.Context) error {
 		return err
 	}
 	if s.repository == nil {
+		s.revision++
 		return nil
 	}
 	committed, err := s.repository.Save(ctx, snapshot)
@@ -92,6 +104,13 @@ func (s *Store) persistContextLocked(ctx context.Context) error {
 	}
 	s.revision = committed
 	return nil
+}
+
+// Revision is the committed resource snapshot revision currently loaded by the store.
+func (s *Store) Revision() uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.revision
 }
 
 func NewStoreFromCapabilities(manifests []capability.Manifest) *Store {
@@ -850,8 +869,7 @@ func credentialAuthSettingsSeedValues() map[string]string {
 		"phonePasswordEnabled":    "true",
 		"emailPasswordEnabled":    "true",
 		"phoneSMSOTPEnabled":      "true",
-		"challengeEnabled":        "true",
-		"challengeMode":           "after-failure",
+		"challengeMode":           "always",
 		"challengeKind":           "captcha",
 		"passwordMaxAttempts":     "5",
 		"lockSeconds":             "900",

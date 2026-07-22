@@ -50,6 +50,12 @@
   --selected: #edf4ff;
 }
 
+.platform-route-loading {
+  display: grid;
+  min-height: 280px;
+  place-items: center;
+}
+
 .admin-tree-workbench {
   display: grid;
   grid-template-columns: clamp(360px, 36vw, 520px) minmax(0, 1fr);
@@ -2143,7 +2149,7 @@ select {
   grid-template-columns: minmax(420px, 0.92fr) minmax(440px, 560px);
   gap: 24px;
   min-height: 100vh;
-  padding: 32px;
+  padding: 24px 32px;
   color: var(--text);
   background:
     linear-gradient(135deg, rgb(29 99 237 / 8%), transparent 42%),
@@ -2272,7 +2278,7 @@ select {
   width: 100%;
   max-width: 560px;
   margin: 0 auto;
-  padding: 78px 28px 28px;
+  padding: 66px 28px 24px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-elevated);
@@ -2290,14 +2296,14 @@ select {
 }
 
 .login-panel h2.ant-typography {
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   color: var(--text);
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1.2;
 }
 
 .login-panel-subtitle {
-  margin-bottom: 18px;
+  margin-bottom: 14px;
   color: var(--muted);
   font-size: 13px;
 }
@@ -2309,7 +2315,7 @@ select {
 .login-provider-options {
   display: grid;
   gap: 10px;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .login-provider-count-1 {
@@ -2330,12 +2336,12 @@ select {
 
 .login-provider-option {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  min-height: 76px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  min-height: 58px;
   min-width: 0;
   align-items: center;
-  gap: 10px;
-  padding: 11px;
+  gap: 8px;
+  padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -2372,8 +2378,8 @@ select {
 
 .login-provider-option-icon {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   place-items: center;
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--primary) 12%, var(--surface) 88%);
@@ -2401,7 +2407,7 @@ select {
 .login-provider-option-title {
   font-size: 13px;
   font-weight: 720;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
 }
 
 .login-provider-option-description {
@@ -2412,6 +2418,14 @@ select {
 
 .login-form-shell {
   min-width: 0;
+}
+
+.login-form-shell .ant-form-item {
+  margin-bottom: 14px;
+}
+
+.login-form-shell .ant-form-item-label {
+  padding-bottom: 3px;
 }
 
 .login-submit {
@@ -2432,7 +2446,7 @@ select {
 
 .login-challenge-card {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .login-challenge-prompt {
@@ -2519,7 +2533,7 @@ select {
   display: flex;
   width: 100%;
   max-width: 300px;
-  height: 40px;
+  height: 36px;
   align-items: center;
   justify-content: center;
   overflow: hidden;
@@ -2556,8 +2570,8 @@ select {
   position: absolute;
   z-index: 2;
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--primary) 36%, var(--border));
   border-radius: var(--radius-sm);
@@ -2576,7 +2590,7 @@ select {
   position: relative;
   z-index: 1;
   min-width: 0;
-  padding: 0 46px;
+  padding: 0 42px;
   overflow: hidden;
   font-size: 12px;
   text-overflow: ellipsis;
@@ -2585,6 +2599,26 @@ select {
 
 .login-challenge-refresh {
   justify-self: start;
+}
+
+@media (min-width: 768px) {
+  .login-slider-challenge .login-challenge-payload {
+    grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .login-slider-challenge .login-challenge-payload > .ant-typography {
+    grid-column: 1 / -1;
+  }
+
+  .login-slider-stage {
+    width: 100%;
+    max-width: 220px !important;
+  }
+
+  .login-slider-track {
+    max-width: none !important;
+  }
 }
 
 .login-challenge-row {
@@ -2951,6 +2985,57 @@ select {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.plugin-restart-checklist {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+}
+
+.plugin-restart-status-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.plugin-restart-checklist-steps {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plugin-restart-checklist-steps li {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-elevated) 84%, var(--page) 16%);
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.plugin-restart-checklist-steps svg {
+  margin-top: 3px;
+  color: var(--primary);
+}
+
+.plugin-restart-checklist-impact {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.plugin-restart-preview-row.compact {
+  grid-template-columns: 128px minmax(0, 0.95fr) minmax(0, 1.4fr);
 }
 
 .resource-grid {
@@ -6689,6 +6774,16 @@ select {
   }
 
   .capability-impact-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .plugin-restart-status-grid,
+  .plugin-entrypoint-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .plugin-restart-preview-row,
+  .plugin-restart-preview-row.compact {
     grid-template-columns: minmax(0, 1fr);
   }
 

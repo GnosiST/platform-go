@@ -40,6 +40,17 @@ func NewGORMRepository(ctx context.Context, db *gorm.DB) (*GORMRepository, error
 	return repository, nil
 }
 
+func (r *GORMRepository) Close() error {
+	if r == nil || r.db == nil {
+		return nil
+	}
+	db, err := r.db.DB()
+	if err != nil {
+		return err
+	}
+	return db.Close()
+}
+
 func (r *GORMRepository) ensureSchema(ctx context.Context) error {
 	db := r.db.WithContext(ctx)
 	if db.Dialector.Name() == "mysql" {

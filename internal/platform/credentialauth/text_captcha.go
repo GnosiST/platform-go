@@ -31,6 +31,8 @@ func defaultTextCaptchaMaterial() (ChallengeMaterial, error) {
 	return ChallengeMaterial{
 		Prompt: "Enter the displayed verification text.",
 		Parameters: map[string]string{
+			"provider":    "platform",
+			"mode":        "text",
 			"image":       imageData,
 			"imageWidth":  strconv.Itoa(textCaptchaImageWidth),
 			"imageHeight": strconv.Itoa(textCaptchaImageHeight),

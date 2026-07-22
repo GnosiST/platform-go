@@ -30,6 +30,17 @@ func NewGORMLifecycleHistory(ctx context.Context, db *gorm.DB) (*GORMLifecycleHi
 	return history, nil
 }
 
+func (h *GORMLifecycleHistory) Close() error {
+	if h == nil || h.db == nil {
+		return nil
+	}
+	db, err := h.db.DB()
+	if err != nil {
+		return err
+	}
+	return db.Close()
+}
+
 func (h *GORMLifecycleHistory) HasMigration(ctx context.Context, capabilityID ID, migrationID string) bool {
 	return h.has(ctx, LifecycleKindMigration, capabilityID, migrationID)
 }

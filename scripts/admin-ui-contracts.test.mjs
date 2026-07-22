@@ -161,6 +161,21 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stdout, /Admin UI contract validation passed/);
   });
 
+  it("rejects navigation search when its shared query binding is removed", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/shell/AdminShell.tsx",
+      "value={globalSearchQuery}",
+      "value={undefined}",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Navigation search must bind both desktop and mobile inputs to the shared query/);
+  });
+
   it("rejects restoring hover-open behavior on the profile dropdown", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
@@ -783,7 +798,7 @@ describe("validate-admin-ui-contracts", () => {
     replaceInTemp(
       tempRoot,
       "admin/src/platform/auth/AdminLoginView.tsx",
-      'return await startCredentialChallenge({ kind: "captcha", purpose: "login" });',
+      'return await startCredentialChallenge({ kind: "captcha", purpose: "login", clientFingerprint });',
       "throw sliderError;",
     );
 

@@ -425,6 +425,17 @@ func NewGORMAdminResourceRepository(ctx context.Context, db *gorm.DB) (*GORMAdmi
 	return repository, nil
 }
 
+func (r *GORMAdminResourceRepository) Close() error {
+	if r == nil || r.db == nil {
+		return nil
+	}
+	db, err := r.db.DB()
+	if err != nil {
+		return err
+	}
+	return db.Close()
+}
+
 func OpenGORMAdminResourceRepository(ctx context.Context, db *gorm.DB) (*GORMAdminResourceRepository, error) {
 	if ctx == nil || db == nil {
 		return nil, errors.New("gorm admin resource repository is unavailable")

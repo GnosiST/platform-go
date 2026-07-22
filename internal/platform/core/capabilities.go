@@ -647,7 +647,6 @@ func credentialAuthSettingsAdminResource() capability.AdminResource {
 			adminField("phonePasswordEnabled", "手机号密码", "Phone Password", "switch", "values", false, false, true, true, true, true, 130, nil),
 			adminField("emailPasswordEnabled", "邮箱密码", "Email Password", "switch", "values", false, false, true, true, true, true, 130, nil),
 			adminField("phoneSMSOTPEnabled", "短信验证码", "Phone SMS OTP", "switch", "values", false, false, true, true, true, true, 130, nil),
-			adminField("challengeEnabled", "登录验证", "Login Challenge", "switch", "values", false, false, true, true, true, true, 120, nil),
 			adminField("challengeMode", "验证模式", "Challenge Mode", "select", "values", true, false, true, true, true, true, 150, credentialChallengeModeOptions()),
 			adminField("challengeKind", "验证类型", "Challenge Kind", "select", "values", true, false, true, true, true, true, 140, credentialChallengeKindOptions()),
 			adminField("passwordMaxAttempts", "密码最大失败次数", "Password Max Attempts", "number", "values", true, false, true, true, true, true, 150, nil),
@@ -839,6 +838,9 @@ func notificationDeliveryAdminResource() capability.AdminResource {
 			adminField("deliveryStatus", "投递状态", "Delivery Status", "select", "values", true, false, true, true, true, true, 130, notificationDeliveryStatusOptions()),
 			adminField("attempts", "尝试次数", "Attempts", "number", "values", false, false, true, true, true, true, 110, nil),
 			adminField("lastAttemptAt", "最近尝试", "Last Attempt", "datetime", "values", false, false, true, true, true, true, 180, nil),
+			adminField("nextRetryAt", "下次重试", "Next Retry", "datetime", "values", false, true, true, true, false, true, 180, nil),
+			adminField("retryBackoffSeconds", "退避秒数", "Backoff Seconds", "number", "values", false, true, true, true, false, true, 130, nil),
+			adminField("retryRequestedAt", "重新排队时间", "Requeued At", "datetime", "values", false, true, true, false, false, true, 180, nil),
 			adminField("deliveredAt", "投递时间", "Delivered At", "datetime", "values", false, false, true, true, true, true, 180, nil),
 			adminField("errorMessage", "错误信息", "Error Message", "textarea", "values", false, false, true, false, true, true, 260, nil),
 			notificationDeliveryCorrelationField(adminField("requestId", "请求 ID", "Request ID", "text", "values", false, true, false, false, false, true, 300, nil), 36, `^req_[0-9a-f]{32}$`),
@@ -847,7 +849,7 @@ func notificationDeliveryAdminResource() capability.AdminResource {
 			adminField("description", "说明", "Description", "textarea", "record", false, false, false, false, true, true, 220, nil),
 			adminField("updatedAt", "更新时间", "Updated At", "datetime", "record", false, true, false, true, false, true, 180, nil),
 		},
-		SearchFields:   []string{"name", "code", "status", "description", "tenantCode", "notificationCode", "recipientUserCode", "target", "provider", "providerMessageId", "channel", "deliveryStatus", "lastAttemptAt", "deliveredAt", "errorMessage"},
+		SearchFields:   []string{"name", "code", "status", "description", "tenantCode", "notificationCode", "recipientUserCode", "target", "provider", "providerMessageId", "channel", "deliveryStatus", "lastAttemptAt", "nextRetryAt", "retryRequestedAt", "deliveredAt", "errorMessage"},
 		DefaultSortKey: "lastAttemptAt",
 	}
 }
@@ -1482,10 +1484,7 @@ func assignmentTypeOptions() []capability.AdminFieldOption {
 
 func credentialChallengeModeOptions() []capability.AdminFieldOption {
 	return []capability.AdminFieldOption{
-		adminFieldOption("off", "关闭", "Off"),
 		adminFieldOption("always", "始终", "Always"),
-		adminFieldOption("after-failure", "失败后", "After Failure"),
-		adminFieldOption("risk-based", "风险策略", "Risk Based"),
 	}
 }
 

@@ -2,6 +2,7 @@ package capability
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -126,6 +127,33 @@ func TestRunLifecycleWrapsExecutorFailure(t *testing.T) {
 	if !strings.Contains(err.Error(), `capability "files" migration "001-files" failed`) {
 		t.Fatalf("RunLifecycle() error = %v, want wrapped migration failure", err)
 	}
+}
+
+func TestRuntimeCloseClosesOwnedResource(t *testing.T) {
+	closer := &runtimeCloser{}
+	runtime := Runtime{Closer: closer}
+
+	if err := runtime.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if closer.calls != 1 {
+		t.Fatalf("Close() calls = %d, want 1", closer.calls)
+	}
+
+	closer.err = errors.New("close failed")
+	if err := runtime.Close(); !errors.Is(err, closer.err) {
+		t.Fatalf("Close() error = %v, want close error", err)
+	}
+}
+
+type runtimeCloser struct {
+	calls int
+	err   error
+}
+
+func (c *runtimeCloser) Close() error {
+	c.calls++
+	return c.err
 }
 
 var errRuntimeTestFailure = runtimeTestError{}

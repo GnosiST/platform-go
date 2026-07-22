@@ -18,7 +18,9 @@ const dataGovernanceDocPath = path.resolve(repoRoot, argValue("--data-governance
 const openapiAdminPath = path.resolve(repoRoot, argValue("--openapi-admin", "resources/generated/openapi.admin.json"));
 const mainGoPath = path.resolve(repoRoot, argValue("--main-go", "cmd/platform-api/main.go"));
 const httpCredentialAuthPath = path.resolve(repoRoot, argValue("--http-credential-auth", "internal/platform/httpapi/credential_auth.go"));
+const credentialServicePath = path.resolve(repoRoot, argValue("--credential-service", "internal/platform/credentialauth/service.go"));
 const adminClientPath = path.resolve(repoRoot, argValue("--admin-client", "admin/src/platform/api/client.ts"));
+const adminLoginViewPath = path.resolve(repoRoot, argValue("--admin-login-view", "admin/src/platform/auth/AdminLoginView.tsx"));
 
 const requiredProviderModes = new Map([
   ["username-password", { identifierType: "username", secretType: "password", configKey: "PLATFORM_CREDENTIAL_AUTH_USERNAME_PASSWORD" }],
@@ -49,9 +51,9 @@ const requiredStorageContracts = new Map([
   ],
   [
     "credential_challenges",
-    ["challengeId", "kind", "purpose", "answerDigest", "expiresAt", "attempts", "usedAt", "clientFingerprintHash"],
+    ["challengeId", "kind", "purpose", "answerDigest", "expiresAt", "attempts", "usedAt", "clientFingerprintHash", "status"],
   ],
-  ["sms_otp_challenges", ["challengeId", "phoneHash", "codeDigest", "expiresAt", "attempts", "messageId", "usedAt"]],
+  ["sms_otp_challenges", ["challengeId", "phoneHash", "codeDigest", "expiresAt", "attempts", "messageId", "usedAt", "status"]],
 ]);
 
 const requiredEndpoints = new Set([
@@ -63,6 +65,7 @@ const requiredEndpoints = new Set([
   "POST /api/admin/profile/current/password/change",
   "POST /api/admin/profile/{id}/password/reset",
   "POST /api/admin/message-center/deliveries/run",
+  "POST /api/admin/message-center/deliveries/{id}/retry",
 ]);
 
 const requiredOpenAPIPaths = new Map([
@@ -330,9 +333,11 @@ function validateStorageContracts(contract, errors) {
 function validateChallengeAndSecretPolicies(contract, errors) {
   const challenge = contract.challengeContract ?? {};
   requireIncludes(challenge.kinds, ["captcha", "slider"], "challengeContract.kinds", errors);
-  requireIncludes(challenge.modes, ["off", "always", "after-failure", "risk-based"], "challengeContract.modes", errors);
-  if (challenge.defaultMode !== "after-failure") {
-    errors.push("challengeContract.defaultMode must be after-failure");
+  if (!Array.isArray(challenge.modes) || challenge.modes.length !== 1 || challenge.modes[0] !== "always") {
+    errors.push("challengeContract.modes must be the mandatory always baseline");
+  }
+  if (challenge.defaultMode !== "always") {
+    errors.push("challengeContract.defaultMode must be always");
   }
   if (challenge.defaultKind !== "captcha") {
     errors.push("challengeContract.defaultKind must be captcha");
@@ -342,6 +347,18 @@ function validateChallengeAndSecretPolicies(contract, errors) {
   }
   if (challenge.singleUse !== true) {
     errors.push("challengeContract.singleUse must be true");
+  }
+  if (challenge.disableOnMaxAttempts !== true) {
+    errors.push("challengeContract.disableOnMaxAttempts must be true");
+  }
+  if (challenge.sliderProofTolerancePixels !== 3) {
+    errors.push("challengeContract.sliderProofTolerancePixels must be 3");
+  }
+  if (challenge.clientFingerprintPersistence !== "digest-only") {
+    errors.push("challengeContract.clientFingerprintPersistence must be digest-only");
+  }
+  if (challenge.mandatoryBaseline !== true || !String(challenge.riskRouting ?? "").includes("valid single-use challenge") || !String(challenge.riskRouting ?? "").includes("Risk-based routing is not exposed")) {
+    errors.push("challengeContract must keep the mandatory baseline and defer risk routing without an approved adapter");
   }
 
   const password = contract.passwordPolicy ?? {};
@@ -363,6 +380,19 @@ function validateChallengeAndSecretPolicies(contract, errors) {
   if (password.secretTransportRequired !== true) {
     errors.push("passwordPolicy.secretTransportRequired must stay true");
   }
+  const governance = password.rotationAndIncidentGovernance ?? {};
+  if (governance.rehashOnSuccessfulParamsUpgrade !== true || governance.privilegedResetSetsMustChange !== true) {
+    errors.push("passwordPolicy.rotationAndIncidentGovernance must require rehash-on-success and MustChange on privileged reset");
+  }
+  for (const [key, snippets] of Object.entries({
+    breachResponse: ["disable affected credentials", "revoke impacted sessions", "raw passwords"],
+    migration: ["dedicated credential tables", "parameter version", "must not rewrite generic Record.Values"],
+    promotionEvidence: ["independent security", "operations approval", "migration rehearsal evidence"],
+  })) {
+    if (!snippets.every((snippet) => String(governance[key] ?? "").includes(snippet))) {
+      errors.push(`passwordPolicy.rotationAndIncidentGovernance.${key} is incomplete`);
+    }
+  }
 
   const sms = contract.smsOtpPolicy ?? {};
   if (sms.transactionEndpoint !== "POST /api/auth/sms-otp/start") {
@@ -370,6 +400,12 @@ function validateChallengeAndSecretPolicies(contract, errors) {
   }
   if (sms.digestOnly !== true || sms.singleUse !== true) {
     errors.push("smsOtpPolicy must stay digest-only and single-use");
+  }
+  if (sms.persistBeforeSend !== true) {
+    errors.push("smsOtpPolicy.persistBeforeSend must stay true");
+  }
+  if (sms.disableOnMaxAttempts !== true) {
+    errors.push("smsOtpPolicy.disableOnMaxAttempts must stay true");
   }
   if (sms.sendThroughCapability !== "notification") {
     errors.push("smsOtpPolicy.sendThroughCapability must be notification");
@@ -438,7 +474,11 @@ function validateMessageCenterContract(contract, errors) {
   );
   requireIncludes(
     messageCenter.runtimeEndpoints,
-    ["POST /api/admin/message-center/test-send", "POST /api/admin/message-center/deliveries/run"],
+    [
+      "POST /api/admin/message-center/test-send",
+      "POST /api/admin/message-center/deliveries/run",
+      "POST /api/admin/message-center/deliveries/{id}/retry",
+    ],
     "messageCenterContract.runtimeEndpoints",
     errors,
   );
@@ -449,11 +489,21 @@ function validateMessageCenterContract(contract, errors) {
   if (!providerTruth.includes("Aliyun/Tencent live SMS SDK adapters") || !providerTruth.includes("dry-run/config validation")) {
     errors.push("messageCenterContract.deliveryWorker.providerRuntimeTruth must describe Aliyun/Tencent live SMS SDK adapters plus dry-run/config validation");
   }
+  if (!providerTruth.includes("in-app, Email and WeChat worker paths use local dry-run receipts")) {
+    errors.push("messageCenterContract.deliveryWorker.providerRuntimeTruth must document in-app, Email and WeChat local dry-run worker paths");
+  }
   if (!providerTruth.includes("SMTP/WeChat supplier integration is not claimed")) {
     errors.push("messageCenterContract.deliveryWorker.providerRuntimeTruth must not claim SMTP/WeChat supplier integration");
   }
   if (!String(messageCenter.configurationClosedLoop ?? "").includes("Provider configuration") || !String(messageCenter.configurationClosedLoop ?? "").includes("manual run")) {
     errors.push("messageCenterContract.configurationClosedLoop must document provider configuration through manual run closure");
+  }
+  const retryTarget = messageCenter.secureRetryTarget ?? {};
+  if (retryTarget.persistence !== "write-only process-memory lease only" || retryTarget.leaseTTLSeconds !== 7200 || retryTarget.retainUntil !== "delivery succeeds or lease expires" || retryTarget.releaseOn !== "successful delivery ledger mutation" || retryTarget.genericRecordValuesRawTargetAllowed !== false) {
+    errors.push("messageCenterContract.secureRetryTarget must retain a bounded write-only target lease without generic raw-target persistence");
+  }
+  if (!String(retryTarget.restartRecovery ?? "").includes("redacted ledger target") || !String(retryTarget.restartRecovery ?? "").includes("submit the recipient again")) {
+    errors.push("messageCenterContract.secureRetryTarget must document restart recovery without raw-target persistence");
   }
 }
 
@@ -502,10 +552,10 @@ function validateAPIContract(contract, errors) {
       "GET /api/auth/providers includes enabled credential-auth provider declarations",
       "GET /api/auth/credential-secret-key exposes short-lived public key metadata for application-layer hybrid encrypted credential secrets",
       "POST /api/auth/challenges creates digest-only CAPTCHA/slider challenge transactions for login",
-      "POST /api/auth/sms-otp/start starts phone SMS OTP transactions through notification.sms",
+      "POST /api/auth/sms-otp/start requires a single-use credential challenge, persists the digest-only OTP transaction before sending and disables it on send failure",
       "POST /api/auth/login accepts structured encrypted credential-password and credential-sms-otp requests while preserving demo/OIDC compatibility",
-      "Admin login UI renders credential provider modes from discovery and encrypts credential secrets with WebCrypto",
-      "credential-auth request paths use rate-limit enforcement and redacted internal error/audit surfaces",
+      "Admin login UI renders credential provider modes from discovery, encrypts credential secrets with WebCrypto and closes CAPTCHA/go-captcha slider challenges",
+      "credential-auth request paths use rate-limit enforcement, login failure audit and redacted internal error/audit surfaces",
     ],
     "apiContract.implementedNow",
     errors,
@@ -513,9 +563,8 @@ function validateAPIContract(contract, errors) {
   requireIncludes(
     api.notProductionComplete,
     [
-      "CAPTCHA login UI is wired; slider presentation and risk strategy can be enhanced beyond the current CAPTCHA/slider transaction contract",
+      "CAPTCHA and go-captcha slider login UI are wired; credential-auth v1 keeps the approved mandatory challenge baseline while any risk-signal adapter remains a separate reviewed capability",
       "real-vendor SMS delivery evidence against approved Aliyun/Tencent accounts",
-      "password rotation, breach response and migration governance",
       "production promotion evidence",
     ],
     "apiContract.notProductionComplete",
@@ -616,8 +665,11 @@ function validateEvidenceWiring(contract, errors) {
   if (!packageC || !["in-progress", "done"].includes(packageC.status)) {
     errors.push("implementationPackages must track C-notification-sms-adapters as in-progress or done after SMS port work starts");
   }
-  if (!String(packageC?.scope ?? "").includes("internal/platform/notification")) {
-    errors.push("implementationPackages.C-notification-sms-adapters scope must point to internal/platform/notification");
+  const packageCScope = String(packageC?.scope ?? "");
+  for (const snippet of ["internal/platform/notification", "Aliyun/Tencent official SDK-backed live adapters", "approved-account delivery evidence"]) {
+    if (!packageCScope.includes(snippet)) {
+      errors.push(`implementationPackages.C-notification-sms-adapters scope must document ${snippet}`);
+    }
   }
   for (const filePath of requiredNotificationSMSFiles) {
     if (!relativeExistingPath(filePath)) {
@@ -673,6 +725,9 @@ function validateDocs(authDoc, capabilityDoc, dataGovernanceDoc, errors) {
     ["`POST /api/auth/challenges` is implemented in the backend runtime", "docs/platform-auth.md must state POST /api/auth/challenges is implemented in backend runtime"],
     ["password change/reset", "docs/platform-auth.md must document password change/reset contract"],
     ["rate-limit enforcement and redacted audit/error surfaces", "docs/platform-auth.md must document rate-limit and redacted audit/error surfaces"],
+    ["always required", "docs/platform-auth.md must document the mandatory challenge baseline"],
+    ["rotation/incident/migration governance contract", "docs/platform-auth.md must document password governance"],
+    ["write-only process-memory lease for two hours", "docs/platform-auth.md must document bounded retry-target handling"],
     ["message delivery worker", "docs/platform-auth.md must document message delivery worker"],
     ["manual run endpoint", "docs/platform-auth.md must document message-center manual run endpoint"],
     ["application-layer hybrid encryption", "docs/platform-auth.md must document application-layer hybrid encryption"],
@@ -698,6 +753,12 @@ function validateDocs(authDoc, capabilityDoc, dataGovernanceDoc, errors) {
     ["deliverable-v1", "docs/platform-capability-development.md must document the current v1 runtime status"],
     ["Do not declare provider kind `password`", "docs/platform-capability-development.md must keep provider kind password blocked until implementation"],
     ["`POST /api/auth/challenges` is now a backend runtime endpoint", "docs/platform-capability-development.md must state POST /api/auth/challenges is implemented in backend runtime"],
+    ["go-captcha slider material", "docs/platform-capability-development.md must document go-captcha slider UI material"],
+    ["digest-only slider X tolerance", "docs/platform-capability-development.md must document digest-only slider X tolerance"],
+    ["per-page challenge nonce", "docs/platform-capability-development.md must document per-page challenge nonce binding"],
+    ["requires its valid single-use challenge", "docs/platform-capability-development.md must document the mandatory challenge baseline"],
+    ["rotation/incident/migration governance contract", "docs/platform-capability-development.md must document password governance"],
+    ["write-only process-memory lease", "docs/platform-capability-development.md must document secure retry-target handling"],
     ["password change/reset contract", "docs/platform-capability-development.md must document password change/reset contract"],
     ["message delivery worker contract", "docs/platform-capability-development.md must document message delivery worker contract"],
     ["manual run endpoint `POST /api/admin/message-center/deliveries/run`", "docs/platform-capability-development.md must document message-center delivery run endpoint"],
@@ -729,6 +790,37 @@ function validateDocs(authDoc, capabilityDoc, dataGovernanceDoc, errors) {
     if (!dataGovernanceDoc.includes(snippet)) {
       errors.push(message);
     }
+  }
+}
+
+function validateChallengeImplementation(credentialService, httpCredentialAuth, adminLoginView, openapi, errors) {
+  if (!credentialService.includes("hashChallengeAnswer") || !credentialService.includes("challengeProofDigestSetPrefix")) {
+    errors.push("credential-auth service must store slider challenge proof tolerance as a digest-only answer set");
+  }
+  if (!credentialService.includes("normalizeChallengeProof(challenge.Kind, input.Proof)")) {
+    errors.push("credential-auth service must normalize raw challenge proof before hashing");
+  }
+  if (!credentialService.includes("challenge.Status = StatusDisabled") || !credentialService.includes("s.repository.UpsertSMSOTPChallenge(ctx, challenge)")) {
+    errors.push("credential-auth service must disable challenge and SMS OTP records on max-attempt rejection");
+  }
+  if (!httpCredentialAuth.includes("Proof:                 proof")) {
+    errors.push("credential-auth HTTP login must pass raw challenge proof to the service for normalization and tolerance handling");
+  }
+  if (!httpCredentialAuth.includes("runtime.Service.PutSMSOTPChallenge(ctx.Request.Context(), otpChallenge)") || !httpCredentialAuth.includes("otpChallenge.Status = credentialauth.StatusDisabled")) {
+    errors.push("credential-auth HTTP SMS OTP start must persist the OTP digest before send and disable it on send failure");
+  }
+  if (!httpCredentialAuth.includes("recordCredentialAuthLoginFailure") || !httpCredentialAuth.includes("\"auth.login\"")) {
+    errors.push("credential-auth HTTP login must write redacted failure audit events");
+  }
+  if (!adminLoginView.includes("clientFingerprintRef") || !adminLoginView.includes("clientFingerprint")) {
+    errors.push("Admin login view must bind credential challenges with a per-page client fingerprint");
+  }
+  if (!adminLoginView.includes("loginRateLimited") || !adminLoginView.includes("loginChallengeExpired")) {
+    errors.push("Admin login view must expose localized rate-limit and challenge-expiry feedback");
+  }
+  const challengeProof = openapi.components?.schemas?.AdminCredentialAuthChallengeProof;
+  if (challengeProof?.properties?.clientFingerprint?.writeOnly !== true) {
+    errors.push("OpenAPI AdminCredentialAuthChallengeProof must include write-only clientFingerprint");
   }
 }
 
@@ -790,6 +882,9 @@ function validateOpenAPI(openapi, errors) {
     if (!String(run.description ?? "").includes("Aliyun/Tencent live SMS SDK adapters") || !String(run.description ?? "").includes("dry-run/config validation")) {
       errors.push("OpenAPI message-center deliveries run must describe Aliyun/Tencent live SMS SDK adapters plus dry-run/config validation");
     }
+    if (!String(run.description ?? "").includes("In-app, Email and WeChat worker paths use local dry-run receipts")) {
+      errors.push("OpenAPI message-center deliveries run must document in-app, Email and WeChat local dry-run worker paths");
+    }
     if (/SMTP.*live|WeChat.*live/i.test(String(run.description ?? ""))) {
       errors.push("OpenAPI message-center deliveries run must not claim SMTP/WeChat supplier integration");
     }
@@ -804,7 +899,9 @@ const authDoc = readText(authDocPath);
 const capabilityDoc = readText(capabilityDocPath);
 const dataGovernanceDoc = readText(dataGovernanceDocPath);
 const httpCredentialAuth = readText(httpCredentialAuthPath);
+const credentialService = readText(credentialServicePath);
 const adminClient = readText(adminClientPath);
+const adminLoginView = readText(adminLoginViewPath);
 
 if (contract.contractVersion !== "0.1.0") {
   errors.push("contractVersion must be 0.1.0");
@@ -825,6 +922,7 @@ validateAPIContract(contract, errors);
 validateConfiguration(contract, errors);
 validateEvidenceWiring(contract, errors);
 validateDocs(authDoc, capabilityDoc, dataGovernanceDoc, errors);
+validateChallengeImplementation(credentialService, httpCredentialAuth, adminLoginView, openapiAdmin, errors);
 validateSecretTransportImplementation(httpCredentialAuth, adminClient, errors);
 validateOpenAPI(openapiAdmin, errors);
 

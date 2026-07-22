@@ -358,6 +358,12 @@ func TestNotificationManifestIsOptionalAndBusinessNeutral(t *testing.T) {
 			t.Fatalf("notification-deliveries field %q = %+v, want internal read-only detail field omitted from export", fieldKey, field)
 		}
 	}
+	for _, fieldKey := range []string{"nextRetryAt", "retryBackoffSeconds", "retryRequestedAt"} {
+		field := adminResourceField(t, resources["notification-deliveries"], fieldKey)
+		if !field.ReadOnly || field.InForm || !field.InDetail || field.Sensitivity != capability.FieldSensitivityPublic {
+			t.Fatalf("notification-deliveries retry field %q = %+v, want public read-only runtime field", fieldKey, field)
+		}
+	}
 
 	for _, resource := range []capability.AdminResource{resources["notification-channels"], resources["notification-providers"], resources["notification-send-policies"], resources["notification-templates"], resources["notification-deliveries"]} {
 		channelField := adminResourceField(t, resource, "channel")
@@ -597,7 +603,7 @@ func TestCredentialAuthManifestExposesSettingsResource(t *testing.T) {
 			t.Fatalf("credential-auth settings field %q = %+v, want writable values field", fieldKey, field)
 		}
 	}
-	requireFieldOption(t, "credential-auth-settings", adminResourceField(t, settings, "challengeMode"), "after-failure")
+	requireFieldOption(t, "credential-auth-settings", adminResourceField(t, settings, "challengeMode"), "always")
 	requireFieldOption(t, "credential-auth-settings", adminResourceField(t, settings, "challengeKind"), "slider")
 	requireFieldOption(t, "credential-auth-settings", adminResourceField(t, settings, "secretTransport"), "ecdh-a256gcm-v1")
 	requireFieldOption(t, "credential-auth-settings", adminResourceField(t, settings, "passwordAlgorithm"), "argon2id")

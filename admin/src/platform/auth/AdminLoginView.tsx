@@ -22,6 +22,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  AdminAPIError,
   loginWithAuthProvider,
   startCredentialChallenge,
   startCredentialSMSOTP,
@@ -114,6 +115,7 @@ export function AdminLoginView({
   const [callbackFailure, setCallbackFailure] = useState<OIDCCallbackFailure | "generic" | null>(null);
   const callbackGuardRef = useRef(createSingleUseGuard());
   const submissionLockRef = useRef(createSubmissionLock());
+  const clientFingerprintRef = useRef(createLoginClientFingerprint());
   const loginHeadingRef = useRef<HTMLElement>(null);
   const errorHeadingRef = useRef<HTMLElement>(null);
   const [form] = Form.useForm<LoginFormValues>();
@@ -189,7 +191,10 @@ export function AdminLoginView({
     setLoginError("");
     try {
       let result;
-      const challenge = credentialChallengeRequest(credentialChallenge, values.challengeProof);
+      const challenge = credentialChallengeRequest(credentialChallenge, values.challengeProof, clientFingerprintRef.current);
+      if (credentialSpec && credentialChallenge && credentialChallengeExpired(credentialChallenge)) {
+        throw new Error(dictionary.loginChallengeExpired);
+      }
       if (credentialSpec && !challenge) throw new Error(dictionary.loginChallengeRequired);
       if (selectedProvider.kind === "demo") {
         result = await loginWithAuthProvider({
@@ -216,7 +221,7 @@ export function AdminLoginView({
       }
       onLoginSuccess(result.principal);
     } catch (nextError) {
-      setLoginError(nextError instanceof Error ? nextError.message : dictionary.loginFailed);
+      setLoginError(loginAPIErrorMessage(nextError, dictionary, dictionary.loginFailed));
       if (credentialSpec) void refreshCredentialChallenge();
     } finally {
       submissionLockRef.current.release();
@@ -231,15 +236,23 @@ export function AdminLoginView({
     }
     try {
       const values = await form.validateFields(["identifier"]);
+      const challenge = credentialChallengeRequest(credentialChallenge, form.getFieldValue("challengeProof"), clientFingerprintRef.current);
+      if (credentialChallenge && credentialChallengeExpired(credentialChallenge)) {
+        throw new Error(dictionary.loginChallengeExpired);
+      }
+      if (!challenge) throw new Error(dictionary.loginChallengeRequired);
       setSendingSMSOTP(true);
       setLoginError("");
       const transaction = await startCredentialSMSOTP({
         provider: selectedProvider.id,
         identifier: { type: "phone", value: values.identifier },
+        challenge,
       });
       setSMSOTPTransaction(transaction);
+      void refreshCredentialChallenge();
     } catch (nextError) {
-      setLoginError(nextError instanceof Error ? nextError.message : dictionary.loginSMSStartFailed);
+      setLoginError(loginAPIErrorMessage(nextError, dictionary, dictionary.loginSMSStartFailed));
+      if (credentialSpec?.mode === "sms-otp") void refreshCredentialChallenge();
     } finally {
       setSendingSMSOTP(false);
     }
@@ -247,13 +260,14 @@ export function AdminLoginView({
 
   const refreshCredentialChallenge = async () => {
     setCredentialChallengeLoading(true);
+    const fallback = credentialChallenge ? dictionary.loginChallengeRefreshFailed : dictionary.loginChallengeStartFailed;
     try {
-      const nextChallenge = await startLoginCredentialChallenge();
+      const nextChallenge = await startLoginCredentialChallenge(clientFingerprintRef.current);
       setCredentialChallenge(nextChallenge);
       form.setFieldValue("challengeProof", "");
     } catch (nextError) {
       setCredentialChallenge(null);
-      setLoginError(nextError instanceof Error ? nextError.message : dictionary.loginChallengeStartFailed);
+      setLoginError(loginAPIErrorMessage(nextError, dictionary, fallback));
     } finally {
       setCredentialChallengeLoading(false);
     }
@@ -600,6 +614,7 @@ function CredentialChallengeField({
 }) {
   const form = Form.useFormInstance<LoginFormValues>();
   const sliderMaterial = sliderChallengeMaterial(challenge);
+  const expired = challenge ? credentialChallengeExpired(challenge) : false;
   const setChallengeProof = useCallback(
     (proof: string) => {
       form.setFieldValue("challengeProof", proof);
@@ -611,6 +626,13 @@ function CredentialChallengeField({
     <Form.Item label={dictionary.loginChallenge} required>
       <div className="login-challenge-card">
         <CredentialChallengePayload challenge={challenge} dictionary={dictionary} onProofChange={setChallengeProof} />
+        {expired ? (
+          <Typography.Text type="danger">{dictionary.loginChallengeExpired}</Typography.Text>
+        ) : challenge ? (
+          <Typography.Text type="secondary">
+            {dictionary.loginChallengeExpiresAt.replace("{time}", formatChallengeTime(challenge.expiresAt))}
+          </Typography.Text>
+        ) : null}
         {sliderMaterial ? (
           <>
             <Form.Item
@@ -908,10 +930,10 @@ function CredentialChallengeDebug({
   );
 }
 
-async function startLoginCredentialChallenge() {
+async function startLoginCredentialChallenge(clientFingerprint: string) {
   let sliderError: unknown;
   try {
-    const sliderChallenge = await startCredentialChallenge({ kind: "slider", purpose: "login" });
+    const sliderChallenge = await startCredentialChallenge({ kind: "slider", purpose: "login", clientFingerprint });
     if (!challengeNeedsCaptchaFallback(sliderChallenge)) {
       return sliderChallenge;
     }
@@ -919,20 +941,56 @@ async function startLoginCredentialChallenge() {
     sliderError = nextError;
   }
   try {
-    return await startCredentialChallenge({ kind: "captcha", purpose: "login" });
+    return await startCredentialChallenge({ kind: "captcha", purpose: "login", clientFingerprint });
   } catch (captchaError) {
     throw captchaError instanceof Error ? captchaError : sliderError ?? captchaError;
   }
 }
 
-function credentialChallengeRequest(challenge: CredentialChallengeStartResult | null, proof: string | undefined) {
+function credentialChallengeRequest(challenge: CredentialChallengeStartResult | null, proof: string | undefined, clientFingerprint: string) {
   const normalizedProof = String(proof ?? "").trim();
   if (!challenge || normalizedProof === "") return undefined;
   return {
     id: challenge.id,
     kind: challenge.kind,
     proof: normalizedProof,
+    clientFingerprint,
   };
+}
+
+function credentialChallengeExpired(challenge: CredentialChallengeStartResult) {
+  const expiresAt = Date.parse(challenge.expiresAt);
+  return Number.isFinite(expiresAt) && expiresAt <= Date.now();
+}
+
+function formatChallengeTime(value: string) {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return value;
+  return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function loginAPIErrorMessage(error: unknown, dictionary: Dictionary, fallback: string) {
+  if (!(error instanceof AdminAPIError)) {
+    return error instanceof Error ? error.message : fallback;
+  }
+  let message = error.message || fallback;
+  if (error.code === "AUTH_INVALID_CREDENTIALS") {
+    message = dictionary.loginInvalidCredentials;
+  } else if (error.code === "RATE_LIMITED") {
+    message = dictionary.loginRateLimited;
+  } else if (error.code === "RATE_LIMIT_UNAVAILABLE") {
+    message = dictionary.loginRateLimitUnavailable;
+  }
+  const correlation = error.requestId || error.traceId;
+  return correlation ? `${message} ${dictionary.loginErrorCorrelation.replace("{id}", correlation)}` : message;
+}
+
+function createLoginClientFingerprint() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `login:${crypto.randomUUID()}`;
+  }
+  const randomPart = Math.random().toString(36).slice(2);
+  return `login:${Date.now().toString(36)}:${randomPart}`;
 }
 
 function challengeStringParameter(challenge: CredentialChallengeStartResult, key: string) {
@@ -958,6 +1016,7 @@ function sliderChallengeMaterial(challenge: CredentialChallengeStartResult | nul
   const imageHeight = Math.round(challengeNumberParameter(challenge, "imageHeight"));
   const tileWidth = Math.round(challengeNumberParameter(challenge, "tileWidth"));
   const tileHeight = Math.round(challengeNumberParameter(challenge, "tileHeight"));
+  const initialX = challengeNumberParameter(challenge, "initialX") || challengeNumberParameter(challenge, "tileX");
   if (!masterImage || !tileImage || imageWidth <= 0 || imageHeight <= 0 || tileWidth <= 0 || tileHeight <= 0) {
     return null;
   }
@@ -971,7 +1030,7 @@ function sliderChallengeMaterial(challenge: CredentialChallengeStartResult | nul
     imageHeight,
     tileWidth,
     tileHeight,
-    initialX: clampNumber(challengeNumberParameter(challenge, "tileX"), 0, imageWidth - tileWidth),
+    initialX: clampNumber(initialX, 0, imageWidth - tileWidth),
     tileY: clampNumber(challengeNumberParameter(challenge, "tileY"), 0, imageHeight - tileHeight),
   };
 }

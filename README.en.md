@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/GnosiST/platform-go/actions/workflows/ci.yml/badge.svg)](https://github.com/GnosiST/platform-go/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f6f9f.svg)](LICENSE)
-[![Go](https://img.shields.io/badge/Go-1.22%2B-00ADD8.svg)](go.mod)
+[![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8.svg)](go.mod)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-0b7285.svg)](https://gnosist.github.io/platform-go/en/)
 
 [English](README.en.md) · [简体中文](README.md) · [Documentation / 文档站](https://gnosist.github.io/platform-go/en/)
@@ -71,6 +71,10 @@ go run ./cmd/platform-api
 ```
 
 The API defaults to `http://127.0.0.1:9200`; the Admin development server defaults to `http://127.0.0.1:9202`.
+
+### Business Integration Baseline
+
+Keeping package version `0.1.0` does not move the published `v0.1.0` tag. Downstream business repositories must pin a reviewed Git commit SHA that has passed this repository's contract and test gates, then attach business manifests and App handlers through `pkg/platform/capability` and `pkg/platform/app`. Do not depend on mutable `main`, and do not modify `internal/platform/**`.
 
 ### Development Target Role Menus
 

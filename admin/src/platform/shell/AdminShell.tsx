@@ -186,6 +186,7 @@ export function AdminShell({
   const globalSearchMenuItems = globalSearchResults.length > 0
     ? globalSearchResults.map((resource) => ({ key: resource.route, label: resource.title[language] }))
     : [{ key: "__no_results__", label: dictionary.globalSearchNoResults, disabled: true }];
+  const notificationResource = resources.find((resource) => resource.route === "/notifications");
   const openTabs = openTabRoutes
     .map((route) => resourcesByRoute.get(route))
     .filter((resource): resource is AdminResourceDefinition => Boolean(resource));
@@ -328,6 +329,23 @@ export function AdminShell({
       return;
     }
     onRouteChange(resource.route);
+  };
+
+  const openNavigationSearchResource = (route: string) => {
+    const resource = resourcesByRoute.get(route);
+    if (resource) openResource(resource);
+    setGlobalSearchQuery("");
+  };
+
+  const openFirstNavigationSearchResult = () => {
+    const resource = globalSearchResults[0];
+    if (resource) openResource(resource);
+    setGlobalSearchQuery("");
+  };
+
+  const navigationSearchMenu = {
+    items: globalSearchMenuItems,
+    onClick: ({ key }: { key: string }) => openNavigationSearchResource(key),
   };
 
   const openResourceFromMobileDrawer = (resource: AdminResourceDefinition) => {
@@ -480,35 +498,22 @@ export function AdminShell({
           </div>
           <Dropdown
             open={Boolean(globalSearchQuery.trim())}
-            menu={{
-              items: globalSearchMenuItems,
-              onClick: ({ key }) => {
-                const resource = resourcesByRoute.get(String(key));
-                if (resource) openResource(resource);
-                setGlobalSearchQuery("");
-              },
-            }}
+            menu={navigationSearchMenu}
             placement="bottomLeft"
             trigger={[]}
           >
             <Input
-              aria-label={dictionary.topSearch}
+              aria-label={dictionary.navigationSearch}
               autoComplete="off"
               className="global-search desktop-global-search"
               id="platform-global-search"
               name="globalSearch"
               prefix={<SearchOutlined />}
               suffix={<span className="keyboard-hint">⌘ {dictionary.commandHint}</span>}
-              placeholder={dictionary.topSearch}
+              placeholder={dictionary.navigationSearch}
               value={globalSearchQuery}
               onChange={(event) => setGlobalSearchQuery(event.target.value)}
-              onPressEnter={() => {
-                const resource = globalSearchResults[0];
-                if (resource) {
-                  openResource(resource);
-                  setGlobalSearchQuery("");
-                }
-              }}
+              onPressEnter={openFirstNavigationSearchResult}
             />
           </Dropdown>
           <Space className="topbar-actions" size={8}>
@@ -520,8 +525,16 @@ export function AdminShell({
                 onClick={() => onLanguageChange(targetLanguage)}
               />
             </Tooltip>
-            <Tooltip title={dictionary.alerts}>
-              <Button aria-label={dictionary.alerts} className="topbar-icon-button" icon={<BellOutlined />} />
+            <Tooltip title={dictionary.messageCenterNotifications}>
+              <Button
+                aria-label={dictionary.messageCenterNotifications}
+                className="topbar-icon-button"
+                disabled={!notificationResource}
+                icon={<BellOutlined />}
+                onClick={() => {
+                  if (notificationResource) openResource(notificationResource);
+                }}
+              />
             </Tooltip>
             <Tooltip title={themeName === "black" ? dictionary.switchToDayMode : dictionary.switchToNightMode}>
               <Button
@@ -743,15 +756,25 @@ export function AdminShell({
         afterOpenChange={handleMobileDrawerOpenChange}
         onClose={() => setMobileNavOpen(false)}
       >
-        <Input
-          aria-label={dictionary.topSearch}
-          autoComplete="off"
-          className="global-search mobile-global-search"
-          id="platform-mobile-global-search"
-          name="mobileGlobalSearch"
-          prefix={<SearchOutlined />}
-          placeholder={dictionary.topSearch}
-        />
+        <Dropdown
+          open={Boolean(globalSearchQuery.trim())}
+          menu={navigationSearchMenu}
+          placement="bottomLeft"
+          trigger={[]}
+        >
+          <Input
+            aria-label={dictionary.navigationSearch}
+            autoComplete="off"
+            className="global-search mobile-global-search"
+            id="platform-mobile-global-search"
+            name="mobileGlobalSearch"
+            prefix={<SearchOutlined />}
+            placeholder={dictionary.navigationSearch}
+            value={globalSearchQuery}
+            onChange={(event) => setGlobalSearchQuery(event.target.value)}
+            onPressEnter={openFirstNavigationSearchResult}
+          />
+        </Dropdown>
         <SideNavigation
           groupedResources={groupedResources}
           activeRoute={activeRoute}

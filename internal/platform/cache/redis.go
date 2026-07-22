@@ -78,3 +78,7 @@ func (s *RedisStore) DeletePrefix(ctx context.Context, prefix string) error {
 func (s *RedisStore) Close() error {
 	return s.client.Close()
 }
+
+func (s *RedisStore) CheckReadiness(ctx context.Context) error {
+	return s.client.Ping(ctx).Err()
+}

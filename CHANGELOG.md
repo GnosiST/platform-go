@@ -17,6 +17,7 @@ and releases follow [Semantic Versioning](https://semver.org/).
 
 - Unified role and role-group administration under one strict two-level role-management workbench while retaining compatibility routes.
 - Reworked role details and menu/permission entry points with platform tree and Tree Transfer primitives across desktop, mobile and dark mode.
+- Sealed the current `main` maintenance baseline without changing package version `0.1.0` or moving the immutable `v0.1.0` release tag. Downstream business projects must pin a reviewed commit SHA rather than rely on a mutable branch.
 
 ### Fixed
 

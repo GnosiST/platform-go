@@ -7,6 +7,14 @@ import (
 	"github.com/GnosiST/platform-go/internal/platform/config"
 )
 
+func CacheRuntimeFromConfig(cfg config.Config) (cache.Runtime, error) {
+	store, err := CacheFromConfig(cfg)
+	if err != nil {
+		return cache.Runtime{}, err
+	}
+	return cache.Runtime{Store: store, InvalidationBus: CacheInvalidationBusFromConfig(cfg)}, nil
+}
+
 func CacheFromConfig(cfg config.Config) (cache.Store, error) {
 	switch cfg.CacheDriver {
 	case "":

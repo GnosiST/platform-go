@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -156,6 +157,17 @@ func NewService(options Options) (*Service, error) {
 		passwordLock:               passwordLock,
 		challengeTTL:               challengeTTL,
 	}, nil
+}
+
+// Close releases an optional repository connection owned by the service.
+func (s *Service) Close() error {
+	if s == nil {
+		return nil
+	}
+	if closer, ok := s.repository.(interface{ Close() error }); ok {
+		return closer.Close()
+	}
+	return nil
 }
 
 func (s *Service) RegisterIdentifier(ctx context.Context, input RegisterIdentifierInput) (IdentifierRecord, error) {
@@ -347,7 +359,7 @@ func (s *Service) CreateCredentialChallenge(ctx context.Context, input CreateCre
 	if material.Proof == "" || material.Prompt == "" {
 		return CreatedCredentialChallenge{}, fmt.Errorf("%w: challenge material is invalid", ErrRepositoryInvariant)
 	}
-	answerDigest, err := s.challengeProofHasher.HashChallengeProof(kind, purpose, challengeID, material.Proof)
+	answerDigest, err := s.hashChallengeAnswer(kind, purpose, challengeID, material.Proof)
 	if err != nil {
 		return CreatedCredentialChallenge{}, err
 	}
@@ -405,17 +417,69 @@ func (s *Service) VerifyCredentialChallenge(ctx context.Context, input Credentia
 		if s.challengeProofHasher == nil {
 			return fmt.Errorf("%w: challenge proof hasher is required", ErrInvalidInput)
 		}
-		digest, err := s.challengeProofHasher.HashChallengeProof(challenge.Kind, challenge.Purpose, challenge.ChallengeID, input.Proof)
+		normalizedProof, err := normalizeChallengeProof(challenge.Kind, input.Proof)
+		if err != nil {
+			if errors.Is(err, ErrInvalidInput) {
+				return s.rejectCredentialChallenge(ctx, challenge, input.MaxAttempts)
+			}
+			return err
+		}
+		digest, err := s.challengeProofHasher.HashChallengeProof(challenge.Kind, challenge.Purpose, challenge.ChallengeID, normalizedProof)
 		if err != nil {
 			return err
 		}
 		answerDigest = digest
 	}
-	if answerDigest == "" || subtle.ConstantTimeCompare([]byte(answerDigest), []byte(challenge.AnswerDigest)) != 1 {
+	if answerDigest == "" || !challengeAnswerDigestMatches(answerDigest, challenge.AnswerDigest) {
 		return s.rejectCredentialChallenge(ctx, challenge, input.MaxAttempts)
 	}
 	challenge.UsedAt = now
 	return s.repository.UpsertCredentialChallenge(ctx, challenge)
+}
+
+func (s *Service) hashChallengeAnswer(kind ChallengeKind, purpose ChallengePurpose, challengeID string, proof string) (string, error) {
+	if s == nil || s.challengeProofHasher == nil {
+		return "", fmt.Errorf("%w: challenge proof hasher is required", ErrInvalidInput)
+	}
+	proofs, err := acceptedChallengeProofs(kind, proof)
+	if err != nil {
+		return "", err
+	}
+	digests := make([]string, 0, len(proofs))
+	seen := make(map[string]struct{}, len(proofs))
+	for _, acceptedProof := range proofs {
+		digest, err := s.challengeProofHasher.HashChallengeProof(kind, purpose, challengeID, acceptedProof)
+		if err != nil {
+			return "", err
+		}
+		if _, ok := seen[digest]; ok {
+			continue
+		}
+		seen[digest] = struct{}{}
+		digests = append(digests, digest)
+	}
+	if len(digests) == 1 {
+		return digests[0], nil
+	}
+	return challengeProofDigestSetPrefix + strings.Join(digests, ","), nil
+}
+
+func challengeAnswerDigestMatches(candidate string, stored string) bool {
+	candidate = strings.TrimSpace(candidate)
+	stored = strings.TrimSpace(stored)
+	if candidate == "" || stored == "" {
+		return false
+	}
+	if !strings.HasPrefix(stored, challengeProofDigestSetPrefix) {
+		return subtle.ConstantTimeCompare([]byte(candidate), []byte(stored)) == 1
+	}
+	matched := false
+	for _, storedDigest := range strings.Split(strings.TrimPrefix(stored, challengeProofDigestSetPrefix), ",") {
+		if subtle.ConstantTimeCompare([]byte(candidate), []byte(strings.TrimSpace(storedDigest))) == 1 {
+			matched = true
+		}
+	}
+	return matched
 }
 
 func (s *Service) PutSMSOTPChallenge(ctx context.Context, challenge SMSOTPChallenge) error {
@@ -460,10 +524,14 @@ func (s *Service) rejectCredentialChallenge(ctx context.Context, challenge Crede
 	if maxAttempts < 0 {
 		return fmt.Errorf("%w: max challenge attempts must not be negative", ErrInvalidInput)
 	}
+	challenge.Attempts++
 	if maxAttempts > 0 && challenge.Attempts >= maxAttempts {
+		challenge.Status = StatusDisabled
+		if err := s.repository.UpsertCredentialChallenge(ctx, challenge); err != nil {
+			return err
+		}
 		return ErrChallengeRejected
 	}
-	challenge.Attempts++
 	if err := s.repository.UpsertCredentialChallenge(ctx, challenge); err != nil {
 		return err
 	}
@@ -477,10 +545,14 @@ func (s *Service) rejectSMSOTP(ctx context.Context, challenge SMSOTPChallenge, m
 	if maxAttempts < 0 {
 		return fmt.Errorf("%w: max sms otp attempts must not be negative", ErrInvalidInput)
 	}
+	challenge.Attempts++
 	if maxAttempts > 0 && challenge.Attempts >= maxAttempts {
+		challenge.Status = StatusDisabled
+		if err := s.repository.UpsertSMSOTPChallenge(ctx, challenge); err != nil {
+			return err
+		}
 		return ErrChallengeRejected
 	}
-	challenge.Attempts++
 	if err := s.repository.UpsertSMSOTPChallenge(ctx, challenge); err != nil {
 		return err
 	}

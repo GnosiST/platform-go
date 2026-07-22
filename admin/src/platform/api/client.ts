@@ -254,6 +254,12 @@ export type CredentialSMSOTPStartInput = {
     type: "phone";
     value: string;
   };
+  challenge?: {
+    id: string;
+    kind: string;
+    proof: string;
+    clientFingerprint?: string;
+  };
 };
 
 export type CredentialSMSOTPStartResult = {
@@ -778,7 +784,16 @@ export type MessageCenterDeliveriesRunResult = {
   attempted: number;
   delivered: number;
   failed: number;
+  deferred: number;
   skipped: number;
+};
+
+export type MessageCenterDeliveryRetryInput = {
+  recipient?: string;
+};
+
+export type MessageCenterDeliveryRetryResult = {
+  delivery: AdminResourceRecord;
 };
 
 type PlatformResponseMode = "data" | "raw" | "blob";
@@ -1012,6 +1027,13 @@ export function testSendMessageCenter(input: MessageCenterTestSendInput) {
 
 export function runMessageCenterDeliveries(input: MessageCenterDeliveriesRunInput = {}) {
   return request<MessageCenterDeliveriesRunResult>("/admin/message-center/deliveries/run", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function retryMessageCenterDelivery(id: string, input: MessageCenterDeliveryRetryInput = {}) {
+  return request<MessageCenterDeliveryRetryResult>(`/admin/message-center/deliveries/${encodeURIComponent(id)}/retry` as `/${string}`, {
     method: "POST",
     body: JSON.stringify(input),
   });

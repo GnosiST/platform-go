@@ -78,6 +78,17 @@ func NewStore(options Options) *Store {
 	}
 }
 
+// Close releases an optional repository connection owned by the store.
+func (s *Store) Close() error {
+	s.mu.Lock()
+	repository := s.repository
+	s.mu.Unlock()
+	if closer, ok := repository.(interface{ Close() error }); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
 func NewRepositoryBackedStore(options Options, repository Repository) (*Store, error) {
 	store := NewStore(options)
 	if repository == nil {

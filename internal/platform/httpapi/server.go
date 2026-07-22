@@ -47,6 +47,8 @@ type ServerOptions struct {
 	Sessions                 *session.Store
 	Cache                    cache.Store
 	InvalidationBus          cache.InvalidationBus
+	ReadinessChecker         cache.ReadinessChecker
+	LifecycleContext         context.Context
 	CacheTTL                 time.Duration
 	FileStorage              storage.ObjectStore
 	UploadPolicy             UploadPolicy
@@ -83,6 +85,7 @@ type ServerOptions struct {
 	AdminMenuServingMode     AdminMenuServingMode
 	AdminMenuResolver        AdminMenuResolver
 	AdminMenuComparisonSink  any
+	SettingsAppliedRevision  uint64
 	tokenService             authTokenService
 	appPhoneCodeGenerator    func() (string, error)
 }
@@ -124,53 +127,58 @@ type FileCleanupSink interface {
 }
 
 type Server struct {
-	router                   *gin.Engine
-	capabilities             []capability.Manifest
-	resources                *adminresource.Store
-	sessions                 *session.Store
-	cache                    cache.Store
-	invalidationBus          cache.InvalidationBus
-	cacheStats               cache.StatsProvider
-	cacheTTL                 time.Duration
-	fileStorage              storage.ObjectStore
-	uploadPolicy             UploadPolicy
-	internalErrorSink        InternalErrorSink
-	requestLogSink           RequestLogSink
-	fileCleanupSink          FileCleanupSink
-	appRoutes                map[appRouteKey]gin.HandlerFunc
-	adminIdentityResolver    AdminIdentityResolver
-	adminIdentityBindings    AdminIdentityBindingStore
-	credentialAuth           *CredentialAuthRuntime
-	appIdentityResolver      AppIdentityResolver
-	appIdentityBindings      AppIdentityBindingStore
-	phoneProtector           PhoneProtector
-	phoneVerificationSender  PhoneVerificationSender
-	notificationSMSSender    notification.SMSSender
-	appPhoneCodeGenerator    func() (string, error)
-	adminStepUpPhoneResolver AdminStepUpPhoneResolver
-	sensitiveReveal          *sensitivereveal.Runtime
-	serviceObjects           *serviceobject.Runtime
-	debugCodeEnabled         bool
-	tokens                   authTokenService
-	now                      func() time.Time
-	startedAt                time.Time
-	openAPIDocument          []byte
-	capabilityLockFile       string
-	capabilityConfigSource   string
-	authorizer               Authorizer
-	policyMu                 sync.Mutex
-	policyAuthorizer         Authorizer
-	allowInsecureHeaderAuth  bool
-	disableDemoAuthProvider  bool
-	security                 SecurityOptions
-	profileRoutesRegistered  bool
-	rateLimiter              ratelimit.Limiter
-	rateLimitKeyBuilder      *ratelimit.KeyBuilder
-	adminMenuServingMode     AdminMenuServingMode
-	adminMenuResolver        AdminMenuResolver
-	adminMenuComparisonSink  any
-	settingsMu               sync.Mutex
-	settingsPendingRestart   map[string]map[string]struct{}
+	router                    *gin.Engine
+	capabilities              []capability.Manifest
+	resources                 *adminresource.Store
+	sessions                  *session.Store
+	cache                     cache.Store
+	invalidationBus           cache.InvalidationBus
+	readinessChecker          cache.ReadinessChecker
+	lifecycleContext          context.Context
+	cacheStats                cache.StatsProvider
+	cacheTTL                  time.Duration
+	fileStorage               storage.ObjectStore
+	uploadPolicy              UploadPolicy
+	internalErrorSink         InternalErrorSink
+	requestLogSink            RequestLogSink
+	fileCleanupSink           FileCleanupSink
+	appRoutes                 map[appRouteKey]gin.HandlerFunc
+	adminIdentityResolver     AdminIdentityResolver
+	adminIdentityBindings     AdminIdentityBindingStore
+	credentialAuth            *CredentialAuthRuntime
+	appIdentityResolver       AppIdentityResolver
+	appIdentityBindings       AppIdentityBindingStore
+	phoneProtector            PhoneProtector
+	phoneVerificationSender   PhoneVerificationSender
+	notificationSMSSender     notification.SMSSender
+	appPhoneCodeGenerator     func() (string, error)
+	adminStepUpPhoneResolver  AdminStepUpPhoneResolver
+	sensitiveReveal           *sensitivereveal.Runtime
+	serviceObjects            *serviceobject.Runtime
+	debugCodeEnabled          bool
+	tokens                    authTokenService
+	now                       func() time.Time
+	startedAt                 time.Time
+	openAPIDocument           []byte
+	capabilityLockFile        string
+	capabilityConfigSource    string
+	authorizer                Authorizer
+	policyMu                  sync.Mutex
+	policyAuthorizer          Authorizer
+	allowInsecureHeaderAuth   bool
+	disableDemoAuthProvider   bool
+	security                  SecurityOptions
+	profileRoutesRegistered   bool
+	rateLimiter               ratelimit.Limiter
+	rateLimitKeyBuilder       *ratelimit.KeyBuilder
+	adminMenuServingMode      AdminMenuServingMode
+	adminMenuResolver         AdminMenuResolver
+	adminMenuComparisonSink   any
+	settingsMu                sync.Mutex
+	settingsAppliedRevision   uint64
+	settingsPendingRestart    map[string]map[string]uint64
+	messageCenterRetryMu      sync.Mutex
+	messageCenterRetryTargets map[string]messageCenterRetryTarget
 }
 
 const (
@@ -241,6 +249,10 @@ func New(options ServerOptions) *Server {
 	if now == nil {
 		now = time.Now
 	}
+	lifecycleContext := options.LifecycleContext
+	if lifecycleContext == nil {
+		lifecycleContext = context.Background()
+	}
 	appPhoneCodeGenerator := options.appPhoneCodeGenerator
 	if appPhoneCodeGenerator == nil {
 		appPhoneCodeGenerator = newAppPhoneDebugCode
@@ -273,47 +285,55 @@ func New(options ServerOptions) *Server {
 	if rateLimitKeyBuilder == nil {
 		rateLimitKeyBuilder, _ = ratelimit.NewKeyBuilder([]byte(defaultRateLimitHMACKey))
 	}
+	settingsAppliedRevision := options.SettingsAppliedRevision
+	if settingsAppliedRevision == 0 {
+		settingsAppliedRevision = resources.Revision()
+	}
 	server := &Server{
-		router:                   router,
-		capabilities:             options.Capabilities,
-		resources:                resources,
-		sessions:                 sessions,
-		cache:                    cacheStore,
-		invalidationBus:          options.InvalidationBus,
-		cacheStats:               cacheStats,
-		cacheTTL:                 cacheTTL,
-		fileStorage:              fileStorage,
-		uploadPolicy:             normalizeUploadPolicy(options.UploadPolicy),
-		internalErrorSink:        internalErrorSink,
-		requestLogSink:           requestLogSink,
-		fileCleanupSink:          fileCleanupSink,
-		adminIdentityResolver:    options.AdminIdentityResolver,
-		adminIdentityBindings:    adminIdentityBindings,
-		credentialAuth:           options.CredentialAuth,
-		appIdentityResolver:      options.AppIdentityResolver,
-		appIdentityBindings:      appIdentityBindings,
-		phoneProtector:           options.PhoneProtector,
-		phoneVerificationSender:  options.PhoneVerificationSender,
-		notificationSMSSender:    options.NotificationSMSSender,
-		appPhoneCodeGenerator:    appPhoneCodeGenerator,
-		adminStepUpPhoneResolver: options.AdminStepUpPhoneResolver,
-		sensitiveReveal:          options.SensitiveReveal,
-		debugCodeEnabled:         options.DebugCodeEnabled,
-		tokens:                   tokens,
-		now:                      now,
-		startedAt:                now().UTC(),
-		openAPIDocument:          append([]byte(nil), options.OpenAPIDocument...),
-		capabilityLockFile:       strings.TrimSpace(options.CapabilityLockFile),
-		capabilityConfigSource:   strings.TrimSpace(options.CapabilityConfigSource),
-		authorizer:               options.Authorizer,
-		allowInsecureHeaderAuth:  options.AllowInsecureHeaderAuth,
-		disableDemoAuthProvider:  options.DisableDemoAuthProvider,
-		security:                 options.Security,
-		rateLimiter:              rateLimiter,
-		rateLimitKeyBuilder:      rateLimitKeyBuilder,
-		adminMenuServingMode:     options.AdminMenuServingMode,
-		adminMenuResolver:        options.AdminMenuResolver,
-		adminMenuComparisonSink:  options.AdminMenuComparisonSink,
+		router:                    router,
+		capabilities:              options.Capabilities,
+		resources:                 resources,
+		sessions:                  sessions,
+		cache:                     cacheStore,
+		invalidationBus:           options.InvalidationBus,
+		readinessChecker:          options.ReadinessChecker,
+		lifecycleContext:          lifecycleContext,
+		cacheStats:                cacheStats,
+		cacheTTL:                  cacheTTL,
+		fileStorage:               fileStorage,
+		uploadPolicy:              normalizeUploadPolicy(options.UploadPolicy),
+		internalErrorSink:         internalErrorSink,
+		requestLogSink:            requestLogSink,
+		fileCleanupSink:           fileCleanupSink,
+		adminIdentityResolver:     options.AdminIdentityResolver,
+		adminIdentityBindings:     adminIdentityBindings,
+		credentialAuth:            options.CredentialAuth,
+		appIdentityResolver:       options.AppIdentityResolver,
+		appIdentityBindings:       appIdentityBindings,
+		phoneProtector:            options.PhoneProtector,
+		phoneVerificationSender:   options.PhoneVerificationSender,
+		notificationSMSSender:     options.NotificationSMSSender,
+		appPhoneCodeGenerator:     appPhoneCodeGenerator,
+		adminStepUpPhoneResolver:  options.AdminStepUpPhoneResolver,
+		sensitiveReveal:           options.SensitiveReveal,
+		debugCodeEnabled:          options.DebugCodeEnabled,
+		tokens:                    tokens,
+		now:                       now,
+		startedAt:                 now().UTC(),
+		openAPIDocument:           append([]byte(nil), options.OpenAPIDocument...),
+		capabilityLockFile:        strings.TrimSpace(options.CapabilityLockFile),
+		capabilityConfigSource:    strings.TrimSpace(options.CapabilityConfigSource),
+		authorizer:                options.Authorizer,
+		allowInsecureHeaderAuth:   options.AllowInsecureHeaderAuth,
+		disableDemoAuthProvider:   options.DisableDemoAuthProvider,
+		security:                  options.Security,
+		rateLimiter:               rateLimiter,
+		rateLimitKeyBuilder:       rateLimitKeyBuilder,
+		adminMenuServingMode:      options.AdminMenuServingMode,
+		adminMenuResolver:         options.AdminMenuResolver,
+		adminMenuComparisonSink:   options.AdminMenuComparisonSink,
+		settingsAppliedRevision:   settingsAppliedRevision,
+		messageCenterRetryTargets: make(map[string]messageCenterRetryTarget),
 	}
 	if options.ServiceObjects != nil {
 		server.serviceObjects = options.ServiceObjects.WithAuthorizer(adminServiceObjectAuthorizer{server: server})
@@ -340,6 +360,7 @@ func (s *Server) Run(addr string) error {
 func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 	api := s.router.Group("/api")
 	api.GET("/health", s.health)
+	api.GET("/ready", s.ready)
 	api.GET("/openapi.json", s.openapi)
 	api.GET("/capabilities", s.capabilitiesList)
 	api.GET("/platform/branding", s.platformBranding)
@@ -363,6 +384,7 @@ func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 	api.GET("/admin/plugin-management/status", s.adminPluginManagementStatus)
 	api.POST("/admin/message-center/test-send", s.adminMessageCenterTestSend)
 	api.POST("/admin/message-center/deliveries/run", s.adminMessageCenterDeliveriesRun)
+	api.POST("/admin/message-center/deliveries/:id/retry", s.adminMessageCenterDeliveryRetry)
 	api.GET("/admin/demo-data", s.adminDemoDataList)
 	api.POST("/admin/demo-data/:capability/:dataset/apply", s.adminDemoDataApply)
 	api.GET("/admin/policy-reviews/export", s.adminPolicyReviewExport)
@@ -392,6 +414,14 @@ func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 }
 
 func (s *Server) health(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, Response[gin.H]{Data: gin.H{"ok": true, "service": "platform-go"}})
+}
+
+func (s *Server) ready(ctx *gin.Context) {
+	if s.readinessChecker != nil && s.readinessChecker.CheckReadiness(ctx.Request.Context()) != nil {
+		ctx.JSON(http.StatusServiceUnavailable, Response[gin.H]{Data: gin.H{"ok": false, "service": "platform-go"}})
+		return
+	}
 	ctx.JSON(http.StatusOK, Response[gin.H]{Data: gin.H{"ok": true, "service": "platform-go"}})
 }
 
@@ -2927,7 +2957,7 @@ func (s *Server) subscribeInvalidations() {
 	if s.invalidationBus == nil {
 		return
 	}
-	_ = s.invalidationBus.SubscribeInvalidations(context.Background(), func(ctx context.Context, event cache.InvalidationEvent) {
+	_ = s.invalidationBus.SubscribeInvalidations(s.lifecycleContext, func(ctx context.Context, event cache.InvalidationEvent) {
 		if event.Resource == sessionInvalidationResource {
 			_ = s.sessions.Reload()
 			return

@@ -2,7 +2,7 @@ import { Refine, type ResourceProps } from "@refinedev/core";
 import { useNotificationProvider } from "@refinedev/antd";
 import routerProvider from "@refinedev/react-router";
 import { App as AntdApp, Empty, Spin, Typography } from "antd";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import {
   ADMIN_SESSION_EXPIRED_EVENT,
@@ -25,17 +25,10 @@ import {
   type PluginManagementStatus,
   type AdminSensitiveRevealFactorComplete,
 } from "./platform/api/client";
-import { CapabilityConsole } from "./platform/capabilities/CapabilityConsole";
 import { enrichCapabilities, optionalCapabilities, type CapabilityView } from "./platform/capabilities/metadata";
 import { dictionaries, type Dictionary, type Language } from "./platform/i18n";
-import { APIDocsPage } from "./platform/api-docs/APIDocsPage";
-import { DemoDataConsole } from "./platform/demo-data/DemoDataConsole";
 import { DashboardHome } from "./platform/dashboard/DashboardHome";
 import { AdminLoginView } from "./platform/auth/AdminLoginView";
-import { LoggingCenterConsole } from "./platform/logging-center/LoggingCenterConsole";
-import { MessageCenterConsole } from "./platform/message-center/MessageCenterConsole";
-import { PolicyReviewConsole } from "./platform/policy-review/PolicyReviewConsole";
-import { SettingsCenterConsole } from "./platform/settings/SettingsCenterConsole";
 import {
   projectRoleManagementNavigation,
   resolveRoleManagementActiveRoute,
@@ -58,6 +51,14 @@ import { accessControlProvider, authProvider, dataProvider } from "./platform/re
 import { AdminShell } from "./platform/shell/AdminShell";
 import { themeTokens, type AdminLayoutMode, type ThemeName } from "./platform/theme";
 import { AdminDesignProvider, defaultAdminUIConfig, normalizeAdminUIConfig, type AdminUIConfig } from "./platform/ui";
+
+const APIDocsPage = lazy(async () => ({ default: (await import("./platform/api-docs/APIDocsPage")).APIDocsPage }));
+const CapabilityConsole = lazy(async () => ({ default: (await import("./platform/capabilities/CapabilityConsole")).CapabilityConsole }));
+const DemoDataConsole = lazy(async () => ({ default: (await import("./platform/demo-data/DemoDataConsole")).DemoDataConsole }));
+const LoggingCenterConsole = lazy(async () => ({ default: (await import("./platform/logging-center/LoggingCenterConsole")).LoggingCenterConsole }));
+const MessageCenterConsole = lazy(async () => ({ default: (await import("./platform/message-center/MessageCenterConsole")).MessageCenterConsole }));
+const PolicyReviewConsole = lazy(async () => ({ default: (await import("./platform/policy-review/PolicyReviewConsole")).PolicyReviewConsole }));
+const SettingsCenterConsole = lazy(async () => ({ default: (await import("./platform/settings/SettingsCenterConsole")).SettingsCenterConsole }));
 
 const adminPreferenceStorageKeys = {
   language: "platform-go.admin.language",
@@ -447,7 +448,8 @@ function PlatformRoutePages({
   const resourceRoutes = resources.filter((resource) => isInternalResourceRoute(resource) && !isCustomRoute(resource.route) && resource.route !== "/policy-reviews");
 
   return (
-    <Routes>
+    <Suspense fallback={<RouteLoading />}>
+      <Routes>
       <Route path="/" element={<Navigate replace to="/overview" />} />
       <Route
         path="/overview"
@@ -549,8 +551,17 @@ function PlatformRoutePages({
           )}
         />
       ))}
-      <Route path="*" element={<EmptyResource resources={resources} route={activeRoute} language={language} dictionary={dictionary} />} />
-    </Routes>
+        <Route path="*" element={<EmptyResource resources={resources} route={activeRoute} language={language} dictionary={dictionary} />} />
+      </Routes>
+    </Suspense>
+  );
+}
+
+function RouteLoading() {
+  return (
+    <div className="platform-route-loading" role="status" aria-live="polite">
+      <Spin size="large" />
+    </div>
   );
 }
 

@@ -316,6 +316,8 @@ function validateNotificationProductization(contract, errors) {
     "delivery-worker attempts",
     "ratelimit.OperationMessageCenterDelivery",
     "must not include raw recipients, OTP codes or template parameter values",
+    "retry backoff seconds and next retry time",
+    "manual retry requeues a failed delivery",
   ]) {
     if (!sendPolicyLimitRuntime.includes(required)) {
       errors.push(`${prefix}.sendPolicyLimitRuntime must document ${required}`);
@@ -330,6 +332,8 @@ function validateNotificationProductization(contract, errors) {
     "message-center test sends",
     "delivery-worker attempts",
     "must not include raw recipients, OTP codes or template parameter values",
+    "retry backoff seconds and next retry time",
+    "manual retry requeues a failed delivery",
   ]) {
     if (!capabilityDevelopmentDoc.includes(required)) {
       errors.push(`docs/platform-capability-development.md must document notification send-policy runtime enforcement: ${required}`);
@@ -338,6 +342,9 @@ function validateNotificationProductization(contract, errors) {
   const runtimeBoundary = String(productization.runtimeBoundary ?? "");
   if (!runtimeBoundary.includes("official SDK-backed Aliyun/Tencent Cloud live SMS adapters")) {
     errors.push(`${prefix}.runtimeBoundary must document official SDK-backed Aliyun/Tencent Cloud live SMS adapters`);
+  }
+  if (!runtimeBoundary.includes("test-send and delivery-worker flows")) {
+    errors.push(`${prefix}.runtimeBoundary must document local dry-run test-send and delivery-worker flows`);
   }
   if (!runtimeBoundary.includes("concrete SMTP and WeChat send adapters remain follow-up runtime slices")) {
     errors.push(`${prefix}.runtimeBoundary must keep SMTP and WeChat send adapters as follow-up runtime slices`);

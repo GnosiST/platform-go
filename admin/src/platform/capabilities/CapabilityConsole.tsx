@@ -1,5 +1,6 @@
 import {
   ApiOutlined,
+  CheckSquareOutlined,
   EyeOutlined,
 } from "@ant-design/icons";
 import { Progress, Segmented, Space, Tag, Typography } from "antd";
@@ -413,6 +414,7 @@ function PluginManagementPanel({
   dictionary: Dictionary;
   language: Language;
 }) {
+  const [checklistOpen, setChecklistOpen] = useState(false);
   const restartRequired = status.restartRequiredForChanges;
   const changes = pluginRestartImpactPreview(status, capabilities, language);
   const currentProjection = pluginEntrypointProjection(status.currentCapabilities, capabilities);
@@ -434,6 +436,15 @@ function PluginManagementPanel({
             {status.pendingRestart ? dictionary.restartPending : dictionary.noPendingRestart}
           </Tag>
           <Tag>{restartRequired ? dictionary.pluginV1RestartRequired : dictionary.no}</Tag>
+          <AdminActionButton
+            icon={<CheckSquareOutlined />}
+            label={dictionary.pluginRestartChecklist}
+            size="small"
+            type="text"
+            onClick={() => setChecklistOpen(true)}
+          >
+            {dictionary.pluginRestartChecklist}
+          </AdminActionButton>
         </div>
         <Typography.Text type="secondary">{dictionary.pluginManagementListHint}</Typography.Text>
       </div>
@@ -483,6 +494,15 @@ function PluginManagementPanel({
           </div>
         </div>
       ) : null}
+      <PluginRestartChecklistModal
+        changes={changes}
+        currentProjection={currentProjection}
+        desiredProjection={desiredProjection}
+        dictionary={dictionary}
+        open={checklistOpen}
+        status={status}
+        onClose={() => setChecklistOpen(false)}
+      />
     </section>
   );
 }
@@ -498,6 +518,98 @@ type CapabilityEntrypointProjection = {
 };
 
 type CapabilityRestartImpact = ReturnType<typeof pluginRestartImpactPreview>[number];
+
+function PluginRestartChecklistModal({
+  changes,
+  currentProjection,
+  desiredProjection,
+  dictionary,
+  open,
+  status,
+  onClose,
+}: {
+  changes: CapabilityRestartImpact[];
+  currentProjection: CapabilityEntrypointProjection;
+  desiredProjection: CapabilityEntrypointProjection;
+  dictionary: Dictionary;
+  open: boolean;
+  status: PluginManagementStatus;
+  onClose: () => void;
+}) {
+  const checklist = [
+    dictionary.pluginRestartChecklistStepLock,
+    dictionary.pluginRestartChecklistStepContracts,
+    dictionary.pluginRestartChecklistStepRestart,
+    dictionary.pluginRestartChecklistStepVerify,
+  ];
+
+  return (
+    <AdminModal
+      centered
+      className="plugin-restart-checklist-modal"
+      footer={null}
+      open={open}
+      preset="detail"
+      title={dictionary.pluginRestartChecklist}
+      onCancel={onClose}
+    >
+      <div className="plugin-restart-checklist">
+        <AdminFeedback
+          type={status.pendingRestart ? "warning" : "info"}
+          message={status.pendingRestart ? dictionary.pluginManualRestartRequired : dictionary.noPendingRestart}
+          description={dictionary.pluginRestartChecklistHint}
+        />
+        <div className="plugin-restart-status-grid">
+          <PluginEntrypointProjectionCell
+            title={dictionary.pluginCurrentEntrypoints}
+            projection={currentProjection}
+            dictionary={dictionary}
+          />
+          <PluginEntrypointProjectionCell
+            title={dictionary.pluginDesiredEntrypoints}
+            projection={desiredProjection}
+            dictionary={dictionary}
+          />
+        </div>
+        <ol className="plugin-restart-checklist-steps">
+          {checklist.map((step) => (
+            <li key={step}>
+              <CheckSquareOutlined />
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
+        <section className="plugin-restart-checklist-impact">
+          <Typography.Text strong>{dictionary.pluginRestartImpactPreview}</Typography.Text>
+          {changes.length > 0 ? (
+            <div className="plugin-restart-preview-list">
+              {changes.map((change) => (
+                <div className="plugin-restart-preview-row compact" key={change.id}>
+                  <Tag color={change.action === "enable" ? "success" : "warning"}>
+                    {change.action === "enable" ? dictionary.capabilityEnableAfterRestart : dictionary.capabilityDisableAfterRestart}
+                  </Tag>
+                  <PlatformOverflowText strong value={change.label} />
+                  <Typography.Text type="secondary">
+                    {formatTemplate(dictionary.pluginRestartImpactCounts, {
+                      menus: String(change.menuRoutes),
+                      resources: String(change.adminResources),
+                      configResources: String(change.configResources),
+                      permissions: String(change.permissions),
+                      serviceOperations: String(change.serviceOperations),
+                      authProviders: String(change.authProviders),
+                    })}
+                  </Typography.Text>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Typography.Text className="secondary-text">{dictionary.pluginRestartNoImpact}</Typography.Text>
+          )}
+        </section>
+      </div>
+    </AdminModal>
+  );
+}
 
 function PluginEntrypointProjectionPanel({
   current,

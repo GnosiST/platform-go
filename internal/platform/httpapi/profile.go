@@ -252,6 +252,10 @@ func (s *Server) updateAdminProfile(ctx *gin.Context, targetID string) {
 		writeAdminResourceError(ctx, s.internalErrorSink, err)
 		return
 	}
+	if err := s.syncAdminProfileCredentialIdentifiers(ctx, record, mutation.Record, input); err != nil {
+		writePlatformErrorWithCause(ctx, s.internalErrorSink, errorcode.CodeAuthProviderResolveFailed, err)
+		return
+	}
 	s.invalidateCachesForResource(ctx.Request.Context(), adminProfileUsersResource)
 	profile := s.adminProfileFromRecord(mutation.Record, principal)
 	ctx.JSON(http.StatusOK, Response[adminProfileResponse]{Data: adminProfileResponse{Profile: profile}})
@@ -347,6 +351,55 @@ func (s *Server) putAdminProfilePasswordCredential(ctx *gin.Context, runtime *Cr
 		MustChange:        mustChange,
 		Status:            credentialauth.StatusEnabled,
 	})
+}
+
+func (s *Server) syncAdminProfileCredentialIdentifiers(ctx *gin.Context, before adminresource.Record, after adminresource.Record, input adminProfileUpdateRequest) error {
+	runtime := s.credentialAuth
+	if runtime == nil || runtime.Service == nil {
+		return nil
+	}
+	principal := credentialauth.PrincipalRef{Type: credentialauth.PrincipalTypeAdmin, ID: strings.TrimSpace(after.ID)}
+	if principal.ID == "" {
+		return nil
+	}
+	if input.Phone != nil {
+		if err := s.syncAdminProfileCredentialIdentifier(ctx, runtime, principal, credentialauth.IdentifierTypePhone, before.Values["phone"], after.Values["phone"]); err != nil {
+			return err
+		}
+	}
+	if input.Email != nil {
+		if err := s.syncAdminProfileCredentialIdentifier(ctx, runtime, principal, credentialauth.IdentifierTypeEmail, before.Values["email"], after.Values["email"]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Server) syncAdminProfileCredentialIdentifier(ctx *gin.Context, runtime *CredentialAuthRuntime, principal credentialauth.PrincipalRef, identifierType credentialauth.IdentifierType, before string, after string) error {
+	before = strings.TrimSpace(before)
+	after = strings.TrimSpace(after)
+	if before == after {
+		return nil
+	}
+	if after != "" {
+		if _, err := runtime.Service.RegisterIdentifier(ctx.Request.Context(), credentialauth.RegisterIdentifierInput{
+			Principal:  principal,
+			Identifier: credentialauth.Identifier{Type: identifierType, Value: after},
+			Status:     credentialauth.StatusEnabled,
+		}); err != nil {
+			return err
+		}
+	}
+	if before != "" {
+		if _, err := runtime.Service.RegisterIdentifier(ctx.Request.Context(), credentialauth.RegisterIdentifierInput{
+			Principal:  principal,
+			Identifier: credentialauth.Identifier{Type: identifierType, Value: before},
+			Status:     credentialauth.StatusDisabled,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Server) recordAdminProfilePasswordAudit(ctx *gin.Context, targetID string, action string, result string, reasonCode string) error {

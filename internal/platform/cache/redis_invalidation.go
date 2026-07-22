@@ -47,16 +47,32 @@ func (b *RedisInvalidationBus) SubscribeInvalidations(ctx context.Context, handl
 	pubsub := b.client.Subscribe(ctx, b.channel)
 	go func() {
 		defer pubsub.Close()
-		for message := range pubsub.Channel() {
+		consumeRedisInvalidations(ctx, pubsub.Channel(), handler)
+	}()
+	return nil
+}
+
+func consumeRedisInvalidations(ctx context.Context, messages <-chan *redis.Message, handler InvalidationHandler) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case message, ok := <-messages:
+			if !ok {
+				return
+			}
 			var event InvalidationEvent
 			if err := json.Unmarshal([]byte(message.Payload), &event); err == nil {
 				handler(ctx, event)
 			}
 		}
-	}()
-	return nil
+	}
 }
 
 func (b *RedisInvalidationBus) Close() error {
 	return b.client.Close()
+}
+
+func (b *RedisInvalidationBus) CheckReadiness(ctx context.Context) error {
+	return b.client.Ping(ctx).Err()
 }
