@@ -37,7 +37,7 @@ body { background: var(--platform-paper); color: var(--platform-ink); }
 .platform-actions .button--primary:hover { border-color: #3bd4b9; background: #3bd4b9; color: #06261f; }
 .platform-actions .button--secondary { border-color: #b9cadb; background: rgba(16, 32, 51, .45); color: #fff; }
 .platform-actions .button--secondary:hover { border-color: #fff; background: #fff; color: var(--platform-ink); }
-.platform-hero__facts { display: grid; grid-template-columns: repeat(3, minmax(0, 170px)); gap: 1px; max-width: 560px; margin: 44px 0 0; background: rgba(198, 216, 234, .4); }
+.platform-hero__facts { display: grid; grid-template-columns: repeat(3, minmax(0, 170px)); gap: 1px; width: max-content; margin: 44px 0 0; background: rgba(198, 216, 234, .4); }
 .platform-hero__facts div { min-width: 0; padding: 14px 16px; background: rgba(16, 32, 51, .72); }
 .platform-hero__facts dt { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .87rem; font-weight: 750; }
 .platform-hero__facts dd { margin: 5px 0 0; color: #c5d4e3; font-size: .75rem; line-height: 1.35; }
