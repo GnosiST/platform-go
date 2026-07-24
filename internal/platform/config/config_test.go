@@ -85,6 +85,8 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_CREDENTIAL_AUTH_PHONE_PASSWORD", "")
 	t.Setenv("PLATFORM_CREDENTIAL_AUTH_EMAIL_PASSWORD", "")
 	t.Setenv("PLATFORM_CREDENTIAL_AUTH_PHONE_SMS_OTP", "")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_CHALLENGE_MODE", "")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_CHALLENGE_KIND", "")
 	t.Setenv("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER", "")
 	t.Setenv("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN", "")
 	t.Setenv("PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY", "")
@@ -228,7 +230,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 	if cfg.DisableDemoAuthProvider {
 		t.Fatalf("DisableDemoAuthProvider = true, want false by default")
 	}
-	if cfg.CredentialAuthConfigured() || cfg.CredentialAuthRepositoryDriver != "" || cfg.CredentialAuthRepositoryDSN != "" || cfg.CredentialAuthIdentifierHMACKey != "" || cfg.CredentialAuthSecretTransportKeyID != "" || cfg.CredentialAuthSecretTransportKey != "" || cfg.CredentialAuthBootstrapAdminUsername != "" || cfg.CredentialAuthBootstrapAdminPassword != "" {
+	if cfg.CredentialAuthConfigured() || cfg.CredentialAuthChallengeMode != "" || cfg.CredentialAuthChallengeKind != "" || cfg.CredentialAuthRepositoryDriver != "" || cfg.CredentialAuthRepositoryDSN != "" || cfg.CredentialAuthIdentifierHMACKey != "" || cfg.CredentialAuthSecretTransportKeyID != "" || cfg.CredentialAuthSecretTransportKey != "" || cfg.CredentialAuthBootstrapAdminUsername != "" || cfg.CredentialAuthBootstrapAdminPassword != "" {
 		t.Fatalf("credential auth defaults = configured(%t), repository/keys/user/password should be empty", cfg.CredentialAuthConfigured())
 	}
 	if cfg.AdminStepUpPhoneSourceConfigured() {
@@ -248,6 +250,16 @@ func TestLoadParsesOptionalIntegrationConfiguration(t *testing.T) {
 	}
 	if err := cfg.ValidateRuntime(); err != nil {
 		t.Fatalf("ValidateRuntime() error = %v", err)
+	}
+}
+
+func TestLoadParsesCredentialAuthChallengeConfiguration(t *testing.T) {
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_CHALLENGE_MODE", "always")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_CHALLENGE_KIND", "slider")
+
+	cfg := Load()
+	if cfg.CredentialAuthChallengeMode != "always" || cfg.CredentialAuthChallengeKind != "slider" {
+		t.Fatalf("credential auth challenge configuration = %q/%q", cfg.CredentialAuthChallengeMode, cfg.CredentialAuthChallengeKind)
 	}
 }
 

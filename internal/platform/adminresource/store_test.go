@@ -67,6 +67,17 @@ func TestStoreRegistersAdminResourcesFromEnabledCapabilities(t *testing.T) {
 	}
 }
 
+func TestCredentialAuthSettingsSeedUsesSliderChallenge(t *testing.T) {
+	store := NewStoreFromCapabilities(core.DefaultManifests())
+	records, err := store.List("credential-auth-settings")
+	if err != nil {
+		t.Fatalf("List(credential-auth-settings) error = %v", err)
+	}
+	if len(records) != 1 || records[0].Values["challengeKind"] != "slider" {
+		t.Fatalf("credential auth settings seed = %+v, want one slider challenge setting", records)
+	}
+}
+
 func TestUpdatePreservesUnsubmittedStoredValuesAcrossMutationPaths(t *testing.T) {
 	resource := capability.AdminResource{
 		Resource: "partial-update-records", Title: capability.Text("部分更新", "Partial Updates"), Description: capability.Text("测试部分更新。", "Tests partial updates."),

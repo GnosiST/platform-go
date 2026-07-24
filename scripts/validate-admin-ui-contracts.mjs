@@ -199,13 +199,13 @@ requireIncludes(files.login, "filterAdminAuthProviders(providers)", "Admin login
 requireIncludes(files.login, "adminProviders.filter((provider) => provider.enabled && provider.configured)", "Admin login must render only enabled and configured providers.");
 requireIncludes(files.login, "const MAX_VISIBLE_LOGIN_PROVIDERS = 3;", "Admin login must cap visible login methods at three.");
 requireIncludes(files.login, ".slice(0, MAX_VISIBLE_LOGIN_PROVIDERS)", "Admin login must apply its visible login method cap after provider discovery.");
-requireIncludes(files.login, "login-methods", "Admin login must present methods in a dedicated navigation region.");
-requireIncludes(files.login, "login-topbar", "Admin login must keep product controls in a compact top bar.");
+requireIncludes(files.login, "login-aside", "Admin login must present product and runtime context in a dedicated side region.");
+requireIncludes(files.login, "login-aside-footer", "Admin login must keep language and runtime status controls in the side region.");
 requireIncludes(files.login, 'role="listbox"', "Admin login provider options must expose an accessible selection container.");
 requireIncludes(files.login, 'className={`login-provider-option${selected ? " selected" : ""}`}', "Admin login provider options must expose selected state styling.");
-requireCssRule(files.styles, ".login-provider-options", ["display: grid;", "gap: 2px;"], "Admin login methods must use a compact vertical selector.");
-requireCssRule(files.styles, ".login-provider-option.selected", ["border-left-color: var(--primary);"], "Admin login must clearly mark the selected method in the vertical selector.");
-requireCssRule(mobileStyles, ".login-workspace", ["grid-template-columns: minmax(0, 1fr);"], "Mobile Admin login must stack method navigation above the authentication form.");
+requireCssRule(files.styles, ".login-provider-options", ["display: grid;", "border: 1px solid var(--border);"], "Admin login methods must use a bounded horizontal selector.");
+requireCssRule(files.styles, ".login-provider-option.selected", ["border-top-color: var(--primary);"], "Admin login must clearly mark the selected method in the horizontal selector.");
+requireCssRule(mobileStyles, ".login-page", ["grid-template-columns: minmax(0, 1fr);"], "Mobile Admin login must stack the side context above the authentication form.");
 requireNotIncludes(files.login, "dictionary.notConfigured", "Admin login must not show unconfigured providers in the login selector.");
 requireNotIncludes(files.login, "disabled={!provider.configured || loading || submitting}", "Admin login must not render unconfigured providers as disabled selector options.");
 requireIncludes(files.client, "type AuthLoginRequest = Omit<AuthLoginInput, \"secret\">", "Credential login requests must separate form input from encrypted transport payloads.");
@@ -1591,9 +1591,9 @@ requireCssRule(
 );
 requireCssRule(
   tabletLoginStyles,
-  ".login-topbar .topbar-icon-button,\n  .login-theme-swatch",
+  ".login-language-trigger",
   ["min-width: 44px;", "min-height: 44px;"],
-  "Tablet login toolbar controls must expose 44px touch targets.",
+  "Tablet login language control must expose 44px touch targets.",
 );
 requireCssRule(mobileStyles, ".platform-data-table-panel .table-actions .ant-btn", ["min-width: 44px;", "min-height: 44px;"], "Mobile resource table actions must expose 44px touch targets.");
 requireCssRule(

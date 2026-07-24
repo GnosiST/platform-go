@@ -649,6 +649,16 @@ func TestDefaultChallengeMaterialDoesNotExposeProof(t *testing.T) {
 	}
 }
 
+func TestDefaultGoCaptchaSlideOptionsUseWideLoginFrame(t *testing.T) {
+	options, err := normalizeGoCaptchaSlideOptions(GoCaptchaSlideOptions{})
+	if err != nil {
+		t.Fatalf("normalizeGoCaptchaSlideOptions() error = %v", err)
+	}
+	if options.ImageWidth != 720 || options.ImageHeight != 160 || options.GraphSizeMin != 52 || options.GraphSizeMax != 60 {
+		t.Fatalf("default slide options = %+v, want 720x160 with 52-60px tile", options)
+	}
+}
+
 func newPasswordServiceForTest(t *testing.T, verifier PasswordVerifier, now *time.Time, maxAttempts int) (*MemoryRepository, *Service) {
 	t.Helper()
 	repository := NewMemoryRepository()

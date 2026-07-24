@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	defaultGoCaptchaSlideImageWidth   = 300
-	defaultGoCaptchaSlideImageHeight  = 220
-	defaultGoCaptchaSlideGraphSizeMin = 60
-	defaultGoCaptchaSlideGraphSizeMax = 70
+	defaultGoCaptchaSlideImageWidth   = 720
+	defaultGoCaptchaSlideImageHeight  = 160
+	defaultGoCaptchaSlideGraphSizeMin = 52
+	defaultGoCaptchaSlideGraphSizeMax = 60
 	goCaptchaSlideTileSourceSize      = 96
 )
 

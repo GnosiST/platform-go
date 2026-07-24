@@ -870,7 +870,7 @@ func credentialAuthSettingsSeedValues() map[string]string {
 		"emailPasswordEnabled":    "true",
 		"phoneSMSOTPEnabled":      "true",
 		"challengeMode":           "always",
-		"challengeKind":           "captcha",
+		"challengeKind":           "slider",
 		"passwordMaxAttempts":     "5",
 		"lockSeconds":             "900",
 		"smsOTPTTLSeconds":        "300",

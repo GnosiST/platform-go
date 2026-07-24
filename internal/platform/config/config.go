@@ -320,6 +320,8 @@ func Load() Config {
 		CredentialAuthPhonePassword:          credentialAuthPhonePassword,
 		CredentialAuthEmailPassword:          credentialAuthEmailPassword,
 		CredentialAuthPhoneSMSOTP:            credentialAuthPhoneSMSOTP,
+		CredentialAuthChallengeMode:          env("PLATFORM_CREDENTIAL_AUTH_CHALLENGE_MODE", ""),
+		CredentialAuthChallengeKind:          env("PLATFORM_CREDENTIAL_AUTH_CHALLENGE_KIND", ""),
 		CredentialAuthRepositoryDriver:       env("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER", ""),
 		CredentialAuthRepositoryDSN:          env("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN", ""),
 		CredentialAuthIdentifierHMACKey:      env("PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY", ""),

@@ -1,4 +1,6 @@
 import {
+  ClockCircleOutlined,
+  CustomerServiceOutlined,
   GlobalOutlined,
   LockOutlined,
   LoadingOutlined,
@@ -6,6 +8,7 @@ import {
   MailOutlined,
   PhoneOutlined,
   ReloadOutlined,
+  SafetyOutlined,
   SafetyCertificateOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -46,7 +49,7 @@ import {
   clearPendingOIDCLogin,
   consumePendingOIDCLogin,
 } from "../refine/authProvider";
-import { themeNames, type ThemeName } from "../theme";
+import type { ThemeName } from "../theme";
 import { AdminFeedback } from "../ui";
 import { sliderTileXFromTrackPointer } from "./sliderChallengeGeometry";
 
@@ -60,7 +63,6 @@ type AdminLoginViewProps = {
   search: string;
   themeName: ThemeName;
   onLanguageChange: (language: Language) => void;
-  onThemeChange: (theme: ThemeName) => void;
   onLoginSuccess: (session: AdminCurrentSession) => void;
 };
 
@@ -104,7 +106,6 @@ export function AdminLoginView({
   search,
   themeName,
   onLanguageChange,
-  onThemeChange,
   onLoginSuccess,
 }: AdminLoginViewProps) {
   const [selectedProviderID, setSelectedProviderID] = useState("demo");
@@ -132,7 +133,6 @@ export function AdminLoginView({
     [availableProviders, selectedProviderID],
   );
   const productName = branding?.productName || "Platform Go";
-  const shortName = branding?.shortName || productName;
   const targetLanguage = language === "zh" ? "en" : "zh";
   const credentialSpec = credentialProviderSpec(selectedProvider);
 
@@ -316,43 +316,75 @@ export function AdminLoginView({
 
   return (
     <main className="login-page" data-theme={themeName}>
-      <header className="login-topbar">
-        <div className="login-brand-row">
+      <aside className="login-aside">
+        <div className="login-aside-brand">
           <div className="login-logo">{branding?.logoUrl ? <img alt="" src={branding.logoUrl} /> : <SafetyCertificateOutlined />}</div>
           <div>
-            <Typography.Text className="login-brand-name">{shortName}</Typography.Text>
-            <Typography.Text className="login-brand-subtitle">{dictionary.appSubtitle}</Typography.Text>
+            <Typography.Text className="login-brand-name">{productName}</Typography.Text>
+            <Typography.Text className="login-brand-subtitle">{dictionary.loginAsideSubtitle}</Typography.Text>
           </div>
         </div>
-        <div className="login-topbar-actions">
+
+        <div className="login-aside-divider" />
+
+        <div className="login-assurance-list" aria-label={dictionary.loginCapabilitySummary}>
+          <div className="login-assurance-item">
+            <SafetyOutlined aria-hidden />
+            <div>
+              <Typography.Text strong>{dictionary.loginTrustSecurity}</Typography.Text>
+              <Typography.Text type="secondary">{dictionary.loginTrustSecurityDescription}</Typography.Text>
+            </div>
+          </div>
+          <div className="login-assurance-item">
+            <ClockCircleOutlined aria-hidden />
+            <div>
+              <Typography.Text strong>{dictionary.loginTrustReliability}</Typography.Text>
+              <Typography.Text type="secondary">{dictionary.loginTrustReliabilityDescription}</Typography.Text>
+            </div>
+          </div>
+          <div className="login-assurance-item">
+            <CustomerServiceOutlined aria-hidden />
+            <div>
+              <Typography.Text strong>{dictionary.loginTrustSupport}</Typography.Text>
+              <Typography.Text type="secondary">{dictionary.loginTrustSupportDescription}</Typography.Text>
+            </div>
+          </div>
+        </div>
+
+        <div className="login-aside-footer">
           <Tooltip title={`${dictionary.switchLanguage}: ${targetLanguage === "zh" ? dictionary.cn : dictionary.en}`}>
             <Button
               aria-label={dictionary.switchLanguage}
-              className="topbar-icon-button"
+              className="login-language-trigger"
               icon={<GlobalOutlined />}
               onClick={() => onLanguageChange(targetLanguage)}
-            />
+            >
+              {language === "zh" ? dictionary.cn : dictionary.en}
+            </Button>
           </Tooltip>
-          <Space size={6}>
-            {themeNames.map((themeName) => (
-              <Tooltip title={themeLabel(dictionary, themeName)} key={themeName}>
-                <button
-                  aria-label={themeLabel(dictionary, themeName)}
-                  className={`login-theme-swatch theme-${themeName}`}
-                  type="button"
-                  onClick={() => onThemeChange(themeName)}
-                />
-              </Tooltip>
-            ))}
-          </Space>
+          <div className="login-runtime-status">
+            <SafetyCertificateOutlined aria-hidden />
+            <span>{dictionary.loginSystemStatus}</span>
+            <span className="login-runtime-status-dot" />
+            <strong>{dictionary.loginStatusNormal}</strong>
+          </div>
         </div>
-      </header>
+      </aside>
 
-      <div className="login-workspace">
-        <aside className="login-methods" aria-label={dictionary.loginProvider}>
-          <Typography.Text className="login-methods-label">{dictionary.loginProvider}</Typography.Text>
+      <section className="login-panel" aria-label={dictionary.loginTitle}>
+        <Typography.Title className="login-heading" level={2} ref={loginHeadingRef} tabIndex={-1}>
+          {dictionary.loginWorkspaceTitle}
+        </Typography.Title>
+        <Typography.Paragraph className="login-panel-subtitle">{dictionary.loginWorkspaceSubtitle}</Typography.Paragraph>
+        {callbackPhase === "idle" ? (
+          <>
+            {loginError ? <AdminFeedback className="login-feedback" type="error" message={loginError} /> : null}
           {availableProviders.length ? (
-            <div className="login-provider-options" role="listbox">
+            <div
+              className="login-provider-options"
+              role="listbox"
+              style={{ gridTemplateColumns: `repeat(${availableProviders.length}, minmax(0, 1fr))` }}
+            >
               {availableProviders.map((provider) => {
                 const providerSpec = credentialProviderSpec(provider);
                 const selected = selectedProvider?.id === provider.id;
@@ -382,18 +414,7 @@ export function AdminLoginView({
               message={loading ? dictionary.loginProvidersLoading : dictionary.loginNoAvailableProviders}
             />
           )}
-        </aside>
-
-        <section className="login-panel" aria-label={dictionary.loginTitle}>
-          <Typography.Title className="login-heading" level={2} ref={loginHeadingRef} tabIndex={-1}>
-            {branding?.loginTitle || dictionary.loginTitle}
-          </Typography.Title>
-          <Typography.Paragraph className="login-panel-subtitle">{branding?.loginSubtitle || dictionary.loginPanelSubtitle}</Typography.Paragraph>
-
           {error ? <AdminFeedback className="login-feedback" type="error" message={error} /> : null}
-          {callbackPhase === "idle" ? (
-            <>
-              {loginError ? <AdminFeedback className="login-feedback" type="error" message={loginError} /> : null}
 
             <Form<LoginFormValues>
               className="login-form-shell"
@@ -527,29 +548,28 @@ export function AdminLoginView({
                   : dictionary.loginOIDCContinue.replace("{provider}", selectedProvider.title[language] || selectedProvider.id)}
               </Button>
             ) : null}
-            </>
-          ) : (
-            <div className="login-callback-status" aria-busy={callbackPhase === "processing"} aria-live="polite">
-              {callbackPhase === "processing" ? (
-                <>
-                  <LoadingOutlined aria-hidden className="login-callback-icon" />
-                  <Typography.Title level={3}>{dictionary.loginOIDCCallbackProgress}</Typography.Title>
-                </>
-              ) : (
-                <>
-                  <Typography.Title className="login-error-heading" level={3} ref={errorHeadingRef} tabIndex={-1}>
-                    {dictionary.loginFailed}
-                  </Typography.Title>
-                  <Typography.Paragraph>{callbackErrorMessage(dictionary, callbackFailure)}</Typography.Paragraph>
-                  <Button block className="login-recovery-action" onClick={recoverFromCallback}>
-                    {dictionary.loginOIDCRecovery}
-                  </Button>
-                </>
-              )}
-            </div>
-          )}
-        </section>
-      </div>
+          </>
+        ) : (
+          <div className="login-callback-status" aria-busy={callbackPhase === "processing"} aria-live="polite">
+            {callbackPhase === "processing" ? (
+              <>
+                <LoadingOutlined aria-hidden className="login-callback-icon" />
+                <Typography.Title level={3}>{dictionary.loginOIDCCallbackProgress}</Typography.Title>
+              </>
+            ) : (
+              <>
+                <Typography.Title className="login-error-heading" level={3} ref={errorHeadingRef} tabIndex={-1}>
+                  {dictionary.loginFailed}
+                </Typography.Title>
+                <Typography.Paragraph>{callbackErrorMessage(dictionary, callbackFailure)}</Typography.Paragraph>
+                <Button block className="login-recovery-action" onClick={recoverFromCallback}>
+                  {dictionary.loginOIDCRecovery}
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+      </section>
     </main>
   );
 }
@@ -613,7 +633,9 @@ function CredentialChallengeField({
               icon={<ReloadOutlined />}
               loading={loading}
               onClick={onRefresh}
-            />
+            >
+              {dictionary.loginChallengeRefresh}
+            </Button>
           </Tooltip>
         </div>
         <CredentialChallengePayload challenge={challenge} dictionary={dictionary} onProofChange={setChallengeProof} />
@@ -792,7 +814,7 @@ function SliderChallengePayload({
   return (
     <div className="login-challenge-prompt login-slider-challenge">
       <div className="login-challenge-payload">
-        <Typography.Text strong>{challenge.prompt || dictionary.loginChallengeProviderPrompt.replace("{kind}", challenge.kind)}</Typography.Text>
+        <Typography.Text strong>{dictionary.loginChallengePrompt}</Typography.Text>
         <div className="login-slider-stage" style={stageStyle}>
           <img alt={dictionary.loginChallengeSliderImageAlt} className="login-slider-background" src={material.masterImage} />
           <img alt={dictionary.loginChallengeSliderTileAlt} className="login-slider-tile" src={material.tileImage} style={tileStyle} />
@@ -998,16 +1020,6 @@ function callbackErrorMessage(dictionary: Dictionary, failure: OIDCCallbackFailu
   if (failure === "expired") return dictionary.loginOIDCTransactionExpired;
   if (failure === "state") return dictionary.loginOIDCTransactionInvalid;
   return dictionary.loginOIDCCallbackFailed;
-}
-
-function themeLabel(dictionary: Dictionary, themeName: ThemeName) {
-  const labels = {
-    tech: dictionary.themeTech,
-    white: dictionary.themeWhite,
-    black: dictionary.themeBlack,
-    warm: dictionary.themeWarm,
-  };
-  return labels[themeName];
 }
 
 function credentialProviderSpec(provider?: AuthProvider): CredentialProviderSpec | null {

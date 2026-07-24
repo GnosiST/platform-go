@@ -351,7 +351,6 @@ function PlatformApp() {
             search={location.search}
             themeName={themeName}
             onLanguageChange={changeLanguage}
-            onThemeChange={applyThemeName}
             onLoginSuccess={(nextSession) => {
               setSessionExpired(false);
               setAuthError("");
