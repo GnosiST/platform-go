@@ -39,6 +39,13 @@ PLATFORM_RATE_LIMIT_HMAC_KEY=replace-with-dedicated-rate-limit-key
 PLATFORM_CACHE_DEFAULT_TTL=300s
 ```
 
+For an opt-in local Redis certification, use an ephemeral non-production instance:
+
+```zsh
+PLATFORM_CERTIFICATION_REDIS_ADDR=127.0.0.1:6379 \
+rtk go test ./internal/platform/cache -run '^TestRedisInvalidationCertificationSmoke$' -count=1
+```
+
 Current behavior:
 
 - empty `PLATFORM_CACHE_DRIVER`: use noop cache;

@@ -103,6 +103,7 @@
     "internal/platform/httpapi/server.go",
     "internal/platform/cache/invalidation.go",
     "internal/platform/cache/redis_invalidation.go",
+    "internal/platform/cache/redis_certification_test.go",
     "internal/platform/httpapi/server_test.go",
     "internal/platform/cache/cache_test.go",
     "docs/platform-cache.md"
