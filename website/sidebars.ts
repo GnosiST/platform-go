@@ -2,9 +2,10 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 
 const sidebars: SidebarsConfig = {
   tutorialSidebar: [
-    {type: 'category', label: '开始使用 / Start here', items: ['intro', 'architecture', 'development', 'human-ai-development']},
-    {type: 'category', label: '平台能力 / Platform', items: ['capabilities', 'api', 'security']},
-    {type: 'category', label: '运行与社区 / Run & community', items: ['operations', 'deployment', 'roadmap', 'faq']},
+    {type: 'category', label: '开始使用 / Start', items: ['intro', 'getting-started', 'business-integration', 'architecture']},
+    {type: 'category', label: '核心概念 / Core', items: ['capabilities', 'authentication', 'api', 'security', 'support-matrix']},
+    {type: 'category', label: '开发 / Build', items: ['development', 'human-ai-development']},
+    {type: 'category', label: '运行 / Run', items: ['configuration', 'deployment', 'production-checklist', 'operations', 'roadmap', 'faq']},
   ],
 };
 

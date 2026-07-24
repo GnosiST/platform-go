@@ -1,23 +1,36 @@
 ---
-sidebar_position: 3
-title: 运维与安全
+sidebar_position: 4
+title: 运维与故障排查
 ---
 
-生产环境必须使用非默认 JWT 密钥、持久化存储、Redis（按生产基线）和禁用 demo 认证。迁移、密钥轮换、备份恢复和回滚应先完成演练，再执行变更。
+# 运维与故障排查
 
-> English: Production requires a non-default JWT secret, durable storage, Redis and demo authentication disabled. Use the language switcher for the complete English guide.
+先使用生成物和只读预检定位问题，再进入受审阅的变更流程。生产操作不能通过临时修改配置、删除数据或跳过验证来“恢复”。
 
-详见 [认证指南](https://github.com/GnosiST/platform-go/blob/main/docs/platform-auth.md) 与 [部署指南](https://github.com/GnosiST/platform-go/blob/main/docs/platform-deployment.md)。
-
-## 发布前检查
+## 日常检查
 
 ```bash
+node scripts/validate-platform-foundation-alignment.mjs
 node scripts/validate-platform-production-readiness.mjs
 node scripts/validate-platform-deployment-topology.mjs
-node scripts/validate-platform-goal-completion-audit.mjs
-node scripts/validate-platform-node-closeout-audit.mjs
+node scripts/run-platform-production-preflight.mjs --list
 ```
 
-## 故障处理
+服务的 `request_id` 用于关联 API、应用日志和审计事件。状态输出只能显示可安全公开的 `disabled`、`ready` 或 `unavailable` 等汇总，不返回适配器端点、凭据或上游错误详情。
 
-先用 `request_id` 关联 API 日志和审计，再确认能力 profile、数据源、缓存和会话状态。恢复操作必须记录影响范围、操作者、前置备份和回滚结果；不要直接修改生产数据库绕过平台合同。
+## 诊断路径
+
+| 症状 | 先检查 | 安全恢复路径 |
+| --- | --- | --- |
+| API 不健康 | 进程、监听地址、`/api/health` | 恢复配置或进程；不要暴露内部 readiness 明细 |
+| API 未就绪 | `GET /api/ready`、存储/Redis 配置、启动日志 | 修复被验证的依赖配置，再重启并复测 |
+| Admin 无数据 | API proxy、session、`request_id` | 先确认认证与授权，不用前端隐藏绕过权限 |
+| 登录失败或 OTP 未送达 | provider discovery、challenge、通知配置、红脱敏审计 | 重新创建 challenge/OTP；不要展示或回填 debug code |
+| 消息/搜索不可用 | capability/profile、命名适配器、健康状态 | 保持 default-off，按独立变更包恢复或回滚 |
+| 迁移/保留任务异常 | 变更包、备份、checkpoint、审计记录 | 停止后按已批准 rollback/restore 演练执行 |
+
+## 变更纪律
+
+数据库迁移、密钥轮换、配置导入恢复、数据保留清除、消息重放和外部短信投递都需要变更负责人、影响分析、停止条件、回滚、观测和红脱敏证据。预检不写入生产，不能替代这些操作证据。
+
+生产配置请从[生产检查清单](./production-checklist)开始；能力是否默认可用见[支持矩阵](./support-matrix)。

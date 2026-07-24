@@ -69,14 +69,14 @@ const config: Config = {
     },
   ],
   themeConfig: {
-    image: 'img/platform-go-social.svg',
+    image: 'img/platform-go-social.png',
     navbar: {
       title: 'platform-go',
       items: [
-        {to: '/docs/intro', label: '文档 / Docs', position: 'left'},
-        {to: '/docs/capabilities', label: '能力 / Capabilities', position: 'left'},
-        {to: '/docs/human-ai-development', label: '协同 / Collaboration', position: 'left'},
-        {to: '/docs/operations', label: '运维 / Operations', position: 'left'},
+        {to: '/docs/getting-started', label: '开始 / Start', position: 'left'},
+        {to: '/docs/business-integration', label: '接入 / Integrate', position: 'left'},
+        {to: '/docs/authentication', label: '认证 / Auth', position: 'left'},
+        {to: '/docs/production-checklist', label: '运行 / Run', position: 'left'},
         {type: 'localeDropdown', position: 'right'},
         {label: 'v0.1.0', href: 'https://github.com/GnosiST/platform-go/releases/tag/v0.1.0', position: 'right'},
         {href: 'https://github.com/GnosiST/platform-go', label: 'GitHub', position: 'right'},
@@ -93,7 +93,7 @@ const config: Config = {
       style: 'dark',
       links: [
         {title: '项目 / Project', items: [{label: 'GitHub', href: 'https://github.com/GnosiST/platform-go'}, {label: '发行版本 / Releases', href: 'https://github.com/GnosiST/platform-go/releases'}]},
-        {title: '文档 / Docs', items: [{label: '快速开始 / Quick start', to: '/docs/intro'}, {label: '能力与扩展 / Capabilities', to: '/docs/capabilities'}, {label: '人机协同 / Collaboration', to: '/docs/human-ai-development'}, {label: '运维与安全 / Operations', to: '/docs/operations'}]},
+        {title: '文档 / Docs', items: [{label: '本地运行 / Run locally', to: '/docs/getting-started'}, {label: '业务接入 / Integrate', to: '/docs/business-integration'}, {label: '认证与授权 / Authentication', to: '/docs/authentication'}, {label: '生产检查 / Production', to: '/docs/production-checklist'}]},
       ],
       copyright: `Copyright © ${new Date().getFullYear()} GnosiST. Built with Docusaurus.`,
     },

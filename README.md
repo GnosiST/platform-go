@@ -1,47 +1,131 @@
 # platform-go
 
-> 面向 Go 服务的业务中立运营平台底座。先把身份、授权、资源合同和运行治理做好，再让业务能力按边界接入。
+> 面向 Go 服务的业务中立平台底座。用能力合同、身份与授权、资源 schema 和运行治理，把可复用机制留在平台层，把业务留在下游。
 
 [![CI](https://github.com/GnosiST/platform-go/actions/workflows/ci.yml/badge.svg)](https://github.com/GnosiST/platform-go/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-Apache--2.0-2f6f9f.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/GnosiST/platform-go?display_name=tag&color=1d63d8)](https://github.com/GnosiST/platform-go/releases/tag/v0.1.0)
+[![License](https://img.shields.io/badge/license-Apache--2.0-1d63d8.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8.svg)](go.mod)
-[![在线文档](https://img.shields.io/badge/文档-GitHub%20Pages-0b7285.svg)](https://gnosist.github.io/platform-go/)
 
-[简体中文](README.md) · [English](README.en.md) · [文档站 / Documentation](https://gnosist.github.io/platform-go/)
+[文档站](https://gnosist.github.io/platform-go/) · [五分钟开始](https://gnosist.github.io/platform-go/docs/getting-started) · [接入业务能力](https://gnosist.github.io/platform-go/docs/business-integration) · [发行版本](https://github.com/GnosiST/platform-go/releases/tag/v0.1.0) · [English](README.en.md)
 
-## 项目定位
+<p align="center">
+  <img src="https://raw.githubusercontent.com/GnosiST/platform-go/main/website/static/video/platform-go-demo.png" alt="platform-go Admin 资源控制台" width="900" />
+</p>
 
-`platform-go` 是可复用、可审计、可扩展的 Go 平台基础层。它不绑定具体业务领域，也不把业务菜单、业务数据或业务工作流写进平台核心；业务包通过 capability manifest、公开端口和稳定合同接入。
+## 为什么是 platform-go
 
-`platform-go` is not a business migration target or an application package. 平台保持业务中立，不交付具体业务资源、路由、存储、状态机、菜单或工作流。
+业务系统通常需要同一组底层机制：身份、会话、RBAC、组织范围、资源管理、审计、文件、合同和生产预检。`platform-go` 把这些机制做成可组合的能力边界，而不把订单、客户、菜单、工作流或领域数据写进核心。
 
-适合需要以下基础能力的团队：
+适合正在构建长期运行 Go 服务、希望让后端与 Admin 合同同步、并需要保留生产安全与迁移边界的团队。不适合把它当作开箱即用的垂直行业系统，或在运行时下载和热安装任意业务插件。
 
-- 用 Gin + GORM 构建长期运行的 Go 服务；
-- 统一处理认证、会话、租户、组织、RBAC、菜单和审计；
-- 用资源 schema、OpenAPI 和代码生成约束前后端协作；
-- 在生产环境中保留迁移、缓存、文件存储和发布治理边界。
-
-## 核心能力
-
-| 领域 | 默认提供 |
+| 你得到什么 | 核心约束 |
 | --- | --- |
-| 平台合同 | capability manifest、资源 schema、路由与权限声明、版本化生成物 |
-| 身份与授权 | JWT 会话、服务端会话撤销、Casbin RBAC、租户与组织范围、菜单可见性 |
-| 管理资源 | Refine + React + Ant Design 管理壳、通用列表/表单、审计与生命周期 |
-| 工程治理 | OpenAPI、App 路由合同、Go/TypeScript codegen 预览、验证器与发布证据 |
-| 运行基础 | GORM 持久化、Redis 缓存端口、文件存储、品牌配置和生产预检 |
+| Gin + GORM 服务底座，Refine + Ant Design Admin | 业务包不依赖 `internal/platform/**` |
+| capability manifest、资源 schema、OpenAPI 与代码生成预览 | 菜单只表示可见性，Casbin 后端授权才是安全边界 |
+| JWT + 服务端会话撤销、租户/组织/RBAC、审计与生命周期 | 默认仅支持一个数据源和一个原生事务边界 |
+| Redis 缓存端口、文件存储、生产预检与发布证据 | 可选集成必须显式组合，并在重启后生效 |
 
-可选能力以 profile 方式启用，默认不改变基础平台：人员、通知、任务和企业治理等扩展保持可拆卸。多数据源、读写路由、分片、联邦查询、XA、MQ 和搜索投影属于后续扩展，不会伪装成当前默认能力。
+## 五分钟跑通
+
+前置条件：Go 1.26+、Node.js 和 npm。下面命令使用开发默认值；SQLite 仅限开发和测试，生产环境需要独立的持久化存储和 Redis。
+
+```bash
+git clone https://github.com/GnosiST/platform-go.git
+cd platform-go
+
+npm --prefix admin install
+go run ./cmd/platform-api
+```
+
+在另一个终端启动 Admin：
+
+```bash
+npm --prefix admin run dev
+```
+
+验证 API 与界面：
+
+```bash
+curl -fsS http://127.0.0.1:9200/api/health
+# 预期包含: "ok":true
+```
+
+打开 [http://127.0.0.1:9202](http://127.0.0.1:9202)。本地可使用 demo/OIDC 流程进行壳层验证；不要把 demo provider、开发密钥或 SQLite 配置带入生产。完整步骤、常见问题和成功标准见[快速开始](https://gnosist.github.io/platform-go/docs/getting-started)。
+
+## 架构：平台提供机制，业务提供领域
+
+```mermaid
+flowchart LR
+  B[下游业务 capability] --> P[pkg/platform/capability]
+  B --> A[pkg/platform/app]
+  P --> C[manifest 与合同注册表]
+  A --> H[Gin API / App routes]
+  C --> U[Admin resources / menus]
+  H --> S[服务、存储与适配器端口]
+  U --> R[Refine Admin shell]
+  S --> D[(GORM / Cache / File storage)]
+```
+
+下游业务只通过公开包声明 capability、资源、权限、路由和生命周期；具体 handler、存储、Admin 交互和领域测试留在下游 composition root。平台核心不反向导入业务包。
+
+## 接入第一个业务能力
+
+从仓库的 [`examples/external-capability`](examples/external-capability) 开始，而不是修改 `internal/platform/**`：
+
+```go
+import "github.com/GnosiST/platform-go/pkg/platform/capability"
+
+func Manifest() capability.Manifest {
+    return capability.Manifest{
+        ID: "inventory",
+        // 声明资源、权限、路由与生命周期；具体实现留在下游。
+    }
+}
+```
+
+1. 复制示例并只导入 `pkg/platform/capability` 和需要的公开 App 合同。
+2. 在 manifest 中声明资源 schema、菜单、权限、路由、服务合同和生命周期。
+3. 在下游 composition root 注入 storage、HTTP handler、Admin action 和业务 UI。
+4. 生成合同并运行外部能力门禁。
+5. 把迁移、回滚和业务测试作为下游交付物一起审阅。
+
+```bash
+node scripts/validate-external-capability-example.mjs
+```
+
+完整教程包括可复制的 composition root 与验收清单：[业务能力接入](https://gnosist.github.io/platform-go/docs/business-integration)。
+
+## 支持边界
+
+| 状态 | 范围 | 说明 |
+| --- | --- | --- |
+| 默认支持 | 身份、会话、RBAC、组织、资源、审计、文件、单数据源 | 适合作为常规业务服务基础 |
+| 显式 profile | 人员、通知、任务、企业治理、Admin OIDC、credential-auth | 通过 manifest/profile 组合，合同重生成后重启生效 |
+| default-off | 数据源注册、读写路由、分片、联邦只读、XA、Outbox/RabbitMQ、搜索投影 | 合同已实现，但需要下游组合根、受控环境和推广证据 |
+| 未支持 | Oracle、KingbaseES、运行时热插拔、远程拉取源码、通用破坏性卸载 | 不应在产品承诺或部署方案中假设可用 |
+
+当前治理快照为 **67 total / 67 implemented / 0 controlled unfinished**。`open-source-portability`、`public-docs-community`、`public-docs-site` 和 `github-release-publication` 均为 `implemented`。实现受控合同不等于默认生产启用，尤其是多数据源、消息与搜索集成仍需要单独的环境与外部证据包。详见[支持矩阵](https://gnosist.github.io/platform-go/docs/support-matrix)。
 
 <details>
-<summary>当前实现状态与支持边界（维护者参考）</summary>
+<summary>发布兼容性记录</summary>
 
-当前治理快照为 **67 total / 67 implemented / 0 controlled unfinished**。数据源、租户路由、读写路由、分片、联邦只读、可选 XA、数据库认证、事务 Outbox 与异步搜索投影均已完成其受控合同。
+The persistent full-scope task graph is implemented. The default release retains one datasource and one native transaction boundary. SQLite is development/test-only by support policy; Oracle and KingbaseES are unsupported. `alibaba/page-agent` is only a default-off optional `public-docs-site` sub-capability.
 
-当前 persistent full-scope task graph 已全部实现。`open-source-portability`、`public-docs-community`、`public-docs-site` 和 `github-release-publication` 均为 `implemented`；数据平面、数据库认证、事务 Outbox 和搜索投影也已完成受控合同。v0.1.0 已正式发布：[GitHub Release](https://github.com/GnosiST/platform-go/releases/tag/v0.1.0) 的 Tag、CI 与 Pages 证据已验证。普通业务仍以 one datasource and one native transaction boundary 为默认路径；XA、RabbitMQ 和搜索适配器均为 default-off。SQLite is development/test-only by support policy，Oracle and KingbaseES are unsupported。`alibaba/page-agent` is only a default-off optional `public-docs-site` sub-capability。
+</details>
 
-策略评审接口：
+## 认证与生产
+
+- `credential-auth` 提供 provider discovery、Argon2id、专用 GORM 仓储、应用层加密 secret transport、mandatory challenge 和 SMS OTP 合同。密码、OTP、挑战答案与原始标识不会进入通用资源字段。
+- 登录方式由 `GET /api/auth/providers` 发现；客户端不得硬编码全部提供方，也不得显示开发调试验证码。
+- 生产需要独立密钥、持久化 Admin/session/lifecycle 存储、Redis、可信 HTTPS 边缘和 `PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true`。
+- 密钥轮换、数据库迁移、备份恢复、外部短信投递、消息和搜索推广都必须有审阅、回滚与红脱敏证据。
+
+从[认证与授权](https://gnosist.github.io/platform-go/docs/authentication)开始；上线前逐项完成[生产检查清单](https://gnosist.github.io/platform-go/docs/production-checklist)。
+
+## 策略评审
+
+策略变更通过受审阅的工作流进入生产，不提供通用绕过入口：
 
 ```text
 POST /api/admin/policy-reviews/:id/request
@@ -50,144 +134,19 @@ POST /api/admin/policy-reviews/:id/approve
 GET /api/admin/policy-reviews/export
 ```
 
-</details>
+## 文档按任务阅读
 
-## 技术栈
+| 目标 | 入口 |
+| --- | --- |
+| 本地运行与排错 | [快速开始](https://gnosist.github.io/platform-go/docs/getting-started) · [故障排查](https://gnosist.github.io/platform-go/docs/operations) |
+| 了解边界与能力模型 | [架构](https://gnosist.github.io/platform-go/docs/architecture) · [能力与扩展](https://gnosist.github.io/platform-go/docs/capabilities) · [支持矩阵](https://gnosist.github.io/platform-go/docs/support-matrix) |
+| 接入业务 | [业务能力接入](https://gnosist.github.io/platform-go/docs/business-integration) · [Admin 与资源](https://gnosist.github.io/platform-go/docs/development) |
+| 接入认证 | [认证与授权](https://gnosist.github.io/platform-go/docs/authentication) · [API 与合同](https://gnosist.github.io/platform-go/docs/api) |
+| 生产运行 | [部署](https://gnosist.github.io/platform-go/docs/deployment) · [生产检查](https://gnosist.github.io/platform-go/docs/production-checklist) · [运维](https://gnosist.github.io/platform-go/docs/operations) |
+| 贡献与治理 | [人机协同开发协议](https://gnosist.github.io/platform-go/docs/human-ai-development) · [安全边界](https://gnosist.github.io/platform-go/docs/security) |
 
-- **后端**：Go、Gin、GORM、Casbin、JWT
-- **管理端**：React、Refine、Ant Design、TypeScript
-- **合同与文档**：OpenAPI、Docusaurus、GitHub Pages
-- **可选运行依赖**：Redis；数据库和外部适配器按支持矩阵接入
+## 版本、贡献与许可
 
-## 快速开始
+v0.1.0 已正式发布，发行说明见 [GitHub Release](https://github.com/GnosiST/platform-go/releases/tag/v0.1.0)。下游生产接入应固定经测试和合同门禁验证的 Git commit SHA，而不是依赖可变的 `main`。新能力需要同时提交 manifest、合同、测试、文档，以及需要时的迁移和回滚证据。
 
-环境要求：Go、Node.js、npm。生产环境另需持久化数据库和 Redis。
-
-```bash
-go test ./...
-npm --prefix admin install
-npm --prefix admin run build
-go run ./cmd/platform-api
-```
-
-API 默认地址为 `http://127.0.0.1:9200`，管理端开发服务器为 `http://127.0.0.1:9202`。
-
-### 业务接入基线
-
-保持 `0.1.0` 包版本不等于移动已发布的 `v0.1.0` tag。下游业务仓库应固定一个通过本仓库合同与测试门禁的 Git commit SHA，再通过 `pkg/platform/capability` 和 `pkg/platform/app` 接入业务 manifest 与 App handler；不要依赖可变的 `main` 分支，也不要修改 `internal/platform/**`。
-
-### 开发环境角色菜单目标态
-
-本地需要验证角色菜单保存时，可在一个新的 SQLite 开发库上显式引导目标态 RBAC 与菜单写入。该命令只接受 `development + sqlite + target serving + role-menu write enabled`，且只会物化空库；生产和 staging 不会自动执行。
-
-```bash
-export PLATFORM_ADMIN_RESOURCE_DSN=<local-sqlite-admin-resource-dsn>
-
-PLATFORM_RUNTIME_ENV=development \
-PLATFORM_ADMIN_RESOURCE_DRIVER=sqlite \
-PLATFORM_ORGANIZATION_RBAC_MODE=target \
-PLATFORM_ADMIN_MENU_SERVING_MODE=target \
-PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=true \
-go run ./cmd/platform-admin organization-rbac-migrate --mode bootstrap-development
-```
-
-随后用同一组环境变量启动 API，再启动 Admin 开发服务器：
-
-```bash
-export PLATFORM_ADMIN_RESOURCE_DSN=<local-sqlite-admin-resource-dsn>
-
-PLATFORM_RUNTIME_ENV=development \
-PLATFORM_ADMIN_RESOURCE_DRIVER=sqlite \
-PLATFORM_ORGANIZATION_RBAC_MODE=target \
-PLATFORM_ADMIN_MENU_SERVING_MODE=target \
-PLATFORM_ADMIN_ROLE_MENU_WRITE_ENABLED=true \
-go run ./cmd/platform-api
-
-npm --prefix admin run dev
-```
-
-生产角色菜单写入仍需走已审阅的 migration packet、数据库 checkpoint、dual-read 比对和 `promote` 运维命令；不要把 development bootstrap 当作生产迁移入口。
-
-<details>
-<summary>生产基线与非变更式预检</summary>
-
-Production baseline: set `PLATFORM_RUNTIME_ENV=production`，并显式配置持久化存储、Redis、可信 HTTPS 边缘、独立密钥和关闭 demo 认证。完整取值、约束和轮换说明以 [部署与生产基线](docs/platform-deployment.md) 为准；README 只保留机器合同要求的初始化清单：
-
-```text
-PLATFORM_RUNTIME_ENV
-PLATFORM_PUBLIC_BASE_URL
-PLATFORM_TRUSTED_PROXIES
-PLATFORM_EDGE_TRUSTED_PROXY
-PLATFORM_HTTP_MAX_BODY_BYTES
-PLATFORM_JWT_SECRET
-PLATFORM_DATA_KEY_PROVIDER
-PLATFORM_ADMIN_RESOURCE_DRIVER
-PLATFORM_ADMIN_RESOURCE_DSN
-PLATFORM_SESSION_DRIVER
-PLATFORM_SESSION_DSN
-PLATFORM_LIFECYCLE_HISTORY_DRIVER
-PLATFORM_LIFECYCLE_HISTORY_DSN
-PLATFORM_CACHE_DRIVER
-PLATFORM_REDIS_ADDR
-PLATFORM_RATE_LIMIT_HMAC_KEY
-PLATFORM_DISABLE_DEMO_AUTH_PROVIDER
-```
-
-保留策略执行器默认关闭；启用前必须一起评审 `PLATFORM_RETENTION_RUNNER_ENABLED`、`PLATFORM_RETENTION_RUNNER_INTERVAL`、`PLATFORM_RETENTION_RUNNER_BATCH_SIZE` 和 `PLATFORM_RETENTION_RUNNER_MAX_RETRIES`。
-
-先列出非变更式生产预检，再针对私有环境执行严格配置审计。标准模板可直接运行 `node scripts/validate-platform-production-env.mjs` 检查：
-
-```bash
-node scripts/validate-platform-foundation-alignment.mjs
-node scripts/run-platform-production-preflight.mjs --list
-node scripts/run-platform-production-preflight.mjs --command production-env-audit --strict-env-file <private-production-env>
-```
-
-`config-backup-export`、`config-import-restore`、`database-migration` 和 `token-rotation` 是需要人工评审、回滚证据与审计记录的生产操作策略；预检本身不会部署、迁移或写入生产状态。
-
-Deployment scheme A is selected as the default：以长生命周期 Gin 服务承载 API，并优先同源提供 Admin 静态资源；边界详见 [部署文档](docs/platform-deployment.md)，变更拓扑前运行 `node scripts/validate-platform-deployment-topology.mjs`。
-
-</details>
-
-## 能力边界
-
-默认发行版以单数据源、单事务边界为支持基线。生产环境不会启用 demo 数据或 demo 登录；JWT 密钥、加密密钥环、持久化存储、Redis 和能力 profile 都必须显式配置。
-
-平台只负责共享机制。业务代码不应直接依赖平台具体存储、HTTP handler 或 Admin 壳层内部实现；应通过公开 capability、service、query/command 和 storage port 接入。
-
-能力装停卸策略由 [resources/platform-capability-operation-policy.json](resources/platform-capability-operation-policy.json) 约束：当前支持启动前按 profile/`PLATFORM_CAPABILITIES`/`PLATFORM_CAPABILITY_LOCK_FILE`/下游 composition root 声明 desired state，重新生成合同后手动重启生效；不支持运行时热插拔、一键远程拉仓库或通用破坏性卸载。禁用后 Admin resource、App route、auth provider 和 demo data set 必须从合同表面消失；基础能力不可卸载。
-
-插件管理 v1 的机器合同在 [resources/platform-plugin-management-v1.json](resources/platform-plugin-management-v1.json)：它采用 restart-required desired-state model。安装或启用插件等于通过 profile、`PLATFORM_CAPABILITIES`、`PLATFORM_CAPABILITY_LOCK_FILE` 或下游 composition root 声明期望能力集合，重新生成合同并手动重启服务；禁用等于从期望集合移除、重新生成合同并重启生效。运行进程与期望集合不一致时只能标记 `pendingRestart`，不能热应用。v1 不从远端仓库拉代码，不支持 runtime hot install/uninstall，不提供破坏性卸载按钮，也不集成 WebSocket；状态提示使用 HTTP polling、`version.json` 或 API version check。
-
-用底座启动新业务项目时，不建议直接把业务代码改进 `platform-go` 核心。推荐新建下游业务仓库或下游 composition root：先声明业务 capability manifest、资源、权限、路由和生命周期，再把 storage、handler、Admin panel 和业务测试放在下游。只有跨业务复用的能力才进入平台 profile。
-
-业务能力接入前先从 [examples/external-capability](examples/external-capability) 复制或改造最小示例，并跑独立示例门禁，确认外部包只依赖公开合同且能够完成 manifest 校验、测试和合同预览：
-
-```bash
-rtk node scripts/validate-external-capability-example.mjs
-```
-
-人类开发者和 AI agent 启动高定制业务系统前，应共同遵守 [人机协同开发协议](docs/platform-human-ai-development-protocol.md)：先声明接口、UI、视觉、数据和代码生成合同，再按对应门禁验证。
-
-## 文档导航
-
-- [快速开始与架构介绍](docs/platform-capability-development.md)
-- [人机协同开发协议](docs/platform-human-ai-development-protocol.md)
-- [认证、会话与 RBAC](docs/platform-auth.md)
-- [Admin 资源与菜单](docs/admin-resource-schema.md)
-- [数据生命周期与保留策略](docs/platform-data-lifecycle-retention.md)
-- [敏感数据保护与迁移](docs/platform-sensitive-data-migration.md)
-- [部署与生产基线](docs/platform-deployment.md)
-- [在线文档站](https://gnosist.github.io/platform-go/)
-
-## 参与贡献
-
-请先阅读 [贡献指南](CONTRIBUTING.md)，再提交 issue 或 pull request。新能力应提供 manifest、合同、测试、文档和必要的迁移/回滚证据；内部计划和 AI 工作过程不属于公开仓库内容。
-
-## License
-
-Apache License 2.0，详见 [LICENSE](LICENSE) 与 [NOTICE](NOTICE)。
-
----
-
-English version: [README.en.md](README.en.md)
+阅读[贡献指南](CONTRIBUTING.md)后再提交 issue 或 pull request。项目采用 [Apache License 2.0](LICENSE)。

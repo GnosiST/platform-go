@@ -19,6 +19,14 @@ const implementedPublicNodeIDs = [
   "public-docs-site",
   "github-release-publication",
 ];
+const publicDocIDs = [
+  "getting-started",
+  "business-integration",
+  "authentication",
+  "configuration",
+  "production-checklist",
+  "support-matrix",
+];
 
 describe("public documentation surface", () => {
   it("keeps public status summaries aligned with the task graph", () => {
@@ -70,5 +78,25 @@ describe("public documentation surface", () => {
     assert.ok(source.includes('<main className="platform-home">'));
     assert.match(source, /const pageTitle = text\(/);
     assert.match(source, /const pageDescription = text\(/);
+  });
+
+  it("keeps task-oriented bilingual docs and social metadata publishable", () => {
+    const sidebar = read("website/sidebars.ts");
+    const config = read("website/docusaurus.config.ts");
+    const chineseRoadmap = read("website/docs/roadmap.md");
+    const englishRoadmap = read("website/i18n/en/docusaurus-plugin-content-docs/current/roadmap.md");
+
+    for (const docID of publicDocIDs) {
+      assert.ok(fs.existsSync(path.join(repoRoot, "website/docs", `${docID}.md`)), `Chinese ${docID} doc must exist`);
+      assert.ok(fs.existsSync(path.join(repoRoot, "website/i18n/en/docusaurus-plugin-content-docs/current", `${docID}.md`)), `English ${docID} doc must exist`);
+      assert.match(sidebar, new RegExp(`'${docID}'`), `${docID} must appear in the sidebar`);
+    }
+
+    assert.ok(fs.existsSync(path.join(repoRoot, "website/static/img/platform-go-social.png")), "social image must exist");
+    assert.match(config, /image: 'img\/platform-go-social\.png'/);
+    for (const source of [chineseRoadmap, englishRoadmap]) {
+      assert.match(source, /67 total \/ 67 implemented \/ 0 controlled unfinished/);
+      assert.doesNotMatch(source, /future nodes|后续独立节点/);
+    }
   });
 });
