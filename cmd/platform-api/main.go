@@ -70,6 +70,20 @@ func main() {
 	for _, status := range integrationRuntime.Status(ctx) {
 		log.Printf("optional integration capability=%s enabled=%t state=%s adapter=%s", status.Capability, status.Enabled, status.State, status.Adapter)
 	}
+	datasourceRuntime, err := bootstrap.DatasourceRuntimeFromConfig(ctx, cfg)
+	if err != nil {
+		log.Fatalf("build datasource registry runtime: %v", err)
+	}
+	if datasourceRuntime != nil {
+		defer func() {
+			if err := datasourceRuntime.Close(); err != nil {
+				log.Printf("close datasource registry runtime: %v", err)
+			}
+		}()
+		for _, health := range datasourceRuntime.Health() {
+			log.Printf("datasource registry datasource=%s ready=%t", health.DatasourceID, health.Ready)
+		}
+	}
 	runtime, err := bootstrap.RuntimeFromConfig(cfg)
 	if err != nil {
 		log.Fatalf("build platform runtime: %v", err)

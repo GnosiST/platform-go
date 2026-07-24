@@ -33,6 +33,22 @@ describe("validate-platform-credential-auth-v1", () => {
     assert.match(result.stdout, /Validated platform credential-auth v1 contract/);
   });
 
+  it("rejects product UI credential debug data exposure", () => {
+    const adminLoginView = `${fs.readFileSync(path.join(repoRoot, "admin/src/platform/auth/AdminLoginView.tsx"), "utf8")}\nvoid smsOTPTransaction?.debugCode;\n`;
+    const adminClient = `${fs.readFileSync(path.join(repoRoot, "admin/src/platform/api/client.ts"), "utf8")}\nexport type LeakedCredentialDebug = { debugVisible?: boolean };\n`;
+
+    const result = runValidator([
+      "--admin-login-view",
+      tempFile("platform-credential-auth-v1-login-", "AdminLoginView.tsx", adminLoginView),
+      "--admin-client",
+      tempFile("platform-credential-auth-v1-client-", "client.ts", adminClient),
+    ]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Admin login view must not expose or consume debugCode development-only credential debug data/);
+    assert.match(result.stderr, /Admin API client must not expose or consume debugVisible development-only credential debug data/);
+  });
+
   it("rejects production completion claims or weakening the existing password-provider guard", () => {
     const contract = readJSON("resources/platform-credential-auth-v1.json");
     contract.runtimeBoundary.status = "implemented-runtime";

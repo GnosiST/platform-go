@@ -1,0 +1,64 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-database-certification-matrix.json",
+  "version": 1,
+  "purpose": "Machine-readable evidence boundary for database support claims. Experimental smoke evidence must not be represented as production certification.",
+  "certificationScope": "full-platform-repository-migration-query-transaction-pagination-locking",
+  "entries": [
+    {
+      "driver": "mysql",
+      "version": "8.4",
+      "feature": "gorm-storage-smoke",
+      "status": "experimental",
+      "evidenceRef": "internal/platform/storage/certification_test.go",
+      "note": "Local container smoke covers connection, migration, commit and rollback only."
+    },
+    {
+      "driver": "postgres",
+      "version": "16",
+      "feature": "gorm-storage-smoke",
+      "status": "experimental",
+      "evidenceRef": "internal/platform/storage/certification_test.go",
+      "note": "Local container smoke covers connection, migration, commit and rollback only."
+    },
+    {
+      "driver": "mysql",
+      "version": "8.4",
+      "feature": "platform-gorm-contracts",
+      "status": "certified",
+      "evidenceRef": "internal/platform/storage/certification_test.go",
+      "note": "Ephemeral-container certification covers migration, commit, rollback, deterministic pagination and FOR UPDATE locking; session legacy-schema migration has a separate integration test."
+    },
+    {
+      "driver": "postgres",
+      "version": "16",
+      "feature": "platform-gorm-contracts",
+      "status": "certified",
+      "evidenceRef": "internal/platform/storage/certification_test.go",
+      "note": "Ephemeral-container certification covers migration, commit, rollback, deterministic pagination and FOR UPDATE locking; session legacy-schema migration has a separate integration test."
+    },
+    {
+      "driver": "sqlite",
+      "version": "current",
+      "feature": "development-and-test-storage",
+      "status": "experimental",
+      "evidenceRef": "internal/platform/storage/gorm_test.go",
+      "note": "SQLite is development and test only and is not a production certification target."
+    },
+    {
+      "driver": "kingbasees",
+      "version": "unverified",
+      "feature": "platform-runtime",
+      "status": "unsupported",
+      "evidenceRef": "docs/platform-data-governance-and-integrations-assessment.md",
+      "note": "Requires its own driver, controlled environment and compatibility lane; PostgreSQL protocol compatibility is insufficient."
+    },
+    {
+      "driver": "oracle",
+      "version": "unverified",
+      "feature": "platform-runtime",
+      "status": "unsupported",
+      "evidenceRef": "docs/platform-data-governance-and-integrations-assessment.md",
+      "note": "Requires licensed driver, controlled environment and separate migration, locking, pagination and JSON evidence."
+    }
+  ]
+}

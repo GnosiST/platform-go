@@ -36,17 +36,7 @@
     "requiresResourceLocks": true,
     "requiresDependencyConflictChecks": true,
     "requiresTaskGraphBeforeNewNode": true,
-    "requiredUnfinishedNodes": [
-      "multi-datasource-contract-and-runtime",
-      "tenant-placement-and-request-routing",
-      "datasource-read-write-routing",
-      "sharding-and-tenant-migration",
-      "federated-read-query",
-      "xa-optional-adapter",
-      "database-certification-matrix",
-      "transactional-outbox-and-one-mq-adapter",
-      "asynchronous-search-projection"
-    ]
+    "requiredUnfinishedNodes": []
   },
   "capabilityPolicy": {
     "contract": "resources/platform-capability-contracts.json",
@@ -92,20 +82,10 @@
     "fullStackVercelGo": "requires-separate-adapter-spec"
   },
   "completionPolicy": {
-    "goalCompletionStatus": "not-complete-controlled",
+    "goalCompletionStatus": "complete",
     "mustNotMarkCompleteWhileBlockersActive": true,
     "mustNotSelfCertifyExternalApprovalEvidence": true,
-    "controlledBlockers": [
-      "multi-datasource-contract-and-runtime",
-      "tenant-placement-and-request-routing",
-      "datasource-read-write-routing",
-      "sharding-and-tenant-migration",
-      "federated-read-query",
-      "xa-optional-adapter",
-      "database-certification-matrix",
-      "transactional-outbox-and-one-mq-adapter",
-      "asynchronous-search-projection"
-    ]
+    "controlledBlockers": []
   },
   "futurePromotionGates": [
     {

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-outbox.json",
+  "version": 1,
+  "defaultRuntime": "disabled",
+  "envelope": "versioned-validated-trace-context",
+  "delivery": "gorm-transaction-lease-retry-dead-letter-replay",
+  "consumerIdempotency": "persistent-consumer-event-receipt",
+  "saga": "durable-audit-caller-owned-compensation",
+  "mqAdapter": "rabbitmq-durable-topic-exchange"
+}

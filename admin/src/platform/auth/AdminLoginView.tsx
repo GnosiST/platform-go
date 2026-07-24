@@ -485,7 +485,6 @@ export function AdminLoginView({
                   {smsOTPTransaction ? (
                     <Typography.Text className="login-sms-status" type="secondary">
                       {dictionary.loginSMSSentTo.replace("{destination}", smsOTPTransaction.maskedIdentifier)}
-                      {smsOTPTransaction.debugCode ? ` ${smsOTPTransaction.debugCode}` : ""}
                     </Typography.Text>
                   ) : null}
                   <CredentialChallengeField
@@ -852,7 +851,6 @@ function SliderChallengePayload({
           </span>
         </div>
       </div>
-      <CredentialChallengeDebug challenge={challenge} dictionary={dictionary} />
     </div>
   );
 }
@@ -876,7 +874,6 @@ function CaptchaChallengePayload({
         {imageSource ? <img alt={dictionary.loginChallengeImageAlt} className="login-challenge-image" src={imageSource} /> : null}
         {!imageSource && displayText ? <Typography.Text type="secondary">{displayText}</Typography.Text> : null}
       </div>
-      <CredentialChallengeDebug challenge={challenge} dictionary={dictionary} />
     </div>
   );
 }
@@ -904,28 +901,6 @@ function ProviderSpecificChallengePayload({
         ) : null}
         {displayText ? <Typography.Text type="secondary">{displayText}</Typography.Text> : null}
       </div>
-      <CredentialChallengeDebug challenge={challenge} dictionary={dictionary} />
-    </div>
-  );
-}
-
-function CredentialChallengeDebug({
-  challenge,
-  dictionary,
-}: {
-  challenge: CredentialChallengeStartResult;
-  dictionary: Dictionary;
-}) {
-  if (!challengeDebugVisible(challenge)) {
-    return null;
-  }
-  const debugText = challengeStringParameter(challenge, "text");
-  if (!debugText) {
-    return null;
-  }
-  return (
-    <div className="login-challenge-debug">
-      <Typography.Text code>{dictionary.loginChallengeDebugText.replace("{text}", debugText)}</Typography.Text>
     </div>
   );
 }
@@ -1050,12 +1025,6 @@ function formatSliderChallengeProof(proofX: number, proofY: number) {
 function clampNumber(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
   return Math.min(Math.max(value, min), max);
-}
-
-function challengeDebugVisible(challenge: CredentialChallengeStartResult) {
-  if (challenge.debugVisible === true) return true;
-  const value = challenge.parameters?.debugVisible;
-  return value === true || value === "true";
 }
 
 function callbackFailureReason(error: unknown): OIDCCallbackFailure | "generic" {

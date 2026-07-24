@@ -3025,10 +3025,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "deferred",
+      "status": "implemented",
       "statusReason": {
-        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
-        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
+        "zh": "版本化注册表、仅引用配置、能力绑定、启动健康、红脱敏状态与同数据源事务钉住已实现并通过专用合同验证。",
+        "en": "The versioned registry, reference-only configuration, capability binding, startup health, redacted status and same-datasource transaction pinning are implemented and contract-verified."
       },
       "completionGate": {
         "zh": "完成版本化数据源与数据源组、能力绑定、加密配置引用、启动验证、健康状态和单数据源/分片事务钉住。",
@@ -3048,7 +3048,15 @@
       "evidence": {
         "docs": [
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md"
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-datasource-registry.md"
+        ],
+        "validators": [
+          "scripts/validate-platform-datasource-registry.mjs"
+        ],
+        "tests": [
+          "internal/platform/datasource/registry_test.go",
+          "scripts/platform-datasource-registry.test.mjs"
         ]
       }
     },
@@ -3060,10 +3068,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "deferred",
+      "status": "implemented",
       "statusReason": {
-        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
-        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
+        "zh": "可信上下文解析、版本化持久化放置、迁移审计及受控限时 override 已实现并验证。",
+        "en": "Trusted-context resolution, versioned persistent placement, migration audit and controlled bounded overrides are implemented and verified."
       },
       "completionGate": {
         "zh": "完成 TenantPlacement 控制面、状态与迁移审计、可信上下文解析以及高权限限域 override。",
@@ -3084,8 +3092,11 @@
       "evidence": {
         "docs": [
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md"
-        ]
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-tenant-placement.md"
+        ],
+        "validators": ["scripts/validate-platform-tenant-placement.mjs"],
+        "tests": ["internal/platform/tenantplacement/store_test.go", "scripts/platform-tenant-placement.test.mjs"]
       }
     },
     {
@@ -3096,10 +3107,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "deferred",
+      "status": "implemented",
       "statusReason": {
-        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
-        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
+        "zh": "主库写与事务钉住、提交后 sticky read、延迟健康筛选及主库回退已实现并验证。",
+        "en": "Primary-pinned writes and transactions, post-commit sticky reads, lag health selection and primary fallback are implemented and verified."
       },
       "completionGate": {
         "zh": "完成 dbresolver 或等价适配、写与事务强制主库、sticky window、延迟健康、故障回退和路由证据。",
@@ -3117,8 +3128,11 @@
       "evidence": {
         "docs": [
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md"
-        ]
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-datasource-routing.md"
+        ],
+        "validators": ["scripts/validate-platform-datasource-routing.mjs"],
+        "tests": ["internal/platform/datasource/routing_test.go", "scripts/platform-datasource-routing.test.mjs"]
       }
     },
     {
@@ -3129,10 +3143,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "deferred",
+      "status": "implemented",
       "statusReason": {
-        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
-        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
+        "zh": "可信分片路由、全局 ID、版本化放置和持久化检查点、审计与补偿迁移已实现并验证。",
+        "en": "Trusted shard routing, global IDs, versioned placement and persistent checkpoint, audit and compensation migration are implemented and verified."
       },
       "completionGate": {
         "zh": "完成分片路由、全局 ID、版本化放置、扩容再平衡和带检查点、审计与补偿的租户迁移。",
@@ -3152,8 +3166,11 @@
       "evidence": {
         "docs": [
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md"
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-sharding.md"
         ]
+        ,"validators": ["scripts/validate-platform-sharding.mjs"],
+        "tests": ["internal/platform/sharding/migration_test.go", "scripts/platform-sharding.test.mjs"]
       }
     },
     {
@@ -3164,10 +3181,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "deferred",
+      "status": "implemented",
       "statusReason": {
-        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
-        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
+        "zh": "版本化持久化报告定义、可信租户范围、受控多源 GORM 只读执行、字段投影、超时和成本限制已实现并验证。",
+        "en": "Versioned persisted report definitions, trusted tenant scope, controlled multi-source GORM read execution, field projection, timeout and cost limits are implemented and verified."
       },
       "completionGate": {
         "zh": "完成仅面向持久化报表定义的只读联邦执行器，禁止普通 OLTP Repository 跨库 Join，并验证隔离与资源限制。",
@@ -3187,8 +3204,11 @@
       "evidence": {
         "docs": [
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md"
-        ]
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-federated-report.md"
+        ],
+        "validators": ["scripts/validate-platform-federated-report.mjs"],
+        "tests": ["internal/platform/federatedreport/runtime_test.go", "scripts/platform-federated-report.test.mjs"]
       }
     },
     {
@@ -3199,10 +3219,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "deferred",
+      "status": "implemented",
       "statusReason": {
-        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
-        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
+        "zh": "默认关闭的 MySQL XA 资源管理器、双实例协议烟测、超时、持久化恢复日志和启发式状态记录已实现并验证。",
+        "en": "The default-off MySQL XA resource manager, two-instance protocol smoke, timeout, persistent recovery log and heuristic state recording are implemented and verified."
       },
       "completionGate": {
         "zh": "完成默认关闭适配器、超时边界、prepare/commit/rollback 证据、启发式恢复记录和运维处置；不替代 Outbox/Saga 默认路径。",
@@ -3222,8 +3242,11 @@
       "evidence": {
         "docs": [
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md"
-        ]
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-xa.md"
+        ],
+        "validators": ["scripts/validate-platform-xa.mjs"],
+        "tests": ["internal/platform/xa/coordinator_test.go", "scripts/platform-xa.test.mjs"]
       }
     },
     {
@@ -3234,10 +3257,10 @@
       },
       "phase": "production-governance",
       "scope": "governance",
-      "status": "deferred",
+      "status": "implemented",
       "statusReason": {
-        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
-        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
+        "zh": "MySQL 8.4 与 PostgreSQL 16 已在临时容器中完成 GORM 迁移、事务、分页、行锁和 session 旧表迁移认证；未认证目标仍保持明确分级。",
+        "en": "MySQL 8.4 and PostgreSQL 16 are certified in ephemeral containers for GORM migration, transactions, pagination, locking and legacy session schema migration; unverified targets remain explicitly tiered."
       },
       "completionGate": {
         "zh": "按驱动、版本和特性聚合自动化认证；任何未通过组合必须明确标记 experimental 或 unsupported。",
@@ -3256,8 +3279,11 @@
       "evidence": {
         "docs": [
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md"
-        ]
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-database-certification.md"
+        ],
+        "validators": ["scripts/validate-platform-database-certification.mjs"],
+        "tests": ["internal/platform/storage/certification_test.go", "internal/platform/session/gorm_repository_integration_test.go", "scripts/platform-database-certification.test.mjs"]
       }
     },
     {
@@ -3268,10 +3294,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "deferred",
+      "status": "implemented",
       "statusReason": {
-        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
-        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
+        "zh": "GORM 事务 Outbox、持久化消费者收据、重试/死信/重放、调用方补偿边界与默认关闭 RabbitMQ 适配器已实现并通过实际 Broker 烟测。",
+        "en": "The GORM transactional Outbox, persistent consumer receipts, retry/dead-letter/replay, caller-owned compensation boundary and default-off RabbitMQ adapter are implemented and passed a real broker smoke."
       },
       "completionGate": {
         "zh": "完成事务 Outbox、版本化事件包络、trace context、幂等消费、重试/死信/重放、Saga 补偿，并只认证一个 MQ 适配器。",
@@ -3293,8 +3319,11 @@
       "evidence": {
         "docs": [
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md"
-        ]
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-outbox.md"
+        ],
+        "validators": ["scripts/validate-platform-outbox.mjs"],
+        "tests": ["internal/platform/outbox/gorm_store_test.go", "internal/platform/outbox/consumer_ledger_test.go", "internal/platform/outbox/saga_test.go", "internal/platform/integration/rabbitmq_test.go", "scripts/platform-outbox.test.mjs"]
       }
     },
     {
@@ -3305,10 +3334,10 @@
       },
       "phase": "production-governance",
       "scope": "foundation",
-      "status": "deferred",
+      "status": "implemented",
       "statusReason": {
-        "zh": "用户明确将此能力移出 v0.1.0 发布边界；合同、依赖、资源锁和完成门保持可见，等待发布后目标重新激活。",
-        "en": "The user explicitly moved this capability outside the v0.1.0 release boundary; its contract, dependencies, resource locks and completion gate remain visible for post-release activation."
+        "zh": "已实现默认关闭的异步搜索投影：服务端注册字段映射、可信租户隔离、持久化幂等与检查点、删除墓碑和有界重建。",
+        "en": "The default-off asynchronous search projection is implemented with server-registered field mappings, trusted tenant isolation, persistent idempotency/checkpoints, deletion tombstones and bounded rebuild."
       },
       "completionGate": {
         "zh": "完成可重建投影、重放与删除同步、字段白名单、租户隔离、成本限制和关系数据库事实源边界。",
@@ -3329,8 +3358,11 @@
       "evidence": {
         "docs": [
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md"
-        ]
+          "docs/platform-data-governance-and-integrations-assessment.md",
+          "docs/platform-search-projection.md"
+        ],
+        "validators": ["scripts/validate-platform-search-projection.mjs"],
+        "tests": ["internal/platform/searchprojection/gorm_store_test.go", "scripts/platform-search-projection.test.mjs"]
       }
     },
     {

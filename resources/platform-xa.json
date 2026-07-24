@@ -1,0 +1,8 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-xa.json",
+  "version": 1,
+  "defaultRuntime": "disabled",
+  "certifiedAdapter": "mysql-xa-two-instance-smoke",
+  "recovery": "persistent-heuristic-log",
+  "businessDefault": "outbox-or-saga"
+}

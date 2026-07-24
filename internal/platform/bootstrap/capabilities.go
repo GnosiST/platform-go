@@ -1,17 +1,59 @@
 package bootstrap
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 
 	"github.com/GnosiST/platform-go/internal/platform/capability"
 	"github.com/GnosiST/platform-go/internal/platform/config"
 	"github.com/GnosiST/platform-go/internal/platform/core"
+	"github.com/GnosiST/platform-go/internal/platform/datasource"
 	"github.com/GnosiST/platform-go/internal/platform/httpapi"
 	"github.com/GnosiST/platform-go/internal/platform/notification"
 	"github.com/GnosiST/platform-go/internal/platform/ratelimit"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
+
+func DatasourceRuntimeFromConfig(ctx context.Context, cfg config.Config, resolvers ...datasource.Resolver) (*datasource.Runtime, error) {
+	if strings.TrimSpace(cfg.DatasourceRegistryFile) == "" {
+		return nil, nil
+	}
+	if len(resolvers) > 1 {
+		return nil, fmt.Errorf("at most one datasource resolver may be configured")
+	}
+	resolver := datasource.Resolver(environmentDatasourceResolver{})
+	if len(resolvers) == 1 {
+		resolver = resolvers[0]
+	}
+	spec, err := datasource.LoadSpecFile(cfg.DatasourceRegistryFile)
+	if err != nil {
+		return nil, err
+	}
+	runtime, err := datasource.Open(ctx, spec, resolver)
+	if err != nil {
+		return nil, err
+	}
+	if err := runtime.ValidateCapabilityBindings(cfg.Capabilities); err != nil {
+		_ = runtime.Close()
+		return nil, err
+	}
+	return runtime, nil
+}
+
+type environmentDatasourceResolver struct{}
+
+func (environmentDatasourceResolver) ResolveDatasource(_ context.Context, ref string) (storage.Config, error) {
+	key := strings.ToUpper(strings.ReplaceAll(ref, "-", "_"))
+	driver := strings.TrimSpace(os.Getenv("PLATFORM_DATASOURCE_" + key + "_DRIVER"))
+	dsn := os.Getenv("PLATFORM_DATASOURCE_" + key + "_DSN")
+	if driver == "" || strings.TrimSpace(dsn) == "" {
+		return storage.Config{}, fmt.Errorf("datasource configuration reference %q is incomplete", ref)
+	}
+	return storage.Config{Driver: driver, DSN: dsn}, nil
+}
 
 type PhoneVerificationRuntime struct {
 	Protector        httpapi.PhoneProtector

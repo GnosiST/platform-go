@@ -763,19 +763,34 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /must project the logging-center workbench from authorized log resources/);
   });
 
-  it("rejects credential challenge debug proof rendering", () => {
+  it("rejects credential challenge debug data rendering", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(
       tempRoot,
       "admin/src/platform/auth/AdminLoginView.tsx",
-      'const debugText = challengeStringParameter(challenge, "text");',
-      'const debugText = challengeStringParameter(challenge, "text");\n  const leakedProof = challenge.debugProof;',
+      "function CaptchaChallengePayload({",
+      "void smsOTPTransaction?.debugCode;\n\nfunction CaptchaChallengePayload({",
     );
 
     const result = runValidator(["--root", tempRoot]);
 
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /Credential login must not read or render server debugProof values/);
+    assert.match(result.stderr, /Credential login must not consume SMS debug codes/);
+  });
+
+  it("rejects sensitive field reveal SMS debug code consumption", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/resources/SensitiveFieldRevealModal.tsx",
+      'setPhase("sms");',
+      'setVerificationCode(started.debugCode ?? "");\n      setPhase("sms");',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Sensitive field reveal must not consume development SMS debug codes/);
   });
 
   it("rejects removing credential slider challenge rendering", () => {

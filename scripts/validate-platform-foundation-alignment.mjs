@@ -885,7 +885,9 @@ function validate() {
   validateProductionAuthHardening(audit, productionAuthHardening, errors);
   validateRefreshTokenFamilyPromotion(audit, refreshTokenFamilyPromotion, productionAuthHardening, errors);
   validateDocuments(audit, errors);
-  validateRequiredValidators(audit, errors);
+  if (errors.length === 0) {
+    validateRequiredValidators(audit, errors);
+  }
 
   return { audit, errors };
 }

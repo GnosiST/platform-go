@@ -57,10 +57,10 @@ for (const id of ["message-bus", "search-indexer", "search-reader"]) {
 }
 const expectedBoundary = {
   capabilityProfilesImplicitlyEnable: false,
-  vendorAdapters: "not-implemented",
-  transactionalOutbox: "not-implemented",
-  deadLetterQueue: "not-implemented",
-  replay: "not-implemented",
+  vendorAdapters: "rabbitmq-bundled-default-off",
+  transactionalOutbox: "internal-gorm-runtime",
+  deadLetterQueue: "outbox-dead-letter-records",
+  replay: "outbox-audited-replay",
   searchProjection: "not-implemented",
   adapterHealthErrorExposure: "redacted",
 };

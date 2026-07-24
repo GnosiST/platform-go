@@ -228,7 +228,6 @@ export function SensitiveFieldRevealModal({
       if (operationGenerationRef.current !== generation) return;
       setTransactionToken(started.transactionToken);
       setMaskedDestination(started.maskedPhone || descriptor.maskedDestination || "");
-      setVerificationCode(started.debugCode ?? "");
       setPhase("sms");
       return;
     }

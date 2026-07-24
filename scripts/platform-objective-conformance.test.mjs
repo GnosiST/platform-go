@@ -7,17 +7,7 @@ import { describe, it } from "node:test";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
-const completionProgramTaskIDs = [
-  "multi-datasource-contract-and-runtime",
-  "tenant-placement-and-request-routing",
-  "datasource-read-write-routing",
-  "sharding-and-tenant-migration",
-  "federated-read-query",
-  "xa-optional-adapter",
-  "database-certification-matrix",
-  "transactional-outbox-and-one-mq-adapter",
-  "asynchronous-search-projection",
-];
+const completionProgramTaskIDs = [];
 
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-objective-conformance.mjs", ...args], {
@@ -38,11 +28,11 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-objective-conformance", () => {
-  it("tracks the ordered completion program as controlled objective blockers", () => {
+  it("tracks a completed objective without controlled task blockers", () => {
     const audit = readJSON("resources/platform-objective-conformance.json");
 
     assert.deepEqual(audit.taskControlPolicy.requiredUnfinishedNodes, completionProgramTaskIDs);
-    assert.equal(audit.completionPolicy.goalCompletionStatus, "not-complete-controlled");
+    assert.equal(audit.completionPolicy.goalCompletionStatus, "complete");
     assert.deepEqual(audit.completionPolicy.controlledBlockers, completionProgramTaskIDs);
   });
 
@@ -226,23 +216,32 @@ describe("validate-platform-objective-conformance", () => {
     assert.match(result.stderr, /objective conformance evidence must include scripts\/validate-platform-node-closeout-audit\.mjs/);
   });
 
-  it("rejects missing controlled blockers while completion nodes remain unfinished", () => {
+  it("rejects omitting a controlled blocker after a completed task regresses", () => {
     const audit = readJSON("resources/platform-objective-conformance.json");
-    audit.completionPolicy.controlledBlockers = completionProgramTaskIDs.slice(1);
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    graph.tasks.find((task) => task.id === "database-certification-matrix").status = "deferred";
     const auditPath = tempJSON("platform-objective-conformance.json", audit);
+    const graphPath = tempJSON("platform-foundation-task-graph.json", graph);
 
-    const result = runValidator(["--audit", auditPath]);
+    const result = runValidator(["--audit", auditPath, "--task-graph", graphPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /completionPolicy\.controlledBlockers must exactly match unfinished task graph nodes in graph order/);
   });
 
-  it("rejects reordering controlled objective blockers", () => {
+  it("rejects reordered controlled blockers after completed tasks regress", () => {
     const audit = readJSON("resources/platform-objective-conformance.json");
-    audit.completionPolicy.controlledBlockers = [completionProgramTaskIDs[1], completionProgramTaskIDs[0], ...completionProgramTaskIDs.slice(2)];
+    const graph = readJSON("resources/platform-foundation-task-graph.json");
+    graph.tasks.find((task) => task.id === "database-certification-matrix").status = "deferred";
+    graph.tasks.find((task) => task.id === "transactional-outbox-and-one-mq-adapter").status = "deferred";
+    audit.completionPolicy.controlledBlockers = [
+      "transactional-outbox-and-one-mq-adapter",
+      "database-certification-matrix",
+    ];
     const auditPath = tempJSON("platform-objective-conformance.json", audit);
+    const graphPath = tempJSON("platform-foundation-task-graph.json", graph);
 
-    const result = runValidator(["--audit", auditPath]);
+    const result = runValidator(["--audit", auditPath, "--task-graph", graphPath]);
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /completionPolicy\.controlledBlockers must exactly match unfinished task graph nodes in graph order/);

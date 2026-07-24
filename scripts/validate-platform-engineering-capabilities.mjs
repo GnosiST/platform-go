@@ -71,11 +71,6 @@ const requiredImplementedCapabilityIDs = [
   "menu-tree-and-button-permission-configuration",
   "organization-rbac-menu-e2e-qa",
   "unified-error-code-governance",
-  "open-source-portability",
-  "public-documentation-and-release",
-];
-const requiredPartialCapabilityIDs = [];
-const requiredDeferredCapabilityIDs = [
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",
   "datasource-read-write-routing",
@@ -85,7 +80,11 @@ const requiredDeferredCapabilityIDs = [
   "database-certification-matrix",
   "transactional-outbox-and-one-mq-adapter",
   "asynchronous-search-projection",
+  "open-source-portability",
+  "public-documentation-and-release",
 ];
+const requiredPartialCapabilityIDs = [];
+const requiredDeferredCapabilityIDs = [];
 const requiredCapabilityDependencies = {
   "menu-tree-and-button-permission-configuration": ["role-tree-and-authorization-entry"],
   "organization-rbac-menu-e2e-qa": [
@@ -520,8 +519,8 @@ function validateIntegrationPorts(capability, errors) {
   for (const testPath of ["internal/platform/integration/integration_test.go", "scripts/platform-integration-ports.test.mjs"]) {
     requireIncludes(values(capability.evidence?.tests), testPath, "integration-ports-disabled-default evidence.tests", errors);
   }
-  if (capability.evidence?.runtimeBoundary?.transactionalOutbox !== "not-implemented") {
-    errors.push("integration ports transactional Outbox must stay unimplemented in this node");
+  if (capability.evidence?.runtimeBoundary?.transactionalOutbox !== "internal-gorm-runtime") {
+    errors.push("integration ports transactional Outbox boundary must stay internal-gorm-runtime");
   }
   if (capability.evidence?.runtimeBoundary?.searchProjection !== "not-implemented") {
     errors.push("integration ports search projection must stay unimplemented in this node");
@@ -593,12 +592,12 @@ function validate() {
     if (capability && capability.status !== "deferred") {
       errors.push(`post-release optional capability ${capabilityID} must stay deferred until explicitly activated`);
     }
-    if (capability) {
-      const expectedDependencies = requiredCapabilityDependencies[capabilityID];
-      const actualDependencies = values(capability.dependsOn);
-      if (!sameOrderedValues(actualDependencies, expectedDependencies)) {
-        errors.push(`post-release optional capability ${capabilityID} dependsOn must equal ${JSON.stringify(expectedDependencies)}`);
-      }
+  }
+  for (const [capabilityID, expectedDependencies] of Object.entries(requiredCapabilityDependencies)) {
+    const capability = capabilityByID.get(capabilityID);
+    const actualDependencies = values(capability?.dependsOn);
+    if (!sameOrderedValues(actualDependencies, expectedDependencies)) {
+      errors.push(`governed capability ${capabilityID} dependsOn must equal ${JSON.stringify(expectedDependencies)}`);
     }
   }
   validateSafeCodegenScaffold(capabilityByID.get("safe-codegen-scaffold"), errors);

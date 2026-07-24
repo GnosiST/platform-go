@@ -2297,7 +2297,7 @@
         "requiredSourceSnippets": [
           {
             "path": "resources/platform-goal-completion-audit.json",
-            "contains": "\"completionStatus\": \"not-complete-controlled\""
+            "contains": "\"completionStatus\": \"complete\""
           },
           {
             "path": "resources/platform-goal-completion-audit.json",
@@ -2552,7 +2552,7 @@
           },
           {
             "path": "resources/platform-objective-conformance.json",
-            "contains": "\"goalCompletionStatus\": \"not-complete-controlled\""
+            "contains": "\"goalCompletionStatus\": \"complete\""
           },
           {
             "path": "resources/platform-objective-conformance.json",
@@ -3060,6 +3060,8 @@
         "sourcePaths": [
           "resources/platform-integration-ports.json",
           "internal/platform/integration/integration.go",
+          "internal/platform/integration/rabbitmq.go",
+          "internal/platform/outbox/gorm_store.go",
           "internal/platform/integration/disabled.go",
           "internal/platform/bootstrap/integration.go",
           "internal/platform/config/config.go",
@@ -3067,6 +3069,7 @@
           "deploy/env/production.example.env",
           "deploy/compose/docker-compose.prod.yml",
           "docs/platform-integration-ports.md",
+          "docs/platform-outbox.md",
           "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
@@ -3078,16 +3081,18 @@
         ],
         "tests": [
           "internal/platform/integration/integration_test.go",
+          "internal/platform/integration/rabbitmq_test.go",
+          "internal/platform/outbox/gorm_store_test.go",
           "internal/platform/bootstrap/integration_test.go",
           "internal/platform/config/config_test.go",
           "scripts/platform-integration-ports.test.mjs"
         ],
         "runtimeBoundary": {
           "capabilityProfilesImplicitlyEnable": false,
-          "vendorAdapters": "not-implemented",
-          "transactionalOutbox": "not-implemented",
-          "deadLetterQueue": "not-implemented",
-          "replay": "not-implemented",
+          "vendorAdapters": "rabbitmq-bundled-default-off",
+          "transactionalOutbox": "internal-gorm-runtime",
+          "deadLetterQueue": "outbox-dead-letter-records",
+          "replay": "outbox-audited-replay",
           "searchProjection": "not-implemented",
           "adapterHealthErrorExposure": "redacted"
         },
@@ -3407,17 +3412,26 @@
         "zh": "多数据源合同与运行时",
         "en": "Multi-Datasource Contract And Runtime"
       },
-      "status": "deferred",
+      "status": "implemented",
       "purpose": "Route declared resources through isolated, validated datasource configurations without weakening platform contracts.",
       "dependsOn": [
         "platform-service-contract-standard"
       ],
       "evidence": {
         "sourcePaths": [
+          "resources/platform-datasource-registry.json",
+          "internal/platform/datasource/registry.go",
+          "internal/platform/datasource/routing.go",
+          "internal/platform/bootstrap/capabilities.go",
+          "internal/platform/config/config.go",
+          "cmd/platform-api/main.go",
+          "docs/platform-datasource-registry.md",
           "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
+        "validators": ["scripts/validate-platform-datasource-registry.mjs"],
+        "tests": ["internal/platform/datasource/registry_test.go", "internal/platform/datasource/routing_test.go", "scripts/platform-datasource-registry.test.mjs"],
         "taskIds": [
           "multi-datasource-contract-and-runtime"
         ]
@@ -3429,7 +3443,7 @@
         "zh": "租户放置与请求路由",
         "en": "Tenant Placement And Request Routing"
       },
-      "status": "deferred",
+      "status": "implemented",
       "purpose": "Resolve trusted tenant context through versioned placement configuration to datasource groups, shards and schemas with controlled override and audit boundaries.",
       "dependsOn": [
         "multi-datasource-contract-and-runtime",
@@ -3437,10 +3451,16 @@
       ],
       "evidence": {
         "sourcePaths": [
+          "resources/platform-tenant-placement.json",
+          "internal/platform/tenantplacement/store.go",
+          "internal/platform/tenantplacement/gorm_store.go",
+          "docs/platform-tenant-placement.md",
           "docs/platform-roadmap.md",
           "docs/platform-data-governance-and-integrations-assessment.md",
           "docs/platform-roadmap.md"
         ],
+        "validators": ["scripts/validate-platform-tenant-placement.mjs"],
+        "tests": ["internal/platform/tenantplacement/store_test.go", "scripts/platform-tenant-placement.test.mjs"],
         "taskIds": [
           "tenant-placement-and-request-routing"
         ]
@@ -3452,17 +3472,21 @@
         "zh": "数据源读写路由",
         "en": "Datasource Read Write Routing"
       },
-      "status": "deferred",
+      "status": "implemented",
       "purpose": "Route primary and replica operations with transaction-primary enforcement, write-after-read stickiness, replication-lag policy and controlled failover.",
       "dependsOn": [
         "tenant-placement-and-request-routing"
       ],
       "evidence": {
         "sourcePaths": [
+          "resources/platform-datasource-routing.json",
+          "internal/platform/datasource/routing.go",
+          "docs/platform-datasource-routing.md",
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/platform-data-governance-and-integrations-assessment.md"
         ],
+        "validators": ["scripts/validate-platform-datasource-routing.mjs"],
+        "tests": ["internal/platform/datasource/routing_test.go", "scripts/platform-datasource-routing.test.mjs"],
         "taskIds": [
           "datasource-read-write-routing"
         ]
@@ -3474,17 +3498,22 @@
         "zh": "分片与租户迁移",
         "en": "Sharding And Tenant Migration"
       },
-      "status": "deferred",
+      "status": "implemented",
       "purpose": "Provide explicit shard keys, global IDs, routing versions, controlled expansion, rebalancing and auditable tenant migration workflows.",
       "dependsOn": [
         "datasource-read-write-routing"
       ],
       "evidence": {
         "sourcePaths": [
+          "resources/platform-sharding.json",
+          "internal/platform/sharding/router.go",
+          "internal/platform/sharding/gorm_controller.go",
+          "docs/platform-sharding.md",
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/platform-data-governance-and-integrations-assessment.md"
         ],
+        "validators": ["scripts/validate-platform-sharding.mjs"],
+        "tests": ["internal/platform/sharding/migration_test.go", "scripts/platform-sharding.test.mjs"],
         "taskIds": [
           "sharding-and-tenant-migration"
         ]
@@ -3496,7 +3525,7 @@
         "zh": "受控联邦只读查询",
         "en": "Controlled Federated Read Query"
       },
-      "status": "deferred",
+      "status": "implemented",
       "purpose": "Execute controlled read-only federated persisted queries with tenant isolation, timeout, cost, field and row boundaries outside ordinary OLTP repositories.",
       "dependsOn": [
         "sharding-and-tenant-migration",
@@ -3504,10 +3533,16 @@
       ],
       "evidence": {
         "sourcePaths": [
+          "resources/platform-federated-report.json",
+          "internal/platform/federatedreport/runtime.go",
+          "internal/platform/federatedreport/gorm_executor.go",
+          "internal/platform/federatedreport/gorm_store.go",
+          "docs/platform-federated-report.md",
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/platform-data-governance-and-integrations-assessment.md"
         ],
+        "validators": ["scripts/validate-platform-federated-report.mjs"],
+        "tests": ["internal/platform/federatedreport/runtime_test.go", "scripts/platform-federated-report.test.mjs"],
         "taskIds": [
           "federated-read-query"
         ]
@@ -3519,17 +3554,23 @@
         "zh": "可选 XA 适配器",
         "en": "Optional XA Adapter"
       },
-      "status": "deferred",
+      "status": "implemented",
       "purpose": "Provide a default-off XA adapter with certified resource-manager compatibility, timeouts, heuristic recovery and explicit operational procedures.",
       "dependsOn": [
         "federated-read-query"
       ],
       "evidence": {
         "sourcePaths": [
+          "resources/platform-xa.json",
+          "internal/platform/xa/coordinator.go",
+          "internal/platform/xa/mysql_resource_manager.go",
+          "internal/platform/xa/gorm_recovery_log.go",
+          "docs/platform-xa.md",
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/platform-data-governance-and-integrations-assessment.md"
         ],
+        "validators": ["scripts/validate-platform-xa.mjs"],
+        "tests": ["internal/platform/xa/coordinator_test.go", "scripts/platform-xa.test.mjs"],
         "taskIds": [
           "xa-optional-adapter"
         ]
@@ -3541,17 +3582,22 @@
         "zh": "数据库认证矩阵",
         "en": "Database Certification Matrix"
       },
-      "status": "deferred",
-      "purpose": "Publish evidence-backed compatibility tiers for supported and planned relational database targets.",
+      "status": "implemented",
+      "purpose": "Publish evidence-backed compatibility tiers for supported and planned relational database targets, with certified MySQL and PostgreSQL GORM contract lanes.",
       "dependsOn": [
         "xa-optional-adapter"
       ],
       "evidence": {
         "sourcePaths": [
+          "resources/platform-database-certification-matrix.json",
+          "internal/platform/storage/certification_test.go",
+          "internal/platform/session/gorm_repository_integration_test.go",
+          "docs/platform-database-certification.md",
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/platform-data-governance-and-integrations-assessment.md"
         ],
+        "validators": ["scripts/validate-platform-database-certification.mjs"],
+        "tests": ["scripts/platform-database-certification.test.mjs"],
         "taskIds": [
           "database-certification-matrix"
         ]
@@ -3563,7 +3609,7 @@
         "zh": "事务发件箱与单消息队列适配器",
         "en": "Transactional Outbox And One MQ Adapter"
       },
-      "status": "deferred",
+      "status": "implemented",
       "purpose": "Provide durable transactional event publication with one production-ready message queue adapter.",
       "dependsOn": [
         "integration-ports-disabled-default",
@@ -3571,10 +3617,17 @@
       ],
       "evidence": {
         "sourcePaths": [
+          "resources/platform-outbox.json",
+          "internal/platform/outbox/gorm_store.go",
+          "internal/platform/outbox/consumer_ledger.go",
+          "internal/platform/outbox/saga.go",
+          "internal/platform/integration/rabbitmq.go",
+          "docs/platform-outbox.md",
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/platform-data-governance-and-integrations-assessment.md"
         ],
+        "validators": ["scripts/validate-platform-outbox.mjs"],
+        "tests": ["internal/platform/outbox/gorm_store_test.go", "internal/platform/outbox/consumer_ledger_test.go", "internal/platform/outbox/saga_test.go", "internal/platform/integration/rabbitmq_test.go", "scripts/platform-outbox.test.mjs"],
         "taskIds": [
           "transactional-outbox-and-one-mq-adapter"
         ]
@@ -3586,7 +3639,7 @@
         "zh": "异步搜索投影",
         "en": "Asynchronous Search Projection"
       },
-      "status": "deferred",
+      "status": "implemented",
       "purpose": "Build recoverable asynchronous search projections without making search infrastructure a source of truth.",
       "dependsOn": [
         "transactional-outbox-and-one-mq-adapter",
@@ -3594,10 +3647,14 @@
       ],
       "evidence": {
         "sourcePaths": [
+          "resources/platform-search-projection.json",
+          "internal/platform/searchprojection/gorm_store.go",
+          "docs/platform-search-projection.md",
           "docs/platform-roadmap.md",
-          "docs/platform-data-governance-and-integrations-assessment.md",
-          "docs/platform-roadmap.md"
+          "docs/platform-data-governance-and-integrations-assessment.md"
         ],
+        "validators": ["scripts/validate-platform-search-projection.mjs"],
+        "tests": ["internal/platform/searchprojection/gorm_store_test.go", "scripts/platform-search-projection.test.mjs"],
         "taskIds": [
           "asynchronous-search-projection"
         ]

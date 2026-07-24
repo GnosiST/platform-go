@@ -1,0 +1,9 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-datasource-routing.json",
+  "version": 1,
+  "writes": "primary-only",
+  "transactions": "primary-only",
+  "reads": "healthy-lag-compliant-replica-or-primary",
+  "readAfterWrite": "bounded-primary-sticky-after-commit",
+  "replicaFailure": "fallback-primary"
+}

@@ -46,6 +46,7 @@ type Config struct {
 	RetentionRunnerMaxRetries            int
 	DatabaseDriver                       string
 	DatabaseDSN                          string
+	DatasourceRegistryFile               string
 	OpenAPIFile                          string
 	JWTSecret                            string
 	CacheDriver                          string
@@ -274,6 +275,7 @@ func Load() Config {
 		RetentionRunnerMaxRetries:            retentionRunnerMaxRetries,
 		DatabaseDriver:                       env("PLATFORM_DATABASE_DRIVER", "mysql"),
 		DatabaseDSN:                          env("PLATFORM_DATABASE_DSN", ""),
+		DatasourceRegistryFile:               env("PLATFORM_DATASOURCE_REGISTRY_FILE", ""),
 		OpenAPIFile:                          env("PLATFORM_OPENAPI_FILE", "resources/generated/openapi.admin.json"),
 		JWTSecret:                            env("PLATFORM_JWT_SECRET", defaultJWTSecret),
 		CacheDriver:                          env("PLATFORM_CACHE_DRIVER", ""),
@@ -490,6 +492,9 @@ func (c Config) ValidateRuntime() error {
 	}
 	errs = append(errs, validateDriverPair("session", c.SessionDriver, c.SessionDSN)...)
 	errs = append(errs, validateDriverPair("lifecycle history", c.LifecycleHistoryDriver, c.LifecycleHistoryDSN)...)
+	if strings.TrimSpace(c.DatasourceRegistryFile) != c.DatasourceRegistryFile {
+		errs = append(errs, errors.New("PLATFORM_DATASOURCE_REGISTRY_FILE must be trimmed"))
+	}
 	for key, state := range map[string]envConfigState{
 		"PLATFORM_RETENTION_RUNNER_ENABLED":     c.retentionRunnerSource.enabled,
 		"PLATFORM_RETENTION_RUNNER_INTERVAL":    c.retentionRunnerSource.interval,

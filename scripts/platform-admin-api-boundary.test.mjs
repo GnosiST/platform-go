@@ -95,6 +95,9 @@ describe("validate-platform-admin-api-boundary", () => {
     const smsData = openAPI.components?.schemas?.AdminCredentialSMSOTPStartData;
     assert.equal(smsData?.properties?.debugCode?.["x-platform-development-only"], true);
     assert.equal(smsData?.properties?.debugCode?.["x-platform-sensitivity"], "secret");
+    const sensitiveRevealSMSData = openAPI.components?.schemas?.AdminSensitiveRevealSMSStartData;
+    assert.equal(sensitiveRevealSMSData?.properties?.debugCode?.["x-platform-development-only"], true);
+    assert.equal(sensitiveRevealSMSData?.properties?.debugCode?.["x-platform-sensitivity"], "secret");
     const settingsRuntime = openAPI.paths?.["/api/admin/settings"]?.get;
     assert.equal(settingsRuntime?.operationId, "getAdminSettingsRuntime");
     assert.equal(settingsRuntime?.["x-platform-runtime"], "settings-runtime-v1.1");
@@ -208,6 +211,7 @@ describe("validate-platform-admin-api-boundary", () => {
     openAPI.components.schemas.AdminCredentialAuthSecretEnvelope.properties.ciphertext.writeOnly = false;
     openAPI.components.schemas.AdminCredentialAuthSecretKeyData.properties.algorithm.enum = ["none"];
     openAPI.components.schemas.AdminCredentialSMSOTPStartData.properties.debugCode["x-platform-development-only"] = false;
+    openAPI.components.schemas.AdminSensitiveRevealSMSStartData.properties.debugCode["x-platform-sensitivity"] = "public";
     delete openAPI.components.schemas.AdminSettingsResourceItem["x-platform-secret-projection"];
     openAPI.components.schemas.AdminSettingsResourceItem.required = openAPI.components.schemas.AdminSettingsResourceItem.required.filter(
       (field) => field !== "runtimeApplyMode" && field !== "restartRequired" && field !== "pendingRestart",
@@ -238,6 +242,7 @@ describe("validate-platform-admin-api-boundary", () => {
     assert.match(result.stderr, /AdminCredentialAuthSecretEnvelope must require client public key and write-only ciphertext/);
     assert.match(result.stderr, /AdminCredentialAuthSecretKeyData must expose ECDH\/AES public key metadata/);
     assert.match(result.stderr, /debugCode development-only secret/);
+    assert.match(result.stderr, /AdminSensitiveRevealSMSStartData must mark debugCode development-only secret/);
     assert.match(result.stderr, /AdminMessageCenterTestSendRequest must keep recipient and template params write-only/);
     assert.match(result.stderr, /AdminMessageCenterDeliveryReceipt must declare redacted target projection/);
   });

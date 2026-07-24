@@ -270,10 +270,15 @@ requireIncludes(files.login, "challengeNeedsCaptchaFallback", "Credential login 
 requireIncludes(files.login, "sliderChallengeMaterial(challenge)", "Credential login must derive slider rendering from returned challenge material.");
 requireIncludes(files.login, "formatSliderChallengeProof(proofX, proofY)", "Credential slider proof must be generated from client drag coordinates.");
 requireIncludes(files.login, 'role="slider"', "Credential slider track must expose slider semantics for keyboard and assistive input.");
-requireIncludes(files.login, "challengeDebugVisible(challenge)", "Credential challenge debug text display must be controlled by an explicit response field.");
-requireIncludes(files.login, "debugVisible", "Credential challenge payloads must support explicit debug visibility control.");
+requireNotIncludes(files.login, "debugCode", "Credential login must not consume SMS debug codes.");
+requireNotIncludes(files.login, "CredentialChallengeDebug", "Credential login must not render challenge debug content.");
+requireNotIncludes(files.login, "debugVisible", "Credential login must not consume challenge debug visibility metadata.");
+requireNotIncludes(files.login, 'challengeStringParameter(challenge, "text")', "Credential login must not read challenge answer text.");
 requireNotIncludes(files.login, "debugProof", "Credential login must not read or render server debugProof values.");
 requireNotIncludes(files.client, "debugProof", "Admin API challenge types must not expose debugProof to the login UI.");
+requireNotIncludes(files.client, "debugCode", "Admin API client types must not expose development SMS debug codes to product UI.");
+requireNotIncludes(files.client, "debugVisible", "Admin API client types must not expose challenge debug visibility metadata to product UI.");
+requireNotIncludes(files.sensitiveRevealModal, "debugCode", "Sensitive field reveal must not consume development SMS debug codes.");
 requireNotIncludes(files.login, "dictionary.loginChallengeText.replace", "Credential challenge UI must not use text answers as the production prompt path.");
 requireNotIncludes(files.login, "challenge.parameters?.text", "Credential challenge UI must not read text answers directly as the production prompt path.");
 requireCssRule(files.styles, ".login-slider-stage", ["position: relative;", "overflow: hidden;"], "Credential slider challenge must frame the returned puzzle images.");
@@ -339,7 +344,6 @@ for (const key of [
   "loginChallengeSliderComplete",
   "loginChallengeProviderPrompt",
   "loginChallengeProviderPayload",
-  "loginChallengeDebugText",
   "loginOIDCContinue",
   "loginOIDCStarting",
   "loginOIDCCallbackProgress",

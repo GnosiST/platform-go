@@ -266,7 +266,6 @@ export type CredentialSMSOTPStartResult = {
   transactionId: string;
   maskedIdentifier: string;
   expiresAt: string;
-  debugCode?: string;
 };
 
 export type CredentialChallengeStartInput = {
@@ -282,7 +281,6 @@ export type CredentialChallengeStartResult = {
   prompt: string;
   parameters?: Record<string, unknown>;
   expiresAt: string;
-  debugVisible?: boolean;
 };
 
 export type CredentialEncryptedPasswordSecret = {
@@ -735,7 +733,6 @@ export type AdminSensitiveRevealSMSStart = {
   transactionToken: string;
   maskedPhone: string;
   expiresAt: string;
-  debugCode?: string;
 };
 
 export type AdminSensitiveRevealFactorComplete = {

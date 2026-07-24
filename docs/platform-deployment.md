@@ -141,6 +141,7 @@ PLATFORM_SESSION_DRIVER=mysql
 PLATFORM_SESSION_DSN=<dsn>
 PLATFORM_LIFECYCLE_HISTORY_DRIVER=mysql
 PLATFORM_LIFECYCLE_HISTORY_DSN=<dsn>
+PLATFORM_DATASOURCE_REGISTRY_FILE=
 PLATFORM_RETENTION_RUNNER_ENABLED=false
 PLATFORM_RETENTION_RUNNER_INTERVAL=24h
 PLATFORM_RETENTION_RUNNER_BATCH_SIZE=100
@@ -161,6 +162,8 @@ PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID=
 ```
 
 Data-protection settings are initialization-time compatibility contracts. `PLATFORM_DATA_KEY_PROVIDER` must be `env-aes256` in production. Both keyrings are JSON objects keyed by canonical version IDs, and every value is a standard-base64-encoded 32-byte key. Encryption and blind-index key material must be distinct. The active IDs select new writes only; startup still requires every historical key referenced by stored envelopes. To rotate, add the new material under a new ID, deploy with the old and new entries present, change the active ID, verify reads and backups, and retire an old entry only after a separately approved migration proves no envelope references it. Replacing material under an existing ID fails startup.
+
+The default deployment leaves `PLATFORM_DATASOURCE_REGISTRY_FILE` empty and retains the supported one-datasource runtime. When the staged datasource registry is explicitly enabled, deploy its JSON file read-only. It may contain only canonical datasource IDs, capability-to-group bindings and `configRef` values; do not place DSNs, passwords, database names or credential material in the file. For a reference such as `orders-primary`, the process resolves only `PLATFORM_DATASOURCE_ORDERS_PRIMARY_DRIVER` and `PLATFORM_DATASOURCE_ORDERS_PRIMARY_DSN` at startup, performs a health check, and logs the datasource ID plus readiness only. The registry does not permit client-controlled datasource, database, schema or shard selection, and it does not enable tenant placement, read/write routing, sharding, federation or cross-datasource transactions.
 
 The standard env template contains recognizable placeholder material and passes only the non-strict shape check. Private production files must pass `--strict-secrets`. Do not commit real keyrings or print them in logs, traces, errors or audit records. `local-test` is limited to development/test. KMS/HSM providers remain future work. The implemented reveal flow is available only to manifest-declared encrypted fields after dedicated permission, active session, step-up policy and one-time grant checks.
 

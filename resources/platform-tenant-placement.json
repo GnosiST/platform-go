@@ -1,0 +1,9 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-tenant-placement.json",
+  "version": 1,
+  "context": "trusted-kernel-execution-context-only",
+  "placementKey": ["tenantCode", "capabilityId"],
+  "transition": "version-monotonic-audited",
+  "override": "authorized-exact-scope-max-15m-audited",
+  "clientPhysicalRouting": "forbidden"
+}

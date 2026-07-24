@@ -1,0 +1,12 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-search-projection.json",
+  "version": 1,
+  "input": "versioned-outbox-envelope",
+  "mapping": "server-registered-field-allowlist",
+  "tenantScope": "trusted-envelope-tenant-only",
+  "idempotency": "persistent-consumer-event-receipt",
+  "deletion": "tombstone-and-adapter-delete",
+  "rebuild": "bounded-relational-projection-replay",
+  "sourceOfTruth": "relational-business-store",
+  "httpSurface": "none"
+}

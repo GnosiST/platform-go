@@ -3,16 +3,81 @@ package bootstrap
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/GnosiST/platform-go/internal/apps"
 	"github.com/GnosiST/platform-go/internal/platform/capability"
 	"github.com/GnosiST/platform-go/internal/platform/config"
+	"github.com/GnosiST/platform-go/internal/platform/datasource"
 	"github.com/GnosiST/platform-go/internal/platform/httpapi"
 	"github.com/GnosiST/platform-go/internal/platform/notification"
 	"github.com/GnosiST/platform-go/internal/platform/ratelimit"
+	"github.com/GnosiST/platform-go/internal/platform/storage"
 )
+
+func TestDatasourceRuntimeFromConfigLoadsReferenceOnlyRegistry(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "datasources.json")
+	if err := os.WriteFile(path, []byte(`{
+  "version": "v1",
+  "datasources": [{"id": "primary", "configRef": "orders-primary"}],
+  "groups": [{"id": "orders", "primaryDatasourceId": "primary", "capabilities": ["orders"]}]
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := DatasourceRuntimeFromConfig(context.Background(), config.Config{DatasourceRegistryFile: path, Capabilities: []string{"orders"}}, datasource.ResolverFunc(func(_ context.Context, ref string) (storage.Config, error) {
+		if ref != "orders-primary" {
+			t.Fatalf("resolver ref = %q, want orders-primary", ref)
+		}
+		return storage.Config{Driver: "sqlite", DSN: filepath.Join(t.TempDir(), "orders.db")}, nil
+	}))
+	if err != nil {
+		t.Fatalf("DatasourceRuntimeFromConfig() error = %v", err)
+	}
+	if runtime == nil {
+		t.Fatal("DatasourceRuntimeFromConfig() runtime = nil")
+	}
+	t.Cleanup(func() { _ = runtime.Close() })
+	if got, err := runtime.DatasourceID("orders"); err != nil || got != "primary" {
+		t.Fatalf("DatasourceID(orders) = %q, %v; want primary, nil", got, err)
+	}
+}
+
+func TestDatasourceRuntimeFromConfigRejectsUnconfiguredCapabilityBinding(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "datasources.json")
+	if err := os.WriteFile(path, []byte(`{
+  "version": "v1",
+  "datasources": [{"id": "primary", "configRef": "orders-primary"}],
+  "groups": [{"id": "orders", "primaryDatasourceId": "primary", "capabilities": ["orders"]}]
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := DatasourceRuntimeFromConfig(context.Background(), config.Config{DatasourceRegistryFile: path, Capabilities: []string{"audit"}}, datasource.ResolverFunc(func(context.Context, string) (storage.Config, error) {
+		return storage.Config{Driver: "sqlite", DSN: filepath.Join(t.TempDir(), "orders.db")}, nil
+	}))
+	if err == nil || !strings.Contains(err.Error(), "not enabled") {
+		t.Fatalf("DatasourceRuntimeFromConfig() error = %v, want unconfigured capability binding", err)
+	}
+}
+
+func TestDatasourceRuntimeFromConfigRejectsMissingProtectedReference(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "datasources.json")
+	if err := os.WriteFile(path, []byte(`{
+  "version": "v1",
+  "datasources": [{"id": "primary", "configRef": "orders-primary"}],
+  "groups": [{"id": "orders", "primaryDatasourceId": "primary", "capabilities": ["orders"]}]
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := DatasourceRuntimeFromConfig(context.Background(), config.Config{DatasourceRegistryFile: path}, datasource.ResolverFunc(func(context.Context, string) (storage.Config, error) {
+		return storage.Config{}, errors.New("reference unavailable")
+	}))
+	if err == nil || !strings.Contains(err.Error(), "resolve datasource \"primary\"") || strings.Contains(err.Error(), "orders-primary") {
+		t.Fatalf("DatasourceRuntimeFromConfig() error = %v, want failed protected reference", err)
+	}
+}
 
 type phoneVerificationSenderStub struct {
 	kind string

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-datasource-registry.json",
+  "version": "v1",
+  "purpose": "Configuration-only datasource registry with capability binding and one-datasource transaction pinning.",
+  "connectionMaterial": "process-owned-config-ref-only",
+  "clientPhysicalRouting": "forbidden",
+  "startup": ["resolve", "open", "ping", "redacted-health"],
+  "transactionBoundary": "one-datasource-one-shard",
+  "deferred": ["tenant-placement", "read-write-routing", "sharding", "federation", "xa"]
+}

@@ -39,6 +39,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("PLATFORM_RETENTION_RUNNER_MAX_RETRIES", "")
 	t.Setenv("PLATFORM_DATABASE_DRIVER", "")
 	t.Setenv("PLATFORM_DATABASE_DSN", "")
+	t.Setenv("PLATFORM_DATASOURCE_REGISTRY_FILE", "")
 	t.Setenv("PLATFORM_OPENAPI_FILE", "")
 	t.Setenv("PLATFORM_JWT_SECRET", "")
 	t.Setenv("PLATFORM_CACHE_DRIVER", "")

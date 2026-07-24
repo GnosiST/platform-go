@@ -16084,7 +16084,10 @@
             "format": "date-time"
           },
           "debugCode": {
-            "type": "string"
+            "type": "string",
+            "description": "Development/test only debug code returned by the local phone verification runtime.",
+            "x-platform-development-only": true,
+            "x-platform-sensitivity": "secret"
           }
         }
       },

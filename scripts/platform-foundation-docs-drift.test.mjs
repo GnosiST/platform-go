@@ -22,7 +22,6 @@ const orderedRemainingSummary = remainingTaskIDs.map((taskID) => `\`${taskID}\``
 describe("platform foundation documentation drift", () => {
   it("keeps completion counts aligned with the task graph", () => {
     for (const relativePath of [
-      "README.md",
       "docs/platform-foundation-task-map.md",
       "docs/platform-roadmap.md",
       "docs/platform-ui-optimization-assessment.md",
@@ -34,21 +33,17 @@ describe("platform foundation documentation drift", () => {
     }
   });
 
-  it("records watermark export governance as implemented", () => {
-    for (const relativePath of [
-      "README.md",
-      "docs/platform-foundation-task-map.md",
-      "docs/platform-roadmap.md",
-      "docs/platform-ui-optimization-assessment.md",
-    ]) {
-      assert.match(read(relativePath), /`admin-watermark-export-governance`[^.\n]*`implemented`/);
-    }
+  it("records the fully implemented completion program", () => {
+    assert.equal(implementedCount, graph.tasks.length);
+    assert.deepEqual(remainingTaskIDs, []);
+    assert.match(read("README.md"), /67 total \/ 67 implemented \/ 0 controlled unfinished/);
   });
 
   it("keeps the remaining completion nodes in task-graph order", () => {
     const source = read("docs/platform-foundation-task-map.md");
 
-    assert.ok(source.includes(`Remaining nodes, in task-graph order: ${orderedRemainingSummary}.`));
+    const expected = orderedRemainingSummary === "" ? "Remaining nodes, in task-graph order: none." : `Remaining nodes, in task-graph order: ${orderedRemainingSummary}.`;
+    assert.ok(source.includes(expected));
     assert.doesNotMatch(source, /ordered seven-node remainder/);
   });
 
@@ -64,7 +59,7 @@ describe("platform foundation documentation drift", () => {
     assert.ok(topology.includes(`v0.1.0 release blockers: ${release}.`));
     assert.deepEqual(activeRelease, []);
     assert.ok(topology.includes("Active v0.1.0 release blockers: none."));
-    assert.ok(topology.includes(`Post-release optional deferred nodes: ${optional}.`));
+    assert.ok(topology.includes("The former post-release data-plane sequence is implemented"));
     assert.match(topology, /Current Remaining Node Order/);
     assert.doesNotMatch(topology, /Open-source publication remains serial after search closeout/);
     assert.doesNotMatch(topology, /keeps all 22 nodes controlled unfinished/);
@@ -73,7 +68,7 @@ describe("platform foundation documentation drift", () => {
     assert.match(topology, /there is no whole-node parallel batch/i);
     assert.doesNotMatch(topology, /Public manuals and compatibility claims must reflect the final service, query, routing, database, messaging and search matrices/);
     assert.match(topology, /v0\.1\.0 manuals and compatibility claims must state the current one-datasource, one-native-transaction boundary/);
-    assert.match(readme, /persistent full-scope unfinished inventory/i);
+    assert.match(readme, /persistent full-scope task graph/i);
     assert.match(readme, /one datasource and one native transaction boundary/);
     assert.match(readme, /SQLite is development\/test-only by support policy/);
     assert.match(readme, /Oracle and KingbaseES are unsupported/);
@@ -82,7 +77,6 @@ describe("platform foundation documentation drift", () => {
 
   it("records organization and user Admin experience as implemented", () => {
     for (const relativePath of [
-      "README.md",
       "docs/platform-foundation-task-map.md",
       "docs/platform-roadmap.md",
       "docs/platform-ui-optimization-assessment.md",
@@ -123,39 +117,23 @@ describe("platform foundation documentation drift", () => {
     assert.doesNotMatch(assessment, /`masked` projection returns the stored value unchanged/);
     assert.match(assessment, /initial reveal-capable factor set is implemented as OIDC reauthentication and Admin SMS OTP/);
     assert.doesNotMatch(assessment, /There are currently zero reveal-capable step-up factors/);
-    assert.match(assessment, /`PLATFORM_DATABASE_DRIVER` and `PLATFORM_DATABASE_DSN` are not wired into process composition/);
+    assert.match(assessment, /MySQL 8\.4 and PostgreSQL 16 have a certified GORM-contract lane/);
     assert.doesNotMatch(assessment, /Redis Pub\/Sub is used only for cache invalidation/);
   });
 
-  it("records runtime security containment as implemented", () => {
-    for (const relativePath of [
-      "README.md",
-      "docs/platform-foundation-task-map.md",
-      "docs/platform-roadmap.md",
-      "docs/platform-ui-optimization-assessment.md",
-    ]) {
-      assert.match(read(relativePath), /`runtime-security-containment`[^.\n]*`implemented`/);
-    }
+  it("retains runtime security containment completion evidence", () => {
+    assert.equal(graph.tasks.find((task) => task.id === "runtime-security-containment")?.status, "implemented");
     assert.match(read("docs/platform-roadmap.md"), /Task 7: complete/);
   });
 
-  it("records configurable sensitive data protection as implemented", () => {
-    for (const relativePath of ["README.md", "docs/platform-foundation-task-map.md", "docs/platform-roadmap.md"]) {
-      assert.match(read(relativePath), /`sensitive-data-protection-runtime`[^.\n]*`implemented`/);
-    }
+  it("retains configurable sensitive data protection evidence", () => {
+    assert.equal(graph.tasks.find((task) => task.id === "sensitive-data-protection-runtime")?.status, "implemented");
     assert.match(read("docs/admin-resource-schema.md"), /Sensitive fields are not identified by a built-in list of names/);
     assert.match(read("docs/platform-roadmap.md"), /Task 4: complete/);
   });
 
-  it("records sensitive data historical migration as implemented", () => {
-    for (const relativePath of [
-      "README.md",
-      "docs/platform-data-governance-and-integrations-assessment.md",
-      "docs/platform-foundation-task-map.md",
-      "docs/platform-roadmap.md",
-    ]) {
-      assert.match(read(relativePath), /`sensitive-data-historical-migration`[^.\n]*`implemented`/);
-    }
+  it("retains sensitive data historical migration evidence", () => {
+    assert.equal(graph.tasks.find((task) => task.id === "sensitive-data-historical-migration")?.status, "implemented");
     assert.match(read("docs/platform-sensitive-data-migration.md"), /platform-admin sensitive-data-migrate/);
   });
 

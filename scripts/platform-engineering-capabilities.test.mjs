@@ -166,6 +166,15 @@ describe("validate-platform-engineering-capabilities", () => {
     "menu-tree-and-button-permission-configuration",
     "organization-rbac-menu-e2e-qa",
     "unified-error-code-governance",
+    "multi-datasource-contract-and-runtime",
+    "tenant-placement-and-request-routing",
+    "datasource-read-write-routing",
+    "sharding-and-tenant-migration",
+    "federated-read-query",
+    "xa-optional-adapter",
+    "database-certification-matrix",
+    "transactional-outbox-and-one-mq-adapter",
+    "asynchronous-search-projection",
     "open-source-portability",
     "public-documentation-and-release",
     ]);
@@ -175,24 +184,12 @@ describe("validate-platform-engineering-capabilities", () => {
       assert.ok(capability.evidence.tests.length > 0);
       assert.ok(capability.evidence.validators.length > 0);
     }
-    const deferredCapabilityIDs = new Set([
-      "multi-datasource-contract-and-runtime",
-      "tenant-placement-and-request-routing",
-      "datasource-read-write-routing",
-      "sharding-and-tenant-migration",
-      "federated-read-query",
-      "xa-optional-adapter",
-      "database-certification-matrix",
-      "transactional-outbox-and-one-mq-adapter",
-      "asynchronous-search-projection",
-    ]);
-    assert.ok(capabilities.filter((item) => deferredCapabilityIDs.has(item.id)).every((item) => item.status === "deferred"));
-    assert.ok(capabilities.filter((item) => !implementedCapabilityIDs.has(item.id) && !deferredCapabilityIDs.has(item.id)).every((item) => item.status === "partial"));
+    assert.ok(capabilities.filter((item) => !implementedCapabilityIDs.has(item.id)).every((item) => item.status === "partial"));
 
     for (const [capabilityID, expectedDependencies] of Object.entries(governedCapabilityDependencies)) {
       const capability = capabilities.find((item) => item.id === capabilityID);
       assert.deepEqual(capability.dependsOn, expectedDependencies);
-      if (!["menu-tree-and-button-permission-configuration", "organization-rbac-menu-e2e-qa", "unified-error-code-governance"].includes(capabilityID)) {
+      if (!["menu-tree-and-button-permission-configuration", "organization-rbac-menu-e2e-qa", "unified-error-code-governance", "multi-datasource-contract-and-runtime", "tenant-placement-and-request-routing", "datasource-read-write-routing", "sharding-and-tenant-migration", "federated-read-query", "xa-optional-adapter", "database-certification-matrix", "transactional-outbox-and-one-mq-adapter", "asynchronous-search-projection"].includes(capabilityID)) {
         const expectedSourcePaths =
           capabilityID === "open-source-portability"
             ? openSourceCapabilityDocs
@@ -273,7 +270,7 @@ describe("validate-platform-engineering-capabilities", () => {
     assert.match(result.stderr, /required implemented capability role-tree-and-authorization-entry must stay implemented/);
   });
 
-  it("rejects omitting unified error governance or reactivating deferred data-plane capabilities", () => {
+  it("rejects omitting unified error governance or regressing implemented data-plane capabilities", () => {
     const matrix = readJSON("resources/platform-engineering-capabilities.json");
     const missingErrorGovernance = structuredClone(matrix);
     missingErrorGovernance.capabilities = missingErrorGovernance.capabilities.filter((item) => item.id !== "unified-error-code-governance");
@@ -286,7 +283,7 @@ describe("validate-platform-engineering-capabilities", () => {
     reactivated.capabilities.find((item) => item.id === "multi-datasource-contract-and-runtime").status = "partial";
     result = runValidator(["--matrix", tempJSON("reactivated-optional-capability.json", reactivated)]);
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /post-release optional capability multi-datasource-contract-and-runtime must stay deferred/);
+    assert.match(result.stderr, /required implemented capability multi-datasource-contract-and-runtime must stay implemented/);
   });
 
   it("rejects regressing organization and user Admin experience after closeout", () => {
@@ -397,7 +394,7 @@ describe("validate-platform-engineering-capabilities", () => {
 
     const result = runValidator(["--matrix", tempJSON("invalid-completion-dependencies.json", matrix)]);
     assert.notEqual(result.status, 0, result.stdout);
-    assert.match(result.stderr, /post-release optional capability federated-read-query dependsOn must equal/);
+    assert.match(result.stderr, /governed capability federated-read-query dependsOn must equal/);
   });
 
   it("accepts current engineering capability coverage", () => {

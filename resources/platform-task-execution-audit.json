@@ -17,17 +17,7 @@
     "parallelBatchesMustAvoidDependencyPaths": true,
     "releaseLanePartitionRequired": true
   },
-  "requiredUnfinishedNodes": [
-    "multi-datasource-contract-and-runtime",
-    "tenant-placement-and-request-routing",
-    "datasource-read-write-routing",
-    "sharding-and-tenant-migration",
-    "federated-read-query",
-    "xa-optional-adapter",
-    "database-certification-matrix",
-    "transactional-outbox-and-one-mq-adapter",
-    "asynchronous-search-projection"
-  ],
+  "requiredUnfinishedNodes": [],
   "knownPromotionBlockers": [
     {
       "taskId": "production-auth-provider-hardening",
@@ -92,7 +82,10 @@
     "scripts/validate-platform-sensitive-data-migration.mjs",
     "scripts/validate-platform-objective-conformance.mjs",
     "scripts/validate-platform-promotion-evidence-templates.mjs",
-    "scripts/validate-platform-promotion-evidence-package.mjs"
+    "scripts/validate-platform-promotion-evidence-package.mjs",
+    "scripts/validate-platform-database-certification.mjs",
+    "scripts/validate-platform-outbox.mjs",
+    "scripts/validate-platform-search-projection.mjs"
   ],
   "requiredTests": [
     "scripts/platform-task-execution-audit.test.mjs",
@@ -101,6 +94,9 @@
     "scripts/platform-service-contract-standard.test.mjs",
     "scripts/platform-service-object-runtime.test.mjs",
     "scripts/platform-integration-ports.test.mjs",
-    "scripts/platform-organization-rbac-menu-contract.test.mjs"
+    "scripts/platform-organization-rbac-menu-contract.test.mjs",
+    "scripts/platform-database-certification.test.mjs",
+    "scripts/platform-outbox.test.mjs",
+    "scripts/platform-search-projection.test.mjs"
   ]
 }

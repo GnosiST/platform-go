@@ -793,7 +793,7 @@ function validateDocs(authDoc, capabilityDoc, dataGovernanceDoc, errors) {
   }
 }
 
-function validateChallengeImplementation(credentialService, httpCredentialAuth, adminLoginView, openapi, errors) {
+function validateChallengeImplementation(credentialService, httpCredentialAuth, adminClient, adminLoginView, openapi, errors) {
   if (!credentialService.includes("hashChallengeAnswer") || !credentialService.includes("challengeProofDigestSetPrefix")) {
     errors.push("credential-auth service must store slider challenge proof tolerance as a digest-only answer set");
   }
@@ -817,6 +817,19 @@ function validateChallengeImplementation(credentialService, httpCredentialAuth, 
   }
   if (!adminLoginView.includes("loginRateLimited") || !adminLoginView.includes("loginChallengeExpired")) {
     errors.push("Admin login view must expose localized rate-limit and challenge-expiry feedback");
+  }
+  for (const [source, label] of [
+    [adminLoginView, "Admin login view"],
+    [adminClient, "Admin API client"],
+  ]) {
+    for (const forbidden of ["debugCode", "debugVisible", "debugProof"]) {
+      if (source.includes(forbidden)) {
+        errors.push(`${label} must not expose or consume ${forbidden} development-only credential debug data`);
+      }
+    }
+  }
+  if (adminLoginView.includes('challengeStringParameter(challenge, "text")')) {
+    errors.push("Admin login view must not read credential challenge answer text");
   }
   const challengeProof = openapi.components?.schemas?.AdminCredentialAuthChallengeProof;
   if (challengeProof?.properties?.clientFingerprint?.writeOnly !== true) {
@@ -922,7 +935,7 @@ validateAPIContract(contract, errors);
 validateConfiguration(contract, errors);
 validateEvidenceWiring(contract, errors);
 validateDocs(authDoc, capabilityDoc, dataGovernanceDoc, errors);
-validateChallengeImplementation(credentialService, httpCredentialAuth, adminLoginView, openapiAdmin, errors);
+validateChallengeImplementation(credentialService, httpCredentialAuth, adminClient, adminLoginView, openapiAdmin, errors);
 validateSecretTransportImplementation(httpCredentialAuth, adminClient, errors);
 validateOpenAPI(openapiAdmin, errors);
 

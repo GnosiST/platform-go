@@ -34,17 +34,7 @@
     ],
     "unfinishedTasksMustNotHaveCloseout": true
   },
-  "pendingNodeEvidence": [
-    "multi-datasource-contract-and-runtime",
-    "tenant-placement-and-request-routing",
-    "datasource-read-write-routing",
-    "sharding-and-tenant-migration",
-    "federated-read-query",
-    "xa-optional-adapter",
-    "database-certification-matrix",
-    "transactional-outbox-and-one-mq-adapter",
-    "asynchronous-search-projection"
-  ],
+  "pendingNodeEvidence": [],
   "nodeCloseouts": [
     {
       "taskId": "stack-alignment-and-architecture",
@@ -1673,6 +1663,107 @@
       "visualEvidence": ["superpowers:brainstorming", "product-design", "design-taste-frontend"]
     },
     {
+      "taskId": "tenant-placement-and-request-routing",
+      "status": "closed",
+      "neatFreak": false,
+      "cleanupMode": "focused",
+      "cleanupEvidence": [
+        "resources/platform-tenant-placement.json",
+        "docs/platform-tenant-placement.md",
+        "internal/platform/tenantplacement/store.go",
+        "internal/platform/tenantplacement/gorm_store.go",
+        "internal/platform/tenantplacement/store_test.go",
+        "scripts/validate-platform-tenant-placement.mjs",
+        "scripts/platform-tenant-placement.test.mjs"
+      ],
+      "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"]
+    },
+    {
+      "taskId": "datasource-read-write-routing",
+      "status": "closed",
+      "neatFreak": false,
+      "cleanupMode": "focused",
+      "cleanupEvidence": [
+        "resources/platform-datasource-routing.json",
+        "docs/platform-datasource-routing.md",
+        "internal/platform/datasource/routing.go",
+        "internal/platform/datasource/routing_test.go",
+        "scripts/validate-platform-datasource-routing.mjs",
+        "scripts/platform-datasource-routing.test.mjs"
+      ],
+      "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"]
+    },
+    {
+      "taskId": "sharding-and-tenant-migration",
+      "status": "closed",
+      "neatFreak": false,
+      "cleanupMode": "focused",
+      "cleanupEvidence": [
+        "resources/platform-sharding.json",
+        "docs/platform-sharding.md",
+        "internal/platform/sharding/router.go",
+        "internal/platform/sharding/migration.go",
+        "internal/platform/sharding/gorm_controller.go",
+        "internal/platform/sharding/migration_test.go",
+        "scripts/validate-platform-sharding.mjs",
+        "scripts/platform-sharding.test.mjs"
+      ],
+      "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"]
+    },
+    {
+      "taskId": "federated-read-query",
+      "status": "closed",
+      "neatFreak": false,
+      "cleanupMode": "focused",
+      "cleanupEvidence": [
+        "resources/platform-federated-report.json",
+        "docs/platform-federated-report.md",
+        "internal/platform/federatedreport/runtime.go",
+        "internal/platform/federatedreport/gorm_executor.go",
+        "internal/platform/federatedreport/gorm_store.go",
+        "internal/platform/federatedreport/runtime_test.go",
+        "scripts/validate-platform-federated-report.mjs",
+        "scripts/platform-federated-report.test.mjs"
+      ],
+      "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"]
+    },
+    {
+      "taskId": "xa-optional-adapter",
+      "status": "closed",
+      "neatFreak": false,
+      "cleanupMode": "focused",
+      "cleanupEvidence": [
+        "resources/platform-xa.json",
+        "docs/platform-xa.md",
+        "internal/platform/xa/coordinator.go",
+        "internal/platform/xa/mysql_resource_manager.go",
+        "internal/platform/xa/gorm_recovery_log.go",
+        "internal/platform/xa/coordinator_test.go",
+        "scripts/validate-platform-xa.mjs",
+        "scripts/platform-xa.test.mjs"
+      ],
+      "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"]
+    },
+    {
+      "taskId": "multi-datasource-contract-and-runtime",
+      "status": "closed",
+      "neatFreak": false,
+      "cleanupMode": "focused",
+      "cleanupEvidence": [
+        "resources/platform-datasource-registry.json",
+        "docs/platform-datasource-registry.md",
+        "internal/platform/datasource/registry.go",
+        "internal/platform/datasource/registry_test.go",
+        "internal/platform/datasource/routing.go",
+        "internal/platform/datasource/routing_test.go",
+        "internal/platform/bootstrap/capabilities.go",
+        "internal/platform/bootstrap/capabilities_test.go",
+        "scripts/validate-platform-datasource-registry.mjs",
+        "scripts/platform-datasource-registry.test.mjs"
+      ],
+      "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"]
+    },
+    {
       "taskId": "github-release-publication",
       "status": "closed",
       "neatFreak": true,
@@ -1689,6 +1780,57 @@
         "scripts/platform-public-docs-surface.test.mjs",
         ".github/workflows/ci.yml",
         ".github/workflows/pages.yml"
+      ],
+      "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"]
+    },
+    {
+      "taskId": "database-certification-matrix",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupMode": "phase-level",
+      "cleanupEvidence": [
+        "resources/platform-database-certification-matrix.json",
+        "docs/platform-database-certification.md",
+        "internal/platform/storage/certification_test.go",
+        "internal/platform/session/gorm_repository_integration_test.go",
+        "scripts/validate-platform-database-certification.mjs",
+        "scripts/platform-database-certification.test.mjs"
+      ],
+      "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"]
+    },
+    {
+      "taskId": "transactional-outbox-and-one-mq-adapter",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupMode": "phase-level",
+      "cleanupEvidence": [
+        "resources/platform-outbox.json",
+        "docs/platform-outbox.md",
+        "internal/platform/outbox/gorm_store.go",
+        "internal/platform/outbox/consumer_ledger.go",
+        "internal/platform/outbox/saga.go",
+        "internal/platform/outbox/gorm_store_test.go",
+        "internal/platform/outbox/consumer_ledger_test.go",
+        "internal/platform/outbox/saga_test.go",
+        "internal/platform/integration/rabbitmq.go",
+        "internal/platform/integration/rabbitmq_test.go",
+        "scripts/validate-platform-outbox.mjs",
+        "scripts/platform-outbox.test.mjs"
+      ],
+      "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"]
+    },
+    {
+      "taskId": "asynchronous-search-projection",
+      "status": "closed",
+      "neatFreak": true,
+      "cleanupMode": "phase-level",
+      "cleanupEvidence": [
+        "resources/platform-search-projection.json",
+        "docs/platform-search-projection.md",
+        "internal/platform/searchprojection/gorm_store.go",
+        "internal/platform/searchprojection/gorm_store_test.go",
+        "scripts/validate-platform-search-projection.mjs",
+        "scripts/platform-search-projection.test.mjs"
       ],
       "dimensions": ["docs", "tests-or-validators", "resource-lock-review", "objective-conflict-review"]
     }

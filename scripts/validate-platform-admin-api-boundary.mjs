@@ -357,6 +357,13 @@ function validateAdminOIDCOpenAPIContract(errors) {
   ) {
     errors.push("AdminCredentialSMSOTPStartData must expose transaction metadata and mark debugCode development-only secret");
   }
+  const sensitiveRevealSMSStartData = openAPI.components?.schemas?.AdminSensitiveRevealSMSStartData;
+  if (
+    sensitiveRevealSMSStartData?.properties?.debugCode?.["x-platform-development-only"] !== true ||
+    sensitiveRevealSMSStartData?.properties?.debugCode?.["x-platform-sensitivity"] !== "secret"
+  ) {
+    errors.push("AdminSensitiveRevealSMSStartData must mark debugCode development-only secret");
+  }
   const startData = openAPI.components?.schemas?.AdminAuthProviderStartData;
   const responseFields = Object.keys(startData?.properties ?? {});
   const allowedResponseFields = new Set(["authorizationUrl", "state", "expiresAt"]);

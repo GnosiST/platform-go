@@ -1,0 +1,9 @@
+{
+  "$schema": "https://platform-go.local/schemas/platform-federated-report.json",
+  "version": 1,
+  "definitions": "persisted-versioned-server-registered",
+  "execution": "read-only-registered-gorm-sources",
+  "tenantScope": "trusted-context-required",
+  "queryInput": "report-id-and-version-only",
+  "resultProjection": "allowlisted-fields-only"
+}

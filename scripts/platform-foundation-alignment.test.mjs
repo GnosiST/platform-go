@@ -29,9 +29,6 @@ const completedProgramTaskIDs = [
   "public-docs-community",
   "public-docs-site",
   "github-release-publication",
-];
-
-const remainingCompletionProgramTaskIDs = [
   "multi-datasource-contract-and-runtime",
   "tenant-placement-and-request-routing",
   "datasource-read-write-routing",
@@ -42,6 +39,8 @@ const remainingCompletionProgramTaskIDs = [
   "transactional-outbox-and-one-mq-adapter",
   "asynchronous-search-projection",
 ];
+
+const remainingCompletionProgramTaskIDs = [];
 
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-foundation-alignment.mjs", ...args], {
@@ -62,7 +61,7 @@ function tempJSON(name, value) {
 }
 
 describe("validate-platform-foundation-alignment", () => {
-  it("tracks completed program nodes as required work and nine unfinished nodes as future work", () => {
+  it("tracks all completed program nodes as required work with no future task blockers", () => {
     const audit = readJSON("resources/platform-foundation-alignment-audit.json");
     const engineering = readJSON("resources/platform-engineering-capabilities.json");
 

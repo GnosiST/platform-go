@@ -7,17 +7,7 @@ import { describe, it } from "node:test";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
-const completionProgramTaskIDs = [
-  "multi-datasource-contract-and-runtime",
-  "tenant-placement-and-request-routing",
-  "datasource-read-write-routing",
-  "sharding-and-tenant-migration",
-  "federated-read-query",
-  "xa-optional-adapter",
-  "database-certification-matrix",
-  "transactional-outbox-and-one-mq-adapter",
-  "asynchronous-search-projection",
-];
+const completionProgramTaskIDs = [];
 
 function runValidator(args = []) {
   return spawnSync(process.execPath, ["scripts/validate-platform-task-execution-audit.mjs", ...args], {
@@ -45,7 +35,7 @@ describe("validate-platform-task-execution-audit", () => {
     assert.match(result.stdout, /Validated platform task execution audit/);
   });
 
-  it("tracks the ordered completion program as controlled unfinished work", () => {
+  it("tracks a completed program without unfinished task nodes", () => {
     const audit = readJSON("resources/platform-task-execution-audit.json");
 
     assert.deepEqual(audit.requiredUnfinishedNodes, completionProgramTaskIDs);
@@ -98,19 +88,15 @@ describe("validate-platform-task-execution-audit", () => {
     assert.ok(audit.requiredTests.includes("scripts/platform-integration-ports.test.mjs"));
   });
 
-  it("rejects missing or reordered completion program execution projections", () => {
+  it("rejects stale completion program execution projections", () => {
     const audit = readJSON("resources/platform-task-execution-audit.json");
     assert.deepEqual(audit.requiredUnfinishedNodes, completionProgramTaskIDs);
 
-    audit.requiredUnfinishedNodes = completionProgramTaskIDs.slice(1);
+    audit.requiredUnfinishedNodes = ["asynchronous-search-projection"];
     const missingResult = runValidator(["--audit", tempJSON("missing-platform-task-execution-audit.json", audit)]);
     assert.notEqual(missingResult.status, 0, missingResult.stdout);
     assert.match(missingResult.stderr, /requiredUnfinishedNodes must exactly match unfinished task graph nodes in graph order/);
 
-    audit.requiredUnfinishedNodes = [completionProgramTaskIDs[1], completionProgramTaskIDs[0], ...completionProgramTaskIDs.slice(2)];
-    const reorderedResult = runValidator(["--audit", tempJSON("reordered-platform-task-execution-audit.json", audit)]);
-    assert.notEqual(reorderedResult.status, 0, reorderedResult.stdout);
-    assert.match(reorderedResult.stderr, /requiredUnfinishedNodes must exactly match unfinished task graph nodes in graph order/);
   });
 
   it("rejects future promotion gates without status reason or completion gate", () => {

@@ -1242,7 +1242,12 @@ function schemas() {
         transactionToken: { type: "string", minLength: 1 },
         maskedPhone: { type: "string" },
         expiresAt: { type: "string", format: "date-time" },
-        debugCode: { type: "string" },
+        debugCode: {
+          type: "string",
+          description: "Development/test only debug code returned by the local phone verification runtime.",
+          "x-platform-development-only": true,
+          "x-platform-sensitivity": "secret",
+        },
       },
     },
     AdminSensitiveRevealSMSCompleteRequest: {
