@@ -3120,7 +3120,7 @@ describe("validate-admin-ui-contracts", () => {
   for (const [name, relativePath, from, to, message] of [
     ["provider audiences", "admin/src/platform/api/client.ts", "audiences: string[];", "audienceList: string[];", "AuthProvider must expose its declared audiences"],
     ["configured provider filtering", "admin/src/platform/auth/AdminLoginView.tsx", "adminProviders.filter((provider) => provider.enabled && provider.configured)", "adminProviders", "Admin login must render only enabled and configured providers"],
-    ["adaptive provider selector", "admin/src/platform/auth/AdminLoginView.tsx", "loginProviderOptionsClassName(availableProviders.length)", "loginProviderOptionsClassName(0)", "Admin login providers must render through the adaptive provider option selector"],
+    ["visible provider cap", "admin/src/platform/auth/AdminLoginView.tsx", "const MAX_VISIBLE_LOGIN_PROVIDERS = 3;", "const MAX_VISIBLE_LOGIN_PROVIDERS = 4;", "Admin login must cap visible login methods at three"],
     ["Web Crypto verifier", "admin/src/platform/refine/authProvider.ts", "crypto.getRandomValues(new Uint8Array(size))", "new Uint8Array(size)", "generate verifier bytes with Web Crypto"],
     ["S256 challenge", "admin/src/platform/refine/authProvider.ts", 'crypto.subtle.digest("SHA-256"', 'legacyDigest("SHA-256"', "derive an S256 challenge with Web Crypto"],
     ["tab-scoped transaction", "admin/src/platform/refine/authProvider.ts", "window.sessionStorage.setItem", "window.localStorage.setItem", "tab-scoped sessionStorage"],
