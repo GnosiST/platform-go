@@ -39,7 +39,7 @@
 
 当前治理快照为 **67 total / 67 implemented / 0 controlled unfinished**。数据源、租户路由、读写路由、分片、联邦只读、可选 XA、数据库认证、事务 Outbox 与异步搜索投影均已完成其受控合同。
 
-当前 persistent full-scope task graph 已全部实现。`open-source-portability`、公开文档、GitHub 发布、数据平面、数据库认证、事务 Outbox 和搜索投影均为 `implemented`。v0.1.0 已正式发布：[GitHub Release](https://github.com/GnosiST/platform-go/releases/tag/v0.1.0) 的 Tag、CI 与 Pages 证据已验证。普通业务仍以 one datasource and one native transaction boundary 为默认路径；XA、RabbitMQ 和搜索适配器均为 default-off。SQLite is development/test-only by support policy，Oracle and KingbaseES are unsupported。`alibaba/page-agent` is only a default-off optional `public-docs-site` sub-capability。
+当前 persistent full-scope task graph 已全部实现。`open-source-portability`、`public-docs-community`、`public-docs-site` 和 `github-release-publication` 均为 `implemented`；数据平面、数据库认证、事务 Outbox 和搜索投影也已完成受控合同。v0.1.0 已正式发布：[GitHub Release](https://github.com/GnosiST/platform-go/releases/tag/v0.1.0) 的 Tag、CI 与 Pages 证据已验证。普通业务仍以 one datasource and one native transaction boundary 为默认路径；XA、RabbitMQ 和搜索适配器均为 default-off。SQLite is development/test-only by support policy，Oracle and KingbaseES are unsupported。`alibaba/page-agent` is only a default-off optional `public-docs-site` sub-capability。
 
 策略评审接口：
 
