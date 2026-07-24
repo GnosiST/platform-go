@@ -246,7 +246,7 @@ The P1/P2 foundation items below are represented in `resources/platform-foundati
 
 Remaining nodes, in task-graph order: none.
 
-The approved program is defined by the earlier implemented-node specifications plus the [activated remaining-task topology](docs/platform-roadmap.md), which supersedes fragmented datasource, SQL-less, Query Object and partial service-contract drafts.
+The approved program is defined by the earlier implemented-node specifications plus the [activated remaining-task topology](platform-roadmap.md), which supersedes fragmented datasource, SQL-less, Query Object and partial service-contract drafts.
 
 `runtime-security-containment` is `implemented`; default-process demo exposure, insecure header authentication, plaintext secret paths and production security-header drift remain covered by its closed source, validator and test evidence.
 
@@ -259,7 +259,7 @@ Sensitive-data historical migration closeout:
 - `platform-admin sensitive-data-migrate` exposes exactly `inventory`, `dry-run`, `prepare`, `apply`, `verify`, `rehearse-restore` and `rollback` as an offline command. It has no HTTP route and does not change the ordinary Store plaintext rejection boundary.
 - Enabled manifests define every encrypted `Source="values"` target. Inventory, dry-run and verify are read-only; `prepare` alone creates journal tables; apply, escrow, events, checkpoints and revision compare-and-swap commit atomically; restore rehearsal emits counts only; rollback refuses post-migration edits through a value hash guard.
 - MySQL/PostgreSQL are production targets only with real integration rehearsal/certification evidence. SQLite is development/test local rehearsal only. Oracle, Kingbase, file mutation and legacy SQL mutation are outside this node. External backup and restore evidence remain mandatory because escrow is not disaster recovery.
-- Evidence: [operator runbook](platform-sensitive-data-migration.md), [design](docs/platform-roadmap.md), [implementation plan](docs/platform-roadmap.md), Go package/CLI/bootstrap tests and `scripts/validate-platform-sensitive-data-migration.mjs`.
+- Evidence: [operator runbook](platform-sensitive-data-migration.md), [design](platform-roadmap.md), [implementation plan](platform-roadmap.md), Go package/CLI/bootstrap tests and `scripts/validate-platform-sensitive-data-migration.mjs`.
 
 Watermark/export closeout:
 
@@ -273,7 +273,7 @@ Sensitive-data reveal closeout:
 - `sensitive-data-reveal-step-up` is `implemented` with manifest-declared field permission/copy policy, `anyOf`/`allOf` factor policy, OIDC reauthentication, Admin SMS OTP, short-lived single-use grants, rate limits and append-only audit.
 - SMS delivery binds the current encrypted phone to its verified digest; OIDC completion must resolve to the active bound Admin identity. Verification failure returns `422` and preserves the main session.
 - The Admin detail action opens an accessible responsive modal; plaintext is rendered only there and clears on close, page hide or expiry.
-- Evidence: [design](docs/platform-roadmap.md), [implementation plan](docs/platform-roadmap.md), Go/Node contract tests and `docs/platform-roadmap.md` browser captures.
+- Evidence: [design](platform-roadmap.md), [implementation plan](platform-roadmap.md), Go/Node contract tests and `docs/platform-roadmap.md` browser captures.
 
 1. Production auth hardening
    - Current state: the policy gate is implemented in `resources/platform-production-auth-hardening.json` and `scripts/validate-platform-production-auth-hardening.mjs`; it is also referenced by production readiness preflight and the engineering capability matrix.

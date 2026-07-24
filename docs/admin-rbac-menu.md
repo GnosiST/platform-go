@@ -1,7 +1,7 @@
 # Admin RBAC And Dynamic Menu
 
 Date: 2026-07-04
-Last updated: 2026-07-19
+Last updated: 2026-07-25
 
 ## Purpose
 
@@ -22,11 +22,13 @@ This slice turns resource permission codes into executable behavior:
 
 ## Auth Boundary
 
-Authentication has an audience-aware provider boundary. The bundled `demo` provider is for local development and verification; optional Admin OIDC uses a dedicated resolver and explicit identity binding, while the issued HTTP credential remains the existing Admin JWT backed by a server-side session.
+Authentication has an audience-aware provider boundary. The bundled `demo` provider is for local development and verification; optional Admin OIDC uses a dedicated resolver and explicit identity binding; credential password and SMS OTP providers use the dedicated credential repository, encrypted secret transport and mandatory challenge boundary. Every successful Admin flow issues the same Admin JWT backed by a server-side session.
 
 - `GET /api/auth/providers` returns enabled provider declarations from capability manifests.
 - `POST /api/auth/providers/:provider/start` begins an Admin OIDC authorization-code flow with signed state and S256 PKCE for a configured Admin-audience provider.
-- `POST /api/auth/login` supports demo credentials or the OIDC callback exchange and returns a JWT admin bearer token plus `expiresAt`.
+- `POST /api/auth/challenges` creates a mandatory single-use CAPTCHA or slider transaction for credential password login, SMS OTP send and SMS OTP login.
+- `POST /api/auth/challenges/verify` gives the slider UI server-authoritative feedback without consuming a correct challenge; a rejected proof counts as an attempt, and final credential login performs the atomic consume.
+- `POST /api/auth/login` supports demo login, the OIDC callback exchange, and enabled credential password or SMS OTP providers, then returns a JWT admin bearer token plus `expiresAt`.
 - OIDC resolves an enabled `admin-identities` binding to an existing enabled platform user with effective permissions. It never auto-creates users or derives roles, permissions, tenants, organizations or areas from provider claims or groups.
 - Admin and App provider audiences, identity resolvers, bindings and token types remain isolated.
 - The bearer token carries an internal server-side session id, so TTL and revocation remain authoritative.

@@ -66,6 +66,41 @@ describe("validate-platform-human-ai-development-protocol", () => {
     );
   });
 
+  it("rejects a protocol that drops credential-auth contract gates", () => {
+    const protocol = readJSON("resources/platform-human-ai-development-protocol.json");
+    const apiDomain = protocol.domains.find((domain) => domain.id === "api-interface-contracts");
+    apiDomain.sourceOfTruth = apiDomain.sourceOfTruth.filter((item) => item !== "resources/platform-credential-auth-v1.json");
+    apiDomain.requiredValidators = apiDomain.requiredValidators.filter(
+      (item) => item !== "scripts/validate-platform-credential-auth-v1.mjs",
+    );
+    apiDomain.requiredTests = apiDomain.requiredTests.filter(
+      (item) => item !== "scripts/platform-credential-auth-v1.test.mjs",
+    );
+    apiDomain.requiredPractices = apiDomain.requiredPractices.filter(
+      (item) => !item.startsWith("slider challenge preverification accepts only slider"),
+    );
+    protocol.minimumAcceptanceCommands = protocol.minimumAcceptanceCommands.filter(
+      (item) => !item.includes("platform-credential-auth-v1"),
+    );
+    protocol.requiredValidators = protocol.requiredValidators.filter(
+      (item) => item !== "scripts/validate-platform-credential-auth-v1.mjs",
+    );
+    protocol.requiredTests = protocol.requiredTests.filter(
+      (item) => item !== "scripts/platform-credential-auth-v1.test.mjs",
+    );
+    const result = runValidator(["--protocol", tempJSON("protocol.json", protocol)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /api-interface-contracts\.sourceOfTruth must include resources\/platform-credential-auth-v1\.json/);
+    assert.match(result.stderr, /api-interface-contracts\.requiredValidators must include scripts\/validate-platform-credential-auth-v1\.mjs/);
+    assert.match(result.stderr, /api-interface-contracts\.requiredTests must include scripts\/platform-credential-auth-v1\.test\.mjs/);
+    assert.match(result.stderr, /api-interface-contracts\.requiredPractices must include slider challenge preverification accepts only slider/);
+    assert.match(result.stderr, /minimumAcceptanceCommands must include rtk node scripts\/validate-platform-credential-auth-v1\.mjs/);
+    assert.match(result.stderr, /minimumAcceptanceCommands must include rtk node --test scripts\/platform-credential-auth-v1\.test\.mjs/);
+    assert.match(result.stderr, /requiredValidators must include scripts\/validate-platform-credential-auth-v1\.mjs/);
+    assert.match(result.stderr, /requiredTests must include scripts\/platform-credential-auth-v1\.test\.mjs/);
+  });
+
   it("rejects a protocol that removes required validator gates", () => {
     const protocol = readJSON("resources/platform-human-ai-development-protocol.json");
     protocol.minimumAcceptanceCommands = ["rtk go test ./..."];

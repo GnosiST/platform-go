@@ -1,6 +1,9 @@
 import {
+  CheckOutlined,
   ClockCircleOutlined,
+  CloseOutlined,
   CustomerServiceOutlined,
+  DownOutlined,
   GlobalOutlined,
   LockOutlined,
   LoadingOutlined,
@@ -12,7 +15,7 @@ import {
   SafetyCertificateOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Button, Form, Input, Space, Tooltip, Typography } from "antd";
+import { Button, Dropdown, Form, Input, Space, Tooltip, Typography, type MenuProps } from "antd";
 import {
   useCallback,
   useEffect,
@@ -29,6 +32,7 @@ import {
   loginWithAuthProvider,
   startCredentialChallenge,
   startCredentialSMSOTP,
+  verifyCredentialChallenge,
   type AdminCurrentSession,
   type AuthProvider,
   type BrandingConfig,
@@ -51,7 +55,15 @@ import {
 } from "../refine/authProvider";
 import type { ThemeName } from "../theme";
 import { AdminFeedback } from "../ui";
-import { sliderTileXFromTrackPointer } from "./sliderChallengeGeometry";
+import {
+  credentialChallengeSecondsRemaining,
+  formatCredentialChallengeCountdown,
+} from "./credentialChallengeTiming";
+import {
+  sliderHandleGrabOffsetFromTrackPointer,
+  sliderTileXFromTrackPointer,
+  sliderTrackContentRect,
+} from "./sliderChallengeGeometry";
 
 type AdminLoginViewProps = {
   language: Language;
@@ -120,6 +132,8 @@ export function AdminLoginView({
   const callbackGuardRef = useRef(createSingleUseGuard());
   const submissionLockRef = useRef(createSubmissionLock());
   const clientFingerprintRef = useRef(createLoginClientFingerprint());
+  const credentialChallengeRefreshInFlightRef = useRef(false);
+  const credentialChallengeRefreshSequenceRef = useRef(0);
   const loginHeadingRef = useRef<HTMLElement>(null);
   const errorHeadingRef = useRef<HTMLElement>(null);
   const [form] = Form.useForm<LoginFormValues>();
@@ -133,7 +147,11 @@ export function AdminLoginView({
     [availableProviders, selectedProviderID],
   );
   const productName = branding?.productName || "Platform Go";
-  const targetLanguage = language === "zh" ? "en" : "zh";
+  const currentLanguageLabel = language === "zh" ? dictionary.cn : dictionary.en;
+  const languageMenuItems: MenuProps["items"] = [
+    { key: "zh", label: dictionary.cn },
+    { key: "en", label: dictionary.en },
+  ];
   const credentialSpec = credentialProviderSpec(selectedProvider);
 
   useEffect(() => {
@@ -146,12 +164,19 @@ export function AdminLoginView({
   }, [availableProviders, form, selectedProviderID]);
 
   useEffect(() => {
+    credentialChallengeRefreshSequenceRef.current += 1;
+    credentialChallengeRefreshInFlightRef.current = false;
     if (!credentialSpec) {
+      setCredentialChallengeLoading(false);
       setCredentialChallenge(null);
       form.setFieldValue("challengeProof", "");
       return;
     }
     void refreshCredentialChallenge();
+    return () => {
+      credentialChallengeRefreshSequenceRef.current += 1;
+      credentialChallengeRefreshInFlightRef.current = false;
+    };
   }, [credentialSpec?.identifierType, credentialSpec?.mode, selectedProvider?.id]);
 
   useEffect(() => {
@@ -258,19 +283,38 @@ export function AdminLoginView({
   };
 
   const refreshCredentialChallenge = async () => {
+    if (credentialChallengeRefreshInFlightRef.current) return;
+    credentialChallengeRefreshInFlightRef.current = true;
+    const refreshSequence = credentialChallengeRefreshSequenceRef.current + 1;
+    credentialChallengeRefreshSequenceRef.current = refreshSequence;
     setCredentialChallengeLoading(true);
     const fallback = credentialChallenge ? dictionary.loginChallengeRefreshFailed : dictionary.loginChallengeStartFailed;
     try {
       const nextChallenge = await startLoginCredentialChallenge(clientFingerprintRef.current);
+      if (refreshSequence !== credentialChallengeRefreshSequenceRef.current) return;
       setCredentialChallenge(nextChallenge);
       form.setFieldValue("challengeProof", "");
     } catch (nextError) {
+      if (refreshSequence !== credentialChallengeRefreshSequenceRef.current) return;
       setCredentialChallenge(null);
       setLoginError(loginAPIErrorMessage(nextError, dictionary, fallback));
     } finally {
-      setCredentialChallengeLoading(false);
+      if (refreshSequence === credentialChallengeRefreshSequenceRef.current) {
+        credentialChallengeRefreshInFlightRef.current = false;
+        setCredentialChallengeLoading(false);
+      }
     }
   };
+
+  const verifySliderChallengeProof = useCallback(async (challengeID: string, proof: string) => {
+    const result = await verifyCredentialChallenge({
+      id: challengeID,
+      kind: "slider",
+      proof,
+      clientFingerprint: clientFingerprintRef.current,
+    });
+    return result.valid;
+  }, []);
 
   const startOIDC = async () => {
     if (!submissionLockRef.current.acquire()) return;
@@ -352,16 +396,28 @@ export function AdminLoginView({
         </div>
 
         <div className="login-aside-footer">
-          <Tooltip title={`${dictionary.switchLanguage}: ${targetLanguage === "zh" ? dictionary.cn : dictionary.en}`}>
+          <Dropdown
+            menu={{
+              items: languageMenuItems,
+              selectable: true,
+              selectedKeys: [language],
+              onClick: ({ key }) => onLanguageChange(key as Language),
+            }}
+            overlayClassName="login-language-menu"
+            placement="topLeft"
+            trigger={["click"]}
+          >
             <Button
-              aria-label={dictionary.switchLanguage}
+              aria-label={`${dictionary.language}: ${currentLanguageLabel}`}
               className="login-language-trigger"
-              icon={<GlobalOutlined />}
-              onClick={() => onLanguageChange(targetLanguage)}
+              icon={<GlobalOutlined aria-hidden />}
+              type="text"
             >
-              {language === "zh" ? dictionary.cn : dictionary.en}
+              <span className="login-language-label">{currentLanguageLabel}</span>
+              <span aria-hidden className="login-language-label-compact">{dictionary.languageCompact}</span>
+              <DownOutlined aria-hidden className="login-language-chevron" />
             </Button>
-          </Tooltip>
+          </Dropdown>
           <div className="login-runtime-status">
             <SafetyCertificateOutlined aria-hidden />
             <span>{dictionary.loginSystemStatus}</span>
@@ -468,6 +524,7 @@ export function AdminLoginView({
                     dictionary={dictionary}
                     loading={credentialChallengeLoading}
                     onRefresh={() => void refreshCredentialChallenge()}
+                    onVerifyProof={verifySliderChallengeProof}
                   />
                   <Button
                     block
@@ -516,6 +573,7 @@ export function AdminLoginView({
                     dictionary={dictionary}
                     loading={credentialChallengeLoading}
                     onRefresh={() => void refreshCredentialChallenge()}
+                    onVerifyProof={verifySliderChallengeProof}
                   />
                   <Button
                     block
@@ -599,15 +657,18 @@ function CredentialChallengeField({
   dictionary,
   loading,
   onRefresh,
+  onVerifyProof,
 }: {
   challenge: CredentialChallengeStartResult | null;
   dictionary: Dictionary;
   loading: boolean;
   onRefresh: () => void;
+  onVerifyProof: (challengeID: string, proof: string) => Promise<boolean>;
 }) {
   const form = Form.useFormInstance<LoginFormValues>();
   const sliderMaterial = sliderChallengeMaterial(challenge);
-  const expired = challenge ? credentialChallengeExpired(challenge) : false;
+  const secondsRemaining = useCredentialChallengeCountdown(challenge?.expiresAt);
+  const expired = challenge ? secondsRemaining === 0 : false;
   const setChallengeProof = useCallback(
     (proof: string) => {
       form.setFieldValue("challengeProof", proof);
@@ -621,6 +682,16 @@ function CredentialChallengeField({
         <div className="login-challenge-meta">
           {expired ? (
             <Typography.Text type="danger">{dictionary.loginChallengeExpired}</Typography.Text>
+          ) : challenge && secondsRemaining !== null ? (
+            <span className={`login-challenge-countdown${secondsRemaining <= 10 ? " warning" : ""}`}>
+              <ClockCircleOutlined aria-hidden />
+              <span>
+                {dictionary.loginChallengeExpiresIn.replace(
+                  "{time}",
+                  formatCredentialChallengeCountdown(secondsRemaining),
+                )}
+              </span>
+            </span>
           ) : challenge ? (
             <Typography.Text type="secondary">
               {dictionary.loginChallengeExpiresAt.replace("{time}", formatChallengeTime(challenge.expiresAt))}
@@ -638,7 +709,15 @@ function CredentialChallengeField({
             </Button>
           </Tooltip>
         </div>
-        <CredentialChallengePayload challenge={challenge} dictionary={dictionary} onProofChange={setChallengeProof} />
+        <CredentialChallengePayload
+          challenge={challenge}
+          dictionary={dictionary}
+          expired={expired}
+          loading={loading}
+          onProofChange={setChallengeProof}
+          onRefresh={onRefresh}
+          onVerifyProof={onVerifyProof}
+        />
         {sliderMaterial ? (
           <Form.Item
             hidden
@@ -667,11 +746,19 @@ function CredentialChallengeField({
 function CredentialChallengePayload({
   challenge,
   dictionary,
+  expired,
+  loading,
   onProofChange,
+  onRefresh,
+  onVerifyProof,
 }: {
   challenge: CredentialChallengeStartResult | null;
   dictionary: Dictionary;
+  expired: boolean;
+  loading: boolean;
   onProofChange: (proof: string) => void;
+  onRefresh: () => void;
+  onVerifyProof: (challengeID: string, proof: string) => Promise<boolean>;
 }) {
   if (!challenge) {
     return (
@@ -686,8 +773,12 @@ function CredentialChallengePayload({
       <SliderChallengePayload
         challenge={challenge}
         dictionary={dictionary}
+        expired={expired}
+        loading={loading}
         material={sliderMaterial}
         onProofChange={onProofChange}
+        onRefresh={onRefresh}
+        onVerifyProof={(proof) => onVerifyProof(challenge.id, proof)}
       />
     );
   }
@@ -700,20 +791,36 @@ function CredentialChallengePayload({
 function SliderChallengePayload({
   challenge,
   dictionary,
+  expired,
+  loading,
   material,
   onProofChange,
+  onRefresh,
+  onVerifyProof,
 }: {
   challenge: CredentialChallengeStartResult;
   dictionary: Dictionary;
+  expired: boolean;
+  loading: boolean;
   material: SliderChallengeMaterial;
   onProofChange: (proof: string) => void;
+  onRefresh: () => void;
+  onVerifyProof: (proof: string) => Promise<boolean>;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const activePointerRef = useRef<number | null>(null);
+  const pointerGrabOffsetRef = useRef(0);
+  const verificationSequenceRef = useRef(0);
+  const recoveryTimerRef = useRef<number | null>(null);
   const maxX = Math.max(0, material.imageWidth - material.tileWidth);
-  const [tileX, setTileX] = useState(() => clampNumber(material.initialX, 0, maxX));
+  const initialX = clampNumber(material.initialX, 0, maxX);
+  const [tileX, setTileX] = useState(() => initialX);
   const [proofReady, setProofReady] = useState(false);
+  const [proofRejected, setProofRejected] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verificationError, setVerificationError] = useState("");
   const [dragging, setDragging] = useState(false);
+  const interactionLocked = loading || expired || verifying || proofReady || proofRejected;
   const boundedTileX = clampNumber(tileX, 0, maxX);
   const handlePercent = ((boundedTileX + material.tileWidth / 2) / material.imageWidth) * 100;
   const stageStyle: CSSProperties = {
@@ -733,33 +840,113 @@ function SliderChallengePayload({
     left: `${handlePercent}%`,
   };
 
-  useEffect(() => {
+  const resetSliderProof = useCallback((rejected = false) => {
+    if (recoveryTimerRef.current !== null) {
+      window.clearTimeout(recoveryTimerRef.current);
+      recoveryTimerRef.current = null;
+    }
+    verificationSequenceRef.current += 1;
     activePointerRef.current = null;
+    pointerGrabOffsetRef.current = 0;
     setDragging(false);
+    setVerifying(false);
     setProofReady(false);
-    setTileX(clampNumber(material.initialX, 0, maxX));
+    setProofRejected(rejected);
+    setVerificationError("");
+    setTileX(initialX);
     onProofChange("");
-  }, [challenge.id, material.initialX, maxX, onProofChange]);
+  }, [initialX, onProofChange]);
+
+  useEffect(() => {
+    resetSliderProof(false);
+  }, [challenge.id, resetSliderProof]);
+
+  useEffect(() => {
+    if (expired) resetSliderProof(false);
+  }, [expired, resetSliderProof]);
+
+  useEffect(() => {
+    if (!loading || recoveryTimerRef.current === null) return;
+    window.clearTimeout(recoveryTimerRef.current);
+    recoveryTimerRef.current = null;
+    setProofRejected(false);
+  }, [loading]);
+
+  useEffect(() => () => {
+    verificationSequenceRef.current += 1;
+    if (recoveryTimerRef.current !== null) window.clearTimeout(recoveryTimerRef.current);
+  }, []);
+
+  const rejectSliderProof = useCallback(() => {
+    resetSliderProof(true);
+    recoveryTimerRef.current = window.setTimeout(() => {
+      recoveryTimerRef.current = null;
+      setProofRejected(false);
+      onRefresh();
+    }, 700);
+  }, [onRefresh, resetSliderProof]);
 
   const updateDraftFromPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const nextX = sliderTileXFromTrackPointer(event.clientX, trackRef.current?.getBoundingClientRect() ?? null, material, maxX);
+    const nextX = sliderTileXFromTrackPointer(
+      event.clientX,
+      sliderTrackContentRect(trackRef.current),
+      material,
+      maxX,
+      pointerGrabOffsetRef.current,
+    );
     setTileX(nextX);
     setProofReady(false);
+    setProofRejected(false);
+    setVerificationError("");
     onProofChange("");
     return nextX;
   };
 
-  const commitProof = (nextX: number) => {
+  const commitProof = async (nextX: number) => {
     const proofX = Math.round(clampNumber(nextX, 0, maxX));
     const proofY = Math.round(material.tileY);
+    const proof = formatSliderChallengeProof(proofX, proofY);
+    const verificationSequence = verificationSequenceRef.current + 1;
+    verificationSequenceRef.current = verificationSequence;
     setTileX(proofX);
-    setProofReady(true);
-    onProofChange(formatSliderChallengeProof(proofX, proofY));
+    setProofReady(false);
+    setProofRejected(false);
+    setVerifying(true);
+    onProofChange("");
+    try {
+      const valid = await onVerifyProof(proof);
+      if (verificationSequence !== verificationSequenceRef.current) return;
+      if (credentialChallengeSecondsRemaining(challenge.expiresAt) === 0) {
+        resetSliderProof(false);
+        onRefresh();
+        return;
+      }
+      if (!valid) {
+        rejectSliderProof();
+        return;
+      }
+      setVerifying(false);
+      setProofReady(true);
+      onProofChange(proof);
+    } catch (nextError) {
+      if (verificationSequence !== verificationSequenceRef.current) return;
+      if (sliderChallengeVerificationRejected(nextError)) {
+        rejectSliderProof();
+        return;
+      }
+      resetSliderProof(false);
+      setVerificationError(sliderChallengeVerificationErrorMessage(nextError, dictionary));
+    }
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || interactionLocked) return;
     event.preventDefault();
+    const track = sliderTrackContentRect(trackRef.current);
+    const startedOnHandle = event.target instanceof Element && event.target.closest(".login-slider-handle") !== null;
+    pointerGrabOffsetRef.current = startedOnHandle
+      ? sliderHandleGrabOffsetFromTrackPointer(event.clientX, track, material, boundedTileX)
+      : 0;
     activePointerRef.current = event.pointerId;
     event.currentTarget.setPointerCapture(event.pointerId);
     setDragging(true);
@@ -777,11 +964,12 @@ function SliderChallengePayload({
     event.preventDefault();
     const nextX = updateDraftFromPointer(event);
     activePointerRef.current = null;
+    pointerGrabOffsetRef.current = 0;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     setDragging(false);
-    commitProof(nextX);
+    void commitProof(nextX);
   };
 
   const handlePointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -790,12 +978,11 @@ function SliderChallengePayload({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    setDragging(false);
-    setProofReady(false);
-    onProofChange("");
+    resetSliderProof(false);
   };
 
   const handleTrackKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (interactionLocked) return;
     const smallStep = event.shiftKey ? 10 : 1;
     const largeStep = event.shiftKey ? 24 : 12;
     let nextX: number | null = null;
@@ -805,14 +992,33 @@ function SliderChallengePayload({
     if (event.key === "PageUp") nextX = boundedTileX + largeStep;
     if (event.key === "Home") nextX = 0;
     if (event.key === "End") nextX = maxX;
-    if (event.key === "Enter" || event.key === " ") nextX = boundedTileX;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      void commitProof(boundedTileX);
+      return;
+    }
     if (nextX === null) return;
     event.preventDefault();
-    commitProof(nextX);
+    setTileX(clampNumber(nextX, 0, maxX));
+    setProofReady(false);
+    setProofRejected(false);
+    setVerificationError("");
+    onProofChange("");
   };
 
+  const trackLabel = expired
+    ? dictionary.loginChallengeSliderExpired
+    : verifying
+      ? dictionary.loginChallengeSliderChecking
+      : proofReady
+        ? dictionary.loginChallengeSliderComplete
+        : proofRejected
+          ? dictionary.loginChallengeSliderRejected
+          : verificationError || dictionary.loginChallengeSliderInstruction;
+  const sliderStateClass = `${proofReady ? " ready" : ""}${proofRejected ? " rejected" : ""}${expired ? " expired" : ""}${verificationError ? " unavailable" : ""}`;
+
   return (
-    <div className="login-challenge-prompt login-slider-challenge">
+    <div className={`login-challenge-prompt login-slider-challenge${sliderStateClass}`}>
       <div className="login-challenge-payload">
         <Typography.Text strong>{dictionary.loginChallengePrompt}</Typography.Text>
         <div className="login-slider-stage" style={stageStyle}>
@@ -821,10 +1027,13 @@ function SliderChallengePayload({
         </div>
         <div
           aria-label={dictionary.loginChallengeSliderTrackLabel}
+          aria-busy={verifying}
+          aria-disabled={interactionLocked}
           aria-valuemax={Math.round(maxX)}
           aria-valuemin={0}
           aria-valuenow={Math.round(boundedTileX)}
-          className={`login-slider-track${dragging ? " dragging" : ""}${proofReady ? " ready" : ""}`}
+          aria-valuetext={trackLabel}
+          className={`login-slider-track${dragging ? " dragging" : ""}${loading ? " disabled" : ""}${verifying ? " verifying" : ""}${sliderStateClass}`}
           ref={trackRef}
           role="slider"
           style={trackStyle}
@@ -837,10 +1046,20 @@ function SliderChallengePayload({
         >
           <span aria-hidden className="login-slider-track-fill" style={trackFillStyle} />
           <span aria-hidden className="login-slider-handle" style={handleStyle}>
-            <LoginOutlined />
+            {verifying ? (
+              <LoadingOutlined spin />
+            ) : proofReady ? (
+              <CheckOutlined />
+            ) : proofRejected ? (
+              <CloseOutlined />
+            ) : expired ? (
+              <ClockCircleOutlined />
+            ) : (
+              <LoginOutlined />
+            )}
           </span>
-          <span className="login-slider-track-label">
-            {proofReady ? dictionary.loginChallengeSliderComplete : dictionary.loginChallengeSliderInstruction}
+          <span aria-live="polite" className="login-slider-track-label">
+            {trackLabel}
           </span>
         </div>
       </div>
@@ -898,6 +1117,33 @@ function ProviderSpecificChallengePayload({
   );
 }
 
+function useCredentialChallengeCountdown(expiresAt: string | undefined) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const deadline = Date.parse(expiresAt ?? "");
+    if (!Number.isFinite(deadline)) {
+      setNow(Date.now());
+      return;
+    }
+    let timer: number | null = null;
+    const tick = () => {
+      const current = Date.now();
+      setNow(current);
+      const remaining = deadline - current;
+      if (remaining <= 0) return;
+      const nextBoundary = remaining % 1000 || 1000;
+      timer = window.setTimeout(tick, Math.max(50, nextBoundary));
+    };
+    tick();
+    return () => {
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [expiresAt]);
+
+  return credentialChallengeSecondsRemaining(expiresAt, now);
+}
+
 async function startLoginCredentialChallenge(clientFingerprint: string) {
   let sliderError: unknown;
   try {
@@ -927,8 +1173,7 @@ function credentialChallengeRequest(challenge: CredentialChallengeStartResult | 
 }
 
 function credentialChallengeExpired(challenge: CredentialChallengeStartResult) {
-  const expiresAt = Date.parse(challenge.expiresAt);
-  return Number.isFinite(expiresAt) && expiresAt <= Date.now();
+  return credentialChallengeSecondsRemaining(challenge.expiresAt) === 0;
 }
 
 function formatChallengeTime(value: string) {
@@ -951,6 +1196,16 @@ function loginAPIErrorMessage(error: unknown, dictionary: Dictionary, fallback: 
   }
   const correlation = error.requestId || error.traceId;
   return correlation ? `${message} ${dictionary.loginErrorCorrelation.replace("{id}", correlation)}` : message;
+}
+
+function sliderChallengeVerificationRejected(error: unknown) {
+  return error instanceof AdminAPIError && error.code === "AUTH_INVALID_CREDENTIALS";
+}
+
+function sliderChallengeVerificationErrorMessage(error: unknown, dictionary: Dictionary) {
+  if (error instanceof AdminAPIError && error.code === "RATE_LIMITED") return dictionary.loginRateLimited;
+  if (error instanceof AdminAPIError && error.code === "RATE_LIMIT_UNAVAILABLE") return dictionary.loginRateLimitUnavailable;
+  return dictionary.loginChallengeSliderUnavailable;
 }
 
 function createLoginClientFingerprint() {

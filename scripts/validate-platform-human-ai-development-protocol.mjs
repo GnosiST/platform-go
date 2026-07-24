@@ -42,9 +42,17 @@ const requiredAcceptanceCommands = [
   "rtk node scripts/validate-admin-resources.mjs",
   "rtk node scripts/validate-platform-admin-api-boundary.mjs",
   "rtk node scripts/validate-platform-app-client-api-boundary.mjs",
+  "rtk node scripts/validate-platform-credential-auth-v1.mjs",
+  "rtk node --test scripts/platform-credential-auth-v1.test.mjs",
   "rtk node scripts/validate-admin-ui-contracts.mjs",
   "rtk node scripts/validate-platform-codegen-source-writing-readiness.mjs",
   "rtk npm --prefix admin run build",
+];
+const requiredAPIInterfaceSources = ["resources/platform-credential-auth-v1.json"];
+const requiredAPIInterfaceValidators = ["scripts/validate-platform-credential-auth-v1.mjs"];
+const requiredAPIInterfaceTests = ["scripts/platform-credential-auth-v1.test.mjs"];
+const requiredAPIInterfacePractices = [
+  "slider challenge preverification accepts only slider, does not consume success, counts failed attempts, returns only valid and leaves final challenge consumption to credential login",
 ];
 const requiredCapabilityLifecyclePractices = [
   "system-level settings use /settings as the dynamic configuration center and aggregate enabled capability configResources from manifest projection",
@@ -180,6 +188,7 @@ function validateProtocol(protocol) {
     "scripts/validate-platform-plugin-management-v1.mjs",
     "scripts/validate-platform-capability-operation-policy.mjs",
     "scripts/validate-external-capability-example.mjs",
+    "scripts/validate-platform-credential-auth-v1.mjs",
     "scripts/validate-admin-ui-contracts.mjs",
     "scripts/validate-platform-codegen-source-writing-readiness.mjs",
   ], "requiredValidators", errors);
@@ -187,6 +196,7 @@ function validateProtocol(protocol) {
     "scripts/platform-human-ai-development-protocol.test.mjs",
     "scripts/platform-plugin-management-v1.test.mjs",
     "scripts/platform-capability-operation-policy.test.mjs",
+    "scripts/platform-credential-auth-v1.test.mjs",
   ], "requiredTests", errors);
 
   for (const principle of values(protocol.principles)) {
@@ -205,6 +215,33 @@ function validateProtocol(protocol) {
   }
   for (const domain of values(protocol.domains)) {
     validateDomain(domain, errors);
+  }
+  const apiInterfaceDomain = values(protocol.domains).find((domain) => domain.id === "api-interface-contracts");
+  if (apiInterfaceDomain) {
+    requireIncludes(
+      apiInterfaceDomain.sourceOfTruth,
+      requiredAPIInterfaceSources,
+      "api-interface-contracts.sourceOfTruth",
+      errors,
+    );
+    requireIncludes(
+      apiInterfaceDomain.requiredValidators,
+      requiredAPIInterfaceValidators,
+      "api-interface-contracts.requiredValidators",
+      errors,
+    );
+    requireIncludes(
+      apiInterfaceDomain.requiredTests,
+      requiredAPIInterfaceTests,
+      "api-interface-contracts.requiredTests",
+      errors,
+    );
+    requireIncludes(
+      apiInterfaceDomain.requiredPractices,
+      requiredAPIInterfacePractices,
+      "api-interface-contracts.requiredPractices",
+      errors,
+    );
   }
   const lifecycleDomain = values(protocol.domains).find((domain) => domain.id === "capability-lifecycle-operations");
   if (lifecycleDomain) {

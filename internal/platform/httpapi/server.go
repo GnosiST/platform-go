@@ -368,6 +368,7 @@ func (s *Server) routes(adminRoutes []AdminRouteRegistration) {
 	api.GET("/auth/providers", s.authProviders)
 	api.GET("/auth/credential-secret-key", s.credentialAuthSecretKey)
 	api.POST("/auth/challenges", s.credentialAuthChallengeStart)
+	api.POST("/auth/challenges/verify", s.credentialAuthChallengeVerify)
 	api.POST("/auth/providers/:provider/start", s.authProviderStart)
 	api.POST("/auth/sms-otp/start", s.credentialAuthSMSOTPStart)
 	api.POST("/auth/login", s.authLogin)

@@ -808,6 +808,201 @@ describe("validate-admin-ui-contracts", () => {
     assert.match(result.stderr, /Credential slider challenges must render through a dedicated slider payload/);
   });
 
+  it("rejects credential sliders that do not wait for server verification", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      "await onVerifyProof(proof)",
+      "Promise.resolve(true)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Credential slider release must await server-side challenge verification/);
+  });
+
+  it("rejects credential sliders that keep an invalid drop position", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      "resetSliderProof(true)",
+      "setProofRejected(true)",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Credential slider rejection must reset the tile and expose local feedback/);
+  });
+
+  it("rejects credential sliders without stale-response protection", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      "verificationSequenceRef",
+      "verificationRequestRef",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Credential slider verification must ignore stale async responses/);
+  });
+
+  it("rejects credential sliders that accept a success response after expiry", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      "if (credentialChallengeSecondsRemaining(challenge.expiresAt) === 0) {",
+      "if (false) {",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must recheck the server deadline before accepting a late success response/);
+  });
+
+  it("rejects credential challenge refresh without a synchronous in-flight lock", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      "if (credentialChallengeRefreshInFlightRef.current) return;",
+      "if (false) return;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must acquire its synchronous lock before starting a request/);
+  });
+
+  it("rejects credential challenge refresh without request generations", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      "const credentialChallengeRefreshSequenceRef = useRef(0);",
+      "const credentialChallengeRefreshRequestRef = useRef(0);",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Credential challenge refresh must track request generations/);
+  });
+
+  it("rejects manual credential challenge refresh that leaves automatic recovery pending", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      "if (!loading || recoveryTimerRef.current === null) return;",
+      "if (!loading) return;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must cancel the pending automatic recovery refresh/);
+  });
+
+  it("rejects credential sliders without a live expiry countdown", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      "useCredentialChallengeCountdown(challenge?.expiresAt)",
+      "null",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Credential slider challenges must render a live server-deadline countdown/);
+  });
+
+  it("rejects credential sliders that map pointer coordinates through the bordered box", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      "sliderTrackContentRect(trackRef.current)",
+      "trackRef.current?.getBoundingClientRect() ?? null",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Credential slider geometry must use the bordered track content box/);
+  });
+
+  it("rejects credential sliders that snap off-center handle grabs to the center", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      "const pointerGrabOffsetRef = useRef(0);",
+      "const pointerGrabOffset = 0;",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Credential slider drags must preserve the pointer grab point/);
+  });
+
+  it("rejects credential sliders that report service failures as wrong positions", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/auth/AdminLoginView.tsx",
+      "sliderChallengeVerificationRejected(nextError)",
+      "true",
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /Credential slider verification must distinguish rejected positions from service failures/);
+  });
+
+  it("rejects credential slider copy that blames every invalid challenge on positioning", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/i18n.ts",
+      'loginChallengeSliderRejected: "验证未通过，正在换一张..."',
+      'loginChallengeSliderRejected: "位置不正确，请重试"',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must not misreport every invalid challenge as a wrong position in Chinese/);
+  });
+
+  it("rejects untranslated neutral recovery copy for credential slider failures", () => {
+    const tempRoot = tempAdminRoot();
+    replaceInTemp(
+      tempRoot,
+      "admin/src/platform/i18n.ts",
+      'loginChallengeSliderRejected: "Verification did not pass. Loading a new puzzle..."',
+      'loginChallengeSliderRejected: "Position incorrect. Try again."',
+    );
+
+    const result = runValidator(["--root", tempRoot]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /must not misreport every invalid challenge as a wrong position in English/);
+  });
+
   it("rejects removing credential captcha fallback", () => {
     const tempRoot = tempAdminRoot();
     replaceInTemp(

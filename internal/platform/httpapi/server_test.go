@@ -1320,6 +1320,82 @@ func TestCredentialAuthChallengeStartAndPasswordLoginConsumesProof(t *testing.T)
 	}
 }
 
+func TestCredentialAuthChallengeCheckRejectsWrongAndKeepsCorrectProofForLogin(t *testing.T) {
+	runtime, _ := credentialAuthRuntimeForTest(t)
+	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
+	startRecorder := httptest.NewRecorder()
+	startRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/challenges", bytes.NewBufferString(`{"kind":"slider","purpose":"login","clientFingerprint":"browser-1"}`))
+	startRequest.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(startRecorder, startRequest)
+	if startRecorder.Code != http.StatusCreated {
+		t.Fatalf("POST credential challenge start status = %d body = %s", startRecorder.Code, startRecorder.Body.String())
+	}
+	var started credentialAuthChallengeStartTestPayload
+	if err := json.Unmarshal(startRecorder.Body.Bytes(), &started); err != nil {
+		t.Fatalf("decode credential challenge start: %v body = %s", err, startRecorder.Body.String())
+	}
+
+	check := func(proof string) *httptest.ResponseRecorder {
+		t.Helper()
+		body, err := json.Marshal(map[string]string{
+			"id":                started.Data.ID,
+			"kind":              "slider",
+			"proof":             proof,
+			"clientFingerprint": "browser-1",
+		})
+		if err != nil {
+			t.Fatalf("marshal challenge check: %v", err)
+		}
+		recorder := httptest.NewRecorder()
+		request := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/challenges/verify", bytes.NewReader(body))
+		request.Header.Set("Content-Type", "application/json")
+		server.Router().ServeHTTP(recorder, request)
+		return recorder
+	}
+	unsupportedRecorder := httptest.NewRecorder()
+	unsupportedRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/challenges/verify", bytes.NewBufferString(`{"id":"captcha-check","kind":"captcha","proof":"answer"}`))
+	unsupportedRequest.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(unsupportedRecorder, unsupportedRequest)
+	if unsupportedRecorder.Code != http.StatusBadRequest || !strings.Contains(unsupportedRecorder.Body.String(), "AUTH_INVALID_REQUEST") {
+		t.Fatalf("POST non-slider credential challenge check = %d body = %s, want invalid request", unsupportedRecorder.Code, unsupportedRecorder.Body.String())
+	}
+
+	wrongRecorder := check("x=0&y=14")
+	if wrongRecorder.Code != http.StatusUnauthorized || !strings.Contains(wrongRecorder.Body.String(), "AUTH_INVALID_CREDENTIALS") {
+		t.Fatalf("POST wrong credential challenge check = %d body = %s, want invalid credentials", wrongRecorder.Code, wrongRecorder.Body.String())
+	}
+	correctRecorder := check(credentialAuthChallengeProofForTest)
+	if correctRecorder.Code != http.StatusOK || !strings.Contains(correctRecorder.Body.String(), `"valid":true`) || strings.Contains(correctRecorder.Body.String(), credentialAuthChallengeProofForTest) {
+		t.Fatalf("POST correct credential challenge check = %d body = %s, want non-leaking valid response", correctRecorder.Code, correctRecorder.Body.String())
+	}
+
+	loginRecorder := httptest.NewRecorder()
+	loginRequest := newCredentialAuthHTTPTestRequest(http.MethodPost, "/api/auth/login", credentialAuthPasswordLoginBodyWithChallengeForTest(t, runtime, "correct-password", started.Data.ID, "slider", credentialAuthChallengeProofForTest, "browser-1"))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	server.Router().ServeHTTP(loginRecorder, loginRequest)
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("POST credential login after challenge check = %d body = %s", loginRecorder.Code, loginRecorder.Body.String())
+	}
+}
+
+func TestCredentialAuthChallengeCheckRejectsUnknownFields(t *testing.T) {
+	runtime, _ := credentialAuthRuntimeForTest(t)
+	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})
+	recorder := httptest.NewRecorder()
+	request := newCredentialAuthHTTPTestRequest(
+		http.MethodPost,
+		"/api/auth/challenges/verify",
+		bytes.NewBufferString(`{"id":"challenge","kind":"slider","proof":"x=0&y=0","unexpected":true}`),
+	)
+	request.Header.Set("Content-Type", "application/json")
+
+	server.Router().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusBadRequest || !strings.Contains(recorder.Body.String(), "AUTH_INVALID_REQUEST") {
+		t.Fatalf("POST credential challenge check with unknown field = %d body = %s, want invalid request", recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestCredentialAuthPasswordLoginRejectsWrongChallengeProof(t *testing.T) {
 	runtime, _ := credentialAuthRuntimeForTest(t)
 	server := newTestServer(ServerOptions{Capabilities: configuredCredentialAuthManifestsForTest(t), CredentialAuth: runtime})

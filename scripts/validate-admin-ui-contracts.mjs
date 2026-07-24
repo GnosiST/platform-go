@@ -272,6 +272,38 @@ requireIncludes(files.login, "clientFingerprintRef", "Credential login must bind
 requireIncludes(files.login, "challengeNeedsCaptchaFallback", "Credential login must fall back when slider material is incomplete.");
 requireIncludes(files.login, "sliderChallengeMaterial(challenge)", "Credential login must derive slider rendering from returned challenge material.");
 requireIncludes(files.login, "formatSliderChallengeProof(proofX, proofY)", "Credential slider proof must be generated from client drag coordinates.");
+requireIncludes(files.client, 'request<CredentialChallengeVerifyResult>("/auth/challenges/verify"', "Admin API client must expose server-side credential challenge verification.");
+requireIncludes(files.login, "await onVerifyProof(proof)", "Credential slider release must await server-side challenge verification.");
+requireIncludes(files.login, "resetSliderProof(true)", "Credential slider rejection must reset the tile and expose local feedback.");
+requireIncludes(files.login, "verificationSequenceRef", "Credential slider verification must ignore stale async responses.");
+requireRegex(
+  files.login,
+  /const valid = await onVerifyProof\(proof\);[\s\S]*?if \(verificationSequence !== verificationSequenceRef\.current\) return;[\s\S]*?if \(credentialChallengeSecondsRemaining\(challenge\.expiresAt\) === 0\) \{[\s\S]*?setProofReady\(true\)/,
+  "Credential slider verification must recheck the server deadline before accepting a late success response.",
+);
+requireIncludes(files.login, "useCredentialChallengeCountdown(challenge?.expiresAt)", "Credential slider challenges must render a live server-deadline countdown.");
+requireIncludes(files.login, "const credentialChallengeRefreshInFlightRef = useRef(false);", "Credential challenge refresh must use a synchronous in-flight lock.");
+requireIncludes(files.login, "const credentialChallengeRefreshSequenceRef = useRef(0);", "Credential challenge refresh must track request generations.");
+requireRegex(
+  files.login,
+  /const refreshCredentialChallenge = async \(\) => \{\s*if \(credentialChallengeRefreshInFlightRef\.current\) return;\s*credentialChallengeRefreshInFlightRef\.current = true;/,
+  "Credential challenge refresh must acquire its synchronous lock before starting a request.",
+);
+requireIncludes(files.login, "if (refreshSequence !== credentialChallengeRefreshSequenceRef.current) return;", "Credential challenge refresh must ignore stale responses.");
+requireRegex(
+  files.login,
+  /useEffect\(\(\) => \{\s*if \(!loading \|\| recoveryTimerRef\.current === null\) return;\s*window\.clearTimeout\(recoveryTimerRef\.current\);\s*recoveryTimerRef\.current = null;\s*setProofRejected\(false\);\s*\}, \[loading\]\);/,
+  "Manual credential challenge refresh must cancel the pending automatic recovery refresh.",
+);
+requireIncludes(files.login, "sliderTrackContentRect(trackRef.current)", "Credential slider geometry must use the bordered track content box.");
+requireIncludes(files.login, "const pointerGrabOffsetRef = useRef(0);", "Credential slider drags must preserve the pointer grab point.");
+requireIncludes(files.login, "sliderHandleGrabOffsetFromTrackPointer(event.clientX, track, material, boundedTileX)", "Credential slider drags must derive their grab offset in image coordinates.");
+requireIncludes(files.login, "const interactionLocked = loading || expired || verifying || proofReady || proofRejected;", "Credential slider interaction must lock during terminal and recovery states.");
+requireIncludes(files.login, "sliderChallengeVerificationRejected(nextError)", "Credential slider verification must distinguish rejected positions from service failures.");
+requireIncludes(files.i18n, 'loginChallengeSliderRejected: "验证未通过，正在换一张..."', "Credential slider rejection must not misreport every invalid challenge as a wrong position in Chinese.");
+requireIncludes(files.i18n, 'loginChallengeSliderRejected: "Verification did not pass. Loading a new puzzle..."', "Credential slider rejection must not misreport every invalid challenge as a wrong position in English.");
+requireIncludes(files.login, "<CheckOutlined />", "Credential slider success must expose a non-color confirmation icon.");
+requireIncludes(files.login, "<CloseOutlined />", "Credential slider rejection must expose a non-color error icon.");
 requireIncludes(files.login, 'role="slider"', "Credential slider track must expose slider semantics for keyboard and assistive input.");
 requireNotIncludes(files.login, "debugCode", "Credential login must not consume SMS debug codes.");
 requireNotIncludes(files.login, "CredentialChallengeDebug", "Credential login must not render challenge debug content.");
@@ -287,6 +319,7 @@ requireNotIncludes(files.login, "challenge.parameters?.text", "Credential challe
 requireCssRule(files.styles, ".login-slider-stage", ["position: relative;", "overflow: hidden;"], "Credential slider challenge must frame the returned puzzle images.");
 requireCssRule(files.styles, ".login-slider-track", ["touch-action: none;", "cursor: grab;"], "Credential slider track must support direct drag gestures.");
 requireCssRule(files.styles, ".login-slider-handle", ["transform: translateX(-50%);"], "Credential slider handle must align with the generated proof coordinate.");
+requireCssRule(files.styles, ".login-slider-challenge.rejected .login-slider-tile", ["transition: left 220ms"], "Credential slider rejection must visibly return the puzzle tile to its origin.");
 requireIncludes(files.login, 'aria-live="polite"', "OIDC callback progress and failure must use a polite live region.");
 requireIncludes(files.login, 'className="login-error-heading"', "OIDC callback failures must expose a stable error heading.");
 requireIncludes(files.login, "tabIndex={-1}", "The OIDC callback error heading must be programmatically focusable.");

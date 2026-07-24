@@ -48,8 +48,11 @@ API and service work starts from contracts, not page code.
 | Admin API | `resources/generated/openapi.admin.json` | `rtk node scripts/validate-platform-admin-api-boundary.mjs` |
 | App API | `capability.Manifest.App.Routes` and `resources/generated/openapi.app.json` | `rtk node scripts/validate-platform-app-client-api-boundary.mjs` |
 | Service contracts | `capability.Manifest.Service` | `rtk node scripts/validate-platform-service-contract-standard.mjs` |
+| Credential authentication | `resources/platform-credential-auth-v1.json` | `rtk node scripts/validate-platform-credential-auth-v1.mjs` and `rtk node --test scripts/platform-credential-auth-v1.test.mjs` |
 
 Admin collection queries use `POST /api/admin/resources/:resource/query`. App routes stay under `/api/app/**` and use app-domain tokens. Service contracts declare identity, trusted tenant context, operations, events, reliability, PII and compatibility before handlers are attached.
+
+Credential slider preverification accepts only `slider`, does not consume a successful check, counts failed attempts, returns only `valid` and leaves final challenge consumption to credential login. Any change to that flow must update the credential-auth contract, generated Admin OpenAPI, validator, contract tests and affected human-facing docs together.
 
 ## UI And Visual Customization
 
@@ -106,6 +109,8 @@ rtk node scripts/validate-external-capability-example.mjs
 rtk node scripts/validate-admin-resources.mjs
 rtk node scripts/validate-platform-admin-api-boundary.mjs
 rtk node scripts/validate-platform-app-client-api-boundary.mjs
+rtk node scripts/validate-platform-credential-auth-v1.mjs
+rtk node --test scripts/platform-credential-auth-v1.test.mjs
 rtk node scripts/validate-admin-i18n.mjs
 rtk node scripts/validate-admin-ui-contracts.mjs
 rtk node scripts/validate-platform-codegen-source-writing-readiness.mjs

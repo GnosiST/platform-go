@@ -9896,6 +9896,74 @@
         "x-platform-runtime-status": "deliverable-v1"
       }
     },
+    "/api/auth/challenges/verify": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "verifyAdminCredentialSliderChallenge",
+        "summary": "Prevalidate an Admin credential-auth slider challenge",
+        "description": "Credential-auth v1 slider-only preverification. A successful check does not consume the challenge, a failed check counts toward the attempt limit, and final credential login verifies and consumes the same challenge. The response data exposes only valid and never returns proof, client fingerprint, target coordinates or debug material.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCredentialSliderChallengeVerifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Admin credential-auth slider challenge preverification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminCredentialSliderChallengeVerifyData"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "501": {
+            "$ref": "#/components/responses/NotImplemented"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "x-platform-capability": "credential-auth",
+        "x-platform-runtime-status": "deliverable-v1",
+        "x-platform-challenge-consumption": "final-login-only"
+      }
+    },
     "/api/auth/credential-secret-key": {
       "get": {
         "tags": [
@@ -10216,7 +10284,7 @@
         }
       },
       "TooManyRequests": {
-        "description": "Sensitive reveal rate limit exceeded",
+        "description": "Request rate limit exceeded",
         "content": {
           "application/json": {
             "schema": {
@@ -10256,7 +10324,7 @@
         }
       },
       "ServiceUnavailable": {
-        "description": "Sensitive reveal runtime or protected value unavailable",
+        "description": "Required runtime unavailable",
         "content": {
           "application/json": {
             "schema": {
@@ -15561,6 +15629,49 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "AdminCredentialSliderChallengeVerifyRequest": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "proof"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "slider"
+            ]
+          },
+          "proof": {
+            "type": "string",
+            "minLength": 1,
+            "writeOnly": true
+          },
+          "clientFingerprint": {
+            "type": "string",
+            "writeOnly": true,
+            "description": "Optional client-side challenge nonce; only a digest may be persisted by credential-auth."
+          }
+        }
+      },
+      "AdminCredentialSliderChallengeVerifyData": {
+        "type": "object",
+        "required": [
+          "valid"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "valid": {
+            "type": "boolean"
           }
         }
       },

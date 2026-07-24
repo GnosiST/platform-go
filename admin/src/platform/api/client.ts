@@ -283,6 +283,17 @@ export type CredentialChallengeStartResult = {
   expiresAt: string;
 };
 
+export type CredentialChallengeVerifyInput = {
+  id: string;
+  kind: "slider";
+  proof: string;
+  clientFingerprint?: string;
+};
+
+export type CredentialChallengeVerifyResult = {
+  valid: boolean;
+};
+
 export type CredentialEncryptedPasswordSecret = {
   type: "password" | "current-password" | "new-password" | string;
   encrypted: CredentialSecretEnvelope;
@@ -948,6 +959,14 @@ export function startCredentialSMSOTP(input: CredentialSMSOTPStartInput) {
 
 export function startCredentialChallenge(input: CredentialChallengeStartInput = {}) {
   return request<CredentialChallengeStartResult>("/auth/challenges", {
+    auth: "none",
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function verifyCredentialChallenge(input: CredentialChallengeVerifyInput) {
+  return request<CredentialChallengeVerifyResult>("/auth/challenges/verify", {
     auth: "none",
     method: "POST",
     body: JSON.stringify(input),

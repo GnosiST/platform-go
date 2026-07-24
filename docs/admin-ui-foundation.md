@@ -1,6 +1,7 @@
 # Admin UI Foundation
 
 Date: 2026-07-05
+Last updated: 2026-07-25
 
 ## Positioning
 
@@ -10,7 +11,7 @@ Ant Design provides mature primitives such as `Table`, `Modal`, `Alert`, `Button
 
 The platform layer provides reusable backoffice semantics, default density, theme tokens and extension slots. Business pages can customize by props, `children`, `actions`, `toolbar`, `summary`, `extra`, `footer` and class names. If a prop is not provided, the component keeps the platform default.
 
-The admin entry now starts with `AdminLoginView`. It consumes the same theme tokens, i18n dictionary and auth provider API as the rest of the shell. The login screen is intentionally provider-driven: demo keeps the username flow, while the Admin-only `oidc` provider uses a configured provider action, tab-scoped state and PKCE transaction, sanitized callback recovery and the existing bound platform principal/session path. Adding another login mode must add an auth provider capability and adapter rather than hard-code business login logic into the shell.
+The admin entry now starts with `AdminLoginView`. It consumes the same theme tokens, i18n dictionary and auth provider API as the rest of the shell. The login screen is intentionally provider-driven: demo keeps the username flow; the Admin-only `oidc` provider uses a configured provider action, tab-scoped state and PKCE transaction, sanitized callback recovery and the existing bound platform principal/session path; credential password and SMS OTP providers use encrypted secret transport plus a mandatory CAPTCHA or slider transaction. The view exposes at most three configured login methods at once and derives their controls from provider declarations. Adding another login mode must add an auth provider capability and adapter rather than hard-code business login logic into the shell.
 
 The design rule is unified defaults with flexible adaptation. Shared components own typography, spacing, color, responsive behavior, i18n, accessibility labels and common states. Business modules may override through documented props, slots and schema fields, but should not fork the base visual rules for tables, buttons, drawers, modals, dropdowns, pagination, prompts or alerts.
 
@@ -62,6 +63,7 @@ Do not wrap a component when:
 - i18n is a hard gate for every new shared component. When adding a component, add Chinese and English dictionary keys, localized sample data if needed, and run the i18n validator in the same change.
 - Admin interface preferences are platform concerns. Language, theme, layout mode and UI configuration are persisted in browser storage by the app shell; branding default theme is used only when the user has not chosen a theme. System-level function configuration belongs to the `/settings` workbench and enabled capability resource schemas, not to the topbar preference drawer.
 - Login screens must use provider declarations from `GET /api/auth/providers`; do not couple the shell to one concrete login provider.
+- Login screens must expose no more than three configured provider methods at once. Credential password and SMS OTP actions must retain their server-issued challenge gate; slider preverification is feedback only and final login remains the atomic consume boundary.
 - Admin login must filter provider audiences to `admin`. OIDC must never render irrelevant username/password controls, auto-provision users or authorization relationships, expose callback material, or reuse the App identity resolver boundary.
 - Logout must clear the platform token and return to the login view.
 - Prefer `AdminPage` for page structure instead of hand-writing `page-heading`.

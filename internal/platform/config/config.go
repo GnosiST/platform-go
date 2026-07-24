@@ -93,6 +93,7 @@ type Config struct {
 	CredentialAuthPhoneSMSOTP            bool
 	CredentialAuthChallengeMode          string
 	CredentialAuthChallengeKind          string
+	CredentialAuthChallengeTTL           time.Duration
 	CredentialAuthPasswordMaxAttempts    int
 	CredentialAuthPasswordLock           time.Duration
 	CredentialAuthSMSOTPTTL              time.Duration
@@ -175,6 +176,7 @@ type credentialAuthSource struct {
 	phonePassword    envConfigState
 	emailPassword    envConfigState
 	phoneSMSOTP      envConfigState
+	challengeTTL     envConfigState
 }
 
 var defaultCapabilities = []string{
@@ -235,6 +237,7 @@ func Load() Config {
 	credentialAuthPhonePassword, credentialAuthPhonePasswordState := boolEnvWithState("PLATFORM_CREDENTIAL_AUTH_PHONE_PASSWORD", false)
 	credentialAuthEmailPassword, credentialAuthEmailPasswordState := boolEnvWithState("PLATFORM_CREDENTIAL_AUTH_EMAIL_PASSWORD", false)
 	credentialAuthPhoneSMSOTP, credentialAuthPhoneSMSOTPState := boolEnvWithState("PLATFORM_CREDENTIAL_AUTH_PHONE_SMS_OTP", false)
+	credentialAuthChallengeTTLSeconds, credentialAuthChallengeTTLState := intEnvWithState("PLATFORM_CREDENTIAL_AUTH_CHALLENGE_TTL_SECONDS", 0)
 	capabilities, capabilitiesState := csvEnvWithState("PLATFORM_CAPABILITIES", defaultCapabilities)
 	capabilityLockFile, capabilityLockFileState := envWithState("PLATFORM_CAPABILITY_LOCK_FILE", "")
 	capabilityLoadedFromLock := false
@@ -322,6 +325,7 @@ func Load() Config {
 		CredentialAuthPhoneSMSOTP:            credentialAuthPhoneSMSOTP,
 		CredentialAuthChallengeMode:          env("PLATFORM_CREDENTIAL_AUTH_CHALLENGE_MODE", ""),
 		CredentialAuthChallengeKind:          env("PLATFORM_CREDENTIAL_AUTH_CHALLENGE_KIND", ""),
+		CredentialAuthChallengeTTL:           time.Duration(credentialAuthChallengeTTLSeconds) * time.Second,
 		CredentialAuthRepositoryDriver:       env("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER", ""),
 		CredentialAuthRepositoryDSN:          env("PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN", ""),
 		CredentialAuthIdentifierHMACKey:      env("PLATFORM_CREDENTIAL_AUTH_IDENTIFIER_HMAC_KEY", ""),
@@ -371,6 +375,7 @@ func Load() Config {
 			phonePassword:    credentialAuthPhonePasswordState,
 			emailPassword:    credentialAuthEmailPasswordState,
 			phoneSMSOTP:      credentialAuthPhoneSMSOTPState,
+			challengeTTL:     credentialAuthChallengeTTLState,
 		},
 	}
 }
@@ -790,6 +795,9 @@ func (c Config) validateCredentialAuth(environment string) []error {
 			errs = append(errs, fmt.Errorf("%s is invalid", key))
 		}
 	}
+	if c.credentialAuthSource.challengeTTL == envConfigInvalid {
+		errs = append(errs, errors.New("PLATFORM_CREDENTIAL_AUTH_CHALLENGE_TTL_SECONDS is invalid"))
+	}
 	if !c.CredentialAuthConfigured() {
 		return errs
 	}
@@ -798,6 +806,9 @@ func (c Config) validateCredentialAuth(environment string) []error {
 	}
 	if kind := strings.TrimSpace(c.CredentialAuthChallengeKind); kind != "" && kind != "captcha" && kind != "slider" {
 		errs = append(errs, fmt.Errorf("credential-auth challenge kind %q is unsupported", kind))
+	}
+	if c.CredentialAuthChallengeTTL < 0 {
+		errs = append(errs, errors.New("credential-auth challenge TTL must not be negative"))
 	}
 	if c.CredentialAuthPasswordMaxAttempts < 0 {
 		errs = append(errs, errors.New("credential-auth password max attempts must not be negative"))

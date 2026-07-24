@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	sliderChallengeProofXTolerance = 3
+	sliderChallengeProofXTolerance = 9
 	sliderChallengeProofYTolerance = 0
 	challengeProofDigestSetPrefix  = "v1:challenge-proof-digest-set:"
 )

@@ -1,6 +1,6 @@
 {
   "$schema": "https://platform-go.local/schemas/platform-human-ai-development-protocol.json",
-  "capturedAt": "2026-07-18",
+  "capturedAt": "2026-07-25",
   "purpose": "Machine-checkable development protocol for human and AI contributors building highly customized business systems on top of the business-neutral platform foundation.",
   "audiences": [
     "human-developers",
@@ -119,7 +119,8 @@
       "sourceOfTruth": [
         "capability.Manifest.Admin.Resources",
         "capability.Manifest.App.Routes",
-        "capability.Manifest.Service"
+        "capability.Manifest.Service",
+        "resources/platform-credential-auth-v1.json"
       ],
       "requiredDocs": [
         "docs/platform-capability-development.md",
@@ -137,12 +138,17 @@
         "scripts/validate-admin-resources.mjs",
         "scripts/validate-platform-admin-api-boundary.mjs",
         "scripts/validate-platform-app-client-api-boundary.mjs",
-        "scripts/validate-platform-service-contract-standard.mjs"
+        "scripts/validate-platform-service-contract-standard.mjs",
+        "scripts/validate-platform-credential-auth-v1.mjs"
+      ],
+      "requiredTests": [
+        "scripts/platform-credential-auth-v1.test.mjs"
       ],
       "requiredPractices": [
         "Admin collection queries use POST /api/admin/resources/:resource/query",
         "App routes stay under /api/app/** and use app security-domain tokens",
-        "service contracts declare identity, trusted tenant context, operations, reliability and compatibility"
+        "service contracts declare identity, trusted tenant context, operations, reliability and compatibility",
+        "slider challenge preverification accepts only slider, does not consume success, counts failed attempts, returns only valid and leaves final challenge consumption to credential login"
       ]
     },
     {
@@ -322,6 +328,8 @@
     "rtk node scripts/validate-admin-resources.mjs",
     "rtk node scripts/validate-platform-admin-api-boundary.mjs",
     "rtk node scripts/validate-platform-app-client-api-boundary.mjs",
+    "rtk node scripts/validate-platform-credential-auth-v1.mjs",
+    "rtk node --test scripts/platform-credential-auth-v1.test.mjs",
     "rtk node scripts/validate-admin-i18n.mjs",
     "rtk node scripts/validate-admin-ui-contracts.mjs",
     "rtk node scripts/validate-platform-codegen-source-writing-readiness.mjs",
@@ -389,12 +397,14 @@
     "scripts/validate-admin-resources.mjs",
     "scripts/validate-platform-admin-api-boundary.mjs",
     "scripts/validate-platform-app-client-api-boundary.mjs",
+    "scripts/validate-platform-credential-auth-v1.mjs",
     "scripts/validate-admin-ui-contracts.mjs",
     "scripts/validate-platform-codegen-source-writing-readiness.mjs"
   ],
   "requiredTests": [
     "scripts/platform-human-ai-development-protocol.test.mjs",
     "scripts/platform-plugin-management-v1.test.mjs",
-    "scripts/platform-capability-operation-policy.test.mjs"
+    "scripts/platform-capability-operation-policy.test.mjs",
+    "scripts/platform-credential-auth-v1.test.mjs"
   ]
 }

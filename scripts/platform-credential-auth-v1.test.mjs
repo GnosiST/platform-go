@@ -90,6 +90,10 @@ describe("validate-platform-credential-auth-v1", () => {
     const contract = readJSON("resources/platform-credential-auth-v1.json");
     contract.providerModes = contract.providerModes.filter((item) => item.id !== "phone-sms-otp");
     contract.challengeContract.modes = ["off"];
+    contract.challengeContract.sliderProofTolerancePixels = 3;
+    contract.configurationContract.securityKeys = contract.configurationContract.securityKeys.filter(
+      (key) => key !== "PLATFORM_CREDENTIAL_AUTH_CHALLENGE_TTL_SECONDS",
+    );
     contract.notificationSmsBoundary.productionMockProviderAllowed = true;
     contract.notificationSmsBoundary.adapterContract = "SMTP live supplier integration is claimed";
     contract.implementationPackages.find((item) => item.id === "C-notification-sms-adapters").scope = "internal/platform/notification";
@@ -103,6 +107,8 @@ describe("validate-platform-credential-auth-v1", () => {
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /providerModes must include phone-sms-otp/);
     assert.match(result.stderr, /challengeContract\.modes must be the mandatory always baseline/);
+    assert.match(result.stderr, /challengeContract\.sliderProofTolerancePixels must be 9/);
+    assert.match(result.stderr, /configurationContract\.securityKeys must include PLATFORM_CREDENTIAL_AUTH_CHALLENGE_TTL_SECONDS/);
     assert.match(result.stderr, /notificationSmsBoundary\.productionMockProviderAllowed must stay false/);
     assert.match(result.stderr, /notificationSmsBoundary\.adapterContract must describe official SDK live adapters plus dry-run\/config validation/);
     assert.match(result.stderr, /C-notification-sms-adapters scope must document Aliyun\/Tencent official SDK-backed live adapters/);
@@ -110,7 +116,84 @@ describe("validate-platform-credential-auth-v1", () => {
     assert.match(result.stderr, /messageCenterContract\.runtimeEndpoints must include POST \/api\/admin\/message-center\/deliveries\/run/);
     assert.match(result.stderr, /messageCenterContract\.deliveryWorker\.providerRuntimeTruth must describe Aliyun\/Tencent live SMS SDK adapters plus dry-run\/config validation/);
     assert.match(result.stderr, /apiContract\.implementedNow must include POST \/api\/auth\/challenges creates digest-only CAPTCHA\/slider challenge transactions for login/);
+    assert.match(result.stderr, /apiContract\.implementedNow must include POST \/api\/auth\/challenges\/verify prevalidates slider proofs without consuming successful challenges, counts failed attempts and returns only valid/);
     assert.match(result.stderr, /apiContract\.endpoints must include POST \/api\/auth\/sms-otp\/start/);
+  });
+
+  it("locks completed HTTP and Admin UI packages while keeping production promotion open", () => {
+    const contract = readJSON("resources/platform-credential-auth-v1.json");
+    contract.implementationPackages.find((item) => item.id === "D-auth-api-compatibility").status = "in-progress";
+    contract.implementationPackages.find((item) => item.id === "E-admin-login-ui").status = "in-progress";
+    const security = contract.implementationPackages.find((item) => item.id === "F-security-governance");
+    security.status = "done";
+    security.scope = "OpenAPI contract coverage and rate-limit enforcement";
+
+    const result = runValidator(["--contract", tempFile("platform-credential-auth-v1-", "contract.json", contract)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /D-auth-api-compatibility must be done after the deliverable-v1 HTTP runtime closeout/);
+    assert.match(result.stderr, /E-admin-login-ui must be done after the deliverable-v1 provider-driven Admin login UI closeout/);
+    assert.match(result.stderr, /F-security-governance must remain in-progress until independent production promotion evidence exists/);
+    assert.match(result.stderr, /F-security-governance scope must document production env validation/);
+    assert.match(result.stderr, /F-security-governance scope must document CI test\/build gates/);
+    assert.match(result.stderr, /F-security-governance scope must document independent production promotion evidence remains/);
+  });
+
+  it("rejects credential-auth production env or CI gate removal", () => {
+    const result = runValidator([
+      "--production-env-validator",
+      tempFile("platform-credential-auth-v1-production-env-", "validate-platform-production-env.mjs", "// credential auth gate removed\n"),
+      "--production-env-test",
+      tempFile("platform-credential-auth-v1-production-env-test-", "platform-production-env.test.mjs", "// credential auth tests removed\n"),
+      "--ci-workflow",
+      tempFile("platform-credential-auth-v1-ci-", "ci.yml", "name: CI\n"),
+    ]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /credential-auth production env validation must remain implemented/);
+    assert.match(result.stderr, /credential-auth production env validation must retain its contract test/);
+    assert.match(result.stderr, /credential-auth CI integration must retain go test \.\/\.\.\./);
+    assert.match(result.stderr, /credential-auth CI integration must retain node --test scripts\/\*\.test\.mjs/);
+    assert.match(result.stderr, /credential-auth CI integration must retain npm run build --prefix admin/);
+  });
+
+  it("rejects weakened slider preverification consumption and response contracts", () => {
+    const contract = readJSON("resources/platform-credential-auth-v1.json");
+    contract.challengeContract.sliderPreverification.allowedKinds = ["captcha", "slider"];
+    contract.challengeContract.sliderPreverification.successConsumesChallenge = true;
+    contract.challengeContract.sliderPreverification.failureIncrementsAttempts = false;
+    contract.challengeContract.sliderPreverification.finalLoginConsumesChallenge = false;
+    contract.challengeContract.sliderPreverification.requestWriteOnlyFields = ["proof"];
+    contract.challengeContract.sliderPreverification.responseFields = ["valid", "targetX"];
+    contract.challengeContract.sliderPreverification.forbiddenResponseFields = [];
+    contract.challengeContract.atomicStateTransitions.consume = "read-modify-write";
+    contract.challengeContract.atomicStateTransitions.failureCounting = "load-increment-save";
+    contract.challengeContract.atomicStateTransitions.preconditions = ["enabled"];
+    contract.challengeContract.atomicStateTransitions.staleWritesCanReactivate = true;
+    contract.apiContract.endpoints = contract.apiContract.endpoints.filter((item) => item.path !== "/api/auth/challenges/verify");
+
+    const result = runValidator(["--contract", tempFile("platform-credential-auth-v1-", "contract.json", contract)]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /challengeContract\.sliderPreverification\.allowedKinds must contain only slider/);
+    assert.match(result.stderr, /successful checks non-consuming, failed checks attempt-counted and final login consuming/);
+    assert.match(result.stderr, /challengeContract\.sliderPreverification\.requestWriteOnlyFields must include clientFingerprint/);
+    assert.match(result.stderr, /challengeContract\.sliderPreverification\.responseFields must contain only valid/);
+    assert.match(result.stderr, /challengeContract\.sliderPreverification\.forbiddenResponseFields must include proof/);
+    assert.match(result.stderr, /challengeContract\.atomicStateTransitions must require conditional consumption and atomic failure counting/);
+    assert.match(result.stderr, /challengeContract\.atomicStateTransitions\.preconditions must include unused/);
+    assert.match(result.stderr, /challengeContract\.atomicStateTransitions\.staleWritesCanReactivate must stay false/);
+    assert.match(result.stderr, /apiContract\.endpoints must include POST \/api\/auth\/challenges\/verify/);
+  });
+
+  it("declares slider preverification rate-limit responses", () => {
+    const openapi = readJSON("resources/generated/openapi.admin.json");
+    const responses = openapi.paths["/api/auth/challenges/verify"].post.responses;
+
+    assert.deepEqual(responses["429"], { $ref: "#/components/responses/TooManyRequests" });
+    assert.deepEqual(responses["503"], { $ref: "#/components/responses/ServiceUnavailable" });
+    assert.equal(openapi.components.responses.TooManyRequests.description, "Request rate limit exceeded");
+    assert.equal(openapi.components.responses.ServiceUnavailable.description, "Required runtime unavailable");
   });
 
   it("rejects weakened credential governance and retry-target retention contracts", () => {
@@ -135,6 +218,7 @@ describe("validate-platform-credential-auth-v1", () => {
   it("rejects missing OpenAPI coverage for credential auth and message-center v1 endpoints", () => {
     const openapi = readJSON("resources/generated/openapi.admin.json");
     delete openapi.paths["/api/auth/challenges"];
+    delete openapi.paths["/api/auth/challenges/verify"];
     delete openapi.paths["/api/admin/profile/current/password/change"];
     delete openapi.paths["/api/admin/profile/{id}/password/reset"];
     openapi.paths["/api/admin/message-center/deliveries/run"] = {
@@ -149,10 +233,72 @@ describe("validate-platform-credential-auth-v1", () => {
 
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /resources\/generated\/openapi\.admin\.json must include POST \/api\/auth\/challenges/);
+    assert.match(result.stderr, /resources\/generated\/openapi\.admin\.json must include POST \/api\/auth\/challenges\/verify/);
     assert.match(result.stderr, /resources\/generated\/openapi\.admin\.json must include POST \/api\/admin\/profile\/current\/password\/change/);
     assert.match(result.stderr, /resources\/generated\/openapi\.admin\.json must include POST \/api\/admin\/profile\/\{id\}\/password\/reset/);
     assert.match(result.stderr, /OpenAPI message-center deliveries run must use notification-delivery-worker-v1 runtime marker/);
     assert.match(result.stderr, /OpenAPI message-center deliveries run must describe Aliyun\/Tencent live SMS SDK adapters plus dry-run\/config validation/);
+  });
+
+  it("rejects slider preverification OpenAPI leakage and implementation drift", () => {
+    const openapi = readJSON("resources/generated/openapi.admin.json");
+    const verifyRequest = openapi.components.schemas.AdminCredentialSliderChallengeVerifyRequest;
+    verifyRequest.properties.kind.enum = ["captcha", "slider"];
+    verifyRequest.properties.proof.writeOnly = false;
+    verifyRequest.properties.clientFingerprint.writeOnly = false;
+    const verifyData = openapi.components.schemas.AdminCredentialSliderChallengeVerifyData;
+    verifyData.properties.proof = { type: "string" };
+    delete openapi.paths["/api/auth/challenges/verify"].post.responses["429"];
+    delete openapi.paths["/api/auth/challenges/verify"].post.responses["503"];
+    const service = fs
+      .readFileSync(path.join(repoRoot, "internal/platform/credentialauth/service.go"), "utf8")
+      .replace("return s.checkCredentialChallenge(ctx, input, false)", "return s.checkCredentialChallenge(ctx, input, true)")
+      .replace("s.repository.RecordCredentialChallengeFailure", "s.repository.UpsertCredentialChallenge");
+    const memoryRepository = fs
+      .readFileSync(path.join(repoRoot, "internal/platform/credentialauth/memory_repository.go"), "utf8")
+      .replaceAll("challengeTransitionAllowed(", "challengeTransitionAllowedRemoved(");
+    const gormRepository = fs
+      .readFileSync(path.join(repoRoot, "internal/platform/credentialauth/gorm_repository.go"), "utf8")
+      .replaceAll("status = ? AND used_at IS NULL AND expires_at > ?", "status = ? AND expires_at > ?")
+      .replaceAll("attempts = attempts + 1", "attempts = 1");
+    const httpCredentialAuth = fs
+      .readFileSync(path.join(repoRoot, "internal/platform/httpapi/credential_auth.go"), "utf8")
+      .replace("kind != credentialauth.ChallengeKindSlider", "kind == credentialauth.ChallengeKindSlider")
+      .replace("decoder.DisallowUnknownFields()", "// unknown fields allowed")
+      .replace("runtime.Service.CheckCredentialChallenge", "runtime.Service.VerifyCredentialChallenge");
+    const adminClient = fs
+      .readFileSync(path.join(repoRoot, "admin/src/platform/api/client.ts"), "utf8")
+      .replace('request<CredentialChallengeVerifyResult>("/auth/challenges/verify"', 'request<CredentialChallengeVerifyResult>("/auth/challenges/missing"');
+
+    const result = runValidator([
+      "--openapi-admin",
+      tempFile("platform-credential-auth-v1-openapi-", "openapi.admin.json", openapi),
+      "--credential-service",
+      tempFile("platform-credential-auth-v1-service-", "service.go", service),
+      "--credential-memory-repository",
+      tempFile("platform-credential-auth-v1-memory-", "memory_repository.go", memoryRepository),
+      "--credential-gorm-repository",
+      tempFile("platform-credential-auth-v1-gorm-", "gorm_repository.go", gormRepository),
+      "--http-credential-auth",
+      tempFile("platform-credential-auth-v1-http-", "credential_auth.go", httpCredentialAuth),
+      "--admin-client",
+      tempFile("platform-credential-auth-v1-client-", "client.ts", adminClient),
+    ]);
+
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /credential-auth service preverification must not consume a successful challenge/);
+    assert.match(result.stderr, /credential-auth service must use repository atomic transition RecordCredentialChallengeFailure/);
+    assert.match(result.stderr, /credential-auth memory repository must apply ConsumeCredentialChallenge under one conditional lock/);
+    assert.match(result.stderr, /credential-auth GORM repository must condition every challenge transition on enabled, unused and unexpired state/);
+    assert.match(result.stderr, /credential-auth GORM repository must atomically increment failures and disable both challenge record types at the threshold/);
+    assert.match(result.stderr, /credential-auth HTTP challenge preverification must accept only slider/);
+    assert.match(result.stderr, /credential-auth HTTP challenge preverification must reject unknown request fields/);
+    assert.match(result.stderr, /credential-auth HTTP challenge preverification must use the non-consuming service check/);
+    assert.match(result.stderr, /Admin API client must call the slider challenge preverification endpoint/);
+    assert.match(result.stderr, /OpenAPI AdminCredentialSliderChallengeVerifyRequest must accept only slider/);
+    assert.match(result.stderr, /OpenAPI slider challenge proof and clientFingerprint must be write-only/);
+    assert.match(result.stderr, /OpenAPI AdminCredentialSliderChallengeVerifyData must expose only required boolean valid/);
+    assert.match(result.stderr, /OpenAPI \/api\/auth\/challenges\/verify must declare rate-limit and rate-limit-runtime responses/);
   });
 
   it("rejects HTTPS-only or plaintext-compatible credential secret transport drift", () => {

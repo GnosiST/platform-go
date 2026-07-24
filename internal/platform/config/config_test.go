@@ -256,10 +256,20 @@ func TestLoadParsesOptionalIntegrationConfiguration(t *testing.T) {
 func TestLoadParsesCredentialAuthChallengeConfiguration(t *testing.T) {
 	t.Setenv("PLATFORM_CREDENTIAL_AUTH_CHALLENGE_MODE", "always")
 	t.Setenv("PLATFORM_CREDENTIAL_AUTH_CHALLENGE_KIND", "slider")
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_CHALLENGE_TTL_SECONDS", "3")
 
 	cfg := Load()
-	if cfg.CredentialAuthChallengeMode != "always" || cfg.CredentialAuthChallengeKind != "slider" {
-		t.Fatalf("credential auth challenge configuration = %q/%q", cfg.CredentialAuthChallengeMode, cfg.CredentialAuthChallengeKind)
+	if cfg.CredentialAuthChallengeMode != "always" || cfg.CredentialAuthChallengeKind != "slider" || cfg.CredentialAuthChallengeTTL != 3*time.Second {
+		t.Fatalf("credential auth challenge configuration = %q/%q/%s", cfg.CredentialAuthChallengeMode, cfg.CredentialAuthChallengeKind, cfg.CredentialAuthChallengeTTL)
+	}
+}
+
+func TestLoadRejectsInvalidCredentialAuthChallengeTTL(t *testing.T) {
+	t.Setenv("PLATFORM_CREDENTIAL_AUTH_CHALLENGE_TTL_SECONDS", "invalid")
+
+	err := Load().ValidateRuntime()
+	if err == nil || !strings.Contains(err.Error(), "PLATFORM_CREDENTIAL_AUTH_CHALLENGE_TTL_SECONDS is invalid") {
+		t.Fatalf("ValidateRuntime() error = %v, want invalid challenge TTL", err)
 	}
 }
 
@@ -1628,6 +1638,7 @@ func TestValidateRuntimeRejectsCredentialAuthUnsafeConfiguration(t *testing.T) {
 		{name: "missing phone seed", apply: func(cfg *Config) { cfg.CredentialAuthBootstrapAdminPhone = "" }, want: "phone providers require"},
 		{name: "missing email seed", apply: func(cfg *Config) { cfg.CredentialAuthBootstrapAdminEmail = "" }, want: "email password provider requires"},
 		{name: "missing sms config", apply: func(cfg *Config) { cfg.NotificationSMSProvider = "" }, want: "phone SMS OTP requires"},
+		{name: "negative challenge ttl", apply: func(cfg *Config) { cfg.CredentialAuthChallengeTTL = -time.Second }, want: "challenge TTL must not be negative"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

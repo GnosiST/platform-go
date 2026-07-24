@@ -1,7 +1,7 @@
 # Platform Auth Provider Contract
 
 Date: 2026-07-04
-Last updated: 2026-07-20
+Last updated: 2026-07-25
 
 ## Purpose
 
@@ -38,7 +38,7 @@ The capability is business-neutral. It now declares provider modes for `username
 
 The storage boundary is deliberately separate from generic Admin resources: password credentials must not be stored in generic `Record.Values`. The first service foundation implements normalized identifier hashes, an in-memory repository for development/test, a dedicated GORM repository for persistent runtime, Argon2id PHC verification, SMS OTP one-time consumption semantics and a bootstrap runtime seeded from Admin credential environment variables. Production credential-auth requires `PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DRIVER`, `PLATFORM_CREDENTIAL_AUTH_REPOSITORY_DSN`, `PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_KEY_ID` and `PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY`. The dedicated stores remain `auth_identifiers`, `password_credentials`, `credential_challenges` and `sms_otp_challenges`. They store normalized hashes, masked identifiers, Argon2id verifier metadata, digests, expiry, attempt and one-time consumption state, not raw passwords, raw OTP codes, raw challenge answers or raw phone/email values.
 
-Challenge support is scoped to login for v1 and is always required, with `captcha` or `slider` as implementation choices. `POST /api/auth/challenges` is implemented in the backend runtime and creates digest-only challenge transactions with rate-limit enforcement and redacted audit/error surfaces. Credential password login, SMS OTP send and SMS OTP login each require a valid single-use challenge, so API clients cannot bypass the login page. Risk-based routing is intentionally not exposed until a separately reviewed risk-signal adapter can preserve this mandatory baseline without persisting raw client identity. The Admin login UI renders both text CAPTCHA and go-captcha slider material, submits a single-use proof before password login, before SMS OTP send, and before SMS OTP login, binds an optional per-page client nonce by digest, and accepts a small server-side slider X tolerance without storing raw challenge answers. Challenge and SMS OTP transactions are disabled after max-attempt rejection, so a later correct proof cannot revive a spent attack sequence.
+Challenge support is scoped to login for v1 and is always required, with `captcha` or `slider` as implementation choices. `POST /api/auth/challenges` is implemented in the backend runtime and creates digest-only challenge transactions with rate-limit enforcement and redacted audit/error surfaces. `POST /api/auth/challenges/verify` accepts only `slider` and exists solely to give the slider UI server-authoritative feedback: a correct preverification does not consume the challenge, an incorrect proof increments the stored attempt count, and final credential login verifies and consumes the same challenge. Its request fields `proof` and `clientFingerprint` are write-only; successful response data contains only `valid` and never exposes the proof, fingerprint, target coordinates or debug material. Credential password login, SMS OTP send and SMS OTP login each require a valid single-use challenge, so API clients cannot bypass the login page. Risk-based routing is intentionally not exposed until a separately reviewed risk-signal adapter can preserve this mandatory baseline without persisting raw client identity. The Admin login UI renders both text CAPTCHA and go-captcha slider material, submits a single-use proof before password login, before SMS OTP send, and before SMS OTP login, binds an optional per-page client nonce by digest, and accepts a server-side `+/-9` source-image-pixel slider X tolerance without storing raw challenge answers. Pointer coordinates use the slider content box rather than its border box; the UI derives a live countdown from the absolute server `expiresAt`, locks and clears proof at expiry, returns rejected tiles to origin, and distinguishes challenge rejection from rate-limit or service failures. Challenge consumption and failed-attempt accounting for both credential challenges and SMS OTP records use repository-level conditional atomic state transitions over enabled, unused and unexpired rows. Stale preverification or failure writes therefore cannot overwrite `usedAt`, lose concurrent attempts, or reactivate a consumed or disabled transaction; max-attempt rejection remains terminal for that transaction.
 
 The password change/reset contract belongs to the same credential-auth boundary. `POST /api/admin/profile/current/password/change` changes the current Admin password, and `POST /api/admin/profile/{id}/password/reset` is the privileged reset contract. Current and new secrets use the same ECDH-P256-HKDF-SHA256+A256GCM `secret.encrypted` envelope as login; raw password, verifier, reset token and challenge answer material must not be returned or stored in generic resources.
 
@@ -52,12 +52,32 @@ The current deliverable v1 API shape is:
 GET /api/auth/providers
 GET /api/auth/credential-secret-key
 POST /api/auth/challenges
+POST /api/auth/challenges/verify
 POST /api/auth/sms-otp/start
 POST /api/auth/login
 POST /api/admin/profile/current/password/change
 POST /api/admin/profile/{id}/password/reset
 POST /api/admin/message-center/deliveries/run
 ```
+
+Slider preverification request and success response:
+
+```json
+{
+  "id": "challenge-id",
+  "kind": "slider",
+  "proof": "opaque-slider-proof",
+  "clientFingerprint": "per-page-client-nonce"
+}
+```
+
+```json
+{
+  "data": { "valid": true }
+}
+```
+
+The success payload above is intentionally minimal. It confirms only validity; the challenge remains unconsumed until the subsequent credential login, while a failed preverification returns the normal redacted authentication error and still counts as an attempt.
 
 Password login request:
 
@@ -124,6 +144,7 @@ PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_EMAIL=admin@example.com
 PLATFORM_CREDENTIAL_AUTH_ARGON2_PARAMS_VERSION=v1
 PLATFORM_CREDENTIAL_AUTH_PASSWORD_MAX_ATTEMPTS=5
 PLATFORM_CREDENTIAL_AUTH_LOCK_SECONDS=900
+PLATFORM_CREDENTIAL_AUTH_CHALLENGE_TTL_SECONDS=300
 PLATFORM_NOTIFICATION_SMS_PROVIDER=aliyun
 PLATFORM_NOTIFICATION_SMS_LOGIN_TEMPLATE_ID=...
 PLATFORM_AUTH_SMS_OTP_TTL_SECONDS=300
@@ -132,7 +153,7 @@ PLATFORM_AUTH_SMS_OTP_MAX_ATTEMPTS=5
 
 The remaining production evidence is approved-account SMS delivery and independent promotion approval. The current runtime is a deliverable v1 slice, not a production-complete credential system.
 
-## APIs
+## Core Session And App APIs
 
 ```text
 GET /api/auth/providers
@@ -158,7 +179,7 @@ POST /api/app/identity/phone-bindings
 }
 ```
 
-For the current slice, only the configured `demo` provider returns a session. The response includes a JWT admin bearer token and `expiresAt`. The token carries the platform user, tenant, token type and internal session id. The admin client stores that token and sends it as `Authorization: Bearer ...` for later requests.
+Configured Admin provider flows return the same session contract. This includes the bundled `demo` flow, bound Admin OIDC callback exchange, and enabled `credential-password` or `credential-sms-otp` flows after their mandatory challenge and secret checks pass. The response includes a JWT admin bearer token and `expiresAt`. The token carries the platform user, tenant, token type and internal session id. The admin client stores that token and sends it as `Authorization: Bearer ...` for later requests.
 
 The JWT token is the external HTTP credential. The internal session id remains server-side state so TTL, logout and future forced revocation are still authoritative. This is intentionally not a weaker stateless-only session model.
 

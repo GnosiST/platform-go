@@ -44,7 +44,7 @@ The recommended model separates masking from revealing:
 - A slider or CAPTCHA is a risk and anti-automation condition, not an identity factor. It may precede step-up but cannot satisfy reveal by itself.
 - Revealed values automatically return to the masked state and must not enter browser storage, URLs, logs, analytics or client-generated exports.
 
-The initial reveal-capable factor set is implemented as OIDC reauthentication and Admin SMS OTP. OIDC uses a reveal-specific state flow and must resolve to the active bound Admin identity. SMS uses the phone verification provider port and a configured Admin phone source whose current phone digest must match the digest captured at verification time. Email OTP, TOTP, WebAuthn and slider/CAPTCHA adapters are not implemented in the current runtime.
+The initial reveal-capable factor set is implemented as OIDC reauthentication and Admin SMS OTP. OIDC uses a reveal-specific state flow and must resolve to the active bound Admin identity. SMS uses the phone verification provider port and a configured Admin phone source whose current phone digest must match the digest captured at verification time. Email OTP, TOTP, WebAuthn and slider/CAPTCHA adapters are not implemented in the sensitive-reveal runtime; this does not describe the separate credential-login slider challenge.
 
 The first supported step-up set should be small and evidence-based:
 
@@ -115,7 +115,7 @@ Only one MQ adapter should be implemented for the first real workload. RabbitMQ 
 
 The remaining work is feasible within the Gin/GORM/capability-manifest architecture, but it crosses shared contracts, identity, persistence, authorization, operations and Admin UI. Each node must be independently testable and must not claim driver or feature support before the applicable certification lane passes.
 
-The unique approved decomposition and all dependency, lock and completion-gate decisions live in the [remaining-task topology adjustment](docs/platform-roadmap.md). The governing sequence is:
+The unique approved decomposition and all dependency, lock and completion-gate decisions live in the [remaining-task topology adjustment](platform-roadmap.md). The governing sequence is:
 
 ```text
 [implemented: persisted-query-command-object-runtime + integration-ports-disabled-default]

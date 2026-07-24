@@ -33,11 +33,13 @@ func CredentialAuthRuntimeFromConfig(ctx context.Context, cfg config.Config, sms
 	if err != nil {
 		return nil, err
 	}
+	challengeTTL := credentialAuthChallengeTTL(cfg)
 	service, err := credentialauth.NewService(credentialauth.Options{
 		Repository:           repository,
 		IdentifierHasher:     hasher,
 		PasswordVerifier:     credentialauth.NewArgon2idVerifier(credentialauth.DefaultArgon2idParams()),
 		ChallengeProofHasher: hasher,
+		ChallengeTTL:         challengeTTL,
 		MaxPasswordAttempts:  cfg.CredentialAuthPasswordMaxAttempts,
 		PasswordLock:         cfg.CredentialAuthPasswordLock,
 		Now:                  time.Now,
@@ -64,13 +66,20 @@ func CredentialAuthRuntimeFromConfig(ctx context.Context, cfg config.Config, sms
 		SMSOTPTTL:               credentialAuthSMSOTPTTL(cfg),
 		MaxSMSOTPAttempts:       credentialAuthSMSOTPMaxAttempts(cfg),
 		MaxChallengeAttempts:    credentialauth.DefaultMaxChallengeAttempts,
-		ChallengeTTL:            credentialauth.DefaultCredentialChallengeTTL,
+		ChallengeTTL:            challengeTTL,
 		LoginChallengeKind:      credentialauth.ChallengeKind(cfg.CredentialAuthChallengeKind),
 		PasswordHashParams:      credentialauth.DefaultArgon2idParams(),
 		PasswordParamsVersion:   "argon2id-default",
 		RequireLoginChallenge:   true,
 		RequireEncryptedSecrets: true,
 	}, nil
+}
+
+func credentialAuthChallengeTTL(cfg config.Config) time.Duration {
+	if cfg.CredentialAuthChallengeTTL > 0 {
+		return cfg.CredentialAuthChallengeTTL
+	}
+	return credentialauth.DefaultCredentialChallengeTTL
 }
 
 func credentialAuthSMSOTPTTL(cfg config.Config) time.Duration {

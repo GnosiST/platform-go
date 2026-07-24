@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Repository interface {
@@ -16,9 +17,13 @@ type Repository interface {
 
 	UpsertCredentialChallenge(context.Context, CredentialChallenge) error
 	CredentialChallenge(context.Context, string) (CredentialChallenge, bool, error)
+	ConsumeCredentialChallenge(context.Context, string, time.Time) (bool, error)
+	RecordCredentialChallengeFailure(context.Context, string, time.Time, int) (bool, error)
 
 	UpsertSMSOTPChallenge(context.Context, SMSOTPChallenge) error
 	SMSOTPChallenge(context.Context, string) (SMSOTPChallenge, bool, error)
+	ConsumeSMSOTPChallenge(context.Context, string, time.Time) (bool, error)
+	RecordSMSOTPChallengeFailure(context.Context, string, time.Time, int) (bool, error)
 }
 
 type MemoryRepository struct {
@@ -123,6 +128,47 @@ func (r *MemoryRepository) CredentialChallenge(ctx context.Context, challengeID 
 	return challenge, ok, nil
 }
 
+func (r *MemoryRepository) ConsumeCredentialChallenge(ctx context.Context, challengeID string, now time.Time) (bool, error) {
+	if err := checkContext(ctx); err != nil {
+		return false, err
+	}
+	challengeID, now, err := normalizedChallengeTransitionKey(challengeID, now)
+	if err != nil {
+		return false, err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	challenge, ok := r.challenges[challengeID]
+	if !ok || !challengeTransitionAllowed(challenge.Status, challenge.UsedAt, challenge.ExpiresAt, now) {
+		return false, nil
+	}
+	challenge.UsedAt = now
+	r.challenges[challengeID] = challenge
+	return true, nil
+}
+
+func (r *MemoryRepository) RecordCredentialChallengeFailure(ctx context.Context, challengeID string, now time.Time, maxAttempts int) (bool, error) {
+	if err := checkContext(ctx); err != nil {
+		return false, err
+	}
+	challengeID, now, err := normalizedChallengeTransitionInput(challengeID, now, maxAttempts)
+	if err != nil {
+		return false, err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	challenge, ok := r.challenges[challengeID]
+	if !ok || !challengeTransitionAllowed(challenge.Status, challenge.UsedAt, challenge.ExpiresAt, now) {
+		return false, nil
+	}
+	challenge.Attempts++
+	if challenge.Attempts >= maxAttempts {
+		challenge.Status = StatusDisabled
+	}
+	r.challenges[challengeID] = challenge
+	return true, nil
+}
+
 func (r *MemoryRepository) UpsertSMSOTPChallenge(ctx context.Context, challenge SMSOTPChallenge) error {
 	if err := checkContext(ctx); err != nil {
 		return err
@@ -149,6 +195,47 @@ func (r *MemoryRepository) SMSOTPChallenge(ctx context.Context, challengeID stri
 	defer r.mu.Unlock()
 	challenge, ok := r.smsOTPs[challengeID]
 	return challenge, ok, nil
+}
+
+func (r *MemoryRepository) ConsumeSMSOTPChallenge(ctx context.Context, challengeID string, now time.Time) (bool, error) {
+	if err := checkContext(ctx); err != nil {
+		return false, err
+	}
+	challengeID, now, err := normalizedChallengeTransitionKey(challengeID, now)
+	if err != nil {
+		return false, err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	challenge, ok := r.smsOTPs[challengeID]
+	if !ok || !challengeTransitionAllowed(challenge.Status, challenge.UsedAt, challenge.ExpiresAt, now) {
+		return false, nil
+	}
+	challenge.UsedAt = now
+	r.smsOTPs[challengeID] = challenge
+	return true, nil
+}
+
+func (r *MemoryRepository) RecordSMSOTPChallengeFailure(ctx context.Context, challengeID string, now time.Time, maxAttempts int) (bool, error) {
+	if err := checkContext(ctx); err != nil {
+		return false, err
+	}
+	challengeID, now, err := normalizedChallengeTransitionInput(challengeID, now, maxAttempts)
+	if err != nil {
+		return false, err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	challenge, ok := r.smsOTPs[challengeID]
+	if !ok || !challengeTransitionAllowed(challenge.Status, challenge.UsedAt, challenge.ExpiresAt, now) {
+		return false, nil
+	}
+	challenge.Attempts++
+	if challenge.Attempts >= maxAttempts {
+		challenge.Status = StatusDisabled
+	}
+	r.smsOTPs[challengeID] = challenge
+	return true, nil
 }
 
 func normalizedIdentifierRecord(record IdentifierRecord) (IdentifierRecord, error) {
@@ -206,6 +293,29 @@ func normalizedSMSOTPChallenge(challenge SMSOTPChallenge) (SMSOTPChallenge, erro
 		return SMSOTPChallenge{}, fmt.Errorf("%w: sms otp challenge is invalid", ErrInvalidInput)
 	}
 	return challenge, nil
+}
+
+func normalizedChallengeTransitionKey(challengeID string, now time.Time) (string, time.Time, error) {
+	challengeID = strings.TrimSpace(challengeID)
+	if challengeID == "" || now.IsZero() {
+		return "", time.Time{}, fmt.Errorf("%w: challenge transition key is invalid", ErrInvalidInput)
+	}
+	return challengeID, now.UTC(), nil
+}
+
+func normalizedChallengeTransitionInput(challengeID string, now time.Time, maxAttempts int) (string, time.Time, error) {
+	challengeID, now, err := normalizedChallengeTransitionKey(challengeID, now)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	if maxAttempts <= 0 {
+		return "", time.Time{}, fmt.Errorf("%w: max challenge attempts must be positive", ErrInvalidInput)
+	}
+	return challengeID, now, nil
+}
+
+func challengeTransitionAllowed(status RecordStatus, usedAt time.Time, expiresAt time.Time, now time.Time) bool {
+	return normalizeStatus(status) == StatusEnabled && usedAt.IsZero() && now.Before(expiresAt)
 }
 
 func checkContext(ctx context.Context) error {

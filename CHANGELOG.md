@@ -12,6 +12,7 @@ and releases follow [Semantic Versioning](https://semver.org/).
 - Added a machine-checked Human + AI development protocol covering interface contracts, Admin UI, visual customization, code generation, data security and handoff rules for downstream business customization.
 - Added a standalone external capability example and validator gate that prove downstream packages can use only `pkg/platform/capability` public contracts for manifest validation, lifecycle execution and JSON-safe contract previews.
 - Exposed public capability-package lifecycle history and recorded executor helpers so downstream composition roots can run manifest migrations and seeds without importing internal platform packages.
+- Added server-authoritative slider challenge preverification with a valid-only response, non-consuming success semantics and final-login consumption.
 
 ### Changed
 
@@ -22,6 +23,7 @@ and releases follow [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - Kept role authorization modal actions inside short desktop and mobile viewports, propagated active theme tokens into portaled authorization surfaces, localized cancellation controls, and restored focus to the opening command after close.
+- Hardened credential challenge and SMS OTP state changes with conditional atomic consumption and failure counting, and fixed slider geometry, expiry, stale-response, rejection recovery and mobile login presentation.
 
 ## [0.1.0] - 2026-07-16
 

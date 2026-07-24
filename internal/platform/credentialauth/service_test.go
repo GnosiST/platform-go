@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -219,6 +220,148 @@ func TestServiceConsumesCredentialChallengeAndSMSOTPOnce(t *testing.T) {
 	}
 }
 
+func TestServiceChecksCredentialChallengeWithoutConsumingValidProof(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 7, 19, 10, 0, 0, 0, time.UTC)
+	repository := NewMemoryRepository()
+	service, err := NewService(Options{
+		Repository: repository,
+		Now:        func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	if err := service.PutCredentialChallenge(ctx, CredentialChallenge{
+		ChallengeID:           "captcha-check",
+		Kind:                  ChallengeKindCaptcha,
+		Purpose:               ChallengePurposeLogin,
+		AnswerDigest:          "digest:answer",
+		ClientFingerprintHash: "fingerprint:1",
+		ExpiresAt:             now.Add(time.Minute),
+	}); err != nil {
+		t.Fatalf("PutCredentialChallenge() error = %v", err)
+	}
+
+	proof := CredentialChallengeProof{
+		ChallengeID:           "captcha-check",
+		Kind:                  ChallengeKindCaptcha,
+		Purpose:               ChallengePurposeLogin,
+		AnswerDigest:          "digest:answer",
+		ClientFingerprintHash: "fingerprint:1",
+	}
+	if err := service.CheckCredentialChallenge(ctx, proof); err != nil {
+		t.Fatalf("CheckCredentialChallenge() error = %v", err)
+	}
+	stored, ok, err := repository.CredentialChallenge(ctx, "captcha-check")
+	if err != nil || !ok || stored.Attempts != 0 || !stored.UsedAt.IsZero() {
+		t.Fatalf("stored challenge after check = %+v, %v, %v; want active and unused", stored, ok, err)
+	}
+	if err := service.VerifyCredentialChallenge(ctx, proof); err != nil {
+		t.Fatalf("VerifyCredentialChallenge() after check error = %v", err)
+	}
+}
+
+func TestServiceRejectCannotReactivateConsumedCredentialChallenge(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 7, 19, 10, 0, 0, 0, time.UTC)
+	repository := newChallengeTransitionReadBarrierRepository()
+	service, err := NewService(Options{Repository: repository, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	if err := service.PutCredentialChallenge(ctx, CredentialChallenge{
+		ChallengeID:  "captcha-interleaved",
+		Kind:         ChallengeKindCaptcha,
+		Purpose:      ChallengePurposeLogin,
+		AnswerDigest: "digest:answer",
+		ExpiresAt:    now.Add(time.Minute),
+	}); err != nil {
+		t.Fatalf("PutCredentialChallenge() error = %v", err)
+	}
+
+	rejected := make(chan error, 1)
+	go func() {
+		rejected <- service.CheckCredentialChallenge(ctx, CredentialChallengeProof{
+			ChallengeID:  "captcha-interleaved",
+			Kind:         ChallengeKindCaptcha,
+			Purpose:      ChallengePurposeLogin,
+			AnswerDigest: "digest:wrong",
+		})
+	}()
+	waitForTestSignal(t, repository.credentialRead)
+	consumeErr := service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
+		ChallengeID:  "captcha-interleaved",
+		Kind:         ChallengeKindCaptcha,
+		Purpose:      ChallengePurposeLogin,
+		AnswerDigest: "digest:answer",
+	})
+	close(repository.releaseCredentialRead)
+	rejectErr := waitForTestError(t, rejected)
+
+	if consumeErr != nil {
+		t.Fatalf("VerifyCredentialChallenge(correct interleaved) error = %v", consumeErr)
+	}
+	if !errors.Is(rejectErr, ErrChallengeConsumed) {
+		t.Errorf("CheckCredentialChallenge(stale rejection) error = %v, want ErrChallengeConsumed", rejectErr)
+	}
+	stored, ok, err := repository.MemoryRepository.CredentialChallenge(ctx, "captcha-interleaved")
+	if err != nil || !ok {
+		t.Fatalf("CredentialChallenge() = %+v, %v, %v; want stored challenge", stored, ok, err)
+	}
+	if stored.UsedAt.IsZero() || stored.Attempts != 0 || stored.Status != StatusEnabled {
+		t.Fatalf("stored challenge after interleaving = %+v, want consumed without a stale rejected attempt", stored)
+	}
+}
+
+func TestServiceRejectCannotReactivateConsumedSMSOTP(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 7, 19, 10, 0, 0, 0, time.UTC)
+	repository := newChallengeTransitionReadBarrierRepository()
+	service, err := NewService(Options{Repository: repository, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	if err := service.PutSMSOTPChallenge(ctx, SMSOTPChallenge{
+		ChallengeID: "otp-interleaved",
+		PhoneHash:   "phone-hash",
+		CodeDigest:  "code-digest",
+		ExpiresAt:   now.Add(time.Minute),
+	}); err != nil {
+		t.Fatalf("PutSMSOTPChallenge() error = %v", err)
+	}
+
+	rejected := make(chan error, 1)
+	go func() {
+		rejected <- service.VerifySMSOTP(ctx, SMSOTPProof{
+			ChallengeID: "otp-interleaved",
+			PhoneHash:   "phone-hash",
+			CodeDigest:  "wrong-code-digest",
+		})
+	}()
+	waitForTestSignal(t, repository.smsOTPRead)
+	consumeErr := service.VerifySMSOTP(ctx, SMSOTPProof{
+		ChallengeID: "otp-interleaved",
+		PhoneHash:   "phone-hash",
+		CodeDigest:  "code-digest",
+	})
+	close(repository.releaseSMSOTPRead)
+	rejectErr := waitForTestError(t, rejected)
+
+	if consumeErr != nil {
+		t.Fatalf("VerifySMSOTP(correct interleaved) error = %v", consumeErr)
+	}
+	if !errors.Is(rejectErr, ErrChallengeConsumed) {
+		t.Errorf("VerifySMSOTP(stale rejection) error = %v, want ErrChallengeConsumed", rejectErr)
+	}
+	stored, ok, err := repository.MemoryRepository.SMSOTPChallenge(ctx, "otp-interleaved")
+	if err != nil || !ok {
+		t.Fatalf("SMSOTPChallenge() = %+v, %v, %v; want stored challenge", stored, ok, err)
+	}
+	if stored.UsedAt.IsZero() || stored.Attempts != 0 || stored.Status != StatusEnabled {
+		t.Fatalf("stored sms otp after interleaving = %+v, want consumed without a stale rejected attempt", stored)
+	}
+}
+
 func TestServiceRejectsExpiredChallenges(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 7, 19, 10, 0, 0, 0, time.UTC)
@@ -352,36 +495,35 @@ func TestServiceAcceptsNormalizedSliderChallengeProofWithinTolerance(t *testing.
 		t.Fatalf("NewService() error = %v", err)
 	}
 
-	created, err := service.CreateCredentialChallenge(ctx, CreateCredentialChallengeInput{
-		Kind:    ChallengeKindSlider,
-		Purpose: ChallengePurposeLogin,
-	})
-	if err != nil {
-		t.Fatalf("CreateCredentialChallenge() error = %v", err)
+	tests := []struct {
+		name    string
+		proof   string
+		wantErr error
+	}{
+		{name: "positive boundary", proof: " y = 14 & x = 81 ", wantErr: nil},
+		{name: "negative boundary", proof: `{"x":63,"y":14}`, wantErr: nil},
+		{name: "positive outside", proof: `{"x":82,"y":14}`, wantErr: ErrChallengeRejected},
+		{name: "negative outside", proof: "x=62&y=14", wantErr: ErrChallengeRejected},
 	}
-	if err := service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
-		ChallengeID: created.ChallengeID,
-		Kind:        ChallengeKindSlider,
-		Purpose:     ChallengePurposeLogin,
-		Proof:       " y = 14 & x = 74.4 ",
-	}); err != nil {
-		t.Fatalf("VerifyCredentialChallenge(normalized in-tolerance proof) error = %v", err)
-	}
-
-	created, err = service.CreateCredentialChallenge(ctx, CreateCredentialChallengeInput{
-		Kind:    ChallengeKindSlider,
-		Purpose: ChallengePurposeLogin,
-	})
-	if err != nil {
-		t.Fatalf("CreateCredentialChallenge(second) error = %v", err)
-	}
-	if err := service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
-		ChallengeID: created.ChallengeID,
-		Kind:        ChallengeKindSlider,
-		Purpose:     ChallengePurposeLogin,
-		Proof:       `{"x":76.1,"y":14}`,
-	}); !errors.Is(err, ErrChallengeRejected) {
-		t.Fatalf("VerifyCredentialChallenge(out-of-tolerance proof) error = %v, want ErrChallengeRejected", err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			created, err := service.CreateCredentialChallenge(ctx, CreateCredentialChallengeInput{
+				Kind:    ChallengeKindSlider,
+				Purpose: ChallengePurposeLogin,
+			})
+			if err != nil {
+				t.Fatalf("CreateCredentialChallenge() error = %v", err)
+			}
+			err = service.VerifyCredentialChallenge(ctx, CredentialChallengeProof{
+				ChallengeID: created.ChallengeID,
+				Kind:        ChallengeKindSlider,
+				Purpose:     ChallengePurposeLogin,
+				Proof:       test.proof,
+			})
+			if !errors.Is(err, test.wantErr) {
+				t.Fatalf("VerifyCredentialChallenge(%q) error = %v, want %v", test.proof, err, test.wantErr)
+			}
+		})
 	}
 }
 
@@ -698,6 +840,73 @@ func TestGoCaptchaSlideGraphImagesDistinguishTargetAndTile(t *testing.T) {
 	}
 	if maxTargetAlpha < 220 {
 		t.Fatalf("target outline alpha = %d, want a high-contrast outline", maxTargetAlpha)
+	}
+}
+
+type challengeTransitionReadBarrierRepository struct {
+	*MemoryRepository
+	mu                    sync.Mutex
+	credentialReads       int
+	smsOTPReads           int
+	credentialRead        chan struct{}
+	releaseCredentialRead chan struct{}
+	smsOTPRead            chan struct{}
+	releaseSMSOTPRead     chan struct{}
+}
+
+func newChallengeTransitionReadBarrierRepository() *challengeTransitionReadBarrierRepository {
+	return &challengeTransitionReadBarrierRepository{
+		MemoryRepository:      NewMemoryRepository(),
+		credentialRead:        make(chan struct{}),
+		releaseCredentialRead: make(chan struct{}),
+		smsOTPRead:            make(chan struct{}),
+		releaseSMSOTPRead:     make(chan struct{}),
+	}
+}
+
+func (r *challengeTransitionReadBarrierRepository) CredentialChallenge(ctx context.Context, challengeID string) (CredentialChallenge, bool, error) {
+	challenge, ok, err := r.MemoryRepository.CredentialChallenge(ctx, challengeID)
+	r.mu.Lock()
+	r.credentialReads++
+	firstRead := r.credentialReads == 1
+	r.mu.Unlock()
+	if firstRead {
+		close(r.credentialRead)
+		<-r.releaseCredentialRead
+	}
+	return challenge, ok, err
+}
+
+func (r *challengeTransitionReadBarrierRepository) SMSOTPChallenge(ctx context.Context, challengeID string) (SMSOTPChallenge, bool, error) {
+	challenge, ok, err := r.MemoryRepository.SMSOTPChallenge(ctx, challengeID)
+	r.mu.Lock()
+	r.smsOTPReads++
+	firstRead := r.smsOTPReads == 1
+	r.mu.Unlock()
+	if firstRead {
+		close(r.smsOTPRead)
+		<-r.releaseSMSOTPRead
+	}
+	return challenge, ok, err
+}
+
+func waitForTestSignal(t *testing.T, signal <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-signal:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for interleaved repository read")
+	}
+}
+
+func waitForTestError(t *testing.T, result <-chan error) error {
+	t.Helper()
+	select {
+	case err := <-result:
+		return err
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for interleaved verification result")
+		return nil
 	}
 }
 

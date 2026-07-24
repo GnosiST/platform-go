@@ -25,6 +25,7 @@ title: 人机协同开发
 | 代码生成 | 默认只生成合同、预览和 scaffold；运行时代码写入需要人工评审 |
 | 能力生命周期 | 安装、禁用、卸载按 operation policy 执行；基础能力不可卸载 |
 | 数据安全 | 租户、组织、区域和敏感字段都由服务端合同与策略控制 |
+| 凭据认证 | 以 `resources/platform-credential-auth-v1.json` 为源；滑块预校验仅接受 `slider`，成功不消费、失败计次、只返回 `valid`，最终由登录消费 challenge |
 
 完整协议见仓库中的 [Human + AI Development Protocol](https://github.com/GnosiST/platform-go/blob/main/docs/platform-human-ai-development-protocol.md)。
 
@@ -42,6 +43,8 @@ rtk node scripts/validate-platform-plugin-management-v1.mjs
 rtk node scripts/validate-platform-capability-operation-policy.mjs
 rtk node scripts/validate-external-capability-example.mjs
 rtk node scripts/validate-admin-resources.mjs
+rtk node scripts/validate-platform-credential-auth-v1.mjs
+rtk node --test scripts/platform-credential-auth-v1.test.mjs
 rtk node scripts/validate-admin-ui-contracts.mjs
 rtk node scripts/validate-platform-codegen-source-writing-readiness.mjs
 ```

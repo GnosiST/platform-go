@@ -5,8 +5,10 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -62,6 +64,10 @@ type credentialAuthChallengeStartResponse struct {
 	Prompt     string            `json:"prompt"`
 	Parameters map[string]string `json:"parameters,omitempty"`
 	ExpiresAt  time.Time         `json:"expiresAt"`
+}
+
+type credentialAuthChallengeVerifyResponse struct {
+	Valid bool `json:"valid"`
 }
 
 type credentialAuthSMSOTPStartRequest struct {
@@ -567,6 +573,50 @@ func (s *Server) credentialAuthChallengeStart(ctx *gin.Context) {
 		ExpiresAt:  created.ExpiresAt,
 	}
 	ctx.JSON(http.StatusCreated, Response[credentialAuthChallengeStartResponse]{Data: response})
+}
+
+func (s *Server) credentialAuthChallengeVerify(ctx *gin.Context) {
+	var input credentialAuthChallengeRequest
+	decoder := json.NewDecoder(ctx.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
+		return
+	}
+	if !s.enforceRateLimit(ctx, ratelimit.OperationCredentialChallenge, rateLimitClientIP(ctx), "credential-challenge-verify") {
+		return
+	}
+	if !s.requireCredentialAuthSecureTransport(ctx) {
+		return
+	}
+	runtime := s.credentialAuth
+	if runtime == nil || runtime.Service == nil || runtime.ChallengeProofHasher == nil {
+		writePlatformError(ctx, errorcode.CodeAuthProviderNotConfigured)
+		return
+	}
+	challengeID := strings.TrimSpace(input.ID)
+	kind := credentialauth.ChallengeKind(strings.TrimSpace(input.Kind))
+	proof := strings.TrimSpace(input.Proof)
+	if challengeID == "" || kind != credentialauth.ChallengeKindSlider || proof == "" {
+		writePlatformError(ctx, errorcode.CodeAuthInvalidRequest)
+		return
+	}
+	if err := runtime.Service.CheckCredentialChallenge(ctx.Request.Context(), credentialauth.CredentialChallengeProof{
+		ChallengeID:           challengeID,
+		Kind:                  kind,
+		Purpose:               credentialauth.ChallengePurposeLogin,
+		Proof:                 proof,
+		ClientFingerprintHash: credentialAuthClientFingerprintHash(input.ClientFingerprint),
+		MaxAttempts:           runtime.MaxChallengeAttempts,
+	}); err != nil {
+		writeCredentialAuthLoginError(ctx, s.internalErrorSink, err)
+		return
+	}
+	ctx.JSON(http.StatusOK, Response[credentialAuthChallengeVerifyResponse]{Data: credentialAuthChallengeVerifyResponse{Valid: true}})
 }
 
 func (s *Server) verifyCredentialAuthLoginChallenge(ctx *gin.Context, input credentialAuthChallengeRequest) (bool, error) {

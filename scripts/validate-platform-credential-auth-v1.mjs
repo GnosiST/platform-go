@@ -19,8 +19,13 @@ const openapiAdminPath = path.resolve(repoRoot, argValue("--openapi-admin", "res
 const mainGoPath = path.resolve(repoRoot, argValue("--main-go", "cmd/platform-api/main.go"));
 const httpCredentialAuthPath = path.resolve(repoRoot, argValue("--http-credential-auth", "internal/platform/httpapi/credential_auth.go"));
 const credentialServicePath = path.resolve(repoRoot, argValue("--credential-service", "internal/platform/credentialauth/service.go"));
+const credentialMemoryRepositoryPath = path.resolve(repoRoot, argValue("--credential-memory-repository", "internal/platform/credentialauth/memory_repository.go"));
+const credentialGORMRepositoryPath = path.resolve(repoRoot, argValue("--credential-gorm-repository", "internal/platform/credentialauth/gorm_repository.go"));
 const adminClientPath = path.resolve(repoRoot, argValue("--admin-client", "admin/src/platform/api/client.ts"));
 const adminLoginViewPath = path.resolve(repoRoot, argValue("--admin-login-view", "admin/src/platform/auth/AdminLoginView.tsx"));
+const productionEnvValidatorPath = path.resolve(repoRoot, argValue("--production-env-validator", "scripts/validate-platform-production-env.mjs"));
+const productionEnvTestPath = path.resolve(repoRoot, argValue("--production-env-test", "scripts/platform-production-env.test.mjs"));
+const ciWorkflowPath = path.resolve(repoRoot, argValue("--ci-workflow", ".github/workflows/ci.yml"));
 
 const requiredProviderModes = new Map([
   ["username-password", { identifierType: "username", secretType: "password", configKey: "PLATFORM_CREDENTIAL_AUTH_USERNAME_PASSWORD" }],
@@ -60,6 +65,7 @@ const requiredEndpoints = new Set([
   "GET /api/auth/providers",
   "GET /api/auth/credential-secret-key",
   "POST /api/auth/challenges",
+  "POST /api/auth/challenges/verify",
   "POST /api/auth/sms-otp/start",
   "POST /api/auth/login",
   "POST /api/admin/profile/current/password/change",
@@ -70,6 +76,7 @@ const requiredEndpoints = new Set([
 
 const requiredOpenAPIPaths = new Map([
   ["/api/auth/challenges", "post"],
+  ["/api/auth/challenges/verify", "post"],
   ["/api/admin/profile/current/password/change", "post"],
   ["/api/admin/profile/{id}/password/reset", "post"],
   ["/api/admin/message-center/deliveries/run", "post"],
@@ -93,6 +100,7 @@ const requiredBackendFiles = [
   "internal/platform/credentialauth/argon2id.go",
   "internal/platform/credentialauth/secret_transport.go",
   "internal/platform/credentialauth/service_test.go",
+  "internal/platform/credentialauth/challenge_transition_test.go",
   "internal/platform/credentialauth/argon2id_test.go",
   "internal/platform/credentialauth/gorm_repository_test.go",
   "internal/platform/credentialauth/secret_transport_test.go",
@@ -351,8 +359,8 @@ function validateChallengeAndSecretPolicies(contract, errors) {
   if (challenge.disableOnMaxAttempts !== true) {
     errors.push("challengeContract.disableOnMaxAttempts must be true");
   }
-  if (challenge.sliderProofTolerancePixels !== 3) {
-    errors.push("challengeContract.sliderProofTolerancePixels must be 3");
+  if (challenge.sliderProofTolerancePixels !== 9) {
+    errors.push("challengeContract.sliderProofTolerancePixels must be 9");
   }
   if (challenge.clientFingerprintPersistence !== "digest-only") {
     errors.push("challengeContract.clientFingerprintPersistence must be digest-only");
@@ -360,6 +368,40 @@ function validateChallengeAndSecretPolicies(contract, errors) {
   if (challenge.mandatoryBaseline !== true || !String(challenge.riskRouting ?? "").includes("valid single-use challenge") || !String(challenge.riskRouting ?? "").includes("Risk-based routing is not exposed")) {
     errors.push("challengeContract must keep the mandatory baseline and defer risk routing without an approved adapter");
   }
+  const transitions = challenge.atomicStateTransitions ?? {};
+  requireIncludes(transitions.records, ["credential_challenges", "sms_otp_challenges"], "challengeContract.atomicStateTransitions.records", errors);
+  if (transitions.consume !== "conditional-update" || transitions.failureCounting !== "atomic-increment-and-disable") {
+    errors.push("challengeContract.atomicStateTransitions must require conditional consumption and atomic failure counting");
+  }
+  requireIncludes(transitions.preconditions, ["enabled", "unused", "unexpired"], "challengeContract.atomicStateTransitions.preconditions", errors);
+  if (transitions.staleWritesCanReactivate !== false) {
+    errors.push("challengeContract.atomicStateTransitions.staleWritesCanReactivate must stay false");
+  }
+  const preverification = challenge.sliderPreverification ?? {};
+  if (preverification.endpoint !== "POST /api/auth/challenges/verify") {
+    errors.push("challengeContract.sliderPreverification.endpoint must be POST /api/auth/challenges/verify");
+  }
+  if (!Array.isArray(preverification.allowedKinds) || preverification.allowedKinds.length !== 1 || preverification.allowedKinds[0] !== "slider") {
+    errors.push("challengeContract.sliderPreverification.allowedKinds must contain only slider");
+  }
+  if (preverification.successConsumesChallenge !== false || preverification.failureIncrementsAttempts !== true || preverification.finalLoginConsumesChallenge !== true) {
+    errors.push("challengeContract.sliderPreverification must keep successful checks non-consuming, failed checks attempt-counted and final login consuming");
+  }
+  requireIncludes(
+    preverification.requestWriteOnlyFields,
+    ["proof", "clientFingerprint"],
+    "challengeContract.sliderPreverification.requestWriteOnlyFields",
+    errors,
+  );
+  if (!Array.isArray(preverification.responseFields) || preverification.responseFields.length !== 1 || preverification.responseFields[0] !== "valid") {
+    errors.push("challengeContract.sliderPreverification.responseFields must contain only valid");
+  }
+  requireIncludes(
+    preverification.forbiddenResponseFields,
+    ["proof", "clientFingerprint", "targetX", "targetY", "x", "y", "debug", "debugProof"],
+    "challengeContract.sliderPreverification.forbiddenResponseFields",
+    errors,
+  );
 
   const password = contract.passwordPolicy ?? {};
   if (password.algorithm !== "argon2id") {
@@ -552,6 +594,7 @@ function validateAPIContract(contract, errors) {
       "GET /api/auth/providers includes enabled credential-auth provider declarations",
       "GET /api/auth/credential-secret-key exposes short-lived public key metadata for application-layer hybrid encrypted credential secrets",
       "POST /api/auth/challenges creates digest-only CAPTCHA/slider challenge transactions for login",
+      "POST /api/auth/challenges/verify prevalidates slider proofs without consuming successful challenges, counts failed attempts and returns only valid",
       "POST /api/auth/sms-otp/start requires a single-use credential challenge, persists the digest-only OTP transaction before sending and disables it on send failure",
       "POST /api/auth/login accepts structured encrypted credential-password and credential-sms-otp requests while preserving demo/OIDC compatibility",
       "Admin login UI renders credential provider modes from discovery, encrypts credential secrets with WebCrypto and closes CAPTCHA/go-captcha slider challenges",
@@ -609,6 +652,7 @@ function validateConfiguration(contract, errors) {
       "PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_PHONE",
       "PLATFORM_CREDENTIAL_AUTH_BOOTSTRAP_ADMIN_EMAIL",
       "PLATFORM_CREDENTIAL_AUTH_ARGON2_PARAMS_VERSION",
+      "PLATFORM_CREDENTIAL_AUTH_CHALLENGE_TTL_SECONDS",
       "PLATFORM_CREDENTIAL_AUTH_PASSWORD_MAX_ATTEMPTS",
       "PLATFORM_CREDENTIAL_AUTH_LOCK_SECONDS",
       "PLATFORM_AUTH_SMS_OTP_TTL_SECONDS",
@@ -677,29 +721,34 @@ function validateEvidenceWiring(contract, errors) {
     }
   }
   const packageD = packages.get("D-auth-api-compatibility");
-  if (!packageD || packageD.status !== "in-progress") {
-    errors.push("implementationPackages.D-auth-api-compatibility must be in-progress for the partial HTTP runtime slice");
+  if (!packageD || packageD.status !== "done") {
+    errors.push("implementationPackages.D-auth-api-compatibility must be done after the deliverable-v1 HTTP runtime closeout");
   }
   if (
     !String(packageD?.scope ?? "").includes("internal/platform/httpapi") ||
     !String(packageD?.scope ?? "").includes("credential-secret-key") ||
-    !String(packageD?.scope ?? "").includes("challenge creation")
+    !String(packageD?.scope ?? "").includes("challenge creation") ||
+    !String(packageD?.scope ?? "").includes("slider-only non-consuming challenge preverification") ||
+    !String(packageD?.scope ?? "").includes("final credential login consumes the challenge")
   ) {
-    errors.push("implementationPackages.D-auth-api-compatibility scope must point to internal/platform/httpapi, credential-secret-key and challenge creation");
+    errors.push("implementationPackages.D-auth-api-compatibility scope must document HTTP challenge creation, slider-only non-consuming preverification and final-login consumption");
   }
   const packageE = packages.get("E-admin-login-ui");
-  if (!packageE || packageE.status !== "in-progress") {
-    errors.push("implementationPackages.E-admin-login-ui must be in-progress for the provider-driven Admin login UI slice");
+  if (!packageE || packageE.status !== "done") {
+    errors.push("implementationPackages.E-admin-login-ui must be done after the deliverable-v1 provider-driven Admin login UI closeout");
   }
   if (!String(packageE?.scope ?? "").includes("provider-discovery driven Admin login form state")) {
     errors.push("implementationPackages.E-admin-login-ui scope must document provider-discovery driven Admin login form state");
   }
   const packageF = packages.get("F-security-governance");
   if (!packageF || packageF.status !== "in-progress") {
-    errors.push("implementationPackages.F-security-governance must be in-progress after OpenAPI/rate-limit/audit contract sync starts");
+    errors.push("implementationPackages.F-security-governance must remain in-progress until independent production promotion evidence exists");
   }
-  if (!String(packageF?.scope ?? "").includes("OpenAPI contract coverage") || !String(packageF?.scope ?? "").includes("rate-limit enforcement")) {
-    errors.push("implementationPackages.F-security-governance scope must document OpenAPI contract coverage and rate-limit enforcement");
+  const packageFScope = String(packageF?.scope ?? "");
+  for (const snippet of ["OpenAPI contract coverage", "rate-limit enforcement", "production env validation", "CI test/build gates", "independent production promotion evidence remains"]) {
+    if (!packageFScope.includes(snippet)) {
+      errors.push(`implementationPackages.F-security-governance scope must document ${snippet}`);
+    }
   }
   const packageG = packages.get("G-message-center-delivery");
   if (!packageG || packageG.status !== "in-progress") {
@@ -709,6 +758,20 @@ function validateEvidenceWiring(contract, errors) {
   for (const snippet of ["SMS provider configuration", "message delivery worker contract", "manual deliveries run endpoint", "settings configuration loop"]) {
     if (!packageGScope.includes(snippet)) {
       errors.push(`implementationPackages.G-message-center-delivery scope must document ${snippet}`);
+    }
+  }
+}
+
+function validateSecurityGovernanceImplementation(productionEnvValidator, productionEnvTest, ciWorkflow, errors) {
+  if (!productionEnvValidator.includes("credentialAuthProviderEnabled") || !productionEnvValidator.includes("PLATFORM_CREDENTIAL_AUTH_SECRET_TRANSPORT_PRIVATE_KEY")) {
+    errors.push("credential-auth production env validation must remain implemented");
+  }
+  if (!productionEnvTest.includes('requires credential-auth production storage and secret transport material when the capability is enabled')) {
+    errors.push("credential-auth production env validation must retain its contract test");
+  }
+  for (const command of ["go test ./...", "node --test scripts/*.test.mjs", "npm run build --prefix admin"]) {
+    if (!ciWorkflow.includes(command)) {
+      errors.push(`credential-auth CI integration must retain ${command}`);
     }
   }
 }
@@ -723,6 +786,10 @@ function validateDocs(authDoc, capabilityDoc, dataGovernanceDoc, errors) {
     ["password credentials must not be stored in generic `Record.Values`", "docs/platform-auth.md must forbid password credentials in generic Record.Values"],
     ["notification` SMS channel", "docs/platform-auth.md must assign SMS delivery to notification"],
     ["`POST /api/auth/challenges` is implemented in the backend runtime", "docs/platform-auth.md must state POST /api/auth/challenges is implemented in backend runtime"],
+    ["`POST /api/auth/challenges/verify` accepts only `slider`", "docs/platform-auth.md must document the slider-only challenge preverification endpoint"],
+    ["final credential login verifies and consumes the same challenge", "docs/platform-auth.md must document final-login challenge consumption"],
+    ["repository-level conditional atomic state transitions", "docs/platform-auth.md must document atomic challenge state transitions"],
+    ["successful response data contains only `valid`", "docs/platform-auth.md must document the valid-only preverification response"],
     ["password change/reset", "docs/platform-auth.md must document password change/reset contract"],
     ["rate-limit enforcement and redacted audit/error surfaces", "docs/platform-auth.md must document rate-limit and redacted audit/error surfaces"],
     ["always required", "docs/platform-auth.md must document the mandatory challenge baseline"],
@@ -753,6 +820,10 @@ function validateDocs(authDoc, capabilityDoc, dataGovernanceDoc, errors) {
     ["deliverable-v1", "docs/platform-capability-development.md must document the current v1 runtime status"],
     ["Do not declare provider kind `password`", "docs/platform-capability-development.md must keep provider kind password blocked until implementation"],
     ["`POST /api/auth/challenges` is now a backend runtime endpoint", "docs/platform-capability-development.md must state POST /api/auth/challenges is implemented in backend runtime"],
+    ["`POST /api/auth/challenges/verify` is a slider-only server check", "docs/platform-capability-development.md must document slider-only server preverification"],
+    ["leaves final credential login responsible for verifying and consuming the challenge", "docs/platform-capability-development.md must document final-login challenge consumption"],
+    ["repository-level conditional atomic state transitions", "docs/platform-capability-development.md must document atomic challenge state transitions"],
+    ["success response data contains only `valid`", "docs/platform-capability-development.md must document the valid-only preverification response"],
     ["go-captcha slider material", "docs/platform-capability-development.md must document go-captcha slider UI material"],
     ["digest-only slider X tolerance", "docs/platform-capability-development.md must document digest-only slider X tolerance"],
     ["per-page challenge nonce", "docs/platform-capability-development.md must document per-page challenge nonce binding"],
@@ -793,21 +864,64 @@ function validateDocs(authDoc, capabilityDoc, dataGovernanceDoc, errors) {
   }
 }
 
-function validateChallengeImplementation(credentialService, httpCredentialAuth, adminClient, adminLoginView, openapi, errors) {
+function validateChallengeImplementation(credentialService, memoryRepository, gormRepository, httpCredentialAuth, adminClient, adminLoginView, openapi, errors) {
   if (!credentialService.includes("hashChallengeAnswer") || !credentialService.includes("challengeProofDigestSetPrefix")) {
     errors.push("credential-auth service must store slider challenge proof tolerance as a digest-only answer set");
   }
   if (!credentialService.includes("normalizeChallengeProof(challenge.Kind, input.Proof)")) {
     errors.push("credential-auth service must normalize raw challenge proof before hashing");
   }
-  if (!credentialService.includes("challenge.Status = StatusDisabled") || !credentialService.includes("s.repository.UpsertSMSOTPChallenge(ctx, challenge)")) {
-    errors.push("credential-auth service must disable challenge and SMS OTP records on max-attempt rejection");
+  if (!credentialService.includes("return s.checkCredentialChallenge(ctx, input, false)")) {
+    errors.push("credential-auth service preverification must not consume a successful challenge");
+  }
+  if (!credentialService.includes("return s.checkCredentialChallenge(ctx, input, true)")) {
+    errors.push("credential-auth service final verification must consume a successful challenge");
+  }
+  for (const method of ["ConsumeCredentialChallenge", "RecordCredentialChallengeFailure", "ConsumeSMSOTPChallenge", "RecordSMSOTPChallengeFailure"]) {
+    if (!credentialService.includes(`s.repository.${method}`)) {
+      errors.push(`credential-auth service must use repository atomic transition ${method}`);
+    }
+  }
+  for (const method of ["ConsumeCredentialChallenge", "RecordCredentialChallengeFailure", "ConsumeSMSOTPChallenge", "RecordSMSOTPChallengeFailure"]) {
+    const body = new RegExp(`func \\(r \\*MemoryRepository\\) ${method}[\\s\\S]{0,900}r\\.mu\\.Lock\\(\\)[\\s\\S]{0,900}challengeTransitionAllowed\\(`);
+    if (!body.test(memoryRepository)) {
+      errors.push(`credential-auth memory repository must apply ${method} under one conditional lock`);
+    }
+  }
+  for (const method of ["ConsumeCredentialChallenge", "RecordCredentialChallengeFailure", "ConsumeSMSOTPChallenge", "RecordSMSOTPChallengeFailure"]) {
+    if (!gormRepository.includes(`func (r *GORMRepository) ${method}`)) {
+      errors.push(`credential-auth GORM repository must implement atomic transition ${method}`);
+    }
+  }
+  const activePredicates = gormRepository.match(/status = \? AND used_at IS NULL AND expires_at > \?/g) ?? [];
+  if (activePredicates.length < 4) {
+    errors.push("credential-auth GORM repository must condition every challenge transition on enabled, unused and unexpired state");
+  }
+  const failureIncrements = gormRepository.match(/attempts = attempts \+ 1/g) ?? [];
+  const thresholdDisables = gormRepository.match(/CASE WHEN attempts \+ 1 >= \? THEN \? ELSE status END/g) ?? [];
+  if (failureIncrements.length < 2 || thresholdDisables.length < 2) {
+    errors.push("credential-auth GORM repository must atomically increment failures and disable both challenge record types at the threshold");
   }
   if (!httpCredentialAuth.includes("Proof:                 proof")) {
     errors.push("credential-auth HTTP login must pass raw challenge proof to the service for normalization and tolerance handling");
   }
   if (!httpCredentialAuth.includes("runtime.Service.PutSMSOTPChallenge(ctx.Request.Context(), otpChallenge)") || !httpCredentialAuth.includes("otpChallenge.Status = credentialauth.StatusDisabled")) {
     errors.push("credential-auth HTTP SMS OTP start must persist the OTP digest before send and disable it on send failure");
+  }
+  if (!httpCredentialAuth.includes("credentialAuthChallengeVerify") || !httpCredentialAuth.includes("kind != credentialauth.ChallengeKindSlider")) {
+    errors.push("credential-auth HTTP challenge preverification must accept only slider");
+  }
+  if (!/func \(s \*Server\) credentialAuthChallengeVerify[\s\S]{0,800}decoder\.DisallowUnknownFields\(\)/.test(httpCredentialAuth)) {
+    errors.push("credential-auth HTTP challenge preverification must reject unknown request fields");
+  }
+  if (!httpCredentialAuth.includes("runtime.Service.CheckCredentialChallenge")) {
+    errors.push("credential-auth HTTP challenge preverification must use the non-consuming service check");
+  }
+  if (!httpCredentialAuth.includes("runtime.Service.VerifyCredentialChallenge")) {
+    errors.push("credential-auth HTTP final login must use the consuming service verification");
+  }
+  if (!adminClient.includes('request<CredentialChallengeVerifyResult>("/auth/challenges/verify"')) {
+    errors.push("Admin API client must call the slider challenge preverification endpoint");
   }
   if (!httpCredentialAuth.includes("recordCredentialAuthLoginFailure") || !httpCredentialAuth.includes("\"auth.login\"")) {
     errors.push("credential-auth HTTP login must write redacted failure audit events");
@@ -879,6 +993,50 @@ function validateOpenAPI(openapi, errors) {
       errors.push("OpenAPI /api/auth/challenges must keep x-platform-runtime-status deliverable-v1");
     }
   }
+  const verify = paths["/api/auth/challenges/verify"]?.post;
+  if (verify) {
+    if (verify.operationId !== "verifyAdminCredentialSliderChallenge") {
+      errors.push("OpenAPI /api/auth/challenges/verify operationId must be verifyAdminCredentialSliderChallenge");
+    }
+    if (verify["x-platform-runtime-status"] !== "deliverable-v1" || verify["x-platform-challenge-consumption"] !== "final-login-only") {
+      errors.push("OpenAPI /api/auth/challenges/verify must keep deliverable-v1 and final-login-only consumption markers");
+    }
+    const description = String(verify.description ?? "");
+    for (const snippet of ["slider-only", "does not consume", "failed check counts", "final credential login", "only valid"]) {
+      if (!description.includes(snippet)) {
+        errors.push(`OpenAPI /api/auth/challenges/verify description must document ${snippet}`);
+      }
+    }
+    if (verify.requestBody?.content?.["application/json"]?.schema?.$ref !== "#/components/schemas/AdminCredentialSliderChallengeVerifyRequest") {
+      errors.push("OpenAPI /api/auth/challenges/verify must use AdminCredentialSliderChallengeVerifyRequest");
+    }
+    const responseDataRef = verify.responses?.["200"]?.content?.["application/json"]?.schema?.properties?.data?.$ref;
+    if (responseDataRef !== "#/components/schemas/AdminCredentialSliderChallengeVerifyData") {
+      errors.push("OpenAPI /api/auth/challenges/verify success data must use AdminCredentialSliderChallengeVerifyData");
+    }
+    if (
+      verify.responses?.["429"]?.$ref !== "#/components/responses/TooManyRequests" ||
+      verify.responses?.["503"]?.$ref !== "#/components/responses/ServiceUnavailable"
+    ) {
+      errors.push("OpenAPI /api/auth/challenges/verify must declare rate-limit and rate-limit-runtime responses");
+    }
+  }
+  const verifyRequest = openapi.components?.schemas?.AdminCredentialSliderChallengeVerifyRequest;
+  const requiredVerifyFields = new Set(values(verifyRequest?.required));
+  if (!["id", "kind", "proof"].every((field) => requiredVerifyFields.has(field))) {
+    errors.push("OpenAPI AdminCredentialSliderChallengeVerifyRequest must require id, kind and proof");
+  }
+  if (verifyRequest?.additionalProperties !== false || !Array.isArray(verifyRequest?.properties?.kind?.enum) || verifyRequest.properties.kind.enum.length !== 1 || verifyRequest.properties.kind.enum[0] !== "slider") {
+    errors.push("OpenAPI AdminCredentialSliderChallengeVerifyRequest must accept only slider without additional properties");
+  }
+  if (verifyRequest?.properties?.proof?.writeOnly !== true || verifyRequest?.properties?.clientFingerprint?.writeOnly !== true) {
+    errors.push("OpenAPI slider challenge proof and clientFingerprint must be write-only");
+  }
+  const verifyData = openapi.components?.schemas?.AdminCredentialSliderChallengeVerifyData;
+  const verifyDataProperties = Object.keys(verifyData?.properties ?? {});
+  if (verifyData?.additionalProperties !== false || values(verifyData?.required).length !== 1 || verifyData.required[0] !== "valid" || verifyDataProperties.length !== 1 || verifyDataProperties[0] !== "valid" || verifyData.properties.valid?.type !== "boolean") {
+    errors.push("OpenAPI AdminCredentialSliderChallengeVerifyData must expose only required boolean valid");
+  }
   const change = paths["/api/admin/profile/current/password/change"]?.post;
   if (change && change["x-platform-secret-transport"] !== "ECDH-P256-HKDF-SHA256+A256GCM") {
     errors.push("OpenAPI password change must use the credential-auth encrypted secret transport");
@@ -913,8 +1071,13 @@ const capabilityDoc = readText(capabilityDocPath);
 const dataGovernanceDoc = readText(dataGovernanceDocPath);
 const httpCredentialAuth = readText(httpCredentialAuthPath);
 const credentialService = readText(credentialServicePath);
+const credentialMemoryRepository = readText(credentialMemoryRepositoryPath);
+const credentialGORMRepository = readText(credentialGORMRepositoryPath);
 const adminClient = readText(adminClientPath);
 const adminLoginView = readText(adminLoginViewPath);
+const productionEnvValidator = readText(productionEnvValidatorPath);
+const productionEnvTest = readText(productionEnvTestPath);
+const ciWorkflow = readText(ciWorkflowPath);
 
 if (contract.contractVersion !== "0.1.0") {
   errors.push("contractVersion must be 0.1.0");
@@ -934,8 +1097,18 @@ validateMessageCenterContract(contract, errors);
 validateAPIContract(contract, errors);
 validateConfiguration(contract, errors);
 validateEvidenceWiring(contract, errors);
+validateSecurityGovernanceImplementation(productionEnvValidator, productionEnvTest, ciWorkflow, errors);
 validateDocs(authDoc, capabilityDoc, dataGovernanceDoc, errors);
-validateChallengeImplementation(credentialService, httpCredentialAuth, adminClient, adminLoginView, openapiAdmin, errors);
+validateChallengeImplementation(
+  credentialService,
+  credentialMemoryRepository,
+  credentialGORMRepository,
+  httpCredentialAuth,
+  adminClient,
+  adminLoginView,
+  openapiAdmin,
+  errors,
+);
 validateSecretTransportImplementation(httpCredentialAuth, adminClient, errors);
 validateOpenAPI(openapiAdmin, errors);
 

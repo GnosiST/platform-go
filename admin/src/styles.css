@@ -2260,8 +2260,46 @@ select {
 
 .login-language-trigger.ant-btn {
   justify-self: start;
-  padding-inline: 0;
+  min-width: 116px;
+  height: 44px;
+  padding-inline: 10px 12px;
+  border-color: transparent;
+  background: transparent;
   color: var(--muted);
+  column-gap: 10px;
+  box-shadow: none;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.login-language-trigger.ant-btn .anticon {
+  font-size: 16px;
+}
+
+.login-language-trigger.ant-btn:hover,
+.login-language-trigger.ant-btn:focus-visible {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  color: var(--text);
+}
+
+.login-language-label {
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.login-language-label-compact {
+  display: none;
+}
+
+.login-language-trigger.ant-btn .login-language-chevron {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.login-language-menu .ant-dropdown-menu {
+  min-width: 116px;
 }
 
 .login-runtime-status {
@@ -2434,6 +2472,21 @@ select {
   gap: 12px;
 }
 
+.login-challenge-countdown {
+  display: inline-flex;
+  min-width: 92px;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.login-challenge-countdown.warning {
+  color: var(--warning);
+  font-weight: 650;
+}
+
 .login-challenge-prompt {
   display: flex;
   align-items: flex-start;
@@ -2513,6 +2566,14 @@ select {
   filter: drop-shadow(0 5px 12px rgb(15 23 42 / 20%));
 }
 
+.login-slider-challenge.rejected .login-slider-tile {
+  transition: left 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.login-slider-challenge.ready .login-slider-stage {
+  border-color: color-mix(in srgb, var(--success) 48%, var(--border));
+}
+
 .login-slider-track {
   position: relative;
   display: flex;
@@ -2551,6 +2612,10 @@ select {
   background: color-mix(in srgb, var(--success) 18%, transparent);
 }
 
+.login-slider-track.rejected .login-slider-track-fill {
+  background: color-mix(in srgb, var(--error) 14%, transparent);
+}
+
 .login-slider-handle {
   position: absolute;
   z-index: 2;
@@ -2569,17 +2634,53 @@ select {
 .login-slider-track.ready .login-slider-handle {
   border-color: color-mix(in srgb, var(--success) 44%, var(--border));
   color: var(--success);
+  animation: login-slider-confirm 260ms ease-out;
+}
+
+.login-slider-track.verifying,
+.login-slider-track.ready,
+.login-slider-track.disabled,
+.login-slider-track.expired {
+  cursor: default;
+}
+
+.login-slider-track.verifying .login-slider-handle {
+  border-color: color-mix(in srgb, var(--primary) 44%, var(--border));
+}
+
+.login-slider-track.rejected .login-slider-handle {
+  border-color: color-mix(in srgb, var(--error) 44%, var(--border));
+  background: var(--error-weak);
+  color: var(--error);
+  transition: left 220ms cubic-bezier(0.22, 1, 0.36, 1), border-color 160ms ease-out, background-color 160ms ease-out;
+}
+
+.login-slider-track.expired .login-slider-handle,
+.login-slider-track.unavailable .login-slider-handle {
+  border-color: color-mix(in srgb, var(--warning) 38%, var(--border));
+  background: var(--warning-weak);
+  color: var(--warning);
 }
 
 .login-slider-track-label {
   position: relative;
   z-index: 1;
+  display: -webkit-box;
   min-width: 0;
   padding: 0 42px;
   overflow: hidden;
   font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-align: center;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@keyframes login-slider-confirm {
+  50% {
+    transform: translateX(-50%) scale(1.08);
+  }
 }
 
 .login-challenge-refresh {
@@ -6605,6 +6706,12 @@ select {
     padding: 8px;
   }
 
+  .login-provider-option-title {
+    font-size: 13px;
+    line-height: 1.2;
+    -webkit-line-clamp: 2;
+  }
+
   .login-panel {
     max-width: none;
     padding: 36px 16px 48px;
@@ -6624,6 +6731,21 @@ select {
   .login-language-trigger {
     min-width: 44px;
     min-height: 44px;
+  }
+
+  .login-language-trigger.ant-btn {
+    min-width: 78px;
+    padding-inline: 8px;
+  }
+
+  .login-language-label {
+    display: none;
+  }
+
+  .login-language-label-compact {
+    display: inline;
+    min-width: 20px;
+    text-align: left;
   }
 
   .platform-content {

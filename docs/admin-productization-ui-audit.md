@@ -15,7 +15,7 @@ The audit intentionally avoids large deferred work items and does not modify the
 ## Confirmed
 
 - Login provider selection is driven by provider discovery and filters to providers that are both `enabled` and `configured`; unconfigured credential providers are not shown as login options.
-- Login layout supports one, two, three and many provider counts through explicit selector classes, and the credential challenge field is rendered for password and SMS OTP credential flows.
+- Login layout supports one to three enabled providers, caps the visible selector at three methods, and renders the credential challenge field for password and SMS OTP credential flows.
 - Avatar and settings are split in the topbar. Settings opens interface preferences only; profile opens on click, closes on outside click or Escape, and contains the logout action.
 - The profile dropdown is guarded by Admin UI contract tests for click-only trigger, no username in the trigger, role-name display, outside-click close, scrollable body and viewport-safe height.
 - Capability management has one combined catalog table with status filters and opens details in an `AdminModal`; optional and disabled capabilities are projected into the same list.
@@ -27,10 +27,10 @@ The audit intentionally avoids large deferred work items and does not modify the
 - Message center exposes channels for SMS, email and WeChat, includes runtime loop status, dry-run/test-send entry, manual delivery run, retry and delivery detail/log panels.
 - Shared modal wrappers exist through `AdminModal` and `AdminFormModal`, and current contract tests check modal/focus/accessibility behavior.
 - Authenticated browser verification completed on `2026-07-22`: `/overview` emitted no warning or error logs, and `/settings` completed configuration validation, an unsupported connection preflight with explicit feedback, and a same-value save with runtime reload.
+- Login browser verification completed on `2026-07-25` with exactly three enabled credential methods: desktop and `390 x 844` mobile layouts had no horizontal overflow, the server-authoritative slider showed successful and rejected states, rejected tiles returned to origin before one refresh, and the absolute-expiry countdown reset with each new challenge.
 
 ## Remaining Gaps
 
-- Visual acceptance for the login page should cover the realistic maximum of three enabled login methods at desktop and mobile widths.
 - Message center external delivery remains productized as configuration and dry-run unless real SMS/email/WeChat provider credentials are supplied.
 
 ## Verification Run

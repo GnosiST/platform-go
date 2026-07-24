@@ -25,6 +25,7 @@ title: Human + AI development
 | Code generation | Generate contracts, previews and scaffolds by default; runtime source writes require human review |
 | Capability lifecycle | Install, disable and uninstall operations follow the operation policy; foundation capabilities are non-removable |
 | Data security | Tenant, organization, area and sensitive fields are controlled by server-side contracts and policies |
+| Credential authentication | Use `resources/platform-credential-auth-v1.json` as the source; slider preverification accepts only `slider`, does not consume success, counts failures, returns only `valid` and leaves final challenge consumption to login |
 
 See the full [Human + AI Development Protocol](https://github.com/GnosiST/platform-go/blob/main/docs/platform-human-ai-development-protocol.md).
 
@@ -42,6 +43,8 @@ rtk node scripts/validate-platform-plugin-management-v1.mjs
 rtk node scripts/validate-platform-capability-operation-policy.mjs
 rtk node scripts/validate-external-capability-example.mjs
 rtk node scripts/validate-admin-resources.mjs
+rtk node scripts/validate-platform-credential-auth-v1.mjs
+rtk node --test scripts/platform-credential-auth-v1.test.mjs
 rtk node scripts/validate-admin-ui-contracts.mjs
 rtk node scripts/validate-platform-codegen-source-writing-readiness.mjs
 ```

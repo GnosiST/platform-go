@@ -92,6 +92,7 @@ func TestCredentialAuthRuntimeFromConfigAppliesDesiredStateLimits(t *testing.T) 
 	cfg.CredentialAuthBootstrapAdminPassword = "correct-password"
 	cfg.CredentialAuthPasswordMaxAttempts = 2
 	cfg.CredentialAuthPasswordLock = 90 * time.Second
+	cfg.CredentialAuthChallengeTTL = 3 * time.Second
 	cfg.CredentialAuthSMSOTPTTL = 2 * time.Minute
 	cfg.CredentialAuthSMSOTPMaxAttempts = 3
 	cfg.CredentialAuthChallengeKind = "slider"
@@ -100,7 +101,7 @@ func TestCredentialAuthRuntimeFromConfigAppliesDesiredStateLimits(t *testing.T) 
 	if err != nil {
 		t.Fatalf("CredentialAuthRuntimeFromConfig() error = %v", err)
 	}
-	if runtime.SMSOTPTTL != 2*time.Minute || runtime.MaxSMSOTPAttempts != 3 || runtime.LoginChallengeKind != credentialauth.ChallengeKindSlider {
+	if runtime.ChallengeTTL != 3*time.Second || runtime.SMSOTPTTL != 2*time.Minute || runtime.MaxSMSOTPAttempts != 3 || runtime.LoginChallengeKind != credentialauth.ChallengeKindSlider {
 		t.Fatalf("credential auth runtime policy = %+v, want desired SMS and challenge settings", runtime)
 	}
 	identifier := credentialauth.Identifier{Type: credentialauth.IdentifierTypeUsername, Value: "admin"}

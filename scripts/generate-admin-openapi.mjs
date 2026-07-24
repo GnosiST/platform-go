@@ -1008,6 +1008,29 @@ function schemas() {
         expiresAt: { type: "string", format: "date-time" },
       },
     },
+    AdminCredentialSliderChallengeVerifyRequest: {
+      type: "object",
+      required: ["id", "kind", "proof"],
+      additionalProperties: false,
+      properties: {
+        id: { type: "string", minLength: 1 },
+        kind: { type: "string", enum: ["slider"] },
+        proof: { type: "string", minLength: 1, writeOnly: true },
+        clientFingerprint: {
+          type: "string",
+          writeOnly: true,
+          description: "Optional client-side challenge nonce; only a digest may be persisted by credential-auth.",
+        },
+      },
+    },
+    AdminCredentialSliderChallengeVerifyData: {
+      type: "object",
+      required: ["valid"],
+      additionalProperties: false,
+      properties: {
+        valid: { type: "boolean" },
+      },
+    },
     AdminCredentialSMSOTPStartRequest: {
       type: "object",
       required: ["provider", "identifier", "challenge"],
@@ -1813,6 +1836,37 @@ paths["/api/auth/challenges"] = {
   },
 };
 
+paths["/api/auth/challenges/verify"] = {
+  post: {
+    tags: ["auth"],
+    operationId: "verifyAdminCredentialSliderChallenge",
+    summary: "Prevalidate an Admin credential-auth slider challenge",
+    description:
+      "Credential-auth v1 slider-only preverification. A successful check does not consume the challenge, a failed check counts toward the attempt limit, and final credential login verifies and consumes the same challenge. The response data exposes only valid and never returns proof, client fingerprint, target coordinates or debug material.",
+    security: [],
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: { $ref: "#/components/schemas/AdminCredentialSliderChallengeVerifyRequest" },
+        },
+      },
+    },
+    responses: {
+      "200": successResponse(
+        "Admin credential-auth slider challenge preverification",
+        apiResponse({ $ref: "#/components/schemas/AdminCredentialSliderChallengeVerifyData" }),
+      ),
+      ...publicAuthErrorResponses(),
+      "429": { $ref: "#/components/responses/TooManyRequests" },
+      "503": { $ref: "#/components/responses/ServiceUnavailable" },
+    },
+    "x-platform-capability": "credential-auth",
+    "x-platform-runtime-status": "deliverable-v1",
+    "x-platform-challenge-consumption": "final-login-only",
+  },
+};
+
 paths["/api/auth/sms-otp/start"] = {
   post: {
     tags: ["auth"],
@@ -2186,11 +2240,11 @@ const openapi = {
       Conflict: platformErrorResponse("Request conflicts with the current reveal state"),
       Gone: platformErrorResponse("Reveal challenge, factor or grant expired"),
       UnprocessableEntity: platformErrorResponse("Sensitive reveal verification failed"),
-      TooManyRequests: platformErrorResponse("Sensitive reveal rate limit exceeded"),
+      TooManyRequests: platformErrorResponse("Request rate limit exceeded"),
       InternalError: platformErrorResponse("Internal server error"),
       NotImplemented: platformErrorResponse("Identity provider resolver not configured"),
       BadGateway: platformErrorResponse("Identity provider unavailable"),
-      ServiceUnavailable: platformErrorResponse("Sensitive reveal runtime or protected value unavailable"),
+      ServiceUnavailable: platformErrorResponse("Required runtime unavailable"),
     },
     schemas: { ...schemas(), ...platformErrorOpenAPISchemas(errorContract) },
   },

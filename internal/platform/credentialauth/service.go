@@ -386,6 +386,14 @@ func (s *Service) CreateCredentialChallenge(ctx context.Context, input CreateCre
 }
 
 func (s *Service) VerifyCredentialChallenge(ctx context.Context, input CredentialChallengeProof) error {
+	return s.checkCredentialChallenge(ctx, input, true)
+}
+
+func (s *Service) CheckCredentialChallenge(ctx context.Context, input CredentialChallengeProof) error {
+	return s.checkCredentialChallenge(ctx, input, false)
+}
+
+func (s *Service) checkCredentialChallenge(ctx context.Context, input CredentialChallengeProof, consume bool) error {
 	if err := checkContext(ctx); err != nil {
 		return err
 	}
@@ -404,13 +412,13 @@ func (s *Service) VerifyCredentialChallenge(ctx context.Context, input Credentia
 		return err
 	}
 	if input.Kind != "" && input.Kind != challenge.Kind {
-		return s.rejectCredentialChallenge(ctx, challenge, input.MaxAttempts)
+		return s.rejectCredentialChallenge(ctx, challenge.ChallengeID, input.MaxAttempts)
 	}
 	if input.Purpose != "" && input.Purpose != challenge.Purpose {
-		return s.rejectCredentialChallenge(ctx, challenge, input.MaxAttempts)
+		return s.rejectCredentialChallenge(ctx, challenge.ChallengeID, input.MaxAttempts)
 	}
 	if challenge.ClientFingerprintHash != "" && input.ClientFingerprintHash != challenge.ClientFingerprintHash {
-		return s.rejectCredentialChallenge(ctx, challenge, input.MaxAttempts)
+		return s.rejectCredentialChallenge(ctx, challenge.ChallengeID, input.MaxAttempts)
 	}
 	answerDigest := strings.TrimSpace(input.AnswerDigest)
 	if answerDigest == "" && strings.TrimSpace(input.Proof) != "" {
@@ -420,7 +428,7 @@ func (s *Service) VerifyCredentialChallenge(ctx context.Context, input Credentia
 		normalizedProof, err := normalizeChallengeProof(challenge.Kind, input.Proof)
 		if err != nil {
 			if errors.Is(err, ErrInvalidInput) {
-				return s.rejectCredentialChallenge(ctx, challenge, input.MaxAttempts)
+				return s.rejectCredentialChallenge(ctx, challenge.ChallengeID, input.MaxAttempts)
 			}
 			return err
 		}
@@ -431,10 +439,20 @@ func (s *Service) VerifyCredentialChallenge(ctx context.Context, input Credentia
 		answerDigest = digest
 	}
 	if answerDigest == "" || !challengeAnswerDigestMatches(answerDigest, challenge.AnswerDigest) {
-		return s.rejectCredentialChallenge(ctx, challenge, input.MaxAttempts)
+		return s.rejectCredentialChallenge(ctx, challenge.ChallengeID, input.MaxAttempts)
 	}
-	challenge.UsedAt = now
-	return s.repository.UpsertCredentialChallenge(ctx, challenge)
+	if !consume {
+		return nil
+	}
+	transitionNow := s.now().UTC()
+	consumed, err := s.repository.ConsumeCredentialChallenge(ctx, challenge.ChallengeID, transitionNow)
+	if err != nil {
+		return err
+	}
+	if consumed {
+		return nil
+	}
+	return s.resolveCredentialChallengeTransition(ctx, challenge.ChallengeID, transitionNow)
 }
 
 func (s *Service) hashChallengeAnswer(kind ChallengeKind, purpose ChallengePurpose, challengeID string, proof string) (string, error) {
@@ -511,52 +529,81 @@ func (s *Service) VerifySMSOTP(ctx context.Context, input SMSOTPProof) error {
 		return err
 	}
 	if strings.TrimSpace(input.PhoneHash) != challenge.PhoneHash || strings.TrimSpace(input.CodeDigest) == "" || subtle.ConstantTimeCompare([]byte(strings.TrimSpace(input.CodeDigest)), []byte(challenge.CodeDigest)) != 1 {
-		return s.rejectSMSOTP(ctx, challenge, input.MaxAttempts)
+		return s.rejectSMSOTP(ctx, challenge.ChallengeID, input.MaxAttempts)
 	}
-	challenge.UsedAt = now
-	return s.repository.UpsertSMSOTPChallenge(ctx, challenge)
+	transitionNow := s.now().UTC()
+	consumed, err := s.repository.ConsumeSMSOTPChallenge(ctx, challenge.ChallengeID, transitionNow)
+	if err != nil {
+		return err
+	}
+	if consumed {
+		return nil
+	}
+	return s.resolveSMSOTPTransition(ctx, challenge.ChallengeID, transitionNow)
 }
 
-func (s *Service) rejectCredentialChallenge(ctx context.Context, challenge CredentialChallenge, maxAttempts int) error {
+func (s *Service) rejectCredentialChallenge(ctx context.Context, challengeID string, maxAttempts int) error {
 	if maxAttempts == 0 {
 		maxAttempts = DefaultMaxChallengeAttempts
 	}
 	if maxAttempts < 0 {
 		return fmt.Errorf("%w: max challenge attempts must not be negative", ErrInvalidInput)
 	}
-	challenge.Attempts++
-	if maxAttempts > 0 && challenge.Attempts >= maxAttempts {
-		challenge.Status = StatusDisabled
-		if err := s.repository.UpsertCredentialChallenge(ctx, challenge); err != nil {
-			return err
-		}
-		return ErrChallengeRejected
-	}
-	if err := s.repository.UpsertCredentialChallenge(ctx, challenge); err != nil {
+	transitionNow := s.now().UTC()
+	updated, err := s.repository.RecordCredentialChallengeFailure(ctx, challengeID, transitionNow, maxAttempts)
+	if err != nil {
 		return err
 	}
-	return ErrChallengeRejected
+	if updated {
+		return ErrChallengeRejected
+	}
+	return s.resolveCredentialChallengeTransition(ctx, challengeID, transitionNow)
 }
 
-func (s *Service) rejectSMSOTP(ctx context.Context, challenge SMSOTPChallenge, maxAttempts int) error {
+func (s *Service) rejectSMSOTP(ctx context.Context, challengeID string, maxAttempts int) error {
 	if maxAttempts == 0 {
 		maxAttempts = DefaultMaxSMSOTPAttempts
 	}
 	if maxAttempts < 0 {
 		return fmt.Errorf("%w: max sms otp attempts must not be negative", ErrInvalidInput)
 	}
-	challenge.Attempts++
-	if maxAttempts > 0 && challenge.Attempts >= maxAttempts {
-		challenge.Status = StatusDisabled
-		if err := s.repository.UpsertSMSOTPChallenge(ctx, challenge); err != nil {
-			return err
-		}
-		return ErrChallengeRejected
-	}
-	if err := s.repository.UpsertSMSOTPChallenge(ctx, challenge); err != nil {
+	transitionNow := s.now().UTC()
+	updated, err := s.repository.RecordSMSOTPChallengeFailure(ctx, challengeID, transitionNow, maxAttempts)
+	if err != nil {
 		return err
 	}
-	return ErrChallengeRejected
+	if updated {
+		return ErrChallengeRejected
+	}
+	return s.resolveSMSOTPTransition(ctx, challengeID, transitionNow)
+}
+
+func (s *Service) resolveCredentialChallengeTransition(ctx context.Context, challengeID string, now time.Time) error {
+	challenge, ok, err := s.repository.CredentialChallenge(ctx, challengeID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrChallengeRejected
+	}
+	if err := validateActiveChallenge(challenge.Status, challenge.UsedAt, challenge.ExpiresAt, now); err != nil {
+		return err
+	}
+	return fmt.Errorf("%w: active credential challenge transition did not change state", ErrRepositoryInvariant)
+}
+
+func (s *Service) resolveSMSOTPTransition(ctx context.Context, challengeID string, now time.Time) error {
+	challenge, ok, err := s.repository.SMSOTPChallenge(ctx, challengeID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrChallengeRejected
+	}
+	if err := validateActiveChallenge(challenge.Status, challenge.UsedAt, challenge.ExpiresAt, now); err != nil {
+		return err
+	}
+	return fmt.Errorf("%w: active sms otp transition did not change state", ErrRepositoryInvariant)
 }
 
 func validateActiveChallenge(status RecordStatus, usedAt time.Time, expiresAt time.Time, now time.Time) error {

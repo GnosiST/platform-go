@@ -209,6 +209,40 @@ func (r *GORMRepository) CredentialChallenge(ctx context.Context, challengeID st
 	return challengeFromGORM(row), true, nil
 }
 
+func (r *GORMRepository) ConsumeCredentialChallenge(ctx context.Context, challengeID string, now time.Time) (bool, error) {
+	if !r.ready(ctx) {
+		return false, fmt.Errorf("%w: repository is unavailable", ErrRepositoryInvariant)
+	}
+	challengeID, now, err := normalizedChallengeTransitionKey(challengeID, now)
+	if err != nil {
+		return false, err
+	}
+	result := r.db.WithContext(ctx).
+		Model(&gormCredentialChallenge{}).
+		Where("challenge_id = ? AND status = ? AND used_at IS NULL AND expires_at > ?", challengeID, string(StatusEnabled), now).
+		UpdateColumn("used_at", now)
+	return singleChallengeTransitionApplied(result)
+}
+
+func (r *GORMRepository) RecordCredentialChallengeFailure(ctx context.Context, challengeID string, now time.Time, maxAttempts int) (bool, error) {
+	if !r.ready(ctx) {
+		return false, fmt.Errorf("%w: repository is unavailable", ErrRepositoryInvariant)
+	}
+	challengeID, now, err := normalizedChallengeTransitionInput(challengeID, now, maxAttempts)
+	if err != nil {
+		return false, err
+	}
+	result := r.db.WithContext(ctx).Exec(
+		"UPDATE "+credentialChallengesTable+" SET status = CASE WHEN attempts + 1 >= ? THEN ? ELSE status END, attempts = attempts + 1 WHERE challenge_id = ? AND status = ? AND used_at IS NULL AND expires_at > ?",
+		maxAttempts,
+		string(StatusDisabled),
+		challengeID,
+		string(StatusEnabled),
+		now,
+	)
+	return singleChallengeTransitionApplied(result)
+}
+
 func (r *GORMRepository) UpsertSMSOTPChallenge(ctx context.Context, challenge SMSOTPChallenge) error {
 	if !r.ready(ctx) {
 		return fmt.Errorf("%w: repository is unavailable", ErrRepositoryInvariant)
@@ -238,6 +272,54 @@ func (r *GORMRepository) SMSOTPChallenge(ctx context.Context, challengeID string
 		return SMSOTPChallenge{}, false, err
 	}
 	return smsOTPFromGORM(row), true, nil
+}
+
+func (r *GORMRepository) ConsumeSMSOTPChallenge(ctx context.Context, challengeID string, now time.Time) (bool, error) {
+	if !r.ready(ctx) {
+		return false, fmt.Errorf("%w: repository is unavailable", ErrRepositoryInvariant)
+	}
+	challengeID, now, err := normalizedChallengeTransitionKey(challengeID, now)
+	if err != nil {
+		return false, err
+	}
+	result := r.db.WithContext(ctx).
+		Model(&gormSMSOTPChallenge{}).
+		Where("challenge_id = ? AND status = ? AND used_at IS NULL AND expires_at > ?", challengeID, string(StatusEnabled), now).
+		UpdateColumn("used_at", now)
+	return singleChallengeTransitionApplied(result)
+}
+
+func (r *GORMRepository) RecordSMSOTPChallengeFailure(ctx context.Context, challengeID string, now time.Time, maxAttempts int) (bool, error) {
+	if !r.ready(ctx) {
+		return false, fmt.Errorf("%w: repository is unavailable", ErrRepositoryInvariant)
+	}
+	challengeID, now, err := normalizedChallengeTransitionInput(challengeID, now, maxAttempts)
+	if err != nil {
+		return false, err
+	}
+	result := r.db.WithContext(ctx).Exec(
+		"UPDATE "+smsOTPChallengesTable+" SET status = CASE WHEN attempts + 1 >= ? THEN ? ELSE status END, attempts = attempts + 1 WHERE challenge_id = ? AND status = ? AND used_at IS NULL AND expires_at > ?",
+		maxAttempts,
+		string(StatusDisabled),
+		challengeID,
+		string(StatusEnabled),
+		now,
+	)
+	return singleChallengeTransitionApplied(result)
+}
+
+func singleChallengeTransitionApplied(result *gorm.DB) (bool, error) {
+	if result.Error != nil {
+		return false, result.Error
+	}
+	switch result.RowsAffected {
+	case 0:
+		return false, nil
+	case 1:
+		return true, nil
+	default:
+		return false, fmt.Errorf("%w: challenge transition affected %d rows", ErrRepositoryInvariant, result.RowsAffected)
+	}
 }
 
 func (r *GORMRepository) ready(ctx context.Context) bool {
