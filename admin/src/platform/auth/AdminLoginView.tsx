@@ -48,6 +48,7 @@ import {
 } from "../refine/authProvider";
 import { themeNames, type ThemeName } from "../theme";
 import { AdminFeedback } from "../ui";
+import { sliderTileXFromTrackPointer } from "./sliderChallengeGeometry";
 
 type AdminLoginViewProps = {
   language: Language;
@@ -713,7 +714,7 @@ function SliderChallengePayload({
   material: SliderChallengeMaterial;
   onProofChange: (proof: string) => void;
 }) {
-  const stageRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const activePointerRef = useRef<number | null>(null);
   const maxX = Math.max(0, material.imageWidth - material.tileWidth);
   const [tileX, setTileX] = useState(() => clampNumber(material.initialX, 0, maxX));
@@ -750,7 +751,7 @@ function SliderChallengePayload({
   }, [challenge.id, material.initialX, maxX, onProofChange]);
 
   const updateDraftFromPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const nextX = pointerTileX(event.clientX, stageRef.current, material, maxX);
+    const nextX = sliderTileXFromTrackPointer(event.clientX, trackRef.current?.getBoundingClientRect() ?? null, material, maxX);
     setTileX(nextX);
     setProofReady(false);
     onProofChange("");
@@ -823,7 +824,7 @@ function SliderChallengePayload({
     <div className="login-challenge-prompt login-slider-challenge">
       <div className="login-challenge-payload">
         <Typography.Text strong>{challenge.prompt || dictionary.loginChallengeProviderPrompt.replace("{kind}", challenge.kind)}</Typography.Text>
-        <div className="login-slider-stage" ref={stageRef} style={stageStyle}>
+        <div className="login-slider-stage" style={stageStyle}>
           <img alt={dictionary.loginChallengeSliderImageAlt} className="login-slider-background" src={material.masterImage} />
           <img alt={dictionary.loginChallengeSliderTileAlt} className="login-slider-tile" src={material.tileImage} style={tileStyle} />
         </div>
@@ -833,6 +834,7 @@ function SliderChallengePayload({
           aria-valuemin={0}
           aria-valuenow={Math.round(boundedTileX)}
           className={`login-slider-track${dragging ? " dragging" : ""}${proofReady ? " ready" : ""}`}
+          ref={trackRef}
           role="slider"
           style={trackStyle}
           tabIndex={0}
@@ -1008,14 +1010,6 @@ function sliderChallengeMaterial(challenge: CredentialChallengeStartResult | nul
     initialX: clampNumber(initialX, 0, imageWidth - tileWidth),
     tileY: clampNumber(challengeNumberParameter(challenge, "tileY"), 0, imageHeight - tileHeight),
   };
-}
-
-function pointerTileX(clientX: number, stage: HTMLDivElement | null, material: SliderChallengeMaterial, maxX: number) {
-  if (!stage) return 0;
-  const rect = stage.getBoundingClientRect();
-  if (rect.width <= 0) return 0;
-  const imageX = (clientX - rect.left) * (material.imageWidth / rect.width);
-  return clampNumber(imageX - material.tileWidth / 2, 0, maxX);
 }
 
 function formatSliderChallengeProof(proofX: number, proofY: number) {
