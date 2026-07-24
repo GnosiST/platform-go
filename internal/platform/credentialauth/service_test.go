@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"image"
+	"image/color"
 	"reflect"
 	"strconv"
 	"strings"
@@ -656,6 +658,46 @@ func TestDefaultGoCaptchaSlideOptionsUseWideLoginFrame(t *testing.T) {
 	}
 	if options.ImageWidth != 720 || options.ImageHeight != 160 || options.GraphSizeMin != 52 || options.GraphSizeMax != 60 {
 		t.Fatalf("default slide options = %+v, want 720x160 with 52-60px tile", options)
+	}
+}
+
+func TestGoCaptchaSlideBackgroundsUseEmbeddedArtworkAtRequestedSize(t *testing.T) {
+	backgrounds, err := goCaptchaSlideBackgrounds(360, 160)
+	if err != nil {
+		t.Fatalf("goCaptchaSlideBackgrounds() error = %v", err)
+	}
+	if len(backgrounds) < 2 {
+		t.Fatalf("goCaptchaSlideBackgrounds() count = %d, want at least two", len(backgrounds))
+	}
+	for index, background := range backgrounds {
+		if got := background.Bounds(); got != image.Rect(0, 0, 360, 160) {
+			t.Fatalf("background %d bounds = %v, want 360x160", index, got)
+		}
+	}
+}
+
+func TestGoCaptchaSlideGraphImagesDistinguishTargetAndTile(t *testing.T) {
+	graph := goCaptchaSlideGraphImages()[0]
+	targetInterior := color.NRGBAModel.Convert(graph.ShadowImage.At(goCaptchaSlideTileSourceSize/2, goCaptchaSlideTileSourceSize/2)).(color.NRGBA)
+	tileInterior := color.NRGBAModel.Convert(graph.OverlayImage.At(goCaptchaSlideTileSourceSize/2, goCaptchaSlideTileSourceSize/2)).(color.NRGBA)
+	if targetInterior.A < 140 {
+		t.Fatalf("target interior alpha = %d, want a clearly visible target", targetInterior.A)
+	}
+	if tileInterior.A > 64 {
+		t.Fatalf("tile overlay alpha = %d, want source artwork to remain visible", tileInterior.A)
+	}
+
+	maxTargetAlpha := uint8(0)
+	for y := 0; y < goCaptchaSlideTileSourceSize; y++ {
+		for x := 0; x < goCaptchaSlideTileSourceSize; x++ {
+			alpha := color.NRGBAModel.Convert(graph.ShadowImage.At(x, y)).(color.NRGBA).A
+			if alpha > maxTargetAlpha {
+				maxTargetAlpha = alpha
+			}
+		}
+	}
+	if maxTargetAlpha < 220 {
+		t.Fatalf("target outline alpha = %d, want a high-contrast outline", maxTargetAlpha)
 	}
 }
 

@@ -1,14 +1,18 @@
 package credentialauth
 
 import (
+	"bytes"
+	"embed"
 	"fmt"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"strconv"
 	"strings"
 
 	"github.com/wenlng/go-captcha/v2/base/option"
 	"github.com/wenlng/go-captcha/v2/slide"
+	"golang.org/x/image/draw"
 )
 
 const (
@@ -18,6 +22,14 @@ const (
 	defaultGoCaptchaSlideGraphSizeMax = 60
 	goCaptchaSlideTileSourceSize      = 96
 )
+
+//go:embed assets/slide/*.jpg
+var goCaptchaSlideBackgroundFS embed.FS
+
+var goCaptchaSlideBackgroundNames = []string{
+	"assets/slide/greenway.jpg",
+	"assets/slide/lakeside.jpg",
+}
 
 type GoCaptchaSlideOptions struct {
 	ImageWidth   int
@@ -31,7 +43,10 @@ func NewGoCaptchaSlideMaterialGenerator(options GoCaptchaSlideOptions) (func(Cha
 	if err != nil {
 		return nil, err
 	}
-	backgrounds := goCaptchaSlideBackgrounds(options.ImageWidth, options.ImageHeight)
+	backgrounds, err := goCaptchaSlideBackgrounds(options.ImageWidth, options.ImageHeight)
+	if err != nil {
+		return nil, err
+	}
 	graphs := goCaptchaSlideGraphImages()
 	return func(kind ChallengeKind) (ChallengeMaterial, error) {
 		kind = ChallengeKind(strings.TrimSpace(string(kind)))
@@ -116,42 +131,62 @@ func normalizeGoCaptchaSlideOptions(options GoCaptchaSlideOptions) (GoCaptchaSli
 	return options, nil
 }
 
-func goCaptchaSlideBackgrounds(width int, height int) []image.Image {
-	return []image.Image{
-		goCaptchaSlideBackground(width, height, color.NRGBA{R: 245, G: 248, B: 250, A: 255}, color.NRGBA{R: 187, G: 218, B: 214, A: 255}),
-		goCaptchaSlideBackground(width, height, color.NRGBA{R: 246, G: 244, B: 239, A: 255}, color.NRGBA{R: 204, G: 190, B: 170, A: 255}),
+func goCaptchaSlideBackgrounds(width int, height int) ([]image.Image, error) {
+	backgrounds := make([]image.Image, 0, len(goCaptchaSlideBackgroundNames))
+	for _, name := range goCaptchaSlideBackgroundNames {
+		data, err := goCaptchaSlideBackgroundFS.ReadFile(name)
+		if err != nil {
+			return nil, fmt.Errorf("load go-captcha slide background %q: %w", name, err)
+		}
+		decoded, err := jpeg.Decode(bytes.NewReader(data))
+		if err != nil {
+			return nil, fmt.Errorf("decode go-captcha slide background %q: %w", name, err)
+		}
+		backgrounds = append(backgrounds, resizeGoCaptchaSlideBackground(decoded, width, height))
 	}
+	return backgrounds, nil
 }
 
-func goCaptchaSlideBackground(width int, height int, first color.NRGBA, second color.NRGBA) image.Image {
-	img := image.NewNRGBA(image.Rect(0, 0, width, height))
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			ratio := float64(x+y) / float64(width+height)
-			base := blendNRGBA(first, second, ratio)
-			if (x/14+y/18)%2 == 0 {
-				base = blendNRGBA(base, color.NRGBA{R: 255, G: 255, B: 255, A: 255}, 0.18)
-			}
-			img.SetNRGBA(x, y, base)
-		}
+func resizeGoCaptchaSlideBackground(source image.Image, width int, height int) image.Image {
+	sourceBounds := source.Bounds()
+	crop := sourceBounds
+	if sourceBounds.Dx()*height > sourceBounds.Dy()*width {
+		cropWidth := sourceBounds.Dy() * width / height
+		crop.Min.X += (sourceBounds.Dx() - cropWidth) / 2
+		crop.Max.X = crop.Min.X + cropWidth
+	} else {
+		cropHeight := sourceBounds.Dx() * height / width
+		crop.Min.Y += (sourceBounds.Dy() - cropHeight) / 2
+		crop.Max.Y = crop.Min.Y + cropHeight
 	}
-	for x := -height; x < width; x += 36 {
-		for y := 0; y < height; y++ {
-			px := x + y/2
-			if px >= 0 && px < width {
-				img.SetNRGBA(px, y, color.NRGBA{R: 255, G: 255, B: 255, A: 70})
-			}
-		}
-	}
-	return img
+	destination := image.NewNRGBA(image.Rect(0, 0, width, height))
+	draw.CatmullRom.Scale(destination, destination.Bounds(), source, crop, draw.Src, nil)
+	return destination
 }
 
 func goCaptchaSlideGraphImages() []*slide.GraphImage {
 	return []*slide.GraphImage{{
-		OverlayImage: goCaptchaSlideTileImage(color.NRGBA{R: 255, G: 255, B: 255, A: 160}, color.NRGBA{R: 47, G: 82, B: 97, A: 170}),
-		ShadowImage:  goCaptchaSlideTileImage(color.NRGBA{R: 18, G: 32, B: 39, A: 90}, color.NRGBA{R: 18, G: 32, B: 39, A: 120}),
+		OverlayImage: goCaptchaSlideTileImage(color.NRGBA{R: 255, G: 255, B: 255, A: 36}, color.NRGBA{R: 255, G: 255, B: 255, A: 232}),
+		ShadowImage:  goCaptchaSlideTargetImage(),
 		MaskImage:    goCaptchaSlideMaskImage(),
 	}}
+}
+
+func goCaptchaSlideTargetImage() image.Image {
+	img := image.NewNRGBA(image.Rect(0, 0, goCaptchaSlideTileSourceSize, goCaptchaSlideTileSourceSize))
+	for y := 0; y < goCaptchaSlideTileSourceSize; y++ {
+		for x := 0; x < goCaptchaSlideTileSourceSize; x++ {
+			if !goCaptchaSlideShapeContains(x, y, goCaptchaSlideTileSourceSize) {
+				continue
+			}
+			if goCaptchaSlideShapeEdgeWidth(x, y, goCaptchaSlideTileSourceSize, 3) {
+				img.SetNRGBA(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 232})
+				continue
+			}
+			img.SetNRGBA(x, y, color.NRGBA{R: 9, G: 20, B: 30, A: 156})
+		}
+	}
+	return img
 }
 
 func goCaptchaSlideMaskImage() image.Image {
@@ -194,9 +229,15 @@ func goCaptchaSlideShapeContains(x int, y int, size int) bool {
 }
 
 func goCaptchaSlideShapeEdge(x int, y int, size int) bool {
-	for _, point := range [][2]int{{x - 1, y}, {x + 1, y}, {x, y - 1}, {x, y + 1}} {
-		if !goCaptchaSlideShapeContains(point[0], point[1], size) {
-			return true
+	return goCaptchaSlideShapeEdgeWidth(x, y, size, 1)
+}
+
+func goCaptchaSlideShapeEdgeWidth(x int, y int, size int, width int) bool {
+	for offsetY := -width; offsetY <= width; offsetY++ {
+		for offsetX := -width; offsetX <= width; offsetX++ {
+			if !goCaptchaSlideShapeContains(x+offsetX, y+offsetY, size) {
+				return true
+			}
 		}
 	}
 	return false
@@ -206,19 +247,4 @@ func insideCircle(x int, y int, cx int, cy int, radius int) bool {
 	dx := x - cx
 	dy := y - cy
 	return dx*dx+dy*dy <= radius*radius
-}
-
-func blendNRGBA(first color.NRGBA, second color.NRGBA, ratio float64) color.NRGBA {
-	if ratio < 0 {
-		ratio = 0
-	}
-	if ratio > 1 {
-		ratio = 1
-	}
-	return color.NRGBA{
-		R: uint8(float64(first.R)*(1-ratio) + float64(second.R)*ratio),
-		G: uint8(float64(first.G)*(1-ratio) + float64(second.G)*ratio),
-		B: uint8(float64(first.B)*(1-ratio) + float64(second.B)*ratio),
-		A: uint8(float64(first.A)*(1-ratio) + float64(second.A)*ratio),
-	}
 }
