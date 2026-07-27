@@ -35,7 +35,7 @@ jobs:
           cache: npm
           cache-dependency-path: admin/package-lock.json
       - run: npm ci --prefix admin
-      - run: npm audit --prefix admin --omit=dev --audit-level=high
+      - run: node scripts/run-node-production-audit.mjs --prefix admin
       - run: node scripts/validate-open-source-portability.mjs --strict --expect-module github.com/GnosiST/platform-go
       - run: node scripts/validate-external-capability-example.mjs
       - run: node --test scripts/*.test.mjs
@@ -50,7 +50,7 @@ jobs:
           cache: npm
           cache-dependency-path: admin/package-lock.json
       - run: npm ci --prefix admin
-      - run: npm audit --prefix admin --omit=dev --audit-level=high
+      - run: node scripts/run-node-production-audit.mjs --prefix admin
       - run: npm run build --prefix admin
   website:
     runs-on: ubuntu-latest
@@ -62,5 +62,5 @@ jobs:
           cache: npm
           cache-dependency-path: website/package-lock.json
       - run: npm ci --prefix website
-      - run: npm audit --prefix website --omit=dev --audit-level=high
+      - run: node scripts/run-node-production-audit.mjs --prefix website
       - run: npm run build --prefix website

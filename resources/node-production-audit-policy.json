@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "exceptions": [
+    {
+      "prefix": "admin",
+      "package": "react-router",
+      "advisory": "GHSA-qwww-vcr4-c8h2",
+      "expiresOn": "2026-08-10",
+      "rationale": "The Admin is a React 18 client-only SPA and does not enable React Server Components. React Router 8.3.0 requires React 19.2.7 and is outside the current @refinedev/react-router 2.x peer contract. Reassess when a compatible React Router 7 fix or Refine-supported Router 8 upgrade is available."
+    }
+  ]
+}

@@ -26,3 +26,10 @@ production baseline, disabled demo authentication and the documented migration
 and rollback runbooks. Review [docs/platform-auth.md](docs/platform-auth.md)
 and [docs/platform-deployment.md](docs/platform-deployment.md) before exposing
 the API.
+
+Node production dependency audits run through
+`scripts/run-node-production-audit.mjs`. Any temporary exception must name one
+package and one GHSA in `resources/node-production-audit-policy.json`, include
+a concrete rationale and expiry date, and remain limited to a runtime mode the
+repository does not use. Expired, unknown, high or critical advisories still
+fail CI; do not lower the audit threshold to bypass them.

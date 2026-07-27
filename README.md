@@ -17,6 +17,8 @@
 
 业务系统通常需要同一组底层机制：身份、会话、RBAC、组织范围、资源管理、审计、文件、合同和生产预检。`platform-go` 把这些机制做成可组合的能力边界，而不把订单、客户、菜单、工作流或领域数据写进核心。
 
+`platform-go` is not a business migration target：参考项目只用于提炼可复用管理模式，具体业务数据、流程与页面必须留在下游能力中。
+
 适合正在构建长期运行 Go 服务、希望让后端与 Admin 合同同步、并需要保留生产安全与迁移边界的团队。不适合把它当作开箱即用的垂直行业系统，或在运行时下载和热安装任意业务插件。
 
 | 你得到什么 | 核心约束 |
@@ -105,6 +107,8 @@ node scripts/validate-external-capability-example.mjs
 | default-off | 数据源注册、读写路由、分片、联邦只读、XA、Outbox/RabbitMQ、搜索投影 | 合同已实现，但需要下游组合根、受控环境和推广证据 |
 | 未支持 | Oracle、KingbaseES、运行时热插拔、远程拉取源码、通用破坏性卸载 | 不应在产品承诺或部署方案中假设可用 |
 
+插件管理 v1 采用 restart-required desired-state 模型：声明能力集合、重新生成合同、手动重启，并在重启后验证禁用 surface 已消失；它不是运行时插件市场。
+
 当前治理快照为 **67 total / 67 implemented / 0 controlled unfinished**。`open-source-portability`、`public-docs-community`、`public-docs-site` 和 `github-release-publication` 均为 `implemented`。实现受控合同不等于默认生产启用，尤其是多数据源、消息与搜索集成仍需要单独的环境与外部证据包。详见[支持矩阵](https://gnosist.github.io/platform-go/docs/support-matrix)。
 
 <details>
@@ -120,6 +124,39 @@ The persistent full-scope task graph is implemented. The default release retains
 - 登录方式由 `GET /api/auth/providers` 发现；客户端不得硬编码全部提供方，也不得显示开发调试验证码。
 - 生产需要独立密钥、持久化 Admin/session/lifecycle 存储、Redis、可信 HTTPS 边缘和 `PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true`。
 - 密钥轮换、数据库迁移、备份恢复、外部短信投递、消息和搜索推广都必须有审阅、回滚与红脱敏证据。
+
+Production baseline: set `PLATFORM_RUNTIME_ENV=production`，按 `docs/platform-deployment.md` 准备私有配置，并在变更前查看可执行预检：
+
+```bash
+node scripts/run-platform-production-preflight.mjs --list
+```
+
+能力启停需要更新 desired state、重新生成合同并手动重启服务；平台不提供运行时热安装或破坏性卸载。
+
+<details>
+<summary>生产配置与运维速查</summary>
+
+生产环境变量按责任分组，值和限制以 `docs/platform-deployment.md` 为准：
+
+| 边界 | 必需或受控配置 |
+| --- | --- |
+| 运行与边缘 | `PLATFORM_RUNTIME_ENV`、`PLATFORM_PUBLIC_BASE_URL`、`PLATFORM_TRUSTED_PROXIES`、`PLATFORM_EDGE_TRUSTED_PROXY`、`PLATFORM_HTTP_MAX_BODY_BYTES` |
+| 身份与数据保护 | `PLATFORM_JWT_SECRET`、`PLATFORM_DATA_KEY_PROVIDER`、`PLATFORM_RATE_LIMIT_HMAC_KEY`、`PLATFORM_DISABLE_DEMO_AUTH_PROVIDER` |
+| 持久化 | `PLATFORM_ADMIN_RESOURCE_DRIVER`、`PLATFORM_ADMIN_RESOURCE_DSN`、`PLATFORM_SESSION_DRIVER`、`PLATFORM_SESSION_DSN`、`PLATFORM_LIFECYCLE_HISTORY_DRIVER`、`PLATFORM_LIFECYCLE_HISTORY_DSN` |
+| 缓存 | `PLATFORM_CACHE_DRIVER`、`PLATFORM_REDIS_ADDR` |
+| 条件式保留任务 | `PLATFORM_RETENTION_RUNNER_ENABLED`、`PLATFORM_RETENTION_RUNNER_INTERVAL`、`PLATFORM_RETENTION_RUNNER_BATCH_SIZE`、`PLATFORM_RETENTION_RUNNER_MAX_RETRIES` |
+
+`productionEnvAudit` 使用私有环境文件执行严格校验；`config-backup-export`、`config-import-restore`、`database-migration` 和 `token-rotation` 都是独立的审阅操作策略，不是普通启动参数。
+
+Deployment scheme A is selected as the default：Admin 静态资源与长驻 Gin API 通过受信边缘组合，Vercel 只作为可选 Admin 静态托管。变更前运行：
+
+```bash
+node scripts/validate-platform-deployment-topology.mjs
+node scripts/validate-platform-foundation-alignment.mjs
+node scripts/validate-platform-production-env.mjs --env-file <private-production-env> --strict-secrets
+```
+
+</details>
 
 从[认证与授权](https://gnosist.github.io/platform-go/docs/authentication)开始；上线前逐项完成[生产检查清单](https://gnosist.github.io/platform-go/docs/production-checklist)。
 

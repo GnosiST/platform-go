@@ -17,6 +17,8 @@
 
 Business systems repeatedly need the same mechanisms: identity, sessions, RBAC, organizational scope, resource management, audit, file handling, contracts, and production preflight. `platform-go` makes those mechanisms composable boundaries without embedding orders, customers, menus, workflows, or domain data in core.
 
+`platform-go` is not a business migration target. Reference projects inform reusable management patterns only; concrete data, workflows, and pages remain in downstream capabilities.
+
 It fits teams building long-running Go services that want Admin and backend contracts to move together while preserving production security and migration boundaries. It is not a turnkey vertical product, nor a runtime marketplace for downloading and hot-installing arbitrary business plugins.
 
 | What you get | Core constraint |
@@ -105,6 +107,8 @@ The full tutorial includes a composition root and acceptance checklist: [busines
 | Default-off | Datasource registry, read/write routing, sharding, read-only federation, XA, Outbox/RabbitMQ, search projection | Contracts are implemented but need a downstream composition root, controlled environment, and promotion evidence |
 | Unsupported | Oracle, KingbaseES, runtime hot-plugging, remote source download, generic destructive uninstall | Do not assume availability in product or deployment commitments |
 
+Plugin management v1 uses a restart-required desired-state model: declare the capability set, regenerate contracts, restart manually, and verify disabled surfaces disappear after restart. It is not a runtime plugin marketplace.
+
 The current governance snapshot is **67 total / 67 implemented / 0 controlled unfinished**. `open-source-portability`, `public-docs-community`, `public-docs-site`, and `github-release-publication` are `implemented`. An implemented controlled contract is not the same as default production enablement, especially for multi-datasource, message, and search integrations. See the [support matrix](https://gnosist.github.io/platform-go/en/docs/support-matrix).
 
 <details>
@@ -120,6 +124,39 @@ The persistent full-scope task graph is implemented. The default release retains
 - Login modes are discovered from `GET /api/auth/providers`; clients must not hard-code all providers or render debug verification codes.
 - Production requires independent keys, durable Admin/session/lifecycle stores, Redis, a trusted HTTPS edge, and `PLATFORM_DISABLE_DEMO_AUTH_PROVIDER=true`.
 - Key rotation, database migration, backup recovery, external SMS delivery, message, and search promotion each require review, rollback, and redacted evidence.
+
+Production baseline: set `PLATFORM_RUNTIME_ENV=production`, prepare private configuration through `docs/platform-deployment.md`, and list the non-mutating preflight commands before making changes:
+
+```bash
+node scripts/run-platform-production-preflight.mjs --list
+```
+
+Capability changes update desired state, regenerate contracts, and take effect after manually restarting the service. The platform does not provide runtime hot installation or destructive uninstall.
+
+<details>
+<summary>Production configuration and operations quick reference</summary>
+
+Production environment variables are grouped by responsibility. Values and constraints remain authoritative in `docs/platform-deployment.md`:
+
+| Boundary | Required or controlled configuration |
+| --- | --- |
+| Runtime and edge | `PLATFORM_RUNTIME_ENV`, `PLATFORM_PUBLIC_BASE_URL`, `PLATFORM_TRUSTED_PROXIES`, `PLATFORM_EDGE_TRUSTED_PROXY`, `PLATFORM_HTTP_MAX_BODY_BYTES` |
+| Identity and data protection | `PLATFORM_JWT_SECRET`, `PLATFORM_DATA_KEY_PROVIDER`, `PLATFORM_RATE_LIMIT_HMAC_KEY`, `PLATFORM_DISABLE_DEMO_AUTH_PROVIDER` |
+| Persistence | `PLATFORM_ADMIN_RESOURCE_DRIVER`, `PLATFORM_ADMIN_RESOURCE_DSN`, `PLATFORM_SESSION_DRIVER`, `PLATFORM_SESSION_DSN`, `PLATFORM_LIFECYCLE_HISTORY_DRIVER`, `PLATFORM_LIFECYCLE_HISTORY_DSN` |
+| Cache | `PLATFORM_CACHE_DRIVER`, `PLATFORM_REDIS_ADDR` |
+| Conditional retention runner | `PLATFORM_RETENTION_RUNNER_ENABLED`, `PLATFORM_RETENTION_RUNNER_INTERVAL`, `PLATFORM_RETENTION_RUNNER_BATCH_SIZE`, `PLATFORM_RETENTION_RUNNER_MAX_RETRIES` |
+
+`productionEnvAudit` strictly validates a private environment file. `config-backup-export`, `config-import-restore`, `database-migration`, and `token-rotation` are separate reviewed operation policies, not ordinary startup switches.
+
+Deployment scheme A is selected as the default: static Admin assets and the long-lived Gin API are composed behind a trusted edge; Vercel remains optional Admin-only static hosting. Run before changes:
+
+```bash
+node scripts/validate-platform-deployment-topology.mjs
+node scripts/validate-platform-foundation-alignment.mjs
+node scripts/validate-platform-production-env.mjs --env-file <private-production-env> --strict-secrets
+```
+
+</details>
 
 Start with [authentication and authorization](https://gnosist.github.io/platform-go/en/docs/authentication) and complete the [production checklist](https://gnosist.github.io/platform-go/en/docs/production-checklist) before launch.
 
