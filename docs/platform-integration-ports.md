@@ -1,6 +1,6 @@
 # Optional Integration Ports
 
-`platform-go` exposes business-neutral ports for a message bus, search indexing and search reads. The stock process keeps every port disabled. RabbitMQ and the internal GORM Outbox are available as default-off building blocks; Elasticsearch, OpenSearch and a search projection are not bundled.
+`platform-go` exposes business-neutral ports for a message bus, search indexing and search reads. The stock process keeps every port disabled. RabbitMQ, the internal GORM Outbox and the asynchronous search-projection runtime are available as default-off building blocks; concrete Elasticsearch and OpenSearch adapters are not bundled.
 
 ## Runtime Contract
 
@@ -29,9 +29,9 @@ At startup the stock process logs each port's `enabled`, `state` and canonical a
 
 Capability profiles such as `notification` and `job` do not implicitly enable an external integration. A downstream product must opt in through configuration and composition together.
 
-## Deferred Work
+## Composition And Promotion Boundary
 
-The internal Outbox implementation is documented in [Transactional Outbox](platform-outbox.md). It provides a caller-owned GORM transaction append boundary, leased dispatch, redacted failure records, retry/dead-letter state and auditable replay. It is not automatically attached to a business mutation, worker loop or the stock API process. RabbitMQ has a default-off adapter and an opt-in local certification smoke test; production promotion still requires successful controlled-environment evidence. Search projection and persisted search engine queries remain separate completion nodes.
+The internal Outbox implementation is documented in [Transactional Outbox](platform-outbox.md). It provides a caller-owned GORM transaction append boundary, leased dispatch, redacted failure records, retry/dead-letter state and auditable replay. It is not automatically attached to a business mutation, worker loop or the stock API process. RabbitMQ has a default-off adapter and an opt-in local certification smoke test; production promotion still requires successful controlled-environment evidence. The search-projection runtime consumes registered Outbox mappings and supports bounded rebuilds, but the stock API starts no worker or external search adapter. A downstream composition root and controlled delivery, replay, rebuild, recovery and rollback evidence remain required before production enablement.
 
 Focused verification:
 

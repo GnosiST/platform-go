@@ -5,6 +5,8 @@ title: Development guide
 
 # Development guide
 
+## Prepare the environment
+
 ```bash
 rtk go test ./...
 rtk npm --prefix admin install
@@ -12,6 +14,8 @@ rtk npm --prefix admin run dev
 ```
 
 The API defaults to `http://127.0.0.1:9200`; Admin defaults to `http://127.0.0.1:9202`.
+
+## Add a capability
 
 Platform capabilities may live under `internal/platform`; concrete business
 capabilities should start in a downstream repository or downstream composition
@@ -31,13 +35,6 @@ example directory:
 
 ```bash
 rtk node scripts/validate-external-capability-example.mjs
-rtk node scripts/validate-admin-resources.mjs
-rtk node scripts/validate-platform-plugin-management-v1.mjs
-rtk node scripts/validate-platform-capability-contracts.mjs
-rtk node scripts/validate-platform-capability-profiles.mjs
-rtk node scripts/validate-platform-capability-operation-policy.mjs
-rtk node scripts/validate-platform-foundation-alignment.mjs
-rtk npm --prefix website run build
 ```
 
 Plugin enable/disable is restart-required in v1: change a profile, `PLATFORM_CAPABILITIES`, `PLATFORM_CAPABILITY_LOCK_FILE` or downstream composition root, regenerate contracts and restart the API manually. v1 does not support WebSocket hot updates, remote repository pull or destructive uninstall.
@@ -48,3 +45,21 @@ For local credential login work, start from the `credential-auth` contract. Do n
 rtk node scripts/validate-platform-credential-auth-v1.mjs
 rtk node --test scripts/platform-credential-auth-v1.test.mjs
 ```
+
+## Common checks
+
+```bash
+rtk node scripts/validate-external-capability-example.mjs
+rtk node scripts/validate-admin-resources.mjs
+rtk node scripts/validate-platform-plugin-management-v1.mjs
+rtk node scripts/validate-platform-credential-auth-v1.mjs
+rtk node scripts/validate-platform-capability-contracts.mjs
+rtk node scripts/validate-platform-capability-profiles.mjs
+rtk node scripts/validate-platform-capability-operation-policy.mjs
+rtk node scripts/validate-platform-admin-api-boundary.mjs
+rtk node scripts/validate-platform-foundation-alignment.mjs
+rtk npm --prefix admin run build
+rtk npm --prefix website run build
+```
+
+Shared Admin components use the platform UI wrappers and update Chinese and English i18n keys together. Business code must not concatenate SQL or bypass authorization middleware.

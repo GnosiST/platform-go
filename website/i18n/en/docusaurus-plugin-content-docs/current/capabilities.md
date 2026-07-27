@@ -1,4 +1,5 @@
 ---
+sidebar_position: 2
 title: Capabilities
 ---
 
@@ -6,7 +7,15 @@ title: Capabilities
 
 Capabilities are declared through versioned manifests. A manifest owns its resources, routes, permissions, lifecycle hooks and optional UI registration without coupling business packages to the Admin shell.
 
-The default foundation includes identity and tenancy, organization units, roles, permissions, menus, audit, sessions, file storage and production readiness contracts. Optional capabilities are enabled through explicit profiles and remain disabled by default.
+See the repository's [capability development guide](https://github.com/GnosiST/platform-go/blob/main/docs/platform-capability-development.md).
+
+## Default capabilities
+
+Identity, tenancy, organization, roles, role groups, menus, resources, audit, sessions, file storage and branding form the default foundation. Role groups classify roles and define governance boundaries; they do not grant permissions directly.
+
+## Optional profiles
+
+Personnel, notifications, jobs, enterprise governance and production Admin OIDC are enabled through explicit profiles. Multi-datasource routing, tenant placement, read/write routing, sharding, federation, XA, MQ and search projection have independent controlled contracts, but remain disabled by default and still require downstream composition, environment certification and external evidence for promotion.
 
 ## Install, Disable And Uninstall Boundary
 
@@ -21,6 +30,8 @@ Plugin management v1 uses a restart-required desired-state model. Declare the de
 `credential-auth` is the local credential authentication capability for username/password, phone/password, email/password and phone/SMS OTP login. Deliverable v1 provides provider discovery, GORM persistence, Argon2id, application-layer encrypted secret transport, digest-only CAPTCHA/slider challenges, password change/reset, audit and rate-limit gates; `GET /api/auth/providers`, `POST /api/auth/challenges`, slider-only non-consuming `POST /api/auth/challenges/verify`, `POST /api/auth/sms-otp/start` and `POST /api/auth/login` preserve demo/OIDC compatibility. It still does not enable the legacy `password` provider kind and is not production-complete. Passwords, OTPs, challenge answers and proofs must not be stored in generic `Record.Values`. SMS delivery belongs to the `notification` SMS channel: Aliyun/Tencent support dry-run and explicitly enabled SDK live send, while `mock-local` remains development/test only. Production still needs approved-account delivery evidence and independent promotion approval; SMTP and WeChat external-provider adapters are not implemented.
 
 New business projects should keep concrete business capabilities in a downstream repository or composition root. Only cross-domain reusable behavior should become a platform profile.
+
+## Registration checks
 
 ```bash
 rtk node scripts/validate-platform-plugin-management-v1.mjs

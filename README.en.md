@@ -143,7 +143,7 @@ GET /api/admin/policy-reviews/export
 | Integrate a domain | [Business integration](https://gnosist.github.io/platform-go/en/docs/business-integration) · [Admin and resources](https://gnosist.github.io/platform-go/en/docs/development) |
 | Add authentication | [Authentication](https://gnosist.github.io/platform-go/en/docs/authentication) · [API and contracts](https://gnosist.github.io/platform-go/en/docs/api) |
 | Run in production | [Deployment](https://gnosist.github.io/platform-go/en/docs/deployment) · [Production checklist](https://gnosist.github.io/platform-go/en/docs/production-checklist) · [Operations](https://gnosist.github.io/platform-go/en/docs/operations) |
-| Contribute and govern | [Human + AI protocol](https://gnosist.github.io/platform-go/en/docs/human-ai-development) · [Security](https://gnosist.github.io/platform-go/en/docs/security) |
+| Contribute and govern | [Human + AI development protocol](https://gnosist.github.io/platform-go/en/docs/human-ai-development) · [Security](https://gnosist.github.io/platform-go/en/docs/security) |
 
 ## Version, contribution, and license
 
